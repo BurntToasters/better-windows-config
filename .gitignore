@@ -1,0 +1,20 @@
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+
+# Publish, installer, and release output
+publish/
+dist/
+artifacts/
+
+# Node
+node_modules/
+
+# Local secrets
+.env
+*.key
+*.pfx

@@ -1,0 +1,23 @@
+<Window
+    x:Class="Bwc.Spike.Interop.ModalDialogWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:AutomationProperties="using:Microsoft.UI.Xaml.Automation">
+
+    <Grid x:Name="DialogRoot" Padding="16" RowSpacing="12" RowDefinitions="Auto,Auto,Auto,*,Auto">
+        <TextBlock Grid.Row="0" Text="Pick a value, then OK or Cancel." />
+        <ComboBox x:Name="Picker" Grid.Row="1" Width="260" SelectedIndex="0"
+                  AutomationProperties.AutomationId="ModalCombo"
+                  SelectionChanged="OnSelectionChanged">
+            <ComboBoxItem Content="Alpha" />
+            <ComboBoxItem Content="Beta" />
+            <ComboBoxItem Content="Gamma" />
+        </ComboBox>
+        <TextBlock Grid.Row="2" x:Name="SelectionText" Text="Selected: Alpha"
+                   AutomationProperties.AutomationId="ModalSelection" />
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button x:Name="OkButton" Content="OK" Click="OnOk" AutomationProperties.AutomationId="ModalOk" />
+            <Button x:Name="CancelButton" Content="Cancel" Click="OnCancel" AutomationProperties.AutomationId="ModalCancel" />
+        </StackPanel>
+    </Grid>
+</Window>

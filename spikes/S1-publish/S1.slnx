@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Bwc.Spike.UI/Bwc.Spike.UI.csproj" />
+  <Project Path="Bwc.Spike.Hub/Bwc.Spike.Hub.csproj" />
+  <Project Path="Bwc.Spike.Tool/Bwc.Spike.Tool.csproj" />
+</Solution>

@@ -1,0 +1,4 @@
+RegOpenKeyEx
+RegCloseKey
+RegQueryInfoKey
+RegEnumKeyEx
