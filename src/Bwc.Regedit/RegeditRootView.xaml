@@ -1,0 +1,10 @@
+<UserControl
+    x:Class="Bwc.Regedit.RegeditRootView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Padding="12">
+        <TextBlock x:Name="TitleText" AutomationProperties.AutomationId="RegeditRoot" />
+    </Grid>
+
+</UserControl>

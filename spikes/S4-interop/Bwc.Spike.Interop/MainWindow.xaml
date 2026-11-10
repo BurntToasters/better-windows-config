@@ -1,0 +1,58 @@
+<Window
+    x:Class="Bwc.Spike.Interop.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:AutomationProperties="using:Microsoft.UI.Xaml.Automation">
+
+    <Grid x:Name="RootGrid" RowDefinitions="Auto,*">
+        <MenuBar x:Name="Menu" Grid.Row="0">
+            <MenuBarItem x:Name="FileItem" Title="File" AccessKey="F">
+                <MenuFlyoutItem Text="New" />
+                <MenuFlyoutItem Text="Open..." />
+                <MenuFlyoutItem Text="Save..." />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Exit" />
+            </MenuBarItem>
+            <MenuBarItem x:Name="EditItem" Title="Edit" AccessKey="E">
+                <MenuFlyoutItem Text="Undo" />
+                <MenuFlyoutItem Text="Cut" />
+                <MenuFlyoutItem Text="Copy" />
+                <MenuFlyoutItem Text="Paste" />
+            </MenuBarItem>
+            <MenuBarItem x:Name="ViewItem" Title="View" AccessKey="V">
+                <MenuFlyoutItem Text="Refresh" />
+                <MenuFlyoutItem Text="Details" />
+            </MenuBarItem>
+        </MenuBar>
+
+        <StackPanel Grid.Row="1" Padding="16" Spacing="8">
+            <Button x:Name="OpenModalButton" Content="Open Modal" Click="OnOpenModal"
+                    AutomationProperties.AutomationId="OpenModalButton" />
+            <Button Content="Open File" Click="OnOpenFile"
+                    AutomationProperties.AutomationId="OpenFileButton" />
+            <Button Content="Save File" Click="OnSaveFile"
+                    AutomationProperties.AutomationId="SaveFileButton" />
+            <Button Content="Permissions" Click="OnPermissions"
+                    AutomationProperties.AutomationId="PermissionsButton" />
+
+            <!-- Control: the same ComboBox in the main (non-modal) window, to tell modal-specific failures apart. -->
+            <ComboBox x:Name="MainCombo" Width="260" Margin="0,4,0,0" SelectedIndex="0"
+                      AutomationProperties.AutomationId="MainCombo"
+                      SelectionChanged="OnMainComboChanged">
+                <ComboBoxItem Content="Alpha" />
+                <ComboBoxItem Content="Beta" />
+                <ComboBoxItem Content="Gamma" />
+            </ComboBox>
+            <TextBlock x:Name="MainComboText" Text="Main combo: Alpha" AutomationProperties.AutomationId="MainComboText" />
+
+            <TextBlock Text="Menu state:" Margin="0,8,0,0" />
+            <TextBlock x:Name="MenuStateText" Text="Idle" AutomationProperties.AutomationId="MenuState" />
+            <TextBlock Text="File result:" Margin="0,8,0,0" />
+            <TextBlock x:Name="FileResultText" Text="(none)" AutomationProperties.AutomationId="FileResult" />
+            <TextBlock Text="Modal result:" Margin="0,8,0,0" />
+            <TextBlock x:Name="ModalResultText" Text="(none)" AutomationProperties.AutomationId="ModalResult" />
+            <TextBlock Text="Permissions result:" Margin="0,8,0,0" />
+            <TextBlock x:Name="PermissionsResultText" Text="(none)" AutomationProperties.AutomationId="PermissionsResult" />
+        </StackPanel>
+    </Grid>
+</Window>

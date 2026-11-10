@@ -1,0 +1,106 @@
+<UserControl
+    x:Class="Bwc.Spike.Tree.DenseTree"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Bwc.Spike.Tree"
+    xmlns:controls="using:Microsoft.UI.Xaml.Controls"
+    IsTabStop="True"
+    KeyDown="OnKeyDown"
+    CharacterReceived="OnCharacterReceived">
+
+    <UserControl.Resources>
+        <!--
+          One row = one ItemsRepeater element. The root Grid is the element itself (no ListViewItem wrapper),
+          so its Height is exactly the row height: no MinHeight, Padding or Margin to strip.
+        -->
+        <DataTemplate x:Key="RowTemplate" x:DataType="local:TreeRow">
+            <Grid
+                Tag="row"
+                Height="{x:Bind RowHeight}"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Top"
+                Margin="0"
+                Padding="0"
+                Background="{x:Bind SelectionBrush, Mode=OneWay}"
+                Tapped="OnRowTapped">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Stretch" Spacing="0">
+                    <!-- Indent: depth * indentPx -->
+                    <Border Width="{x:Bind IndentWidth}" Background="Transparent" />
+
+                    <!-- Expander box (classic +/- square). The 13px hit area stays even on leaves so labels align. -->
+                    <Grid Width="13" Background="Transparent" Tapped="OnExpanderTapped">
+                        <Grid
+                            Width="9"
+                            Height="9"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Visibility="{x:Bind ExpanderVisibility, Mode=OneWay}">
+                            <Border
+                                BorderThickness="1"
+                                BorderBrush="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <Rectangle
+                                Width="5"
+                                Height="1"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Fill="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <Rectangle
+                                Width="1"
+                                Height="5"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Fill="{ThemeResource TextFillColorPrimaryBrush}"
+                                Visibility="{x:Bind PlusBarVisibility, Mode=OneWay}" />
+                        </Grid>
+                    </Grid>
+
+                    <Border Width="3" Background="Transparent" />
+
+                    <!-- 16x16 folder placeholder -->
+                    <Grid Width="16" Height="16" VerticalAlignment="Center">
+                        <Rectangle
+                            Width="14"
+                            Height="11"
+                            VerticalAlignment="Bottom"
+                            RadiusX="1"
+                            RadiusY="1"
+                            Fill="#FFF2C14E"
+                            Stroke="#FFB7871C"
+                            StrokeThickness="1" />
+                    </Grid>
+
+                    <Border Width="4" Background="Transparent" />
+
+                    <TextBlock
+                        Text="{x:Bind Label, Mode=OneTime}"
+                        FontFamily="Segoe UI"
+                        FontSize="{x:Bind FontSize, Mode=OneTime}"
+                        Foreground="{x:Bind LabelBrush, Mode=OneWay}"
+                        VerticalAlignment="Center"
+                        TextWrapping="NoWrap"
+                        Margin="0"
+                        Padding="0" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <ScrollViewer
+            x:Name="Scroller"
+            Padding="0"
+            HorizontalScrollMode="Disabled"
+            HorizontalScrollBarVisibility="Disabled"
+            VerticalScrollMode="Enabled"
+            VerticalScrollBarVisibility="Auto"
+            IsTabStop="False">
+            <controls:ItemsRepeater
+                x:Name="Repeater"
+                ItemTemplate="{StaticResource RowTemplate}">
+                <controls:ItemsRepeater.Layout>
+                    <controls:StackLayout Orientation="Vertical" Spacing="0" />
+                </controls:ItemsRepeater.Layout>
+            </controls:ItemsRepeater>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

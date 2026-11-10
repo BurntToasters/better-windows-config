@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Bwc.Oracle.Resources</RootNamespace>
+    <AssemblyName>Bwc.Oracle.Resources</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Dumps classic regedit.exe and regedit.exe.mui UI resources into a deterministic JSON and Markdown oracle.</Description>
+  </PropertyGroup>
+
+</Project>
