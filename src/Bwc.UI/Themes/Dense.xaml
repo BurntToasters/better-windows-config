@@ -5,6 +5,8 @@
     <!--
         Classic regedit metrics in DIPs, from docs/parity/oracle/regedit-metrics.json.
         That capture ran at 200% scale (192 DPI), so each pixel value is halved.
+        Bwc.UI.Theme.DenseMetrics holds the same defaults; the shell applies the runtime
+        values in code so a font change recomputes the row heights.
     -->
     <x:Double x:Key="BwcFontSize">12</x:Double>
     <x:Double x:Key="BwcTreeRowHeight">17</x:Double>
@@ -12,5 +14,46 @@
     <x:Double x:Key="BwcHeaderHeight">20</x:Double>
     <x:Double x:Key="BwcMenuBarHeight">19</x:Double>
     <x:Double x:Key="BwcTreeIndent">16</x:Double>
+    <x:Double x:Key="BwcTreePaneWidth">216</x:Double>
+
+    <!-- Keyed styles: ordinary controls elsewhere keep the Fluent defaults. -->
+    <Style x:Key="BwcMenuBarStyle" TargetType="MenuBar">
+        <Setter Property="Height" Value="{StaticResource BwcMenuBarHeight}" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FontSize" Value="{StaticResource BwcFontSize}" />
+    </Style>
+
+    <Style x:Key="BwcMenuBarItemStyle" TargetType="MenuBarItem">
+        <Setter Property="Height" Value="{StaticResource BwcMenuBarHeight}" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="6,0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="FontSize" Value="{StaticResource BwcFontSize}" />
+    </Style>
+
+    <Style x:Key="BwcMenuFlyoutItemStyle" TargetType="MenuFlyoutItem">
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="4,2" />
+        <Setter Property="FontSize" Value="{StaticResource BwcFontSize}" />
+    </Style>
+
+    <Style x:Key="BwcMenuFlyoutSeparatorStyle" TargetType="MenuFlyoutSeparator">
+        <Setter Property="Height" Value="1" />
+        <Setter Property="Margin" Value="0" />
+    </Style>
+
+    <!--
+        Address bar only. This is keyed so a normal TextBox in another view keeps its
+        Fluent height and padding.
+    -->
+    <Style x:Key="BwcAddressBarTextBoxStyle" TargetType="TextBox">
+        <Setter Property="Height" Value="{StaticResource BwcMenuBarHeight}" />
+        <Setter Property="MinHeight" Value="{StaticResource BwcMenuBarHeight}" />
+        <Setter Property="Padding" Value="2,1" />
+        <Setter Property="FontSize" Value="{StaticResource BwcFontSize}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
 
 </ResourceDictionary>

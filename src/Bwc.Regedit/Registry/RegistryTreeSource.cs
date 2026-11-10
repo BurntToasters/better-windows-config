@@ -1,0 +1,184 @@
+using Bwc.Core;
+using Bwc.Registry;
+using Bwc.UI.Tree;
+
+namespace Bwc.Regedit.Registry;
+
+/// <summary>
+/// Lazy read-only tree source over the live registry. Construction is free: the virtual
+/// <c>Computer</c> node and its five roots are created without touching the registry, and every
+/// child list is enumerated on the thread pool when a node is expanded or restored.
+/// </summary>
+public sealed class RegistryTreeSource : ITreeNodeSource
+{
+    private static readonly StringComparer NameComparer = StringComparer.CurrentCultureIgnoreCase;
+    private static readonly IReadOnlyList<TreeNode> NoChildren = Array.Empty<TreeNode>();
+
+    private static readonly RegistryRoot[] RootOrder =
+    [
+        RegistryRoot.ClassesRoot,
+        RegistryRoot.CurrentUser,
+        RegistryRoot.LocalMachine,
+        RegistryRoot.Users,
+        RegistryRoot.CurrentConfig,
+    ];
+
+    private readonly RegistryReader _reader;
+
+    public RegistryTreeSource(RegistryReader? reader = null)
+    {
+        _reader = reader ?? new RegistryReader();
+        Computer = new TreeNode("Computer", registryPath: null, hasChildren: true, source: this)
+        {
+            IsExpanded = true,
+        };
+
+        foreach (RegistryRoot root in RootOrder)
+        {
+            string displayName = root.DisplayName();
+            string displayPath = RegistryPath.Parse(displayName).ToDisplayString();
+            Computer.AddChild(new TreeNode(displayName, displayPath, hasChildren: true, source: this));
+        }
+
+        Roots = [Computer];
+    }
+
+    /// <summary>The always-expanded virtual root that owns the five predefined keys.</summary>
+    public TreeNode Computer { get; }
+
+    /// <summary>The roots passed to <c>DenseTree.SetRoots</c>. Only the virtual Computer node.</summary>
+    public IReadOnlyList<TreeNode> Roots { get; }
+
+    public Task<IReadOnlyList<TreeNode>> LoadChildrenAsync(TreeNode node, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+
+        if (node.RegistryPath is not { Length: > 0 } displayPath)
+        {
+            return Task.FromResult(node.Children);
+        }
+
+        if (!RegistryPath.TryParse(displayPath, out RegistryPath? path))
+        {
+            Log.Warn($"Registry tree node '{node.Name}' has an invalid path '{displayPath}'.");
+            return Task.FromResult(NoChildren);
+        }
+
+        return Task.Run(() => LoadChildren(path, cancellationToken), cancellationToken);
+    }
+
+    /// <summary>
+    /// Walks or rebuilds the path from the virtual Computer node. Ancestors are marked expanded so
+    /// a following <c>SetRoots</c> shows the restored key. Returns null when the path is invalid,
+    /// the key disappeared, or a read failed.
+    /// </summary>
+    public async Task<TreeNode?> FindPathAsync(string displayPath)
+    {
+        if (string.IsNullOrWhiteSpace(displayPath))
+        {
+            return null;
+        }
+
+        string candidate = displayPath.Trim();
+        if (string.Equals(candidate, Computer.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            return Computer;
+        }
+
+        if (!RegistryPath.TryParse(candidate, out RegistryPath? path))
+        {
+            Log.Warn($"Registry tree could not restore '{displayPath}': the path is not valid.");
+            return null;
+        }
+
+        try
+        {
+            TreeNode? current = FindChild(Computer, path.Root.DisplayName());
+            if (current is null)
+            {
+                return null;
+            }
+
+            foreach (string component in path.Components)
+            {
+                await current.LoadChildrenAsync(CancellationToken.None).ConfigureAwait(true);
+                TreeNode? next = FindChild(current, component);
+                if (next is null)
+                {
+                    return null;
+                }
+
+                current.IsExpanded = true;
+                current = next;
+            }
+
+            for (TreeNode? ancestor = current.Parent; ancestor is not null; ancestor = ancestor.Parent)
+            {
+                ancestor.IsExpanded = true;
+            }
+
+            return current;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Warn($"Registry tree could not restore '{displayPath}': {ex.Message}");
+            return null;
+        }
+    }
+
+    private IReadOnlyList<TreeNode> LoadChildren(RegistryPath path, CancellationToken cancellationToken)
+    {
+        try
+        {
+            IReadOnlyList<string> names = _reader.EnumerateSubKeyNames(path, cancellationToken);
+
+            // The contract asks for the native linguistic order. The managed culture comparer is
+            // the closest equivalent; punctuation and digit runs can differ in edge cases.
+            List<string> sorted = names.OrderBy(name => name, NameComparer).ToList();
+            var children = new List<TreeNode>(sorted.Count);
+
+            foreach (string name in sorted)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                string childPath;
+                try
+                {
+                    childPath = path.Append(name).ToDisplayString();
+                }
+                catch (ArgumentException ex)
+                {
+                    // A real registry key can be named '.' or '..', which RegistryPath rejects
+                    // because the same string is ambiguous in a display path. Skip it instead of
+                    // failing the whole child list.
+                    Log.Warn(
+                        $"Registry tree skipped the child '{name}' of '{path.ToDisplayString()}': {ex.Message}");
+                    continue;
+                }
+
+                children.Add(new TreeNode(name, childPath, hasChildren: true, source: this));
+            }
+
+            return children;
+        }
+        catch (RegistryOperationException ex)
+        {
+            Log.Warn(
+                $"Registry tree could not enumerate '{path.ToDisplayString()}': Win32 {ex.Win32Error} ({ex.Message}).");
+            return NoChildren;
+        }
+    }
+
+    private static TreeNode? FindChild(TreeNode parent, string name)
+    {
+        foreach (TreeNode child in parent.Children)
+        {
+            if (string.Equals(child.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                return child;
+            }
+        }
+
+        return null;
+    }
+}

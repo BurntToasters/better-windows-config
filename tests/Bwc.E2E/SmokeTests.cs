@@ -1,204 +1,82 @@
-using System.Diagnostics;
-using System.Text.Json;
-using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Tools;
-using FlaUI.UIA3;
+using Bwc.E2E.Harness;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Bwc.E2E;
 
 /// <summary>
-/// Launches the Hub and the Registry Editor from a publish folder and checks their main windows.
-/// BWC_PUBLISH_DIR selects the folder; a relative value is relative to the repo root. The default is publish/win-arm64.
-/// Writes TestResults/e2e-smoke-&lt;folder&gt;.json.
+/// Launches the Hub and the Registry Editor and checks their main windows. Every check is also
+/// written to artifacts/e2e/result.json by assembly cleanup.
 /// </summary>
 [TestClass]
 public sealed class SmokeTests
 {
-    private const string GateName = @"Local\BwcGuiTestLock";
-    private const string HubExe = "BetterWindowsConfig.exe";
-    private const string RegeditExe = "BwcRegedit.exe";
     private const string HubTitle = "Better Windows Config";
     private const string RegeditTitle = "Registry Editor";
     private const string RegeditRootId = "RegeditRoot";
-    private static readonly TimeSpan WindowTimeout = TimeSpan.FromSeconds(30);
 
     [TestMethod]
-    public void HubAndRegeditShowTheirMainWindows()
+    [TestCategory("Smoke")]
+    public void Smoke_HubAndRegeditShowTheirMainWindows()
     {
-        var repoRoot = FindRepoRoot();
-        var publishDir = ResolvePublishDir(repoRoot);
-        var hubPath = Path.Combine(publishDir, HubExe);
-        var regeditPath = Path.Combine(publishDir, RegeditExe);
-
-        var missing = new[] { hubPath, regeditPath }.Where(p => !File.Exists(p)).Select(p => Path.GetFileName(p)).ToArray();
-        if (missing.Length > 0)
-        {
-            Assert.Fail($"BWC_PUBLISH_DIR '{publishDir}' does not contain {string.Join(", ", missing)}. Publish first (docs/build-setup.md) or set BWC_PUBLISH_DIR.");
-        }
-
-        var checks = new List<SmokeCheck>();
+        var config = GuiGate.Config;
         try
         {
-            using var gate = new Mutex(false, GateName);
-            AcquireGate(gate);
-            try
-            {
-                RunSmoke(hubPath, regeditPath, checks);
-            }
-            finally
-            {
-                gate.ReleaseMutex();
-            }
+            config.EnsureExecutablesExist();
+            E2EResults.Record("smoke.publish.executables", true, config.PublishDir);
         }
-        finally
+        catch (FileNotFoundException ex)
         {
-            WriteArtifact(repoRoot, publishDir, checks);
+            E2EResults.Record("smoke.publish.executables", false, ex.Message);
+            Assert.Fail(ex.Message);
         }
 
-        var failed = checks.Where(c => !c.Pass).Select(c => $"{c.Name}: {c.Detail}").ToArray();
-        Assert.AreEqual(0, failed.Length, string.Join(Environment.NewLine, failed));
+        VerifyHub(config);
+        VerifyRegedit(config);
+
+        var failures = E2EResults.FailedChecks();
+        Assert.AreEqual(
+            0,
+            failures.Count,
+            $"E2E checks failed:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
     }
 
-    private static void RunSmoke(string hubPath, string regeditPath, List<SmokeCheck> checks)
-    {
-        using var automation = new UIA3Automation();
-
-        using (var hub = StartTool(hubPath))
-        {
-            try
-            {
-                var window = WaitForMainWindow(automation, hub, HubExe);
-                Expect(checks, "Hub main window title", HubTitle, window.Title);
-            }
-            finally
-            {
-                Stop(hub);
-            }
-        }
-
-        using (var regedit = StartTool(regeditPath))
-        {
-            try
-            {
-                var window = WaitForMainWindow(automation, regedit, RegeditExe);
-                Expect(checks, "Registry Editor main window title", RegeditTitle, window.Title);
-                var root = Retry.WhileNull(() => window.FindFirstDescendant(cf => cf.ByAutomationId(RegeditRootId)), TimeSpan.FromSeconds(15)).Result;
-                Expect(checks, "Registry Editor RegeditRoot text", RegeditTitle, root?.Name);
-            }
-            finally
-            {
-                Stop(regedit);
-            }
-        }
-    }
-
-    private static void Expect(List<SmokeCheck> checks, string name, string expected, string? actual)
-    {
-        checks.Add(new SmokeCheck(name, actual == expected, $"expected '{expected}', got '{actual ?? "(none)"}'"));
-    }
-
-    private static Process StartTool(string exePath)
-    {
-        var startInfo = new ProcessStartInfo(exePath)
-        {
-            UseShellExecute = false,
-            WorkingDirectory = Path.GetDirectoryName(exePath)!,
-        };
-        // Keeps the highestAvailable manifest of BwcRegedit from raising a UAC prompt. The Hub passes it on to its children.
-        startInfo.Environment["__COMPAT_LAYER"] = "RunAsInvoker";
-        return Process.Start(startInfo) ?? throw new InvalidOperationException($"Process.Start returned no process for {exePath}.");
-    }
-
-    // Polls the process directly. FlaUI's Application wrapper disposes the Process it is given, which breaks later calls.
-    private static Window WaitForMainWindow(UIA3Automation automation, Process process, string exeName)
-    {
-        var deadline = DateTime.UtcNow + WindowTimeout;
-        while (DateTime.UtcNow < deadline)
-        {
-            process.Refresh();
-            if (process.HasExited)
-            {
-                throw new InvalidOperationException($"{exeName} exited with code 0x{process.ExitCode:X8} before showing a main window.");
-            }
-
-            if (process.MainWindowHandle != IntPtr.Zero)
-            {
-                return automation.FromHandle(process.MainWindowHandle).AsWindow();
-            }
-
-            Thread.Sleep(250);
-        }
-
-        throw new TimeoutException($"{exeName} showed no main window within {WindowTimeout.TotalSeconds:0} s.");
-    }
-
-    private static void Stop(Process process)
-    {
-        if (process.HasExited)
-        {
-            return;
-        }
-
-        process.CloseMainWindow();
-        if (!process.WaitForExit(TimeSpan.FromSeconds(10)))
-        {
-            process.Kill(entireProcessTree: true);
-            process.WaitForExit();
-        }
-    }
-
-    private static void AcquireGate(Mutex gate)
+    private static void VerifyHub(E2EConfig config)
     {
         try
         {
-            if (!gate.WaitOne(TimeSpan.FromMinutes(15)))
-            {
-                throw new TimeoutException($"Timed out waiting for {GateName}.");
-            }
+            using var session = new AppSession(config, config.HubExePath);
+            var title = session.Window.Title;
+            E2EResults.Record(
+                "smoke.hub.title",
+                string.Equals(title, HubTitle, StringComparison.Ordinal),
+                $"expected '{HubTitle}', got '{title}'.");
         }
-        catch (AbandonedMutexException)
+        catch (Exception ex)
         {
-            // The previous holder exited without releasing the mutex; ownership has transferred to this thread.
+            E2EResults.Record("smoke.hub.error", false, ex.Message);
         }
     }
 
-    private static string FindRepoRoot()
+    private static void VerifyRegedit(E2EConfig config)
     {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        try
         {
-            if (File.Exists(Path.Combine(dir.FullName, "BetterWindowsConfig.slnx")))
-            {
-                return dir.FullName;
-            }
+            using var session = new AppSession(config, config.RegeditExePath);
+            var title = session.Window.Title;
+            E2EResults.Record(
+                "smoke.regedit.title",
+                string.Equals(title, RegeditTitle, StringComparison.Ordinal),
+                $"expected '{RegeditTitle}', got '{title}'.");
+
+            var rootText = session.WaitForText(RegeditRootId, RegeditTitle, TimeSpan.FromSeconds(15));
+            E2EResults.Record(
+                "smoke.regedit.root",
+                string.Equals(rootText, RegeditTitle, StringComparison.Ordinal),
+                $"automation id '{RegeditRootId}' expected '{RegeditTitle}', got '{rootText ?? "(none)"}'.");
         }
-
-        throw new InvalidOperationException($"BetterWindowsConfig.slnx was not found above {AppContext.BaseDirectory}.");
-    }
-
-    private static string ResolvePublishDir(string repoRoot)
-    {
-        var configured = Environment.GetEnvironmentVariable("BWC_PUBLISH_DIR");
-        return string.IsNullOrWhiteSpace(configured)
-            ? Path.Combine(repoRoot, "publish", "win-arm64")
-            : Path.GetFullPath(configured, repoRoot);
-    }
-
-    private static void WriteArtifact(string repoRoot, string publishDir, List<SmokeCheck> checks)
-    {
-        var dir = Path.Combine(repoRoot, "TestResults");
-        Directory.CreateDirectory(dir);
-        var folder = Path.GetFileName(Path.TrimEndingDirectorySeparator(publishDir));
-        var artifact = new
+        catch (Exception ex)
         {
-            generatedUtc = DateTime.UtcNow,
-            publishDir,
-            pass = checks.Count > 0 && checks.All(c => c.Pass),
-            checks,
-        };
-        File.WriteAllText(
-            Path.Combine(dir, $"e2e-smoke-{folder}.json"),
-            JsonSerializer.Serialize(artifact, new JsonSerializerOptions { WriteIndented = true }));
+            E2EResults.Record("smoke.regedit.error", false, ex.Message);
+        }
     }
 }
-
-internal sealed record SmokeCheck(string Name, bool Pass, string Detail);

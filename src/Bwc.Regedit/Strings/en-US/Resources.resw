@@ -44,4 +44,264 @@
   <data name="RegeditTitle" xml:space="preserve">
     <value>Registry Editor</value>
   </data>
+  <!--
+    Menu texts copied verbatim from docs/parity/oracle/regedit-resources.json (RT_MENU 103).
+    The ampersand marks the mnemonic. The oracle uses a TAB between text and accelerator;
+    &#x9; keeps that character instead of letting XML normalize it to a space.
+  -->
+  <data name="MenuFile" xml:space="preserve">
+    <value>&amp;File</value>
+  </data>
+  <data name="MenuFileImport" xml:space="preserve">
+    <value>&amp;Import...</value>
+  </data>
+  <data name="MenuFileExport" xml:space="preserve">
+    <value>&amp;Export...</value>
+  </data>
+  <data name="MenuFileLoadHive" xml:space="preserve">
+    <value>&amp;Load Hive...</value>
+  </data>
+  <data name="MenuFileUnloadHive" xml:space="preserve">
+    <value>&amp;Unload Hive...</value>
+  </data>
+  <data name="MenuFileConnectNetworkRegistry" xml:space="preserve">
+    <value>&amp;Connect Network Registry...</value>
+  </data>
+  <data name="MenuFileDisconnectNetworkRegistry" xml:space="preserve">
+    <value>&amp;Disconnect Network Registry...</value>
+  </data>
+  <data name="MenuFilePrint" xml:space="preserve">
+    <value>&amp;Print...&#x9;Ctrl+P</value>
+  </data>
+  <data name="MenuFileExit" xml:space="preserve">
+    <value>E&amp;xit</value>
+  </data>
+  <data name="MenuEdit" xml:space="preserve">
+    <value>&amp;Edit</value>
+  </data>
+  <data name="MenuEditNew" xml:space="preserve">
+    <value>&amp;New</value>
+  </data>
+  <data name="MenuEditNewKey" xml:space="preserve">
+    <value>&amp;Key</value>
+  </data>
+  <data name="MenuEditNewStringValue" xml:space="preserve">
+    <value>&amp;String Value</value>
+  </data>
+  <data name="MenuEditNewBinaryValue" xml:space="preserve">
+    <value>&amp;Binary Value</value>
+  </data>
+  <data name="MenuEditNewDwordValue" xml:space="preserve">
+    <value>&amp;DWORD (32-bit) Value</value>
+  </data>
+  <data name="MenuEditNewQwordValue" xml:space="preserve">
+    <value>&amp;QWORD (64-bit) Value</value>
+  </data>
+  <data name="MenuEditNewMultiStringValue" xml:space="preserve">
+    <value>&amp;Multi-String Value</value>
+  </data>
+  <data name="MenuEditNewExpandableStringValue" xml:space="preserve">
+    <value>&amp;Expandable String Value</value>
+  </data>
+  <data name="MenuEditPermissions" xml:space="preserve">
+    <value>&amp;Permissions...</value>
+  </data>
+  <data name="MenuEditDelete" xml:space="preserve">
+    <value>&amp;Delete&#x9;Del</value>
+  </data>
+  <data name="MenuEditRename" xml:space="preserve">
+    <value>&amp;Rename</value>
+  </data>
+  <data name="MenuEditCopyKeyName" xml:space="preserve">
+    <value>&amp;Copy Key Name</value>
+  </data>
+  <data name="MenuEditFind" xml:space="preserve">
+    <value>&amp;Find...&#x9;Ctrl+F</value>
+  </data>
+  <data name="MenuEditFindNext" xml:space="preserve">
+    <value>Find Ne&amp;xt&#x9;F3</value>
+  </data>
+  <data name="MenuView" xml:space="preserve">
+    <value>&amp;View</value>
+  </data>
+  <data name="MenuViewAddressBar" xml:space="preserve">
+    <value>Address &amp;Bar</value>
+  </data>
+  <data name="MenuViewSplit" xml:space="preserve">
+    <value>Sp&amp;lit</value>
+  </data>
+  <data name="MenuViewDisplayBinaryData" xml:space="preserve">
+    <value>&amp;Display Binary Data...</value>
+  </data>
+  <data name="MenuViewRefresh" xml:space="preserve">
+    <value>&amp;Refresh&#x9;F5</value>
+  </data>
+  <data name="MenuViewFont" xml:space="preserve">
+    <value>&amp;Font</value>
+  </data>
+  <data name="MenuFavorites" xml:space="preserve">
+    <value>F&amp;avorites</value>
+  </data>
+  <data name="MenuFavoritesAdd" xml:space="preserve">
+    <value>&amp;Add to Favorites...</value>
+  </data>
+  <data name="MenuFavoritesRemove" xml:space="preserve">
+    <value>&amp;Remove Favorite...</value>
+  </data>
+  <data name="MenuHelp" xml:space="preserve">
+    <value>&amp;Help</value>
+  </data>
+  <data name="MenuHelpAbout" xml:space="preserve">
+    <value>&amp;About Registry Editor...</value>
+  </data>
+  <data name="DialogOk" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="DialogCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="DialogYes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="DialogNo" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="DialogErrorTitle" xml:space="preserve">
+    <value>Registry Editor</value>
+  </data>
+  <data name="DialogNewKeyTitle" xml:space="preserve">
+    <value>New Key</value>
+  </data>
+  <data name="DialogKeyNameLabel" xml:space="preserve">
+    <value>Key name</value>
+  </data>
+  <data name="DialogNewValueTitle" xml:space="preserve">
+    <value>New Value</value>
+  </data>
+  <data name="DialogValueNameLabel" xml:space="preserve">
+    <value>Value name</value>
+  </data>
+  <data name="DialogRenameKeyTitle" xml:space="preserve">
+    <value>Rename Key</value>
+  </data>
+  <data name="DialogRenameValueTitle" xml:space="preserve">
+    <value>Rename Value</value>
+  </data>
+  <data name="DialogDeleteValueTitle" xml:space="preserve">
+    <value>Confirm Value Delete</value>
+  </data>
+  <data name="DialogDeleteKeyTitle" xml:space="preserve">
+    <value>Confirm Key Delete</value>
+  </data>
+  <data name="DialogDeleteValueMessage" xml:space="preserve">
+    <value>Deleting certain registry values could cause system instability. Are you sure you want to permanently delete the selected value?</value>
+  </data>
+  <data name="DialogDeleteKeyMessage" xml:space="preserve">
+    <value>Deleting certain registry keys could cause system instability. Are you sure you want to permanently delete this key?</value>
+  </data>
+  <data name="DialogDeleteKeyChildrenWarning" xml:space="preserve">
+    <value>Deleting this key will delete all of its subkeys.</value>
+  </data>
+  <data name="DialogValueStringTitle" xml:space="preserve">
+    <value>New String Value</value>
+  </data>
+  <data name="DialogValueExpandableTitle" xml:space="preserve">
+    <value>New Expandable String Value</value>
+  </data>
+  <data name="DialogValueBinaryTitle" xml:space="preserve">
+    <value>New Binary Value</value>
+  </data>
+  <data name="DialogValueDwordTitle" xml:space="preserve">
+    <value>New DWORD (32-bit) Value</value>
+  </data>
+  <data name="DialogValueQwordTitle" xml:space="preserve">
+    <value>New QWORD (64-bit) Value</value>
+  </data>
+  <data name="DialogValueMultiStringTitle" xml:space="preserve">
+    <value>New Multi-String Value</value>
+  </data>
+  <data name="DialogRootKeyLocked" xml:space="preserve">
+    <value>A predefined registry root cannot be renamed or deleted.</value>
+  </data>
+  <data name="DialogDefaultValueLocked" xml:space="preserve">
+    <value>The default value cannot be renamed.</value>
+  </data>
+  <data name="DialogInvalidKeyName" xml:space="preserve">
+    <value>Enter a key name that is not empty, not a separator, and not longer than 255 characters.</value>
+  </data>
+  <data name="DialogInvalidValueName" xml:space="preserve">
+    <value>Enter a value name without NUL characters and no longer than 16383 characters.</value>
+  </data>
+  <data name="DialogNameExists" xml:space="preserve">
+    <value>A registry object with this name already exists.</value>
+  </data>
+  <data name="DialogNoSelection" xml:space="preserve">
+    <value>Select a key or value first.</value>
+  </data>
+  <data name="DialogExportNoSelection" xml:space="preserve">
+    <value>Select a key to export. Exporting the whole registry from Computer is not supported.</value>
+  </data>
+  <data name="DialogAddressBarInvalidPath" xml:space="preserve">
+    <value>Enter Computer, a predefined root such as HKCU, or a full key path such as HKCU\Software.</value>
+  </data>
+  <data name="DialogAddressBarKeyNotFound" xml:space="preserve">
+    <value>The key was not found or could not be read. Check the path and try again.</value>
+  </data>
+  <data name="DialogFindTitle" xml:space="preserve">
+    <value>Find</value>
+  </data>
+  <data name="DialogFindWhat" xml:space="preserve">
+    <value>Find what:</value>
+  </data>
+  <data name="DialogFindLookAt" xml:space="preserve">
+    <value>Look at</value>
+  </data>
+  <data name="DialogFindKeys" xml:space="preserve">
+    <value>Keys</value>
+  </data>
+  <data name="DialogFindValues" xml:space="preserve">
+    <value>Values</value>
+  </data>
+  <data name="DialogFindData" xml:space="preserve">
+    <value>Data</value>
+  </data>
+  <data name="DialogFindMatchWhole" xml:space="preserve">
+    <value>Match whole string only</value>
+  </data>
+  <data name="DialogFindSubtree" xml:space="preserve">
+    <value>Search in subtree</value>
+  </data>
+  <data name="DialogFindNext" xml:space="preserve">
+    <value>Find Next</value>
+  </data>
+  <data name="DialogFindCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="DialogFindSearching" xml:space="preserve">
+    <value>Searching...</value>
+  </data>
+  <data name="DialogFindFound" xml:space="preserve">
+    <value>Found: {0}</value>
+  </data>
+  <data name="DialogFindFinished" xml:space="preserve">
+    <value>Finished searching through the registry.</value>
+  </data>
+  <data name="DialogFindEmptyText" xml:space="preserve">
+    <value>Enter text to find.</value>
+  </data>
+  <data name="DialogFindNoScope" xml:space="preserve">
+    <value>Select at least one of Keys, Values, or Data.</value>
+  </data>
+  <data name="DialogFindSearchFailed" xml:space="preserve">
+    <value>The search could not be completed.</value>
+  </data>
+  <data name="DialogHexTitle" xml:space="preserve">
+    <value>Binary Data</value>
+  </data>
+  <data name="DialogHexClose" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="DialogHexNoSelection" xml:space="preserve">
+    <value>Select a single value to display its binary data.</value>
+  </data>
 </root>

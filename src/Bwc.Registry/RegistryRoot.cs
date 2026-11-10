@@ -12,7 +12,7 @@ public enum RegistryRoot
 public static class RegistryRootExtensions
 {
     /// <summary>The predefined HKEY. The handles are negative 32-bit values, sign-extended to pointer size.</summary>
-    public static nint ToHkey(this RegistryRoot root) => (nint)(int)root;
+    internal static nint ToHkey(this RegistryRoot root) => (nint)(int)root;
 
     public static string DisplayName(this RegistryRoot root) => root switch
     {
