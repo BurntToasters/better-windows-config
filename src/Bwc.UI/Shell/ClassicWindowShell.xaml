@@ -1,0 +1,82 @@
+<UserControl
+    x:Class="Bwc.UI.Shell.ClassicWindowShell"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:list="using:Bwc.UI.List"
+    xmlns:primitives="using:Microsoft.UI.Xaml.Controls.Primitives"
+    xmlns:tree="using:Bwc.UI.Tree"
+    AutomationProperties.AutomationId="ClassicWindowShell"
+    AutomationProperties.Name="Classic window shell"
+    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+    IsTabStop="True"
+    UseSystemFocusVisuals="False">
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition x:Name="AddressRow" Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <MenuBar
+            x:Name="MenuBarRoot"
+            Grid.Row="0"
+            Style="{StaticResource BwcMenuBarStyle}" />
+
+        <TextBox
+            x:Name="AddressBox"
+            Grid.Row="1"
+            AutomationProperties.AutomationId="AddressBar"
+            AutomationProperties.Name="Address bar"
+            IsSpellCheckEnabled="False"
+            IsTextPredictionEnabled="False"
+            KeyDown="OnAddressBarKeyDown"
+            Style="{StaticResource BwcAddressBarTextBoxStyle}"
+            Text="Computer" />
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="TreeColumn" Width="216" />
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border
+                x:Name="TreePaneBorder"
+                AutomationProperties.AutomationId="TreePane"
+                AutomationProperties.Name="Tree pane"
+                Background="{ThemeResource LayerFillColorDefaultBrush}">
+                <Grid x:Name="TreeBody" AutomationProperties.AutomationId="TreeBody">
+                    <tree:DenseTree x:Name="TreeControl" />
+                </Grid>
+            </Border>
+
+            <primitives:Thumb
+                x:Name="SplitterThumb"
+                Grid.Column="1"
+                Width="4"
+                AutomationProperties.AutomationId="Splitter"
+                AutomationProperties.Name="Splitter"
+                DragDelta="OnSplitterDragDelta"
+                DragStarted="OnSplitterDragStarted"
+                IsTabStop="True"
+                KeyDown="OnSplitterKeyDown"
+                LostFocus="OnSplitterLostFocus">
+                <primitives:Thumb.Template>
+                    <ControlTemplate TargetType="primitives:Thumb">
+                        <Border Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                    </ControlTemplate>
+                </primitives:Thumb.Template>
+            </primitives:Thumb>
+
+            <Border
+                x:Name="ListPaneBorder"
+                Grid.Column="2"
+                AutomationProperties.AutomationId="ListPane"
+                AutomationProperties.Name="List pane"
+                Background="{ThemeResource LayerFillColorDefaultBrush}">
+                <list:DetailsList x:Name="ListControl" />
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

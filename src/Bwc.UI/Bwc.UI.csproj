@@ -9,9 +9,12 @@
     <WindowsPackageType>None</WindowsPackageType>
     <EnableMsixTooling>true</EnableMsixTooling>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- The menu keyboard uses function pointers for SetWindowSubclass. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
   </ItemGroup>
 
