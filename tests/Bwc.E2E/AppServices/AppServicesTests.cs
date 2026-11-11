@@ -171,6 +171,47 @@ public sealed class AppServicesTests
                 changed,
                 $"list row height after 16 DIP font={after:0.#} px, expected {expectedAfter:0.#} px.");
 
+            // The whole window must stay walkable through UI Automation after the metrics change: every
+            // descendant is enumerated and read, and the list rows and tree items must both be present.
+            int listRows = 0;
+            int treeItems = 0;
+            int unnamed = 0;
+            string walkError = string.Empty;
+            try
+            {
+                foreach (AutomationElement element in app.Window.FindAllDescendants())
+                {
+                    ControlType type = element.ControlType;
+                    if (type == ControlType.DataItem)
+                    {
+                        listRows++;
+                    }
+                    else if (type == ControlType.TreeItem)
+                    {
+                        treeItems++;
+                    }
+
+                    try
+                    {
+                        _ = element.Name;
+                    }
+                    catch (Exception)
+                    {
+                        // Some framework elements do not expose a name. Counted, not treated as a broken walk.
+                        unnamed++;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                walkError = $"{ex.GetType().Name}: {ex.Message}";
+            }
+
+            E2EResults.Record(
+                "appsvc.font.uiaWalk",
+                walkError.Length == 0 && listRows > 0 && treeItems > 0,
+                $"window UI Automation walk after the font change: list rows={listRows}, tree items={treeItems}, elements without a name={unnamed}, error='{walkError}'.");
+
             // The window closes the way a user closes it, so the saved font is the one the restart must read.
             bool closedByUser = app.CloseWithAltF4(TimeSpan.FromSeconds(15));
             E2EResults.Record(
