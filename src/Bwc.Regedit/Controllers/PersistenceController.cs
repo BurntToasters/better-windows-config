@@ -1,5 +1,7 @@
+using Bwc.Regedit.Commands;
 using Bwc.Regedit.Registry;
 using Bwc.UI.List;
+using Bwc.UI.Theme;
 
 namespace Bwc.Regedit.Controllers;
 
@@ -51,6 +53,20 @@ internal sealed class PersistenceController
 
         _view.ApplyColumnWidths(state.ListColumnWidths);
 
+        // The split is applied with the column widths, before the first layout. A missing or unusable width keeps the default.
+        if (settings.TreePaneWidth is { } treeWidth && double.IsFinite(treeWidth) && treeWidth > 0)
+        {
+            _context.Shell.TreePaneWidth = treeWidth;
+        }
+
+        // The font and the theme are applied here, before the first layout that reads them. The
+        // Theme radio item follows the override that is in effect.
+        state.FontSize = AppearanceSettings.ValidFontSizeDip(settings.FontSize);
+        DenseMetrics.ApplyFont(state.FontSize);
+        state.ThemeOverride = AppearanceSettings.FormatTheme(AppearanceSettings.ParseTheme(settings.ThemeOverride));
+        BwcTheme.SetOverride(AppearanceSettings.ParseTheme(state.ThemeOverride));
+        RegeditMenu.SetThemeChecked(_context.Shell.MenuBar, BwcTheme.Override);
+
         if (!string.Equals(state.LastKey, "Computer", StringComparison.OrdinalIgnoreCase))
         {
             _ = _view.RestoreLastKeyAsync(state.LastKey);
@@ -74,6 +90,10 @@ internal sealed class PersistenceController
             FindLastHitValue = state.FindLastHitValue,
             FindLastHitKind = state.FindLastHitKind,
             FindLastHitText = state.FindLastHitText,
+            FontSize = state.FontSize,
+            ThemeOverride = state.ThemeOverride,
+
+            TreePaneWidth = _context.Shell.TreePaneWidth,
         };
 
         foreach (DetailsColumn column in _context.Shell.ListContent.Columns)

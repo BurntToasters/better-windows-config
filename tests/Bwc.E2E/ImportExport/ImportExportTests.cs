@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using Bwc.E2E.AppServices;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
@@ -16,8 +17,8 @@ namespace Bwc.E2E.ImportExport;
 /// <summary>
 /// Drives File > Export and File > Import through the real COM common item dialogs. Every check is
 /// scoped to the run sandbox under HKCU and to a temporary folder under artifacts/e2e. The test
-/// verifies dialog ownership, the disabled owner, the returned file, cancellation, and the tree and
-/// list refresh after an import.
+/// verifies dialog ownership, the disabled owner, the returned file, cancellation, the success message
+/// after an import, and the tree and list refresh after an import.
 /// </summary>
 [TestClass]
 public sealed class ImportExportTests
@@ -240,6 +241,24 @@ public sealed class ImportExportTests
             "importexport.import.registry",
             rootValue && childValue,
             $"rootValue={rootValue}, childValue={childValue}.");
+
+        // The result message (RT_STRING 228) is modal. It is read and dismissed here, before the tree and list checks.
+        IntPtr result = AppServicesSupport.WaitForOwnedWindow(session.MainHwnd, null, "Registry Editor", TimeSpan.FromSeconds(10));
+        bool resultText = result != IntPtr.Zero
+            && AppServicesSupport.DialogText(result).Contains("successfully added to the registry", StringComparison.Ordinal);
+        E2EResults.Record(
+            "importexport.import.result",
+            resultText,
+            $"success message shown={result != IntPtr.Zero}, text names the import={resultText}.");
+        if (result != IntPtr.Zero)
+        {
+            // The message must close before the next command, or its modal state blocks the Export menu.
+            bool dismissed = AppServicesSupport.DismissMessage(result, TimeSpan.FromSeconds(10));
+            E2EResults.Record(
+                "importexport.import.dismissed",
+                dismissed,
+                $"the success message closed with Enter={dismissed}.");
+        }
 
         bool rootSelected = ControlTestSupport.WaitForTreeSelection(
             session,

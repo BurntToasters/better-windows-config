@@ -17,14 +17,16 @@ using Windows.UI.Core;
 namespace Bwc.UI.Hex;
 
 /// <summary>
-/// Read-only virtualized hex viewer. One row displays sixteen bytes as an eight digit offset, sixteen
-/// two digit hex cells, and sixteen ASCII cells. Only rows near the viewport are created; the data is
+/// Virtualized hex editor. One row shows eight bytes as a four digit offset (more digits past 64 KiB),
+/// eight two digit hex cells, and eight ASCII cells. Only rows near the viewport are created; the data is
 /// stored once as a <see cref="ReadOnlyMemory{T}"/> and rows are addressed by index.
 /// </summary>
 public sealed class HexEditor : UserControl
 {
-    /// <summary>Bytes shown on one row.</summary>
-    public const int BytesPerRow = 16;
+    /// <summary>Bytes shown on one row. Classic Edit Binary Value shows eight, with offsets 0000, 0008, and so on.</summary>
+    public const int BytesPerRow = 8;
+    /// <summary>The fewest offset digits, as classic shows them (0000).</summary>
+    public const int MinimumOffsetDigits = 4;
 
     /// <summary>Fixed row height in DIP.</summary>
     public const double RowHeight = 16;
@@ -39,11 +41,12 @@ public sealed class HexEditor : UserControl
     private readonly HashSet<HexRowElement> _realized = new();
     private readonly FontFamily _fontFamily;
     private readonly double _charWidth;
-    private readonly double _offsetWidth;
-    private readonly double _hexLeft;
+    private double _offsetWidth;
+    private double _hexLeft;
     private readonly double _byteStep;
-    private readonly double _asciiLeft;
-    private readonly double _contentWidth;
+    private double _asciiLeft;
+    private double _contentWidth;
+    private int _offsetDigits = MinimumOffsetDigits;
 
     private byte[] _bytes = Array.Empty<byte>();
     private int _length;
@@ -71,11 +74,8 @@ public sealed class HexEditor : UserControl
 
         _fontFamily = ResolveMonospaceFont();
         _charWidth = MeasureText("00000000").Width / 8.0;
-        _offsetWidth = _charWidth * 8;
-        _hexLeft = _offsetWidth + ColumnGap;
         _byteStep = (_charWidth * 2) + ByteGap;
-        _asciiLeft = _hexLeft + (BytesPerRow * _byteStep) + ColumnGap;
-        _contentWidth = _asciiLeft + (BytesPerRow * _charWidth) + 2;
+        UpdateColumns();
 
         _repeater = new ItemsRepeater
         {
@@ -190,6 +190,9 @@ public sealed class HexEditor : UserControl
     internal double CharWidth => _charWidth;
 
     internal double OffsetWidth => _offsetWidth;
+
+    /// <summary>Hex digits in the offset column for the current length. Never fewer than four.</summary>
+    internal int OffsetDigits => _offsetDigits;
 
     internal double HexLeft => _hexLeft;
 
@@ -911,8 +914,24 @@ public sealed class HexEditor : UserControl
         }
     }
 
+    /// <summary>
+    /// Sizes the columns for the offset digits the current length needs. The offset column is never
+    /// narrower than the digits it shows, so an offset above FFFF is not clipped.
+    /// </summary>
+    private void UpdateColumns()
+    {
+        int largest = Math.Max(0, _length - 1);
+        int digits = Math.Max(MinimumOffsetDigits, largest.ToString("X", CultureInfo.InvariantCulture).Length);
+        _offsetDigits = digits;
+        _offsetWidth = _charWidth * digits;
+        _hexLeft = _offsetWidth + ColumnGap;
+        _asciiLeft = _hexLeft + (BytesPerRow * _byteStep) + ColumnGap;
+        _contentWidth = _asciiLeft + (BytesPerRow * _charWidth) + 2;
+    }
+
     private void ResetRows()
     {
+        UpdateColumns();
         _repeater.ItemsSource = null;
         foreach (HexRowElement row in _realized)
         {

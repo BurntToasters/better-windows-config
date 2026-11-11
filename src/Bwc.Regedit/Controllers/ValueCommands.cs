@@ -445,7 +445,7 @@ internal sealed class ValueCommands
         string initialText = string.Join(
             Environment.NewLine,
             RegistryValueCodec.DecodeMultiString(value.Data).Strings);
-        var dialog = new MultiStringValueDialog(Get("DialogEditMultiStringTitle"), initialText);
+        var dialog = new MultiStringValueDialog(Get("DialogEditMultiStringTitle"), initialText, ValueLabel(rawName));
         if (!await _context.ShowDialogAsync(dialog))
         {
             return false;

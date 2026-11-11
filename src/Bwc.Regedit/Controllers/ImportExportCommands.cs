@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Text;
 using Bwc.Core;
 using Bwc.Regedit.Registry;
+using Bwc.UI.Dialogs;
 using Bwc.Registry;
 
 namespace Bwc.Regedit.Controllers;
@@ -21,6 +23,34 @@ internal sealed class ImportExportCommands
 
     public void Export() => _context.StartCommand(ExportAsync);
 
+    /// <summary>
+    /// Imports a .reg file named on the command line or sent by a second launch. Classic regedit asks
+    /// first (RT_STRING 304), then reports the result (RT_STRING 228).
+    /// </summary>
+    public void ImportRegistryFile(string filePath) => _context.StartCommand(() => ImportPathAsync(filePath));
+
+    private async Task ImportPathAsync(string filePath)
+    {
+        string caption = Get("MsgCaptionRegistryEditor");
+        if (!File.Exists(filePath))
+        {
+            await _context.ShowMessageAsync(caption, string.Format(CultureInfo.CurrentCulture, Get("MsgImportFileMissing"), filePath));
+            return;
+        }
+
+        var confirm = new ConfirmDialog(
+            caption,
+            string.Format(CultureInfo.CurrentCulture, Get("MsgImportConfirm"), filePath),
+            Get("DialogYes"),
+            Get("DialogNo"));
+        if (!await _context.ShowDialogAsync(confirm))
+        {
+            return;
+        }
+
+        await ImportFileAsync(filePath);
+    }
+
     private async Task ImportAsync()
     {
         string? filePath = _context.ShowFileDialog(save: false, defaultFileName: null);
@@ -29,14 +59,24 @@ internal sealed class ImportExportCommands
             return;
         }
 
-        string? selectedPath = _context.Shell.TreeContent.SelectedNode?.RegistryPath;
+        await ImportFileAsync(filePath);
+    }
 
+    /// <summary>
+    /// Applies a .reg file, refreshes the tree and the list, and then shows the classic result. A skipped
+    /// line does not change the result. A refused file shows its own text, and a rejected write shows
+    /// string 132. The import keeps going after a rejected write, as classic regedit does.
+    /// </summary>
+    private async Task ImportFileAsync(string filePath)
+    {
+        string? selectedPath = _context.Shell.TreeContent.SelectedNode?.RegistryPath;
+        RegFileImportResult result;
         try
         {
-            await _context.RunRegistryAsync(() =>
+            result = await _context.RunRegistryAsync(() =>
             {
                 RegistryStore store = RegeditWritePolicy.CreateStore();
-                RegFileImporter.ApplyFile(store, filePath, CancellationToken.None);
+                return RegFileImporter.ApplyFile(store, filePath, CancellationToken.None);
             });
         }
         catch (Exception ex) when (IsFileOperationFailure(ex))
@@ -46,8 +86,12 @@ internal sealed class ImportExportCommands
             return;
         }
 
+        RegFileImportReport.LogOutcome(filePath, result);
         await _context.RefreshTreeAsync(selectedPath);
         await _context.RefreshValuesAsync(selectDisplayName: null);
+        await _context.ShowMessageAsync(
+            Get("MsgCaptionRegistryEditor"),
+            string.Format(CultureInfo.CurrentCulture, Get(RegFileImportReport.MessageKey(result)), filePath));
     }
 
     private async Task ExportAsync()

@@ -102,6 +102,13 @@ internal sealed class HiveRemoteCommands
             return;
         }
 
+        // Load Hive is enabled only at the HKEY_LOCAL_MACHINE or HKEY_USERS root. The hive loads under that root.
+        if (!_context.TryGetSelectedKeyPath(out RegistryPath root) || !RegeditContext.IsLoadHiveRoot(root))
+        {
+            await _context.ShowMessageAsync(Get("DialogNoSelection"));
+            return;
+        }
+
         string? filePath = _context.ShowFileDialog(save: false, defaultFileName: null);
         if (string.IsNullOrEmpty(filePath))
         {
@@ -112,14 +119,14 @@ internal sealed class HiveRemoteCommands
             Get("DialogLoadHiveTitle"),
             Get("DialogLoadHiveNameLabel"),
             string.Empty,
-            ValidateHiveKeyName);
+            name => ValidateHiveKeyName(root, name));
 
         if (!await _context.ShowDialogAsync(dialog))
         {
             return;
         }
 
-        RegistryPath target = RegistryPath.Parse(@"HKLM\" + dialog.Value.Trim());
+        RegistryPath target = root.Append(dialog.Value.Trim());
 
         try
         {
@@ -135,12 +142,15 @@ internal sealed class HiveRemoteCommands
         _context.FocusTreeAfterDialog();
     }
 
-    private string? ValidateHiveKeyName(string name)
+    private string? ValidateHiveKeyName(RegistryPath root, string name)
     {
         string candidate = name.Trim();
-        if (!RegistryPath.TryParse(@"HKLM\" + candidate, out RegistryPath? target) ||
-            target is null ||
-            target.Components.Count != 1)
+        RegistryPath target;
+        try
+        {
+            target = root.Append(candidate);
+        }
+        catch (ArgumentException)
         {
             return Get("DialogLoadHiveNameInvalid");
         }
@@ -167,7 +177,7 @@ internal sealed class HiveRemoteCommands
 
         if (!_context.TryGetSelectedKeyPath(out RegistryPath path) ||
             _context.Shell.ListContent.SelectedRows.Count > 0 ||
-            !RegeditContext.IsHiveRootChild(path))
+            !RegeditContext.IsUnloadableHiveRoot(path))
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;

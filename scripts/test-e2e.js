@@ -179,7 +179,7 @@ function tail(text, lines = 60) {
 // Known gaps are listed in this order. Each one cites a work package from the parity plan.
 const knownGapOrder = ["E1", "E2", "RF1", "RF4", "RF8", "UF7"];
 
-function printResult(result) {
+function printResult(result, verdict = result.pass === true) {
   const checks = Array.isArray(result.checks) ? result.checks : [];
   const notes = Array.isArray(result.notes) ? result.notes : [];
   const knownGaps = Array.isArray(result.knownGaps) ? result.knownGaps : [];
@@ -187,7 +187,7 @@ function printResult(result) {
   const failed = checks.filter((check) => check.pass !== true);
 
   console.log("");
-  console.log(`E2E ${result.pass === true ? "PASS" : "FAIL"}`);
+  console.log(`E2E ${verdict ? "PASS" : "FAIL"}`);
   console.log(`runId: ${result.runId}`);
   console.log(`rid: ${result.rid}  flavor: ${result.flavor}`);
   console.log(`publishDir: ${result.publishDir}`);
@@ -393,7 +393,7 @@ if (result.schema !== 2) {
   process.exit(1);
 }
 
-printResult(result);
+printResult(result, testRun.code === 0 && result.pass === true);
 
 if (testRun.code !== 0) {
   console.error(`dotnet test exited with code ${testRun.code}.`);

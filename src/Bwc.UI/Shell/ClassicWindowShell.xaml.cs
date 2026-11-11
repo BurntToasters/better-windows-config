@@ -195,6 +195,16 @@ public sealed partial class ClassicWindowShell : UserControl
     }
 
     /// <summary>
+    /// The tree pane width in DIPs. A drag or the Left and Right keys change it, and a value set here is
+    /// clamped to the same range as the splitter. The host reads it at close and sets it at startup.
+    /// </summary>
+    public double TreePaneWidth
+    {
+        get => _treePaneWidth;
+        set => SetTreeWidth(value);
+    }
+
+    /// <summary>
     /// Puts keyboard focus on the splitter. Left and Right move the tree pane by 8 DIP.
     /// Enter or Escape leaves keyboard mode and focuses the shell.
     /// </summary>

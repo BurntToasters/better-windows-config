@@ -36,6 +36,157 @@ public static class ClassicDialogTemplates
     /// <summary>Edit QWORD (64-bit) Value (RT_DIALOG 117): same geometry as the DWORD template. 219 x 103 DLU.</summary>
     public static ClassicDialogDefinition EditQword(string caption) => NumberTemplate(caption, "RT_DIALOG 117 (en-US regedit.exe.mui)");
 
+    /// <summary>Edit Multi-String (RT_DIALOG 114): one string per line, multi-line edit. 232 x 178 DLU.</summary>
+    public static ClassicDialogDefinition EditMultiString(string caption) =>
+        new(
+            caption,
+            "RT_DIALOG 114 (en-US regedit.exe.mui)",
+            232,
+            178,
+            [
+                Label("ValueDataLabel", "&Value data:", 6, 33, 220, 8),
+                MultiLineEdit("ValueEditorInput", 1001, 6, 44, 220, 110),
+                Button("DialogPrimary", 1, "OK", 120, 158, 50, 14, isDefault: true),
+                Button("DialogSecondary", 2, "Cancel", 176, 158, 50, 14),
+                Label("ValueNameLabel", "Value &name:", 6, 6, 220, 8),
+                Edit("ValueNameInput", 1000, 6, 17, 220, 12, readOnly: true),
+            ])
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
+    /// <summary>Edit Binary Value (RT_DIALOG 103): the HEX control for the value data. 232 x 178 DLU.</summary>
+    public static ClassicDialogDefinition EditBinary(string caption) =>
+        new(
+            caption,
+            "RT_DIALOG 103 (en-US regedit.exe.mui)",
+            232,
+            178,
+            [
+                Label("ValueDataLabel", "&Value data:", 6, 33, 220, 8),
+                HexControl("HexEditor", 1001, 6, 44, 220, 110),
+                Button("DialogPrimary", 1, "OK", 120, 158, 50, 14, isDefault: true),
+                Button("DialogSecondary", 2, "Cancel", 176, 158, 50, 14),
+                Label("ValueNameLabel", "Value &name:", 6, 6, 220, 8),
+                Edit("ValueNameInput", 1000, 6, 17, 220, 12, readOnly: true),
+            ])
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
+    /// <summary>
+    /// Find (RT_DIALOG 106): the search text, Look at (Keys, Values, Data), the two options, and the
+    /// Find Next and Cancel buttons. 264 x 96 DLU. The texts come from the caller's resource map.
+    /// </summary>
+    public static ClassicDialogDefinition Find(
+        string caption,
+        string findWhat,
+        string lookAt,
+        string keys,
+        string values,
+        string data,
+        string matchWholeString,
+        string searchInSubtree,
+        string findNext,
+        string cancel,
+        bool subtreeChecked) =>
+        new(
+            caption,
+            "RT_DIALOG 106 (en-US regedit.exe.mui)",
+            264,
+            96,
+            [
+                Label("FindWhatLabel", findWhat, 6, 8, 40, 8),
+                Edit("FindText", 1150, 50, 6, 150, 14),
+                CheckBox("FindKeys", 1152, keys, 12, 38, 35, 10, isChecked: true),
+                CheckBox("FindValues", 1153, values, 12, 50, 35, 10, isChecked: true),
+                CheckBox("FindData", 1154, data, 12, 62, 35, 10, isChecked: true),
+                CheckBox("FindWholeString", 1151, matchWholeString, 6, 80, 109, 10, isChecked: false),
+                CheckBox("FindSubtree", 1161, searchInSubtree, 120, 80, 109, 10, isChecked: subtreeChecked),
+                Button("DialogPrimary", 1, findNext, 208, 6, 50, 14, isDefault: true),
+                Button("DialogSecondary", 2, cancel, 208, 24, 50, 14),
+                Group("FindLookAt", lookAt, 6, 26, 194, 50),
+            ])
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
+    /// <summary>
+    /// Remove Favorites (RT_DIALOG 113): a multi-select, sorted list with OK and Cancel at the right.
+    /// 194 x 103 DLU. The list label is the caller's text.
+    /// </summary>
+    public static ClassicDialogDefinition RemoveFavorites(string caption, string label, string primaryText, string secondaryText) =>
+        new(
+            caption,
+            "RT_DIALOG 113 (en-US regedit.exe.mui)",
+            194,
+            103,
+            [
+                Button("DialogPrimary", 1, primaryText, 137, 7, 50, 14, isDefault: true),
+                Button("DialogSecondary", 2, secondaryText, 137, 28, 50, 14),
+                ListBox("FavoritesList", 1191, 7, 23, 121, 72, multiSelect: true),
+                Label("FavoritesLabel", label, 7, 7, 93, 8),
+            ])
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
+    /// <summary>
+    /// The one-line prompt for a key or value name (RT_DIALOG 104, Load Hive). 252 x 53 DLU. The
+    /// label and the caption are the caller's text.
+    /// </summary>
+    public static ClassicDialogDefinition TextPrompt(string caption, string label) =>
+        new(
+            caption,
+            "RT_DIALOG 104 (en-US regedit.exe.mui)",
+            252,
+            53,
+            [
+                Label("PromptLabel", label, 6, 6, 134, 8),
+                Edit("DialogTextInput", 1001, 6, 17, 240, 12),
+                Button("DialogPrimary", 1, "OK", 142, 35, 50, 14, isDefault: true),
+                Button("DialogSecondary", 2, "Cancel", 196, 35, 50, 14),
+            ])
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
+    private static ClassicControlDefinition MultiLineEdit(string automationId, int id, int x, int y, int cx, int cy) =>
+        Edit(automationId, id, x, y, cx, cy, multiline: true);
+
+    private static ClassicControlDefinition HexControl(string automationId, int id, int x, int y, int cx, int cy) =>
+        new(ClassicControlKind.HexEditor, id, automationId, "Value data", x, y, cx, cy)
+        {
+            TabStop = true,
+        };
+
+    private static ClassicControlDefinition ListBox(string automationId, int id, int x, int y, int cx, int cy, bool multiSelect) =>
+        new(ClassicControlKind.ListBox, id, automationId, string.Empty, x, y, cx, cy)
+        {
+            TabStop = true,
+            MultiSelect = multiSelect,
+        };
+
+    private static ClassicControlDefinition CheckBox(
+        string automationId,
+        int id,
+        string text,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        bool isChecked) =>
+        new(ClassicControlKind.CheckBox, id, automationId, text, x, y, cx, cy)
+        {
+            TabStop = true,
+            Checked = isChecked,
+        };
+
     private static ClassicDialogDefinition NumberTemplate(string caption, string source) =>
         new(
             caption,

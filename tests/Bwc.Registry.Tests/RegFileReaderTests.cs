@@ -345,12 +345,13 @@ public sealed class RegFileReaderTests
     }
 
     [TestMethod]
-    public void TrailingCommaWithoutContinuationIsRejected()
+    public void TrailingCommaWithoutContinuationIsAccepted()
     {
-        RegFileParseException error = ParseV5ValueError("\"Value\"=hex:00,\r\n");
+        // Classic regedit imports hex:01,02, as 01 02 (oracle: hex-trailing-comma).
+        RegFileDocument document = ParseV5("[HKEY_CURRENT_USER\\Software\\Test]\r\n\"Value\"=hex:00,\r\n");
 
-        Assert.AreEqual(4, error.Line);
-        Assert.IsTrue(error.Message.Length > 0);
+        RegFileValue value = FindValue(FindKey(document, "HKEY_CURRENT_USER\\Software\\Test"), "Value");
+        CollectionAssert.AreEqual(new byte[] { 0x00 }, value.Data);
     }
 
     [TestMethod]
@@ -381,9 +382,10 @@ public sealed class RegFileReaderTests
     }
 
     [TestMethod]
-    public void DwordWithWrongNumberOfDigitsIsRejected()
+    public void DwordWithMoreThanEightDigitsIsRejected()
     {
-        RegFileParseException error = ParseV5ValueError("\"Value\"=dword:123\r\n");
+        // One to eight digits are read as hex (oracle: dword-short). Nine is not a DWORD.
+        RegFileParseException error = ParseV5ValueError("\"Value\"=dword:123456789\r\n");
 
         Assert.AreEqual(4, error.Line);
         Assert.IsTrue(error.Column > 1);

@@ -105,13 +105,10 @@ public sealed class HiveTests
             }
             else
             {
-                E2EResults.RecordOrKnownGap(
+                E2EResults.Record(
                     "hives.menu.load-disabled",
-                    matchesOracle: !loadEnabled,
-                    workPackage: "RF8",
-                    expectedOracleBehavior:
-                        "File > Load Hive is disabled while HKEY_CURRENT_USER is selected. It is enabled only with HKEY_LOCAL_MACHINE or HKEY_USERS selected.",
-                    observed: $"Load Hive enabled={loadEnabled} with the run key under HKEY_CURRENT_USER selected.");
+                    !loadEnabled,
+                    $"Load Hive enabled={loadEnabled} with the run key under HKEY_CURRENT_USER selected; oracle: disabled (only HKEY_LOCAL_MACHINE and HKEY_USERS enable it).");
             }
 
             // Only an enabled Load Hive opens the owned dialog. Invoking a disabled item would send Enter

@@ -1,15 +1,13 @@
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using WinRT.Interop;
 
 namespace Bwc.UI.Dialogs;
 
 /// <summary>
-/// Multi-select favorite remover (oracle DLG-026 and DLG-027). The list is sorted by the caller and
-/// again here so the visible order always matches the menu. The primary action is refused until at
-/// least one name is selected.
+/// Remove Favorites (RT_DIALOG 113). A multi-select list, sorted here so the visible order always
+/// matches the menu. OK with nothing selected shows the message and keeps the dialog open.
 /// </summary>
-public sealed class RemoveFavoritesDialog : ModalDialogWindow
+public sealed class RemoveFavoritesDialog : ClassicDialog
 {
     private const string DefaultEmptySelectionMessage = "Select at least one favorite to remove.";
 
@@ -23,6 +21,7 @@ public sealed class RemoveFavoritesDialog : ModalDialogWindow
         string primaryText = "OK",
         string secondaryText = "Cancel",
         string? emptySelectionMessage = null)
+        : base(ClassicDialogTemplates.RemoveFavorites(title, label, primaryText, secondaryText))
     {
         ArgumentException.ThrowIfNullOrEmpty(title);
         ArgumentException.ThrowIfNullOrEmpty(label);
@@ -32,33 +31,13 @@ public sealed class RemoveFavoritesDialog : ModalDialogWindow
             ? DefaultEmptySelectionMessage
             : emptySelectionMessage;
 
-        Title = title;
-        SetHeading(title);
-        PrimaryText = primaryText;
-        SecondaryText = secondaryText;
-        SetPreferredSize(470, 360);
-
-        _list = new ListBox
-        {
-            SelectionMode = SelectionMode.Multiple,
-            MinHeight = 160,
-            MaxHeight = 240,
-        };
-
-        AutomationProperties.SetAutomationId(_list, "FavoritesList");
-        AutomationProperties.SetName(_list, label);
-
+        _list = RequireControl<ListBox>("FavoritesList");
         foreach (string name in names
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase))
         {
             _list.Items.Add(name);
         }
-
-        var body = new StackPanel { Spacing = 6 };
-        body.Children.Add(new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap });
-        body.Children.Add(_list);
-        SetBody(body);
     }
 
     /// <summary>The names selected when the primary action completed.</summary>
@@ -66,7 +45,7 @@ public sealed class RemoveFavoritesDialog : ModalDialogWindow
 
     protected override void OnDialogLoaded()
     {
-        _ = _list.Focus(FocusState.Programmatic);
+        _ = _list.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
     }
 
     protected override bool TryAccept()
@@ -82,12 +61,19 @@ public sealed class RemoveFavoritesDialog : ModalDialogWindow
 
         if (selected.Count == 0)
         {
-            ShowValidation(_emptySelectionMessage);
-            _ = _list.Focus(FocusState.Programmatic);
+            _ = ShowEmptySelectionAsync();
             return false;
         }
 
         SelectedNames = selected;
         return true;
+    }
+
+    private async Task ShowEmptySelectionAsync()
+    {
+        // The message is owned by this dialog, so this dialog stays disabled until the message closes.
+        ModalDialogWindow error = ErrorDialog.ForMessage(Title, _emptySelectionMessage);
+        _ = await error.ShowAsync(WindowNative.GetWindowHandle(this));
+        _ = _list.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
     }
 }

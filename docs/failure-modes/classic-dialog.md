@@ -374,7 +374,90 @@ the wrong order.
 Guard: callers open follow-up dialogs after `ShowAsync` returns, which the Registry Editor already
 does through `await`.
 
-## 9. Test coverage
+## 9. Classic value editors (RF5)
+
+These are the editors migrated to the classic template in this batch: Edit Multi-String
+(RT_DIALOG 114), Edit Binary Value (RT_DIALOG 103, with the HEX control), Find (RT_DIALOG 106),
+Remove Favorites (RT_DIALOG 113), and the Load Hive style key-name prompt (RT_DIALOG 104) that
+`TextPromptDialog` now uses. The Binary Data viewer keeps its hex control until its listbox layout
+is migrated; see 9.9.
+
+### 9.1 Empty strings saved without a warning
+
+Classic Registry Editor does not save a multi-string with empty strings silently. OK with one or
+more empty lines shows the message box with string 116 (one empty string) or 117 (more than one),
+with the Warning icon and OK. The text is the oracle text, and the box is owned by the Multi-String
+dialog, so the owner stays disabled until the box closes. Guard: `MultiStringValueDialog.TryAccept`
+never returns the list with empty entries before the warning has been answered.
+
+### 9.2 Empty strings kept after OK on the warning
+
+After OK on the warning the empty strings are removed and the dialog closes with the cleaned list.
+A stale result that still holds an empty entry would write it to the registry. Guard: the cleaned
+list is the value, and `Value` is the only result read by the caller.
+
+### 9.3 Warning answered by Escape keeps the empty strings
+
+The classic warning is a message box with OK only (MB_OK), so Escape answers it the same way as OK:
+the empty strings are removed and the dialog closes. There is no Cancel path to test. Guard: the
+warning is shown with `ClassicMessageButtons.Ok`, and `MultiStringValueDialog` removes the empty
+strings only after the warning returns. Test: `valueeditors.multi.cleanup`.
+
+### 9.4 Enter in the Multi-String edit presses OK
+
+The Multi-String edit has ES_WANTRETURN, so Enter inserts a line break. Guard: `FocusedIsMultilineEdit`
+in `ClassicDialog`. Enter only presses OK when the focus is on a button or outside the edit.
+
+### 9.5 Binary editor hex control trapping Tab
+
+The HEX control is a tab stop with a Tab key handler of its own. Tab must leave it for Cancel and
+the value name is read-only and skipped by typing. Guard: the classic root key handler handles Tab
+before the control. Test: Edit Binary tab order.
+
+### 9.6 Binary editor value name edited
+
+The value name is read-only (ES_READONLY), so typing in it changes nothing and it is not an edit
+the caller reads back. Guard: `ReadOnly` on the template edit. Test: Edit Binary read-only name.
+
+### 9.7 Find layout drifts from the template
+
+Find uses RT_DIALOG 106 geometry. The control set is the classic one: Find what, Look at (Keys,
+Values, Data), Match whole string only, Search in subtree, Find Next, and Cancel. The oracle
+measures Search in subtree as visible, so it stays; the request's option list did not include it.
+Guard: each control rectangle is compared with the oracle rectangle within 1 DIP. Test: Find layout.
+
+### 9.12 Find dialog stays open during a search (known gap)
+
+Classic closes the Find dialog when the search starts and shows "Searching the registry..." (RT_DIALOG
+109) with Cancel. The host (`FindController`, not owned by this batch) keeps the Find dialog open and
+reports progress in its status line. Closing on start needs the host to show the progress and
+finished messages, so it is not claimed here.
+
+### 9.8 Find text and scope lost on reopen
+
+The Find options are saved in the settings when the dialog closes, including an unsubmitted edit.
+Guard: `FindDialog.Options` is read in the host's `finally`, unchanged by the layout migration.
+Test: Find state survives reopen.
+
+### 9.9 Binary Data viewer still a hex control
+
+Classic Binary Data (RT_DIALOG 2020 and 2021) is a listbox with Byte, Word, Dword, and Qword format
+radios. The current viewer is the hex control and keeps that layout until the listbox is migrated.
+The gap is reported as a known difference, not verified as parity.
+
+### 9.10 Remove Favorites list not sorted or not multi-select
+
+The list is a multi-select listbox (LBS_MULTIPLESEL with LBS_SORT, style 0x50A1010B). Guard:
+`ClassicControlDefinition.MultiSelect` and the sort in `RemoveFavoritesDialog`. OK with no selection
+shows the message and keeps the dialog open. Test: Remove Favorites multi-select.
+
+### 9.11 Prompt geometry differs from Load Hive
+
+`TextPromptDialog` uses the Load Hive key-name template (RT_DIALOG 104) for every caller. The
+Add to Favorites and new-key prompts have their own templates in classic; those differences are
+reported, not claimed. Guard: rectangles are compared with RT_DIALOG 104 only.
+
+## 10. Test coverage
 
 | Area | Guard | E2E check |
 | --- | --- | --- |
@@ -386,6 +469,11 @@ does through `await`.
 | Enter and Escape | 3.8 | Enter saves once, Escape cancels |
 | Base conversion | 5.1 | 0x1388 shows 5000 in Decimal |
 | Face and text readable | 6.3 | Client face is the palette face; each static text has 12+ strong pixels (`DialogContrast`) |
+| Multi-string warning and cleanup | 9.1, 9.2, 9.3 | `valueeditors.multi.warning`, `valueeditors.multi.cleanup` |
+| Multi-string geometry and tab order | 2.5, 3.1 | `valueeditors.multi.geometry`, `valueeditors.multi.focus-and-tab-order` |
+| Edit Binary geometry and read-only name | 2.5, 3.4, 9.6 | `valueeditors.binary.geometry`, `valueeditors.binary.value-name` |
+| Eight bytes per HEX row | 9.5 (layout) | `valueeditors.binary.eight-bytes` |
+| Find layout | 9.7 | Not yet a geometry check (open item) |
 | Screenshots | all | `artifacts/e2e/visual/dialogs/*.png` |
 
 Edge cases with no E2E check yet: 100 % and 150 % scale (the E2E machine runs at 200 %), monitors

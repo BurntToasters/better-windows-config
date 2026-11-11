@@ -3,6 +3,7 @@ using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
+using FlaUI.Core.Input;
 using FlaUI.UIA3;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Win32;
@@ -225,20 +226,27 @@ public sealed class MessageTests
         driver.OpenMenu(MenuEdit, MenuEditNew, MenuEditNewKey);
         bool prompt = driver.WaitForDialog() && driver.WaitForElement("DialogTextInput") is not null;
         bool typed = prompt && driver.SetText("DialogTextInput", "Child");
-        // The duplicate check runs when the prompt is submitted, and the prompt stays open with the text.
+        // The duplicate check runs when the prompt is submitted. The error is its own modal window over the
+        // prompt, so its text is DialogErrorText. Enter dismisses it, and the prompt stays open with the text.
         bool submitted = typed && driver.Invoke("DialogPrimary");
 
         string validation = string.Empty;
         bool shown = submitted && ControlTestSupport.WaitUntil(
             () =>
             {
-                validation = driver.TextOf("DialogValidationText");
+                validation = driver.TextOf("DialogErrorText");
                 return string.Equals(validation, TextNewKeyExists, StringComparison.Ordinal);
             },
             TimeSpan.FromSeconds(5));
         if (validation.Length > 0)
         {
             SeenMessages.Add(validation);
+        }
+
+        if (shown)
+        {
+            Keyboard.Type(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
+            _ = ControlTestSupport.WaitUntil(() => driver.TextOf("DialogErrorText").Length == 0, TimeSpan.FromSeconds(5));
         }
 
         bool cancelled = shown && driver.Invoke("DialogSecondary");

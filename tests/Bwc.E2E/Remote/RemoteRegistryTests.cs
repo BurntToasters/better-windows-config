@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using Bwc.E2E.Controls;
+using Bwc.E2E.Dialogs;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
@@ -107,17 +108,18 @@ public sealed class RemoteRegistryTests
             bool owned = dialog != 0 &&
                 Win32.GetWindow(dialog, Win32.GvOwner) == session.MainHwnd;
             bool mainDisabled = dialog != 0 && !Win32.IsWindowEnabled(session.MainHwnd);
-            string heading = dialogShown ? driver.TextOf("DialogHeading") : string.Empty;
-            AutomationElement? input = dialogShown ? driver.WaitForElement("DialogTextInput") : null;
-            string label = ControlTestSupport.SafeName(input);
+            // The classic prompt has no heading. Its window title is the caption, and PromptLabel holds the label.
+            AutomationElement? promptRoot = dialogShown ? driver.WaitForElement("DialogRoot") : null;
+            string heading = promptRoot is null ? string.Empty : ControlTestSupport.SafeName(ClassicDialogTests.WindowOf(promptRoot));
+            string label = dialogShown ? driver.TextOf("PromptLabel") : string.Empty;
             E2EResults.Record(
                 "remote.connect.dialog",
                 dialogShown &&
                     owned &&
                     mainDisabled &&
-                    heading.Length > 0 &&
-                    label.Length > 0,
-                $"dialog={dialogShown}, hwnd=0x{dialog:X}, owned={owned}, mainDisabled={mainDisabled}, heading='{heading}', label='{label}'.");
+                    string.Equals(heading, "Connect Network Registry", StringComparison.Ordinal) &&
+                    string.Equals(label, "Computer name:", StringComparison.Ordinal),
+                $"dialog={dialogShown}, hwnd=0x{dialog:X}, owned={owned}, mainDisabled={mainDisabled}, title='{heading}', label='{label}'.");
 
             bool cancelled = dialogShown &&
                 driver.Invoke("DialogSecondary") &&
@@ -139,12 +141,14 @@ public sealed class RemoteRegistryTests
             bool submitted = typed && driver.Invoke("DialogPrimary");
             bool localMessageShown = submitted && ControlTestSupport.WaitUntil(
                 () => string.Equals(
-                    driver.TextOf("DialogValidationText"),
+                    driver.TextOf("DialogErrorText"),
                     LocalComputerMessage,
                     StringComparison.Ordinal),
                 TimeSpan.FromSeconds(10));
-            string validation = localMessageShown ? driver.TextOf("DialogValidationText") : string.Empty;
-            bool dialogStayedOpen = localMessageShown && driver.WaitForDialog(TimeSpan.FromSeconds(2));
+            string validation = localMessageShown ? driver.TextOf("DialogErrorText") : string.Empty;
+            // The error is its own message box with OK focused. Enter closes it, and the prompt stays open.
+            bool errorDismissed = localMessageShown && driver.DismissErrorBox();
+            bool dialogStayedOpen = errorDismissed && driver.WaitForDialog(TimeSpan.FromSeconds(2));
             bool localCancelled = dialogStayedOpen &&
                 driver.Invoke("DialogSecondary") &&
                 driver.WaitForNoDialog();

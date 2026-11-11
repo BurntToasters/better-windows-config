@@ -65,17 +65,22 @@ finished, including all of its values, before cancellation is observed again.
    and ignores only `ERROR_FILE_NOT_FOUND`. A normal line calls `SetValue` with the raw type and
    bytes.
 
-An import is not transactional. If a native call fails in the middle of a section, the calls
-that already succeeded stay applied. That can leave a key with some of its values updated. The
-importer stops at that point and does not start the next section. The same is true when the
-write policy rejects a path: the policy runs before the native call, so the rejected entry
-causes no write, but earlier entries stay applied.
+An import is not transactional, and it does not stop at the first problem. A rejected write is
+recorded in `RegFileImportResult.Failures` as a `WriteFailed` failure with its file line, key
+path, value name, and Win32 error. The importer then continues with the next line, as classic
+regedit does. A section whose key cannot be created or opened has its value lines skipped, and
+the import continues with the next section. Writes that already succeeded stay applied. The write
+policy runs before the native call, so a rejected entry causes no write.
 
-`ApplyFile` parses the whole file with `RegFileReader.ParseFile` before applying anything. A
-malformed file, an unreadable file, or a bad path in the document therefore causes no registry
-change at all. A document constructed by hand is not re-validated against the file grammar, but
-every key path still goes through `RegistryPath.Parse`; a path that is not an absolute registry
-path raises `ArgumentException`.
+`ApplyFile` reads the file with `RegFileReader.ParseFileLenient`. A line the grammar rejects is
+skipped and recorded as a `MalformedLine` failure, and the rest of the file is applied. Only a
+file-level problem refuses the whole file, and a refused file writes nothing. The refusal is a
+`RegFileRefusal` code: `NotRegistryFile` for a missing or wrong header or an undecodable byte
+order, `InvalidKeyPath` for a key path with an unknown root or a bad segment, and `ReadFailed` for
+a file that cannot be opened or read. A document constructed by hand is not re-validated against
+the file grammar, but every key path still goes through `RegistryPath.Parse`. A path that is not
+an absolute registry path raises `ArgumentException` out of `Apply`, and the window and the
+command line report it as a failed import.
 
 Deleting a key that does not exist, deleting a value that does not exist, and creating a key
 that already exists are all normal idempotent outcomes. Deleting a predefined root is rejected
@@ -86,18 +91,18 @@ successful import.
 
 A key section `[-HKEY_CURRENT_USER\...]` deletes the key and everything below it. A value line
 `@=-` or `"name"=-` deletes that value. Missing targets are ignored only for the two
-file-not-found cases above. Access denied, a read-only key, or a policy denial is reported as
-`RegistryOperationException` and stops the import.
+file-not-found cases above. Access denied, a read-only key, or a policy denial is recorded as a
+`WriteFailed` failure, and the import continues with the next line.
 
 A value line that follows a delete key section is parsed but not applied. Classic files do not
 produce that shape, and treating the section as a pure delete keeps the behavior predictable.
 
 ## 6. Missing keys and values
 
-The importer does not invent missing ancestors. Each section creates exactly its own path, so a
-file that creates `HKCU\Software\A\B` without a section for `HKCU\Software\A` fails when
-`CreateKey` tries to open the missing parent. Classic regedit writes every ancestor section, so
-a well-formed export always imports.
+The importer creates every missing ancestor of a section's key before the section, top down, as
+classic regedit does. A file that creates `HKCU\Software\A\B` without a section for
+`HKCU\Software\A` therefore still imports. A predefined root always exists and is never created.
+An ancestor that a concurrent writer creates first is not an error.
 
 A value line under a key that the same file deleted earlier applies to the recreated key only if
 a later section recreates it. Order matters and is preserved.
@@ -133,8 +138,8 @@ documented lossy behavior of classic regedit and is covered by `reg-files.md`. T
 the UTF-16 text.
 
 The importer detects the format from the BOM and the first line. A file with no recognized
-header, an odd UTF-16LE byte count, or a big-endian UTF-16 BOM is a parse failure and applies
-nothing.
+header, an odd UTF-16LE byte count, or a big-endian UTF-16 BOM is a refused file and applies
+nothing. The window reports it with string 133, and the command line exits 1.
 
 ## 10. Unknown switches and arguments
 
@@ -146,10 +151,12 @@ available.
 
 ## 11. `/m`
 
-`/m` is accepted as a no-op for multiple instances. This build has no single-instance gate, so
-there is nothing to disable. `/m` by itself continues to the normal window with the usual
-LastKey, shell, and settings behavior. `/m` may appear before or after another switch; it does
-not change that operation's exit code.
+`/m` opens a separate window. A launch with `/m` never joins the single-instance gate, so it does
+not activate a window that is already running. A launch without `/m` activates the running window
+instead of opening a second one, and a `.reg` path on that launch asks to import the file in the
+running window. `/m` by itself continues to the normal window with the usual LastKey, shell, and
+settings behavior. `/m` may appear before or after another switch; it does not change that
+operation's exit code.
 
 ## 12. No window, exit codes, and flushing
 
@@ -159,11 +166,22 @@ unchanged.
 
 | Result | Exit code |
 | --- | --- |
-| Silent import succeeded | 0 |
+| Silent import succeeded, or skipped only malformed lines | 0 |
 | Export succeeded | 0 |
 | Normal window launched, including `/m` alone | process stays alive |
-| Import or export failed, including a policy denial | 1 |
+| Silent import refused (not a registry file, bad key path, unreadable file) | 1 |
+| Silent import with at least one rejected write, including a policy denial | 1 |
+| Export failed | 1 |
 | Unknown switch or bad argument shape | 2 |
+
+The oracle (`docs/parity/oracle/import-behavior.json`) records exit 0 for every file it could run,
+including a file with a malformed line. It has no captured exit code for a refused file, a rejected
+write, or a file it refused before running, so the exit 1 rows are BWC decisions. A future oracle
+capture can confirm or change them.
+
+In the window, a refused file shows string 133, 125, or 129 with the file path. A rejected write
+shows string 132 after the rest of the file has been applied. A file that imports with only skipped
+lines shows string 228. The window does not show a message for a skipped line.
 
 Errors go to the log through `Bwc.Core.Log` and to standard error when that handle is available.
 The log writer flushes each entry itself; standard error is flushed before `Environment.Exit`

@@ -2,6 +2,8 @@ using Bwc.E2E.Controls;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
+using FlaUI.Core.Input;
+using FlaUI.Core.WindowsAPI;
 using FlaUI.UIA3;
 
 namespace Bwc.E2E.Editing;
@@ -55,6 +57,18 @@ internal sealed class EditingDriver : IDisposable
 
     internal bool WaitForDialog(TimeSpan? timeout = null) =>
         WaitForElement("DialogRoot", timeout ?? UiTimeout) is not null;
+
+    /// <summary>
+    /// Dismisses a message box whose OK button has the focus. Enter is sent once, and the message text must
+    /// clear. A prompt underneath is left open.
+    /// </summary>
+    internal bool DismissErrorBox(TimeSpan? timeout = null)
+    {
+        Keyboard.Type(VirtualKeyShort.RETURN);
+        return ControlTestSupport.WaitUntil(
+            () => TextOf("DialogErrorText").Length == 0,
+            timeout ?? TimeSpan.FromSeconds(10));
+    }
 
     internal bool WaitForNoDialog(TimeSpan? timeout = null) =>
         ControlTestSupport.WaitUntil(

@@ -15,6 +15,9 @@
     <None Include="..\..\docs\parity\oracle\exports\*.reg"
           Link="oracle\%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\docs\parity\oracle\import-behavior.json"
+          Link="oracle\import-behavior.json"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

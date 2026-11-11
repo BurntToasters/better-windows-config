@@ -324,7 +324,7 @@ public sealed class ClassicDialogTests
     }
 
     /// <summary>The template rows in template order, with the numbers copied from the oracle (DLU).</summary>
-    private static readonly ControlRect[] EditStringControls =
+    internal static readonly ControlRect[] EditStringControls =
     [
         new("ValueDataLabel", 65535, 6, 35, 161, 8),
         new(ValueInput, 1001, 6, 46, 240, 12),
@@ -334,7 +334,7 @@ public sealed class ClassicDialogTests
         new(NameInputId, 1000, 6, 17, 240, 12),
     ];
 
-    private static readonly ControlRect[] DwordControls =
+    internal static readonly ControlRect[] DwordControls =
     [
         new("ValueDataLabel", 65535, 6, 35, 61, 8),
         new(ValueInput, 1001, 6, 46, 92, 12),
@@ -351,7 +351,7 @@ public sealed class ClassicDialogTests
     /// Compares every control rectangle with the template converted by MapDialogRect on a hidden
     /// dialog built from the same font, at the dialog's DPI. The tolerance is one DIP.
     /// </summary>
-    private static void CheckGeometry(
+    internal static void CheckGeometry(
         string checkId,
         AutomationElement dialog,
         IntPtr hwnd,
@@ -414,7 +414,7 @@ public sealed class ClassicDialogTests
             (deviations.Count == 0 ? "All within tolerance." : string.Join("; ", deviations)));
     }
 
-    private static AutomationElement? OpenValueRow(AppSession session, SandboxRegistry sandbox, string name, string checkId)
+    internal static AutomationElement? OpenValueRow(AppSession session, SandboxRegistry sandbox, string name, string checkId)
     {
         AutomationElement? row = ControlTestSupport.FindRowByName(
             session,
@@ -438,7 +438,7 @@ public sealed class ClassicDialogTests
     /// Opens the value editor with Edit > Modify from the value's context menu (command 912), the same
     /// real-input path the classic Modify command uses. The row must already be selected.
     /// </summary>
-    private static bool OpenEditor(AppSession session, EditingDriver driver, AutomationElement row, string checkId)
+    internal static bool OpenEditor(AppSession session, EditingDriver driver, AutomationElement row, string checkId)
     {
         _ = ControlTestSupport.EnsureForeground(session);
         using var menus = new ContextMenuDriver(session);
@@ -450,7 +450,7 @@ public sealed class ClassicDialogTests
     }
 
     /// <summary>Sends Alt+letter to the foreground dialog. The letter is the mnemonic under test.</summary>
-    private static bool SendAltLetter(char letter)
+    internal static bool SendAltLetter(char letter)
     {
         try
         {
@@ -463,14 +463,14 @@ public sealed class ClassicDialogTests
         }
     }
 
-    private static void SelectAllAndType(string text)
+    internal static void SelectAllAndType(string text)
     {
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
         Keyboard.Type(text);
     }
 
     /// <summary>Presses Tab until the focused element has the automation id, at most five presses.</summary>
-    private static bool FocusAutomationId(UIA3Automation automation, string automationId)
+    internal static bool FocusAutomationId(UIA3Automation automation, string automationId)
     {
         for (int i = 0; i < 5; i++)
         {
@@ -487,7 +487,7 @@ public sealed class ClassicDialogTests
     }
 
     /// <summary>Presses Tab <paramref name="count"/> times and returns the focused automation id after each press.</summary>
-    private static string TabSequence(UIA3Automation automation, int count)
+    internal static string TabSequence(UIA3Automation automation, int count)
     {
         var names = new List<string>();
         for (int i = 0; i < count; i++)
@@ -501,7 +501,7 @@ public sealed class ClassicDialogTests
         return string.Join(",", names);
     }
 
-    private static string FocusedId(UIA3Automation automation)
+    internal static string FocusedId(UIA3Automation automation)
     {
         try
         {
@@ -513,7 +513,7 @@ public sealed class ClassicDialogTests
         }
     }
 
-    private static string CaptionOf(UIA3Automation automation, IntPtr hwnd)
+    internal static string CaptionOf(UIA3Automation automation, IntPtr hwnd)
     {
         try
         {
@@ -526,7 +526,7 @@ public sealed class ClassicDialogTests
     }
 
     /// <summary>The HWND of the top-level dialog window. DialogRoot has no handle, so the Window ancestor is used.</summary>
-    private static IntPtr DialogHandle(AutomationElement dialog)
+    internal static IntPtr DialogHandle(AutomationElement dialog)
     {
         AutomationElement? current = dialog;
         for (int depth = 0; current is not null && depth < 32; depth++)
@@ -549,7 +549,7 @@ public sealed class ClassicDialogTests
         return IntPtr.Zero;
     }
 
-    private static bool EnsureForeground(IntPtr hwnd)
+    internal static bool EnsureForeground(IntPtr hwnd)
     {
         for (int attempt = 0; attempt < 3; attempt++)
         {
@@ -569,7 +569,7 @@ public sealed class ClassicDialogTests
     }
 
     /// <summary>Saves the whole dialog window, including its caption and frame, as a PNG.</summary>
-    private static string SaveScreenshot(AutomationElement dialog, string path)
+    internal static string SaveScreenshot(AutomationElement dialog, string path)
     {
         AutomationElement window = WindowOf(dialog);
         using (var image = Capture.Element(window))
@@ -580,7 +580,7 @@ public sealed class ClassicDialogTests
         return path;
     }
 
-    private static AutomationElement WindowOf(AutomationElement dialog)
+    internal static AutomationElement WindowOf(AutomationElement dialog)
     {
         AutomationElement? current = dialog;
         for (int depth = 0; current is not null && depth < 32; depth++)
@@ -603,11 +603,11 @@ public sealed class ClassicDialogTests
         return dialog;
     }
 
-    private static bool RowExists(AppSession session, string name) =>
+    internal static bool RowExists(AppSession session, string name) =>
         ControlTestSupport.ListRowNames(session).Contains(name, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Checks the value name box: it shows the expected name and is read-only, as in classic regedit.</summary>
-    private static void CheckValueName(EditingDriver driver, string expected, string checkId)
+    internal static void CheckValueName(EditingDriver driver, string expected, string checkId)
     {
         AutomationElement? box = driver.WaitForElement(NameInputId, TimeSpan.FromSeconds(2));
         string shown = box is null ? string.Empty : driver.TextOf(NameInputId);
@@ -618,7 +618,7 @@ public sealed class ClassicDialogTests
             $"value name box='{shown}', expected '{expected}', read-only={readOnly}.");
     }
 
-    private static bool IsReadOnly(AutomationElement element)
+    internal static bool IsReadOnly(AutomationElement element)
     {
         try
         {
@@ -779,7 +779,7 @@ public sealed class ClassicDialogTests
         }
     }
 
-    private static string FreshDataRoot(E2EConfig config, string scope)
+    internal static string FreshDataRoot(E2EConfig config, string scope)
     {
         string path = config.DataRootFor(scope);
         if (Directory.Exists(path))
@@ -792,7 +792,7 @@ public sealed class ClassicDialogTests
     }
 
     /// <summary>One template control: its id, its automation id, and its rectangle in DLU.</summary>
-    private sealed record ControlRect(string AutomationId, int Id, int X, int Y, int Cx, int Cy);
+    internal sealed record ControlRect(string AutomationId, int Id, int X, int Y, int Cx, int Cy);
 
     /// <summary>
     /// Converts DLU rectangles with MapDialogRect. A hidden dialog is created from an in-memory

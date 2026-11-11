@@ -1,4 +1,5 @@
 using Bwc.E2E.Controls;
+using Bwc.E2E.Dialogs;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
@@ -98,7 +99,9 @@ public sealed class FavoritesTests
             E2EGuards.RequireSandboxSelection(session, sandbox, "favorites.sandbox.add");
             bool addMenu = TryOpenMenu(driver, 517, 1281);
             bool addDialog = addMenu && driver.WaitForDialog();
-            string heading = addDialog ? driver.TextOf("DialogHeading") : string.Empty;
+            // The classic prompt has no heading. Its window title is the caption.
+            AutomationElement? promptRoot = addDialog ? driver.WaitForElement("DialogRoot") : null;
+            string heading = promptRoot is null ? string.Empty : ControlTestSupport.SafeName(ClassicDialogTests.WindowOf(promptRoot));
             string suggested = addDialog ? driver.TextOf("DialogTextInput") : string.Empty;
             bool typed = addDialog && driver.SetText("DialogTextInput", FavoriteName);
             bool accepted = typed && driver.Invoke("DialogPrimary") && driver.WaitForNoDialog();
@@ -152,12 +155,14 @@ public sealed class FavoritesTests
             bool duplicateSubmitted = duplicateTyped && driver.Invoke("DialogPrimary");
             bool duplicateMessage = duplicateSubmitted && ControlTestSupport.WaitUntil(
                 () => string.Equals(
-                    driver.TextOf("DialogValidationText"),
+                    driver.TextOf("DialogErrorText"),
                     "There is already a favorite with that name.",
                     StringComparison.OrdinalIgnoreCase),
                 TimeSpan.FromSeconds(10));
-            string duplicateText = duplicateMessage ? driver.TextOf("DialogValidationText") : string.Empty;
-            bool duplicateCancelled = duplicateMessage &&
+            string duplicateText = duplicateMessage ? driver.TextOf("DialogErrorText") : string.Empty;
+            // The error is its own message box with OK focused. Enter closes it, and the prompt stays open.
+            bool duplicateErrorDismissed = duplicateMessage && driver.DismissErrorBox();
+            bool duplicateCancelled = duplicateErrorDismissed &&
                 driver.Invoke("DialogSecondary") &&
                 driver.WaitForNoDialog();
             string? stillStored = duplicateCancelled ? sandbox.ReadString("Favorites", FavoriteName) : null;

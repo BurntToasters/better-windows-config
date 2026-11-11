@@ -160,8 +160,29 @@ the owning package records the observed behavior as a golden before implementing
   document. Classic regedit does not refuse it: a probe export stopped silently at such a value
   and did not exit, so copying that output is not an option.
 - The parser accepts everything regedit accepts, including `-` key deletion lines,
-  `"name"=-` value deletion, `hex(N):` for any type, and continuation lines. Error behavior for
-  malformed files is *verify against oracle*.
+  `"name"=-` value deletion, `hex(N):` for any type, and continuation lines.
+- Import (package E2) follows classic `regedit /s`, the oracle in
+  `docs/parity/oracle/import-behavior.json`, and is specified in `docs/failure-modes/reg-import.md`.
+  The lenient entry points are `RegFileReader.ParseLenient` and `RegFileReader.ParseFileLenient`.
+  A malformed line is skipped and listed in `RegFileDocument.Problems`. Only a file-level problem
+  refuses the whole file, and the refusal is a code on `RegFileRefusal`: `NotRegistryFile`,
+  `InvalidKeyPath`, or `ReadFailed`. A refused file writes nothing.
+- `RegFileImporter.Apply` and `ApplyFile` return a `RegFileImportResult` and do not throw for a
+  malformed or refused file, or for a rejected write. The result carries `KeysWritten`,
+  `KeysDeleted`, `ValuesWritten`, `ValuesDeleted`, and `Failures`. Each failure has its file line,
+  a kind (`MalformedLine` or `WriteFailed`), the key path and value name for a write, and the Win32
+  error. A write failure does not stop the import, and writes that succeeded stay applied.
+- Import creates each missing ancestor key before its section, as classic regedit does. A
+  predefined root (`[HKEY_CURRENT_USER]`) is never created or deleted; its values are written
+  through the normal write path.
+- Import reports progress through `IProgress<ImportProgress>` after each key section finishes.
+  Cancellation is checked before each section and throws `OperationCanceledException`. Sections
+  already finished stay applied.
+- The engine returns codes only. The UI maps a refusal to regedit string 133 (not a registry file),
+  129 or 130 (read failure), or 125 (invalid key). It maps a result with `HasWriteFailures` to
+  string 132, the text of which is `Cannot import %1: Not all data was successfully written to the
+  registry.  Some keys are open by the system or other processes, or you have insufficient
+  privileges to perform this operation.` (two spaces after `registry.`).
 
 ## Command line (package R13)
 

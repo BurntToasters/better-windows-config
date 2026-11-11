@@ -107,7 +107,7 @@ public sealed class FindTests
 
             bool entered = preparedKeys && driver.Focus("FindText") && driver.SendEnter();
             Record("find.keys.enter", entered, $"Enter sent={entered}.");
-            bool alphaStatus = driver.WaitForStatus("Found", TimeSpan.FromSeconds(30));
+            bool alphaStatus = driver.WaitForSearchIdle(TimeSpan.FromSeconds(30));
             bool alphaSelected = ControlTestSupport.WaitForTreeSelection(
                 session,
                 "Alpha",
@@ -115,10 +115,10 @@ public sealed class FindTests
             Record(
                 "find.keys.first",
                 alphaStatus && alphaSelected,
-                $"status='{driver.TextOf("FindStatus")}', Alpha selected={alphaSelected}.");
+                $"status='{driver.StatusText()}', Alpha selected={alphaSelected}.");
 
             bool nextClicked = driver.Invoke("DialogPrimary");
-            bool alphabetStatus = nextClicked && driver.WaitForStatus("Found", TimeSpan.FromSeconds(30));
+            bool alphabetStatus = nextClicked && driver.WaitForSearchIdle(TimeSpan.FromSeconds(30));
             bool alphabetSelected = ControlTestSupport.WaitForTreeSelection(
                 session,
                 "Alphabet",
@@ -126,7 +126,7 @@ public sealed class FindTests
             Record(
                 "find.keys.second",
                 alphabetStatus && alphabetSelected,
-                $"status='{driver.TextOf("FindStatus")}', Alphabet selected={alphabetSelected}.");
+                $"status='{driver.StatusText()}', Alphabet selected={alphabetSelected}.");
 
             // Values only: DataNeedle's value name matches and its list row is selected.
             bool resetForValue = SelectRunRoot(session, config);
@@ -137,7 +137,7 @@ public sealed class FindTests
                 driver.SetChecked("FindValues", true) &&
                 driver.SetChecked("FindData", false);
             bool valueClicked = preparedValue && driver.Invoke("DialogPrimary");
-            bool valueStatus = valueClicked && driver.WaitForStatus("Found", TimeSpan.FromSeconds(30));
+            bool valueStatus = valueClicked && driver.WaitForSearchIdle(TimeSpan.FromSeconds(30));
             bool valueRowSelected = ControlTestSupport.WaitUntil(
                 () => ControlTestSupport.IsSelected(
                     ControlTestSupport.FindRowByName(
@@ -149,7 +149,7 @@ public sealed class FindTests
             Record(
                 "find.values.hit",
                 valueStatus && valueRowSelected,
-                $"status='{driver.TextOf("FindStatus")}', row '{ValueHitName}' selected={valueRowSelected}.");
+                $"status='{driver.StatusText()}', row '{ValueHitName}' selected={valueRowSelected}.");
 
             // Data only: the value data contains the needle text and maps back to its row.
             bool resetForData = SelectRunRoot(session, config);
@@ -160,7 +160,7 @@ public sealed class FindTests
                 driver.SetChecked("FindValues", false) &&
                 driver.SetChecked("FindData", true);
             bool dataClicked = preparedData && driver.Invoke("DialogPrimary");
-            bool dataStatus = dataClicked && driver.WaitForStatus("Found", TimeSpan.FromSeconds(30));
+            bool dataStatus = dataClicked && driver.WaitForSearchIdle(TimeSpan.FromSeconds(30));
             bool dataRowSelected = ControlTestSupport.WaitUntil(
                 () => ControlTestSupport.IsSelected(
                     ControlTestSupport.FindRowByName(
@@ -172,7 +172,7 @@ public sealed class FindTests
             Record(
                 "find.data.hit",
                 dataStatus && dataRowSelected,
-                $"status='{driver.TextOf("FindStatus")}', row '{DataHitName}' selected={dataRowSelected}.");
+                $"status='{driver.StatusText()}', row '{DataHitName}' selected={dataRowSelected}.");
 
             // No hit: the oracle finished message is shown and the dialog stays open.
             bool resetForMiss = SelectRunRoot(session, config);
@@ -190,15 +190,18 @@ public sealed class FindTests
             Record(
                 "find.miss.finished",
                 finished && staysOpen,
-                $"status='{driver.TextOf("FindStatus")}', dialog open={staysOpen}.");
+                $"status='{driver.StatusText()}', dialog open={staysOpen}.");
 
-            bool missAgain = driver.Invoke("DialogPrimary") && driver.WaitForStatusText(
+            // The finished message is modal to the Find dialog, so it is dismissed with OK before Find Next again.
+            Keyboard.Type(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
+            bool dismissed = ControlTestSupport.WaitUntil(() => driver.StatusText() != FinishedMessage, TimeSpan.FromSeconds(10));
+            bool missAgain = dismissed && driver.Invoke("DialogPrimary") && driver.WaitForStatusText(
                 FinishedMessage,
                 TimeSpan.FromSeconds(10));
             Record(
                 "find.miss.noWrap",
                 missAgain,
-                $"second Find Next status='{driver.TextOf("FindStatus")}'.");
+                $"second Find Next status='{driver.StatusText()}'.");
 
             bool cancelClosed = driver.Invoke("DialogSecondary") && driver.WaitForClosed();
             Record("find.miss.cancelCloses", cancelClosed, $"Cancel closed={cancelClosed}.");
@@ -639,14 +642,35 @@ public sealed class FindTests
             }
         }
 
+        /// <summary>
+        /// The classic Find dialog has no status line. A finished search is a message box, so its text is
+        /// the status. A status line, when present, is read as before.
+        /// </summary>
+        internal string StatusText()
+        {
+            AutomationElement? message = FindAcrossWindows("DialogMessage");
+            if (message is not null)
+            {
+                return ControlTestSupport.SafeName(message);
+            }
+
+            return TextOf("FindStatus");
+        }
+
+        /// <summary>A hit leaves the dialog open with Find Next enabled again; the search is idle when it is.</summary>
+        internal bool WaitForSearchIdle(TimeSpan timeout) =>
+            ControlTestSupport.WaitUntil(
+                () => FindElement("DialogPrimary") is { IsEnabled: true },
+                timeout);
+
         internal bool WaitForStatus(string fragment, TimeSpan timeout) =>
             ControlTestSupport.WaitUntil(
-                () => TextOf("FindStatus").Contains(fragment, StringComparison.Ordinal),
+                () => StatusText().Contains(fragment, StringComparison.Ordinal),
                 timeout);
 
         internal bool WaitForStatusText(string expected, TimeSpan timeout) =>
             ControlTestSupport.WaitUntil(
-                () => string.Equals(TextOf("FindStatus"), expected, StringComparison.Ordinal),
+                () => string.Equals(StatusText(), expected, StringComparison.Ordinal),
                 timeout);
 
         internal bool SendEnter() => SendVirtualKey(VirtualKeyShort.RETURN);

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Bwc.UI.Menu;
 using Bwc.UI.Shell;
+using Bwc.UI.Theme;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -25,6 +26,14 @@ public static class RegeditMenu
     /// <summary>Oracle command id of View &gt; Address Bar (RT_MENU 103, id 668), the one toggle item.</summary>
     private const int AddressBarCommandId = 668;
     private const string MenuFlyoutSeparatorStyleKey = "BwcMenuFlyoutSeparatorStyle";
+
+    /// <summary>The View > Theme submenu (BWC addition, outside the oracle ids) and its three radio items.</summary>
+    internal const int ThemeMenuCommandId = 9100;
+    internal const int ThemeSystemCommandId = 9101;
+    internal const int ThemeLightCommandId = 9102;
+    internal const int ThemeDarkCommandId = 9103;
+
+    private const string ThemeRadioGroupName = "BwcTheme";
 
     /// <summary>The AutomationId prefix for the dynamic favorite entries after the two commands.</summary>
     internal const string FavoriteAutomationPrefix = "MenuCommand_Favorite_";
@@ -60,7 +69,10 @@ public static class RegeditMenu
         Action? loadHive = null,
         Action? unloadHive = null,
         Action? connectNetworkRegistry = null,
-        Action? disconnectNetworkRegistry = null)
+        Action? disconnectNetworkRegistry = null,
+        Action? font = null,
+        Action? about = null,
+        Action<BwcThemeOverride>? setTheme = null)
     {
         ArgumentNullException.ThrowIfNull(loader);
         ArgumentNullException.ThrowIfNull(shell);
@@ -143,7 +155,19 @@ public static class RegeditMenu
                 Command(loader, 679, "MenuViewDisplayBinaryData", isEnabled: false, children: NoChildren, invoke: displayBinaryData),
                 ClassicCommandItem.Separator,
                 Command(loader, 648, "MenuViewRefresh", isEnabled: true, NoChildren, editCommands.Refresh),
-                Command(loader, 699, "MenuViewFont"),
+                Command(loader, 699, "MenuViewFont", isEnabled: true, NoChildren, font),
+                ClassicCommandItem.Separator,
+                Command(
+                    loader,
+                    ThemeMenuCommandId,
+                    "MenuViewTheme",
+                    isEnabled: true,
+                    new ClassicCommandItem[]
+                    {
+                        Command(loader, ThemeSystemCommandId, "MenuViewThemeSystem", isEnabled: true, NoChildren, () => setTheme?.Invoke(BwcThemeOverride.System)),
+                        Command(loader, ThemeLightCommandId, "MenuViewThemeLight", isEnabled: true, NoChildren, () => setTheme?.Invoke(BwcThemeOverride.Light)),
+                        Command(loader, ThemeDarkCommandId, "MenuViewThemeDark", isEnabled: true, NoChildren, () => setTheme?.Invoke(BwcThemeOverride.Dark)),
+                    }),
             });
 
         var favorites = Command(
@@ -164,7 +188,7 @@ public static class RegeditMenu
             isEnabled: true,
             new ClassicCommandItem[]
             {
-                Command(loader, 667, "MenuHelpAbout"),
+                Command(loader, 667, "MenuHelpAbout", isEnabled: true, NoChildren, about),
             });
 
         return new[] { file, edit, view, favorites, help };
@@ -434,9 +458,13 @@ public static class RegeditMenu
         }
 
         // View > Address Bar is a toggle, so it is a ToggleMenuFlyoutItem and carries the check mark.
+        // The three theme items are radio items in one group, so exactly one shows a bullet.
+        bool radio = IsThemeRadio(command.Id);
         MenuFlyoutItem item = command.Id == AddressBarCommandId
             ? new ToggleMenuFlyoutItem()
-            : new MenuFlyoutItem();
+            : radio
+                ? new RadioMenuFlyoutItem { GroupName = ThemeRadioGroupName }
+                : new MenuFlyoutItem();
         item.Text = command.Text;
         item.IsEnabled = command.IsEnabled;
         item.Tag = command.Id;
@@ -462,6 +490,45 @@ public static class RegeditMenu
 
         ApplyStyle(item, item is ToggleMenuFlyoutItem ? ToggleMenuFlyoutItemStyleKey : MenuFlyoutItemStyleKey);
         return item;
+    }
+
+    private static bool IsThemeRadio(int commandId) =>
+        commandId is ThemeSystemCommandId or ThemeLightCommandId or ThemeDarkCommandId;
+
+    /// <summary>
+    /// Marks the View > Theme radio item that matches the override. Call after the menu is built and
+    /// after each change.
+    /// </summary>
+    public static void SetThemeChecked(MenuBar menuBar, BwcThemeOverride value)
+    {
+        ArgumentNullException.ThrowIfNull(menuBar);
+
+        int checkedId = value switch
+        {
+            BwcThemeOverride.Light => ThemeLightCommandId,
+            BwcThemeOverride.Dark => ThemeDarkCommandId,
+            _ => ThemeSystemCommandId,
+        };
+
+        foreach (var item in menuBar.Items.OfType<MenuBarItem>())
+        {
+            CheckThemeRadios(item.Items, checkedId);
+        }
+    }
+
+    private static void CheckThemeRadios(IEnumerable<MenuFlyoutItemBase> items, int checkedId)
+    {
+        foreach (var entry in items)
+        {
+            if (entry is RadioMenuFlyoutItem radio && radio.Tag is int id && IsThemeRadio(id))
+            {
+                radio.IsChecked = id == checkedId;
+            }
+            else if (entry is MenuFlyoutSubItem subItem)
+            {
+                CheckThemeRadios(subItem.Items, checkedId);
+            }
+        }
     }
 
     private static void ApplyStyle(FrameworkElement element, string key)

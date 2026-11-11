@@ -119,19 +119,16 @@ public sealed class HexEditingTests
             opened,
             $"doubleClick opened editor={opened}.");
 
-        string heading = driver.TextOf("DialogHeading");
-        string status = driver.TextOf("HexStatus");
+        string status = StatusOf(driver);
         AutomationElement? firstRow = driver.WaitForElement("HexRow_0");
         string rowText = ControlTestSupport.SafeName(firstRow);
-        bool rowOk = rowText.Contains("00000000", StringComparison.Ordinal) &&
-            rowText.Contains("00 01 02", StringComparison.Ordinal);
+        bool rowOk = rowText.StartsWith("0000  00 01 02", StringComparison.Ordinal);
         bool statusOk = status.Contains("48 bytes", StringComparison.Ordinal) &&
-            status.Contains("REG_BINARY", StringComparison.Ordinal) &&
             status.Contains("Overwrite", StringComparison.Ordinal);
         E2EResults.Record(
             "hexedit.dialog.content",
-            heading.Contains(BinaryValueName, StringComparison.Ordinal) && rowOk && statusOk,
-            $"heading='{heading}', status='{status}', row0='{rowText}'.");
+            driver.TextOf("ValueNameInput") == BinaryValueName && rowOk && statusOk,
+            $"caption-name='{driver.TextOf("ValueNameInput")}', status='{status}', row0='{rowText}'.");
 
         AutomationElement? editor = driver.WaitForElement("HexEditor");
         bool focused = FocusEditor(session, firstRow, editor);
@@ -216,7 +213,7 @@ public sealed class HexEditingTests
 
         E2EGuards.RequireSandboxSelection(session, sandbox, "hexedit.sandbox.reopen");
         bool opened = OpenEditor(session, driver, BinaryValueName);
-        string status = driver.TextOf("HexStatus");
+        string status = StatusOf(driver);
         AutomationElement? editor = driver.WaitForElement("HexEditor");
         AutomationElement? firstRow = driver.WaitForElement("HexRow_0");
         bool focused = FocusEditor(session, firstRow, editor);
@@ -232,12 +229,12 @@ public sealed class HexEditingTests
         }
 
         bool insertStatus = insert && ControlTestSupport.WaitUntil(
-            () => driver.TextOf("HexStatus").Contains("Insert", StringComparison.Ordinal),
+            () => StatusOf(driver).Contains("Insert", StringComparison.Ordinal),
             TimeSpan.FromSeconds(5));
         E2EResults.Record(
             "hexedit.insertmode",
             insertStatus,
-            $"insert={insert}, status='{driver.TextOf("HexStatus")}', help='{HelpTextOf(editor)}'.");
+            $"insert={insert}, status='{StatusOf(driver)}', help='{HelpTextOf(editor)}'.");
 
         bool moved = insertStatus;
         if (moved)
@@ -258,12 +255,12 @@ public sealed class HexEditingTests
         }
 
         bool lengthChanged = backspaced && ControlTestSupport.WaitUntil(
-            () => driver.TextOf("HexStatus").Contains("46 bytes", StringComparison.Ordinal),
+            () => StatusOf(driver).Contains("46 bytes", StringComparison.Ordinal),
             TimeSpan.FromSeconds(5));
         E2EResults.Record(
             "hexedit.insert.delete",
             moved && deleted && backspaced && lengthChanged,
-            $"moved={moved}, deleted={deleted}, backspaced={backspaced}, status='{driver.TextOf("HexStatus")}', help='{HelpTextOf(editor)}'.");
+            $"moved={moved}, deleted={deleted}, backspaced={backspaced}, status='{StatusOf(driver)}', help='{HelpTextOf(editor)}'.");
 
         Keyboard.Press(VirtualKeyShort.ESCAPE);
         bool closed = driver.WaitForNoDialog();
@@ -366,7 +363,7 @@ public sealed class HexEditingTests
         }
 
         bool dialog = driver.WaitForDialog();
-        bool root = driver.WaitForElement("HexEditorDialog") is not null;
+        bool root = driver.WaitForElement("DialogRoot") is not null;
         bool editor = driver.WaitForElement("HexEditor") is not null;
         return dialog && root && editor;
     }
@@ -463,6 +460,32 @@ public sealed class HexEditingTests
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// The classic Edit Binary Value has no status line. The length and the mode come from the editor's
+    /// E2E help text, and the text reads like the old status: "48 bytes Overwrite".
+    /// </summary>
+    private static string StatusOf(EditingDriver driver)
+    {
+        string help = HelpTextOf(driver.WaitForElement("HexEditor"));
+        string length = HelpField(help, "Length");
+        string mode = HelpField(help, "Mode");
+        return length.Length == 0 ? string.Empty : $"{length} bytes {mode}";
+    }
+
+    private static string HelpField(string help, string name)
+    {
+        foreach (string part in help.Split(';'))
+        {
+            int equals = part.IndexOf('=', StringComparison.Ordinal);
+            if (equals > 0 && string.Equals(part[..equals], name, StringComparison.Ordinal))
+            {
+                return part[(equals + 1)..];
+            }
+        }
+
+        return string.Empty;
     }
 
     private static string HelpTextOf(AutomationElement? element)

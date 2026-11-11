@@ -1,3 +1,4 @@
+using Bwc.UI.Hex;
 using Bwc.UI.Theme;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
@@ -138,6 +139,18 @@ internal static class ClassicControlFactory
                     FontFamily = new FontFamily(font.Face),
                     FontSize = font.DipSize,
                     IsTabStop = definition.TabStop,
+                    SelectionMode = definition.MultiSelect ? SelectionMode.Multiple : SelectionMode.Single,
+                };
+                break;
+
+            case ClassicControlKind.HexEditor:
+                // The HEX control is read-only until the dialog that owns it enables editing.
+                element = new HexEditor
+                {
+                    IsReadOnly = true,
+                    IsTabStop = definition.TabStop,
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Top,
                 };
                 break;
 
@@ -191,6 +204,8 @@ internal static class ClassicControlFactory
         var box = new TextBox
         {
             Style = StyleOf(styles, "BwcClassicTextBoxStyle"),
+            // A classic edit is painted in COLOR_WINDOW (the window color), not in the dialog face.
+            Background = BwcBrushes.Window,
             FontFamily = new FontFamily(font.Face),
             FontSize = font.DipSize,
             AcceptsReturn = definition.Multiline,
