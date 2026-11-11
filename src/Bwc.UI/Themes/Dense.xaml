@@ -60,6 +60,12 @@
     <SolidColorBrush x:Key="BwcMenuHighlightBrush" Color="#FFF0F0F0" />
     <SolidColorBrush x:Key="BwcMenuSeparatorBrush" Color="#FFD7D7D7" />
 
+    <!--
+        Popup shadow. The presenter border is lifted by its translation, so the theme shadow falls on the
+        window behind it, which gives the soft edge of a classic popup.
+    -->
+    <ThemeShadow x:Key="BwcMenuShadow" />
+
     <!-- Keyed styles: ordinary controls elsewhere keep the Fluent defaults. -->
     <Style x:Key="BwcMenuBarStyle" TargetType="MenuBar">
         <Setter Property="Height" Value="{StaticResource BwcMenuBarHeight}" />
@@ -158,17 +164,17 @@
     </Style>
 
     <!--
-        Popup presenter. The WinUI default presenter is rounded, shadowed, and has a system backdrop.
-        This template keeps the default ScrollViewer and ItemsPresenter, which the flyout needs to show
-        its items, and replaces the chrome: square corners and a 1 DIP border (2 px at 192 DPI).
-        Items sit 1.5 DIP from the edge.
+        Popup presenter. The WinUI default presenter has a system backdrop and Fluent padding. This template keeps
+        the default ScrollViewer and ItemsPresenter, which the flyout needs to show its items, and replaces the
+        chrome: a 4 DIP corner radius (about 8 px at 192 DPI, measured on the classic popup), a 1 DIP border (2 px
+        at 192 DPI), and the theme shadow. Items sit 1.5 DIP from the edge.
     -->
     <Style TargetType="MenuFlyoutPresenter">
         <Setter Property="Background" Value="{StaticResource BwcMenuBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource BwcMenuBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="0.5" />
-        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="CornerRadius" Value="4" />
         <Setter Property="MinWidth" Value="0" />
         <Setter Property="MinHeight" Value="0" />
         <Setter Property="ScrollViewer.HorizontalScrollMode" Value="Disabled" />
@@ -190,7 +196,9 @@
                         Background="{TemplateBinding Background}"
                         BorderBrush="{TemplateBinding BorderBrush}"
                         BorderThickness="{TemplateBinding BorderThickness}"
-                        CornerRadius="{TemplateBinding CornerRadius}">
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Shadow="{StaticResource BwcMenuShadow}"
+                        Translation="0,0,32">
                         <ItemsPresenter />
                     </Border>
                 </ControlTemplate>
@@ -201,8 +209,8 @@
     <!--
         Shared item template for leaves. Column 0 is the check gutter (the Icon holds the check mark),
         column 1 is the label with the classic mnemonic underline, column 2 is the accelerator text.
-        The keyboard focus frame is a 0.5 DIP outline that spans the item height; hover and keyboard
-        focus both fill with the highlight brush.
+        Hover fills the item with the highlight brush. Keyboard focus draws a 0.5 DIP (1 px) frame inside the
+        item, as the classic popup does, and leaves the fill unchanged.
     -->
     <Style x:Key="BwcMenuFlyoutItemStyle" TargetType="MenuFlyoutItem">
         <Setter Property="UseSystemFocusVisuals" Value="False" />
@@ -511,7 +519,8 @@
 
     <!--
         Address bar only. This is keyed so a normal TextBox in another view keeps its
-        Fluent height and padding.
+        Fluent height and padding. The corner radius is 0, so the field is a flat rectangle as in the
+        classic edit. The border and background brushes are set in ClassicWindowShell.
     -->
     <Style x:Key="BwcAddressBarTextBoxStyle" TargetType="TextBox">
         <Setter Property="Height" Value="{StaticResource BwcMenuBarHeight}" />
@@ -519,6 +528,7 @@
         <Setter Property="Padding" Value="2,1" />
         <Setter Property="FontSize" Value="{StaticResource BwcFontSize}" />
         <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="0" />
         <Setter Property="BorderBrush" Value="{StaticResource BwcShadowBrush}" />
         <Setter Property="Background" Value="{StaticResource BwcWindowBrush}" />
         <Setter Property="Foreground" Value="{StaticResource BwcWindowTextBrush}" />

@@ -2,12 +2,14 @@ using Bwc.UI.List;
 using Bwc.UI.Menu;
 using Bwc.UI.Theme;
 using Bwc.UI.Tree;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.System;
+using Windows.UI.Core;
 
 namespace Bwc.UI.Shell;
 
@@ -41,12 +43,26 @@ public sealed partial class ClassicWindowShell : UserControl
     private nint _topHwnd;
     private bool _metricsSubscribed;
     private bool _keyboardSplitMode;
+    private bool _splitterDragging;
+    private double _splitterDragStartWidth;
     private string _currentPath = "Computer";
+
+    // Menu items whose visibility is already watched for a popup width. Each item is watched once.
+    private readonly HashSet<FrameworkElement> _observedEntries = [];
+
+    /// <summary>The panes in the classic Tab order. The address bar joins the cycle only while it is visible.</summary>
+    private enum Pane
+    {
+        Tree,
+        List,
+        Address,
+    }
 
     public ClassicWindowShell()
     {
         InitializeComponent();
         _currentPath = AddressBox.Text;
+        ApplyAddressBarPalette();
         ApplyMetrics();
 
         // The palette is applied here on the UI thread, after the Dense.xaml brushes exist.
@@ -80,10 +96,52 @@ public sealed partial class ClassicWindowShell : UserControl
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         MenuBarRoot.PreviewKeyDown += OnMenuPreviewKeyDown;
+        PreviewKeyDown += OnShellNavigationKeyDown;
+        RegisterAddressBarAccelerators();
 
         // A popup's keys can arrive here before the window hook sees them. Letters are offered to an
         // open popup, and handled events are included so an earlier handler cannot hide the key.
         AddHandler(UIElement.PreviewKeyDownEvent, new KeyEventHandler(OnShellPreviewKeyDown), handledEventsToo: true);
+    }
+
+    /// <summary>
+    /// The address bar is flat and classic: the Fluent corner radius is removed, and the border and the
+    /// background come from the palette, so focus does not add the accent line.
+    /// </summary>
+    private void ApplyAddressBarPalette()
+    {
+        foreach (var key in new[] { "TextControlBorderBrush", "TextControlBorderBrushPointerOver", "TextControlBorderBrushFocused" })
+        {
+            AddressBox.Resources[key] = BwcBrushes.Shadow;
+        }
+
+        foreach (var key in new[] { "TextControlBackground", "TextControlBackgroundPointerOver", "TextControlBackgroundFocused" })
+        {
+            AddressBox.Resources[key] = BwcBrushes.Window;
+        }
+    }
+
+    /// <summary>Ctrl+L and Alt+D both focus the address bar (ACC-013 and ACC-014, command 672).</summary>
+    private void RegisterAddressBarAccelerators()
+    {
+        AddAddressBarAccelerator(VirtualKey.L, VirtualKeyModifiers.Control);
+        AddAddressBarAccelerator(VirtualKey.D, VirtualKeyModifiers.Menu);
+    }
+
+    private void AddAddressBarAccelerator(VirtualKey key, VirtualKeyModifiers modifiers)
+    {
+        var accelerator = new KeyboardAccelerator
+        {
+            Key = key,
+            Modifiers = modifiers,
+            ScopeOwner = this,
+        };
+        accelerator.Invoked += (_, args) =>
+        {
+            args.Handled = true;
+            FocusAddressBar();
+        };
+        KeyboardAccelerators.Add(accelerator);
     }
 
     /// <summary>The menu bar. The host application fills it from its command table.</summary>
@@ -143,7 +201,9 @@ public sealed partial class ClassicWindowShell : UserControl
     public void BeginSplitKeyboardMode()
     {
         _keyboardSplitMode = true;
-        _ = SplitterThumb.Focus(FocusState.Keyboard);
+
+        // The splitter is not a tab stop, so keyboard focus is requested programmatically.
+        _ = SplitterThumb.Focus(FocusState.Programmatic);
 
         // A View menu click closes the flyout after the Click handler. Focus again after that
         // close so the flyout cannot take focus back from the splitter.
@@ -151,7 +211,7 @@ public sealed partial class ClassicWindowShell : UserControl
         {
             if (_keyboardSplitMode)
             {
-                _ = SplitterThumb.Focus(FocusState.Keyboard);
+                _ = SplitterThumb.Focus(FocusState.Programmatic);
             }
         });
     }
@@ -289,8 +349,84 @@ public sealed partial class ClassicWindowShell : UserControl
             }
         }
 
+        ApplyPopupWidths(MenuBarRoot.Items.OfType<MenuBarItem>(), scale);
+
         AddressRow.Height = IsAddressBarVisible ? GridLength.Auto : new GridLength(0);
         SetTreeWidth(_treePaneWidth);
+    }
+
+    /// <summary>
+    /// Sizes every popup the way Win32 sizes a menu: as wide as its widest visible item. Every leaf and submenu
+    /// item of a popup takes that width as its MinWidth, so the flyout presenter takes it too. A collapsed item
+    /// does not count, as in the classic menu, and a change of its visibility sizes the popup again.
+    /// </summary>
+    private void ApplyPopupWidths(IEnumerable<MenuBarItem> tops, double scale)
+    {
+        foreach (var top in tops)
+        {
+            ApplyFlyoutWidth(top.Items, scale);
+        }
+    }
+
+    /// <summary>Sizes the popups again from the current visibility of their items.</summary>
+    private void RefreshPopupWidths()
+    {
+        double scale = XamlRoot?.RasterizationScale ?? 1.0;
+        ApplyPopupWidths(MenuBarRoot.Items.OfType<MenuBarItem>(), scale);
+    }
+
+    private void ApplyFlyoutWidth(IList<MenuFlyoutItemBase> items, double scale)
+    {
+        var labels = new List<string>();
+        var accelerators = new List<string>();
+        foreach (var entry in items)
+        {
+            if (entry is not (MenuFlyoutItem or MenuFlyoutSubItem) || ((FrameworkElement)entry).Visibility != Visibility.Visible)
+            {
+                continue;
+            }
+
+            if (entry is MenuFlyoutItem leaf)
+            {
+                labels.Add(leaf.Text ?? string.Empty);
+                accelerators.Add(leaf.KeyboardAcceleratorTextOverride ?? string.Empty);
+            }
+            else if (entry is MenuFlyoutSubItem sub)
+            {
+                labels.Add(sub.Text ?? string.Empty);
+                accelerators.Add(string.Empty);
+            }
+        }
+
+        double width = ClassicMenuMetrics.PopupItemWidthDip(labels, accelerators, scale);
+        if (width > 0)
+        {
+            foreach (var entry in items)
+            {
+                if (entry is MenuFlyoutItem or MenuFlyoutSubItem)
+                {
+                    var element = (FrameworkElement)entry;
+                    element.MinWidth = width;
+                    ObserveEntryVisibility(element);
+                }
+            }
+        }
+
+        foreach (var sub in items.OfType<MenuFlyoutSubItem>())
+        {
+            ApplyFlyoutWidth(sub.Items, scale);
+        }
+    }
+
+    /// <summary>Watches an item's visibility once, so a value item that appears or hides resizes its popup.</summary>
+    private void ObserveEntryVisibility(FrameworkElement entry)
+    {
+        if (!_observedEntries.Add(entry))
+        {
+            return;
+        }
+
+        _ = entry.RegisterPropertyChangedCallback(UIElement.VisibilityProperty, (_, _) => RefreshPopupWidths());
     }
 
     private void SetAddressBarVisible(bool visible)
@@ -303,8 +439,30 @@ public sealed partial class ClassicWindowShell : UserControl
         IsAddressBarVisible = visible;
         AddressBox.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         AddressRow.Height = visible ? GridLength.Auto : new GridLength(0);
+        if (!visible && IsWithin(FocusedElement(), AddressBox))
+        {
+            _ = TreeControl.Focus(FocusState.Keyboard);
+        }
+
         SyncAddressBarCheck();
         AddressBarVisibilityChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Shows the address bar when it is hidden, then puts keyboard focus in it with its text selected.</summary>
+    private void FocusAddressBar()
+    {
+        if (!IsAddressBarVisible)
+        {
+            SetAddressBarVisible(true);
+        }
+
+        _ = AddressBox.Focus(FocusState.Keyboard);
+        AddressBox.SelectAll();
+    }
+
+    private DependencyObject? FocusedElement()
+    {
+        return XamlRoot is { } root ? FocusManager.GetFocusedElement(root) as DependencyObject : null;
     }
 
     /// <summary>
@@ -403,9 +561,110 @@ public sealed partial class ClassicWindowShell : UserControl
         }
     }
 
+    /// <summary>
+    /// Tab and F6 move through the panes in the classic order: tree, list, and the address bar when it is
+    /// visible. Shift+Tab goes the other way. The splitter is not in the cycle, so Tab from it goes to the
+    /// list and Shift+Tab to the tree. Escape during a mouse drag of the splitter cancels the drag.
+    /// </summary>
+    private void OnShellNavigationKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Handled)
+        {
+            return;
+        }
+
+        if (e.Key == VirtualKey.Escape && _splitterDragging)
+        {
+            e.Handled = true;
+            SplitterThumb.CancelDrag();
+            return;
+        }
+
+        if (e.Key != VirtualKey.Tab && e.Key != VirtualKey.F6)
+        {
+            return;
+        }
+
+        // Focus on the menu bar is outside the cycle, so Tab from it starts the cycle at the tree (Shift+Tab at the address bar).
+        // Handling the key here keeps XAML's own tab order, which would reach the splitter, out of the route.
+        var focused = FocusedElement();
+        bool backward = e.Key == VirtualKey.Tab && IsShiftDown();
+        e.Handled = true;
+        if (IsWithin(focused, SplitterThumb))
+        {
+            FocusPane(backward ? Pane.Tree : Pane.List);
+            return;
+        }
+
+        var order = IsAddressBarVisible
+            ? new[] { Pane.Tree, Pane.List, Pane.Address }
+            : new[] { Pane.Tree, Pane.List };
+        int count = order.Length;
+        int index = PaneIndex(focused, order) ?? (backward ? count : -1);
+        int next = backward ? (index - 1 + count) % count : (index + 1) % count;
+        FocusPane(order[next]);
+    }
+
+    private static bool IsShiftDown()
+    {
+        return InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
+    }
+
+    /// <summary>The position of the pane that holds the focus in the cycle, or null when no cycle pane has it.</summary>
+    private int? PaneIndex(DependencyObject? focused, IReadOnlyList<Pane> order)
+    {
+        for (var i = 0; i < order.Count; i++)
+        {
+            bool holds = order[i] switch
+            {
+                Pane.Tree => IsWithin(focused, TreePaneBorder),
+                Pane.List => IsWithin(focused, ListPaneBorder),
+                _ => IsWithin(focused, AddressBox),
+            };
+            if (holds)
+            {
+                return i;
+            }
+        }
+
+        return null;
+    }
+
+    private void FocusPane(Pane pane)
+    {
+        switch (pane)
+        {
+            case Pane.Tree:
+                _ = TreeControl.Focus(FocusState.Keyboard);
+                break;
+            case Pane.List:
+                _ = ListControl.Focus(FocusState.Keyboard);
+                break;
+            default:
+                _ = AddressBox.Focus(FocusState.Keyboard);
+                break;
+        }
+    }
+
     private void OnSplitterDragStarted(object sender, DragStartedEventArgs e)
     {
         _keyboardSplitMode = false;
+        _splitterDragging = true;
+
+        // Escape cancels a drag through the shell's key handling, which only sees keys that reach the shell's
+        // XAML tree. A press that leaves the keyboard focus outside the shell would lose the Escape.
+        _ = SplitterThumb.Focus(FocusState.Pointer);
+        _splitterDragStartWidth = _treePaneWidth;
+    }
+
+    /// <summary>A canceled drag (Escape) puts back the split that was in effect when the drag started.</summary>
+    private void OnSplitterDragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        _splitterDragging = false;
+        if (e.Canceled)
+        {
+            SetTreeWidth(_splitterDragStartWidth);
+        }
     }
 
     private void OnSplitterDragDelta(object sender, DragDeltaEventArgs e)

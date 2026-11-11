@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml;
 #if BWC_E2E
 using Microsoft.UI.Xaml.Automation;
 #endif
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.Foundation;
@@ -39,6 +40,20 @@ public sealed class TreeRenameRequestedEventArgs : EventArgs
     public string NewName { get; }
 }
 
+/// <summary>A child load failed during expand. The node was collapsed again and no rows were added.</summary>
+public sealed class TreeNodeErrorEventArgs : EventArgs
+{
+    public TreeNodeErrorEventArgs(TreeNode node, Exception exception)
+    {
+        Node = node;
+        Exception = exception;
+    }
+
+    public TreeNode Node { get; }
+
+    public Exception Exception { get; }
+}
+
 /// <summary>A right-click or menu key request for one tree row.</summary>
 public sealed class TreeNodeContextRequestedEventArgs : EventArgs
 {
@@ -64,8 +79,10 @@ public sealed class TreeNodeContextRequestedEventArgs : EventArgs
 public sealed partial class DenseTree : UserControl
 {
     private const int ExpandChunkSize = 500;
-    private const long TypeAheadWindowMs = 500;
+    private const long TypeAheadWindowMs = 1000;
     private const int MaxTypeAheadLength = 32;
+    private const double MinimumLabelVisibleDip = 40;
+    private const double LeftRevealMarginDip = 8;
 
     private readonly FlatNodeList _rows = new();
     private readonly List<TreeNode> _roots = new();
@@ -118,6 +135,12 @@ public sealed partial class DenseTree : UserControl
     /// </summary>
     public new event EventHandler<TreeNodeContextRequestedEventArgs>? ContextRequested;
 
+    /// <summary>
+    /// Raised when a child load fails during expand (for example access denied). The host shows the
+    /// error. The tree has already collapsed the node, so no spinner or partial children remain.
+    /// </summary>
+    public event EventHandler<TreeNodeErrorEventArgs>? ExpandFailed;
+
     /// <summary>Raised when Delete is pressed with a selected node.</summary>
     public event EventHandler? DeleteRequested;
 
@@ -157,7 +180,7 @@ public sealed partial class DenseTree : UserControl
     public void SelectNode(TreeNode node, bool scroll = true)
     {
         ArgumentNullException.ThrowIfNull(node);
-        if (_rows.IndexOf(node) < 0)
+        if (_rows.IndexOfNode(node) < 0)
         {
             return;
         }
@@ -210,7 +233,7 @@ public sealed partial class DenseTree : UserControl
         }
     }
 
-    internal int IndexOfVisibleNode(TreeNode? node) => node is null ? -1 : _rows.IndexOf(node);
+    internal int IndexOfVisibleNode(TreeNode? node) => _rows.IndexOfNode(node);
 
     internal void RowTapped(TreeRowElement row)
     {
@@ -223,6 +246,22 @@ public sealed partial class DenseTree : UserControl
         _ = Focus(FocusState.Pointer);
     }
 
+    /// <summary>
+    /// A double-click on a row's label toggles the node. A double-click on a leaf does nothing, and
+    /// the row is selected first, as a classic TreeView does.
+    /// </summary>
+    internal void RowDoubleTapped(TreeRowElement row)
+    {
+        if (row.Node is not { HasChildren: true } node)
+        {
+            return;
+        }
+
+        SelectNode(node, scroll: false);
+        _ = Focus(FocusState.Pointer);
+        ToggleNode(node);
+    }
+
     internal void ChevronTapped(TreeRowElement row)
     {
         if (row.Node is not { HasChildren: true } node)
@@ -231,14 +270,7 @@ public sealed partial class DenseTree : UserControl
         }
 
         SelectNode(node, scroll: false);
-        if (node.IsExpanded)
-        {
-            CollapseNode(node);
-        }
-        else
-        {
-            _ = ExpandNodeAsync(node);
-        }
+        ToggleNode(node);
     }
 
     internal void ExpandFromAutomation(TreeNode node)
@@ -252,6 +284,73 @@ public sealed partial class DenseTree : UserControl
         if (SelectedNode is { HasChildren: true, IsExpanded: false } node)
         {
             _ = ExpandNodeAsync(node);
+        }
+    }
+
+    /// <summary>Collapses the selected node when it is expanded. The selection stays on that node.</summary>
+    public void CollapseSelected()
+    {
+        if (SelectedNode is { IsExpanded: true } node)
+        {
+            CollapseNode(node);
+        }
+    }
+
+    private void ToggleNode(TreeNode node)
+    {
+        if (node.IsExpanded)
+        {
+            CollapseNode(node);
+        }
+        else
+        {
+            _ = ExpandNodeAsync(node);
+        }
+    }
+
+    /// <summary>
+    /// Expands the selected node and every descendant that has children (numpad *). Each level is
+    /// expanded in order through the normal chunked path, so a large subtree never blocks the UI
+    /// thread. The walk stops when the root is collapsed while it runs or a child load fails.
+    /// </summary>
+    public async Task ExpandSubtreeSelectedAsync()
+    {
+        if (SelectedNode is not { HasChildren: true } root)
+        {
+            return;
+        }
+
+        var pending = new Stack<TreeNode>();
+        pending.Push(root);
+        while (pending.Count > 0)
+        {
+            var node = pending.Pop();
+            if (!ReferenceEquals(node, root) && !root.IsExpanded)
+            {
+                // The user collapsed the root while the walk ran. Hidden nodes are not loaded.
+                break;
+            }
+
+            if (!node.HasChildren)
+            {
+                continue;
+            }
+
+            if (!node.IsExpanded)
+            {
+                await ExpandNodeAsync(node);
+            }
+
+            if (!node.IsExpanded)
+            {
+                // A failed or cancelled load, or the node was collapsed by the user.
+                continue;
+            }
+
+            for (var i = node.Children.Count - 1; i >= 0; i--)
+            {
+                pending.Push(node.Children[i]);
+            }
         }
     }
 
@@ -274,10 +373,36 @@ public sealed partial class DenseTree : UserControl
 
     internal void RevealNode(TreeNode node)
     {
-        var index = _rows.IndexOf(node);
+        var index = _rows.IndexOfNode(node);
         if (index >= 0)
         {
             RevealIndex(index);
+            RevealHorizontally(node);
+        }
+    }
+
+    /// <summary>
+    /// Scrolls horizontally only when the selected node's label start is off screen, so a shallow
+    /// selection keeps the classic unscrolled geometry. The label start stays a few DIPs in view on
+    /// the left, and at least <see cref="MinimumLabelVisibleDip"/> of the label stays visible on the right.
+    /// </summary>
+    private void RevealHorizontally(TreeNode node)
+    {
+        double viewport = Scroller.ViewportWidth;
+        if (viewport <= 0)
+        {
+            return;
+        }
+
+        double labelStart = TreeRowElement.LabelStartFor(node);
+        double offset = Scroller.HorizontalOffset;
+        if (labelStart < offset)
+        {
+            Scroller.ChangeView(Math.Max(0, labelStart - LeftRevealMarginDip), null, null, disableAnimation: true);
+        }
+        else if (labelStart + MinimumLabelVisibleDip > offset + viewport)
+        {
+            Scroller.ChangeView(labelStart + MinimumLabelVisibleDip - viewport, null, null, disableAnimation: true);
         }
     }
 
@@ -296,7 +421,7 @@ public sealed partial class DenseTree : UserControl
         node.IsExpanded = false;
         RefreshRealizedExpansion();
 
-        var index = _rows.IndexOf(node);
+        var index = _rows.IndexOfNode(node);
         if (index < 0)
         {
             UpdateHelpText();
@@ -307,6 +432,12 @@ public sealed partial class DenseTree : UserControl
         while (end < _rows.Count && _rows[end].Depth > node.Depth)
         {
             end++;
+        }
+
+        // A rename box over a row that is about to be removed has no row to sit on, so it ends first.
+        if (_renameNode is { } renamed && IsDescendantOf(renamed, node))
+        {
+            EndRenameCore();
         }
 
         bool selectionInside = SelectedNode is { } selected && IsDescendantOf(selected, node);
@@ -369,7 +500,7 @@ public sealed partial class DenseTree : UserControl
 
                 var count = Math.Min(ExpandChunkSize, visible.Count - offset);
                 var chunk = visible.GetRange(offset, count);
-                var index = _rows.IndexOf(node);
+                var index = _rows.IndexOfNode(node);
                 if (index < 0)
                 {
                     return;
@@ -389,6 +520,15 @@ public sealed partial class DenseTree : UserControl
             // Collapse cancelled the remaining chunks. The rows already inserted are removed by
             // CollapseNode; nothing here may reinsert them.
         }
+        catch (Exception ex)
+        {
+            // A cancelled load can also fail (the registry changed under it). Only a live expand is
+            // a failure the user should see.
+            if (!tokenSource.IsCancellationRequested)
+            {
+                FailExpand(node, ex);
+            }
+        }
         finally
         {
             if (_expandTokens.TryGetValue(node, out var current) && ReferenceEquals(current, tokenSource))
@@ -401,6 +541,21 @@ public sealed partial class DenseTree : UserControl
                 tokenSource.Dispose();
             }
         }
+    }
+
+    /// <summary>
+    /// Collapses a node whose expand failed and removes any rows it managed to insert, so the node
+    /// never stays expanded with no children. The retry is the next expand, because the node keeps
+    /// HasChildren and its children stay unloaded.
+    /// </summary>
+    private void FailExpand(TreeNode node, Exception exception)
+    {
+        if (node.IsExpanded)
+        {
+            CollapseNode(node);
+        }
+
+        ExpandFailed?.Invoke(this, new TreeNodeErrorEventArgs(node, exception));
     }
 
     private Task YieldToDispatcherAsync()
@@ -523,7 +678,7 @@ public sealed partial class DenseTree : UserControl
         }
 
         int page = Math.Max(1, (int)(Scroller.ViewportHeight / DenseMetrics.TreeRowHeight) - 1);
-        int current = SelectedNode is null ? -1 : _rows.IndexOf(SelectedNode);
+        int current = SelectedNode is null ? -1 : _rows.IndexOfNode(SelectedNode);
         bool shift = IsKeyDown(VirtualKey.Shift);
         bool control = IsKeyDown(VirtualKey.Control);
 
@@ -561,8 +716,16 @@ public sealed partial class DenseTree : UserControl
                 ExpandOrGoToChild();
                 e.Handled = true;
                 break;
+            case VirtualKey.Add:
+                ExpandSelected();
+                e.Handled = true;
+                break;
+            case VirtualKey.Subtract:
+                CollapseSelected();
+                e.Handled = true;
+                break;
             case VirtualKey.Multiply:
-                ExpandSelectedSiblings();
+                _ = ExpandSubtreeSelectedAsync();
                 e.Handled = true;
                 break;
             case VirtualKey.F2:
@@ -600,7 +763,7 @@ public sealed partial class DenseTree : UserControl
             return;
         }
 
-        int index = _rows.IndexOf(node);
+        int index = _rows.IndexOfNode(node);
         if (index < 0)
         {
             return;
@@ -635,7 +798,7 @@ public sealed partial class DenseTree : UserControl
 
         if (node.Parent is { } parent)
         {
-            MoveTo(_rows.IndexOf(parent));
+            MoveTo(_rows.IndexOfNode(parent));
         }
     }
 
@@ -654,26 +817,14 @@ public sealed partial class DenseTree : UserControl
             return;
         }
 
+        // An expanded node moves to its first child. A node with no visible child stays put, so the
+        // next row (a sibling) is never selected by Right.
         if (node.IsExpanded)
         {
-            MoveTo(_rows.IndexOf(node) + 1);
-        }
-    }
-
-    private void ExpandSelectedSiblings()
-    {
-        var node = SelectedNode;
-        if (node is null)
-        {
-            return;
-        }
-
-        IReadOnlyList<TreeNode> siblings = node.Parent is null ? _roots : node.Parent.Children;
-        foreach (var sibling in siblings)
-        {
-            if (sibling.HasChildren && !sibling.IsExpanded)
+            int next = _rows.IndexOfNode(node) + 1;
+            if (next < _rows.Count && _rows[next].Depth > node.Depth)
             {
-                _ = ExpandNodeAsync(sibling);
+                MoveTo(next);
             }
         }
     }
@@ -705,13 +856,19 @@ public sealed partial class DenseTree : UserControl
 
         _typeAhead.Append(character);
         string prefix = _typeAhead.ToString();
-        int current = SelectedNode is null ? -1 : _rows.IndexOf(SelectedNode);
-        int start = prefix.Length == 1 ? current + 1 : Math.Max(0, current);
+        int current = SelectedNode is null ? -1 : _rows.IndexOfNode(SelectedNode);
+
+        // One letter repeated (or a single letter) cycles through the rows that start with it, from the
+        // row after the selection. Any other prefix is matched from the selected row, inclusive, so a
+        // longer prefix keeps the row the shorter prefix already selected.
+        bool cycle = IsRepeatedCharacter(prefix);
+        string search = cycle ? prefix[..1] : prefix;
+        int start = cycle ? current + 1 : Math.Max(0, current);
 
         for (var step = 0; step < _rows.Count; step++)
         {
-            int index = ((start + step) % _rows.Count + _rows.Count) % _rows.Count;
-            if (_rows[index].Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            int index = (start + step) % _rows.Count;
+            if (_rows[index].Name.StartsWith(search, StringComparison.OrdinalIgnoreCase))
             {
                 MoveTo(index);
                 break;
@@ -719,6 +876,19 @@ public sealed partial class DenseTree : UserControl
         }
 
         e.Handled = true;
+    }
+
+    private static bool IsRepeatedCharacter(string text)
+    {
+        for (var i = 1; i < text.Length; i++)
+        {
+            if (char.ToUpperInvariant(text[i]) != char.ToUpperInvariant(text[0]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void BeginRename()
@@ -745,7 +915,7 @@ public sealed partial class DenseTree : UserControl
             return;
         }
 
-        var index = _rows.IndexOf(_renameNode);
+        var index = _rows.IndexOfNode(_renameNode);
         if (index < 0)
         {
             return;
@@ -777,11 +947,15 @@ public sealed partial class DenseTree : UserControl
         }
     }
 
+    /// <summary>
+    /// Classic behavior: clicking elsewhere applies the rename. CommitRename clears the rename state
+    /// before it raises the event, so the focus change that closes the box is a no-op.
+    /// </summary>
     private void OnRenameLostFocus(object sender, RoutedEventArgs e)
     {
         if (_renaming)
         {
-            CancelRename();
+            CommitRename();
         }
     }
 
@@ -867,4 +1041,26 @@ public sealed partial class DenseTree : UserControl
             row.ApplyTheme();
         }
     }
+
+    protected override AutomationPeer OnCreateAutomationPeer() => new DenseTreeAutomationPeer(this);
+}
+
+/// <summary>
+/// UIA peer for the tree control itself. It reports the Tree control type so clients treat the rows
+/// as tree items. The name and automation id come from the XAML AutomationProperties.
+/// </summary>
+internal sealed class DenseTreeAutomationPeer : FrameworkElementAutomationPeer
+{
+    public DenseTreeAutomationPeer(DenseTree owner)
+        : base(owner)
+    {
+    }
+
+    protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Tree;
+
+    protected override string GetClassNameCore() => "DenseTree";
+
+    protected override bool IsControlElementCore() => true;
+
+    protected override bool IsContentElementCore() => true;
 }

@@ -34,10 +34,41 @@ ampersand removed. A menu that shows a literal ampersand fails the width check.
 
 ### Fluent chrome instead of classic chrome
 
-The default MenuFlyoutPresenter has rounded corners, a shadow, and Fluent item padding. Classic
-popups are square, with a 1 px border, and each item is the classic item height from the
-measurement. The presenter and item templates are replaced, not patched with individual setters,
-because the corner radius and item hover shape come from template parts and theme resources.
+The default MenuFlyoutPresenter has rounded corners, a shadow, and Fluent item padding. Each item is
+the classic item height from the measurement. The presenter and item templates are replaced, not
+patched with individual setters, because the corner radius and item hover shape come from template
+parts and theme resources.
+
+### Corner shape disagrees between captures
+
+`regedit-menu-metrics.json` says "Square popup corners". A read-only capture of classic regedit for
+this package (File popup, 548 by 410 px at 192 DPI) shows a curved 1 px border: the border line
+starts about 8 device px from each corner, so the radius is about 8 px, which is 4 DIP. The
+presenter uses 4 DIP. A square presenter fails the corner check in `MenuTests.cs`, and a radius of
+8 DIP (16 device px) would round the corners more than the capture does.
+
+### Shadow missing
+
+Classic popups have a soft shadow. The capture shows the edge darkening over about 12 device px
+below and to the right of the popup, lightening toward the background. The presenter casts a
+ThemeShadow from its border. A presenter with no shadow reads as flat against the window.
+
+### Popup width drifts from classic
+
+Classic popups size to the widest label plus the accelerator column, with a fixed gap. The formula
+that reproduces the measured widths at 192 DPI is, in device px, 66 (text left) + widest label +
+44 (gap) + widest accelerator + 45 (right inset). It gives File 542 px and Edit 392 px for the item
+rectangles (popups are 548 and 398 px, 3 px each side more), and it also gives View 401 px, Help
+395 px, and Edit > New 411 px. A WinUI popup sized by its content is narrower, because a label
+column with no reserved gap ends at the accelerator. Each leaf and submenu item takes the classic
+width as its MinWidth. The label widths are GDI widths of the menu font, as the bar uses.
+
+### Keyboard focus frame
+
+The classic keyboard focus is a 1 px black rounded frame inside the item, and the fill does not change
+(`#F9F9F9` in the light capture, the same as the unfocused items). The package matches that: a
+0.5 DIP frame in the window text color, no fill change. A fill on the keyboard-focused item, or no
+frame, fails the focus check in `MenuTests.cs`.
 
 ### Item height depends on the template
 
