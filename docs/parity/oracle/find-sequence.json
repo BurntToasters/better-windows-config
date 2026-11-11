@@ -1,0 +1,360 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture find",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26200",
+    "ubr": 9711,
+    "displayVersion": "25H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "needle": "ab",
+  "startKey": "HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Find",
+  "searchInSubtree": true,
+  "matchCase": "not offered by classic Find; the search is case-insensitive",
+  "note": "Registry value names are case-insensitive, so the seeded AB and ab in the Find key are one value; the later write (AB) holds the data AB. A hit reports the key by its tree path and the value name as shown in the list. The sequence stops when the selection leaves the Find tree.",
+  "seed": [
+    {
+      "key": "Find",
+      "values": [
+        {
+          "name": "ab",
+          "type": "REG_SZ",
+          "data": "whole name, lower"
+        },
+        {
+          "name": "xAbx",
+          "type": "REG_SZ",
+          "data": "Data ab with mixed case"
+        },
+        {
+          "name": "AB",
+          "type": "REG_SZ",
+          "data": "AB"
+        },
+        {
+          "name": "Name",
+          "type": "REG_SZ",
+          "data": "ab"
+        },
+        {
+          "name": "dw",
+          "type": "REG_DWORD",
+          "data": "ab000000"
+        },
+        {
+          "name": "bin",
+          "type": "REG_BINARY",
+          "data": "6162"
+        },
+        {
+          "name": "ms",
+          "type": "REG_MULTI_SZ",
+          "data": "zz|ab"
+        },
+        {
+          "name": "ex",
+          "type": "REG_EXPAND_SZ",
+          "data": "%ab%"
+        },
+        {
+          "name": "none",
+          "type": "REG_SZ",
+          "data": "nothing here"
+        },
+        {
+          "name": "Mixed Ab",
+          "type": "REG_SZ",
+          "data": "xx"
+        }
+      ]
+    },
+    {
+      "key": "Find\\Cab",
+      "values": []
+    },
+    {
+      "key": "Find\\ABC",
+      "values": [
+        {
+          "name": "k",
+          "type": "REG_SZ",
+          "data": "AB-data"
+        }
+      ]
+    },
+    {
+      "key": "Find\\ab",
+      "values": [
+        {
+          "name": "v",
+          "type": "REG_SZ",
+          "data": "nothing"
+        }
+      ]
+    },
+    {
+      "key": "Find\\Zed\\Inner\\abracadabra",
+      "values": []
+    },
+    {
+      "key": "Find\\Zed\\Inner\\ab",
+      "values": [
+        {
+          "name": "q",
+          "type": "REG_SZ",
+          "data": "z"
+        }
+      ]
+    },
+    {
+      "key": "Find\\Plain",
+      "values": [
+        {
+          "name": "ab",
+          "type": "REG_SZ",
+          "data": "ab"
+        }
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "flags": {
+        "keys": true,
+        "values": true,
+        "data": true,
+        "wholeString": false,
+        "searchInSubtree": true
+      },
+      "name": "keys-values-data",
+      "hits": [
+        {
+          "key": "Find",
+          "value": "ab"
+        },
+        {
+          "key": "Find",
+          "value": "ex"
+        },
+        {
+          "key": "Find",
+          "value": "Mixed Ab"
+        },
+        {
+          "key": "Find",
+          "value": "ms"
+        },
+        {
+          "key": "Find",
+          "value": "Name"
+        },
+        {
+          "key": "Find",
+          "value": "xAbx"
+        },
+        {
+          "key": "Find\\ab",
+          "value": ""
+        },
+        {
+          "key": "Find\\ABC",
+          "value": ""
+        },
+        {
+          "key": "Find\\ABC",
+          "value": "k"
+        },
+        {
+          "key": "Find\\Cab",
+          "value": ""
+        },
+        {
+          "key": "Find\\Plain",
+          "value": "ab"
+        },
+        {
+          "key": "Find\\Zed\\Inner\\ab",
+          "value": ""
+        },
+        {
+          "key": "Find\\Zed\\Inner\\abracadabra",
+          "value": ""
+        }
+      ],
+      "endedBy": "left-find-tree"
+    },
+    {
+      "flags": {
+        "keys": true,
+        "values": true,
+        "data": true,
+        "wholeString": true,
+        "searchInSubtree": true
+      },
+      "name": "keys-values-data-whole",
+      "hits": [
+        {
+          "key": "Find",
+          "value": "ab"
+        },
+        {
+          "key": "Find",
+          "value": "Name"
+        },
+        {
+          "key": "Find\\ab",
+          "value": ""
+        },
+        {
+          "key": "Find\\Plain",
+          "value": "ab"
+        },
+        {
+          "key": "Find\\Zed\\Inner\\ab",
+          "value": ""
+        }
+      ],
+      "endedBy": "no-change"
+    },
+    {
+      "flags": {
+        "keys": true,
+        "values": false,
+        "data": false,
+        "wholeString": false,
+        "searchInSubtree": true
+      },
+      "name": "keys-only",
+      "hits": [
+        {
+          "key": "Find\\ab",
+          "value": ""
+        },
+        {
+          "key": "Find\\ABC",
+          "value": ""
+        },
+        {
+          "key": "Find\\Cab",
+          "value": ""
+        },
+        {
+          "key": "Find\\Zed\\Inner\\ab",
+          "value": ""
+        },
+        {
+          "key": "Find\\Zed\\Inner\\abracadabra",
+          "value": ""
+        }
+      ],
+      "endedBy": "left-find-tree"
+    },
+    {
+      "flags": {
+        "keys": false,
+        "values": true,
+        "data": false,
+        "wholeString": false,
+        "searchInSubtree": true
+      },
+      "name": "values-only",
+      "hits": [
+        {
+          "key": "Find",
+          "value": "ab"
+        },
+        {
+          "key": "Find",
+          "value": "Mixed Ab"
+        },
+        {
+          "key": "Find",
+          "value": "xAbx"
+        },
+        {
+          "key": "Find\\Plain",
+          "value": "ab"
+        }
+      ],
+      "endedBy": "left-find-tree"
+    },
+    {
+      "flags": {
+        "keys": false,
+        "values": false,
+        "data": true,
+        "wholeString": false,
+        "searchInSubtree": true
+      },
+      "name": "data-only",
+      "hits": [
+        {
+          "key": "Find",
+          "value": "ab"
+        },
+        {
+          "key": "Find",
+          "value": "ex"
+        },
+        {
+          "key": "Find",
+          "value": "ms"
+        },
+        {
+          "key": "Find",
+          "value": "Name"
+        },
+        {
+          "key": "Find",
+          "value": "xAbx"
+        },
+        {
+          "key": "Find\\ABC",
+          "value": "k"
+        },
+        {
+          "key": "Find\\Plain",
+          "value": "ab"
+        }
+      ],
+      "endedBy": "left-find-tree"
+    },
+    {
+      "flags": {
+        "keys": false,
+        "values": true,
+        "data": true,
+        "wholeString": true,
+        "searchInSubtree": true
+      },
+      "name": "values-data-whole",
+      "hits": [
+        {
+          "key": "Find",
+          "value": "ab"
+        },
+        {
+          "key": "Find",
+          "value": "Name"
+        },
+        {
+          "key": "Find\\Plain",
+          "value": "ab"
+        }
+      ],
+      "endedBy": "no-change"
+    }
+  ]
+}

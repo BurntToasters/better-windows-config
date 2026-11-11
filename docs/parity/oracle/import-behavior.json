@@ -1,0 +1,1754 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture import",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26200",
+    "ubr": 9711,
+    "displayVersion": "25H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "scope": "Every file targets HKEY_CURRENT_USER\\Software\\BWC-Oracle only. Each case starts from the same base tree: Import\\A (Keep = \"1\", Sub with S = \"x\") and Import\\B (Other = dword 1).",
+  "cases": [
+    {
+      "name": "v5-utf16le-bom-crlf",
+      "description": "Version 5 header, UTF-16LE with BOM, CRLF, blank line after header, typed values.",
+      "bytes": 442,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C1]",
+        "\"Text\"=\"hello\"",
+        "\"Num\"=dword:0000002a",
+        "\"Bin\"=hex:01,02",
+        "\"Multi\"=hex(7):61,00,00,00,00,00",
+        "\"Qword\"=hex(b):01,00,00,00,00,00,00,00"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C1",
+            "values": [
+              {
+                "name": "Bin",
+                "kind": "Binary",
+                "data": "0102"
+              },
+              {
+                "name": "Multi",
+                "kind": "MultiString",
+                "data": [
+                  "a"
+                ]
+              },
+              {
+                "name": "Num",
+                "kind": "DWord",
+                "data": 42
+              },
+              {
+                "name": "Qword",
+                "kind": "QWord",
+                "data": "0000000000000001"
+              },
+              {
+                "name": "Text",
+                "kind": "String",
+                "data": "hello"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "v5-utf16le-bom-lf-no-blank",
+      "description": "Version 5 header with LF endings and no blank line after the header.",
+      "bytes": 200,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C2]",
+        "\"Text\"=\"lf\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C2",
+            "values": [
+              {
+                "name": "Text",
+                "kind": "String",
+                "data": "lf"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "v5-utf8-bom",
+      "description": "Version 5 header in UTF-8 with a byte-order mark.",
+      "bytes": 116,
+      "encoding": "Utf8Bom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C3]",
+        "\"Text\"=\"utf8 bom ü\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C3",
+            "values": [
+              {
+                "name": "Text",
+                "kind": "String",
+                "data": "utf8 bom ü"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "v5-utf8-no-bom",
+      "description": "Version 5 header in UTF-8 without a byte-order mark.",
+      "bytes": 109,
+      "encoding": "Utf8",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C4]",
+        "\"Text\"=\"utf8 ü\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C4",
+            "values": [
+              {
+                "name": "Text",
+                "kind": "String",
+                "data": "utf8 Ã¼"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "v5-utf16le-no-bom",
+      "description": "Version 5 header in UTF-16LE without a byte-order mark.",
+      "bytes": 214,
+      "encoding": "Utf16LeNoBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C5]",
+        "\"Text\"=\"nobom\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "regedit4-ansi-crlf",
+      "description": "REGEDIT4 header, ASCII, CRLF, blank line after header.",
+      "bytes": 78,
+      "encoding": "Ansi",
+      "lines": [
+        "REGEDIT4",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C6]",
+        "\"Text\"=\"ansi\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C6",
+            "values": [
+              {
+                "name": "Text",
+                "kind": "String",
+                "data": "ansi"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "regedit4-no-blank-line",
+      "description": "REGEDIT4 header with no blank line after it.",
+      "bytes": 77,
+      "encoding": "Ansi",
+      "lines": [
+        "REGEDIT4",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C7]",
+        "\"Text\"=\"ansi2\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C7",
+            "values": [
+              {
+                "name": "Text",
+                "kind": "String",
+                "data": "ansi2"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "header-version-typo",
+      "description": "Header reads Version 5.0 (missing trailing zero); no section is valid without a known header.",
+      "bytes": 212,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.0",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C8]",
+        "\"Text\"=\"typo\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "no-header",
+      "description": "No version header; the first line is a section.",
+      "bytes": 142,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C9]",
+        "\"Text\"=\"noheader\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty-file",
+      "description": "Zero bytes.",
+      "bytes": 0,
+      "encoding": "Ansi",
+      "lines": [
+        ""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing-ancestors",
+      "description": "Section names keys whose parents do not exist yet; regedit must create the ancestors.",
+      "bytes": 260,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\Missing\\Ancestor\\Deep\\Key]",
+        "\"Leaf\"=\"deep\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\Missing",
+            "values": []
+          },
+          {
+            "path": "Import\\Missing\\Ancestor",
+            "values": []
+          },
+          {
+            "path": "Import\\Missing\\Ancestor\\Deep",
+            "values": []
+          },
+          {
+            "path": "Import\\Missing\\Ancestor\\Deep\\Key",
+            "values": [
+              {
+                "name": "Leaf",
+                "kind": "String",
+                "data": "deep"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "root-section-only",
+      "description": "Only the BWC-Oracle root section, with a value and a default value.",
+      "bytes": 234,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle]",
+        "\"Root\"=\"value\"",
+        "@=\"default value\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": [
+              {
+                "name": "",
+                "kind": "String",
+                "data": "default value"
+              },
+              {
+                "name": "Root",
+                "kind": "String",
+                "data": "value"
+              }
+            ]
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "bad-line-middle",
+      "description": "A line that is not a value sits between two good sections.",
+      "bytes": 444,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C10]",
+        "\"First\"=\"ok\"",
+        "this line is not a value",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C10\\After]",
+        "\"Second\"=\"after the bad line\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C10",
+            "values": [
+              {
+                "name": "First",
+                "kind": "String",
+                "data": "ok"
+              }
+            ]
+          },
+          {
+            "path": "Import\\C10\\After",
+            "values": [
+              {
+                "name": "Second",
+                "kind": "String",
+                "data": "after the bad line"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "header-missing-close-bracket",
+      "description": "Section header with no closing bracket, followed by a value.",
+      "bytes": 220,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C11",
+        "\"Text\"=\"noclose\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "header-extra-close-bracket",
+      "description": "Section header with a doubled closing bracket.",
+      "bytes": 222,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C12]]",
+        "\"Text\"=\"double\""
+      ],
+      "refused": "header '[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C12]]' has a path segment 'C12]' that is not allowed"
+    },
+    {
+      "name": "delete-subkey",
+      "description": "Deletes the Import\\A\\Sub key from the base tree.",
+      "bytes": 192,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[-HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\A\\Sub]"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "delete-value",
+      "description": "Deletes the Keep value of Import\\A with \"Keep\"=-.",
+      "bytes": 202,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\A]",
+        "\"Keep\"=-"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": []
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "delete-key-then-recreate",
+      "description": "Deletes Import\\A and recreates it with one value.",
+      "bytes": 318,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[-HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\A]",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\A]",
+        "\"Fresh\"=\"new\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Fresh",
+                "kind": "String",
+                "data": "new"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "hex-continuation-indented",
+      "description": "Hex value continued on the next line with a leading space after the backslash.",
+      "bytes": 242,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C13]",
+        "\"Bin\"=hex:01,02,\\",
+        "  03,04"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C13",
+            "values": [
+              {
+                "name": "Bin",
+                "kind": "Binary",
+                "data": "01020304"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "hex-continuation-no-indent",
+      "description": "Hex value continued on the next line with no indent.",
+      "bytes": 238,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C14]",
+        "\"Bin\"=hex:01,02,\\",
+        "03,04"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C14",
+            "values": [
+              {
+                "name": "Bin",
+                "kind": "Binary",
+                "data": "01020304"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "hex-trailing-comma",
+      "description": "Hex value ending with a comma.",
+      "bytes": 222,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C15]",
+        "\"Bin\"=hex:01,02,"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C15",
+            "values": [
+              {
+                "name": "Bin",
+                "kind": "Binary",
+                "data": "0102"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "hex-empty",
+      "description": "Hex value with no bytes.",
+      "bytes": 210,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C16]",
+        "\"Bin\"=hex:"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C16",
+            "values": [
+              {
+                "name": "Bin",
+                "kind": "Binary",
+                "data": ""
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "hex-bad-digit",
+      "description": "Hex value with a non-hex digit.",
+      "bytes": 258,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C17]",
+        "\"Bin\"=hex:zz",
+        "\"After\"=\"still here\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C17",
+            "values": [
+              {
+                "name": "After",
+                "kind": "String",
+                "data": "still here"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "dword-short",
+      "description": "DWORD with one hex digit.",
+      "bytes": 212,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C18]",
+        "\"N\"=dword:1"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C18",
+            "values": [
+              {
+                "name": "N",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "value-before-section",
+      "description": "A value line before any section header.",
+      "bytes": 256,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "\"Orphan\"=\"before\"",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C19]",
+        "\"Text\"=\"after\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C19",
+            "values": [
+              {
+                "name": "Text",
+                "kind": "String",
+                "data": "after"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "duplicate-section",
+      "description": "The same section twice with different values.",
+      "bytes": 364,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C20]",
+        "\"V\"=\"one\"",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C20]",
+        "\"V\"=\"two\"",
+        "\"W\"=\"three\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C20",
+            "values": [
+              {
+                "name": "V",
+                "kind": "String",
+                "data": "two"
+              },
+              {
+                "name": "W",
+                "kind": "String",
+                "data": "three"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "escaped-string",
+      "description": "Escaped backslash and quote in a string value.",
+      "bytes": 220,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Import\\C21]",
+        "\"Esc\"=\"a\\\\b\\\"c\""
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "tree": {
+        "present": true,
+        "keys": [
+          {
+            "path": "",
+            "values": []
+          },
+          {
+            "path": "Import",
+            "values": []
+          },
+          {
+            "path": "Import\\A",
+            "values": [
+              {
+                "name": "Keep",
+                "kind": "String",
+                "data": "1"
+              }
+            ]
+          },
+          {
+            "path": "Import\\A\\Sub",
+            "values": [
+              {
+                "name": "S",
+                "kind": "String",
+                "data": "x"
+              }
+            ]
+          },
+          {
+            "path": "Import\\B",
+            "values": [
+              {
+                "name": "Other",
+                "kind": "DWord",
+                "data": 1
+              }
+            ]
+          },
+          {
+            "path": "Import\\C21",
+            "values": [
+              {
+                "name": "Esc",
+                "kind": "String",
+                "data": "a\\b\"c"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "refused-dotdot-segment",
+      "description": "Header with a parent-directory segment that would leave the root. Must be refused before running.",
+      "bytes": 218,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\..\\..\\Microsoft]",
+        "\"Bad\"=\"x\""
+      ],
+      "refused": "header '[HKEY_CURRENT_USER\\Software\\BWC-Oracle\\..\\..\\Microsoft]' has a path segment '..' that is not allowed"
+    },
+    {
+      "name": "refused-other-root",
+      "description": "Header naming HKEY_LOCAL_MACHINE. Must be refused before running.",
+      "bytes": 202,
+      "encoding": "Utf16LeBom",
+      "lines": [
+        "Windows Registry Editor Version 5.00",
+        "",
+        "[HKEY_LOCAL_MACHINE\\Software\\BWC-Oracle\\Import]",
+        "\"Bad\"=\"x\""
+      ],
+      "refused": "header '[HKEY_LOCAL_MACHINE\\Software\\BWC-Oracle\\Import]' is outside HKEY_CURRENT_USER\\Software\\BWC-Oracle"
+    }
+  ]
+}

@@ -35,19 +35,24 @@ internal static class Program
         var architecture = Architectures.Current();
         if (architecture is null)
         {
-            return WriteCheck(UpdateFailure.InvalidOptions, "this build does not support the running architecture", null, 2);
+            return WriteCheck(UpdateFailure.InvalidOptions, "this build does not support the running architecture", null, null, 2);
         }
 
-        var manifest = UrlPolicy.Validate(parsed.Single("--manifest-url"), requireHttps: true);
+        var options = new UpdateOptions();
+#if BWC_E2E
+        options = UpdateE2ESeam.ApplyCheckOverrides(options);
+#endif
+
+        var manifest = UrlPolicy.Validate(parsed.Single("--manifest-url"), requireHttps: options.RequireHttps);
         if (!manifest.Ok)
         {
-            return WriteCheck(manifest.Failure, manifest.Detail, null, 1);
+            return WriteCheck(manifest.Failure, manifest.Detail, null, null, 1);
         }
 
-        var signature = UrlPolicy.Validate(parsed.Single("--signature-url"), requireHttps: true);
+        var signature = UrlPolicy.Validate(parsed.Single("--signature-url"), requireHttps: options.RequireHttps);
         if (!signature.Ok)
         {
-            return WriteCheck(signature.Failure, signature.Detail, null, 1);
+            return WriteCheck(signature.Failure, signature.Detail, null, null, 1);
         }
 
         UpdateChannelNames.TryParse(parsed.Single("--channel"), out var channel);
@@ -59,8 +64,13 @@ internal static class Program
             architecture,
             UpdatePaths.DefaultStagingRoot);
 
-        var outcome = await new UpdateChecker(new UpdateOptions()).CheckAsync(request);
-        return WriteCheck(outcome.Failure, outcome.Detail, outcome.Value?.Receipt.Version, outcome.Ok ? 0 : 1);
+        var outcome = await new UpdateChecker(options).CheckAsync(request);
+        return WriteCheck(
+            outcome.Failure,
+            outcome.Detail,
+            outcome.Value?.Receipt.Version,
+            outcome.Value?.NotesUrl?.AbsoluteUri,
+            outcome.Ok ? 0 : 1);
     }
 
     private static async Task<int> RunApplyAsync(UpdateArguments parsed, string[] args)
@@ -119,7 +129,7 @@ internal static class Program
         _ => 3,
     };
 
-    private static int WriteCheck(UpdateFailure failure, string detail, string? version, int exitCode)
+    private static int WriteCheck(UpdateFailure failure, string detail, string? version, string? notesUrl, int exitCode)
     {
         Console.WriteLine(JsonSerializer.Serialize(new
         {
@@ -127,6 +137,7 @@ internal static class Program
             failure = failure.ToString(),
             detail,
             version,
+            notesUrl,
         }));
         return exitCode;
     }

@@ -3,68 +3,85 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <ContentControl
+    <Grid
         x:Name="HubRoot"
         AutomationProperties.AutomationId="HubRoot"
         AutomationProperties.Name="Better Windows Config"
-        Padding="0"
-        HorizontalAlignment="Stretch"
-        VerticalAlignment="Stretch"
-        HorizontalContentAlignment="Stretch"
-        VerticalContentAlignment="Stretch">
-        <Grid Padding="12" RowSpacing="8">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+        Background="{StaticResource BwcFaceBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+        <MenuBar
+            x:Name="HubMenuBar"
+            Grid.Row="0"
+            AutomationProperties.AutomationId="HubMenuBar"
+            AutomationProperties.Name="Menu bar"
+            Style="{StaticResource BwcMenuBarStyle}" />
+
+        <Border
+            Grid.Row="1"
+            Margin="6,4,6,0"
+            Background="{StaticResource BwcWindowBrush}"
+            BorderBrush="{StaticResource BwcShadowBrush}"
+            BorderThickness="1">
+            <ListView
+                x:Name="ToolList"
+                AutomationProperties.AutomationId="ToolList"
+                AutomationProperties.Name="Tools"
+                Padding="0"
+                Margin="0"
+                BorderThickness="0"
+                Background="{StaticResource BwcWindowBrush}"
+                SelectionMode="Single"
+                IsItemClickEnabled="False"
+                UseSystemFocusVisuals="False"
+                ScrollViewer.HorizontalScrollMode="Disabled"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+        </Border>
+
+        <Grid Grid.Row="2" Margin="6,6,6,0" HorizontalAlignment="Stretch">
+            <Button
+                x:Name="LaunchButton"
+                HorizontalAlignment="Right"
+                MinWidth="84"
+                MinHeight="23"
+                Padding="10,1"
+                AutomationProperties.AutomationId="LaunchSelected"
+                AutomationProperties.Name="Launch selected tool"
+                FontFamily="Segoe UI"
+                FontSize="{StaticResource BwcFontSize}" />
+        </Grid>
+
+        <Border
+            Grid.Row="3"
+            Margin="0,6,0,0"
+            Padding="6,2,6,3"
+            Background="{StaticResource BwcFaceBrush}"
+            BorderBrush="{StaticResource BwcShadowBrush}"
+            BorderThickness="0,1,0,0">
+            <Grid>
                 <TextBlock
-                    x:Name="ProductTitle"
+                    x:Name="StatusText"
+                    HorizontalAlignment="Left"
+                    AutomationProperties.AutomationId="HubStatus"
                     FontFamily="Segoe UI"
                     FontSize="{StaticResource BwcFontSize}"
-                    FontWeight="SemiBold"
-                    VerticalAlignment="Center" />
+                    Foreground="{StaticResource BwcWindowTextBrush}"
+                    TextTrimming="CharacterEllipsis" />
                 <TextBlock
                     x:Name="VersionText"
+                    HorizontalAlignment="Right"
+                    Margin="12,0,0,0"
                     AutomationProperties.AutomationId="HubVersion"
                     FontFamily="Segoe UI"
                     FontSize="{StaticResource BwcFontSize}"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    VerticalAlignment="Center" />
-            </StackPanel>
-
-            <ScrollViewer
-                x:Name="ToolList"
-                Grid.Row="1"
-                AutomationProperties.AutomationId="ToolList"
-                HorizontalScrollBarVisibility="Disabled"
-                HorizontalScrollMode="Disabled"
-                VerticalScrollBarVisibility="Auto"
-                VerticalScrollMode="Auto">
-                <StackPanel x:Name="ToolRows" Spacing="4" />
-            </ScrollViewer>
-
-            <TextBlock
-                x:Name="HubStatus"
-                Grid.Row="2"
-                AutomationProperties.AutomationId="HubStatus"
-                FontFamily="Segoe UI"
-                FontSize="{StaticResource BwcFontSize}"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                TextWrapping="Wrap" />
-
-            <TextBlock
-                x:Name="HubAbout"
-                Grid.Row="3"
-                AutomationProperties.AutomationId="HubAbout"
-                FontFamily="Segoe UI"
-                FontSize="{StaticResource BwcFontSize}"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                TextWrapping="Wrap" />
-        </Grid>
-    </ContentControl>
+                    Foreground="{StaticResource BwcWindowTextBrush}" />
+            </Grid>
+        </Border>
+    </Grid>
 
 </Window>

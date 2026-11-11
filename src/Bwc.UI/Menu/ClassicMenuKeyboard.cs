@@ -2,7 +2,9 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Bwc.UI.Interop;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
+using Microsoft.UI.Xaml.Automation.Provider;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
@@ -17,6 +19,12 @@ namespace Bwc.UI.Menu;
 ///   Left/Right (bar active) -> previous/next top-level item through the XAML XYFocus ring
 ///   Down (bar active)  -> open that item's flyout (HandleKeyFromXaml)
 ///   Esc (flyout open)  -> passed through so XAML closes the flyout; the bar stays active
+///   Letter (flyout open) -> the innermost open popup is searched for that access key. An enabled
+///     leaf is invoked and the menu closes; a submenu is expanded. Separators and disabled items
+///     are skipped, and a letter with no match does nothing.
+///
+/// Mnemonic underlines follow the input method: keyboard activation (Alt, F10, or a letter on the
+/// bar) sets ClassicMenuState.ShowMnemonics, and a pointer press or the end of menu mode clears it.
 ///
 /// Hook approach: SetWindowSubclass on the top-level HWND and on every descendant HWND. The WinUI
 /// keyboard focus lives in a child HWND of the window, so WM_SYSKEYDOWN and WM_KEYDOWN are
@@ -219,11 +227,15 @@ public sealed unsafe class ClassicMenuKeyboard : IDisposable
                         {
                             _mode = Mode.BarFocused;
                             Publish();
+                            return false;
                         }
 
-                        return false;
+                        return TryPopupMnemonic(vk);
                     default:
-                        return false;
+                        // A popup can be open without menu mode (a pointer opened it). A letter then
+                        // works in that popup, as it does in a Win32 menu. With no popup open this
+                        // returns false, so ordinary typing in the tree is not taken.
+                        return TryPopupMnemonic(vk);
                 }
             }
 
@@ -253,7 +265,8 @@ public sealed unsafe class ClassicMenuKeyboard : IDisposable
 
             case Win32.WM_LBUTTONDOWN:
             case Win32.WM_RBUTTONDOWN:
-                // Pointer input leaves keyboard menu mode.
+                // Pointer input leaves keyboard menu mode and hides the mnemonic underlines.
+                ClassicMenuState.ShowMnemonics = false;
                 if (_mode != Mode.Idle)
                 {
                     _mode = Mode.Idle;
@@ -329,6 +342,7 @@ public sealed unsafe class ClassicMenuKeyboard : IDisposable
 
         _savedFocus = FocusManager.GetFocusedElement(root);
         _mode = Mode.BarFocused;
+        ClassicMenuState.ShowMnemonics = true;
         FocusItem(index);
         Publish();
     }
@@ -341,6 +355,7 @@ public sealed unsafe class ClassicMenuKeyboard : IDisposable
         }
 
         _mode = Mode.Idle;
+        ClassicMenuState.ShowMnemonics = false;
         if (_savedFocus is Control control)
         {
             control.Focus(FocusState.Programmatic);
@@ -348,6 +363,174 @@ public sealed unsafe class ClassicMenuKeyboard : IDisposable
 
         _savedFocus = null;
         Publish();
+    }
+
+    /// <summary>
+    /// Handles a letter typed while a popup is open. The innermost open popup is the only one searched,
+    /// as in a Win32 menu. Returns true when the key was consumed.
+    /// </summary>
+    private bool TryPopupMnemonic(int vk)
+    {
+        if (vk < 'A' || vk > 'Z')
+        {
+            return false;
+        }
+
+        MenuBarItem? top = OpenTopLevelItem();
+        if (top is null)
+        {
+            return false;
+        }
+
+        var letter = (char)vk;
+        MenuFlyoutSubItem? open = FindExpandedSubItem(top.Items);
+        IList<MenuFlyoutItemBase> scope = open is not null ? open.Items : top.Items;
+
+        // Only enabled items in the open popup with this access key. Separators have no key and are skipped.
+        var matches = new List<Control>();
+        foreach (MenuFlyoutItemBase entry in scope)
+        {
+            if (entry is MenuFlyoutItem or MenuFlyoutSubItem)
+            {
+                var control = (Control)entry;
+                if (control.IsEnabled && MatchesAccessKey(control.AccessKey, letter))
+                {
+                    matches.Add(control);
+                }
+            }
+        }
+
+        if (matches.Count == 0)
+        {
+            return false;
+        }
+
+        // A single match runs at once, as in a Win32 menu. With several, the first press focuses the first
+        // match and each further press focuses the next one; Enter then runs the focused item.
+        if (matches.Count == 1)
+        {
+            Activate(matches[0]);
+            return true;
+        }
+
+        int current = matches.FindIndex(IsFocused);
+        matches[(current + 1) % matches.Count].Focus(FocusState.Keyboard);
+        return true;
+    }
+
+    private void Activate(Control control)
+    {
+        if (control is MenuFlyoutSubItem sub)
+        {
+            ExpandSubItem(sub);
+            return;
+        }
+
+        InvokeLeaf((MenuFlyoutItem)control);
+    }
+
+    private static bool IsFocused(Control control)
+    {
+        return control.XamlRoot is { } root && ReferenceEquals(FocusManager.GetFocusedElement(root), control);
+    }
+
+    /// <summary>
+    /// The top-level item whose popup is open. Menu mode knows it directly. Otherwise the UI Automation
+    /// expand state of each top-level item is read, so a popup opened by a pointer or by automation
+    /// still takes letters.
+    /// </summary>
+    private MenuBarItem? OpenTopLevelItem()
+    {
+        if (_mode == Mode.FlyoutOpen && _index >= 0 && _index < _items.Count)
+        {
+            return _items[_index];
+        }
+
+        foreach (MenuBarItem item in _items)
+        {
+            if (PeerOf(item) is IExpandCollapseProvider provider
+                && provider.ExpandCollapseState == ExpandCollapseState.Expanded)
+            {
+                return item;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Entry point for a letter that reaches the shell through XAML instead of the window hook. Returns
+    /// true when the key was consumed by an open popup.
+    /// </summary>
+    public bool HandlePopupKey(VirtualKey key)
+    {
+        return TryPopupMnemonic((int)key);
+    }
+
+    private static bool MatchesAccessKey(string? accessKey, char letter)
+    {
+        return !string.IsNullOrEmpty(accessKey)
+            && char.ToUpperInvariant(accessKey[0]) == letter;
+    }
+
+    /// <summary>The submenu of this popup that UIA reports as expanded, or null when none is open.</summary>
+    private static MenuFlyoutSubItem? FindExpandedSubItem(IList<MenuFlyoutItemBase> items)
+    {
+        foreach (MenuFlyoutItemBase entry in items)
+        {
+            if (entry is not MenuFlyoutSubItem sub)
+            {
+                continue;
+            }
+
+            if (PeerOf(sub) is IExpandCollapseProvider provider
+                && provider.ExpandCollapseState == ExpandCollapseState.Expanded)
+            {
+                return sub;
+            }
+        }
+
+        return null;
+    }
+
+    private void ExpandSubItem(MenuFlyoutSubItem sub)
+    {
+        if (PeerOf(sub) is IExpandCollapseProvider provider)
+        {
+            provider.Expand();
+        }
+    }
+
+    /// <summary>
+    /// Invokes a leaf through its automation peer, which runs the same path as a click and closes the
+    /// popup. Menu mode ends after the command, so the mnemonic underlines are hidden.
+    /// </summary>
+    private void InvokeLeaf(MenuFlyoutItem item)
+    {
+        // The menu closes first, as it does after a click. The command then runs with the same action a click
+        // would run, queued so it starts after this key message has returned rather than inside the window hook.
+        // The open top-level item is found before the state changes; _index is stale when a pointer or
+        // automation opened the popup, so it cannot name the popup that must close.
+        MenuBarItem? open = OpenTopLevelItem();
+        _mode = Mode.Idle;
+        _savedFocus = null;
+        ClassicMenuState.ShowMnemonics = false;
+        if (open is not null && PeerOf(open) is IExpandCollapseProvider provider)
+        {
+            provider.Collapse();
+        }
+
+        Publish();
+        if (MenuItemActions.TryGet(item, out Action action))
+        {
+            _ = item.DispatcherQueue.TryEnqueue(() => action());
+        }
+    }
+
+    private static AutomationPeer? PeerOf(FrameworkElement element)
+    {
+        return FrameworkElementAutomationPeer.FromElement(element)
+            ?? FrameworkElementAutomationPeer.CreatePeerForElement(element);
     }
 
     private void FocusItem(int index)

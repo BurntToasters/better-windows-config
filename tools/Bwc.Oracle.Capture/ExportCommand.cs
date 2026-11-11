@@ -14,18 +14,16 @@ internal static class ExportCommand
     {
         Directory.CreateDirectory(paths.ExportsDir);
 
-        GuiLock.Run(() =>
-        {
-            int v5Exit = ExportTo(paths.ExportV5, "/e", OracleKeyArg);
-            int regedit4Exit = ExportTo(paths.ExportRegedit4, "/a", OracleKeyArg);
-            int singleExit = ExportTo(paths.ExportSingleKeyV5, "/e", ManyKeyArg);
+        // Runs inside OracleSession, which holds the GUI mutex for the whole session.
+        int v5Exit = ExportTo(paths.ExportV5, "/e", OracleKeyArg);
+        int regedit4Exit = ExportTo(paths.ExportRegedit4, "/a", OracleKeyArg);
+        int singleExit = ExportTo(paths.ExportSingleKeyV5, "/e", ManyKeyArg);
 
-            Console.WriteLine($"export exit codes: v5={v5Exit} regedit4={regedit4Exit} single-key-v5={singleExit}");
-            if (v5Exit != 0 || regedit4Exit != 0 || singleExit != 0)
-            {
-                throw new InvalidOperationException("regedit export returned a nonzero exit code.");
-            }
-        });
+        Console.WriteLine($"export exit codes: v5={v5Exit} regedit4={regedit4Exit} single-key-v5={singleExit}");
+        if (v5Exit != 0 || regedit4Exit != 0 || singleExit != 0)
+        {
+            throw new InvalidOperationException("regedit export returned a nonzero exit code.");
+        }
 
         ValidateHeader(paths.ExportV5, isV5: true);
         ValidateHeader(paths.ExportRegedit4, isV5: false);

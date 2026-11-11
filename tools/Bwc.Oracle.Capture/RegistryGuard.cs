@@ -11,10 +11,7 @@ internal static class RegistryGuard
     internal const string AppletRoot = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit";
 
     private const string OracleSubPath = @"Software\BWC-Oracle";
-    private const string AppletSubPath = @"Software\Microsoft\Windows\CurrentVersion\Applets\Regedit";
-
-    // The only applet values this tool may write or remove.
-    private static readonly string[] AllowedAppletValues = { "LastKey", "View" };
+    internal const string AppletSubPath = @"Software\Microsoft\Windows\CurrentVersion\Applets\Regedit";
 
     internal static void AssertAllowed(string fullPath)
     {
@@ -69,48 +66,50 @@ internal static class RegistryGuard
         RegistryNative.SetExact(key.Handle, valueName, type, data);
     }
 
-    // Restores one applet value (LastKey or View) to a previously captured raw state.
-    internal static void SetAppletValue(string valueName, uint type, byte[] data)
+    // Opens (creating if needed) a key under the Regedit applet key, for the snapshot restore only.
+    // relative is "" for the applet key itself or a subkey path such as "Favorites".
+    internal static RegistryKey OpenOrCreateAppletKey(string relative)
     {
-        EnsureAppletValueAllowed(valueName);
-        using RegistryKey key = Registry.CurrentUser.CreateSubKey(AppletSubPath, writable: true)
-            ?? throw new IOException("Could not open applet key for writing.");
-        SetRawValue(key, AppletRoot, valueName, type, data);
+        string full = relative.Length == 0 ? AppletRoot : AppletRoot + @"\" + relative;
+        AssertAllowed(full);
+        string sub = relative.Length == 0 ? AppletSubPath : AppletSubPath + @"\" + relative;
+        return Registry.CurrentUser.CreateSubKey(sub, writable: true)
+            ?? throw new IOException($"Could not open '{full}' for writing.");
     }
 
-    internal static void DeleteAppletValue(string valueName)
+    internal static void SetAppletValue(string relative, string valueName, uint type, byte[] data)
     {
-        EnsureAppletValueAllowed(valueName);
-        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(AppletSubPath, writable: true);
-        if (key is null)
+        using RegistryKey key = OpenOrCreateAppletKey(relative);
+        string full = relative.Length == 0 ? AppletRoot : AppletRoot + @"\" + relative;
+        AssertAllowed(full);
+        RegistryNative.SetExact(key.Handle, valueName, type, data);
+    }
+
+    internal static void DeleteAppletValue(string relative, string valueName)
+    {
+        string sub = relative.Length == 0 ? AppletSubPath : AppletSubPath + @"\" + relative;
+        string full = relative.Length == 0 ? AppletRoot : AppletRoot + @"\" + relative;
+        AssertAllowed(full);
+        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(sub, writable: true);
+        key?.DeleteValue(valueName, throwOnMissingValue: false);
+    }
+
+    // Removes one subkey of the applet key with everything under it. relative must name a subkey, never the applet key.
+    internal static void DeleteAppletSubtree(string relative)
+    {
+        if (relative.Length == 0)
         {
-            return;
+            throw new InvalidOperationException("Refusing to delete the whole Regedit applet key.");
         }
 
+        AssertAllowed(AppletRoot + @"\" + relative);
+        Registry.CurrentUser.DeleteSubKeyTree(AppletSubPath + @"\" + relative, throwOnMissingSubKey: false);
+    }
+
+    // Removes the applet key itself. Only used when the snapshot found it absent before the run.
+    internal static void DeleteAppletKeyTree()
+    {
         AssertAllowed(AppletRoot);
-        key.DeleteValue(valueName, throwOnMissingValue: false);
-    }
-
-    // Removes the applet key itself. Only used when it did not exist before this tool ran
-    // and is now empty, so that the registry returns to its original shape.
-    internal static void DeleteAppletKeyIfEmpty()
-    {
-        AssertAllowed(AppletRoot);
-        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(AppletSubPath, writable: false);
-        if (key is null || key.ValueCount != 0 || key.SubKeyCount != 0)
-        {
-            return;
-        }
-
-        key.Dispose();
-        Registry.CurrentUser.DeleteSubKey(AppletSubPath, throwOnMissingSubKey: false);
-    }
-
-    private static void EnsureAppletValueAllowed(string valueName)
-    {
-        if (!AllowedAppletValues.Contains(valueName, StringComparer.Ordinal))
-        {
-            throw new InvalidOperationException($"Applet value '{valueName}' is not on the allow list.");
-        }
+        Registry.CurrentUser.DeleteSubKeyTree(AppletSubPath, throwOnMissingSubKey: false);
     }
 }

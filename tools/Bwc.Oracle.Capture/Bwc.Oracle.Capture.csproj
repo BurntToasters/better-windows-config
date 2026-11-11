@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <!-- Brings System.Drawing from the in-box Windows Desktop shared framework; no NuGet package, so CPM needs no version. -->
+    <UseWindowsForms>true</UseWindowsForms>
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -14,9 +16,5 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
-  </ItemGroup>
 
 </Project>

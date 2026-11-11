@@ -33,6 +33,9 @@ public sealed partial class ClassicWindowShell : UserControl
     private const double MaxTreePaneWidth = 600;
     private const double KeyboardSplitStep = 8;
 
+    // Oracle command id of View > Address Bar (RT_MENU 103, id 668).
+    private const int AddressBarCommandId = 668;
+
     private double _treePaneWidth = DenseMetrics.TreePaneWidth;
     private ClassicMenuKeyboard? _menuKeyboard;
     private nint _topHwnd;
@@ -49,6 +52,7 @@ public sealed partial class ClassicWindowShell : UserControl
         // The palette is applied here on the UI thread, after the Dense.xaml brushes exist.
         BwcTheme.EnsureInitialized();
         RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
+        ClassicMenuBrushes.Refresh();
 
         // Fallback for the WinRT theme events, which an unpackaged app can be refused. A change of
         // the effective Windows theme changes this element's ActualTheme, so the palette re-reads.
@@ -76,6 +80,10 @@ public sealed partial class ClassicWindowShell : UserControl
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         MenuBarRoot.PreviewKeyDown += OnMenuPreviewKeyDown;
+
+        // A popup's keys can arrive here before the window hook sees them. Letters are offered to an
+        // open popup, and handled events are included so an earlier handler cannot hide the key.
+        AddHandler(UIElement.PreviewKeyDownEvent, new KeyEventHandler(OnShellPreviewKeyDown), handledEventsToo: true);
     }
 
     /// <summary>The menu bar. The host application fills it from its command table.</summary>
@@ -178,7 +186,9 @@ public sealed partial class ClassicWindowShell : UserControl
 
         BwcTheme.Changed += OnThemeChanged;
         RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
+        ClassicMenuBrushes.Refresh();
         ApplyMetrics();
+        SyncAddressBarCheck();
         RefreshPaneFocus();
         if (_topHwnd != 0)
         {
@@ -201,6 +211,7 @@ public sealed partial class ClassicWindowShell : UserControl
     private void OnThemeChanged(object? sender, EventArgs e)
     {
         RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
+        ClassicMenuBrushes.Refresh();
     }
 
     /// <summary>
@@ -264,11 +275,18 @@ public sealed partial class ClassicWindowShell : UserControl
         TreeControl.ApplyMetrics();
         ListControl.ApplyMetrics();
 
+        // Top-level widths come from the GDI label width at the window scale, so they match the oracle.
+        double scale = XamlRoot?.RasterizationScale ?? 1.0;
         foreach (var item in MenuBarRoot.Items.OfType<MenuBarItem>())
         {
             item.Height = DenseMetrics.MenuBarHeight;
             item.FontSize = DenseMetrics.FontSize;
             item.FontFamily = DenseMetrics.FontFamily;
+            double width = ClassicMenuMetrics.BarItemWidthDip(item.Title, scale);
+            if (width > 0)
+            {
+                item.Width = width;
+            }
         }
 
         AddressRow.Height = IsAddressBarVisible ? GridLength.Auto : new GridLength(0);
@@ -285,7 +303,36 @@ public sealed partial class ClassicWindowShell : UserControl
         IsAddressBarVisible = visible;
         AddressBox.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         AddressRow.Height = visible ? GridLength.Auto : new GridLength(0);
+        SyncAddressBarCheck();
         AddressBarVisibilityChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Puts a check mark on View &gt; Address Bar while the address bar is showing. The item is a
+    /// ToggleMenuFlyoutItem; its check glyph sits in the reserved gutter, so the label does not move.
+    /// </summary>
+    private void SyncAddressBarCheck()
+    {
+        foreach (var top in MenuBarRoot.Items.OfType<MenuBarItem>())
+        {
+            SetCheck(top.Items, AddressBarCommandId, IsAddressBarVisible);
+        }
+    }
+
+    private static void SetCheck(IList<MenuFlyoutItemBase> items, int commandId, bool isChecked)
+    {
+        foreach (var entry in items)
+        {
+            if (entry is ToggleMenuFlyoutItem toggle && toggle.Tag is int id && id == commandId)
+            {
+                toggle.IsChecked = isChecked;
+            }
+
+            if (entry is MenuFlyoutSubItem subItem)
+            {
+                SetCheck(subItem.Items, commandId, isChecked);
+            }
+        }
     }
 
     private void CreateMenuKeyboard()
@@ -323,6 +370,14 @@ public sealed partial class ClassicWindowShell : UserControl
     private void OnMenuPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (_menuKeyboard is not null && _menuKeyboard.HandleKeyFromXaml(e.Key))
+        {
+            e.Handled = true;
+        }
+    }
+
+    private void OnShellPreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (!e.Handled && _menuKeyboard is not null && _menuKeyboard.HandlePopupKey(e.Key))
         {
             e.Handled = true;
         }

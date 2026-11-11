@@ -20,40 +20,19 @@ internal static class MetricsCommand
     private const string SeededKeyPath = @"Software\BWC-Oracle\Mixed";
     private const int ExpectedListRows = 8; // seven values in Mixed plus the (Default) row
 
+    // Runs inside OracleSession (GUI mutex, applet snapshot and restore, BWC-Oracle cleanup).
     internal static void Run(RepoPaths paths, bool allowDpi)
     {
-        Win32.SetProcessDpiAwarenessContext(Msg.DpiAwarePerMonitorV2);
-        uint systemDpi = Win32.GetDpiForSystem();
-        if (systemDpi != RequiredDpi && !allowDpi)
-        {
-            throw new InvalidOperationException(
-                $"metrics refused: system DPI is {systemDpi}, but classic-regedit parity is measured at {RequiredDpi} DPI (100%). " +
-                "Set the display scale to 100%, or pass --allow-dpi to record metrics at this DPI.");
-        }
-
-        using (RegistryKey? seeded = Registry.CurrentUser.OpenSubKey(SeededKeyPath, writable: false))
-        {
-            if (seeded is null)
-            {
-                throw new InvalidOperationException($"metrics needs the seeded tree: HKCU\\{SeededKeyPath} is missing. Run `seed` first.");
-            }
-        }
-
-        bool written = GuiLock.Run(() => Measure(paths, systemDpi, allowDpi));
-        if (!written)
-        {
-            throw new InvalidOperationException("metrics did not complete.");
-        }
+        uint systemDpi = OracleSession.RequireDpi(allowDpi);
+        Measure(paths, systemDpi, allowDpi);
     }
 
-    private static bool Measure(RepoPaths paths, uint systemDpi, bool allowDpi)
+    private static void Measure(RepoPaths paths, uint systemDpi, bool allowDpi)
     {
-        AppletSnapshot before = AppletSnapshot.Capture();
-        Console.WriteLine($"metrics: applet state before: {before.Describe()}");
         Process? proc = null;
         try
         {
-            RegistryGuard.SetAppletValue("LastKey", RegType.Sz, SeedSpec.Sz(LastKeyValue));
+            RegistryGuard.SetAppletValue(string.Empty, "LastKey", RegType.Sz, SeedSpec.Sz(LastKeyValue));
             proc = RegeditProcess.Start(Array.Empty<string>());
             proc.WaitForInputIdle(15000);
             IntPtr hwnd = WaitForMainWindow(proc);
@@ -82,7 +61,6 @@ internal static class MetricsCommand
             }).Replace("\r\n", "\n") + "\n";
             Util.WriteUtf8NoBom(paths.MetricsJson, json);
             Console.WriteLine($"metrics: wrote {paths.MetricsJson} and {paths.ScreenshotPng}");
-            return true;
         }
         finally
         {
@@ -92,9 +70,6 @@ internal static class MetricsCommand
                 proc.WaitForExit(5000);
                 Console.WriteLine("metrics: killed the regedit process this run started");
             }
-
-            before.Restore();
-            Console.WriteLine($"metrics: applet state restored: {before.Describe()}");
         }
     }
 

@@ -13,7 +13,7 @@ public sealed record UpdateRequest(
     string StagingRoot);
 
 /// <summary>A verified installer, staged in its own folder, with the receipt that describes it.</summary>
-public sealed record ReadyUpdate(string FolderPath, string InstallerPath, string ReceiptPath, UpdateReceipt Receipt);
+public sealed record ReadyUpdate(string FolderPath, string InstallerPath, string ReceiptPath, UpdateReceipt Receipt, Uri? NotesUrl = null);
 
 /// <summary>
 /// The check pipeline: manifest and signature, manifest signature, parse, the signed version
@@ -199,7 +199,7 @@ public sealed class UpdateChecker
         }
 
         Log.Info($"update ready: version={offered} architecture={request.Architecture} size={installer.Size}");
-        return Outcome<ReadyUpdate>.Success(new ReadyUpdate(folder, installerPath, receiptPath, receipt));
+        return Outcome<ReadyUpdate>.Success(new ReadyUpdate(folder, installerPath, receiptPath, receipt, manifest.Value.NotesUrl));
     }
 
     private static void Discard(string folder)
