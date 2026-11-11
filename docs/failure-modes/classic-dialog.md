@@ -304,6 +304,24 @@ constructor. The dialog never opens and the owner is never disabled, so the fail
 Guard: every theme key in the styles file is a key the Fluent theme defines. The constructor
 catches load failures and reports them through the log instead of leaving the owner disabled.
 
+### 6.3 Face and text not painted
+
+The dialog root is a `ContentControl`, and its face came from the `Background` in
+`BwcClassicRootStyle`. That background is set on the root but is not painted, so the window
+backing shows through. On this stack the backing is black. The static text uses the palette text
+color, which is black on the light palette, so the Hub's About and update dialogs showed their
+buttons and nothing else. The Registry Editor dialogs looked right only because their palette
+text is white, which is readable on the same black. UI Automation reads each control's text, not
+its pixels, so every text check passed while the text was invisible.
+
+Guard: the dialog paints the palette face itself, on the template canvas or on the wrapper grid that
+holds a flow layout. Static text, check and radio labels, and the group caption take `BwcBrushes`
+(the palette brushes), and the root's element theme follows the palette so the Fluent buttons match
+it. The palette brushes are live, so a theme change repaints the dialog. The E2E check
+`DialogContrast` captures the client area and fails when the most common color is not the palette
+face within 6 per channel, or when a static text control has fewer than 12 pixels whose luminance
+differs from its background by more than 40 percent of full scale.
+
 ## 7. Message box
 
 ### 7.1 Wrong default or cancel for a button set
@@ -367,6 +385,7 @@ does through `await`.
 | Alt mnemonics | 3.6 | Alt+V, Alt+H, Alt+D move focus |
 | Enter and Escape | 3.8 | Enter saves once, Escape cancels |
 | Base conversion | 5.1 | 0x1388 shows 5000 in Decimal |
+| Face and text readable | 6.3 | Client face is the palette face; each static text has 12+ strong pixels (`DialogContrast`) |
 | Screenshots | all | `artifacts/e2e/visual/dialogs/*.png` |
 
 Edge cases with no E2E check yet: 100 % and 150 % scale (the E2E machine runs at 200 %), monitors

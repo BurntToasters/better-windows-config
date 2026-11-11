@@ -25,10 +25,16 @@ internal sealed class ViewCommands
 
     private string Get(string key) => _context.Messages.Get(key);
 
-    /// <summary>Deletes the selected values when the list has a selection, otherwise the selected key.</summary>
-    public void DeleteSelection()
+    /// <summary>
+    /// Deletes the selection of the pane that has focus. The tree deletes the selected key, and the list
+    /// deletes the selected values. The menu uses the pane that had focus last.
+    /// </summary>
+    public void DeleteSelection() => DeleteFrom(_context.FocusedPane());
+
+    /// <summary>Deletes from one pane. The tree and list Delete keys name their own pane.</summary>
+    public void DeleteFrom(RegeditContext.Pane pane)
     {
-        if (_context.Shell.ListContent.SelectedRows.Count > 0)
+        if (pane == RegeditContext.Pane.List)
         {
             _values.DeleteValues();
             return;
@@ -37,17 +43,20 @@ internal sealed class ViewCommands
         _keys.DeleteKey();
     }
 
-    /// <summary>Renames the single selected value, or the selected key when the list has no selection.</summary>
+    /// <summary>
+    /// Renames the item of the pane that has focus. The tree renames the selected key. The list renames
+    /// the single selected value, or the selected key when the list has no selection.
+    /// </summary>
     public void RenameSelection()
     {
         IReadOnlyList<DetailsRow> rows = _context.Shell.ListContent.SelectedRows;
-        if (rows.Count > 1)
+        if (_context.FocusedPane() == RegeditContext.Pane.List && rows.Count > 1)
         {
             _context.StartCommand(() => _context.ShowMessageAsync(Get("DialogNoSelection")));
             return;
         }
 
-        if (rows.Count == 1)
+        if (_context.FocusedPane() == RegeditContext.Pane.List && rows.Count == 1)
         {
             _values.RenameValueInteractive(rows[0]);
             return;
@@ -76,12 +85,11 @@ internal sealed class ViewCommands
         _context.StartCommand(() => NavigateToAddressAsync(text, generation));
     }
 
-    /// <summary>Refreshes the tree and reselects the current key. Bound to F5.</summary>
-    public void Refresh()
-    {
-        string? currentPath = _context.Shell.TreeContent.SelectedNode?.RegistryPath;
-        _context.StartCommand(() => _context.RefreshTreeAsync(currentPath));
-    }
+    /// <summary>
+    /// Re-reads the tree and the value list. Expansion, the selected key and value rows, and the scroll
+    /// positions are kept. Bound to F5 and View &gt; Refresh.
+    /// </summary>
+    public void Refresh() => _context.StartCommand(_context.RefreshViewAsync);
 
     public void GoToLocalMachine()
     {

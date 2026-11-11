@@ -36,8 +36,8 @@ internal sealed class ValueCommands
 
     public void RenameValueInteractive(DetailsRow row) => _context.StartCommand(() => RenameValueInteractiveAsync(row));
 
-    /// <summary>Opens the hex editor for a double-clicked value.</summary>
-    public void ActivateValue(DetailsRow row) => _context.StartCommand(() => EditValueHexAsync(row));
+    /// <summary>Opens the editor for an Entered or double-clicked value. It is the same dispatch as Modify.</summary>
+    public void ActivateValue(DetailsRow row) => _context.StartCommand(() => ModifyValueAsync(row));
 
     /// <summary>Applies an inline rename that the list committed for one of its rows.</summary>
     public void RenameFromList(DetailsRow row, string newName)
@@ -67,7 +67,7 @@ internal sealed class ValueCommands
 
     public void ModifyBinaryData() => _context.StartCommand(ModifyBinaryDataAsync);
 
-    public void ModifySelectedValue() => _context.StartCommand(ModifySelectedValueAsync);
+    public void ModifySelectedValue() => _context.StartCommand(() => ModifyValueAsync(null));
 
     private async Task ShowBinaryDataAsync()
     {
@@ -120,14 +120,10 @@ internal sealed class ValueCommands
     }
 
     /// <summary>
-    /// Opens the hex editor for a double-clicked value when the raw type has no dedicated typed
-    /// editor. The value is read on the thread pool and written back with its original type when
-    /// the dialog accepts.
+    /// Opens the hex editor for a value whose type has no typed editor, or for Modify Binary Data. The
+    /// value is read on the thread pool and written back with its original type when the dialog accepts.
     /// </summary>
-    private Task EditValueHexAsync(DetailsRow activatedRow) =>
-        EditValueHexAsync(activatedRow, requireHexEditableType: true);
-
-    private async Task EditValueHexAsync(DetailsRow activatedRow, bool requireHexEditableType)
+    private async Task EditValueHexAsync(DetailsRow activatedRow)
     {
         if (_context.DialogOpen || _context.WindowHwnd == 0)
         {
@@ -165,11 +161,6 @@ internal sealed class ValueCommands
             return;
         }
 
-        if (requireHexEditableType && !IsHexEditableType(value.Type))
-        {
-            return;
-        }
-
         var dialog = new HexEditorDialog(Get("DialogHexEditTitle"));
         dialog.SetValue(
             activatedRow.Name,
@@ -197,13 +188,6 @@ internal sealed class ValueCommands
         await _context.RefreshValuesAsync(activatedRow.Name);
     }
 
-    private static bool IsHexEditableType(uint type) =>
-        type != (uint)RegistryValueType.String &&
-        type != (uint)RegistryValueType.ExpandString &&
-        type != (uint)RegistryValueType.Dword &&
-        type != (uint)RegistryValueType.Qword &&
-        type != (uint)RegistryValueType.MultiString;
-
     private async Task ModifyBinaryDataAsync()
     {
         if (_context.DialogOpen || _context.WindowHwnd == 0)
@@ -220,12 +204,18 @@ internal sealed class ValueCommands
             return;
         }
 
-        // The context menu enables this command for any single value. Unlike the double-click
-        // path, a typed value is intentionally editable here and is written back with its type.
-        await EditValueHexAsync(rows[0], requireHexEditableType: false);
+        // The menus enable this command for any single value. A typed value is intentionally editable
+        // here and is written back with its type.
+        await EditValueHexAsync(rows[0]);
     }
 
-    private async Task ModifySelectedValueAsync()
+    /// <summary>
+    /// The one dispatch for Modify, Enter, and double-click. REG_SZ and REG_EXPAND_SZ open Edit String,
+    /// REG_DWORD opens Edit DWORD, REG_QWORD opens Edit QWORD, and REG_MULTI_SZ opens Edit Multi-String.
+    /// Every other type opens Edit Binary, as classic regedit does. The activated row is given for Enter
+    /// and double-click, and must be the only selected row. Modify passes null and uses the selection.
+    /// </summary>
+    private async Task ModifyValueAsync(DetailsRow? activated)
     {
         if (_context.DialogOpen || _context.WindowHwnd == 0)
         {
@@ -235,11 +225,39 @@ internal sealed class ValueCommands
         }
 
         IReadOnlyList<DetailsRow> rows = _context.Shell.ListContent.SelectedRows;
-        if (rows.Count != 1 ||
-            !_context.TryGetSelectedKeyPath(out RegistryPath key) ||
-            !_context.TryGetRawValueName(rows[0], out string rawName))
+        if (activated is not null)
+        {
+            // A stale activation, for a row that is no longer the single selection, does nothing.
+            if (rows.Count != 1 || !ReferenceEquals(rows[0], activated))
+            {
+                return;
+            }
+        }
+        else if (rows.Count != 1)
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
+            return;
+        }
+
+        DetailsRow row = rows[0];
+        if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
+        {
+            if (activated is null)
+            {
+                await _context.ShowMessageAsync(Get("DialogNoSelection"));
+            }
+
+            return;
+        }
+
+        if (_context.IsSyntheticDefault(row))
+        {
+            await EditSyntheticDefaultAsync(key);
+            return;
+        }
+
+        if (!_context.TryGetRawValueName(row, out string rawName))
+        {
             return;
         }
 
@@ -279,16 +297,45 @@ internal sealed class ValueCommands
                 saved = await EditMultiStringValueAsync(key, rawName, value);
                 break;
             default:
-                // The menu state keeps Modify disabled for these types. If a stale row still
-                // reaches this path, the editable hex dialog is the lossless fallback.
-                await EditValueHexAsync(rows[0], requireHexEditableType: false);
+                // Every other type has no typed editor. The hex editor keeps the bytes and the type.
+                await EditValueHexAsync(row);
                 return;
         }
 
         if (saved)
         {
-            await _context.RefreshValuesAsync(rows[0].Name);
+            await _context.RefreshValuesAsync(row.Name);
         }
+    }
+
+    /// <summary>
+    /// Edit String for the synthetic (Default) row, which has no value behind it. Accepting the dialog
+    /// writes the default value, as classic regedit does.
+    /// </summary>
+    private async Task EditSyntheticDefaultAsync(RegistryPath key)
+    {
+        var dialog = new StringValueDialog(
+            Get("DialogEditStringTitle"),
+            multiline: false,
+            string.Empty,
+            RegistryValueDisplay.FormatName(string.Empty));
+
+        if (!await _context.ShowDialogAsync(dialog))
+        {
+            return;
+        }
+
+        try
+        {
+            _context.Store.SetString(key, string.Empty, dialog.Value);
+        }
+        catch (RegistryOperationException ex)
+        {
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.EditValue, ValueLabel(string.Empty));
+            return;
+        }
+
+        await _context.RefreshValuesAsync(MessageCatalog.DefaultValueLabel);
     }
 
     private async Task<bool> EditStringValueAsync(

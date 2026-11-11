@@ -220,12 +220,10 @@ public sealed class ContextMenuTests
         }
         else
         {
-            E2EResults.RecordOrKnownGap(
+            E2EResults.Record(
                 "contextmenu.value.modify",
-                matchesOracle: modify.Enabled,
-                workPackage: "RF1",
-                expectedOracleBehavior: "Modify... is enabled for every value type, including binary values.",
-                observed: $"Modify... enabled={modify.Enabled} on the REG_BINARY value.");
+                modify.Enabled,
+                $"Modify... enabled={modify.Enabled} on the REG_BINARY value; the oracle enables it for every value type.");
         }
 
         E2EGuards.RequireSandboxSelection(session, sandbox, "contextmenu.sandbox.modifybinary");

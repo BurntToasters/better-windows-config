@@ -52,6 +52,9 @@ internal sealed class MessageCatalog
     /// <summary>Label shown for the unnamed default value.</summary>
     public const string DefaultValueLabel = "(Default)";
 
+    /// <summary>Data text of the default value when it is not set (oracle string 27).</summary>
+    public const string ValueNotSetData = "(value not set)";
+
     /// <summary>Prefix of the attempted path line in an address bar error.</summary>
     public const string PathLinePrefix = "Path: ";
 

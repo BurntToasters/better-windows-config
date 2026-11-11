@@ -101,16 +101,17 @@ internal sealed class ContextMenuController
         IReadOnlyList<DetailsRow> rows = _context.Shell.ListContent.SelectedRows;
         bool single = rows.Count == 1;
         bool canRename = single && row.Renameable;
-        bool canModify = single && IsTypedValueType(row.Type);
 
+        // Modify is enabled for every single value. Binary and unknown types open the hex editor from it.
+        // Modify Binary Data and Delete need a value behind the row, so the synthetic (Default) row
+        // does not enable them.
+        int realValues = _context.SelectedRealValueCount();
         var items = new List<ClassicCommandItem>
         {
-            // Modify has no initial-value support for binary or unknown types. Those use the
-            // separate Modify Binary Data command so the raw bytes stay lossless.
-            MenuCommand(912, "ContextModify", canModify, _values.ModifySelectedValue),
-            MenuCommand(917, "ContextModifyBinary", single, _values.ModifyBinaryData),
+            MenuCommand(912, "ContextModify", single, _values.ModifySelectedValue),
+            MenuCommand(917, "ContextModifyBinary", single && realValues == 1, _values.ModifyBinaryData),
             ClassicCommandItem.Separator,
-            MenuCommand(913, "ContextDelete", rows.Count > 0, _editCommands.DeleteSelection),
+            MenuCommand(913, "ContextDelete", realValues > 0, _editCommands.DeleteSelection),
             MenuCommand(914, "ContextRename", canRename, BeginListRenameFromMenu),
         };
 
@@ -200,10 +201,4 @@ internal sealed class ContextMenuController
         }
     }
 
-    private static bool IsTypedValueType(string type) =>
-        string.Equals(type, "REG_SZ", StringComparison.Ordinal) ||
-        string.Equals(type, "REG_EXPAND_SZ", StringComparison.Ordinal) ||
-        string.Equals(type, "REG_DWORD", StringComparison.Ordinal) ||
-        string.Equals(type, "REG_QWORD", StringComparison.Ordinal) ||
-        string.Equals(type, "REG_MULTI_SZ", StringComparison.Ordinal);
 }

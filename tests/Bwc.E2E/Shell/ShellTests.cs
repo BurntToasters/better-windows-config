@@ -341,14 +341,7 @@ public sealed class ShellTests
         CheckMenuItemState(checks, session, "view.addressBar", "Address Bar", true);
         CheckMenuItemState(checks, session, "view.split", "Split", true);
         CheckMenuItemState(checks, session, "view.displayBinaryData", "Display Binary Data...", false);
-        CheckMenuItemGap(
-            checks,
-            session,
-            "view.refresh",
-            "Refresh",
-            oracleEnabled: true,
-            workPackage: "RF1",
-            oracleBehavior: "View > Refresh is enabled, as in classic Registry Editor.");
+        CheckMenuItemState(checks, session, "view.refresh", "Refresh", true);
         CheckMenuItemGap(
             checks,
             session,

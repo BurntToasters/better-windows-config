@@ -29,6 +29,12 @@ public static class RegeditMenu
     /// <summary>The AutomationId prefix for the dynamic favorite entries after the two commands.</summary>
     internal const string FavoriteAutomationPrefix = "MenuCommand_Favorite_";
 
+    /// <summary>Oracle command id of the Edit menu (RT_MENU 103, id 513).</summary>
+    private const int EditCommandId = 513;
+
+    /// <summary>The Edit menu starts with Modify, Modify Binary Data, and a separator. These are the value items.</summary>
+    private const int ValueItemCount = 3;
+
     private static readonly ClassicCommandItem[] NoChildren = Array.Empty<ClassicCommandItem>();
 
     /// <summary>
@@ -101,11 +107,15 @@ public static class RegeditMenu
 
         var edit = Command(
             loader,
-            513,
+            EditCommandId,
             "MenuEdit",
             isEnabled: true,
             new ClassicCommandItem[]
             {
+                // The two value items come first. SetValueCommandsVisible hides them unless a value is selected.
+                Command(loader, 912, "ContextModify", isEnabled: false, NoChildren, editCommands.ModifySelectedValue),
+                Command(loader, 917, "ContextModifyBinary", isEnabled: false, NoChildren, editCommands.ModifyBinaryData),
+                ClassicCommandItem.Separator,
                 editNew,
                 ClassicCommandItem.Separator,
                 Command(loader, 678, "MenuEditPermissions", isEnabled: false, NoChildren, permissions),
@@ -113,7 +123,7 @@ public static class RegeditMenu
                 Command(loader, 913, "MenuEditDelete", invoke: editCommands.DeleteSelection),
                 Command(loader, 914, "MenuEditRename", invoke: editCommands.RenameSelection),
                 ClassicCommandItem.Separator,
-                Command(loader, 675, "MenuEditCopyKeyName"),
+                Command(loader, 675, "MenuEditCopyKeyName", isEnabled: false, NoChildren, editCommands.CopyKeyName),
                 ClassicCommandItem.Separator,
                 Command(loader, 662, "MenuEditFind", isEnabled: true, NoChildren, editCommands.Find),
                 Command(loader, 671, "MenuEditFindNext", isEnabled: true, NoChildren, editCommands.FindNext),
@@ -132,7 +142,7 @@ public static class RegeditMenu
                 ClassicCommandItem.Separator,
                 Command(loader, 679, "MenuViewDisplayBinaryData", isEnabled: false, children: NoChildren, invoke: displayBinaryData),
                 ClassicCommandItem.Separator,
-                Command(loader, 648, "MenuViewRefresh"),
+                Command(loader, 648, "MenuViewRefresh", isEnabled: true, NoChildren, editCommands.Refresh),
                 Command(loader, 699, "MenuViewFont"),
             });
 
@@ -228,6 +238,28 @@ public static class RegeditMenu
             }
 
             WalkFlyout(item.Items, commandId, isEnabled);
+        }
+    }
+
+    /// <summary>
+    /// Shows or hides the value items at the top of Edit (Modify, Modify Binary Data, and their
+    /// separator). Classic regedit shows them only while a value is selected. The items stay in the
+    /// menu, so their order and enabled state are kept while they are hidden.
+    /// </summary>
+    public static void SetValueCommandsVisible(MenuBar menuBar, bool visible)
+    {
+        ArgumentNullException.ThrowIfNull(menuBar);
+
+        MenuBarItem? edit = FindTopLevelItem(menuBar, EditCommandId);
+        if (edit is null || edit.Items.Count < ValueItemCount)
+        {
+            return;
+        }
+
+        Visibility visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        for (var index = 0; index < ValueItemCount; index += 1)
+        {
+            edit.Items[index].Visibility = visibility;
         }
     }
 

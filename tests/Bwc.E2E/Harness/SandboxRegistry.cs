@@ -61,6 +61,18 @@ public sealed partial class SandboxRegistry
     public void SetBinary(string relativePath, string name, byte[] value) =>
         SetValue(relativePath, name, value, RegistryValueKind.Binary);
 
+    /// <summary>Writes one value of the given registry kind under the run root, for kinds without a typed helper.</summary>
+    public void SetValueOfKind(string relativePath, string name, object value, RegistryValueKind kind) =>
+        SetValue(relativePath, name, value, kind);
+
+    /// <summary>Creates a key below the run root, with its parents. An existing key is kept.</summary>
+    public void CreateKey(string relativePath)
+    {
+        var fullPath = Combine(RunRootPath, relativePath);
+        using var key = Registry.CurrentUser.CreateSubKey(fullPath, writable: true)
+            ?? throw new InvalidOperationException($"Could not create registry key '{fullPath}'.");
+    }
+
     public string? ReadString(string relativePath, string name)
     {
         using var key = OpenExisting(relativePath);

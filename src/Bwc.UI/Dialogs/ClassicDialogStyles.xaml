@@ -5,14 +5,13 @@
     <!--
         Dense control styles for the classic dialogs. Sizes come from the template in DLU, so
         these styles only remove the Fluent padding, minimum sizes, and rounded corners. Colors are
-        theme keys. A theme that defines these keys restyles every classic dialog, and the system
-        values are the fallback. Fonts are set in code from the template face and size.
+        theme keys for the Fluent parts (buttons, check and radio marks, text boxes). The dialog face
+        and the static text are palette brushes set in code, so they do not depend on the app theme
+        dictionaries. Fonts are set in code from the template face and size.
     -->
 
-    <!-- Applied in code to the DialogRootControl, which is a ContentControl. -->
+    <!-- Applied in code to the DialogRootControl, which is a ContentControl. The face and text come from the palette in code. -->
     <Style x:Key="BwcClassicRootStyle" TargetType="ContentControl">
-        <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
-        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="BorderThickness" Value="0" />
     </Style>
