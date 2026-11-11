@@ -177,6 +177,63 @@ internal static class HubUi
     }
 
     /// <summary>
+    /// Brings the window to the foreground. When Windows refuses the plain request, this thread is attached to the
+    /// foreground thread for the request, which lets the Hub take focus back from another window. Returns true once
+    /// the window is the foreground window within the timeout.
+    /// </summary>
+    public static bool ForceForeground(IntPtr hwnd, TimeSpan timeout)
+    {
+        if (Foreground(hwnd, TimeSpan.FromMilliseconds(500)))
+        {
+            return true;
+        }
+
+        IntPtr foreground = GetForegroundWindow();
+        uint currentThread = GetCurrentThreadId();
+        uint foregroundThread = GetWindowThreadProcessId(foreground, out _);
+        bool attached = foregroundThread != 0 && foregroundThread != currentThread &&
+            AttachThreadInput(currentThread, foregroundThread, true);
+        try
+        {
+            Win32.ShowWindow(hwnd, Win32.SwRestore);
+            _ = BringWindowToTop(hwnd);
+            _ = Win32.SetForegroundWindow(hwnd);
+        }
+        finally
+        {
+            if (attached)
+            {
+                _ = AttachThreadInput(currentThread, foregroundThread, false);
+            }
+        }
+
+        return Foreground(hwnd, timeout);
+    }
+
+    /// <summary>
+    /// Names the foreground window, its process, and whether a Registry Editor process is still running. The text goes
+    /// into the run record, so a failed About open shows which window held the focus.
+    /// </summary>
+    public static string DescribeForeground(IntPtr hub)
+    {
+        IntPtr foreground = GetForegroundWindow();
+        _ = GetWindowThreadProcessId(foreground, out uint processId);
+        string name;
+        try
+        {
+            name = System.Diagnostics.Process.GetProcessById((int)processId).ProcessName;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            name = "(unknown)";
+        }
+
+        int regedits = System.Diagnostics.Process.GetProcessesByName("BwcRegedit").Length;
+        return $"foreground=0x{foreground.ToInt64():X} pid={processId} process={name} hub=0x{hub.ToInt64():X} " +
+            $"hubIsForeground={foreground == hub} bwcRegeditRunning={regedits}";
+    }
+
+    /// <summary>
     /// Opens the Help menu by clicking its menu bar item. The mouse path does not depend on the
     /// keyboard state of the menu router, which a previous Alt+H and Escape can leave behind.
     /// </summary>
@@ -469,5 +526,19 @@ internal static class HubUi
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmGetWindowAttribute(IntPtr hwnd, uint attribute, out Win32.NativeRect value, int size);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool attach);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool BringWindowToTop(IntPtr hwnd);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
 #pragma warning restore SYSLIB1054
 }

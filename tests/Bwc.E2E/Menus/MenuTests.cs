@@ -58,6 +58,8 @@ public sealed class MenuTests
     private static readonly TimeSpan MenuTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan SessionTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan PopupSettle = TimeSpan.FromMilliseconds(600);
+    private static readonly TimeSpan PopupFadeSample = TimeSpan.FromMilliseconds(150);
+    private static readonly TimeSpan PopupFadeTimeout = TimeSpan.FromSeconds(2);
     private static readonly List<KeyValuePair<string, string>> Summary = [];
     private static readonly object SummaryLock = new();
     private static UIA3Automation? _automation;
@@ -191,14 +193,14 @@ public sealed class MenuTests
         using (var bwc = OpenBwc(config, "menus-popup-bwc"))
         {
             var popup = OpenBwcPopup(bwc, "File", expectedItems: 8);
-            CheckPopup(checks, "bwc.file", popup, metrics, bwc);
+            CheckPopup(checks, "bwc.file", popup, metrics, bwc, waitForFadeIn: false);
             CloseBwcMenus(bwc);
         }
 
         using (var classic = OpenClassic(config, "menus-popup-classic"))
         {
             var popup = OpenClassicPopup(classic, "ALT+KEY_F", expectedItems: 8);
-            CheckPopup(checks, "classic.file", popup, metrics, classic);
+            CheckPopup(checks, "classic.file", popup, metrics, classic, waitForFadeIn: true);
             CloseClassicMenus(classic);
         }
 
@@ -531,7 +533,13 @@ public sealed class MenuTests
         IReadOnlyList<string> Names,
         IReadOnlyList<Rectangle> SeparatorBands);
 
-    private static void CheckPopup(Checks checks, string id, Popup popup, MenuMetrics metrics, AppSession session)
+    private static void CheckPopup(
+        Checks checks,
+        string id,
+        Popup popup,
+        MenuMetrics metrics,
+        AppSession session,
+        bool waitForFadeIn)
     {
         uint dpi = ControlTestSupport.WindowDpi(session);
         double dipPx = dpi / 96.0;
@@ -553,7 +561,8 @@ public sealed class MenuTests
             popup.SeparatorBands.Count == metrics.SeparatorCount,
             $"expected {metrics.SeparatorCount} separators in the popup, found {popup.SeparatorBands.Count} gaps between items.");
 
-        using Bitmap shot = CaptureScreen(popup.Bounds);
+        // The classic popup fades in, so its separator rows are scanned only after the pixels settle.
+        using Bitmap shot = waitForFadeIn ? SettledPopupCapture(popup.Bounds) : CaptureScreen(popup.Bounds);
         int visible = 0;
         var offsets = new List<string>();
         foreach (Rectangle band in popup.SeparatorBands)
@@ -1101,6 +1110,54 @@ public sealed class MenuTests
         }
 
         return bitmap;
+    }
+
+    /// <summary>
+    /// Captures a popup after its fade-in has finished. Two captures PopupFadeSample apart must match before the
+    /// capture is used. The wait is bounded by PopupFadeTimeout, and the last capture is returned when the bound
+    /// passes, so a popup that never settles is still scanned and fails on its own pixels.
+    /// </summary>
+    private static Bitmap SettledPopupCapture(Rectangle area)
+    {
+        DateTime deadline = DateTime.UtcNow + PopupFadeTimeout;
+        Bitmap previous = CaptureScreen(area);
+        while (DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(PopupFadeSample);
+            Bitmap next = CaptureScreen(area);
+            bool same = SameBitmap(previous, next);
+            if (same)
+            {
+                previous.Dispose();
+                return next;
+            }
+
+            previous.Dispose();
+            previous = next;
+        }
+
+        return previous;
+    }
+
+    private static bool SameBitmap(Bitmap a, Bitmap b)
+    {
+        if (a.Width != b.Width || a.Height != b.Height)
+        {
+            return false;
+        }
+
+        for (int y = 0; y < a.Height; y++)
+        {
+            for (int x = 0; x < a.Width; x++)
+            {
+                if (a.GetPixel(x, y).ToArgb() != b.GetPixel(x, y).ToArgb())
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     private static int Contrast(Color a, Color b) =>
