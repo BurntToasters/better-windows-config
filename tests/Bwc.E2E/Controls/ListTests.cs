@@ -9,8 +9,9 @@ namespace Bwc.E2E.Controls;
 
 /// <summary>
 /// Drives the details list in the shipped Registry Editor against a seeded HKCU sandbox: real
-/// values, sorting, Ctrl multi-select, the F2 rename cancel path, and the measured tree and list
-/// row heights at the window scale. The expected heights come from the oracle metrics file.
+/// values, the classic order with a header click that does not reorder, Ctrl multi-select, the F2
+/// rename cancel path, and the measured tree and list row heights at the window scale. The expected
+/// heights come from the oracle metrics file. The behaviors beyond these are in tests/Bwc.E2E/List.
 /// </summary>
 [TestClass]
 public sealed class ListTests
@@ -27,7 +28,7 @@ public sealed class ListTests
     [TestMethod]
     [TestCategory("Controls")]
     [TestCategory("Mutating")]
-    public void List_SortsMultiSelectsAndCancelsRename()
+    public void List_HeaderClickKeepsOrderMultiSelectsAndCancelsRename()
     {
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
@@ -119,48 +120,26 @@ public sealed class ListTests
             E2EResults.Record("controls.list.header.name", headerFound, $"HeaderName present={headerFound}.");
 
             _ = ControlTestSupport.EnsureForeground(session);
-            bool asc = false;
             if (header is not null)
             {
                 try
                 {
                     header.Click();
-                    asc = ControlTestSupport.WaitUntil(
-                        () => string.Equals(ControlTestSupport.SafeName(session.Find("ListRow_0")), "(Default)", StringComparison.Ordinal),
-                        TimeSpan.FromSeconds(5));
+                    Thread.Sleep(300);
                 }
                 catch (Exception ex)
                 {
-                    E2EResults.Record("controls.list.sort.asc.error", false, ex.Message);
+                    E2EResults.Record("controls.list.header.error", false, ex.Message);
                 }
             }
 
+            // Classic does not sort on a header click (docs/parity/oracle/sort-order.json: changed=false).
+            string firstAfterClick = ControlTestSupport.SafeName(session.Find("ListRow_0"));
+            bool headerNoReorder = string.Equals(firstAfterClick, "(Default)", StringComparison.Ordinal);
             E2EResults.Record(
-                "controls.list.sort.asc",
-                asc,
-                $"first row after Name click='{ControlTestSupport.SafeName(session.Find("ListRow_0"))}', expected '(Default)'.");
-
-            bool desc = false;
-            header = session.Find("HeaderName");
-            if (header is not null)
-            {
-                try
-                {
-                    header.Click();
-                    desc = ControlTestSupport.WaitUntil(
-                        () => string.Equals(ControlTestSupport.SafeName(session.Find("ListRow_0")), "ZebraString", StringComparison.Ordinal),
-                        TimeSpan.FromSeconds(5));
-                }
-                catch (Exception ex)
-                {
-                    E2EResults.Record("controls.list.sort.desc.error", false, ex.Message);
-                }
-            }
-
-            E2EResults.Record(
-                "controls.list.sort.desc",
-                desc,
-                $"first row after second Name click='{ControlTestSupport.SafeName(session.Find("ListRow_0"))}', expected 'ZebraString'.");
+                "controls.list.header.no-reorder",
+                headerNoReorder,
+                $"first row after Name click='{firstAfterClick}', expected '(Default)' (no sort).");
 
             var first = session.Find("ListRow_0");
             var second = session.Find("ListRow_1");
@@ -187,10 +166,11 @@ public sealed class ListTests
                 multi,
                 $"row0 selected={ControlTestSupport.IsSelected(session.Find("ListRow_0"))}, row1 selected={ControlTestSupport.IsSelected(session.Find("ListRow_1"))}.");
 
-            ControlTestSupport.Select(session.Find("ListRow_0"));
-            _ = ControlTestSupport.WaitUntil(() => ControlTestSupport.IsSelected(session.Find("ListRow_0")), TimeSpan.FromSeconds(3));
+            // Row 0 is the default value, which cannot be renamed. Row 1 is AlphaString.
+            ControlTestSupport.Select(session.Find("ListRow_1"));
+            _ = ControlTestSupport.WaitUntil(() => ControlTestSupport.IsSelected(session.Find("ListRow_1")), TimeSpan.FromSeconds(3));
 
-            E2EGuards.RequireListRowIdSelected(session, "ListRow_0", "controls.list.rename.row");
+            E2EGuards.RequireListRowIdSelected(session, "ListRow_1", "controls.list.rename.row");
             E2EGuards.RequireSandboxSelection(session, sandbox, "controls.list.rename");
             ControlTestSupport.SendKeys(session, "F2");
             bool renameOpened = ControlTestSupport.WaitUntil(

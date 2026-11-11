@@ -3,6 +3,7 @@ using Bwc.UI.Tree;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -12,16 +13,13 @@ using Windows.Foundation;
 namespace Bwc.UI.List;
 
 /// <summary>
-/// Column header row. Each column has a transparent click target (sort), a title, a small sort
-/// arrow, a 1 DIP divider, and a 4 DIP drag grip centered on the divider.
+/// Column header row. Each column has a title, a 1 DIP divider, and a 4 DIP drag grip centered on
+/// the divider. Header clicks do nothing, as in the classic list view, so there is no click target
+/// and no sort arrow. A grip drag resizes the column, and a grip double tap auto-sizes it.
 /// </summary>
 public sealed class DetailsHeaderPanel : Panel
 {
-    private const double ArrowWidth = 7;
-    private const double ArrowHeight = 4;
-    private const double ArrowSpace = 12;
     private const double GripWidth = 4;
-    private const double Pad = 4;
 
     private readonly List<HeaderCell> _cells = new();
     private DetailsList? _owner;
@@ -30,6 +28,10 @@ public sealed class DetailsHeaderPanel : Panel
     {
         Background = DenseTheme.HeaderBackground;
     }
+
+    /// <summary>The header item for a column, or null before the header is built.</summary>
+    internal HeaderTitle? TitleAt(int index) =>
+        index >= 0 && index < _cells.Count ? _cells[index].Title : null;
 
     internal void Attach(DetailsList owner)
     {
@@ -50,9 +52,9 @@ public sealed class DetailsHeaderPanel : Panel
         Height = _owner.HeaderHeight;
         foreach (var cell in _cells)
         {
-            cell.Title.FontSize = DenseMetrics.FontSize;
-            cell.Title.FontFamily = DenseMetrics.FontFamily;
-            cell.Title.LineHeight = DenseMetrics.FontSize * 4.0 / 3.0;
+            cell.Title.Label.FontSize = DenseMetrics.FontSize;
+            cell.Title.Label.FontFamily = DenseMetrics.FontFamily;
+            cell.Title.Label.LineHeight = DenseMetrics.FontSize * 4.0 / 3.0;
         }
 
         InvalidateMeasure();
@@ -76,25 +78,9 @@ public sealed class DetailsHeaderPanel : Panel
         Background = DenseTheme.HeaderBackground;
         foreach (var cell in _cells)
         {
-            cell.Hit.Fill = DenseTheme.Transparent;
             cell.Grip.Background = DenseTheme.Transparent;
-            cell.Title.Foreground = DenseTheme.Text;
-            cell.Arrow.Fill = DenseTheme.Text;
+            cell.Title.Label.Foreground = DenseTheme.Text;
             cell.Divider.Fill = DenseTheme.Divider;
-        }
-    }
-
-    internal void SetSort(string? key, bool ascending)
-    {
-        for (var i = 0; i < _cells.Count; i++)
-        {
-            var column = _owner!.Columns[i];
-            var visible = string.Equals(column.Key, key, StringComparison.Ordinal);
-            _cells[i].Arrow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-            if (visible)
-            {
-                _cells[i].Arrow.Points = ArrowPoints(ascending);
-            }
         }
     }
 
@@ -132,7 +118,7 @@ public sealed class DetailsHeaderPanel : Panel
             for (var i = 0; i < _cells.Count; i++)
             {
                 var column = _owner.Columns[i];
-                _cells[i].Title.Text = column.Header;
+                _cells[i].Title.Label.Text = column.Header;
                 AutomationProperties.SetName(_cells[i].Title, column.Header);
                 AutomationProperties.SetAutomationId(_cells[i].Title, "Header" + column.Key);
             }
@@ -149,33 +135,13 @@ public sealed class DetailsHeaderPanel : Panel
             var column = _owner.Columns[i];
             var index = i;
 
-            var hit = new Rectangle { Fill = DenseTheme.Transparent };
-            hit.Tapped += (_, _) => _owner?.OnHeaderTapped(index);
-
-            var title = new TextBlock
-            {
-                Text = column.Header,
-                FontFamily = DenseMetrics.FontFamily,
-                FontSize = DenseMetrics.FontSize,
-                TextWrapping = TextWrapping.NoWrap,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                VerticalAlignment = VerticalAlignment.Center,
-                IsHitTestVisible = false,
-                Foreground = DenseTheme.Text,
-                LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
-            };
+            var title = new HeaderTitle();
+            title.Label.Text = column.Header;
+            title.Label.FontFamily = DenseMetrics.FontFamily;
+            title.Label.FontSize = DenseMetrics.FontSize;
+            title.Label.Foreground = DenseTheme.Text;
             AutomationProperties.SetName(title, column.Header);
             AutomationProperties.SetAutomationId(title, "Header" + column.Key);
-
-            var arrow = new Polygon
-            {
-                Width = ArrowWidth,
-                Height = ArrowHeight,
-                Fill = DenseTheme.Text,
-                IsHitTestVisible = false,
-                Visibility = Visibility.Collapsed,
-                Points = ArrowPoints(ascending: true),
-            };
 
             var divider = new Rectangle
             {
@@ -184,28 +150,25 @@ public sealed class DetailsHeaderPanel : Panel
                 IsHitTestVisible = false,
             };
 
+            // handledEventsToo: a divider drag must start even when an ancestor has marked the press handled.
+            // The list owns the drag after the press, so moves and the release are handled there.
             var grip = new GripPanel(resizeCursor) { Width = GripWidth };
-            grip.PointerPressed += (_, e) => _owner?.OnDividerPressed(index, grip, e);
-            grip.PointerMoved += (_, e) => _owner?.OnDividerMoved(index, e);
-            grip.PointerReleased += (_, e) => _owner?.OnDividerReleased(index, grip, e);
+            grip.AddHandler(
+                UIElement.PointerPressedEvent,
+                new PointerEventHandler((_, e) => _owner?.OnDividerPressed(index, e)),
+                handledEventsToo: true);
             grip.DoubleTapped += (_, e) =>
             {
                 _owner?.AutoSizeColumn(index);
                 e.Handled = true;
             };
 
-            _cells.Add(new HeaderCell(hit, title, arrow, divider, grip));
-        }
-
-        for (var i = 0; i < _cells.Count; i++)
-        {
-            Children.Add(_cells[i].Hit);
+            _cells.Add(new HeaderCell(title, divider, grip));
         }
 
         for (var i = 0; i < _cells.Count; i++)
         {
             Children.Add(_cells[i].Title);
-            Children.Add(_cells[i].Arrow);
             Children.Add(_cells[i].Divider);
         }
 
@@ -228,9 +191,7 @@ public sealed class DetailsHeaderPanel : Panel
             var cell = _cells[i];
             double x = _owner.Columns[i].Width <= 0 ? 0 : ColumnLeft(i);
             double width = _owner.Columns[i].Width;
-            Place(cell.Hit, x, 0, width, height, arrange);
-            Place(cell.Title, x + Pad, 0, Math.Max(0, width - Pad - ArrowSpace), height, arrange);
-            Place(cell.Arrow, x + width - Pad - ArrowWidth, (height - ArrowHeight) / 2, ArrowWidth, ArrowHeight, arrange);
+            Place(cell.Title, x, 0, width, height, arrange);
             Place(cell.Divider, x + width - 1, 3, 1, Math.Max(0, height - 6), arrange);
             Place(cell.Grip, x + width - (GripWidth / 2), 0, GripWidth, height, arrange);
         }
@@ -257,28 +218,12 @@ public sealed class DetailsHeaderPanel : Panel
         }
     }
 
-    private static PointCollection ArrowPoints(bool ascending)
-    {
-        var points = new PointCollection();
-        if (ascending)
-        {
-            points.Add(new Point(0, ArrowHeight));
-            points.Add(new Point(ArrowWidth, ArrowHeight));
-            points.Add(new Point(ArrowWidth / 2, 0));
-        }
-        else
-        {
-            points.Add(new Point(0, 0));
-            points.Add(new Point(ArrowWidth, 0));
-            points.Add(new Point(ArrowWidth / 2, ArrowHeight));
-        }
+    private sealed record HeaderCell(HeaderTitle Title, Rectangle Divider, GripPanel Grip);
 
-        return points;
-    }
-
-    private sealed record HeaderCell(Rectangle Hit, TextBlock Title, Polygon Arrow, Rectangle Divider, GripPanel Grip);
-
-    /// <summary>Transparent strip over a divider. A panel subclass is needed to set ProtectedCursor.</summary>
+    /// <summary>
+    /// Transparent strip over a divider. A panel subclass is needed to set ProtectedCursor. Its peer is a
+    /// Separator, the UIA role of a column divider, so the strip is visible to automation.
+    /// </summary>
     private sealed class GripPanel : Panel
     {
         public GripPanel(InputCursor cursor)
@@ -286,5 +231,82 @@ public sealed class DetailsHeaderPanel : Panel
             Background = DenseTheme.Transparent;
             ProtectedCursor = cursor;
         }
+
+        protected override AutomationPeer OnCreateAutomationPeer() => new HeaderGripAutomationPeer(this);
     }
+}
+
+/// <summary>
+/// A column title: one text block inset by the header padding. TextBlock is sealed, so the title is a
+/// panel. Its peer reports the HeaderItem control type that the Table pattern lists.
+/// </summary>
+internal sealed class HeaderTitle : Panel
+{
+    private const double Pad = 4;
+
+    public HeaderTitle()
+    {
+        Label = new TextBlock
+        {
+            TextWrapping = TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false,
+            LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+        };
+        Children.Add(Label);
+    }
+
+    public TextBlock Label { get; }
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        double width = double.IsInfinity(availableSize.Width) ? 0 : availableSize.Width;
+        Label.Measure(new Size(Math.Max(0, width - (Pad * 2)), availableSize.Height));
+        return new Size(width, availableSize.Height);
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        Label.Arrange(new Rect(Pad, 0, Math.Max(0, finalSize.Width - (Pad * 2)), finalSize.Height));
+        return finalSize;
+    }
+
+    protected override AutomationPeer OnCreateAutomationPeer() => new HeaderItemAutomationPeer(this);
+}
+
+/// <summary>UIA peer for a column divider grip. It reports the Separator role and a fixed name.</summary>
+internal sealed class HeaderGripAutomationPeer : FrameworkElementAutomationPeer
+{
+    public HeaderGripAutomationPeer(FrameworkElement grip)
+        : base(grip)
+    {
+    }
+
+    protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Separator;
+
+    protected override string GetClassNameCore() => "DetailsListHeaderDivider";
+
+    protected override string GetNameCore() => "Column divider";
+
+    protected override bool IsControlElementCore() => true;
+
+    protected override bool IsContentElementCore() => true;
+}
+
+/// <summary>UIA peer for one column title. The name and automation id come from the title element.</summary>
+internal sealed class HeaderItemAutomationPeer : FrameworkElementAutomationPeer
+{
+    public HeaderItemAutomationPeer(HeaderTitle title)
+        : base(title)
+    {
+    }
+
+    protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.HeaderItem;
+
+    protected override string GetClassNameCore() => "DetailsListHeaderItem";
+
+    protected override bool IsControlElementCore() => true;
+
+    protected override bool IsContentElementCore() => true;
 }
