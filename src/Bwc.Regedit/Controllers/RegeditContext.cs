@@ -156,19 +156,28 @@ internal sealed class RegeditContext
     public Task ShowMessageAsync(string message) =>
         ShowDialogAsync(ErrorDialog.ForMessage(Messages.Get("DialogErrorTitle"), message));
 
+    /// <summary>Shows a validation message under the caption of the command that refused it.</summary>
+    public Task ShowMessageAsync(string caption, string message) =>
+        ShowDialogAsync(ErrorDialog.ForMessage(caption, message));
+
     public Task ShowErrorAsync(ErrorDialog dialog) => ShowDialogAsync(dialog);
 
-    public async Task ShowRegistryErrorAsync(RegistryOperationException ex)
+    /// <summary>
+    /// Shows the classic message for a failed registry operation. The action names what the command
+    /// was doing. Without one, the engine operation name picks the action. The developer detail is
+    /// logged here and not shown.
+    /// </summary>
+    public async Task ShowRegistryErrorAsync(
+        RegistryOperationException ex,
+        RegistryAction? action = null,
+        string? subject = null)
     {
         Log.Warn(
-            $"Registry Editor command failed: {ex.Operation} for {ex.Path.ToDisplayString()}, Win32 {ex.Win32Error}.");
+            $"Registry Editor command failed: {ex.Operation} for {ex.Path.ToDisplayString()}, Win32 {ex.Win32Error}: {ex.Message}");
 
-        await ShowErrorAsync(ErrorDialog.ForOperation(
-            Messages.Get("DialogErrorTitle"),
-            ex.Operation,
-            ex.Path.ToDisplayString(),
-            ex.Win32Error,
-            ex.Message));
+        RegistryAction resolved = action ?? MessageCatalog.ActionFor(ex.Operation);
+        string name = subject ?? DefaultSubject(ex.Path);
+        await ShowErrorAsync(Messages.ForRegistryError(resolved, ex, name).ToErrorDialog());
 
         if (ex.Win32Error == 2)
         {
@@ -178,6 +187,38 @@ internal sealed class RegeditContext
             await RefreshTreeAsync(current);
         }
     }
+
+    /// <summary>
+    /// Shows the classic error for a key that cannot be opened for reading. The developer detail
+    /// goes to the log only.
+    /// </summary>
+    public Task ShowUnreadableKeyAsync(RegistryPath path, RegistryOperationException ex)
+    {
+        Log.Warn(
+            $"Registry Editor could not open '{path.ToDisplayString()}' for reading: Win32 {ex.Win32Error} ({ex.Message}).");
+        return ShowErrorAsync(Messages.ForUnreadableKey(path.ToDisplayString(), ex.Win32Error).ToErrorDialog());
+    }
+
+    /// <summary>
+    /// Opens the key with the same rights as a read and returns the failure, or null when it opens.
+    /// The value source catches its own failures and would hide this one, so the probe runs first.
+    /// </summary>
+    public RegistryOperationException? ProbeKeyForRead(RegistryPath path)
+    {
+        try
+        {
+            _ = Store.Reader.GetKeyInfo(path);
+            return null;
+        }
+        catch (RegistryOperationException ex)
+        {
+            return ex;
+        }
+    }
+
+    /// <summary>The name a message names for a key: the leaf name, or the root name for a root.</summary>
+    public static string DefaultSubject(RegistryPath path) =>
+        path.Components.Count == 0 ? path.ToDisplayString() : path.Components[^1];
 
     public Task ShowAddressBarErrorAsync(string message, string attempted)
     {
@@ -218,7 +259,7 @@ internal sealed class RegeditContext
         catch (Exception ex)
         {
             Log.Warn("Registry Editor could not show a file dialog: " + ex.Message);
-            _ = ShowErrorAsync(ErrorDialog.ForMessage(Messages.Get("DialogErrorTitle"), ex.Message));
+            _ = ShowErrorAsync(Messages.ForCommandFailure().ToErrorDialog());
             return null;
         }
         finally
@@ -360,9 +401,13 @@ internal sealed class RegeditContext
         }
 
         IReadOnlyList<DetailsRow> rows;
+        RegistryOperationException? unreadable = null;
         try
         {
-            rows = await ValueSource.LoadAsync(path, CancellationToken.None);
+            unreadable = await RunRegistryAsync(() => ProbeKeyForRead(path));
+            rows = unreadable is null
+                ? await ValueSource.LoadAsync(path, CancellationToken.None)
+                : Array.Empty<DetailsRow>();
         }
         catch (Exception ex)
         {
@@ -378,6 +423,12 @@ internal sealed class RegeditContext
         Shell.ListContent.SetRows(rows);
         UpdateCommandStates();
 
+        if (unreadable is not null)
+        {
+            await ShowUnreadableKeyAsync(path, unreadable);
+            return;
+        }
+
         if (!string.IsNullOrEmpty(selectDisplayName))
         {
             SelectListRow(rows, selectDisplayName);
@@ -392,6 +443,8 @@ internal sealed class RegeditContext
         ValueLoad = tokenSource;
         int generation = ++ValueGeneration;
         IReadOnlyList<DetailsRow> rows;
+        RegistryPath? unreadablePath = null;
+        RegistryOperationException? unreadable = null;
 
         try
         {
@@ -415,7 +468,13 @@ internal sealed class RegeditContext
             }
             else
             {
-                rows = await ValueSource.LoadAsync(parsed, tokenSource.Token);
+                // A key that cannot be opened shows the classic error and an empty list. The probe
+                // runs first because the value source reports a failed read as an empty list.
+                unreadable = await RunRegistryAsync(() => ProbeKeyForRead(parsed), tokenSource.Token);
+                unreadablePath = parsed;
+                rows = unreadable is null
+                    ? await ValueSource.LoadAsync(parsed, tokenSource.Token)
+                    : Array.Empty<DetailsRow>();
             }
         }
         catch (OperationCanceledException)
@@ -447,6 +506,12 @@ internal sealed class RegeditContext
             if (generation == ValueGeneration)
             {
                 Shell.ListContent.SetRows(rows);
+                if (unreadablePath is not null && unreadable is not null)
+                {
+                    _ = ShowUnreadableKeyAsync(unreadablePath, unreadable);
+                    return;
+                }
+
                 if (!string.IsNullOrEmpty(selectDisplayName))
                 {
                     SelectListRow(rows, selectDisplayName);
@@ -590,12 +655,13 @@ internal sealed class RegeditContext
         }
         catch (ArgumentException ex)
         {
-            await ShowErrorAsync(ErrorDialog.ForMessage(Messages.Get("DialogErrorTitle"), ex.Message));
+            Log.Warn("Registry Editor command rejected an argument: " + ex.Message);
+            await ShowErrorAsync(Messages.ForCommandFailure().ToErrorDialog());
         }
         catch (Exception ex)
         {
             Log.Exception("Registry Editor command failed.", ex);
-            await ShowErrorAsync(ErrorDialog.ForMessage(Messages.Get("DialogErrorTitle"), ex.Message));
+            await ShowErrorAsync(Messages.ForCommandFailure().ToErrorDialog());
         }
     }
 

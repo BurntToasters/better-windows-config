@@ -79,12 +79,14 @@ internal sealed class FavoritesController
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.FavoriteAdd, dialog.Value);
             return;
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
         {
-            await _context.ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogErrorAddingFavorite"), ex.Message));
+            Log.Warn($"Registry Editor could not add favorite '{dialog.Value}': {ex.Message}");
+            await _context.ShowErrorAsync(
+                new ClassicMessage(Get("DialogErrorAddingFavorite"), Get("MsgCreateValueWriteFailed")).ToErrorDialog());
             return;
         }
 
@@ -153,12 +155,14 @@ internal sealed class FavoritesController
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.DeleteValues, string.Empty);
             return;
         }
         catch (InvalidOperationException ex)
         {
-            await _context.ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogFavoriteCaption"), ex.Message));
+            Log.Warn($"Registry Editor could not remove favorites: {ex.Message}");
+            await _context.ShowErrorAsync(
+                new ClassicMessage(Get("DialogFavoriteCaption"), Get("MsgDeleteValuesFailed")).ToErrorDialog());
             return;
         }
 
@@ -181,13 +185,11 @@ internal sealed class FavoritesController
 
     private Task ShowFavoriteLoadErrorAsync()
     {
-        string details = Get("DialogFavoriteLoadFailed");
-        if (!string.IsNullOrWhiteSpace(_context.Favorites.LoadError))
-        {
-            details += Environment.NewLine + Environment.NewLine + _context.Favorites.LoadError;
-        }
-
-        return _context.ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogFavoriteCaption"), details));
+        // The load error text is developer detail. It goes to the log, and the dialog shows the plain text.
+        Log.Warn("Registry Editor could not read the favorites list: " + (_context.Favorites.LoadError ?? "no detail"));
+        return _context.ShowErrorAsync(ErrorDialog.ForMessage(
+            Get("DialogFavoriteCaption"),
+            Get("DialogFavoriteLoadFailed")));
     }
 
     private void ApplyFavoritesMenu()

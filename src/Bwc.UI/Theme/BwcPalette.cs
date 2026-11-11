@@ -26,9 +26,17 @@ public enum BwcPane
 }
 
 /// <summary>
+/// One selected row: the fill, the one device pixel border (transparent when the selection has
+/// none), and the text color on the fill.
+/// </summary>
+public readonly record struct BwcSelection(Color Fill, Color Border, Color Text);
+
+/// <summary>
 /// One resolved set of colors. Light and HighContrast read the system color table with GetSysColor.
 /// Dark is computed, with the Windows accent as the focused selection. Field names follow the
-/// classic system color names so the mapping is easy to check against the oracle.
+/// classic system color names so the mapping is easy to check against the oracle. The tree
+/// selection on the light palette is read from the Explorer visual style, and the list selection
+/// follows the classic list view. See docs/parity/oracle/regedit-selection-colors.json.
 /// </summary>
 public readonly record struct BwcPalette(
     BwcThemeKind Kind,
@@ -40,4 +48,8 @@ public readonly record struct BwcPalette(
     Color Face,
     Color GrayText,
     Color Shadow,
-    Color Highlight3D);
+    Color Highlight3D,
+    BwcSelection TreeFocused,
+    BwcSelection TreeInactive,
+    BwcSelection ListFocused,
+    BwcSelection ListInactive);

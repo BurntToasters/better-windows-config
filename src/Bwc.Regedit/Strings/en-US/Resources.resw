@@ -325,8 +325,9 @@ Error code: {1} (0x{1:X8})
   <data name="DialogAddressBarInvalidPath" xml:space="preserve">
     <value>Enter Computer, a predefined root such as HKCU, or a full key path such as HKCU\Software.</value>
   </data>
+  <!-- Oracle 148. Also used when a key that was selected no longer exists. -->
   <data name="DialogAddressBarKeyNotFound" xml:space="preserve">
-    <value>The key was not found or could not be read. Check the path and try again.</value>
+    <value>The selected branch does not exist. Make sure that the correct path is given.</value>
   </data>
   <data name="DialogFindTitle" xml:space="preserve">
     <value>Find</value>
@@ -454,4 +455,281 @@ Error code: {1} (0x{1:X8})
   <data name="DialogDisconnectNoSelection" xml:space="preserve">
     <value>Select a connected computer to disconnect.</value>
   </data>
+  <!--
+    Classic message and caption texts. Each entry is a plain copy of the oracle string named in
+    its comment (docs/parity/oracle/regedit-resources.json, en-US/regedit.exe.mui), with %1 and %2
+    converted to {0} and {1}. Captions are listed first. Oracle 16, 41, 49 to 54, 152, 153, 171,
+    172, 173, 181, 186 and 148 reuse the existing keys above.
+  -->
+  <data name="MsgCaptionRenameKeyError" xml:space="preserve">
+    <!-- Oracle 64 -->
+    <value>Error Renaming Key</value>
+  </data>
+  <data name="MsgCaptionRenameValueError" xml:space="preserve">
+    <!-- Oracle 72 -->
+    <value>Error Renaming Value</value>
+  </data>
+  <data name="MsgCaptionDeleteKeyError" xml:space="preserve">
+    <!-- Oracle 80 -->
+    <value>Error Deleting Key</value>
+  </data>
+  <data name="MsgCaptionDeleteValuesError" xml:space="preserve">
+    <!-- Oracle 88 -->
+    <value>Error Deleting Values</value>
+  </data>
+  <data name="MsgCaptionOpenKeyError" xml:space="preserve">
+    <!-- Oracle 96 -->
+    <value>Error Opening Key</value>
+  </data>
+  <data name="MsgCaptionDisplayValueError" xml:space="preserve">
+    <!-- Oracle 100 -->
+    <value>Error Displaying Value</value>
+  </data>
+  <data name="MsgCaptionEditValueError" xml:space="preserve">
+    <!-- Oracle 112 -->
+    <value>Error Editing Value</value>
+  </data>
+  <data name="MsgCaptionCreateKeyError" xml:space="preserve">
+    <!-- Oracle 160 -->
+    <value>Error Creating Key</value>
+  </data>
+  <data name="MsgCaptionCreateValueError" xml:space="preserve">
+    <!-- Oracle 168 -->
+    <value>Error Creating Value</value>
+  </data>
+  <data name="MsgCaptionConfirmKeyDelete" xml:space="preserve">
+    <!-- Oracle 49 -->
+    <value>Confirm Key Delete</value>
+  </data>
+  <data name="MsgCaptionConfirmValueDelete" xml:space="preserve">
+    <!-- Oracle 51 -->
+    <value>Confirm Value Delete</value>
+  </data>
+  <data name="MsgCaptionConfirmUnloadHive" xml:space="preserve">
+    <!-- Oracle 54 -->
+    <value>Confirm Unload Hive</value>
+  </data>
+  <data name="MsgDeleteKeyConfirm" xml:space="preserve">
+    <!-- Oracle 48. Used for every key, with or without subkeys. -->
+    <value>Are you sure you want to permanently delete this key and all of its subkeys?</value>
+  </data>
+  <data name="MsgDeleteValueConfirm" xml:space="preserve">
+    <!-- Oracle 52 -->
+    <value>Deleting certain registry values could cause system instability. Are you sure you want to permanently delete this value?</value>
+  </data>
+  <data name="MsgDeleteValuesConfirm" xml:space="preserve">
+    <!-- Oracle 50 -->
+    <value>Deleting certain registry values could cause system instability. Are you sure you want to permanently delete these values?</value>
+  </data>
+  <data name="MsgUnloadHiveConfirm" xml:space="preserve">
+    <!-- Oracle 53 -->
+    <value>Are you sure you want to unload the current key and all of its subkeys?</value>
+  </data>
+  <data name="MsgRenameKeyFailed" xml:space="preserve">
+    <!-- Oracle 66 -->
+    <value>The Registry Editor cannot rename {0}. Error while renaming key.</value>
+  </data>
+  <data name="MsgRenameKeyTooLong" xml:space="preserve">
+    <!-- Oracle 67 -->
+    <value>The Registry Editor cannot rename {0}. The specified key name is too long. Type a shorter name and try again.</value>
+  </data>
+  <data name="MsgRenameKeyExists" xml:space="preserve">
+    <!-- Oracle 68 -->
+    <value>The Registry Editor cannot rename {0}. The specified key name already exists. Type another name and try again.</value>
+  </data>
+  <data name="MsgRenameKeyBackslash" xml:space="preserve">
+    <!-- Oracle 69 -->
+    <value>The Registry Editor cannot rename {0}. Specify a key name without a backslash (\).</value>
+  </data>
+  <data name="MsgRenameKeyEmpty" xml:space="preserve">
+    <!-- Oracle 70 -->
+    <value>The Registry Editor cannot rename {0}. The specified key name is empty. Type another name and try again.</value>
+  </data>
+  <data name="MsgRenameValueFailed" xml:space="preserve">
+    <!-- Oracle 73 -->
+    <value>The Registry Editor cannot rename {0}. Error while renaming value.</value>
+  </data>
+  <data name="MsgRenameValueExists" xml:space="preserve">
+    <!-- Oracle 74 -->
+    <value>The Registry Editor cannot rename {0}. The specified value name already exists. Type another name and try again.</value>
+  </data>
+  <data name="MsgRenameValueEmpty" xml:space="preserve">
+    <!-- Oracle 75 -->
+    <value>The Registry Editor cannot rename {0}. The specified value name is empty. Type another name and try again.</value>
+  </data>
+  <data name="MsgDeleteKeyFailed" xml:space="preserve">
+    <!-- Oracle 82 -->
+    <value>Cannot delete {0}:  Error while deleting key.</value>
+  </data>
+  <data name="MsgDeleteValuesFailed" xml:space="preserve">
+    <!-- Oracle 89 -->
+    <value>Unable to delete all specified values.</value>
+  </data>
+  <data name="MsgOpenKeyFailed" xml:space="preserve">
+    <!-- Oracle 97 -->
+    <value>{0} cannot be opened.
+An error is preventing this key from being opened.</value>
+  </data>
+  <data name="MsgOpenKeyFailedDetails" xml:space="preserve">
+    <!-- Oracle 98 -->
+    <value>{0} cannot be opened.
+An error is preventing this key from being opened.
+Details: {1}</value>
+  </data>
+  <data name="MsgDisplayValueFailed" xml:space="preserve">
+    <!-- Oracle 101 -->
+    <value>Cannot display {0}:  Error reading the value's contents.</value>
+  </data>
+  <data name="MsgEditValueReadFailed" xml:space="preserve">
+    <!-- Oracle 114 -->
+    <value>Cannot edit {0}:  Error reading the value's contents.</value>
+  </data>
+  <data name="MsgEditValueWriteFailed" xml:space="preserve">
+    <!-- Oracle 115 -->
+    <value>Cannot edit {0}:  Error writing the value's new contents.</value>
+  </data>
+  <data name="MsgImportInvalidKey" xml:space="preserve">
+    <!-- Oracle 125 -->
+    <value>Cannot import {0}: The key selected is invalid.</value>
+  </data>
+  <data name="MsgImportPrivileges" xml:space="preserve">
+    <!-- Oracle 126 -->
+    <value>Cannot import {0}: Insufficient privileges.</value>
+  </data>
+  <data name="MsgImportOpenFailed" xml:space="preserve">
+    <!-- Oracle 129 -->
+    <value>Cannot import {0}: Error opening the file. There may be a disk or file system error.</value>
+  </data>
+  <data name="MsgImportReadFailed" xml:space="preserve">
+    <!-- Oracle 130 -->
+    <value>Cannot import {0}: Error reading the file. There may be a disk error or the file may be corrupt.</value>
+  </data>
+  <data name="MsgImportRegistryAccess" xml:space="preserve">
+    <!-- Oracle 231 -->
+    <value>Cannot import {0}: Error accessing the registry.</value>
+  </data>
+  <data name="MsgImportPartial" xml:space="preserve">
+    <!-- Oracle 132 -->
+    <value>Cannot import {0}: Not all data was successfully written to the registry.  Some keys are open by the system or other processes, or you have insufficient privileges to perform this operation.</value>
+  </data>
+  <data name="MsgImportNotRegistryFile" xml:space="preserve">
+    <!-- Oracle 133 -->
+    <value>Cannot import {0}: The specified file is not a registry file. You can import only registry files.</value>
+  </data>
+  <data name="MsgImportFileMissing" xml:space="preserve">
+    <!-- Oracle 235 -->
+    <value>Cannot import {0}: The file specified does not exist.</value>
+  </data>
+  <data name="MsgExportOpenFailed" xml:space="preserve">
+    <!-- Oracle 138 -->
+    <value>Cannot export {0}: Error opening the file. There may be a disk or file system error.</value>
+  </data>
+  <data name="MsgExportWriteFailed" xml:space="preserve">
+    <!-- Oracle 141 -->
+    <value>Cannot export {0}: Error writing the file. There may be a disk or file system error.</value>
+  </data>
+  <data name="MsgExportPrivileges" xml:space="preserve">
+    <!-- Oracle 142 -->
+    <value>Cannot export {0}: Insufficient privileges.</value>
+  </data>
+  <data name="MsgExportKeyInvalid" xml:space="preserve">
+    <!-- Oracle 143 -->
+    <value>Cannot export {0}: The key selected is invalid.</value>
+  </data>
+  <data name="MsgPrintMemory" xml:space="preserve">
+    <!-- Oracle 144 -->
+    <value>Cannot print: Insufficient memory to begin job. Try closing down some applications, and try again. If you still see this message, try restarting Windows.</value>
+  </data>
+  <data name="MsgPrintFailed" xml:space="preserve">
+    <!-- Oracle 145 -->
+    <value>Cannot print: An error occurred during printing. Check your printer and your printer's settings for problems, and try again.</value>
+  </data>
+  <data name="MsgPrintReadFailed" xml:space="preserve">
+    <!-- Oracle 146 -->
+    <value>Cannot print:  Error reading a registry value's contents.</value>
+  </data>
+  <data name="MsgConnectFailed" xml:space="preserve">
+    <!-- Oracle 154 -->
+    <value>Unable to connect to {0}.  Make sure that this computer is on the network, has remote administration enabled, and that both computers are running the remote registry service.</value>
+  </data>
+  <data name="MsgConnectRootsFailed" xml:space="preserve">
+    <!-- Oracle 155 -->
+    <value>Unable to connect to all of the roots of the computer's registry.  Disconnect from the remote registry and then reconnect before trying again.</value>
+  </data>
+  <data name="MsgConnectPermission" xml:space="preserve">
+    <!-- Oracle 156 -->
+    <value>Unable to connect to {0}.  Make sure you have permission to administer this computer.</value>
+  </data>
+  <data name="MsgCreateKeyOpenFailed" xml:space="preserve">
+    <!-- Oracle 161 -->
+    <value>Cannot create key: Error while opening the key {0}.</value>
+  </data>
+  <data name="MsgCreateKeyWriteFailed" xml:space="preserve">
+    <!-- Oracle 162 -->
+    <value>Cannot create key: Error writing to the registry.</value>
+  </data>
+  <data name="MsgCreateKeyNoUniqueName" xml:space="preserve">
+    <!-- Oracle 163 -->
+    <value>Cannot create key: Unable to generate a unique name.</value>
+  </data>
+  <data name="MsgCreateKeyPermission" xml:space="preserve">
+    <!-- Oracle 164 -->
+    <value>Cannot create key: You do not have the requisite permissions to create a new key under {0}.</value>
+  </data>
+  <data name="MsgCreateValueWriteFailed" xml:space="preserve">
+    <!-- Oracle 169 -->
+    <value>Cannot create value: Error writing to the registry.</value>
+  </data>
+  <data name="MsgCreateValueNoUniqueName" xml:space="preserve">
+    <!-- Oracle 170 -->
+    <value>Cannot create value: Unable to generate a unique name.</value>
+  </data>
+  <data name="MsgLoadHivePrivileges" xml:space="preserve">
+    <!-- Oracle 182 -->
+    <value>Cannot Load {0}: Insufficient privileges.</value>
+  </data>
+  <data name="MsgLoadHiveFailed" xml:space="preserve">
+    <!-- Oracle 183 -->
+    <value>Cannot Load {0}: Error while loading hive.</value>
+  </data>
+  <data name="MsgLoadHiveAccessDenied" xml:space="preserve">
+    <!-- Oracle 189 -->
+    <value>Cannot Load {0}: Access is denied.</value>
+  </data>
+  <data name="MsgLoadHiveInUse" xml:space="preserve">
+    <!-- Oracle 188 -->
+    <value>Cannot Load {0}: The process cannot access the file because it is being used by another process.</value>
+  </data>
+  <data name="MsgUnloadHivePrivileges" xml:space="preserve">
+    <!-- Oracle 184 -->
+    <value>Cannot Unload {0}: Insufficient privileges.</value>
+  </data>
+  <data name="MsgUnloadHiveFailed" xml:space="preserve">
+    <!-- Oracle 185 -->
+    <value>Cannot Unload {0}: Error while unloading hive.</value>
+  </data>
+  <data name="MsgUnloadHiveAccessDenied" xml:space="preserve">
+    <!-- Oracle 187 -->
+    <value>Cannot Unload {0}: Access is denied.</value>
+  </data>
+  <data name="MsgSecurityRetrieveDenied" xml:space="preserve">
+    <!-- Oracle 7050 -->
+    <value>Registry Editor could not retrieve the security information.
+The key currently selected does not give you access to retrieve such information.</value>
+  </data>
+  <data name="MsgSecurityRetrieveDeleted" xml:space="preserve">
+    <!-- Oracle 7051 -->
+    <value>Registry Editor could not retrieve the security information.
+The key currently selected is marked for deletion.</value>
+  </data>
+  <data name="MsgSecurityRetrieveFailed" xml:space="preserve">
+    <!-- Oracle 7052 -->
+    <value>Registry Editor could not retrieve the security information.
+The key currently selected is not accessible.</value>
+  </data>
+  <!-- Written for this product: the oracle has no generic text for a command that has no registry operation. -->
+  <data name="MsgCommandFailed" xml:space="preserve">
+    <value>The Registry Editor could not complete this command. Try again.</value>
+  </data>
 </root>
+

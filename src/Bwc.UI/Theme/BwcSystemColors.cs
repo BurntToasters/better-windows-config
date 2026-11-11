@@ -21,34 +21,83 @@ internal static class BwcSystemColors
     private static readonly Color DarkHighlight3D = Color.FromArgb(0xFF, 0x5C, 0x5C, 0x5C);
     private static readonly Color Black = Color.FromArgb(0xFF, 0x00, 0x00, 0x00);
 
-    /// <summary>The palette made from GetSysColor. Used for Light and HighContrast.</summary>
-    public static BwcPalette SystemPalette(BwcThemeKind kind) => new(
-        kind,
-        Window: SystemColor(SYS_COLOR_INDEX.COLOR_WINDOW),
-        WindowText: SystemColor(SYS_COLOR_INDEX.COLOR_WINDOWTEXT),
-        Highlight: SystemColor(SYS_COLOR_INDEX.COLOR_HIGHLIGHT),
-        HighlightText: SystemColor(SYS_COLOR_INDEX.COLOR_HIGHLIGHTTEXT),
-        InactiveSelection: SystemColor(SYS_COLOR_INDEX.COLOR_BTNFACE),
-        Face: SystemColor(SYS_COLOR_INDEX.COLOR_3DFACE),
-        GrayText: SystemColor(SYS_COLOR_INDEX.COLOR_GRAYTEXT),
-        Shadow: SystemColor(SYS_COLOR_INDEX.COLOR_3DSHADOW),
-        Highlight3D: SystemColor(SYS_COLOR_INDEX.COLOR_3DHILIGHT));
+    /// <summary>The border of a selection that draws none. Transparent, so the brush shows nothing.</summary>
+    private static readonly Color NoBorder = Color.FromArgb(0x00, 0x00, 0x00, 0x00);
+
+    /// <summary>
+    /// The palette made from GetSysColor. The light palette takes the tree selection from the
+    /// Explorer visual style when it can be read, and falls back to the system colors. HighContrast
+    /// always uses the system colors.
+    /// </summary>
+    public static BwcPalette SystemPalette(BwcThemeKind kind)
+    {
+        Color window = SystemColor(SYS_COLOR_INDEX.COLOR_WINDOW);
+        Color windowText = SystemColor(SYS_COLOR_INDEX.COLOR_WINDOWTEXT);
+        Color highlight = SystemColor(SYS_COLOR_INDEX.COLOR_HIGHLIGHT);
+        Color highlightText = SystemColor(SYS_COLOR_INDEX.COLOR_HIGHLIGHTTEXT);
+        Color btnFace = SystemColor(SYS_COLOR_INDEX.COLOR_BTNFACE);
+
+        // Fallback: the classic system colors, as the tree used before the Explorer read.
+        var treeFocused = new BwcSelection(highlight, NoBorder, highlightText);
+        var treeInactive = new BwcSelection(btnFace, NoBorder, windowText);
+        if (kind == BwcThemeKind.Light
+            && BwcExplorerSelection.TryReadTreeSelection(out ExplorerPaint focused, out ExplorerPaint unfocused))
+        {
+            treeFocused = FromExplorer(focused, windowText);
+            treeInactive = FromExplorer(unfocused, windowText);
+        }
+
+        // The classic list view draws COLOR_HIGHLIGHT when focused and hides the selection otherwise.
+        return new(
+            kind,
+            Window: window,
+            WindowText: windowText,
+            Highlight: highlight,
+            HighlightText: highlightText,
+            InactiveSelection: btnFace,
+            Face: SystemColor(SYS_COLOR_INDEX.COLOR_3DFACE),
+            GrayText: SystemColor(SYS_COLOR_INDEX.COLOR_GRAYTEXT),
+            Shadow: SystemColor(SYS_COLOR_INDEX.COLOR_3DSHADOW),
+            Highlight3D: SystemColor(SYS_COLOR_INDEX.COLOR_3DHILIGHT),
+            TreeFocused: treeFocused,
+            TreeInactive: treeInactive,
+            ListFocused: new BwcSelection(highlight, NoBorder, highlightText),
+            ListInactive: new BwcSelection(window, NoBorder, windowText));
+    }
 
     /// <summary>
     /// The dark palette. The focused selection is the Windows accent, and its text is black on a
-    /// light accent so the selected label always has contrast.
+    /// light accent so the selected label always has contrast. Both states use a fill and a border,
+    /// and the dark border is transparent.
     /// </summary>
-    public static BwcPalette DarkPalette(Color accent) => new(
-        BwcThemeKind.Dark,
-        Window: DarkWindow,
-        WindowText: DarkWindowText,
-        Highlight: accent,
-        HighlightText: Luminance(accent) > 0.6 ? Black : DarkWindowText,
-        InactiveSelection: DarkInactiveSelection,
-        Face: DarkFace,
-        GrayText: DarkGrayText,
-        Shadow: DarkShadow,
-        Highlight3D: DarkHighlight3D);
+    public static BwcPalette DarkPalette(Color accent)
+    {
+        Color highlightText = Luminance(accent) > 0.6 ? Black : DarkWindowText;
+        var focused = new BwcSelection(accent, NoBorder, highlightText);
+        var inactive = new BwcSelection(DarkInactiveSelection, NoBorder, DarkWindowText);
+        return new(
+            BwcThemeKind.Dark,
+            Window: DarkWindow,
+            WindowText: DarkWindowText,
+            Highlight: accent,
+            HighlightText: highlightText,
+            InactiveSelection: DarkInactiveSelection,
+            Face: DarkFace,
+            GrayText: DarkGrayText,
+            Shadow: DarkShadow,
+            Highlight3D: DarkHighlight3D,
+            TreeFocused: focused,
+            TreeInactive: inactive,
+            ListFocused: focused,
+            ListInactive: inactive);
+    }
+
+    /// <summary>
+    /// Converts an Explorer paint to a selection. The theme text color is used when the theme sets
+    /// one, and COLOR_WINDOWTEXT otherwise.
+    /// </summary>
+    private static BwcSelection FromExplorer(ExplorerPaint paint, Color windowText) =>
+        new(paint.Fill, paint.Border ?? NoBorder, paint.Text ?? windowText);
 
     /// <summary>True when the Windows apps background is dark, using UISettings.</summary>
     public static bool SystemAppsAreDark(UISettings settings) =>

@@ -10,6 +10,9 @@ namespace Bwc.Regedit.Controllers;
 /// <summary>Key commands: New Key, Delete Key, Rename Key, and Copy Key Name.</summary>
 internal sealed class KeyCommands
 {
+    /// <summary>Longest key name component the registry accepts, in characters.</summary>
+    private const int MaxKeyNameLength = 255;
+
     private readonly RegeditContext _context;
 
     public KeyCommands(RegeditContext context)
@@ -97,7 +100,7 @@ internal sealed class KeyCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.CreateKey, RegeditContext.DefaultSubject(created));
             return;
         }
 
@@ -118,26 +121,21 @@ internal sealed class KeyCommands
             return;
         }
 
-        bool hasChildren;
+        // The classic confirmation text is the same for every key, with or without subkeys. The
+        // subkey count is still read so that a key which cannot be read is reported before the prompt.
         try
         {
-            hasChildren = _context.Store.Reader.GetKeyInfo(path).SubKeyCount > 0;
+            _ = _context.Store.Reader.GetKeyInfo(path);
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.DeleteKey, RegeditContext.DefaultSubject(path));
             return;
         }
 
-        string message = Get("DialogDeleteKeyMessage");
-        if (hasChildren)
-        {
-            message += Environment.NewLine + Environment.NewLine + Get("DialogDeleteKeyChildrenWarning");
-        }
-
         var dialog = new ConfirmDialog(
-            Get("DialogDeleteKeyTitle"),
-            message,
+            Get("MsgCaptionConfirmKeyDelete"),
+            Get("MsgDeleteKeyConfirm"),
             Get("DialogYes"),
             Get("DialogNo"));
 
@@ -152,7 +150,7 @@ internal sealed class KeyCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.DeleteKey, RegeditContext.DefaultSubject(path));
             return;
         }
 
@@ -199,7 +197,7 @@ internal sealed class KeyCommands
         string? error = ValidateRenameKey(path, newName);
         if (error is not null)
         {
-            await _context.ShowMessageAsync(error);
+            await _context.ShowMessageAsync(Get("MsgCaptionRenameKeyError"), error);
             return;
         }
 
@@ -210,7 +208,7 @@ internal sealed class KeyCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.RenameKey, RegeditContext.DefaultSubject(path));
             return;
         }
 
@@ -235,15 +233,35 @@ internal sealed class KeyCommands
         }
         catch (RegistryOperationException ex)
         {
-            return ex.Message;
+            return ValidationFailure(ex, RegistryAction.OpenKey, RegeditContext.DefaultSubject(parent));
         }
     }
 
+    /// <summary>
+    /// The text for a rename that cannot proceed. The classic rename texts name the old key, so the
+    /// subject is the current leaf name. Null when the name is acceptable.
+    /// </summary>
     private string? ValidateRenameKey(RegistryPath path, string newName)
     {
         if (string.Equals(path.Components[^1], newName, StringComparison.OrdinalIgnoreCase))
         {
             return null;
+        }
+
+        string subject = path.Components[^1];
+        if (newName.Length == 0)
+        {
+            return Format("MsgRenameKeyEmpty", subject);
+        }
+
+        if (newName.Contains('\\', StringComparison.Ordinal))
+        {
+            return Format("MsgRenameKeyBackslash", subject);
+        }
+
+        if (newName.Length > MaxKeyNameLength)
+        {
+            return Format("MsgRenameKeyTooLong", subject);
         }
 
         RegistryPath target;
@@ -258,13 +276,23 @@ internal sealed class KeyCommands
 
         try
         {
-            return _context.Store.Reader.KeyExists(target) ? Get("DialogNameExists") : null;
+            return _context.Store.Reader.KeyExists(target) ? Format("MsgRenameKeyExists", subject) : null;
         }
         catch (RegistryOperationException ex)
         {
-            return ex.Message;
+            return ValidationFailure(ex, RegistryAction.RenameKey, subject);
         }
     }
+
+    /// <summary>Logs the failure and returns the classic text for it, for a prompt to show.</summary>
+    private string ValidationFailure(RegistryOperationException ex, RegistryAction action, string subject)
+    {
+        Log.Warn($"Registry Editor could not check a key name: {ex.Operation} for {ex.Path.ToDisplayString()}, Win32 {ex.Win32Error}: {ex.Message}");
+        return _context.Messages.ForRegistryError(action, ex, subject).Text;
+    }
+
+    private string Format(string key, string subject) =>
+        string.Format(CultureInfo.CurrentCulture, Get(key), subject);
 
     private string NextUniqueKeyName(RegistryPath parent)
     {

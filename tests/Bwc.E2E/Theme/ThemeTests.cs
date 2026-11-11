@@ -14,17 +14,18 @@ namespace Bwc.E2E.Theme;
 /// <summary>
 /// Read-only palette checks on the Registry Editor. Each case opens the editor, selects
 /// HKEY_CURRENT_USER\Console with the keyboard, moves focus to the list with Tab, selects one
-/// value with Down, and samples pixels from a PrintWindow capture of the main window. The focused
-/// pane selection must equal the highlight color, the unfocused pane selection must equal the
-/// inactive color, the pane backgrounds must equal the window color, and only the focused
-/// selected row carries a dotted focus rectangle.
+/// value with Down, and samples pixels from a PrintWindow capture of the main window. The tree
+/// selection must match the Explorer visual style, the list selection must match the classic list
+/// view, the pane backgrounds must equal the window color, and only the focused selected row carries
+/// a dotted focus rectangle.
 /// </summary>
 /// <remarks>
-/// Expected colors come from GetSysColor for Light, and from the computed dark palette with the
-/// Windows accent for Dark. The system case reads the same UISettings background the app reads to
-/// choose its palette. Captures and sampled values are written under artifacts/e2e/visual/theme/.
-/// The Light and Dark cases force the palette with BWC_E2E_THEME, which the app reads only in
-/// E2E builds.
+/// Expected tree colors are derived in this test by drawing Explorer::TreeView with
+/// DrawThemeBackground and sampling the bitmap, which is the method the app uses. The derived values
+/// are also compared with docs/parity/oracle/regedit-selection-colors.json. The list colors come
+/// from GetSysColor for Light and from the computed dark palette for Dark. Captures and sampled
+/// values are written under artifacts/e2e/visual/theme/. The Light and Dark cases force the palette
+/// with BWC_E2E_THEME, which the app reads only in E2E builds.
 /// </remarks>
 [TestClass]
 public sealed class ThemeTests
@@ -36,6 +37,7 @@ public sealed class ThemeTests
     private const string ListRowPrefix = "ListRow_";
 
     private const int ColorWindow = 5;
+    private const int ColorWindowText = 8;
     private const int ColorHighlight = 13;
     private const int ColorHighlightText = 14;
     private const int ColorBtnFace = 15;
@@ -44,10 +46,19 @@ public sealed class ThemeTests
     private const int StrokeTolerance = 24;
     private const int DottedMinPercent = 30;
     private const int DottedMaxPercent = 70;
-    private const int StrokeBrightnessStep = 90;
+    private static readonly TimeSpan SettleTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan SettleInterval = TimeSpan.FromMilliseconds(150);
+    private const int TreeBaseWidthDip = 64;
+    private const int TreeBaseHeightDip = 32;
 
     private static readonly Color DarkWindowColor = Color.FromArgb(0xFF, 0x1E, 0x1E, 0x1E);
     private static readonly Color DarkInactiveColor = Color.FromArgb(0xFF, 0x3F, 0x3F, 0x46);
+
+    /// <summary>Oracle values from docs/parity/oracle/regedit-selection-colors.json (this OS build, 200 percent).</summary>
+    private static readonly Color OracleTreeFocusFill = Color.FromArgb(0xFF, 0xCC, 0xE8, 0xFF);
+    private static readonly Color OracleTreeFocusBorder = Color.FromArgb(0xFF, 0x00, 0x78, 0xD4);
+    private static readonly Color OracleTreeInactiveFill = Color.FromArgb(0xFF, 0xD9, 0xD9, 0xD9);
+    private static readonly Color OracleTreeInactiveBorder = Color.FromArgb(0xFF, 0x94, 0x94, 0x94);
 
     [ClassInitialize]
     public static void ClassInitialize(TestContext testContext)
@@ -107,11 +118,21 @@ public sealed class ThemeTests
         {
             ["mode"] = mode,
             ["expectedWindow"] = Hex(expected.Window),
-            ["expectedHighlight"] = Hex(expected.Highlight),
-            ["expectedHighlightText"] = Hex(expected.HighlightText),
-            ["expectedInactive"] = Hex(expected.Inactive),
+            ["expectedTreeFocusFill"] = Hex(expected.TreeFocusFill),
+            ["expectedTreeFocusBorder"] = expected.TreeFocusBorder is { } tfb ? Hex(tfb) : "none",
+            ["expectedTreeInactiveFill"] = Hex(expected.TreeInactiveFill),
+            ["expectedTreeInactiveBorder"] = expected.TreeInactiveBorder is { } tib ? Hex(tib) : "none",
+            ["expectedListFocusFill"] = Hex(expected.ListFocusFill),
+            ["expectedListFocusText"] = Hex(expected.ListFocusText),
+            ["expectedListInactiveFill"] = Hex(expected.ListInactiveFill),
+            ["explorerSource"] = expected.ExplorerSource,
         };
         Directory.CreateDirectory(VisualDir(config));
+
+        if (string.Equals(mode, "Light", StringComparison.Ordinal))
+        {
+            CheckOracleMatch(caseId, expected, samples);
+        }
 
         // The editor saves its last visited key under the data root. This case gets its own folder so
         // selecting Console here cannot change the launch state that the shell tests read.
@@ -152,42 +173,46 @@ public sealed class ThemeTests
         }
 
         // Phase one: the tree has keyboard focus and its selected row is the focused selection.
-        Bitmap treeCapture = CaptureWindow(session.MainHwnd, out Rectangle windowRect);
-        AutomationElement? selectedTree = SelectedTreeRow(session);
-        AutomationElement? treeRow = selectedTree;
+        // Every pixel probe below is settled against fresh captures (see Settle), so the rectangles
+        // stay in screen coordinates and each probe converts them to its own capture.
+        AutomationElement? treeRow = SelectedTreeRow(session);
         if (treeRow is null)
         {
             Record(caseId, "tree.selectedRow", false, "No tree row reports IsSelected.");
-            treeCapture.Dispose();
             AssertNoFailures(start, caseId);
             return;
         }
 
-        Rectangle treeRowRect = ToBitmap(treeRow.BoundingRectangle, windowRect);
-        Rectangle treePaneRect = ToBitmap(ElementRect(session, ControlTestSupport.TreeControl), windowRect);
-        Rectangle listPaneRect = ToBitmap(ElementRect(session, ControlTestSupport.ListControl), windowRect);
+        Rectangle treeRowRect = treeRow.BoundingRectangle;
+        Rectangle treePaneRect = ElementRect(session, ControlTestSupport.TreeControl);
+        Rectangle listPaneRect = ElementRect(session, ControlTestSupport.ListControl);
         bool treeHasFocus = HasKeyboardFocus(session.Find(ControlTestSupport.TreeControl)) || HasKeyboardFocus(treeRow);
         Record(caseId, "focus.tree.start", treeHasFocus, "Keyboard focus is in the tree before Tab.");
 
-        Color focusedFill = PixelAt(treeCapture, treeRowRect.Right - 8, treeRowRect.Top + treeRowRect.Height / 2);
-        CheckColor(caseId, "tree.focusedSelection", focusedFill, expected.Highlight, "COLOR_HIGHLIGHT on the focused tree row.", samples, "treeFocusedSelection");
+        IntPtr hwnd = session.MainHwnd;
+        int fillX = treeRowRect.Right - 8;
+        int fillY = treeRowRect.Top + treeRowRect.Height / 2;
+        CheckPixel(caseId, "tree.focusedSelection", hwnd, fillX, fillY, expected.TreeFocusFill, "The focused tree selection is the Explorer selected fill.", samples, "treeFocusedSelection");
+        CheckBorder(caseId, "tree.focusedBorder", hwnd, fillX, treeRowRect.Top, expected.TreeFocusBorder, samples, "treeFocusedBorder");
 
-        bool dottedTree = HasDottedFocusRect(treeCapture, treeRowRect, expected.Highlight);
-        Record(caseId, "tree.focusRect.onFocusedRow", dottedTree, "A one pixel dotted rectangle is on the focused tree row.");
+        bool dottedTree = SettledDotted(hwnd, treeRowRect, expected.TreeText, expectedDotted: true);
+        Record(caseId, "tree.focusRect.onFocusedRow", dottedTree, $"A one pixel dotted rectangle is on the focused tree row. Observed {(dottedTree ? "dotted" : "not dotted")}.");
         samples["treeFocusRectDotted"] = dottedTree ? "yes" : "no";
 
         int aboveTree = treeRowRect.Top - treeRowRect.Height;
         var rowAbove = new Rectangle(treeRowRect.Left, aboveTree, treeRowRect.Width, treeRowRect.Height);
-        bool aboveHasFill = HasColorInTopBand(treeCapture, rowAbove, expected.Highlight);
-        Record(caseId, "tree.focusRect.notOnOtherRows", !aboveHasFill, "The row above the focused row has no selection or focus pixels.");
+        bool aboveHasFill = SettledBand(hwnd, rowAbove, expected.TreeFocusFill, expectedFill: false);
+        Record(caseId, "tree.focusRect.notOnOtherRows", !aboveHasFill, $"The row above the focused row has no selection or focus pixels. Observed {(aboveHasFill ? "fill" : "none")}.");
 
-        CheckColor(caseId, "tree.background", PixelAt(treeCapture, treePaneRect.Left + 380, treePaneRect.Bottom - 20), expected.Window, "Tree background is COLOR_WINDOW.", samples, "treeBackground");
-        CheckColor(caseId, "list.background", PixelAt(treeCapture, listPaneRect.Left + 1200, listPaneRect.Bottom - 60), expected.Window, "List background is COLOR_WINDOW.", samples, "listBackground");
-        CheckColor(caseId, "tree.edge", PixelAt(treeCapture, treePaneRect.Left + 1, treePaneRect.Top + 200), expected.Window, "The tree pane edge has no system focus rectangle.", samples, "treeEdge");
+        CheckPixel(caseId, "tree.background", hwnd, treePaneRect.Left + 380, treePaneRect.Bottom - 20, expected.Window, "Tree background is COLOR_WINDOW.", samples, "treeBackground");
+        CheckPixel(caseId, "list.background", hwnd, listPaneRect.Left + 1200, listPaneRect.Bottom - 60, expected.Window, "List background is COLOR_WINDOW.", samples, "listBackground");
+        CheckPixel(caseId, "tree.edge", hwnd, treePaneRect.Left + 1, treePaneRect.Top + 200, expected.Window, "The tree pane edge has no system focus rectangle.", samples, "treeEdge");
 
-        string treeCapturePath = SaveCapture(config, $"main-{mode.ToLowerInvariant()}-{caseId}-tree-focus", treeCapture);
-        treeCapture.Dispose();
-        E2EResults.Note($"theme.{caseId}.capture.tree", treeCapturePath);
+        using (Bitmap treeCapture = CaptureWindow(hwnd, out _))
+        {
+            string treeCapturePath = SaveCapture(config, $"main-{mode.ToLowerInvariant()}-{caseId}-tree-focus", treeCapture);
+            E2EResults.Note($"theme.{caseId}.capture.tree", treeCapturePath);
+        }
 
         // Phase two: move focus to the list and select one value with the keyboard.
         bool listFocused = FocusList(session);
@@ -216,28 +241,60 @@ public sealed class ThemeTests
             return;
         }
 
-        Bitmap listCapture = CaptureWindow(session.MainHwnd, out Rectangle listWindowRect);
-        Rectangle listRowRect = ToBitmap(selectedList.BoundingRectangle, listWindowRect);
-        Rectangle listPaneRectAgain = ToBitmap(ElementRect(session, ControlTestSupport.ListControl), listWindowRect);
-        Rectangle treeRowAgain = ToBitmap(treeRow.BoundingRectangle, listWindowRect);
+        // UI Automation reports the selection before the list repaints it. Each probe below settles
+        // against fresh captures, so it waits for the paint instead of sleeping for a fixed time.
+        Rectangle listRowRect = selectedList.BoundingRectangle;
+        Rectangle listPaneRectAgain = ElementRect(session, ControlTestSupport.ListControl);
+        Rectangle treeRowAgain = treeRow.BoundingRectangle;
         int listFillRight = Math.Min(listRowRect.Right, listPaneRectAgain.Right - 60) - 8;
 
-        CheckColor(caseId, "list.focusedSelection", PixelAt(listCapture, listFillRight, listRowRect.Top + listRowRect.Height / 2), expected.Highlight, "COLOR_HIGHLIGHT on the focused list row.", samples, "listFocusedSelection");
-        bool dottedList = HasDottedFocusRect(listCapture, listRowRect, expected.Highlight);
-        Record(caseId, "list.focusRect.onFocusedRow", dottedList, "A one pixel dotted rectangle is on the focused list row.");
+        CheckPixel(caseId, "list.focusedSelection", hwnd, listFillRight, listRowRect.Top + listRowRect.Height / 2, expected.ListFocusFill, "The focused list selection is the classic list highlight.", samples, "listFocusedSelection");
+        bool dottedList = SettledDotted(hwnd, listRowRect, expected.ListFocusText, expectedDotted: true);
+        Record(caseId, "list.focusRect.onFocusedRow", dottedList, $"A one pixel dotted rectangle is on the focused list row. Observed {(dottedList ? "dotted" : "not dotted")}.");
         samples["listFocusRectDotted"] = dottedList ? "yes" : "no";
 
-        CheckColor(caseId, "tree.unfocusedSelection", PixelAt(listCapture, treeRowAgain.Right - 8, treeRowAgain.Top + treeRowAgain.Height / 2), expected.Inactive, "The unfocused tree selection is COLOR_BTNFACE (dark: muted).", samples, "treeUnfocusedSelection");
-        bool dottedTreeUnfocused = HasColorInTopBand(listCapture, treeRowAgain, expected.HighlightText);
-        Record(caseId, "tree.focusRect.absentWhenUnfocused", !dottedTreeUnfocused, "The unfocused tree row has no focus rectangle.");
+        CheckPixel(caseId, "tree.unfocusedSelection", hwnd, treeRowAgain.Right - 8, treeRowAgain.Top + treeRowAgain.Height / 2, expected.TreeInactiveFill, "The unfocused tree selection is the Explorer not-focused fill (dark: muted).", samples, "treeUnfocusedSelection");
+        CheckBorder(caseId, "tree.unfocusedBorder", hwnd, treeRowAgain.Right - 8, treeRowAgain.Top, expected.TreeInactiveBorder, samples, "treeUnfocusedBorder");
+        bool dottedTreeUnfocused = SettledDotted(hwnd, treeRowAgain, expected.TreeText, expectedDotted: false);
+        Record(caseId, "tree.focusRect.absentWhenUnfocused", !dottedTreeUnfocused, $"The unfocused tree row has no focus rectangle. Observed {(dottedTreeUnfocused ? "dotted" : "none")}.");
         samples["treeUnfocusedHasStroke"] = dottedTreeUnfocused ? "yes" : "no";
 
-        string listCapturePath = SaveCapture(config, $"main-{mode.ToLowerInvariant()}-{caseId}-list-focus", listCapture);
-        listCapture.Dispose();
-        E2EResults.Note($"theme.{caseId}.capture.list", listCapturePath);
+        using (Bitmap listCapture = CaptureWindow(hwnd, out _))
+        {
+            string listCapturePath = SaveCapture(config, $"main-{mode.ToLowerInvariant()}-{caseId}-list-focus", listCapture);
+            E2EResults.Note($"theme.{caseId}.capture.list", listCapturePath);
+        }
+
+        // Phase three: Tab back to the tree. The list keeps its selection but loses focus, so the
+        // classic list draws no selection (the row stays the window color, dark: muted).
+        bool treeFocused = FocusTree(session);
+        Record(caseId, "focus.tree.return", treeFocused, "Tab moves keyboard focus back to the tree.");
+        if (treeFocused)
+        {
+            Rectangle listRowReturn = selectedList.BoundingRectangle;
+            int listReturnRight = Math.Min(listRowReturn.Right, ElementRect(session, ControlTestSupport.ListControl).Right - 60) - 8;
+            CheckPixel(caseId, "list.unfocusedSelection", hwnd, listReturnRight, listRowReturn.Top + listRowReturn.Height / 2, expected.ListInactiveFill, "The unfocused list selection is not drawn (light: window color).", samples, "listUnfocusedSelection");
+            using Bitmap returnCapture = CaptureWindow(hwnd, out _);
+            string returnPath = SaveCapture(config, $"main-{mode.ToLowerInvariant()}-{caseId}-tree-refocus", returnCapture);
+            E2EResults.Note($"theme.{caseId}.capture.refocus", returnPath);
+        }
 
         WriteSamples(config, caseId, samples);
         AssertNoFailures(start, caseId);
+    }
+
+    /// <summary>
+    /// Checks the Explorer tree colors that this test derives against the committed oracle. The
+    /// oracle was sampled from classic regedit on this OS build, so a mismatch means the Explorer
+    /// style or the derivation changed, and it is reported as a failed check.
+    /// </summary>
+    private static void CheckOracleMatch(string caseId, ExpectedPalette expected, Dictionary<string, string> samples)
+    {
+        bool fill = Near(expected.TreeFocusFill, OracleTreeFocusFill) && Near(expected.TreeInactiveFill, OracleTreeInactiveFill);
+        bool border = expected.TreeFocusBorder is { } fb && Near(fb, OracleTreeFocusBorder)
+            && expected.TreeInactiveBorder is { } ib && Near(ib, OracleTreeInactiveBorder);
+        samples["oracleTreeMatch"] = fill && border ? "yes" : "no";
+        Record(caseId, "oracle.tree.matchesClassic", fill && border, $"Explorer tree colors match the classic oracle. Derived {Hex(expected.TreeFocusFill)}/{Hex(expected.TreeFocusBorder ?? Color.Empty)}, oracle {Hex(OracleTreeFocusFill)}/{Hex(OracleTreeFocusBorder)}.");
     }
 
     /// <summary>
@@ -273,20 +330,35 @@ public sealed class ThemeTests
         return false;
     }
 
-    private static bool FocusList(AppSession session)
+    private static bool FocusList(AppSession session) =>
+        MoveFocusTo(session, ControlTestSupport.ListControl);
+
+    /// <summary>Presses Tab until the tree has keyboard focus again. The address bar can take one stop.</summary>
+    private static bool FocusTree(AppSession session) =>
+        MoveFocusTo(session, ControlTestSupport.TreeControl);
+
+    /// <summary>
+    /// Brings the editor to the foreground, then presses Tab until the named control reports keyboard
+    /// focus. Each press waits up to two seconds for the focus change to show in UI Automation, so a
+    /// slow focus move is not counted as a failed Tab.
+    /// </summary>
+    private static bool MoveFocusTo(AppSession session, string automationId)
     {
+        _ = ControlTestSupport.EnsureForeground(session);
         for (int attempt = 0; attempt < 4; attempt++)
         {
-            if (HasKeyboardFocus(session.Find(ControlTestSupport.ListControl)))
+            if (HasKeyboardFocus(session.Find(automationId)))
             {
                 return true;
             }
 
             session.SendKeys("Tab");
-            Thread.Sleep(150);
+            _ = ControlTestSupport.WaitUntil(
+                () => HasKeyboardFocus(session.Find(automationId)),
+                TimeSpan.FromSeconds(2));
         }
 
-        return HasKeyboardFocus(session.Find(ControlTestSupport.ListControl));
+        return HasKeyboardFocus(session.Find(automationId));
     }
 
     private static AutomationElement? SelectedTreeRow(AppSession session)
@@ -334,11 +406,11 @@ public sealed class ThemeTests
 
     /// <summary>
     /// Dotted means alternating pixels along the top edge of the row. The band starts one device
-    /// pixel below the row top, where the one pixel stroke sits. A stroke pixel is any pixel that is
-    /// clearly brighter than the fill, so a half-tone blend counts and a solid anti-aliased line of
-    /// half-tone pixels does not pass the 30 to 70 percent window. The rest must be the fill.
+    /// pixel below the row top, where the one pixel stroke sits. A stroke pixel is one that matches
+    /// the focus rectangle color (the selection text color), so the solid selection border, which
+    /// sits on the same line, does not count. The stroke must cover 30 to 70 percent of the band.
     /// </summary>
-    private static bool HasDottedFocusRect(Bitmap capture, Rectangle row, Color fill)
+    private static bool HasDottedFocusRect(Bitmap capture, Rectangle row, Color stroke)
     {
         if (row.IsEmpty || row.Width <= 16)
         {
@@ -358,22 +430,16 @@ public sealed class ThemeTests
         for (int y = row.Top + 1; y <= row.Top + 3; y++)
         {
             int strokeCount = 0;
-            int fillCount = 0;
             for (int x = left; x < right; x++)
             {
-                Color pixel = PixelAt(capture, x, y);
-                if (Brightness(pixel) - Brightness(fill) >= StrokeBrightnessStep)
+                if (Near(PixelAt(capture, x, y), stroke))
                 {
                     strokeCount++;
-                }
-                else if (Near(pixel, fill))
-                {
-                    fillCount++;
                 }
             }
 
             int strokePercent = strokeCount * 100 / width;
-            if (strokePercent >= DottedMinPercent && strokePercent <= DottedMaxPercent && fillCount > 0)
+            if (strokePercent >= DottedMinPercent && strokePercent <= DottedMaxPercent)
             {
                 return true;
             }
@@ -413,6 +479,112 @@ public sealed class ThemeTests
         samples[sampleKey] = Hex(observed);
         bool pass = Near(observed, expected);
         Record(caseId, check, pass, $"{notes} Expected {Hex(expected)}, observed {Hex(observed)}.");
+    }
+
+    /// <summary>
+    /// Checks the selection border on the top edge of a row. The border sits on the first or second
+    /// device pixel, so the three rows from the top are scanned. A null expected border means the
+    /// palette draws none, and the check is skipped.
+    /// </summary>
+    private static void CheckBorder(
+        string caseId,
+        string check,
+        IntPtr hwnd,
+        int screenX,
+        int screenTop,
+        Color? expected,
+        Dictionary<string, string> samples,
+        string sampleKey)
+    {
+        if (expected is not { } border)
+        {
+            samples[sampleKey] = "none";
+            return;
+        }
+
+        (Color First, Color Second, Color Third) rows = Settle(
+            hwnd,
+            (bitmap, window) => (
+                PixelAt(bitmap, screenX - window.X, screenTop - window.Y),
+                PixelAt(bitmap, screenX - window.X, screenTop + 1 - window.Y),
+                PixelAt(bitmap, screenX - window.X, screenTop + 2 - window.Y)),
+            v => Near(v.Item1, border) || Near(v.Item2, border) || Near(v.Item3, border));
+        string text = $"{Hex(rows.First)},{Hex(rows.Second)},{Hex(rows.Third)}";
+        samples[sampleKey] = text;
+        bool pass = Near(rows.First, border) || Near(rows.Second, border) || Near(rows.Third, border);
+        Record(caseId, check, pass, $"The selection border is one device pixel {Hex(border)} on the row top edge. Rows: {text}.");
+    }
+
+    /// <summary>Settles one pixel at a screen point and checks it against the expected color.</summary>
+    private static void CheckPixel(
+        string caseId,
+        string check,
+        IntPtr hwnd,
+        int screenX,
+        int screenY,
+        Color expected,
+        string notes,
+        Dictionary<string, string> samples,
+        string sampleKey)
+    {
+        Color observed = Settle(
+            hwnd,
+            (bitmap, window) => PixelAt(bitmap, screenX - window.X, screenY - window.Y),
+            c => Near(c, expected));
+        CheckColor(caseId, check, observed, expected, notes, samples, sampleKey);
+    }
+
+    /// <summary>Settles the dotted focus rectangle check on a screen row. True means the pattern is present.</summary>
+    private static bool SettledDotted(IntPtr hwnd, Rectangle screenRow, Color stroke, bool expectedDotted) =>
+        Settle(
+            hwnd,
+            (bitmap, window) => HasDottedFocusRect(bitmap, ToBitmap(screenRow, window), stroke),
+            v => v == expectedDotted);
+
+    /// <summary>Settles the check for a fill color along the top edge of a screen row.</summary>
+    private static bool SettledBand(IntPtr hwnd, Rectangle screenRow, Color color, bool expectedFill) =>
+        Settle(
+            hwnd,
+            (bitmap, window) => HasColorInTopBand(bitmap, ToBitmap(screenRow, window), color),
+            v => v == expectedFill);
+
+    /// <summary>
+    /// Samples a probe from fresh window captures until its value matches the expectation, or until
+    /// two consecutive samples SettleInterval apart are equal. Gives up after SettleTimeout and
+    /// returns the last observed value, so a failed check reports what the window showed.
+    /// </summary>
+    private static T Settle<T>(IntPtr hwnd, Func<Bitmap, Rectangle, T> probe, Func<T, bool> matches)
+    {
+        DateTime deadline = DateTime.UtcNow + SettleTimeout;
+        T previous = default!;
+        bool havePrevious = false;
+        while (true)
+        {
+            T value;
+            using (Bitmap bitmap = CaptureWindow(hwnd, out Rectangle window))
+            {
+                value = probe(bitmap, window);
+            }
+
+            if (matches(value))
+            {
+                return value;
+            }
+
+            if (havePrevious && EqualityComparer<T>.Default.Equals(value, previous))
+            {
+                return value;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                return value;
+            }
+
+            previous = value;
+            havePrevious = true;
+            Thread.Sleep(SettleInterval);
+        }
     }
 
     private static void Record(string caseId, string check, bool pass, string notes)
@@ -486,8 +658,6 @@ public sealed class ThemeTests
         return bitmap.GetPixel(x, y);
     }
 
-    private static int Brightness(Color color) => color.R + color.G + color.B;
-
     private static bool Near(Color a, Color b)
     {
         if (a.IsEmpty || b.IsEmpty)
@@ -499,7 +669,7 @@ public sealed class ThemeTests
         return distance <= StrokeTolerance;
     }
 
-    private static string Hex(Color color) => $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+    private static string Hex(Color color) => color.IsEmpty ? "none" : $"#{color.R:X2}{color.G:X2}{color.B:X2}";
 
     /// <summary>
     /// The system apps mode, read from the current user hive (read only). The app reads the same
@@ -535,20 +705,153 @@ public sealed class ThemeTests
         if (string.Equals(mode, "Dark", StringComparison.Ordinal))
         {
             Color accent = SystemAccent();
-            Color highlight = accent;
             bool lightAccent = Luminance(accent.R, accent.G, accent.B) > 0.6;
+            Color darkText = lightAccent ? Color.Black : Color.White;
             return new ExpectedPalette(
-                DarkWindowColor,
-                highlight,
-                lightAccent ? Color.Black : Color.White,
-                DarkInactiveColor);
+                Window: DarkWindowColor,
+                WindowText: Color.White,
+                TreeFocusFill: accent,
+                TreeFocusBorder: null,
+                TreeInactiveFill: DarkInactiveColor,
+                TreeInactiveBorder: null,
+                TreeText: Color.White,
+                ListFocusFill: accent,
+                ListFocusText: darkText,
+                ListInactiveFill: DarkInactiveColor,
+                ExplorerSource: "dark palette (computed, not Explorer)");
         }
 
+        // Light: the tree comes from Explorer::TreeView, derived here, and the list from the classic list view.
+        ExplorerTreeColors tree = DeriveExplorerTreeColors();
         return new ExpectedPalette(
-            SystemColor(ColorWindow),
-            SystemColor(ColorHighlight),
-            SystemColor(ColorHighlightText),
-            SystemColor(ColorBtnFace));
+            Window: SystemColor(ColorWindow),
+            WindowText: SystemColor(ColorWindowText),
+            TreeFocusFill: tree.FocusFill,
+            TreeFocusBorder: tree.FocusBorder,
+            TreeInactiveFill: tree.InactiveFill,
+            TreeInactiveBorder: tree.InactiveBorder,
+            TreeText: tree.Text ?? SystemColor(ColorWindowText),
+            ListFocusFill: SystemColor(ColorHighlight),
+            ListFocusText: SystemColor(ColorHighlightText),
+            ListInactiveFill: SystemColor(ColorWindow),
+            ExplorerSource: tree.Source);
+    }
+
+    /// <summary>
+    /// Derives the Explorer tree selection the same way the app does: open Explorer::TreeView,
+    /// draw the selected and not-focused item into a 32 bit bitmap at the system DPI, and sample the
+    /// center pixel for the fill and the top edge for the border. Falls back to the classic system
+    /// colors when the visual style is off, and says so in the source field.
+    /// </summary>
+    private static ExplorerTreeColors DeriveExplorerTreeColors()
+    {
+        if (!IsThemeActive())
+        {
+            return ExplorerTreeColors.Fallback(SystemColor(ColorHighlight), SystemColor(ColorBtnFace), SystemColor(ColorHighlightText), "fallback: visual style off");
+        }
+
+        IntPtr theme = OpenThemeData(GetDesktopWindow(), "Explorer::TreeView");
+        if (theme == IntPtr.Zero)
+        {
+            return ExplorerTreeColors.Fallback(SystemColor(ColorHighlight), SystemColor(ColorBtnFace), SystemColor(ColorHighlightText), "fallback: OpenThemeData failed");
+        }
+
+        try
+        {
+            int dpi = (int)GetDpiForSystem();
+            int width = Math.Max(8, TreeBaseWidthDip * dpi / 96);
+            int height = Math.Max(8, TreeBaseHeightDip * dpi / 96);
+            IntPtr screen = GetDC(IntPtr.Zero);
+            IntPtr dc = CreateCompatibleDC(screen);
+            _ = ReleaseDC(IntPtr.Zero, screen);
+            Color focusFill;
+            Color focusEdge;
+            Color inactiveFill;
+            Color inactiveEdge;
+            try
+            {
+                var info = new BitmapInfo
+                {
+                    Size = (uint)Marshal.SizeOf<BitmapInfo>(),
+                    Width = width,
+                    Height = -height,
+                    Planes = 1,
+                    BitCount = 32,
+                    Compression = 0,
+                };
+                IntPtr dib = CreateDIBSection(dc, ref info, 0, out IntPtr bits, IntPtr.Zero, 0);
+                IntPtr previous = SelectObject(dc, dib);
+                try
+                {
+                    (focusFill, focusEdge) = DrawAndSample(theme, dc, bits, width, height, TreisSelected);
+                    (inactiveFill, inactiveEdge) = DrawAndSample(theme, dc, bits, width, height, TreisSelectedNotFocus);
+                }
+                finally
+                {
+                    _ = SelectObject(dc, previous);
+                    _ = DeleteObject(dib);
+                }
+            }
+            finally
+            {
+                _ = DeleteDC(dc);
+            }
+
+            return new ExplorerTreeColors(
+                FocusFill: focusFill,
+                FocusBorder: Near(focusEdge, focusFill) ? null : focusEdge,
+                InactiveFill: inactiveFill,
+                InactiveBorder: Near(inactiveEdge, inactiveFill) ? null : inactiveEdge,
+                Text: null,
+                Source: $"Explorer::TreeView derived at {dpi} dpi ({width}x{height})");
+        }
+        finally
+        {
+            CloseThemeData(theme);
+        }
+    }
+
+    /// <summary>TVP_TREEITEM is part 1. Part 2 is TVP_GLYPH, the expand chevron.</summary>
+    private const int TvpTreeItem = 1;
+    private const int TreisSelected = 3;
+    private const int TreisSelectedNotFocus = 5;
+
+    /// <summary>
+    /// Clears the DIB to white, draws one state of the tree item, and reads the pixels back. The
+    /// fill is the center pixel and the border is the top edge pixel.
+    /// </summary>
+    private static (Color Fill, Color Edge) DrawAndSample(IntPtr theme, IntPtr dc, IntPtr bits, int width, int height, int state)
+    {
+        var white = new int[width * height];
+        Array.Fill(white, 0x00FFFFFF);
+        Marshal.Copy(white, 0, bits, white.Length);
+
+        var rect = new NativeRect { Left = 0, Top = 0, Right = width, Bottom = height };
+        _ = DrawThemeBackground(theme, dc, TvpTreeItem, state, ref rect, IntPtr.Zero);
+
+        var pixels = new int[width * height];
+        Marshal.Copy(bits, pixels, 0, pixels.Length);
+        return (FromPixel(pixels[(height / 2) * width + width / 2]), FromPixel(pixels[width / 2]));
+    }
+
+    /// <summary>GDI pixels are 0xAARRGGBB as a 32 bit value on a little endian machine.</summary>
+    private static Color FromPixel(int pixel) =>
+        Color.FromArgb(0xFF, (pixel >> 16) & 0xFF, (pixel >> 8) & 0xFF, pixel & 0xFF);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BitmapInfo
+    {
+        public uint Size;
+        public int Width;
+        public int Height;
+        public ushort Planes;
+        public ushort BitCount;
+        public uint Compression;
+        public uint SizeImage;
+        public int XPelsPerMeter;
+        public int YPelsPerMeter;
+        public uint ClrUsed;
+        public uint ClrImportant;
     }
 
     /// <summary>GetSysColor returns a COLORREF: red in the low byte, then green, then blue.</summary>
@@ -565,11 +868,30 @@ public sealed class ThemeTests
     private static double Luminance(byte r, byte g, byte b) =>
         (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0;
 
+    private sealed record ExplorerTreeColors(
+        Color FocusFill,
+        Color? FocusBorder,
+        Color InactiveFill,
+        Color? InactiveBorder,
+        Color? Text,
+        string Source)
+    {
+        public static ExplorerTreeColors Fallback(Color highlight, Color btnFace, Color highlightText, string source) =>
+            new(highlight, null, btnFace, null, highlightText, source);
+    }
+
     private sealed record ExpectedPalette(
         Color Window,
-        Color Highlight,
-        Color HighlightText,
-        Color Inactive);
+        Color WindowText,
+        Color TreeFocusFill,
+        Color? TreeFocusBorder,
+        Color TreeInactiveFill,
+        Color? TreeInactiveBorder,
+        Color TreeText,
+        Color ListFocusFill,
+        Color ListFocusText,
+        Color ListInactiveFill,
+        string ExplorerSource);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeRect
@@ -580,7 +902,7 @@ public sealed class ThemeTests
         public int Bottom;
     }
 
-#pragma warning disable SYSLIB1054 // The small user32 surface does not justify LibraryImport plumbing.
+#pragma warning disable SYSLIB1054 // The small user32 and uxtheme surface does not justify LibraryImport plumbing.
     [DllImport("user32.dll")]
     private static extern uint GetSysColor(int index);
 
@@ -589,5 +911,45 @@ public sealed class ThemeTests
 
     [DllImport("user32.dll")]
     private static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDesktopWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForSystem();
+
+    [DllImport("uxtheme.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsThemeActive();
+
+    [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr OpenThemeData(IntPtr hwnd, string classList);
+
+    [DllImport("uxtheme.dll")]
+    private static extern int CloseThemeData(IntPtr theme);
+
+    [DllImport("uxtheme.dll")]
+    private static extern int DrawThemeBackground(IntPtr theme, IntPtr hdc, int part, int state, ref NativeRect rect, IntPtr clipRect);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDC(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr SelectObject(IntPtr hdc, IntPtr obj);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr obj);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateDIBSection(IntPtr hdc, ref BitmapInfo info, uint usage, out IntPtr bits, IntPtr section, uint offset);
 #pragma warning restore SYSLIB1054
 }

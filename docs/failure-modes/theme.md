@@ -1,6 +1,7 @@
 # Theme and palette failure modes (UF1)
 
-Scope: `src/Bwc.UI/Theme` (`BwcTheme`, `BwcPalette`, `BwcBrushes`, system color reader),
+Scope: `src/Bwc.UI/Theme` (`BwcTheme`, `BwcPalette`, `BwcBrushes`, system color reader, and
+`BwcExplorerSelection`, which reads the tree selection from the Explorer visual style),
 `src/Bwc.UI/Themes/Dense.xaml` (brush keys and control styles), `src/Bwc.UI/Tree/DenseTheme.cs`,
 the color and focus code in `TreeRowElement`, `DetailsRowElement`, `DetailsHeaderPanel`, and
 `ClassicWindowShell`. The E2E test is `tests/Bwc.E2E/Theme/ThemeTests.cs`.
@@ -21,29 +22,81 @@ classic regedit. The light palette is read from `GetSysColor` on every apply. Th
 | --- | --- | --- |
 | Pane and header background | `COLOR_WINDOW` | `#FFFFFF` |
 | Text | `COLOR_WINDOWTEXT` | `#000000` |
-| Focused selection fill | `COLOR_HIGHLIGHT` | `#0078D4` |
-| Focused selection text and focus rectangle | `COLOR_HIGHLIGHTTEXT` | `#FFFFFF` |
-| Unfocused selection fill | `COLOR_BTNFACE` | `#F0F0F0` |
-| Unfocused selection text | `COLOR_WINDOWTEXT` | `#000000` |
+| Focused list selection fill and unfocused list selection (hidden) | `COLOR_HIGHLIGHT`, `COLOR_WINDOW` | `#0078D4`, `#FFFFFF` |
+| Focused list selection text | `COLOR_HIGHLIGHTTEXT` | `#FFFFFF` |
 | Gray text | `COLOR_GRAYTEXT` | `#6D6D6D` |
 | Splitter and face | `COLOR_3DFACE` | `#F0F0F0` |
 | Dividers and edges | `COLOR_3DSHADOW` | `#A0A0A0` |
 | Edge highlight | `COLOR_3DHILIGHT` | `#FFFFFF` |
 
-### Classic regedit draws a different focused selection
+The tree selection is not in this table. Its fill and border come from the Explorer visual style
+(see the next section).
 
-The oracle capture `docs/parity/oracle/regedit-100dpi.png` and a live capture of
-`C:\Windows\regedit.exe` on the test machine (read-only, PrintWindow) both show the focused tree
-selection as `#CCE8FF`, not `COLOR_HIGHLIGHT`. The edge of the selection was not measured. The
-comctl32 visual style used by the Windows 11 tree control draws that fill. The package keeps the mapping in the
-table above because the decision was taken with the user, and the E2E test asserts it. The gap is
-recorded in the report and in the E2E notes so the decision can be revisited with evidence.
+### Selection colors follow classic regedit, not the system highlight
+
+The oracle capture is `docs/parity/oracle/regedit-selection-colors.json`. It was sampled from
+`C:\Windows\regedit.exe` on the test machine at 200 percent, read only. The values:
+
+| Pane and state | Fill | Border | Text |
+| --- | --- | --- | --- |
+| Tree, focused | `#CCE8FF` | 1 px `#0078D4` | `#000000` |
+| Tree, not focused | `#D9D9D9` | 1 px `#949494` | `#000000` |
+| Tree, hover | no change (tree has no `TVS_TRACKSELECT`) | none | none |
+| List, focused | `#0078D4` (`COLOR_HIGHLIGHT`) | none | `#FFFFFF` (`COLOR_HIGHLIGHTTEXT`) |
+| List, not focused | no selection drawn (row stays `#FFFFFF`) | none | `#000000` |
+
+The tree uses the Explorer visual style, so its colors are read at runtime from
+`Explorer::TreeView` (`BwcExplorerSelection`). The list is the classic list view, so its focused
+selection is `COLOR_HIGHLIGHT` and its unfocused selection is hidden. The classic list does not use
+the Explorer theme, so `Explorer::ListView` is not used for the list. Keeping it would paint
+`#CCE8FF` instead of the measured `#0078D4`.
+
+Failure: the Explorer visual style is off (classic theme), or `OpenThemeData` fails for
+`Explorer::TreeView`. The tree falls back to `COLOR_HIGHLIGHT` and `COLOR_BTNFACE`, which is the
+pre-change look. The palette does not fail, and the E2E test reports the fallback in its sample
+file.
+
+Failure: the Explorer rendering returns a fill that is not the expected value after an OS update.
+The E2E test derives the expected values from the same visual style at test time, and it also
+checks them against the oracle constants. A mismatch against the oracle is reported as a check
+failure, not hidden.
+
+Failure: the DIB is rendered at the wrong DPI. The rendered rectangle is scaled by the system DPI
+(`GetDpiForSystem`). The cache is keyed by DPI and visual style state, so a DPI change renders
+again. A per-monitor DPI change that the system DPI does not reflect falls back to the cached value
+until the next key change. The tree border is one device pixel because the sampled border is read
+from the rendered bitmap, not computed from the DPI.
+
+Failure: a theme change that flips the visual style on or off (a classic theme) leaves the cached
+value in place. The cache key includes whether a visual style is active, so the next palette apply
+re-reads the theme.
+
+Failure: text color. `GetThemeColor(TMT_TEXTCOLOR)` returns a value that is not black on this build.
+The tree text would then differ from `COLOR_WINDOWTEXT`. The E2E test samples the darkest pixel in
+the selected label, so a theme text color that differs from `#000000` is caught.
+
+Failure: a hover highlight is added for the tree. The oracle has none, so adding one would
+reintroduce the mismatch. The hot states are not rendered and the palette has no hover slot.
+
+Failure: the selection border is drawn on the whole row, while classic draws it around the label
+only (a box about 64 by 16 DIP at 200 percent). The fill is also full row width in BWC. The box
+shape is geometry and is not changed by this package, so the border follows the row. The
+difference is recorded as a known gap.
+
+Failure: the dotted focus rectangle is still drawn on the focused tree and list rows. Classic
+regedit draws no dotted rectangle on either selection in the oracle. The package keeps it, colored
+with the selection text color (`COLOR_WINDOWTEXT` on the light tree, `COLOR_HIGHLIGHTTEXT` on the
+list), so it stays visible on the light fill. Removing it is a separate change.
 
 ### Dark colors are derived, and the accent is the system accent
 
 Dark has no system color table entry, so the palette is a fixed neutral set plus the Windows
 accent (`UISettings`, `UIColorType.Accent`) for the focused selection. The text on the accent
 is black when the accent is light, and white otherwise, so the selected text always has contrast.
+
+The dark focused and unfocused selections use the same structure as the light ones: a fill, and
+a border that may be transparent. The dark border is transparent in both states, so the dark
+look is unchanged.
 
 ## Runtime switching
 
@@ -182,10 +235,19 @@ first initialization apply nothing.
 - `Theme_E2EOnly_DarkOverride_UsesDarkPalette` (E2EOnly, read-only). It forces Dark with
   `BWC_E2E_THEME=Dark`. The expected accent is the `AccentColor` DWM value (read only), because
   the test project does not reference the WinRT projection that the app uses.
+- The light case also checks the Explorer tree colors that the test derives (drawn with
+  `Explorer::TreeView` into a GDI DIB, the same method as the app) against the oracle constants in
+  `docs/parity/oracle/regedit-selection-colors.json`, under `oracle.tree.matchesClassic`.
+- The tree focused and unfocused fills and borders are checked on the top edge of the row, within
+  the first three device pixel rows, because the border sits on the inset line.
+- After Tab returns focus to the tree, the list selection must be the palette's unfocused fill
+  (the window color on light, muted on dark). This is `list.unfocusedSelection`.
 - Every case writes a capture per focus state and a `samples-<case>.json` file to
-  `artifacts/e2e/visual/theme/`.
-- The dotted check counts pixels that are clearly brighter than the fill on three rows below the
-  row top. It requires 30 to 70 percent of the row to be stroke, which a solid half-tone line fails.
+  `artifacts/e2e/visual/theme/`. `tests/Bwc.E2E/Theme/classic-selection-oracle.ps1` writes the
+  classic captures and `compare-*.png` side-by-side images next to them.
+- The dotted check counts pixels that match the focus rectangle color (the selection text color),
+  not the fill. It requires 30 to 70 percent of the band to be that color, which a solid border
+  line fails.
 
 ## Known gaps
 
@@ -195,10 +257,13 @@ first initialization apply nothing.
 - A runtime switch of the override without restart is implemented but not covered by E2E,
   because the only E2E hook is the launch-time environment variable.
 - Multi-select focus rectangle on the list (see above).
-- The classic focused selection color differs from `COLOR_HIGHLIGHT` (see the palette section).
-  The E2E light case asserts the `COLOR_HIGHLIGHT` mapping that was decided, so it passes against
-  the mapping and not against the classic capture.
-- The unfocused selection color (`COLOR_BTNFACE`) was not compared with classic regedit, because
-  focus could not be moved into the classic window without sending input to another window.
+- The tree selection box is drawn over the full row width, and classic draws it around the label
+  only. The fill and border colors match the oracle, the geometry does not (see the focus
+  rectangle section).
+- The dotted focus rectangle is drawn on the focused row, and classic draws none (see the focus
+  rectangle section).
+- The Explorer tree colors are read at runtime. The oracle JSON is for this OS build and this
+  DPI. On another build the derived values are the source of truth, and the oracle is not
+  re-checked.
 - The menu bar labels are clipped at the bottom in both palettes. The clipping predates this
   package (the menu bar height comes from `DenseMetrics`) and is not changed here.

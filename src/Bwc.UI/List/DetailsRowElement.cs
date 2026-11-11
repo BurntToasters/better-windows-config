@@ -18,12 +18,19 @@ namespace Bwc.UI.List;
 /// </summary>
 public sealed class DetailsRowElement : Panel
 {
+    // The value icon sits 2 DIP from the left edge and the name starts at 18 DIP, measured on
+    // classic regedit at 200 percent (docs/parity/oracle/regedit-row-metrics.json).
+    private const double IconLeft = 2;
+    private const double NameLeft = 18;
+
     private TextBlock[] _cells = [];
     private int _index = -1;
     private bool _selected;
     private double _rowHeight = -1;
     private double _fontSize = -1;
     private readonly Rectangle _focusRect;
+    private readonly Image _icon;
+    private readonly Rectangle _selectionBorder;
 
     public DetailsRowElement()
     {
@@ -31,9 +38,18 @@ public sealed class DetailsRowElement : Panel
         // Visible only on the single selected row while the list has focus. The brush does the
         // gating, so a focus change never needs to re-apply rows. See BwcTheme.SetPaneState.
         _focusRect = BwcFocusRect.Create(DenseTheme.ListFocusRect);
+        _icon = new Image
+        {
+            Width = Icons.IconProvider.IconDip,
+            Height = Icons.IconProvider.IconDip,
+            Stretch = Stretch.Fill,
+            IsHitTestVisible = false,
+        };
+        _selectionBorder = BwcFocusRect.CreateBorder(DenseTheme.ListSelectionBorder);
         PointerPressed += OnPointerPressed;
         DoubleTapped += OnDoubleTapped;
         RightTapped += OnRightTapped;
+        Loaded += (_, _) => ApplyIcon();
     }
 
     internal DetailsList? Owner { get; private set; }
@@ -70,6 +86,7 @@ public sealed class DetailsRowElement : Panel
             }
         }
 
+        ApplyIcon();
         SetSelected(selected);
     }
 
@@ -96,6 +113,7 @@ public sealed class DetailsRowElement : Panel
         }
 
         _focusRect.Stroke = _selected ? DenseTheme.ListFocusRect : DenseTheme.Transparent;
+        _selectionBorder.Stroke = _selected ? DenseTheme.ListSelectionBorder : DenseTheme.Transparent;
     }
 
     internal void SetSelected(bool selected)
@@ -118,14 +136,17 @@ public sealed class DetailsRowElement : Panel
         }
 
         double total = Owner.ColumnsTotalWidth;
+        _icon.Measure(new Size(Icons.IconProvider.IconDip, Icons.IconProvider.IconDip));
         foreach (var column in Owner.Columns)
         {
             int index = IndexOf(column);
             double columnWidth = column.Width;
-            _cells[index].Measure(new Size(Math.Max(0, columnWidth - 8), height));
+            double inset = index == 0 ? NameLeft : 4;
+            _cells[index].Measure(new Size(Math.Max(0, columnWidth - inset - 4), height));
         }
 
         double width = double.IsInfinity(availableSize.Width) ? total : Math.Max(total, availableSize.Width);
+        BwcFocusRect.Measure(_selectionBorder, this, new Size(width, height));
         BwcFocusRect.Measure(_focusRect, this, new Size(width, height));
         return new Size(width, height);
     }
@@ -140,6 +161,9 @@ public sealed class DetailsRowElement : Panel
 
         double total = Owner.ColumnsTotalWidth;
         double extra = Math.Max(0, finalSize.Width - total);
+        double iconSize = Icons.IconProvider.IconDip;
+        _icon.Arrange(new Rect(IconLeft, (height - iconSize) / 2, iconSize, iconSize));
+
         double left = 0;
         for (var i = 0; i < Owner.Columns.Count; i++)
         {
@@ -149,11 +173,13 @@ public sealed class DetailsRowElement : Panel
                 width += extra;
             }
 
+            double inset = i == 0 ? NameLeft : 4;
             double textHeight = Math.Min(height, _cells[i].DesiredSize.Height);
-            _cells[i].Arrange(new Rect(left + 4, (height - textHeight) / 2, Math.Max(0, width - 8), textHeight));
+            _cells[i].Arrange(new Rect(left + inset, (height - textHeight) / 2, Math.Max(0, width - inset - 4), textHeight));
             left += Owner.Columns[i].Width;
         }
 
+        BwcFocusRect.Arrange(_selectionBorder, this, new Size(finalSize.Width, height));
         BwcFocusRect.Arrange(_focusRect, this, new Size(finalSize.Width, height));
         return finalSize;
     }
@@ -197,8 +223,22 @@ public sealed class DetailsRowElement : Panel
             Children.Add(cell);
         }
 
-        // Clear removed the overlay too, so add it back after the cells.
+        // Clear removed the overlays and the icon too, so add them back after the cells.
+        Children.Add(_icon);
+        Children.Add(_selectionBorder);
         Children.Add(_focusRect);
+    }
+
+    /// <summary>The value icon follows the row's registry type and the window's pixel scale.</summary>
+    private void ApplyIcon()
+    {
+        if (Row is null)
+        {
+            return;
+        }
+
+        double scale = XamlRoot?.RasterizationScale ?? 1.0;
+        _icon.Source = Icons.IconProvider.Get(Icons.IconProvider.ValueIconKind(Row.Type), scale);
     }
 
     private void ApplyMetricsCore()

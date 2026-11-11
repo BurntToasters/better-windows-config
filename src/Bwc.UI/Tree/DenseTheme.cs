@@ -20,6 +20,9 @@ internal static class DenseTheme
     /// <summary>Text on the tree selection.</summary>
     public static Brush TreeSelectionForeground => BwcBrushes.TreeSelectionText;
 
+    /// <summary>Border of the selected tree row. Transparent when the palette draws none.</summary>
+    public static Brush TreeSelectionBorder => BwcBrushes.TreeSelectionBorder;
+
     /// <summary>Focus rectangle on the selected tree row. Transparent unless the tree has focus.</summary>
     public static Brush TreeFocusRect => BwcBrushes.TreeFocusRect;
 
@@ -28,6 +31,9 @@ internal static class DenseTheme
 
     /// <summary>Text on the list selection.</summary>
     public static Brush ListSelectionForeground => BwcBrushes.ListSelectionText;
+
+    /// <summary>Border of the single selected list row. Transparent on the classic list.</summary>
+    public static Brush ListSelectionBorder => BwcBrushes.ListSelectionBorder;
 
     /// <summary>Focus rectangle on the single selected list row. Transparent unless the list has focus.</summary>
     public static Brush ListFocusRect => BwcBrushes.ListFocusRect;

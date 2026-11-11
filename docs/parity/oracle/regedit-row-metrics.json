@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "generator": "manual capture with scratchpad capture-classic.ps1 and pixel measurement (read-only, regedit started with __COMPAT_LAYER=RunAsInvoker on the child only)",
+  "os": {
+    "productName": "Windows 11 Enterprise",
+    "currentBuild": "26200"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "iconGroups": {
+      "computer": 201,
+      "closedFolder": 203,
+      "stringValue": 205,
+      "binaryValue": 206
+    },
+    "openFolderIconObserved": false,
+    "notes": "The selected key in the classic tree shows the closed folder icon (203), not an open folder. No open-folder group exists in regedit.exe; SIID_FOLDEROPEN was not seen in the tree."
+  },
+  "dpi": {
+    "window": 192,
+    "scale": 2,
+    "note": "Pixel values below are device pixels at 192 DPI. Values in DIP are the pixel value divided by 2."
+  },
+  "tree": {
+    "rowHeightDip": 17,
+    "indentPerLevelDip": 16,
+    "expander": {
+      "shownOnlyForKeysWithSubkeys": true,
+      "centerXDipForDepth": "16 * depth + 10.5",
+      "glyphWidthPx": 9,
+      "measuredCenterXPxDepth1": 53
+    },
+    "icon": {
+      "sizeDip": 16,
+      "leftDipForDepth": "16 * depth + 18",
+      "measuredFolderYellowRunPxDepth1": [71, 98]
+    },
+    "text": {
+      "leftDipForDepth": "16 * depth + 37",
+      "firstInkDipForDepth": "16 * depth + 37.5 (depth 1 ink measured at 54)",
+      "measuredLeftPxDepth0": 75,
+      "measuredLeftPxDepth1": 108
+    },
+    "oracleConflict": "regedit-metrics.json tree.firstVisibleItems places the depth 0 text at 52 px and depth 1 at 84 px (textRect). This capture measures 75 px and 108 px, which is about 24 px more at both depths. The UIA item rectangles were not exposed for classic tree items in this session, so the source of the difference is not resolved. The pixel values from this capture are used here."
+  },
+  "list": {
+    "rowHeightDip": 18,
+    "icon": {
+      "sizeDip": 16,
+      "leftDip": 2
+    },
+    "labelLeftDip": 18,
+    "source": "regedit-metrics.json list.firstRows (icon x=4 px, label x=36 px at 192 DPI); not re-measured in this session",
+    "typeToIcon": {
+      "REG_SZ": "stringValue (205)",
+      "REG_EXPAND_SZ": "stringValue (205), from the rule in the work package; not observed",
+      "REG_MULTI_SZ": "stringValue (205), from the rule in the work package; not observed",
+      "REG_DWORD": "binaryValue (206), observed",
+      "REG_LINK": "binaryValue (206), from the rule in the work package; not observed",
+      "REG_NONE": "binaryValue (206), from the rule in the work package; not observed"
+    }
+  },
+  "measuredFrom": {
+    "initialCapture": "artifacts/e2e/visual/icons/classic-initial-window.png",
+    "hkcuExpandedCapture": "artifacts/e2e/visual/icons/classic-hkcu-expanded-window.png"
+  }
+}
