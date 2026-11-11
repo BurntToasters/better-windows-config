@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:list="using:Bwc.UI.List"
     xmlns:primitives="using:Microsoft.UI.Xaml.Controls.Primitives"
+    xmlns:shell="using:Bwc.UI.Shell"
     xmlns:tree="using:Bwc.UI.Tree"
     AutomationProperties.AutomationId="ClassicWindowShell"
     AutomationProperties.Name="Classic window shell"
@@ -57,6 +58,7 @@
                 Width="4"
                 AutomationProperties.AutomationId="Splitter"
                 AutomationProperties.Name="Splitter"
+                DragCompleted="OnSplitterDragCompleted"
                 DragDelta="OnSplitterDragDelta"
                 DragStarted="OnSplitterDragStarted"
                 IsTabStop="True"
@@ -64,10 +66,11 @@
                 LostFocus="OnSplitterLostFocus">
                 <primitives:Thumb.Template>
                     <ControlTemplate TargetType="primitives:Thumb">
-                        <Border
-                            Background="{StaticResource BwcFaceBrush}"
-                            BorderBrush="{StaticResource BwcHighlight3DBrush}"
-                            BorderThickness="1,0,0,0" />
+                        <shell:SplitterSurface Background="{StaticResource BwcFaceBrush}">
+                            <Border
+                                BorderBrush="{StaticResource BwcHighlight3DBrush}"
+                                BorderThickness="1,0,0,0" />
+                        </shell:SplitterSurface>
                     </ControlTemplate>
                 </primitives:Thumb.Template>
             </primitives:Thumb>

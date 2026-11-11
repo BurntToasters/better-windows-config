@@ -164,6 +164,8 @@ public sealed class MenuTests
         var checks = new Checks("menus.keyboard");
         using var session = OpenBwc(config, "menus-keyboard");
 
+        // A click puts the keyboard in the window first, as the shell tests do; Alt alone is not delivered otherwise.
+        session.Window.Click();
         SendRaw("ALT+KEY_F");
         var file = TopLevelItems(session).FirstOrDefault(e => string.Equals(SafeName(e), "File", StringComparison.Ordinal));
         bool expanded = WaitUntil(() => StateOf(file) == ExpandCollapseState.Expanded, MenuTimeout);
@@ -338,6 +340,150 @@ public sealed class MenuTests
             bottomOk,
             $"Bottom client edge pixel is #{bottom.R:X2}{bottom.G:X2}{bottom.B:X2}; a black strip is #000000.");
         Remember("edge", $"client {width}x{height} px; right #{right.R:X2}{right.G:X2}{right.B:X2}, bottom #{bottom.R:X2}{bottom.G:X2}{bottom.B:X2}.");
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Menus")]
+    public void Menus_FileAndEditPopupWidthMatchesClassic()
+    {
+        var config = GuiGate.Config;
+        var checks = new Checks("menus.width");
+        double dipPx;
+        Rectangle[] bwcFile;
+        Rectangle[] bwcEdit;
+        using (var bwc = OpenBwc(config, "menus-width-bwc"))
+        {
+            dipPx = ControlTestSupport.WindowDpi(bwc) / 96.0;
+            bwcFile = OpenBwcPopup(bwc, "File", expectedItems: 8).Items.ToArray();
+            CloseBwcMenus(bwc);
+            bwcEdit = OpenBwcPopup(bwc, "Edit", expectedItems: 7).Items.ToArray();
+            CloseBwcMenus(bwc);
+        }
+
+        Rectangle[] classicFile;
+        Rectangle[] classicEdit;
+        using (var classic = OpenClassic(config, "menus-width-classic"))
+        {
+            classicFile = OpenClassicPopup(classic, "ALT+KEY_F", expectedItems: 8).Items.ToArray();
+            CloseClassicMenus(classic);
+            classicEdit = OpenClassicPopup(classic, "ALT+KEY_E", expectedItems: 7).Items.ToArray();
+            CloseClassicMenus(classic);
+        }
+
+        // Item rectangles are compared, not the popup windows, so the border and padding do not count. Two DIP is the tolerance.
+        int bwcFileWidth = Union(bwcFile).Width;
+        int classicFileWidth = Union(classicFile).Width;
+        int bwcEditWidth = Union(bwcEdit).Width;
+        int classicEditWidth = Union(classicEdit).Width;
+        checks.Record(
+            "file",
+            Within(bwcFileWidth, classicFileWidth, 2 * dipPx),
+            $"File item width BWC {bwcFileWidth} px, classic {classicFileWidth} px; tolerance 2 DIP ({2 * dipPx:0.#} px).");
+        checks.Record(
+            "edit",
+            Within(bwcEditWidth, classicEditWidth, 2 * dipPx),
+            $"Edit item width BWC {bwcEditWidth} px, classic {classicEditWidth} px; tolerance 2 DIP ({2 * dipPx:0.#} px).");
+        Remember("width", $"file bwc={bwcFileWidth} classic={classicFileWidth}; edit bwc={bwcEditWidth} classic={classicEditWidth} px.");
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Menus")]
+    public void Menus_KeyboardFocusedItemHasFrameAndNoFill()
+    {
+        var config = GuiGate.Config;
+        var checks = new Checks("menus.focus");
+        using var session = OpenBwc(config, "menus-focus");
+
+        session.Window.Click();
+        SendRaw("ALT+KEY_F");
+        var items = WaitForFlyoutItems(session, 8);
+        checks.Record("open", items.Length >= 8, $"Alt+F showed {items.Length} File items; expected 8.");
+        SendRaw("DOWN");
+        Thread.Sleep(PopupSettle);
+
+        var rects = ProcessMenuItems(session)
+            .Where(e => !SafeOffscreen(e) && string.Equals(SafeClassName(e), FlyoutItemClass, StringComparison.Ordinal))
+            .Select(e => new { Rect = e.BoundingRectangle, Focused = HasKeyboardFocus(e) })
+            .OrderBy(e => e.Rect.Top)
+            .ToArray();
+        var focused = rects.FirstOrDefault(e => e.Focused);
+        var other = rects.FirstOrDefault(e => !e.Focused);
+        checks.Record("focused", focused is not null, $"{rects.Length} leaf items; keyboard focus on one of them={focused is not null}.");
+        if (focused is null || other is null)
+        {
+            CloseBwcMenus(session);
+            checks.AssertAllPassed();
+            return;
+        }
+
+        // A pointer over an item paints the hover fill, which would hide the keyboard state.
+        // The pointer goes to the desktop first.
+        Mouse.MoveTo(new System.Drawing.Point(0, 0));
+        Thread.Sleep(300);
+        Rectangle r = focused.Rect;
+        using Bitmap shot = CaptureScreen(Rectangle.Inflate(r, 4, 4));
+        // The shot starts 4 px left of and above the item. The fill is sampled in the gutter, clear of the frame and the text.
+        const int margin = 4;
+        int fillY = (r.Height / 2) - 8;
+        Color fill = shot.GetPixel(margin + 20, margin + fillY);
+        Color background = CaptureScreen(new Rectangle(other.Rect.Left + 20, other.Rect.Top + (other.Rect.Height / 2) - 8, 1, 1)).GetPixel(0, 0);
+        int fillContrast = Contrast(fill, background);
+
+        // The focus frame sits 3 DIP (6 px) in from the item edge. A dark pixel in that column is the frame.
+        int frameX = margin + 6;
+        int darkFrame = 0;
+        for (int y = margin + 2; y < shot.Height - margin - 2; y++)
+        {
+            if (Contrast(shot.GetPixel(frameX, y), fill) >= InkContrast)
+            {
+                darkFrame++;
+            }
+        }
+
+        checks.Record(
+            "fillUnchanged",
+            fillContrast < 4,
+            $"Focused item fill #{fill.R:X2}{fill.G:X2}{fill.B:X2} against the unfocused item #{background.R:X2}{background.G:X2}{background.B:X2}: contrast {fillContrast}; classic keeps the fill (need under 4).");
+        checks.Record(
+            "frame",
+            darkFrame > 0,
+            $"Frame pixels in the focus column: {darkFrame}; classic draws a 1 px frame on the keyboard-focused item (need at least 1).");
+        Remember("focus", $"fill=#{fill.R:X2}{fill.G:X2}{fill.B:X2} contrast={fillContrast} darkFrame={darkFrame}.");
+        CloseBwcMenus(session);
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Menus")]
+    public void Menus_PopupCornersAreRounded()
+    {
+        var config = GuiGate.Config;
+        var checks = new Checks("menus.corner");
+        using var session = OpenBwc(config, "menus-corner");
+        var popup = OpenBwcPopup(session, "File", expectedItems: 8);
+        double dipPx = ControlTestSupport.WindowDpi(session) / 96.0;
+
+        // The presenter edge is 1.5 DIP outside the first item (1 DIP border plus 0.5 DIP padding). Its top
+        // border is about 1 DIP thick. A square corner shows the border color at the corner pixel; a rounded
+        // one shows the window behind.
+        Rectangle items = Union(popup.Items);
+        int edge = (int)Math.Round(1.5 * dipPx);
+        int x0 = items.Left - edge;
+        int y0 = items.Top - edge;
+        using Bitmap shot = CaptureScreen(Rectangle.Inflate(new Rectangle(x0, y0, items.Width + (2 * edge), items.Height + (2 * edge)), 4, 4));
+        int ox = 4;
+        int oy = 4;
+        Color corner = shot.GetPixel(ox, oy);
+        Color topBorder = shot.GetPixel(ox + ((items.Width + (2 * edge)) / 2), oy + 1);
+        int contrast = Contrast(corner, topBorder);
+        checks.Record(
+            "rounded",
+            contrast >= 12,
+            $"Corner pixel #{corner.R:X2}{corner.G:X2}{corner.B:X2} against the top border #{topBorder.R:X2}{topBorder.G:X2}{topBorder.B:X2}: contrast {contrast}, need 12 for a rounded corner.");
+        Remember("corner", $"corner contrast={contrast} vs top border.");
+        CloseBwcMenus(session);
         checks.AssertAllPassed();
     }
 
@@ -871,6 +1017,18 @@ public sealed class MenuTests
         catch (Exception)
         {
             return string.Empty;
+        }
+    }
+
+    private static bool HasKeyboardFocus(AutomationElement? element)
+    {
+        try
+        {
+            return element?.Properties.HasKeyboardFocus.Value ?? false;
+        }
+        catch (Exception)
+        {
+            return false;
         }
     }
 

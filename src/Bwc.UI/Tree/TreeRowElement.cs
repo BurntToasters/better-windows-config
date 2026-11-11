@@ -38,6 +38,9 @@ public sealed class TreeRowElement : Panel
     private double _indentWidth;
     private double _rowHeight = -1;
     private double _fontSize = -1;
+    private double _overlayWidth = -1;
+    private double _overlayHeight = -1;
+    private ExpandCollapseState _expandState = ExpandCollapseState.LeafNode;
 
     public TreeRowElement()
     {
@@ -62,6 +65,7 @@ public sealed class TreeRowElement : Panel
         };
         _chevronHost.Children.Add(_chevron);
         _chevronHost.Tapped += OnChevronTapped;
+        _chevronHost.DoubleTapped += OnChevronDoubleTapped;
 
         _icon = new Image
         {
@@ -94,6 +98,7 @@ public sealed class TreeRowElement : Panel
         Children.Add(_selectionBorder);
         Children.Add(_focusRect);
         Tapped += OnRowTapped;
+        DoubleTapped += OnRowDoubleTapped;
         RightTapped += OnRowRightTapped;
         Loaded += (_, _) => ApplyIcon();
         Height = DenseMetrics.TreeRowHeight;
@@ -173,6 +178,32 @@ public sealed class TreeRowElement : Panel
 
         _selected = selected;
         ApplyTheme();
+        NotifyPeer(peer =>
+        {
+            peer.RaiseSelectionChanged(!selected, selected);
+            if (selected)
+            {
+                peer.RaiseElementSelected();
+            }
+        });
+    }
+
+    /// <summary>
+    /// The x of the label start for a node, in content coordinates (the indent plus the text inset).
+    /// The tree scrolls horizontally only when this start is off screen.
+    /// </summary>
+    internal static double LabelStartFor(TreeNode node) =>
+        (Math.Max(0, node.Depth) * DenseMetrics.TreeIndent) + TextInset;
+
+    /// <summary>The UIA expand state of a node. A node without children is a leaf.</summary>
+    internal static ExpandCollapseState StateOf(TreeNode? node)
+    {
+        if (node is null || !node.HasChildren)
+        {
+            return ExpandCollapseState.LeafNode;
+        }
+
+        return node.IsExpanded ? ExpandCollapseState.Expanded : ExpandCollapseState.Collapsed;
     }
 
     internal void RefreshExpansion()
@@ -195,8 +226,6 @@ public sealed class TreeRowElement : Panel
         double width = double.IsInfinity(availableSize.Width)
             ? textX + _label.DesiredSize.Width
             : availableSize.Width;
-        BwcFocusRect.Measure(_selectionBorder, this, new Size(width, height));
-        BwcFocusRect.Measure(_focusRect, this, new Size(width, height));
         return new Size(width, height);
     }
 
@@ -212,6 +241,17 @@ public sealed class TreeRowElement : Panel
         double textWidth = Math.Max(0, finalSize.Width - textX - 2);
         double labelHeight = Math.Min(height, _label.DesiredSize.Height);
         _label.Arrange(new Rect(textX, (height - labelHeight) / 2, textWidth, labelHeight));
+        if (finalSize.Width != _overlayWidth || height != _overlayHeight)
+        {
+            // The overlays take their size from the width they are measured with. A row measured without
+            // a bound (horizontal scrolling) measures to its label, so the overlays are sized here from the
+            // width the row was arranged to, which spans the whole content.
+            BwcFocusRect.Measure(_selectionBorder, this, new Size(finalSize.Width, height));
+            BwcFocusRect.Measure(_focusRect, this, new Size(finalSize.Width, height));
+            _overlayWidth = finalSize.Width;
+            _overlayHeight = height;
+        }
+
         BwcFocusRect.Arrange(_selectionBorder, this, new Size(finalSize.Width, height));
         BwcFocusRect.Arrange(_focusRect, this, new Size(finalSize.Width, height));
         return finalSize;
@@ -259,12 +299,26 @@ public sealed class TreeRowElement : Panel
     {
         bool hasChildren = Node?.HasChildren == true;
         _chevronHost.Visibility = hasChildren ? Visibility.Visible : Visibility.Collapsed;
-        if (!hasChildren)
+        if (hasChildren)
         {
-            return;
+            _chevron.Glyph = Node?.IsExpanded == true ? "\uE70D" : "\uE76C";
         }
 
-        _chevron.Glyph = Node?.IsExpanded == true ? "\uE70D" : "\uE76C";
+        var state = StateOf(Node);
+        if (state != _expandState)
+        {
+            var before = _expandState;
+            _expandState = state;
+            NotifyPeer(peer => peer.RaiseExpandStateChanged(before, state));
+        }
+    }
+
+    private void NotifyPeer(Action<TreeRowAutomationPeer> action)
+    {
+        if (FrameworkElementAutomationPeer.FromElement(this) is TreeRowAutomationPeer peer)
+        {
+            action(peer);
+        }
     }
 
     private void OnRowTapped(object sender, TappedRoutedEventArgs e)
@@ -278,11 +332,28 @@ public sealed class TreeRowElement : Panel
         e.Handled = true;
     }
 
+    private void OnRowDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    {
+        if (e.Handled)
+        {
+            return;
+        }
+
+        Owner?.RowDoubleTapped(this);
+        e.Handled = true;
+    }
+
     private void OnChevronTapped(object sender, TappedRoutedEventArgs e)
     {
         Owner?.ChevronTapped(this);
         e.Handled = true;
     }
+
+    /// <summary>
+    /// The expander toggles on each click through its own Tapped handler. A double-tap on the expander
+    /// must not reach the row, or the row would toggle a second time.
+    /// </summary>
+    private static void OnChevronDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => e.Handled = true;
 
     private void OnRowRightTapped(object sender, RightTappedRoutedEventArgs e)
     {
@@ -329,19 +400,19 @@ internal sealed class TreeRowAutomationPeer :
         _row = row;
     }
 
-    public ExpandCollapseState ExpandCollapseState
-    {
-        get
-        {
-            var node = _row.Node;
-            if (node is null || !node.HasChildren)
-            {
-                return ExpandCollapseState.LeafNode;
-            }
+    public ExpandCollapseState ExpandCollapseState => TreeRowElement.StateOf(_row.Node);
 
-            return node.IsExpanded ? ExpandCollapseState.Expanded : ExpandCollapseState.Collapsed;
-        }
-    }
+    /// <summary>Raised by the row when its expand state changes, so UIA clients re-read the state.</summary>
+    internal void RaiseExpandStateChanged(ExpandCollapseState before, ExpandCollapseState after) =>
+        RaisePropertyChangedEvent(ExpandCollapsePatternIdentifiers.ExpandCollapseStateProperty, before, after);
+
+    /// <summary>Raised by the row when its selection changes.</summary>
+    internal void RaiseSelectionChanged(bool before, bool after) =>
+        RaisePropertyChangedEvent(SelectionItemPatternIdentifiers.IsSelectedProperty, before, after);
+
+    /// <summary>Raised by the row when it becomes the selected item of its tree.</summary>
+    internal void RaiseElementSelected() =>
+        RaiseAutomationEvent(AutomationEvents.SelectionItemPatternOnElementSelected);
 
     public bool IsSelected =>
         _row.Owner?.SelectedNode is { } selected && ReferenceEquals(selected, _row.Node);

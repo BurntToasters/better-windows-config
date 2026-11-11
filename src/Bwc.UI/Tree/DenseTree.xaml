@@ -19,8 +19,8 @@
     <Grid>
         <ScrollViewer
             x:Name="Scroller"
-            HorizontalScrollBarVisibility="Disabled"
-            HorizontalScrollMode="Disabled"
+            HorizontalScrollBarVisibility="Auto"
+            HorizontalScrollMode="Auto"
             IsTabStop="False"
             Padding="0"
             VerticalScrollBarVisibility="Auto"

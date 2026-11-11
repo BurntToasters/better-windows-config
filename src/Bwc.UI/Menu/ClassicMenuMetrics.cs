@@ -74,6 +74,98 @@ public static class ClassicMenuMetrics
         }
     }
 
+    /// <summary>Classic popup item layout in DIPs (66, 44, and 45 device px at 192 DPI): the text starts 33 DIP in.</summary>
+    public const double PopupTextLeftDip = 33;
+
+    /// <summary>The gap between the widest label and the accelerator column, in DIPs.</summary>
+    public const double PopupAcceleratorGapDip = 22;
+
+    /// <summary>The accelerator column's right inset from the item edge, in DIPs (45 px at 192 DPI).</summary>
+    public const double PopupAcceleratorInsetDip = 22.5;
+
+    /// <summary>
+    /// The width in DIPs of a popup item, sized as Win32 sizes a menu: the classic text inset, the widest label,
+    /// the gap, the widest accelerator, and the right inset. The text is measured with GDI in the menu font at the
+    /// window scale. Returns 0 when the popup has no labels or the font cannot be measured.
+    /// </summary>
+    public static double PopupItemWidthDip(IReadOnlyList<string> labels, IReadOnlyList<string> accelerators, double scale)
+    {
+        if (labels.Count == 0 || scale <= 0)
+        {
+            return 0;
+        }
+
+        double labelPx = MaxTextWidthPx(labels, scale);
+        double acceleratorPx = MaxTextWidthPx(accelerators, scale);
+        if (labelPx < 0 || acceleratorPx < 0)
+        {
+            return 0;
+        }
+
+        return PopupTextLeftDip + (labelPx / scale) + PopupAcceleratorGapDip + (acceleratorPx / scale) + PopupAcceleratorInsetDip;
+    }
+
+    /// <summary>The widest text in device pixels in the menu font, or -1 when the font cannot be measured.</summary>
+    private static double MaxTextWidthPx(IReadOnlyList<string> texts, double scale)
+    {
+        uint dpi = (uint)Math.Round(scale * 96, MidpointRounding.AwayFromZero);
+        var metrics = new NonClientMetrics { cbSize = (uint)Marshal.SizeOf<NonClientMetrics>() };
+        if (!SystemParametersInfoForDpi(SpiGetNonClientMetrics, metrics.cbSize, ref metrics, 0, dpi))
+        {
+            return -1;
+        }
+
+        IntPtr dc = CreateCompatibleDC(IntPtr.Zero);
+        if (dc == IntPtr.Zero)
+        {
+            return -1;
+        }
+
+        IntPtr font = IntPtr.Zero;
+        IntPtr previous = IntPtr.Zero;
+        try
+        {
+            font = CreateFontIndirectW(ref metrics.lfMenuFont);
+            if (font == IntPtr.Zero)
+            {
+                return -1;
+            }
+
+            previous = SelectObject(dc, font);
+            double widest = 0;
+            foreach (string text in texts)
+            {
+                if (string.IsNullOrEmpty(text))
+                {
+                    continue;
+                }
+
+                if (!GetTextExtentPoint32W(dc, text, text.Length, out Size size))
+                {
+                    return -1;
+                }
+
+                widest = Math.Max(widest, size.cx);
+            }
+
+            return widest;
+        }
+        finally
+        {
+            if (previous != IntPtr.Zero)
+            {
+                _ = SelectObject(dc, previous);
+            }
+
+            if (font != IntPtr.Zero)
+            {
+                _ = DeleteObject(font);
+            }
+
+            _ = DeleteDC(dc);
+        }
+    }
+
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct LogFont
     {

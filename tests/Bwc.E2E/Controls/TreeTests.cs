@@ -105,7 +105,7 @@ public sealed class TreeTests
                 softwareVisible,
                 $"state={ControlTestSupport.StateOf(hkcu)}; Software visible={softwareVisible}.");
 
-            ControlTestSupport.TypeAhead(session, "Software");
+            TypeAhead(session, "Software");
             bool softwareSelected = ControlTestSupport.WaitForTreeSelection(session, "Software");
             E2EResults.Record(
                 "controls.tree.typeahead.software",
@@ -119,7 +119,7 @@ public sealed class TreeTests
                 sandboxVisible,
                 $"Right expanded Software and BWC-E2E is visible={sandboxVisible}.");
 
-            ControlTestSupport.TypeAhead(session, "BWC-E2E");
+            TypeAhead(session, "BWC-E2E");
             bool sandboxSelected = ControlTestSupport.WaitForTreeSelection(session, "BWC-E2E");
             E2EResults.Record(
                 "controls.tree.typeahead.sandbox",
@@ -133,7 +133,7 @@ public sealed class TreeTests
                 runVisible,
                 $"Right expanded BWC-E2E and run key '{config.RunId}' is visible={runVisible}.");
 
-            ControlTestSupport.TypeAhead(session, config.RunId);
+            TypeAhead(session, config.RunId);
             bool runSelected = ControlTestSupport.WaitForTreeSelection(session, config.RunId);
             E2EResults.Record(
                 "controls.tree.typeahead.run",
@@ -193,16 +193,16 @@ public sealed class TreeTests
 
             ControlTestSupport.SendKeys(session, "Right");
             _ = WaitForRow(session, "BWC-E2E");
-            ControlTestSupport.TypeAhead(session, "BWC-E2E");
+            TypeAhead(session, "BWC-E2E");
             _ = ControlTestSupport.WaitForTreeSelection(session, "BWC-E2E");
             ControlTestSupport.SendKeys(session, "Right");
             _ = WaitForRow(session, config.RunId);
-            ControlTestSupport.TypeAhead(session, config.RunId);
+            TypeAhead(session, config.RunId);
             _ = ControlTestSupport.WaitForTreeSelection(session, config.RunId);
 
             ControlTestSupport.SendKeys(session, "Right");
             bool wideVisible = WaitForRow(session, "Wide");
-            ControlTestSupport.TypeAhead(session, "Wide");
+            TypeAhead(session, "Wide");
             bool wideSelected = ControlTestSupport.WaitForTreeSelection(session, "Wide");
 
             int before = ControlTestSupport.WaitUntil(
@@ -234,7 +234,7 @@ public sealed class TreeTests
                 $"Home selected Computer={computerSelected}.");
 
             // The rename starts on the run key inside the sandbox. The virtual Computer node is never a target.
-            ControlTestSupport.TypeAhead(session, config.RunId);
+            TypeAhead(session, config.RunId);
             bool renameTargetSelected = ControlTestSupport.WaitForTreeSelection(session, config.RunId);
             E2EGuards.RequireSandboxNavigation(session, sandbox, renameTargetSelected, "controls.tree.sandbox.rename");
 
@@ -256,6 +256,15 @@ public sealed class TreeTests
         {
             ControlTestSupport.CleanupRegistry(config);
         }
+    }
+
+    /// <summary>
+    /// Waits past the tree's 1000 ms type-ahead window before typing, so the prefix starts a new search.
+    /// </summary>
+    private static void TypeAhead(AppSession session, string text)
+    {
+        Thread.Sleep(1100);
+        ControlTestSupport.SendKeys(session, text);
     }
 
     private static bool WaitForRow(AppSession session, string name)
