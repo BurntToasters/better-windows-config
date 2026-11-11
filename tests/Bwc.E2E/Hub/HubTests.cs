@@ -14,12 +14,13 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Bwc.E2E.Hub;
 
 /// <summary>
-/// Drives the Hub from its published output. Covers the classic window and tool list, Enter and the
-/// Alt+H keyboard path, About, the update check in three states (not configured, up to date, update
-/// available), cancel, the update settings, the light and dark captures, and the pixel contrast of every
-/// dialog (<see cref="DialogContrast"/>), in light and in dark. Update checks run
-/// against a loopback server that serves signed fixtures generated for the run; nothing reaches the
-/// network. Captures are written to artifacts/e2e/visual/hub.
+/// Drives the Hub from its published output. Tests that use no E2E seam run in the ship flavor: the classic
+/// window and tool list, Enter and the Alt+H keyboard path, About text, the not-configured update message,
+/// and the update settings file. Tests that force the palette (BWC_E2E_THEME) or serve update fixtures
+/// (BWC_E2E_UPDATE_*) are tagged E2EOnly: the light and dark captures, the pixel contrast of every dialog
+/// (<see cref="DialogContrast"/>), and the update checks in three states (up to date, update available, cancel).
+/// Update checks run against a loopback server that serves signed fixtures generated for the run; nothing
+/// reaches the network. Captures are written to artifacts/e2e/visual/hub.
 /// </summary>
 [TestClass]
 public sealed class HubTests
@@ -36,12 +37,15 @@ public sealed class HubTests
     private const string DarkTheme = "Dark";
     private const string NoticesScope = "hub-main";
     private const string UnconfiguredScope = "hub-unconfigured";
+    private const string SettingsScope = "hub-settings";
+    private const string LightScope = "hub-light";
     private const string UpdateScope = "hub-update";
     private const string DarkScope = "hub-dark";
     private const double LightBrightnessFloor = 150;
     private const double DarkBrightnessCeiling = 90;
     private const int HeldManifestMilliseconds = 60_000;
     private const int ProgressManifestMilliseconds = 2_000;
+    private const int AboutOpenAttempts = 2;
     private static readonly TimeSpan ElementTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan DialogTimeout = TimeSpan.FromSeconds(20);
@@ -67,7 +71,7 @@ public sealed class HubTests
         EnsureExecutables(config);
         string semVer = ReadSemVer(config);
 
-        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, NoticesScope, LightTheme));
+        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, NoticesScope, null));
         E2EResults.CurrentSession = hub;
         using var automation = new UIA3Automation();
 
@@ -112,14 +116,9 @@ public sealed class HubTests
         string status = WaitForText(hub, "HubStatus");
         E2EResults.Record("hub.status", !string.IsNullOrWhiteSpace(status), $"HubStatus text was '{status}'.");
 
-        string mainCapture = CaptureMain(hub, "main-light.png");
-        double lightBrightness = HubUi.AverageBrightness(mainCapture);
-        E2EResults.Record(
-            "hub.main.light",
-            lightBrightness >= LightBrightnessFloor,
-            $"Light capture average brightness {lightBrightness:0.0}, expected at least {LightBrightnessFloor}.");
-
-        CheckAboutDialog(hub, automation, semVer, LightTheme, "about.png", "hub.about");
+        // The smoke test leaves its Registry Editor running, and that window can keep the foreground from the Hub.
+        CloseRegeditLeftovers();
+        CheckAboutDialog(hub, automation, semVer, null, "about.png", "hub.about");
 
         if (row is not null)
         {
@@ -143,24 +142,73 @@ public sealed class HubTests
         var config = GuiGate.Config;
         EnsureExecutables(config);
 
-        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, UnconfiguredScope, LightTheme));
+        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, UnconfiguredScope, null));
         E2EResults.CurrentSession = hub;
         using var automation = new UIA3Automation();
 
-        CheckNotConfiguredDialog(hub, automation, LightTheme, "update-not-configured.png", "hub.update.unconfigured");
+        CheckNotConfiguredDialog(hub, automation, null, "update-not-configured.png", "hub.update.unconfigured");
 
         hub.Close();
         AssertNoFailures("Hub not-configured checks");
     }
 
+    [TestMethod]
+    [TestCategory("Hub")]
+    public void Hub_UpdateSettings_WritesChannelAndStartupCheck()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        EnsureExecutables(config);
+
+        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, SettingsScope, null));
+        E2EResults.CurrentSession = hub;
+        using var automation = new UIA3Automation();
+
+        CheckUpdateSettings(hub, automation, config, SettingsScope, null);
+
+        hub.Close();
+        AssertNoFailures("Hub update settings checks");
+    }
+
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_LightTheme_CapturesAndDialogContrast()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        string semVer = ReadSemVer(config);
+
+        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, LightScope, LightTheme));
+        E2EResults.CurrentSession = hub;
+        using var automation = new UIA3Automation();
+
+        string mainCapture = CaptureMain(hub, "main-light.png");
+        double lightBrightness = HubUi.AverageBrightness(mainCapture);
+        E2EResults.Record(
+            "hub.main.light",
+            lightBrightness >= LightBrightnessFloor,
+            $"Light capture average brightness {lightBrightness:0.0}, expected at least {LightBrightnessFloor}.");
+
+        CheckAboutDialog(hub, automation, semVer, LightTheme, "about.png", "hub.about");
+        CheckNotConfiguredDialog(hub, automation, LightTheme, "update-not-configured.png", "hub.update.unconfigured");
+        CheckUpdateSettings(hub, automation, config, LightScope, LightTheme);
+
+        hub.Close();
+        AssertNoFailures("Hub light theme checks");
+    }
+
     /// <summary>
     /// Runs Help > Check for Updates on a Hub with no update server, checks the message and the status line,
     /// and captures the message window in the given theme. <paramref name="checkPrefix"/> names the checks.
+    /// A null theme means no palette is forced, so the capture and its contrast check are skipped.
     /// </summary>
     private static void CheckNotConfiguredDialog(
         AppSession hub,
         UIA3Automation automation,
-        string theme,
+        string? theme,
         string fileName,
         string checkPrefix)
     {
@@ -181,7 +229,11 @@ public sealed class HubTests
 
         if (dialog is not null)
         {
-            CaptureDialog(dialog, fileName, checkPrefix + ".contrast", theme);
+            if (theme is not null)
+            {
+                CaptureDialog(dialog, fileName, checkPrefix + ".contrast", theme);
+            }
+
             AutomationElement? ok = HubUi.WaitWithin(dialog, "DialogPrimary", DialogTimeout);
             if (ok is not null)
             {
@@ -201,10 +253,12 @@ public sealed class HubTests
 
     [TestMethod]
     [TestCategory("Hub")]
-    public void Hub_CheckForUpdates_LocalManifest_UpToDateAvailableCancelAndSettings()
+    [TestCategory("E2EOnly")]
+    public void Hub_CheckForUpdates_LocalManifest_UpToDateAvailableAndCancel()
     {
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
         EnsureExecutables(config);
         string installed = ReadSemVer(config);
         DateTime testStartUtc = DateTime.UtcNow;
@@ -337,20 +391,18 @@ public sealed class HubTests
             !AnyHelperStartedSince(testStartUtc, Process.GetProcessesByName(UpdateProcessName)),
             "No BwcUpdate process from this test is still running after Cancel.");
 
-        // Settings: channel and startup check are written to the Hub settings file.
-        server.ManifestDelayMilliseconds = 0;
-        CheckUpdateSettings(hub, automation, config);
-
         hub.Close();
         AssertNoFailures("Hub update checks");
     }
 
     [TestMethod]
     [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
     public void Hub_DarkTheme_MainWindowCapture()
     {
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
         EnsureExecutables(config);
 
         using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, DarkScope, DarkTheme));
@@ -369,10 +421,12 @@ public sealed class HubTests
 
     [TestMethod]
     [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
     public void Hub_DarkTheme_DialogsAreReadable()
     {
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
         EnsureExecutables(config);
         string semVer = ReadSemVer(config);
 
@@ -385,6 +439,19 @@ public sealed class HubTests
 
         hub.Close();
         AssertNoFailures("Hub dark dialog checks");
+    }
+
+    /// <summary>
+    /// Closes every Registry Editor process that an earlier test left running, so it cannot hold the foreground from
+    /// the Hub. Each close is recorded by the check that CloseChild writes.
+    /// </summary>
+    private static void CloseRegeditLeftovers()
+    {
+        foreach (Process process in Process.GetProcessesByName(RegeditProcessName))
+        {
+            E2EResults.Note("hub.regedit.leftover", $"closing BwcRegedit pid {process.Id} left by an earlier test.");
+            CloseChild(process);
+        }
     }
 
     private static void CheckHelpMenuOpensWithAltH(AppSession hub, UIA3Automation automation)
@@ -401,21 +468,35 @@ public sealed class HubTests
 
     /// <summary>
     /// Opens Help > About, checks its text, captures it in the given theme, and closes it. <paramref name="checkPrefix"/>
-    /// names the checks, so the light and dark runs record different ids.
+    /// names the checks, so the light and dark runs record different ids. A null theme means no palette is forced,
+    /// so the capture and its contrast check are skipped.
     /// </summary>
     private static void CheckAboutDialog(
         AppSession hub,
         UIA3Automation automation,
         string semVer,
-        string theme,
+        string? theme,
         string fileName,
         string checkPrefix)
     {
-        HubUi.OpenHelpMenuByMouse(hub, automation);
-        AutomationElement? about = HubUi.FindInProcess(automation, hub.ProcessId, "MenuItem_About", ElementTimeout);
-        HubUi.ClickMenuItem(about);
+        // A foreign window can take the foreground between steps, and then the Help menu click lands nowhere. Each
+        // attempt makes the Hub foreground first, and the foreground is recorded so a failure names the window that won.
+        AutomationElement? window = null;
+        for (int attempt = 1; attempt <= AboutOpenAttempts && window is null; attempt++)
+        {
+            E2EResults.Note(checkPrefix + ".foreground.attempt" + attempt, HubUi.DescribeForeground(hub.MainHwnd));
+            _ = HubUi.ForceForeground(hub.MainHwnd, TimeSpan.FromSeconds(3));
+            HubUi.OpenHelpMenuByMouse(hub, automation);
+            AutomationElement? about = HubUi.FindInProcess(automation, hub.ProcessId, "MenuItem_About", ElementTimeout);
+            HubUi.ClickMenuItem(about);
+            window = HubUi.FindWindowInProcess(automation, hub.ProcessId, AboutTitle, DialogTimeout);
+        }
 
-        AutomationElement? window = HubUi.FindWindowInProcess(automation, hub.ProcessId, AboutTitle, DialogTimeout);
+        if (window is null)
+        {
+            E2EResults.Note(checkPrefix + ".foreground.failed", HubUi.DescribeForeground(hub.MainHwnd));
+        }
+
         E2EResults.Record(checkPrefix + ".open", window is not null, window is null ? "About did not open." : "About opened.");
         if (window is null)
         {
@@ -439,7 +520,11 @@ public sealed class HubTests
             noNotices,
             "With no THIRD-PARTY-NOTICES.txt beside the Hub, About shows no notices button and says so.");
 
-        CaptureDialog(window, fileName, checkPrefix + ".contrast", theme);
+        if (theme is not null)
+        {
+            CaptureDialog(window, fileName, checkPrefix + ".contrast", theme);
+        }
+
         AutomationElement? ok = HubUi.WaitWithin(window, "AboutOk", DialogTimeout);
         if (ok is not null)
         {
@@ -452,7 +537,7 @@ public sealed class HubTests
             "About closed.");
     }
 
-    private static void CheckUpdateSettings(AppSession hub, UIA3Automation automation, E2EConfig config)
+    private static void CheckUpdateSettings(AppSession hub, UIA3Automation automation, E2EConfig config, string scope, string? theme)
     {
         HubUi.OpenHelpMenuByMouse(hub, automation);
         AutomationElement? settings = HubUi.FindInProcess(automation, hub.ProcessId, "MenuItem_UpdateSettings", ElementTimeout);
@@ -465,7 +550,10 @@ public sealed class HubTests
             return;
         }
 
-        CaptureDialog(window, "update-settings.png", "hub.settings.contrast", LightTheme);
+        if (theme is not null)
+        {
+            CaptureDialog(window, "update-settings.png", "hub.settings.contrast", theme);
+        }
         AutomationElement? beta = HubUi.WaitWithin(window, "UpdateChannelBeta", DialogTimeout);
         AutomationElement? startup = HubUi.WaitWithin(window, "UpdateStartupCheck", DialogTimeout);
         beta?.Click();
@@ -482,7 +570,7 @@ public sealed class HubTests
             HubUi.WaitForWindowGone(automation, hub.ProcessId, SettingsTitle, DialogTimeout),
             "Update Settings closed on OK.");
 
-        string path = Path.Combine(config.DataRootFor(UpdateScope), "hub", "settings.json");
+        string path = Path.Combine(config.DataRootFor(scope), "hub", "settings.json");
         bool saved = false;
         string detail = $"settings file '{path}' was not written.";
         if (File.Exists(path))
@@ -632,17 +720,23 @@ public sealed class HubTests
         return any;
     }
 
+    /// <summary>
+    /// The child environment for one Hub run. The palette seam is set only when a theme is given, and the update
+    /// seams only when a fixture server is given, so a null theme with no server is the ship-equivalent run.
+    /// </summary>
     private static Dictionary<string, string> Environment(
         E2EConfig config,
         string scope,
-        string theme,
+        string? theme,
         UpdateFixtureServer? server = null,
         UpdateFixture? fixture = null)
     {
-        var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+        var environment = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (theme is not null)
         {
-            ["BWC_E2E_THEME"] = theme,
-        };
+            environment["BWC_E2E_THEME"] = theme;
+        }
+
         foreach (KeyValuePair<string, string> pair in config.DataRootEnvironment(scope))
         {
             environment[pair.Key] = pair.Value;
