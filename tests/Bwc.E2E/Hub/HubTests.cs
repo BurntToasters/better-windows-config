@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Bwc.E2E.Controls;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Input;
@@ -45,6 +46,15 @@ public sealed class HubTests
     private static readonly Regex FullCommitPattern = new("[0-9a-fA-F]{40}", RegexOptions.CultureInvariant);
 
     private static int _checkStart;
+
+    [ClassInitialize]
+    public static void ClassInitialize(TestContext testContext)
+    {
+        _ = testContext;
+
+        // Window rectangles and screen captures are only exact in a per-monitor DPI aware process.
+        ControlTestSupport.PrepareDpi();
+    }
 
     [TestMethod]
     [TestCategory("Hub")]
@@ -198,7 +208,9 @@ public sealed class HubTests
         // Same version: the helper refuses with SameVersion, which the Hub shows as up to date.
         server.Offer(sameManifest, sameSignature, fixture.Installer);
         RunCheck(hub, automation);
-        AutomationElement? upToDate = HubUi.FindWindowInProcess(automation, hub.ProcessId, CheckTitle, DialogTimeout);
+        // The interactive check shows its progress window under the same title first, so the lookup waits
+        // for the window that holds the result message.
+        AutomationElement? upToDate = HubUi.FindWindowWithChild(automation, hub.ProcessId, CheckTitle, "DialogMessage", DialogTimeout);
         string upToDateText = MessageText(upToDate);
         E2EResults.Record(
             "hub.update.uptodate.dialog",
