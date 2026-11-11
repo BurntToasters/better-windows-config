@@ -70,11 +70,11 @@ Elevated are skipped by every step; scripts/elevated-runner/run.js runs them.
 
 Options:
   --rid <rid>  win-x64, win-arm64, or all. Default from process.arch.
-               The three test projects always use the host architecture, so
+               The test projects always use the host architecture, so
                win-x64 on an ARM64 machine still runs them as ARM64. all runs
-               the builds and the three test projects once, and the publish and
+               the builds and the test projects once, and the publish and
                E2E steps once for each RID.
-  --quick      Run both architecture builds and all three test projects, but
+  --quick      Run both architecture builds and all test projects, but
                skip the publish, flavor, and E2E steps.
   --help       Show this help.
 

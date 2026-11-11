@@ -43,6 +43,9 @@ not affected, which hides the problem until publish.
 
 ## Commands
 
+Use the npm scripts and `scripts/` tools below. They publish, verify the flavor, and remove stale
+ReadyToRun intermediates. The raw commands are for reference only:
+
 ```
 dotnet publish -c Release -r win-x64   -p:Platform=x64   -p:PublishReadyToRun=true -o publish/win-x64
 dotnet publish -c Release -r win-arm64 -p:Platform=ARM64 -p:PublishReadyToRun=true -o publish/win-arm64
@@ -58,11 +61,18 @@ A minimal self-contained WinUI app published this way is about 280 MB (x64) and 
 ## Quality gate evidence
 
 `node scripts/test-all.js` runs the gate steps in order and stops at the first failure.
-`--rid win-x64|win-arm64|all` picks the target (default from `process.arch`), and
-`--quick` runs only the builds and the three test projects. `--rid all` runs the shared
-steps once and the publish, flavor, and E2E steps once for each RID.
+`--rid win-x64|win-arm64|all` picks the target (default from `process.arch`).
 
-The three test projects always build and run for the host architecture (`process.arch`:
+The shared steps are `sync-version`, `registry-writer`, `no-em-dash`, `changelog-version`, and
+`comment-lint`, then `build-arm64`, `build-x64`, and four test projects: `test-core`
+(`Bwc.Core.Tests`), `test-registry-e2e` (`Bwc.Registry.Tests`), `test-registry-shipping`
+(`Bwc.Registry.Shipping.Tests`), and `test-update` (`Bwc.Update.Tests`).
+
+`--quick` runs the shared steps only. Without it, each RID then runs `publish-ship`,
+`verify-flavor-ship`, `e2e-ship`, `publish-e2e`, `verify-flavor-e2e`, and `e2e-flavor`.
+`--rid all` runs the shared steps once and the publish, flavor, and E2E steps once for each RID.
+
+The four test projects always build and run for the host architecture (`process.arch`:
 ARM64 or x64), whatever `--rid` is. `--rid` only picks the app RID for the publish and E2E
 steps. On an ARM64 machine, `--rid win-x64` therefore runs the tests as ARM64 against the
 x64 app, which runs under emulation. The x64 app is self-contained, so no x64 .NET runtime
@@ -77,7 +87,7 @@ Each run removes the previous run's outputs first, then writes:
 
 Schema 2 fields of `result.json`:
 
-- `schema`, `startedUtc`, `durationMs`, `rid` (requested: `win-x64`, `win-arm64`, or `all`), `testPlatform` (the host architecture the three test projects ran as: `ARM64` or `x64`), `quick`, `pass`
+- `schema`, `startedUtc`, `durationMs`, `rid` (requested: `win-x64`, `win-arm64`, or `all`), `testPlatform` (the host architecture the four test projects ran as: `ARM64` or `x64`), `quick`, `pass`
 - `git`: `commit` (full SHA), `branch`, `dirty`, `dirtyPaths` (from `git status --porcelain -z`; a rename reads `new (from old)`), `error`
 - `environment`: `node` (version), `dotnet` (`version`, `error` from `dotnet --version`), `os` (`type`, `version`, `release`), `arch` (`process.arch`)
 - `rids`: one entry per requested RID with `platform`, `status` (`pass`, `fail`, `not-run` after an earlier failure, or `skipped` in quick mode), and its step names
@@ -103,7 +113,7 @@ Every assembly carries `BwcFlavor` from `Directory.Build.props`: `ship` in ship 
   `BwcUpdate.exe`) must declare one `requestedExecutionLevel`. In `publish/<rid>-e2e` it must be
   `asInvoker`. In `publish/<rid>` it must be the level in that project's source manifest:
   `highestAvailable` (`src/Bwc.Regedit.App/app.manifest`), `asInvoker` (`src/Bwc.Hub/app.manifest`),
-  and `requireAdministrator` (`src/Bwc.Update/app.manifest`). The check reads the manifest bytes
+  and `asInvoker` (`src/Bwc.Update/app.manifest`). The check reads the manifest bytes
   in both ASCII and UTF-16LE. It ignores closing tags.
 
 The check runs at the end of every `scripts/dotnet-build.js` publish, where it is recorded
@@ -113,6 +123,18 @@ steps `verify-flavor-ship` and `verify-flavor-e2e`. To check one folder by hand:
 ```
 node scripts/flavor-metadata.js --rid win-arm64 --flavor e2e
 ```
+
+### The two E2E flavors
+
+- `ship` (`publish/<rid>`): real registry writes are allowed through `ShippingWritePolicy`. The
+  E2E run covers only tests that are not tagged `Mutating`, `E2EOnly`, or `Elevated`.
+- `e2e` (`publish/<rid>-e2e`): every write is limited by `SandboxWritePolicy` to
+  `HKCU\Software\BWC-E2E\<run-id>`. The run covers every test except `Elevated`. Mutating tests run
+  only here.
+- Each mutating step first checks that the address bar is inside the sandbox root, and fails the
+  test if it is not. Tests delete only the keys they created.
+- `scripts/test-e2e.js` writes `artifacts/e2e/result-<rid>-<flavor>.json`. The file holds the checks,
+  notes, and known gaps, and it records the commit and the run ID.
 
 ### E2E flavor never elevates
 
@@ -159,3 +181,30 @@ exclude them. `node scripts/test-e2e.js --filter TestCategory=Elevated` runs onl
 It needs `--flavor e2e` and an elevated process. In a normal shell it exits 3 with NOT RUN,
 and it exits 3 when no E2E test carries the tag. The runner that does this unattended is
 described in [elevated-runner.md](elevated-runner.md).
+
+## GUI tests and input
+
+- GUI tests share the desktop. Hold the named mutex `Local\BwcGuiTestLock` around any GUI launch.
+  `tests/Bwc.E2E/Harness/GuiGate.cs` takes it for E2E runs, and the oracle tools use the same name.
+- FlaUI's held-key and held-button helpers (`Keyboard.Pressing`, `TypeSimultaneously`) do not produce
+  real input sequences in this environment. Tests that hold a modifier or drag a mouse button use the
+  `keybd_event` and `mouse_event` helpers instead, for example `tests/Bwc.E2E/List/RawKeyboard.cs`.
+- UI Automation patterns are for reading state. Input paths are tested with real keys and clicks.
+
+## npm scripts
+
+| Script | What it runs |
+|---|---|
+| `npm run build:win:x64`, `build:win:arm64` | `scripts/dotnet-build.js` for one RID (ship flavor) |
+| `npm run build:win:e2e` | `scripts/dotnet-build.js` for arm64 in the E2E flavor |
+| `npm run test:all`, `npm run gate` | `scripts/test-all.js` (the full gate) |
+| `npm run test:e2e` | `scripts/test-e2e.js` |
+| `npm run installer:x64`, `installer:arm64` | `scripts/build-installer.js` (needs NSIS 3.10 or newer) |
+| `npm run run:hub`, `run:regedit` | `scripts/run-app.js` (starts the app with RunAsInvoker) |
+| `npm run oracle` | `scripts/oracle.js` (regenerates the classic regedit captures) |
+| `npm run sync-version` | `scripts/sync-version.js` |
+| `npm run validate` | em dash check, changelog version check, comment lint |
+
+`npm run oracle` and the oracle files are described in
+[docs/parity/oracle/README.md](parity/oracle/README.md). The installer is described in
+[installer.md](installer.md).
