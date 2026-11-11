@@ -33,6 +33,7 @@ public sealed class HexViewerDialog : ModalDialogWindow
         {
             Height = 260,
             HorizontalAlignment = HorizontalAlignment.Stretch,
+            IsReadOnly = true,
             VerticalAlignment = VerticalAlignment.Stretch,
         };
 

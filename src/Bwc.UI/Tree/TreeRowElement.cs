@@ -68,6 +68,7 @@ public sealed class TreeRowElement : Panel
         Children.Add(_chevronHost);
         Children.Add(_label);
         Tapped += OnRowTapped;
+        RightTapped += OnRowRightTapped;
         Height = DenseMetrics.TreeRowHeight;
     }
 
@@ -227,6 +228,32 @@ public sealed class TreeRowElement : Panel
     {
         Owner?.ChevronTapped(this);
         e.Handled = true;
+    }
+
+    private void OnRowRightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        if (e.Handled || IsChevronSource(e.OriginalSource))
+        {
+            return;
+        }
+
+        Owner?.RowRightTapped(this, e);
+        e.Handled = true;
+    }
+
+    private bool IsChevronSource(object? source)
+    {
+        for (var current = source as DependencyObject;
+            current is not null;
+            current = VisualTreeHelper.GetParent(current))
+        {
+            if (ReferenceEquals(current, _chevronHost))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 

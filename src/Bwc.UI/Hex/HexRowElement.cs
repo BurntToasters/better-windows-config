@@ -93,6 +93,13 @@ internal sealed class HexRowElement : Panel
         _offsetText.Foreground = DenseTheme.Text;
     }
 
+    /// <summary>Rebuilds the row text after an edit without recreating the element.</summary>
+    internal void Refresh()
+    {
+        ApplyContent();
+        ApplySelection();
+    }
+
     protected override Size MeasureOverride(Size availableSize)
     {
         if (Owner is null)
@@ -228,7 +235,7 @@ internal sealed class HexRowElement : Panel
 
         bool shift = (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift) & CoreVirtualKeyStates.Down)
             == CoreVirtualKeyStates.Down;
-        Owner.HandleBytePressed(_index, byteInRow, shift);
+        Owner.HandleBytePressed(_index, byteInRow, shift, ascii: x >= Owner.AsciiLeft);
         e.Handled = true;
     }
 }

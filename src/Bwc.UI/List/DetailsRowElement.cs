@@ -27,6 +27,8 @@ public sealed class DetailsRowElement : Panel
     {
         Background = DenseTheme.Transparent;
         PointerPressed += OnPointerPressed;
+        DoubleTapped += OnDoubleTapped;
+        RightTapped += OnRightTapped;
     }
 
     internal DetailsList? Owner { get; private set; }
@@ -214,6 +216,22 @@ public sealed class DetailsRowElement : Panel
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
         Owner?.RowPressed(this, e);
+    }
+
+    private void OnDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    {
+        Owner?.RowDoubleTapped(this, e);
+    }
+
+    private void OnRightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        if (e.Handled)
+        {
+            return;
+        }
+
+        Owner?.RowRightTapped(this, e);
+        e.Handled = true;
     }
 }
 

@@ -7,7 +7,8 @@ namespace Bwc.Regedit.Registry;
 /// <summary>
 /// Lazy read-only tree source over the live registry. Construction is free: the virtual
 /// <c>Computer</c> node and its five roots are created without touching the registry, and every
-/// child list is enumerated on the thread pool when a node is expanded or restored.
+/// child list is enumerated on the thread pool when a node is expanded or restored. Connected
+/// remote computers are appended after the five local roots.
 /// </summary>
 public sealed class RegistryTreeSource : ITreeNodeSource
 {
@@ -25,7 +26,9 @@ public sealed class RegistryTreeSource : ITreeNodeSource
 
     private readonly RegistryReader _reader;
 
-    public RegistryTreeSource(RegistryReader? reader = null)
+    public RegistryTreeSource(
+        RegistryReader? reader = null,
+        IReadOnlyList<RemoteRegistryConnection>? remoteConnections = null)
     {
         _reader = reader ?? new RegistryReader();
         Computer = new TreeNode("Computer", registryPath: null, hasChildren: true, source: this)
@@ -41,13 +44,55 @@ public sealed class RegistryTreeSource : ITreeNodeSource
         }
 
         Roots = [Computer];
+
+        if (remoteConnections is not null)
+        {
+            foreach (RemoteRegistryConnection connection in remoteConnections)
+            {
+                AddRemoteComputer(connection);
+            }
+        }
     }
 
-    /// <summary>The always-expanded virtual root that owns the five predefined keys.</summary>
+    /// <summary>The always-expanded virtual root that owns the five predefined keys and any remote computers.</summary>
     public TreeNode Computer { get; }
 
     /// <summary>The roots passed to <c>DenseTree.SetRoots</c>. Only the virtual Computer node.</summary>
     public IReadOnlyList<TreeNode> Roots { get; }
+
+    /// <summary>
+    /// Appends one connected computer as a child of the virtual Computer node. A disposed
+    /// connection or a name that is already present is ignored.
+    /// </summary>
+    public void AddRemoteComputer(RemoteRegistryConnection connection)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        string nodeName = RemoteRegistryTreeSource.DisplayPrefix(connection.ComputerName);
+        if (FindChild(Computer, nodeName) is not null)
+        {
+            Log.Warn($"Registry tree already shows the remote computer '{connection.ComputerName}'.");
+            return;
+        }
+
+        RemoteRegistryTreeSource source;
+        try
+        {
+            source = new RemoteRegistryTreeSource(connection);
+        }
+        catch (ObjectDisposedException ex)
+        {
+            Log.Warn(
+                $"Registry tree ignored the disposed remote computer '{connection.ComputerName}': {ex.Message}");
+            return;
+        }
+
+        Computer.AddChild(new TreeNode(
+            nodeName,
+            registryPath: nodeName,
+            hasChildren: true,
+            source: source));
+    }
 
     public Task<IReadOnlyList<TreeNode>> LoadChildrenAsync(TreeNode node, CancellationToken cancellationToken)
     {

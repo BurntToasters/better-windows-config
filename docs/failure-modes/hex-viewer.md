@@ -2,9 +2,9 @@
 
 Scope: the read-only `HexEditor` in `src/Bwc.UI/Hex`, `HexViewerDialog` in
 `src/Bwc.UI/Dialogs/HexViewerDialog.cs`, the View > Display Binary Data wiring in
-`src/Bwc.Regedit`, and the Hex E2E suite. The viewer never writes to the registry. Editing is a
-later batch (U10); this document records what the read-only viewer does and what the implementation
-action is.
+`src/Bwc.Regedit`, and the Hex E2E suite. The viewer never writes to the registry. The editable
+path and `HexEditorDialog` are documented in `hex-editor.md`; this document records what the
+read-only viewer does and what the implementation action is.
 
 ## Large values and virtualization
 
@@ -79,8 +79,9 @@ space, for example `00 01 02`. No binary clipboard format is provided in this ba
 
 ### Clipboard content and read-only state
 
-Copy does not change the selection and does not modify the value. Paste is not handled. The editor
-reports `IsReadOnly` as true and does not expose an edit path.
+Copy does not change the selection and does not modify the value. The viewer does not handle
+paste; `HexViewerDialog` sets `IsReadOnly` to true and exposes no edit path. The editable dialog
+and its paste rules are documented in `hex-editor.md`.
 
 ## Registry views
 

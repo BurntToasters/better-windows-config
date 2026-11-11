@@ -121,6 +121,41 @@
   <data name="MenuEditFindNext" xml:space="preserve">
     <value>Find Ne&amp;xt&#x9;F3</value>
   </data>
+  <!--
+    Context menu texts copied from the RT_MENU 104, 105, and 106 entries in
+    docs/parity/regedit-inventory.md. These are separate keys because several oracle context
+    strings differ from the main menu strings, for example Export without an ellipsis.
+  -->
+  <data name="ContextExpand" xml:space="preserve">
+    <value>Expand</value>
+  </data>
+  <data name="ContextFind" xml:space="preserve">
+    <value>&amp;Find...</value>
+  </data>
+  <data name="ContextDelete" xml:space="preserve">
+    <value>&amp;Delete</value>
+  </data>
+  <data name="ContextRename" xml:space="preserve">
+    <value>&amp;Rename</value>
+  </data>
+  <data name="ContextExport" xml:space="preserve">
+    <value>&amp;Export</value>
+  </data>
+  <data name="ContextPermissions" xml:space="preserve">
+    <value>&amp;Permissions...</value>
+  </data>
+  <data name="ContextCopyKeyName" xml:space="preserve">
+    <value>&amp;Copy Key Name</value>
+  </data>
+  <data name="ContextGoToHklm" xml:space="preserve">
+    <value>Go &amp;to HKEY_LOCAL_MACHINE</value>
+  </data>
+  <data name="ContextModify" xml:space="preserve">
+    <value>&amp;Modify...</value>
+  </data>
+  <data name="ContextModifyBinary" xml:space="preserve">
+    <value>Modify &amp;Binary Data...</value>
+  </data>
   <data name="MenuView" xml:space="preserve">
     <value>&amp;View</value>
   </data>
@@ -168,6 +203,52 @@
   </data>
   <data name="DialogErrorTitle" xml:space="preserve">
     <value>Registry Editor</value>
+  </data>
+  <data name="DialogPermissionsFailed" xml:space="preserve">
+    <value>The permissions dialog failed with HRESULT 0x{0:X8} (Win32 code {1}).</value>
+  </data>
+  <data name="DialogPrintFailed" xml:space="preserve">
+    <value>Printing the selected key failed.
+
+Key: {0}
+Error code: {1} (0x{1:X8})
+{2}</value>
+  </data>
+  <data name="DialogFavoriteAddTitle" xml:space="preserve">
+    <value>Add to Favorites</value>
+  </data>
+  <data name="DialogFavoriteNameLabel" xml:space="preserve">
+    <value>Favorite name:</value>
+  </data>
+  <data name="DialogFavoriteDuplicate" xml:space="preserve">
+    <value>There is already a favorite with that name.</value>
+  </data>
+  <data name="DialogErrorAddingFavorite" xml:space="preserve">
+    <value>Error Adding Favorite</value>
+  </data>
+  <data name="DialogFavoriteCaption" xml:space="preserve">
+    <value>Favorite</value>
+  </data>
+  <data name="DialogFavoriteRemoveTitle" xml:space="preserve">
+    <value>Remove Favorites</value>
+  </data>
+  <data name="DialogFavoriteSelectLabel" xml:space="preserve">
+    <value>Select Favorite(s):</value>
+  </data>
+  <data name="DialogFavoriteEmptyName" xml:space="preserve">
+    <value>Enter a favorite name.</value>
+  </data>
+  <data name="DialogFavoriteComputer" xml:space="preserve">
+    <value>Computer cannot be added to favorites. Select a key first.</value>
+  </data>
+  <data name="DialogFavoriteNone" xml:space="preserve">
+    <value>There are no favorites to remove.</value>
+  </data>
+  <data name="DialogFavoriteNoSelection" xml:space="preserve">
+    <value>Select at least one favorite to remove.</value>
+  </data>
+  <data name="DialogFavoriteLoadFailed" xml:space="preserve">
+    <value>The favorites list could not be read.</value>
   </data>
   <data name="DialogNewKeyTitle" xml:space="preserve">
     <value>New Key</value>
@@ -298,10 +379,79 @@
   <data name="DialogHexTitle" xml:space="preserve">
     <value>Binary Data</value>
   </data>
+  <data name="DialogHexEditTitle" xml:space="preserve">
+    <value>Edit Binary Data</value>
+  </data>
   <data name="DialogHexClose" xml:space="preserve">
     <value>Close</value>
   </data>
   <data name="DialogHexNoSelection" xml:space="preserve">
     <value>Select a single value to display its binary data.</value>
+  </data>
+  <data name="DialogEditStringTitle" xml:space="preserve">
+    <value>Edit String</value>
+  </data>
+  <data name="DialogEditExpandableTitle" xml:space="preserve">
+    <value>Edit Expandable String Value</value>
+  </data>
+  <data name="DialogEditDwordTitle" xml:space="preserve">
+    <value>Edit DWORD (32-bit) Value</value>
+  </data>
+  <data name="DialogEditQwordTitle" xml:space="preserve">
+    <value>Edit QWORD (64-bit) Value</value>
+  </data>
+  <data name="DialogEditMultiStringTitle" xml:space="preserve">
+    <value>Edit Multi-String</value>
+  </data>
+  <data name="DialogLoadHiveTitle" xml:space="preserve">
+    <value>Load Hive</value>
+  </data>
+  <data name="DialogLoadHiveNameLabel" xml:space="preserve">
+    <value>Key name under HKEY_LOCAL_MACHINE:</value>
+  </data>
+  <data name="DialogLoadHiveNameInvalid" xml:space="preserve">
+    <value>Enter a single key name without separators. The name cannot be empty, cannot be "." or "..", cannot contain NUL characters, and cannot be longer than 255 characters.</value>
+  </data>
+  <data name="DialogLoadHiveNameExists" xml:space="preserve">
+    <value>A key with that name already exists under HKEY_LOCAL_MACHINE. Choose another name.</value>
+  </data>
+  <data name="DialogUnloadHiveTitle" xml:space="preserve">
+    <value>Unload Hive</value>
+  </data>
+  <data name="DialogUnloadHiveMessage" xml:space="preserve">
+    <value>Unload the hive at {0}? The hive file is not deleted.</value>
+  </data>
+  <data name="DialogConnectTitle" xml:space="preserve">
+    <value>Connect Network Registry</value>
+  </data>
+  <data name="DialogConnectLabel" xml:space="preserve">
+    <value>Computer name:</value>
+  </data>
+  <data name="DialogConnectEmpty" xml:space="preserve">
+    <value>Enter a computer name.</value>
+  </data>
+  <data name="DialogConnectInvalid" xml:space="preserve">
+    <value>A computer name must be one name without backslashes, slashes, or NUL.</value>
+  </data>
+  <data name="DialogConnectLocal" xml:space="preserve">
+    <value>You cannot connect to your own computer.</value>
+  </data>
+  <data name="DialogConnectDuplicate" xml:space="preserve">
+    <value>That computer is already connected.</value>
+  </data>
+  <data name="DialogConnectFailedTitle" xml:space="preserve">
+    <value>Error Connecting Network Registry</value>
+  </data>
+  <data name="DialogDisconnectTitle" xml:space="preserve">
+    <value>Disconnect Network Registry</value>
+  </data>
+  <data name="DialogDisconnectLabel" xml:space="preserve">
+    <value>Select a connected computer:</value>
+  </data>
+  <data name="DialogDisconnectEmpty" xml:space="preserve">
+    <value>No remote computer is connected.</value>
+  </data>
+  <data name="DialogDisconnectNoSelection" xml:space="preserve">
+    <value>Select a connected computer to disconnect.</value>
   </data>
 </root>

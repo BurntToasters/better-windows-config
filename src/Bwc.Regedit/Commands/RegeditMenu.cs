@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Bwc.UI.Menu;
 using Bwc.UI.Shell;
@@ -20,12 +21,18 @@ public static class RegeditMenu
     private const string MenuFlyoutItemStyleKey = "BwcMenuFlyoutItemStyle";
     private const string MenuFlyoutSeparatorStyleKey = "BwcMenuFlyoutSeparatorStyle";
 
+    /// <summary>The AutomationId prefix for the dynamic favorite entries after the two commands.</summary>
+    internal const string FavoriteAutomationPrefix = "MenuCommand_Favorite_";
+
     private static readonly ClassicCommandItem[] NoChildren = Array.Empty<ClassicCommandItem>();
 
     /// <summary>
-    /// Builds the command table. File Import, File Export, File Exit, View Address Bar, View Split,
-    /// View Display Binary Data, the New subtree, Delete, Rename, Find, and Find Next are implemented.
-    /// The host updates Export, Delete, Rename, and Display Binary Data as the selection changes.
+    /// Builds the command table. File Import, File Export, File Load Hive, File Unload Hive,
+    /// Connect Network Registry, Disconnect Network Registry, File Print, File Exit, View Address
+    /// Bar, View Split, View Display Binary Data, the New subtree, Delete, Rename, Find, Find Next,
+    /// and the two Favorites commands are implemented. The host updates Export, Print, Unload Hive,
+    /// Disconnect Network Registry, Delete, Rename, Display Binary Data, and the dynamic favorite
+    /// list as the selection and store change.
     /// </summary>
     public static IReadOnlyList<ClassicCommand> Create(
         ResourceLoader loader,
@@ -34,7 +41,15 @@ public static class RegeditMenu
         Action exit,
         Action? import = null,
         Action? export = null,
-        Action? displayBinaryData = null)
+        Action? displayBinaryData = null,
+        Action? addFavorite = null,
+        Action? removeFavorite = null,
+        Action? permissions = null,
+        Action? print = null,
+        Action? loadHive = null,
+        Action? unloadHive = null,
+        Action? connectNetworkRegistry = null,
+        Action? disconnectNetworkRegistry = null)
     {
         ArgumentNullException.ThrowIfNull(loader);
         ArgumentNullException.ThrowIfNull(shell);
@@ -68,13 +83,13 @@ public static class RegeditMenu
                 Command(loader, 658, "MenuFileImport", isEnabled: true, NoChildren, import),
                 Command(loader, 659, "MenuFileExport", isEnabled: false, NoChildren, export),
                 ClassicCommandItem.Separator,
-                Command(loader, 680, "MenuFileLoadHive"),
-                Command(loader, 681, "MenuFileUnloadHive"),
+                Command(loader, 680, "MenuFileLoadHive", isEnabled: true, NoChildren, loadHive),
+                Command(loader, 681, "MenuFileUnloadHive", isEnabled: false, NoChildren, unloadHive),
                 ClassicCommandItem.Separator,
-                Command(loader, 657, "MenuFileConnectNetworkRegistry"),
-                Command(loader, 768, "MenuFileDisconnectNetworkRegistry"),
+                Command(loader, 657, "MenuFileConnectNetworkRegistry", isEnabled: true, NoChildren, connectNetworkRegistry),
+                Command(loader, 768, "MenuFileDisconnectNetworkRegistry", isEnabled: false, NoChildren, disconnectNetworkRegistry),
                 ClassicCommandItem.Separator,
-                Command(loader, 660, "MenuFilePrint"),
+                Command(loader, 660, "MenuFilePrint", isEnabled: false, NoChildren, print),
                 ClassicCommandItem.Separator,
                 Command(loader, 661, "MenuFileExit", isEnabled: true, NoChildren, exit),
             });
@@ -88,7 +103,7 @@ public static class RegeditMenu
             {
                 editNew,
                 ClassicCommandItem.Separator,
-                Command(loader, 678, "MenuEditPermissions"),
+                Command(loader, 678, "MenuEditPermissions", isEnabled: false, NoChildren, permissions),
                 ClassicCommandItem.Separator,
                 Command(loader, 913, "MenuEditDelete", invoke: editCommands.DeleteSelection),
                 Command(loader, 914, "MenuEditRename", invoke: editCommands.RenameSelection),
@@ -123,8 +138,8 @@ public static class RegeditMenu
             isEnabled: true,
             new ClassicCommandItem[]
             {
-                Command(loader, 1281, "MenuFavoritesAdd"),
-                Command(loader, 1280, "MenuFavoritesRemove"),
+                Command(loader, 1281, "MenuFavoritesAdd", isEnabled: true, NoChildren, addFavorite),
+                Command(loader, 1280, "MenuFavoritesRemove", isEnabled: false, NoChildren, removeFavorite),
             });
 
         var help = Command(
@@ -151,6 +166,45 @@ public static class RegeditMenu
         {
             menuBar.Items.Add(BuildTopLevelItem(command));
         }
+    }
+
+    /// <summary>Finds one top-level menu by oracle command id. Returns null for an unknown id.</summary>
+    public static MenuBarItem? FindTopLevelItem(MenuBar menuBar, int commandId)
+    {
+        ArgumentNullException.ThrowIfNull(menuBar);
+
+        foreach (var item in menuBar.Items.OfType<MenuBarItem>())
+        {
+            if (item.Tag is int id && id == commandId)
+            {
+                return item;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Builds one dynamic favorite leaf. The entries have no oracle id, so they use a stable
+    /// AutomationId prefix plus their sorted index and take their text directly from the store.
+    /// </summary>
+    internal static MenuFlyoutItem BuildFavoriteItem(string name, int index, Action invoke)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(invoke);
+
+        var item = new MenuFlyoutItem
+        {
+            Text = name,
+        };
+
+        AutomationProperties.SetAutomationId(
+            item,
+            FavoriteAutomationPrefix + index.ToString(CultureInfo.InvariantCulture));
+
+        item.Click += (_, _) => invoke();
+        ApplyStyle(item, MenuFlyoutItemStyleKey);
+        return item;
     }
 
     /// <summary>
@@ -306,7 +360,9 @@ public static class RegeditMenu
         return item;
     }
 
-    private static MenuFlyoutItemBase BuildFlyoutItem(ClassicCommandItem entry)
+    internal static MenuFlyoutItemBase BuildFlyoutItem(
+        ClassicCommandItem entry,
+        string automationPrefix = "MenuCommand_")
     {
         if (entry is not ClassicCommand command)
         {
@@ -324,7 +380,7 @@ public static class RegeditMenu
                 Tag = command.Id,
             };
 
-            AutomationProperties.SetAutomationId(subItem, "MenuCommand_" + command.Id);
+            AutomationProperties.SetAutomationId(subItem, automationPrefix + command.Id);
 
             if (command.AccessKey is not null)
             {
@@ -333,7 +389,7 @@ public static class RegeditMenu
 
             foreach (var child in command.Children)
             {
-                subItem.Items.Add(BuildFlyoutItem(child));
+                subItem.Items.Add(BuildFlyoutItem(child, automationPrefix));
             }
 
             return subItem;
@@ -346,7 +402,7 @@ public static class RegeditMenu
             Tag = command.Id,
         };
 
-        AutomationProperties.SetAutomationId(item, "MenuCommand_" + command.Id);
+        AutomationProperties.SetAutomationId(item, automationPrefix + command.Id);
 
         if (command.AccessKey is not null)
         {

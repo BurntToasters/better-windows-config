@@ -38,7 +38,35 @@ public sealed class RegistryStore
     public void CopyTree(RegistryPath source, RegistryPath destination) =>
         _writer.CopyTree(source, destination);
 
+    /// <summary>Loads a hive file at a direct child of HKLM or HKU.</summary>
+    public void LoadHive(RegistryPath path, string filePath) => _writer.LoadHive(path, filePath);
+
+    /// <summary>Unloads a hive at a direct child of HKLM or HKU.</summary>
+    public void UnloadHive(RegistryPath path) => _writer.UnloadHive(path);
+
+    /// <summary>Saves a key tree to a new hive file.</summary>
+    public void SaveKey(RegistryPath path, string filePath) => _writer.SaveKey(path, filePath);
+
+    /// <summary>Replaces a key tree from a hive file and writes the previous contents to a backup file.</summary>
+    public void ReplaceKey(RegistryPath path, string newFileName, string backupFileName) =>
+        _writer.ReplaceKey(path, newFileName, backupFileName);
+
+    /// <summary>Restores a key tree from a hive file without creating a backup.</summary>
+    public void RestoreKey(RegistryPath path, string filePath) => _writer.RestoreKey(path, filePath);
+
     public void DeleteValue(RegistryPath key, string valueName) => _writer.DeleteValue(key, valueName);
+
+    public byte[] GetKeySecurity(
+        RegistryPath key,
+        RegistrySecurityInformation information,
+        CancellationToken cancellationToken = default) =>
+        _reader.GetKeySecurity(key, information, cancellationToken);
+
+    public void SetKeySecurity(
+        RegistryPath key,
+        RegistrySecurityInformation information,
+        ReadOnlySpan<byte> securityDescriptor) =>
+        _writer.SetKeySecurity(key, information, securityDescriptor);
 
     public RegistryValueInfo? GetValue(
         RegistryPath key,

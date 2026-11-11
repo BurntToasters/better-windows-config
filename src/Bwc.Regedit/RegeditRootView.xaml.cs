@@ -2,10 +2,13 @@ using System.Globalization;
 using System.Text;
 using Bwc.Core;
 using Bwc.Regedit.Commands;
+using Bwc.Regedit.Dialogs;
+using Bwc.Regedit.Printing;
 using Bwc.Regedit.Registry;
 using Bwc.Registry;
 using Bwc.UI.Dialogs;
 using Bwc.UI.List;
+using Bwc.UI.Menu;
 using Bwc.UI.Shell;
 using Bwc.UI.Tree;
 using Microsoft.UI.Xaml;
@@ -16,6 +19,8 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.Windows.ApplicationModel.Resources;
 using Microsoft.UI.Input;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Foundation;
 using Windows.System;
 using Windows.UI.Core;
 
@@ -28,10 +33,12 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
 
     private readonly RegistryStore _store;
     private readonly RegistryValueSource _valueSource;
+    private readonly FavoritesStore _favorites;
     private readonly RegeditSettings _settings = new();
     private readonly ResourceLoader _loader;
     private readonly RegistryFinder _finder;
     private readonly IReadOnlyList<RegistryPath>? _findRoots;
+    private readonly List<RemoteRegistryConnection> _remoteConnections = new();
     private RegistryTreeSource _treeSource;
     private CancellationTokenSource? _valueLoad;
     private CancellationTokenSource? _silentFind;
@@ -41,7 +48,9 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
     private bool _settingsApplied;
     private bool _dialogOpen;
     private bool _fileDialogOpen;
+    private bool _remoteConnectionsDisposed;
     private FindDialog? _findDialog;
+    private MenuFlyout? _contextFlyout;
     private RegistryFindQuery? _lastFindQuery;
     private RegistryFindHit? _lastFindHit;
     private bool _findExhausted;
@@ -52,6 +61,7 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         _store = CreateStore();
         _treeSource = new RegistryTreeSource(_store.Reader);
         _valueSource = new RegistryValueSource(_store.Reader);
+        _favorites = new FavoritesStore();
         _finder = new RegistryFinder(_store.Reader);
         _findRoots = ResolveFindRoots();
 
@@ -65,13 +75,28 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
             () => ExitRequested?.Invoke(this, EventArgs.Empty),
             Import,
             Export,
-            displayBinaryData: DisplayBinaryData);
+            displayBinaryData: DisplayBinaryData,
+            addFavorite: AddFavorite,
+            removeFavorite: RemoveFavorite,
+            permissions: Permissions,
+            print: Print,
+            loadHive: LoadHive,
+            unloadHive: UnloadHive,
+            connectNetworkRegistry: ConnectNetworkRegistry,
+            disconnectNetworkRegistry: DisconnectNetworkRegistry);
         RegeditMenu.Populate(Shell.MenuBar, commands);
+        ReloadFavoritesOnStartup();
 
         Shell.TreeContent.SelectionChanged += OnTreeSelectionChanged;
         Shell.TreeContent.RenameRequested += OnTreeRenameRequested;
         Shell.ListContent.SelectionChanged += OnListSelectionChanged;
         Shell.ListContent.RenameRequested += OnListRenameRequested;
+        Shell.ListContent.RowActivated += OnListRowActivated;
+        Shell.TreeContent.ContextRequested += OnTreeContextRequested;
+        Shell.TreeContent.DeleteRequested += OnSelectionDeleteRequested;
+        Shell.TreeContent.CopyKeyNameRequested += OnCopyKeyNameRequested;
+        Shell.ListContent.ContextRequested += OnListContextRequested;
+        Shell.ListContent.DeleteRequested += OnSelectionDeleteRequested;
         Shell.AddressBarSubmitted += OnAddressBarSubmitted;
         Shell.TreeContent.SetRoots(_treeSource.Roots);
         Shell.TreeContent.SelectNode(_treeSource.Computer);
@@ -80,6 +105,7 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         // handledEventsToo keeps Ctrl+F and F3 working when the tree or list already consumed a
         // different key. Dialogs are separate windows, so their keys never reach this handler.
         AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(OnRootKeyDown), handledEventsToo: true);
+        Unloaded += OnRegeditRootViewUnloaded;
     }
 
     /// <summary>Raised when File > Exit is chosen. The window owns the actual close.</summary>
@@ -221,8 +247,73 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
 
     public void Export() => StartCommand(ExportAsync);
 
+    public void LoadHive() => StartCommand(LoadHiveAsync);
+
+    public void UnloadHive() => StartCommand(UnloadHiveAsync);
+
+    public void ConnectNetworkRegistry() => StartCommand(ConnectNetworkRegistryAsync);
+
+    public void DisconnectNetworkRegistry() => StartCommand(DisconnectNetworkRegistryAsync);
+
+    /// <summary>Prints the selected key and its readable descendants after the owned print dialog.</summary>
+    public void Print() => StartCommand(PrintAsync);
+
     /// <summary>Opens the read-only binary viewer for the single selected value.</summary>
     public void DisplayBinaryData() => StartCommand(ShowBinaryDataAsync);
+
+    /// <summary>Opens the standard aclui security editor for the selected registry key.</summary>
+    public void Permissions() => StartCommand(PermissionsAsync);
+
+    private async Task PermissionsAsync()
+    {
+        if (_dialogOpen || _fileDialogOpen || _windowHwnd == 0)
+        {
+            Log.Warn(
+                "Registry Editor ignored Permissions because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        if (!TryGetSelectedKeyPath(out RegistryPath path))
+        {
+            await ShowMessageAsync(Get("DialogNoSelection"));
+            return;
+        }
+
+        if (Shell.ListContent.SelectedRows.Count > 0)
+        {
+            // The command is disabled for value selections. Keep the keyboard path consistent.
+            await ShowMessageAsync(Get("DialogNoSelection"));
+            return;
+        }
+
+        int result;
+        _dialogOpen = true;
+        try
+        {
+            result = RegistryPermissionsDialog.Show(_windowHwnd, _store.Reader, _store, path);
+        }
+        finally
+        {
+            _dialogOpen = false;
+        }
+
+        if (result >= 0)
+        {
+            return;
+        }
+
+        uint hresult = (uint)result;
+        string win32Text = (hresult & 0xFFFF0000u) == 0x80070000u
+            ? (hresult & 0xFFFFu).ToString(CultureInfo.InvariantCulture)
+            : "n/a";
+        string message = string.Format(
+            CultureInfo.InvariantCulture,
+            Get("DialogPermissionsFailed"),
+            hresult,
+            win32Text);
+
+        await ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogErrorTitle"), message));
+    }
 
     private async Task ShowBinaryDataAsync()
     {
@@ -278,6 +369,315 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
 
         _ = await ShowDialogAsync(dialog);
         _ = Shell.ListContent.Focus(FocusState.Programmatic);
+    }
+
+    /// <summary>
+    /// Opens the hex editor for a double-clicked value when the raw type has no dedicated typed
+    /// editor. The value is read on the thread pool and written back with its original type when
+    /// the dialog accepts.
+    /// </summary>
+    private Task EditValueHexAsync(DetailsRow activatedRow) =>
+        EditValueHexAsync(activatedRow, requireHexEditableType: true);
+
+    private async Task EditValueHexAsync(DetailsRow activatedRow, bool requireHexEditableType)
+    {
+        if (_dialogOpen || _windowHwnd == 0)
+        {
+            Log.Warn(
+                "Registry Editor ignored value editing because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        IReadOnlyList<DetailsRow> rows = Shell.ListContent.SelectedRows;
+        if (rows.Count != 1 || !ReferenceEquals(rows[0], activatedRow))
+        {
+            return;
+        }
+
+        if (!TryGetSelectedKeyPath(out RegistryPath key) ||
+            !TryGetRawValueName(activatedRow, out string rawName))
+        {
+            return;
+        }
+
+        RegistryValueInfo? value;
+        try
+        {
+            value = await Task.Run(() => _store.Reader.ReadValue(key, rawName));
+        }
+        catch (RegistryOperationException ex)
+        {
+            await ShowRegistryErrorAsync(ex);
+            return;
+        }
+
+        if (value is null)
+        {
+            await ShowQueryValueErrorAsync(key, rawName);
+            return;
+        }
+
+        if (requireHexEditableType && !IsHexEditableType(value.Type))
+        {
+            return;
+        }
+
+        var dialog = new HexEditorDialog(Get("DialogHexEditTitle"));
+        dialog.SetValue(
+            activatedRow.Name,
+            key.ToDisplayString(),
+            value.Data,
+            RegistryValueTypeExtensions.ToDisplayName(value.Type));
+
+        bool accepted = await ShowDialogAsync(dialog);
+        _ = Shell.ListContent.Focus(FocusState.Programmatic);
+        if (!accepted)
+        {
+            return;
+        }
+
+        try
+        {
+            _store.SetValue(key, rawName, (RegistryValueType)value.Type, dialog.Data);
+        }
+        catch (RegistryOperationException ex)
+        {
+            await ShowRegistryErrorAsync(ex);
+            return;
+        }
+
+        await RefreshValuesAsync(activatedRow.Name);
+    }
+
+    private static bool IsHexEditableType(uint type) =>
+        type != (uint)RegistryValueType.String &&
+        type != (uint)RegistryValueType.ExpandString &&
+        type != (uint)RegistryValueType.Dword &&
+        type != (uint)RegistryValueType.Qword &&
+        type != (uint)RegistryValueType.MultiString;
+
+    private void ModifyBinaryData() => StartCommand(ModifyBinaryDataAsync);
+
+    private async Task ModifyBinaryDataAsync()
+    {
+        if (_dialogOpen || _windowHwnd == 0)
+        {
+            Log.Warn(
+                "Registry Editor ignored Modify Binary Data because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        IReadOnlyList<DetailsRow> rows = Shell.ListContent.SelectedRows;
+        if (rows.Count != 1)
+        {
+            await ShowMessageAsync(Get("DialogHexNoSelection"));
+            return;
+        }
+
+        // The context menu enables this command for any single value. Unlike the double-click
+        // path, a typed value is intentionally editable here and is written back with its type.
+        await EditValueHexAsync(rows[0], requireHexEditableType: false);
+    }
+
+    private void ModifySelectedValue() => StartCommand(ModifySelectedValueAsync);
+
+    private async Task ModifySelectedValueAsync()
+    {
+        if (_dialogOpen || _windowHwnd == 0)
+        {
+            Log.Warn(
+                "Registry Editor ignored Modify because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        IReadOnlyList<DetailsRow> rows = Shell.ListContent.SelectedRows;
+        if (rows.Count != 1 ||
+            !TryGetSelectedKeyPath(out RegistryPath key) ||
+            !TryGetRawValueName(rows[0], out string rawName))
+        {
+            await ShowMessageAsync(Get("DialogNoSelection"));
+            return;
+        }
+
+        RegistryValueInfo? value;
+        try
+        {
+            value = await Task.Run(() => _store.Reader.ReadValue(key, rawName));
+        }
+        catch (RegistryOperationException ex)
+        {
+            await ShowRegistryErrorAsync(ex);
+            return;
+        }
+
+        if (value is null)
+        {
+            await ShowQueryValueErrorAsync(key, rawName);
+            return;
+        }
+
+        bool saved;
+        switch ((RegistryValueType)value.Type)
+        {
+            case RegistryValueType.String:
+                saved = await EditStringValueAsync(key, rawName, value, expandable: false);
+                break;
+            case RegistryValueType.ExpandString:
+                saved = await EditStringValueAsync(key, rawName, value, expandable: true);
+                break;
+            case RegistryValueType.Dword:
+                saved = await EditDwordValueAsync(key, rawName, value);
+                break;
+            case RegistryValueType.Qword:
+                saved = await EditQwordValueAsync(key, rawName, value);
+                break;
+            case RegistryValueType.MultiString:
+                saved = await EditMultiStringValueAsync(key, rawName, value);
+                break;
+            default:
+                // The menu state keeps Modify disabled for these types. If a stale row still
+                // reaches this path, the editable hex dialog is the lossless fallback.
+                await EditValueHexAsync(rows[0], requireHexEditableType: false);
+                return;
+        }
+
+        if (saved)
+        {
+            await RefreshValuesAsync(rows[0].Name);
+        }
+    }
+
+    private async Task<bool> EditStringValueAsync(
+        RegistryPath key,
+        string rawName,
+        RegistryValueInfo value,
+        bool expandable)
+    {
+        var dialog = new StringValueDialog(
+            Get(expandable ? "DialogEditExpandableTitle" : "DialogEditStringTitle"),
+            multiline: expandable,
+            RegistryValueCodec.DecodeString(value.Data));
+
+        if (!await ShowDialogAsync(dialog))
+        {
+            return false;
+        }
+
+        try
+        {
+            if (expandable)
+            {
+                _store.SetExpandString(key, rawName, dialog.Value);
+            }
+            else
+            {
+                _store.SetString(key, rawName, dialog.Value);
+            }
+
+            return true;
+        }
+        catch (RegistryOperationException ex)
+        {
+            await ShowRegistryErrorAsync(ex);
+            return false;
+        }
+    }
+
+    private async Task<bool> EditDwordValueAsync(
+        RegistryPath key,
+        string rawName,
+        RegistryValueInfo value)
+    {
+        if (!RegistryValueCodec.IsValidDword(value.Data))
+        {
+            return false;
+        }
+
+        var dialog = new DwordValueDialog(
+            Get("DialogEditDwordTitle"),
+            RegistryValueCodec.DecodeDword(value.Data).ToString(CultureInfo.InvariantCulture));
+        if (!await ShowDialogAsync(dialog))
+        {
+            return false;
+        }
+
+        try
+        {
+            _store.SetDword(key, rawName, dialog.Value);
+            return true;
+        }
+        catch (RegistryOperationException ex)
+        {
+            await ShowRegistryErrorAsync(ex);
+            return false;
+        }
+    }
+
+    private async Task<bool> EditQwordValueAsync(
+        RegistryPath key,
+        string rawName,
+        RegistryValueInfo value)
+    {
+        if (!RegistryValueCodec.IsValidQword(value.Data))
+        {
+            return false;
+        }
+
+        var dialog = new QwordValueDialog(
+            Get("DialogEditQwordTitle"),
+            RegistryValueCodec.DecodeQword(value.Data).ToString(CultureInfo.InvariantCulture));
+        if (!await ShowDialogAsync(dialog))
+        {
+            return false;
+        }
+
+        try
+        {
+            _store.SetQword(key, rawName, dialog.Value);
+            return true;
+        }
+        catch (RegistryOperationException ex)
+        {
+            await ShowRegistryErrorAsync(ex);
+            return false;
+        }
+    }
+
+    private async Task<bool> EditMultiStringValueAsync(
+        RegistryPath key,
+        string rawName,
+        RegistryValueInfo value)
+    {
+        string initialText = string.Join(
+            Environment.NewLine,
+            RegistryValueCodec.DecodeMultiString(value.Data).Strings);
+        var dialog = new MultiStringValueDialog(Get("DialogEditMultiStringTitle"), initialText);
+        if (!await ShowDialogAsync(dialog))
+        {
+            return false;
+        }
+
+        try
+        {
+            _store.SetMultiString(key, rawName, dialog.Value);
+            return true;
+        }
+        catch (RegistryOperationException ex)
+        {
+            await ShowRegistryErrorAsync(ex);
+            return false;
+        }
+    }
+
+    private Task ShowQueryValueErrorAsync(RegistryPath key, string rawName)
+    {
+        string valueLabel = rawName.Length == 0 ? "(Default)" : rawName;
+        return ShowErrorAsync(ErrorDialog.ForOperation(
+            Get("DialogErrorTitle"),
+            "QueryValue",
+            key.ToDisplayString(),
+            2,
+            "Value: " + valueLabel));
     }
 
     private async Task ImportAsync()
@@ -344,6 +744,393 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
             LogFileOperationFailure("export", filePath, ex);
             await ShowFileOperationErrorAsync(filePath, ex);
         }
+    }
+
+    private async Task LoadHiveAsync()
+    {
+        if (_dialogOpen || _fileDialogOpen || _windowHwnd == 0)
+        {
+            Log.Warn(
+                "Registry Editor ignored Load Hive because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        string? filePath = ShowFileDialog(save: false, defaultFileName: null);
+        if (string.IsNullOrEmpty(filePath))
+        {
+            return;
+        }
+
+        var dialog = new TextPromptDialog(
+            Get("DialogLoadHiveTitle"),
+            Get("DialogLoadHiveNameLabel"),
+            string.Empty,
+            ValidateHiveKeyName);
+
+        if (!await ShowDialogAsync(dialog))
+        {
+            return;
+        }
+
+        RegistryPath target = RegistryPath.Parse(@"HKLM\" + dialog.Value.Trim());
+
+        try
+        {
+            await Task.Run(() => _store.LoadHive(target, filePath));
+        }
+        catch (RegistryOperationException ex)
+        {
+            await ShowRegistryErrorAsync(ex);
+            return;
+        }
+
+        await RefreshTreeAsync(target.ToDisplayString());
+        FocusTreeAfterFavoriteDialog();
+    }
+
+    private string? ValidateHiveKeyName(string name)
+    {
+        string candidate = name.Trim();
+        if (!RegistryPath.TryParse(@"HKLM\" + candidate, out RegistryPath? target) ||
+            target is null ||
+            target.Components.Count != 1)
+        {
+            return Get("DialogLoadHiveNameInvalid");
+        }
+
+        try
+        {
+            return _store.Reader.KeyExists(target) ? Get("DialogLoadHiveNameExists") : null;
+        }
+        catch (RegistryOperationException ex)
+        {
+            return ex.Message;
+        }
+    }
+
+    private async Task UnloadHiveAsync()
+    {
+        if (_dialogOpen || _fileDialogOpen || _windowHwnd == 0)
+        {
+            Log.Warn(
+                "Registry Editor ignored Unload Hive because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        if (!TryGetSelectedKeyPath(out RegistryPath path) ||
+            Shell.ListContent.SelectedRows.Count > 0 ||
+            !IsHiveRootChild(path))
+        {
+            await ShowMessageAsync(Get("DialogNoSelection"));
+            return;
+        }
+
+        var dialog = new ConfirmDialog(
+            Get("DialogUnloadHiveTitle"),
+            string.Format(
+                CultureInfo.CurrentCulture,
+                Get("DialogUnloadHiveMessage"),
+                path.ToDisplayString()),
+            Get("DialogYes"),
+            Get("DialogNo"));
+
+        if (!await ShowDialogAsync(dialog))
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.Run(() => _store.UnloadHive(path));
+        }
+        catch (RegistryOperationException ex)
+        {
+            await ShowRegistryErrorAsync(ex);
+            return;
+        }
+
+        await RefreshTreeAsync(path.Parent!.ToDisplayString());
+        FocusTreeAfterFavoriteDialog();
+    }
+
+    private static bool IsHiveRootChild(RegistryPath path) =>
+        path.Components.Count == 1 &&
+        path.Root is RegistryRoot.LocalMachine or RegistryRoot.Users;
+
+    private async Task ConnectNetworkRegistryAsync()
+    {
+        if (_dialogOpen || _fileDialogOpen || _windowHwnd == 0)
+        {
+            Log.Warn(
+                "Registry Editor ignored Connect Network Registry because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        var dialog = new TextPromptDialog(
+            Get("DialogConnectTitle"),
+            Get("DialogConnectLabel"),
+            string.Empty,
+            ValidateRemoteComputerName);
+
+        if (!await ShowDialogAsync(dialog))
+        {
+            return;
+        }
+
+        string computerName = dialog.Value.Trim();
+
+        RemoteRegistryConnection connection;
+        try
+        {
+            connection = await Task.Run(() => RemoteRegistryConnection.Connect(computerName));
+        }
+        catch (RemoteRegistryException ex)
+        {
+            await ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogConnectFailedTitle"), ex.Message));
+            return;
+        }
+        catch (ArgumentException ex)
+        {
+            await ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogConnectFailedTitle"), ex.Message));
+            return;
+        }
+
+        _remoteConnections.Add(connection);
+        _treeSource.AddRemoteComputer(connection);
+        Shell.TreeContent.SetRoots(_treeSource.Roots);
+
+        TreeNode? node = FindChild(_treeSource.Computer, @"\\" + connection.ComputerName);
+        if (node is not null)
+        {
+            Shell.TreeContent.SelectNode(node);
+            node.IsExpanded = true;
+
+            // The remote root list is built in memory, so this does not touch the network. Loading
+            // it before the second SetRoots makes HKEY_LOCAL_MACHINE and HKEY_USERS visible while
+            // the new computer node is selected and expanded.
+            await node.LoadChildrenAsync(CancellationToken.None);
+            Shell.TreeContent.SetRoots(_treeSource.Roots);
+            Shell.TreeContent.SelectNode(node);
+            Shell.TreeContent.FocusSelected();
+        }
+
+        UpdateCommandStates();
+        Log.Info($"Registry Editor connected to the remote computer '{connection.ComputerName}'.");
+    }
+
+    private string? ValidateRemoteComputerName(string name)
+    {
+        string candidate = name.Trim();
+        if (candidate.Length == 0)
+        {
+            return Get("DialogConnectEmpty");
+        }
+
+        if (RemoteRegistryConnection.IsLocalComputer(candidate))
+        {
+            return Get("DialogConnectLocal");
+        }
+
+        if (candidate.Length > 255 ||
+            candidate.Contains('\0') ||
+            candidate.Contains('\\') ||
+            candidate.Contains('/'))
+        {
+            return Get("DialogConnectInvalid");
+        }
+
+        foreach (RemoteRegistryConnection connection in _remoteConnections)
+        {
+            if (string.Equals(connection.ComputerName, candidate, StringComparison.OrdinalIgnoreCase))
+            {
+                return Get("DialogConnectDuplicate");
+            }
+        }
+
+        return null;
+    }
+
+    private async Task DisconnectNetworkRegistryAsync()
+    {
+        if (_dialogOpen || _fileDialogOpen || _windowHwnd == 0)
+        {
+            Log.Warn(
+                "Registry Editor ignored Disconnect Network Registry because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        if (_remoteConnections.Count == 0)
+        {
+            await ShowMessageAsync(Get("DialogDisconnectEmpty"));
+            return;
+        }
+
+        string[] names = _remoteConnections
+            .Select(connection => connection.ComputerName)
+            .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+
+        var dialog = new RemoteComputerListDialog(
+            Get("DialogDisconnectTitle"),
+            Get("DialogDisconnectLabel"),
+            names,
+            Get("DialogDisconnectNoSelection"),
+            Get("DialogOk"),
+            Get("DialogCancel"));
+
+        if (!await ShowDialogAsync(dialog) || dialog.SelectedName is not { Length: > 0 } selected)
+        {
+            return;
+        }
+
+        RemoteRegistryConnection? connection = null;
+        foreach (RemoteRegistryConnection candidate in _remoteConnections)
+        {
+            if (string.Equals(candidate.ComputerName, selected, StringComparison.OrdinalIgnoreCase))
+            {
+                connection = candidate;
+                break;
+            }
+        }
+
+        if (connection is null)
+        {
+            Log.Warn($"Registry Editor could not find the selected remote computer '{selected}'.");
+            return;
+        }
+
+        _remoteConnections.Remove(connection);
+        RemoveRemoteTreeNode();
+        connection.Dispose();
+        await RefreshTreeAsync("Computer");
+        Shell.TreeContent.FocusSelected();
+        UpdateCommandStates();
+        Log.Info($"Registry Editor disconnected the remote computer '{connection.ComputerName}'.");
+    }
+
+    /// <summary>
+    /// Drops a disconnected remote node before its connection is closed. TreeNode has no removal
+    /// API, so the source is rebuilt from the remaining connections; RefreshTreeAsync rebuilds it
+    /// once more and selects the virtual Computer node.
+    /// </summary>
+    private void RemoveRemoteTreeNode()
+    {
+        _treeSource = new RegistryTreeSource(_store.Reader, _remoteConnections);
+        Shell.TreeContent.SetRoots(_treeSource.Roots);
+    }
+
+    private void OnRegeditRootViewUnloaded(object sender, RoutedEventArgs e)
+    {
+        Unloaded -= OnRegeditRootViewUnloaded;
+        if (_remoteConnectionsDisposed)
+        {
+            return;
+        }
+
+        _remoteConnectionsDisposed = true;
+        foreach (RemoteRegistryConnection connection in _remoteConnections)
+        {
+            connection.Dispose();
+        }
+
+        _remoteConnections.Clear();
+    }
+
+    private static TreeNode? FindChild(TreeNode parent, string name)
+    {
+        foreach (TreeNode child in parent.Children)
+        {
+            if (string.Equals(child.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                return child;
+            }
+        }
+
+        return null;
+    }
+
+    private async Task PrintAsync()
+    {
+        if (_dialogOpen || _fileDialogOpen || _windowHwnd == 0)
+        {
+            Log.Warn(
+                "Registry Editor ignored Print because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        if (!TryGetSelectedKeyPath(out RegistryPath key))
+        {
+            await ShowMessageAsync(Get("DialogNoSelection"));
+            return;
+        }
+
+        bool listHadFocus = IsFocusWithin(Shell.ListContent);
+        PrintResult result;
+
+        // Keep the modal gate for the dialog and the background GDI job. This rejects a second
+        // print or another modal while the spooler is receiving the report.
+        _dialogOpen = true;
+        try
+        {
+            if (!RegistryPrinter.TryShowPrintDialog(
+                    _windowHwnd,
+                    out PrintDevice? device,
+                    out result))
+            {
+                if (result.Status == PrintStatus.Cancelled)
+                {
+                    Log.Info("Registry Editor print was cancelled.");
+                }
+            }
+            else if (device is not null)
+            {
+                using (device)
+                {
+                    try
+                    {
+                        result = await Task.Run(
+                            () => RegistryPrinter.PrintToDevice(device, _store.Reader, key));
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn("Registry Editor print job failed: " + ex.Message);
+                        result = PrintResult.Failed(0, ex.Message);
+                    }
+                }
+            }
+            else
+            {
+                result = PrintResult.Failed(
+                    0,
+                    "The Windows print dialog returned no printer device.");
+            }
+        }
+        finally
+        {
+            _dialogOpen = false;
+        }
+
+        FocusAfterPrint(listHadFocus);
+
+        if (result.Status == PrintStatus.Printed)
+        {
+            Log.Info($"Registry Editor printed '{key.ToDisplayString()}'.");
+            return;
+        }
+
+        if (result.Status != PrintStatus.Failed)
+        {
+            return;
+        }
+
+        string message = string.Format(
+            CultureInfo.InvariantCulture,
+            Get("DialogPrintFailed"),
+            key.ToDisplayString(),
+            result.ErrorCode,
+            result.Message);
+
+        await ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogErrorTitle"), message));
     }
 
     private string? ShowFileDialog(bool save, string? defaultFileName)
@@ -424,6 +1211,243 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         await ShowErrorAsync(ErrorDialog.ForMessage(
             Get("DialogErrorTitle"),
             "File: " + filePath + Environment.NewLine + Environment.NewLine + exception.Message));
+    }
+
+    private void AddFavorite() => StartCommand(AddFavoriteAsync);
+
+    private async Task AddFavoriteAsync()
+    {
+        if (_dialogOpen || _windowHwnd == 0)
+        {
+            Log.Warn(
+                "Registry Editor ignored Add to Favorites because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        if (!TryGetSelectedKeyPath(out RegistryPath key))
+        {
+            TreeNode? selected = Shell.TreeContent.SelectedNode;
+            string message = selected is not null &&
+                string.Equals(selected.Name, "Computer", StringComparison.OrdinalIgnoreCase)
+                ? Get("DialogFavoriteComputer")
+                : Get("DialogNoSelection");
+            await ShowMessageAsync(message);
+            return;
+        }
+
+        string suggested = key.Components.Count == 0
+            ? key.Root.DisplayName()
+            : key.Components[^1];
+
+        var dialog = new TextPromptDialog(
+            Get("DialogFavoriteAddTitle"),
+            Get("DialogFavoriteNameLabel"),
+            suggested,
+            ValidateFavoriteName);
+
+        if (!await ShowDialogAsync(dialog))
+        {
+            FocusTreeAfterFavoriteDialog();
+            return;
+        }
+
+        try
+        {
+            _favorites.Add(dialog.Value, key);
+        }
+        catch (RegistryOperationException ex)
+        {
+            await ShowRegistryErrorAsync(ex);
+            return;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            await ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogErrorAddingFavorite"), ex.Message));
+            return;
+        }
+
+        await RefreshFavoritesAfterChangeAsync();
+        FocusTreeAfterFavoriteDialog();
+    }
+
+    private string? ValidateFavoriteName(string name)
+    {
+        string candidate = name.Trim();
+        if (candidate.Length == 0)
+        {
+            return Get("DialogFavoriteEmptyName");
+        }
+
+        if (candidate.Length > MaxValueNameLength || candidate.Contains('\0'))
+        {
+            return Get("DialogInvalidValueName");
+        }
+
+        return _favorites.ContainsName(candidate) ? Get("DialogFavoriteDuplicate") : null;
+    }
+
+    private void RemoveFavorite() => StartCommand(RemoveFavoriteAsync);
+
+    private async Task RemoveFavoriteAsync()
+    {
+        if (_dialogOpen || _windowHwnd == 0)
+        {
+            Log.Warn(
+                "Registry Editor ignored Remove Favorite because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        _favorites.Reload();
+        if (_favorites.LoadError is not null)
+        {
+            await ShowFavoriteLoadErrorAsync();
+            return;
+        }
+
+        if (_favorites.Favorites.Count == 0)
+        {
+            await ShowErrorAsync(ErrorDialog.ForMessage(
+                Get("DialogFavoriteCaption"),
+                Get("DialogFavoriteNone")));
+            return;
+        }
+
+        IReadOnlyList<string> names = _favorites.Favorites.Select(favorite => favorite.Name).ToArray();
+        var dialog = new RemoveFavoritesDialog(
+            Get("DialogFavoriteRemoveTitle"),
+            Get("DialogFavoriteSelectLabel"),
+            names,
+            Get("DialogOk"),
+            Get("DialogCancel"),
+            Get("DialogFavoriteNoSelection"));
+
+        if (!await ShowDialogAsync(dialog))
+        {
+            FocusTreeAfterFavoriteDialog();
+            return;
+        }
+
+        try
+        {
+            _favorites.Remove(dialog.SelectedNames);
+        }
+        catch (RegistryOperationException ex)
+        {
+            await ShowRegistryErrorAsync(ex);
+            return;
+        }
+        catch (InvalidOperationException ex)
+        {
+            await ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogFavoriteCaption"), ex.Message));
+            return;
+        }
+
+        await RefreshFavoritesAfterChangeAsync();
+        FocusTreeAfterFavoriteDialog();
+    }
+
+    private void ReloadFavoritesOnStartup()
+    {
+        _favorites.Reload();
+        if (_favorites.LoadError is not null)
+        {
+            Log.Warn("Registry Editor could not load favorites at startup: " + _favorites.LoadError);
+        }
+
+        ApplyFavoritesMenu();
+    }
+
+    private async Task RefreshFavoritesAfterChangeAsync()
+    {
+        _favorites.Reload();
+        if (_favorites.LoadError is not null)
+        {
+            Log.Warn("Registry Editor could not refresh favorites: " + _favorites.LoadError);
+            await ShowFavoriteLoadErrorAsync();
+            return;
+        }
+
+        ApplyFavoritesMenu();
+    }
+
+    private Task ShowFavoriteLoadErrorAsync()
+    {
+        string details = Get("DialogFavoriteLoadFailed");
+        if (!string.IsNullOrWhiteSpace(_favorites.LoadError))
+        {
+            details += Environment.NewLine + Environment.NewLine + _favorites.LoadError;
+        }
+
+        return ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogFavoriteCaption"), details));
+    }
+
+    private void ApplyFavoritesMenu()
+    {
+        MenuBarItem? favoritesMenu = RegeditMenu.FindTopLevelItem(Shell.MenuBar, 517);
+        if (favoritesMenu is null)
+        {
+            Log.Warn("Registry Editor could not find the Favorites menu to refresh.");
+            return;
+        }
+
+        while (favoritesMenu.Items.Count > 2)
+        {
+            favoritesMenu.Items.RemoveAt(favoritesMenu.Items.Count - 1);
+        }
+
+        IReadOnlyList<Favorite> favorites = _favorites.Favorites;
+        if (favorites.Count > 0)
+        {
+            favoritesMenu.Items.Add(RegeditMenu.BuildFlyoutItem(ClassicCommandItem.Separator));
+        }
+
+        for (var index = 0; index < favorites.Count; index += 1)
+        {
+            Favorite favorite = favorites[index];
+            favoritesMenu.Items.Add(RegeditMenu.BuildFavoriteItem(
+                favorite.Name,
+                index,
+                () => StartCommand(() => NavigateToFavoriteAsync(favorite))));
+        }
+
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 1280, favorites.Count > 0);
+    }
+
+    private async Task NavigateToFavoriteAsync(Favorite favorite)
+    {
+        TreeNode? target;
+        try
+        {
+            target = await _treeSource.FindPathAsync(favorite.DisplayPath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Warn($"Registry Editor could not resolve favorite '{favorite.Name}': {ex.Message}");
+            target = null;
+        }
+
+        if (target is null)
+        {
+            Log.Warn(
+                $"Registry Editor favorite '{favorite.Name}' points at '{favorite.DisplayPath}', which does not resolve.");
+            await ShowAddressBarErrorAsync(Get("DialogAddressBarKeyNotFound"), favorite.DisplayPath);
+            FocusTreeAfterFavoriteDialog();
+            return;
+        }
+
+        ApplyNavigation(target);
+    }
+
+    private void FocusTreeAfterFavoriteDialog()
+    {
+        try
+        {
+            Shell.TreeContent.FocusSelected();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Registry Editor could not return focus to the tree: " + ex.Message);
+        }
     }
 
     public void Find() => StartCommand(ShowFindDialogAsync);
@@ -1053,6 +2077,38 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         return true;
     }
 
+    /// <summary>
+    /// Resolves a selected remote node to its connection and local-style registry path. Local
+    /// nodes and the remote machine node fail, which keeps local commands disabled.
+    /// </summary>
+    private bool TryResolveRemoteNode(
+        TreeNode node,
+        out RemoteRegistryConnection connection,
+        out RegistryPath path)
+    {
+        connection = null!;
+        path = null!;
+
+        if (node.RegistryPath is not { Length: > 0 } displayPath ||
+            !RemoteRegistryTreeSource.TryParseDisplayPath(displayPath, out RegistryPath? parsed))
+        {
+            return false;
+        }
+
+        foreach (RemoteRegistryConnection candidate in _remoteConnections)
+        {
+            string prefix = RemoteRegistryTreeSource.DisplayPrefix(candidate.ComputerName);
+            if (displayPath.StartsWith(prefix + "\\", StringComparison.OrdinalIgnoreCase))
+            {
+                connection = candidate;
+                path = parsed;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private bool TryGetRawValueName(DetailsRow row, out string rawName)
     {
         if (_valueSource.RawNamesByName.TryGetValue(row.Name, out string? mapped) && mapped is not null)
@@ -1300,6 +2356,225 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         });
     }
 
+    private void OnListRowActivated(object? sender, DetailsRowActivatedEventArgs e)
+    {
+        StartCommand(() => EditValueHexAsync(e.Row));
+    }
+
+    private void OnSelectionDeleteRequested(object? sender, EventArgs e) => DeleteSelection();
+
+    private void OnCopyKeyNameRequested(object? sender, EventArgs e) => CopySelectedKeyName();
+
+    private void OnTreeContextRequested(object? sender, TreeNodeContextRequestedEventArgs e)
+    {
+        if (_dialogOpen || _fileDialogOpen)
+        {
+            Log.Warn("Registry Editor ignored a tree context menu request because another modal is open.");
+            return;
+        }
+
+        ShowContextFlyout(CreateTreeContextMenu(e.Node), e.Element, e.Point);
+    }
+
+    private void OnListContextRequested(object? sender, DetailsRowContextRequestedEventArgs e)
+    {
+        if (_dialogOpen || _fileDialogOpen)
+        {
+            Log.Warn("Registry Editor ignored a list context menu request because another modal is open.");
+            return;
+        }
+
+        MenuFlyout flyout = e.Row is null
+            ? CreateBackgroundContextMenu()
+            : CreateValueContextMenu(e.Row);
+        ShowContextFlyout(flyout, e.Element, e.Point);
+    }
+
+    private MenuFlyout CreateTreeContextMenu(TreeNode node)
+    {
+        bool hasKey = TryGetSelectedKeyPath(out RegistryPath key);
+        bool mutableKey = hasKey && !key.IsRoot;
+
+        var items = new List<ClassicCommandItem>
+        {
+            MenuCommand(
+                915,
+                "ContextExpand",
+                node.HasChildren && !node.IsExpanded,
+                Shell.TreeContent.ExpandSelected),
+            MenuCommand(516, "MenuEditNew", hasKey, children: BuildNewSubmenu(hasKey)),
+            ClassicCommandItem.Separator,
+            MenuCommand(662, "ContextFind", isEnabled: true, invoke: Find),
+            ClassicCommandItem.Separator,
+            MenuCommand(913, "ContextDelete", mutableKey, () => StartCommand(DeleteKeyAsync)),
+            MenuCommand(914, "ContextRename", mutableKey, BeginTreeRenameFromMenu),
+            ClassicCommandItem.Separator,
+            MenuCommand(659, "ContextExport", hasKey, Export),
+            MenuCommand(678, "ContextPermissions", hasKey, Permissions),
+            ClassicCommandItem.Separator,
+            MenuCommand(675, "ContextCopyKeyName", hasKey, CopySelectedKeyName),
+            MenuCommand(918, "ContextGoToHklm", isEnabled: true, invoke: GoToLocalMachine),
+        };
+
+        return CreateContextFlyout(items);
+    }
+
+    private MenuFlyout CreateValueContextMenu(DetailsRow row)
+    {
+        IReadOnlyList<DetailsRow> rows = Shell.ListContent.SelectedRows;
+        bool single = rows.Count == 1;
+        bool canRename = single && row.Renameable;
+        bool canModify = single && IsTypedValueType(row.Type);
+
+        var items = new List<ClassicCommandItem>
+        {
+            // Modify has no initial-value support for binary or unknown types. Those use the
+            // separate Modify Binary Data command so the raw bytes stay lossless.
+            MenuCommand(912, "ContextModify", canModify, ModifySelectedValue),
+            MenuCommand(917, "ContextModifyBinary", single, ModifyBinaryData),
+            ClassicCommandItem.Separator,
+            MenuCommand(913, "ContextDelete", rows.Count > 0, DeleteSelection),
+            MenuCommand(914, "ContextRename", canRename, BeginListRenameFromMenu),
+        };
+
+        return CreateContextFlyout(items);
+    }
+
+    private MenuFlyout CreateBackgroundContextMenu()
+    {
+        bool hasKey = TryGetSelectedKeyPath(out _);
+        var items = new List<ClassicCommandItem>
+        {
+            MenuCommand(516, "MenuEditNew", hasKey, children: BuildNewSubmenu(hasKey)),
+        };
+
+        return CreateContextFlyout(items);
+    }
+
+    private IReadOnlyList<ClassicCommandItem> BuildNewSubmenu(bool isEnabled)
+    {
+        return new ClassicCommandItem[]
+        {
+            MenuCommand(663, "MenuEditNewKey", isEnabled, NewKey),
+            ClassicCommandItem.Separator,
+            MenuCommand(664, "MenuEditNewStringValue", isEnabled, NewStringValue),
+            MenuCommand(665, "MenuEditNewBinaryValue", isEnabled, NewBinaryValue),
+            MenuCommand(674, "MenuEditNewDwordValue", isEnabled, NewDwordValue),
+            MenuCommand(688, "MenuEditNewQwordValue", isEnabled, NewQwordValue),
+            MenuCommand(676, "MenuEditNewMultiStringValue", isEnabled, NewMultiStringValue),
+            MenuCommand(677, "MenuEditNewExpandableStringValue", isEnabled, NewExpandableStringValue),
+        };
+    }
+
+    private ClassicCommand MenuCommand(
+        int id,
+        string resourceKey,
+        bool isEnabled,
+        Action? invoke = null,
+        IReadOnlyList<ClassicCommandItem>? children = null)
+    {
+        var parsed = RegeditMenu.ParseMenuText(Get(resourceKey));
+        return new ClassicCommand(
+            id,
+            parsed.Text,
+            parsed.AccessKey,
+            parsed.AcceleratorText,
+            isEnabled,
+            children ?? Array.Empty<ClassicCommandItem>(),
+            invoke);
+    }
+
+    private static MenuFlyout CreateContextFlyout(IReadOnlyList<ClassicCommandItem> items)
+    {
+        var flyout = new MenuFlyout();
+        foreach (ClassicCommandItem item in items)
+        {
+            flyout.Items.Add(RegeditMenu.BuildFlyoutItem(item, "ContextMenuCommand_"));
+        }
+
+        return flyout;
+    }
+
+    private void ShowContextFlyout(MenuFlyout flyout, FrameworkElement element, Point point)
+    {
+        _contextFlyout?.Hide();
+        _contextFlyout = flyout;
+        flyout.ShowAt(element, point);
+    }
+
+    /// <summary>
+    /// Starts the inline rename after the flyout has finished closing. The flyout can restore
+    /// focus to its placement target, which would immediately cancel a rename box opened inside
+    /// the click handler.
+    /// </summary>
+    private void BeginTreeRenameFromMenu()
+    {
+        if (!Shell.DispatcherQueue.TryEnqueue(Shell.TreeContent.BeginRenameSelected))
+        {
+            Shell.TreeContent.BeginRenameSelected();
+        }
+    }
+
+    private void BeginListRenameFromMenu()
+    {
+        if (!Shell.DispatcherQueue.TryEnqueue(Shell.ListContent.BeginRenameSelected))
+        {
+            Shell.ListContent.BeginRenameSelected();
+        }
+    }
+
+    private static bool IsTypedValueType(string type) =>
+        string.Equals(type, "REG_SZ", StringComparison.Ordinal) ||
+        string.Equals(type, "REG_EXPAND_SZ", StringComparison.Ordinal) ||
+        string.Equals(type, "REG_DWORD", StringComparison.Ordinal) ||
+        string.Equals(type, "REG_QWORD", StringComparison.Ordinal) ||
+        string.Equals(type, "REG_MULTI_SZ", StringComparison.Ordinal);
+
+    private void CopySelectedKeyName()
+    {
+        if (!TryGetSelectedKeyPath(out RegistryPath key))
+        {
+            return;
+        }
+
+        try
+        {
+            var package = new DataPackage();
+            package.SetText(key.ToDisplayString());
+            Clipboard.SetContent(package);
+        }
+        catch (Exception ex)
+        {
+            // Clipboard access is environmental. The selection and menu stay usable.
+            Log.Warn("Registry Editor could not copy the selected key name: " + ex.Message);
+        }
+    }
+
+    private void GoToLocalMachine()
+    {
+        StartCommand(async () =>
+        {
+            TreeNode? target;
+            try
+            {
+                target = await _treeSource.FindPathAsync("Computer\\HKEY_LOCAL_MACHINE");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Log.Warn("Registry Editor could not resolve HKEY_LOCAL_MACHINE: " + ex.Message);
+                target = null;
+            }
+
+            if (target is null)
+            {
+                await ShowMessageAsync(Get("DialogAddressBarKeyNotFound"));
+                return;
+            }
+
+            ApplyNavigation(target);
+        });
+    }
+
     private void UpdateCommandStates()
     {
         bool hasKey = TryGetSelectedKeyPath(out RegistryPath key);
@@ -1314,7 +2589,16 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
 
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 913, hasValue || mutableKey);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 659, hasKey);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 660, hasKey);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 679, hasValue && rows.Count == 1);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 678, hasKey && !hasValue);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 680, true);
+        RegeditMenu.SetCommandEnabled(
+            Shell.MenuBar,
+            681,
+            hasKey && !hasValue && IsHiveRootChild(key));
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 657, true);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 768, _remoteConnections.Count > 0);
 
         bool canRename = mutableKey;
         if (hasValue)
@@ -1335,16 +2619,81 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
             return;
         }
 
+        if (e.Key == VirtualKey.F5)
+        {
+            e.Handled = true;
+            string? currentPath = Shell.TreeContent.SelectedNode?.RegistryPath;
+            StartCommand(() => RefreshTreeAsync(currentPath));
+            return;
+        }
+
         if (e.Key == VirtualKey.F && IsControlDown())
         {
             e.Handled = true;
             Find();
+            return;
+        }
+
+        if (e.Key == VirtualKey.P && IsControlDown() && IsTreeOrListFocused())
+        {
+            e.Handled = true;
+            Print();
         }
     }
 
     private static bool IsControlDown() =>
         (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) & CoreVirtualKeyStates.Down)
         == CoreVirtualKeyStates.Down;
+
+    private bool IsTreeOrListFocused() =>
+        IsFocusWithin(Shell.TreeContent) || IsFocusWithin(Shell.ListContent);
+
+    private bool IsFocusWithin(DependencyObject root)
+    {
+        try
+        {
+            object? focused = FocusManager.GetFocusedElement(Shell.XamlRoot);
+            return focused is DependencyObject element && IsDescendantOf(element, root);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Registry Editor could not read the focused element: " + ex.Message);
+            return false;
+        }
+    }
+
+    private static bool IsDescendantOf(DependencyObject? element, DependencyObject ancestor)
+    {
+        while (element is not null)
+        {
+            if (ReferenceEquals(element, ancestor))
+            {
+                return true;
+            }
+
+            element = VisualTreeHelper.GetParent(element);
+        }
+
+        return false;
+    }
+
+    private void FocusAfterPrint(bool listHadFocus)
+    {
+        if (listHadFocus)
+        {
+            _ = Shell.ListContent.Focus(FocusState.Programmatic);
+            return;
+        }
+
+        try
+        {
+            Shell.TreeContent.FocusSelected();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Registry Editor could not return focus to the tree after printing: " + ex.Message);
+        }
+    }
 
     private async Task ShowFindDialogAsync()
     {
@@ -1815,11 +3164,22 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
 
         try
         {
-            if (node.RegistryPath is not { Length: > 0 } displayPath ||
-                !RegistryPath.TryParse(displayPath, out RegistryPath? parsed) ||
-                parsed is null)
+            if (node.RegistryPath is not { Length: > 0 } displayPath)
             {
                 // Computer is virtual and has no registry values.
+                rows = Array.Empty<DetailsRow>();
+            }
+            else if (TryResolveRemoteNode(node, out RemoteRegistryConnection? remote, out RegistryPath? remotePath))
+            {
+                // Remote machine and root nodes have no values below the root itself. A remote
+                // reader only accepts HKEY_LOCAL_MACHINE and HKEY_USERS paths.
+                rows = remotePath.IsRoot
+                    ? Array.Empty<DetailsRow>()
+                    : await new RegistryValueSource(remote.CreateReader())
+                        .LoadAsync(remotePath, tokenSource.Token);
+            }
+            else if (!RegistryPath.TryParse(displayPath, out RegistryPath? parsed) || parsed is null)
+            {
                 rows = Array.Empty<DetailsRow>();
             }
             else
@@ -1904,7 +3264,7 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
 
     private async Task RefreshTreeAsync(string? selectDisplayPath)
     {
-        var source = new RegistryTreeSource(_store.Reader);
+        var source = new RegistryTreeSource(_store.Reader, _remoteConnections);
         TreeNode? target = null;
 
         if (!string.IsNullOrWhiteSpace(selectDisplayPath))

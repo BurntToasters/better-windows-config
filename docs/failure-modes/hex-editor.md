@@ -1,0 +1,189 @@
+# Hex editor failure modes
+
+Scope: the editable `HexEditor` in `src/Bwc.UI/Hex`, the new `HexEditorDialog` in
+`src/Bwc.UI/Dialogs/HexEditorDialog.cs`, the `DetailsList.RowActivated` event, and the
+double-click value editing wiring in `src/Bwc.Regedit`. The read-only viewer behavior recorded in
+`hex-viewer.md` still applies to `HexViewerDialog`; this document covers the edit path and the
+places where it can disagree with the user's intent.
+
+## Read-only versus edit
+
+### Default state
+
+`HexEditor.IsReadOnly` defaults to true. `HexViewerDialog` sets it explicitly to true, so the
+View > Display Binary Data path keeps the read-only contract: no key, paste, delete, or character
+input changes the snapshot. `HexEditorDialog.SetValue` sets `IsReadOnly` to false before the data,
+which is the only host allowed to enable editing in this batch.
+
+### Edit path does not reach the registry by itself
+
+The editor owns a private copy of the bytes. Every accepted change raises `DataChanged` and changes
+only that copy. The registry is written by the host after the dialog returns `Accepted == true`,
+using `RegistryStore.SetValue` with the original raw type. Canceling, Escape, closing the window,
+or losing focus to another application leaves the registry untouched.
+
+### Oversized or zero-length values
+
+`SetData` copies the incoming memory into one `byte[]`, so memory stays O(n). A zero-length value
+has zero rows; hex typing, ASCII typing, Delete, and Backspace do nothing because there is no
+position. Paste into an empty buffer is allowed and appends the parsed bytes. A value that is not
+a multiple of sixteen has a short final row; cells past the length are never selectable and edits
+clamp to the last real byte.
+
+## Selection and nibbles
+
+### Selection is byte based
+
+Selection is one contiguous range of byte offsets. Clicking the hex or ASCII column selects one
+byte. Shift click extends from the anchor. Arrows move one byte, Up and Down move sixteen bytes,
+Page Up and Page Down move one visible page, Home and End move to the start and end of the current
+row, and Ctrl+Home and Ctrl+End move to the first and last byte. Space moves one byte forward in the
+hex column. Ctrl+A selects every byte. A selection that is longer than the data is clamped.
+
+### Nibble state
+
+The editor does not paint a separate nibble selection. Instead it tracks whether the next typed
+hex digit belongs to the high or low nibble of the selected byte. The first digit replaces the high
+nibble and clears the low nibble, and the second digit writes the low nibble and advances to the
+next byte. Moving the selection, clicking, deleting, pasting, and `SetData` reset that state to the
+high nibble. This is why typing `AA` at offset 0 produces `AA` and leaves the caret on byte 1,
+not a shifted or partially updated byte.
+
+### Editing a multi-byte selection
+
+Typing over a selected range collapses the selection to its first byte, then applies the nibble
+rules and advances one byte at a time. Bytes after the typed prefix stay untouched. This is
+documented rather than silently deleting the rest of the range.
+
+### Column focus determines the character meaning
+
+A click in the hex column puts character input in hex mode. A click in the ASCII column puts
+character input in ASCII mode. In hex mode only `0` to `9`, `a` to `f`, and `A` to `F` are accepted.
+In ASCII mode characters 32 through 126 are written as one byte; other characters are ignored. The
+same physical key can therefore mean `0x0A` or the letter `A` depending on where the user clicked.
+
+## Insert and delete
+
+### Overwrite versus insert
+
+Overwrite is the default. Insert mode inserts a zero byte before applying the high nibble, or
+inserts the ASCII byte, which grows the buffer and shifts the remainder right. The Insert key
+toggles the mode when editable. Insert mode is preserved by `SetData` and is not reset by a new
+dialog. When the buffer is empty, insert mode still has no position to edit; a paste is the only
+way to add the first bytes.
+
+### Delete and Backspace
+
+Delete removes the selected bytes. With no selection, Delete removes the byte at the caret and
+Backspace removes the byte before it. Backspace with a selection removes the selection, matching
+the common editor expectation. Removing the last remaining byte leaves an empty buffer and a
+cleared selection. Every deletion clamps the caret to the new length.
+
+### Row count changes
+
+Overwrite edits keep the row count stable. Insert and delete can change the row count, so the
+repeater source is rebuilt with the new row index count. Realized row elements are detached first
+so a recycled row cannot show bytes that belong to the old length. The rebuilt rows still read
+from the same single buffer, so memory remains O(n) and no element is created per byte.
+
+## Clipboard
+
+### Copy format
+
+Ctrl+C copies the selected bytes as uppercase hexadecimal pairs separated by one space, for
+example `00 01 02`. The text is the single clipboard format in this batch; a separate binary
+stream format is not provided. Copy does not change the selection or the data. If another process
+holds the clipboard, the failure is caught and reported through the editor help text, and the
+selection remains usable.
+
+### Paste format
+
+Ctrl+V accepts hexadecimal text with optional spaces and commas. Every remaining character must be
+a hex digit; otherwise the paste is ignored and the help text records an invalid clipboard. If
+there is a selection, the pasted bytes replace that range. With no selection, overwrite mode
+overwrites from the caret and appends past the end when necessary, while insert mode inserts the
+bytes and shifts the remainder right. A pasted block raises one `DataChanged`, not one per byte.
+
+## Registry integration
+
+### Type preservation
+
+The host reads the raw value, keeps `RegistryValueInfo.Type`, and writes with
+`RegistryStore.SetValue(key, rawName, originalType, data)`. It does not call `SetBinary`, so a
+REG_NONE value stays REG_NONE and an unknown type keeps its numeric type even though the editor
+shows only bytes. Accepting without changing a byte writes the same bytes back with the same type.
+
+### Double-click target
+
+`DetailsList.RowActivated` is raised by a double tap on a realized details row, after the row has
+become the single selection. Header clicks, the rename box, and multi-selection gestures do not
+raise it. The registry host ignores the event when exactly one value row is not selected. Known
+string, expandable string, DWORD, QWORD, and multi-string types keep their existing editors and are
+a no-op for this batch; REG_BINARY, REG_NONE, DWORD big endian, link, resource types, and unknown
+raw types open the hex editor.
+
+### Value deleted under the dialog
+
+The dialog owns a snapshot. If another process deletes the value while the dialog is open, the
+snapshot stays editable and accepting writes the value back with the original type, recreating it.
+If the value is already missing when the host reads it, the host shows the standard QueryValue
+error with Win32 error 2 and opens no dialog. The list is not changed by a failed read.
+
+### Save failure and access denied
+
+Reading or writing can fail with `RegistryOperationException`, including access denied. The host
+catches it around the background read and around the write, shows the standard registry error
+dialog with operation, path, and Win32 code, and does not refresh the list. A write that fails
+after the dialog closes cannot be undone from the dialog; the user sees the error and the old
+registry value remains. The host never writes partially and never falls back to REG_BINARY.
+
+### Modal owner and focus
+
+`HexEditorDialog` derives from `ModalDialogWindow`, so it disables the owner, centers over it, and
+restores it on close. If the owner handle is missing or another modal is already open, the host
+logs and returns without showing a window. Escape cancels and OK accepts. Enter is deliberately
+not a submit shortcut in this dialog: `SubmitsOnEnter` is false so Enter inside the hex body does
+not save. Enter still activates the OK button when that button has keyboard focus. Focus returns
+to the details list after the dialog closes only when the host actually showed it.
+
+### Dialog state
+
+The status line reports byte count, type name, display name, and Insert or Overwrite mode with the
+automation id `HexStatus`. Selection changes, edits, and mode changes update it. `SetData` clears
+the selection without raising `DataChanged`, so a host can replace the snapshot without treating
+it as a user edit.
+
+## UIA and recycling
+
+### Row peers
+
+The grid peer and row peer behavior from `hex-viewer.md` is unchanged. Only realized rows have row
+peers, row automation ids are recomputed from the element index on prepare, and the row name is the
+current row text. An edit refreshes the realized row text in place. Insert or delete rebuilds the
+row source, which detaches the old elements, so a stale row cannot keep the old offset or bytes.
+The editor help text keeps the `Length=...;SelectedOffset=...;SelectedLength=...` prefix and adds
+`Mode=...` and `ReadOnly=...` for tests.
+
+### Focus during edits
+
+The editor keeps focus while typing. Rebuilding the repeater on insert or delete does not move
+focus to another control. Clicking a row still focuses the editor before applying the selection,
+so the first typed character after a click is not lost.
+
+## E2E and cleanup
+
+### Editing test
+
+The HexEdit test seeds `HKCU\Software\BWC-E2E\<runId>` with a binary value `0x00` through `0x2F`
+and a string value, launches the published application with an isolated data root, navigates to
+the key, and double-clicks the binary row. It edits the first bytes, accepts, verifies the bytes
+and the REG_BINARY type through Win32, then reopens to change the length in insert mode and cancels
+to prove the registry is unchanged. It reopens for Ctrl+A and Ctrl+C, and records the clipboard
+check as informational when another process holds the clipboard. Escape must return focus to the
+list.
+
+### Cleanup
+
+The test removes only the run subtree and its scoped data root, and disposes the application
+session in a finally block. The shared assembly cleanup removes the empty `HKCU\Software\BWC-E2E`
+parent when possible. No test writes to HKLM or to another user's hive.

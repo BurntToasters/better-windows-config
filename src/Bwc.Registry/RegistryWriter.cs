@@ -1,6 +1,7 @@
 using Microsoft.Win32.SafeHandles;
 using Windows.Win32;
 using Windows.Win32.Foundation;
+using Windows.Win32.Security;
 using Windows.Win32.System.Registry;
 
 namespace Bwc.Registry;
@@ -9,11 +10,13 @@ namespace Bwc.Registry;
 /// The only type that calls mutating registry APIs. Every mutation passes the write policy
 /// first and every key is opened in the 64-bit view.
 /// </summary>
-public sealed class RegistryWriter
+public sealed partial class RegistryWriter
 {
     private const int MaxValueNameLength = 16383;
     private const uint DeleteStandardRight = 0x00010000;
+    private const uint ReadControlStandardRight = 0x00020000;
     private const uint WriteDacStandardRight = 0x00040000;
+    private const uint WriteOwnerStandardRight = 0x00080000;
     private const int ErrorAccessDenied = 5;
 
     private readonly IRegistryWritePolicy _policy;
@@ -171,52 +174,60 @@ public sealed class RegistryWriter
         ThrowIfFailed(error, Operation, destination);
     }
 
-    public void LoadHive(RegistryPath path, string filePath)
+    public void SetKeySecurity(
+        RegistryPath path,
+        RegistrySecurityInformation information,
+        ReadOnlySpan<byte> securityDescriptor)
     {
         ArgumentNullException.ThrowIfNull(path);
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.LoadHive);
-        ArgumentNullException.ThrowIfNull(filePath);
-        throw new NotImplementedException("LoadHive is reserved for B8 and is not implemented yet.");
-    }
 
-    public void UnloadHive(RegistryPath path)
-    {
-        ArgumentNullException.ThrowIfNull(path);
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.UnloadHive);
-        throw new NotImplementedException("UnloadHive is reserved for B8 and is not implemented yet.");
-    }
-
-    public void SaveKey(RegistryPath path, string filePath)
-    {
-        ArgumentNullException.ThrowIfNull(path);
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.SaveKey);
-        ArgumentNullException.ThrowIfNull(filePath);
-        throw new NotImplementedException("SaveKey is reserved for B8 and is not implemented yet.");
-    }
-
-    public void ReplaceKey(RegistryPath path, string newFileName, string backupFileName)
-    {
-        ArgumentNullException.ThrowIfNull(path);
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.ReplaceKey);
-        ArgumentNullException.ThrowIfNull(newFileName);
-        ArgumentNullException.ThrowIfNull(backupFileName);
-        throw new NotImplementedException("ReplaceKey is reserved for B8 and is not implemented yet.");
-    }
-
-    public void RestoreKey(RegistryPath path, string filePath)
-    {
-        ArgumentNullException.ThrowIfNull(path);
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.RestoreKey);
-        ArgumentNullException.ThrowIfNull(filePath);
-        throw new NotImplementedException("RestoreKey is reserved for B8 and is not implemented yet.");
-    }
-
-    public void SetKeySecurity(RegistryPath path, ReadOnlySpan<byte> securityDescriptor)
-    {
-        ArgumentNullException.ThrowIfNull(path);
+        const string Operation = nameof(RegistryWriteOperation.SetKeySecurity);
         _policy.EnsureWriteAllowed(path, RegistryWriteOperation.SetKeySecurity);
-        _ = securityDescriptor;
-        throw new NotImplementedException("SetKeySecurity is reserved for B8 and is not implemented yet.");
+
+        if (information == RegistrySecurityInformation.None)
+        {
+            throw new ArgumentException(
+                "At least one security information flag is required.",
+                nameof(information));
+        }
+
+        if (!RegistrySecurityDescriptor.TryGetLength(securityDescriptor, out int declaredLength) ||
+            declaredLength != securityDescriptor.Length)
+        {
+            throw new ArgumentException(
+                "The buffer is not a valid self-relative security descriptor with an exact declared length.",
+                nameof(securityDescriptor));
+        }
+
+        uint access = WriteDacStandardRight | ReadControlStandardRight;
+        if ((information & (RegistrySecurityInformation.Owner | RegistrySecurityInformation.Group)) != 0)
+        {
+            // Owner and primary-group changes need WRITE_OWNER. DACL-only changes must not
+            // require it, or a non-owner who can still edit the DACL would be refused.
+            access |= WriteOwnerStandardRight;
+        }
+
+        using SafeRegistryKeyHandle handle = OpenKey(
+            path,
+            (REG_SAM_FLAGS)access,
+            Operation,
+            path);
+
+        var requested = (OBJECT_SECURITY_INFORMATION)(uint)information;
+        WIN32_ERROR error;
+
+        unsafe
+        {
+            fixed (byte* pointer = securityDescriptor)
+            {
+                error = PInvoke.RegSetKeySecurity(
+                    handle,
+                    requested,
+                    new PSECURITY_DESCRIPTOR(pointer));
+            }
+        }
+
+        ThrowIfFailed(error, Operation, path);
     }
 
     private SafeRegistryKeyHandle OpenKey(

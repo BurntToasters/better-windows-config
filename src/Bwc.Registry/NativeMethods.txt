@@ -19,7 +19,14 @@ RegReplaceKey
 RegRestoreKey
 RegSetKeySecurity
 RegGetKeySecurity
+GetSecurityDescriptorLength
+IsValidSecurityDescriptor
 RegLoadAppKey
 RegFlushKey
 RegNotifyChangeKeyValue
 RegConnectRegistry
+OpenProcessToken
+GetCurrentProcess
+LookupPrivilegeValue
+AdjustTokenPrivileges
+GetTokenInformation

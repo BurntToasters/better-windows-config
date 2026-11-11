@@ -45,13 +45,17 @@ public sealed class HexEditor : UserControl
     private readonly double _asciiLeft;
     private readonly double _contentWidth;
 
-    private ReadOnlyMemory<byte> _data;
+    private byte[] _bytes = Array.Empty<byte>();
     private int _length;
     private int _rowCount;
     private long _anchor = -1;
     private long _caret = -1;
     private long _selectionStart;
     private int _selectionLength;
+    private int _nibble;
+    private bool _editAscii;
+    private bool _insertMode;
+    private bool _isReadOnly = true;
     private string? _clipboardIssue;
 
     public HexEditor()
@@ -98,14 +102,60 @@ public sealed class HexEditor : UserControl
 
         Content = _scroll;
         KeyDown += OnKeyDown;
+        CharacterReceived += OnCharacterReceived;
         ActualThemeChanged += OnActualThemeChanged;
     }
 
-    /// <summary>True for this batch. The control is structured for a later editable mode.</summary>
-    public bool IsReadOnly => true;
+    /// <summary>
+    /// True while the snapshot is view only. The viewer keeps the default; the edit dialog sets
+    /// false before the data is assigned.
+    /// </summary>
+    public bool IsReadOnly
+    {
+        get => _isReadOnly;
+        set
+        {
+            if (_isReadOnly == value)
+            {
+                return;
+            }
+
+            _isReadOnly = value;
+            UpdateHelpText();
+        }
+    }
+
+    /// <summary>Insert mode inserts typed bytes instead of replacing them. Toggled by Insert.</summary>
+    public bool InsertMode
+    {
+        get => _insertMode;
+        set
+        {
+            if (_insertMode == value)
+            {
+                return;
+            }
+
+            _insertMode = value;
+            UpdateHelpText();
+            ModeChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>Current edit mode name for a status line.</summary>
+    public string Mode => _insertMode ? "Insert" : "Overwrite";
+
+    /// <summary>Which column received the last click. Hex is the default.</summary>
+    public string ActiveColumn => _editAscii ? "ASCII" : "Hex";
 
     /// <summary>Number of bytes in the current value.</summary>
     public int Length => _length;
+
+    /// <summary>A copy of the current bytes. The host writes these after the dialog accepts.</summary>
+    public byte[] GetBytes() => _bytes.AsSpan(0, _length).ToArray();
+
+    /// <summary>The current bytes without copying.</summary>
+    public ReadOnlyMemory<byte> Bytes => _bytes.AsMemory(0, _length);
 
     /// <summary>First selected byte offset, or -1 when nothing is selected.</summary>
     public long SelectedOffset => _selectionLength > 0 ? _selectionStart : -1;
@@ -116,13 +166,19 @@ public sealed class HexEditor : UserControl
     /// <summary>Raised after the selected range changes.</summary>
     public event EventHandler? SelectionChanged;
 
+    /// <summary>Raised after an edit changes the bytes or the length.</summary>
+    public event EventHandler? DataChanged;
+
+    /// <summary>Raised when Insert or Overwrite mode changes.</summary>
+    public event EventHandler? ModeChanged;
+
     internal int RowCount => _rowCount;
 
     internal int SelectionStart => checked((int)_selectionStart);
 
     internal int SelectionLength => _selectionLength;
 
-    internal ReadOnlyMemory<byte> Data => _data;
+    internal ReadOnlyMemory<byte> Data => _bytes.AsMemory(0, _length);
 
     internal FontFamily MonospaceFont => _fontFamily;
 
@@ -142,33 +198,55 @@ public sealed class HexEditor : UserControl
 
     internal int GridColumnCountValue => GridColumnCount;
 
-    /// <summary>Replaces the displayed bytes and clears the selection.</summary>
+    /// <summary>
+    /// Replaces the displayed bytes and clears the selection. The edit mode and read-only state are
+    /// preserved. The snapshot is copied so later edits never mutate the caller's array. This is
+    /// not an edit, so <see cref="DataChanged"/> is not raised.
+    /// </summary>
     public void SetData(ReadOnlyMemory<byte> data)
     {
         bool hadSelection = _selectionLength > 0;
-        _data = data;
-        _length = data.Length;
+        _bytes = data.ToArray();
+        _length = _bytes.Length;
         _rowCount = (_length + BytesPerRow - 1) / BytesPerRow;
         _anchor = -1;
         _caret = -1;
         _selectionStart = 0;
         _selectionLength = 0;
+        _nibble = 0;
 
-        _repeater.ItemsSource = null;
-        foreach (HexRowElement row in _realized)
-        {
-            row.Detach();
-        }
-
-        _realized.Clear();
+        ResetRows();
         _clipboardIssue = null;
-        _repeater.ItemsSource = new RowIndexList(_rowCount);
         UpdateHelpText();
 
         if (hadSelection)
         {
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    /// <summary>
+    /// Selects <paramref name="length"/> bytes starting at <paramref name="offset"/>. Values are
+    /// clamped to the data; a zero length leaves the selection empty.
+    /// </summary>
+    public void SelectRange(long offset, int length)
+    {
+        if (_length == 0)
+        {
+            _anchor = -1;
+            _caret = -1;
+            SetSelection(0, 0);
+            return;
+        }
+
+        long start = Math.Clamp(offset, 0, _length - 1);
+        int available = checked((int)(_length - start));
+        int count = Math.Clamp(length, 0, available);
+        _anchor = start;
+        _caret = count > 0 ? start + count - 1 : start;
+        _nibble = 0;
+        SetSelection(start, count);
+        RevealRow(checked((int)(start / BytesPerRow)));
     }
 
     internal bool IsByteSelected(long offset)
@@ -215,6 +293,7 @@ public sealed class HexEditor : UserControl
         long offset = (long)index * BytesPerRow;
         _anchor = offset;
         _caret = offset;
+        _nibble = 0;
         SetSelection(offset, 1);
         RevealRow(index);
         FocusEditor();
@@ -224,16 +303,19 @@ public sealed class HexEditor : UserControl
     {
         _anchor = -1;
         _caret = -1;
+        _nibble = 0;
         SetSelection(0, 0);
     }
 
-    internal void HandleBytePressed(int index, int byteInRow, bool shift)
+    internal void HandleBytePressed(int index, int byteInRow, bool shift, bool ascii)
     {
         if (index < 0 || index >= _rowCount || byteInRow < 0 || byteInRow >= RowByteCount(index))
         {
             return;
         }
 
+        _editAscii = ascii;
+        _nibble = 0;
         long target = ((long)index * BytesPerRow) + byteInRow;
         if (shift && _anchor >= 0)
         {
@@ -400,11 +482,15 @@ public sealed class HexEditor : UserControl
                 e.Handled = true;
                 break;
             case VirtualKey.Home:
-                MoveCaret(0, shift);
+                MoveCaret(control ? 0 : RowStart(_caret), shift);
                 e.Handled = true;
                 break;
             case VirtualKey.End:
-                MoveCaret(_length - 1, shift);
+                MoveCaret(control ? _length - 1 : RowEnd(_caret), shift);
+                e.Handled = true;
+                break;
+            case VirtualKey.Space when !_editAscii:
+                MoveCaret((_caret < 0 ? 0 : _caret) + 1, shift);
                 e.Handled = true;
                 break;
             case VirtualKey.A when control:
@@ -415,7 +501,45 @@ public sealed class HexEditor : UserControl
                 CopySelection();
                 e.Handled = true;
                 break;
+            case VirtualKey.V when control && !_isReadOnly:
+                PasteFromClipboard();
+                e.Handled = true;
+                break;
+            case VirtualKey.Insert when !_isReadOnly:
+                InsertMode = !InsertMode;
+                e.Handled = true;
+                break;
+            case VirtualKey.Delete when !_isReadOnly:
+                DeleteSelectionOrCaret(backspace: false);
+                e.Handled = true;
+                break;
+            case VirtualKey.Back when !_isReadOnly:
+                DeleteSelectionOrCaret(backspace: true);
+                e.Handled = true;
+                break;
         }
+    }
+
+    private long RowStart(long offset)
+    {
+        if (_length == 0)
+        {
+            return 0;
+        }
+
+        long start = Math.Clamp(offset, 0, _length - 1);
+        return start - (start % BytesPerRow);
+    }
+
+    private long RowEnd(long offset)
+    {
+        if (_length == 0)
+        {
+            return 0;
+        }
+
+        long end = RowStart(offset) + BytesPerRow - 1;
+        return Math.Min(end, _length - 1);
     }
 
     private int PageBytes()
@@ -433,6 +557,7 @@ public sealed class HexEditor : UserControl
         }
 
         long clamped = Math.Clamp(target, 0, _length - 1);
+        _nibble = 0;
         if (extend && _anchor >= 0)
         {
             long start = Math.Min(_anchor, clamped);
@@ -450,7 +575,8 @@ public sealed class HexEditor : UserControl
         RevealRow(checked((int)(clamped / BytesPerRow)));
     }
 
-    private void SelectAll()
+    /// <summary>Selects every byte. Exposed for hosts and tests.</summary>
+    public void SelectAll()
     {
         if (_length == 0)
         {
@@ -459,6 +585,7 @@ public sealed class HexEditor : UserControl
 
         _anchor = 0;
         _caret = _length - 1;
+        _nibble = 0;
         SetSelection(0, _length);
         RevealRow(0);
     }
@@ -514,7 +641,7 @@ public sealed class HexEditor : UserControl
         }
 
         var builder = new StringBuilder(_selectionLength * 3);
-        ReadOnlySpan<byte> bytes = _data.Span.Slice(SelectionStart, _selectionLength);
+        ReadOnlySpan<byte> bytes = _bytes.AsSpan(SelectionStart, _selectionLength);
         for (var index = 0; index < bytes.Length; index++)
         {
             if (index > 0)
@@ -541,9 +668,389 @@ public sealed class HexEditor : UserControl
         UpdateHelpText();
     }
 
+    private void OnCharacterReceived(UIElement sender, CharacterReceivedRoutedEventArgs e)
+    {
+        if (_isReadOnly || e.Handled || IsDown(VirtualKey.Control))
+        {
+            return;
+        }
+
+        char character = e.Character;
+        if (character is '\0' or '\r' or '\n' or '\t')
+        {
+            return;
+        }
+
+        if (_editAscii)
+        {
+            if (character is >= (char)32 and <= (char)126)
+            {
+                ApplyAsciiByte((byte)character);
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        int digit = HexDigit(character);
+        if (digit >= 0)
+        {
+            ApplyHexDigit(digit);
+            e.Handled = true;
+        }
+    }
+
+    private static int HexDigit(char character) => character switch
+    {
+        >= '0' and <= '9' => character - '0',
+        >= 'a' and <= 'f' => character - 'a' + 10,
+        >= 'A' and <= 'F' => character - 'A' + 10,
+        _ => -1,
+    };
+
+    private int CurrentEditOffset()
+    {
+        if (_length == 0)
+        {
+            return -1;
+        }
+
+        if (_selectionLength > 0)
+        {
+            return checked((int)_selectionStart);
+        }
+
+        return _caret >= 0 ? checked((int)Math.Min(_caret, _length - 1)) : 0;
+    }
+
+    /// <summary>
+    /// Applies one hex digit. The first digit of a byte replaces the high nibble and clears the
+    /// low nibble; the second writes the low nibble and advances. In insert mode the high nibble
+    /// inserts a zero byte first so the rest of the buffer shifts right.
+    /// </summary>
+    private void ApplyHexDigit(int digit)
+    {
+        int offset = CurrentEditOffset();
+        if (offset < 0)
+        {
+            return;
+        }
+
+        if (_selectionLength > 1)
+        {
+            _nibble = 0;
+        }
+
+        if (_selectionLength != 1 || _selectionStart != offset)
+        {
+            _anchor = offset;
+            _caret = offset;
+            SetSelection(offset, 1);
+        }
+
+        bool rowsChanged = false;
+        if (_insertMode && _nibble == 0)
+        {
+            InsertByteAt(offset, 0);
+            rowsChanged = true;
+        }
+
+        if (_nibble == 0)
+        {
+            _bytes[offset] = (byte)(digit << 4);
+            _nibble = 1;
+            AfterEdit(offset, rowsChanged);
+            return;
+        }
+
+        _bytes[offset] = (byte)((_bytes[offset] & 0xF0) | digit);
+        _nibble = 0;
+        int next = Math.Min(offset + 1, _length - 1);
+        _anchor = next;
+        _caret = next;
+        SetSelection(next, 1);
+        AfterEdit(next, rowsChanged);
+    }
+
+    private void ApplyAsciiByte(byte value)
+    {
+        int offset = CurrentEditOffset();
+        if (offset < 0)
+        {
+            return;
+        }
+
+        if (_selectionLength != 1 || _selectionStart != offset)
+        {
+            _anchor = offset;
+            _caret = offset;
+            SetSelection(offset, 1);
+        }
+
+        bool rowsChanged = false;
+        if (_insertMode)
+        {
+            InsertByteAt(offset, value);
+            rowsChanged = true;
+        }
+        else
+        {
+            _bytes[offset] = value;
+        }
+
+        int next = Math.Min(offset + 1, _length - 1);
+        _anchor = next;
+        _caret = next;
+        _nibble = 0;
+        SetSelection(next, 1);
+        AfterEdit(next, rowsChanged);
+    }
+
+    private void DeleteSelectionOrCaret(bool backspace)
+    {
+        int start;
+        int count;
+
+        if (_selectionLength > 0)
+        {
+            start = SelectionStart;
+            count = _selectionLength;
+        }
+        else if (backspace)
+        {
+            if (_caret <= 0)
+            {
+                return;
+            }
+
+            start = checked((int)_caret - 1);
+            count = 1;
+        }
+        else
+        {
+            if (_caret < 0 || _caret >= _length)
+            {
+                return;
+            }
+
+            start = checked((int)_caret);
+            count = 1;
+        }
+
+        RemoveRange(start, count);
+        _nibble = 0;
+
+        if (_length == 0)
+        {
+            _anchor = -1;
+            _caret = -1;
+            SetSelection(0, 0);
+        }
+        else
+        {
+            int next = Math.Clamp(start, 0, _length - 1);
+            _anchor = next;
+            _caret = next;
+            SetSelection(next, 1);
+        }
+
+        AfterEdit(_length == 0 ? 0 : SelectionStart, rowsChanged: true);
+    }
+
+    private void InsertByteAt(int index, byte value)
+    {
+        int oldLength = _length;
+        Array.Resize(ref _bytes, oldLength + 1);
+        if (index < oldLength)
+        {
+            Array.Copy(_bytes, index, _bytes, index + 1, oldLength - index);
+        }
+
+        _bytes[index] = value;
+        _length = oldLength + 1;
+        _rowCount = (_length + BytesPerRow - 1) / BytesPerRow;
+    }
+
+    private void RemoveRange(int start, int count)
+    {
+        if (start < 0 || count <= 0 || start + count > _length)
+        {
+            return;
+        }
+
+        int tail = _length - (start + count);
+        if (tail > 0)
+        {
+            Array.Copy(_bytes, start + count, _bytes, start, tail);
+        }
+
+        _length -= count;
+        Array.Resize(ref _bytes, _length);
+        _rowCount = (_length + BytesPerRow - 1) / BytesPerRow;
+    }
+
+    private void AfterEdit(int revealOffset, bool rowsChanged)
+    {
+        if (rowsChanged)
+        {
+            ResetRows();
+        }
+        else
+        {
+            RefreshRealizedRows();
+        }
+
+        UpdateHelpText();
+        DataChanged?.Invoke(this, EventArgs.Empty);
+        if (_length > 0)
+        {
+            RevealRow(checked((int)(Math.Clamp(revealOffset, 0, _length - 1) / BytesPerRow)));
+        }
+    }
+
+    private void ResetRows()
+    {
+        _repeater.ItemsSource = null;
+        foreach (HexRowElement row in _realized)
+        {
+            row.Detach();
+        }
+
+        _realized.Clear();
+        _repeater.ItemsSource = new RowIndexList(_rowCount);
+    }
+
+    private void RefreshRealizedRows()
+    {
+        foreach (HexRowElement row in _realized)
+        {
+            row.Refresh();
+        }
+    }
+
+    private void PasteFromClipboard() => _ = PasteFromClipboardAsync();
+
+    private async Task PasteFromClipboardAsync()
+    {
+        if (_isReadOnly)
+        {
+            return;
+        }
+
+        string text;
+        try
+        {
+            DataPackageView content = Clipboard.GetContent();
+            if (!content.Contains(StandardDataFormats.Text))
+            {
+                _clipboardIssue = "no-text";
+                UpdateHelpText();
+                return;
+            }
+
+            text = await content.GetTextAsync();
+        }
+        catch (Exception)
+        {
+            _clipboardIssue = "unavailable";
+            UpdateHelpText();
+            return;
+        }
+
+        byte[] pasted = ParseHexText(text);
+        if (pasted.Length == 0)
+        {
+            _clipboardIssue = "invalid";
+            UpdateHelpText();
+            return;
+        }
+
+        _clipboardIssue = null;
+        ApplyPaste(pasted);
+    }
+
+    /// <summary>Accepts hex digits with optional spaces, tabs, line breaks, and commas.</summary>
+    private static byte[] ParseHexText(string text)
+    {
+        var digits = new StringBuilder(text.Length);
+        foreach (char character in text)
+        {
+            if (character is ' ' or '\t' or '\r' or '\n' or ',')
+            {
+                continue;
+            }
+
+            if (HexDigit(character) < 0)
+            {
+                return Array.Empty<byte>();
+            }
+
+            digits.Append(character);
+        }
+
+        if (digits.Length < 2)
+        {
+            return Array.Empty<byte>();
+        }
+
+        var result = new byte[digits.Length / 2];
+        for (var index = 0; index < result.Length; index++)
+        {
+            result[index] = (byte)((HexDigit(digits[index * 2]) << 4) | HexDigit(digits[(index * 2) + 1]));
+        }
+
+        return result;
+    }
+
+    private void ApplyPaste(byte[] pasted)
+    {
+        int start = CurrentEditOffset();
+        if (start < 0)
+        {
+            start = 0;
+        }
+
+        bool replacedSelection = _selectionLength > 0;
+        if (replacedSelection)
+        {
+            RemoveRange(start, _selectionLength);
+        }
+
+        bool rowsChanged = replacedSelection;
+        if (_insertMode || replacedSelection || _length == 0)
+        {
+            for (var index = 0; index < pasted.Length; index++)
+            {
+                InsertByteAt(start + index, pasted[index]);
+            }
+
+            rowsChanged = true;
+        }
+        else
+        {
+            int needed = start + pasted.Length;
+            if (needed > _length)
+            {
+                Array.Resize(ref _bytes, needed);
+                _length = needed;
+                _rowCount = (_length + BytesPerRow - 1) / BytesPerRow;
+                rowsChanged = true;
+            }
+
+            Array.Copy(pasted, 0, _bytes, start, pasted.Length);
+        }
+
+        _nibble = 0;
+        _anchor = start;
+        _caret = start + pasted.Length - 1;
+        SetSelection(start, pasted.Length);
+        AfterEdit(start, rowsChanged);
+    }
+
     private void UpdateHelpText()
     {
-        string text = $"Length={_length};SelectedOffset={SelectedOffset};SelectedLength={_selectionLength}";
+        string text =
+            $"Length={_length};SelectedOffset={SelectedOffset};SelectedLength={_selectionLength};Mode={Mode};ReadOnly={_isReadOnly}";
         if (_clipboardIssue is not null)
         {
             text += ";Clipboard=" + _clipboardIssue;
