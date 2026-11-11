@@ -2,7 +2,9 @@ using Bwc.UI.Theme;
 using Bwc.UI.Tree;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
+#if BWC_E2E
 using Microsoft.UI.Xaml.Automation;
+#endif
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -955,7 +957,10 @@ public sealed partial class DetailsList : UserControl
 
     private void UpdateHelpText()
     {
+#if BWC_E2E
+        // E2E-only: debug counts in UIA help text would be announced by screen readers in ship builds.
         AutomationProperties.SetHelpText(this, $"Rows={_rows.Count};Selected={_selected.Count}");
+#endif
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)

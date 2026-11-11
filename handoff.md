@@ -76,7 +76,7 @@ unimplemented. The app and tests are green.
 1. **R15 parity audit.** This is the next lane and the main remaining feature work.
    - Classify every row in `docs/parity/regedit-inventory.md` as `pass`, `declared-difference`,
      or `gap`, with evidence.
-   - Evidence sources: `artifacts/gate/result.json`, `artifacts/e2e/result.json`, the E2E and
+   - Evidence sources: `artifacts/gate/result.json`, `artifacts/e2e/result-<rid>-<flavor>.json`, the E2E and
      registry tests, the three `.reg` goldens, `docs/parity/oracle/*`, `Resources.resw`, the
      failure-mode docs, and `resume.md` known gaps.
    - Write `docs/parity/regedit-audit.md` with the method, summary counts, and every exception

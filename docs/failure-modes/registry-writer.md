@@ -1,194 +1,393 @@
 # Registry writer failure modes
 
-This document covers `src/Bwc.Registry`: `RegistryPath`, `RegistryWriter`, the write policies,
-and the guard script `scripts/check-registry-writer.js`. The writer is the only code allowed to
-call mutating registry APIs. Every mutation passes through `IRegistryWritePolicy` first.
+This document covers `src/Bwc.Registry`: `RegistryPath`, `RegistryWriter` and its partial files,
+the write policies, the hive file scanner, and the static guard `scripts/check-registry-writer.js`.
+It was written before the guard code and the guard tests, and it states the intended behavior for
+every entry. Each entry names where it is enforced and which test covers it.
 
-## 1. Path prefix confusion (`Foo` versus `Foobar`)
+The writer is the only code that calls mutating registry APIs. Every mutation first asks
+`IRegistryWritePolicy.EnsureWriteAllowed`. The sandbox policy (E2E flavor only) then requires an
+extra guard: the writer walks the key path from the predefined root without following symbolic
+links, so a link at any component is visible before anything is written.
 
-`RegistryPath.IsDescendantOf` compares root and components, not display strings. `Software\Foo`
-is not a descendant of `Software\F`, and `Software\Foobar` is not a descendant of `Software\Foo`.
-A string prefix check would allow both. Tests cover these exact pairs.
+## Threat model
 
-`SandboxWritePolicy` uses the same component-wise comparison, so a sandbox root of
-`HKCU\Software\BWC-E2E\run1` does not authorize `HKCU\Software\BWC-E2E\run10`.
+The guard is a safety net against bugs in the app and in tests running in the same user session.
+It is not a security boundary against hostile processes running as the same user, because those
+processes can write `HKCU` directly. Section D lists the races that remain.
 
-## 2. Relative path escape
+## Policies
 
-`Parse` accepts only absolute forms with a known root (or the optional `Computer\` prefix). It
-rejects empty components, `.` and `..`, leading separators, interior doubled separators, and a
-trailing separator. `Append` accepts one component and rejects separators, NUL, `.`, and `..`.
-There is no API that resolves a relative path against an open handle, so `..` cannot escape a
-sandbox after parsing.
+| Policy | Flavor | Allows | Refuses |
+| --- | --- | --- | --- |
+| `ShippingWritePolicy` | all | every path, follows links, allows `REG_LINK` values | nothing (unchanged) |
+| `SandboxWritePolicy` | `BWC_E2E` only | the sandbox root and descendants of `HKCU\Software\BWC-E2E` | everything else, links at any path component, renaming the root, copying from outside the sandbox, `REG_LINK` values |
+| `DenyAllWritePolicy` | all | nothing | every mutating call, before any native code |
 
-A trailing separator is rejected instead of trimmed. Trimming would make two spellings of one
-path compare differently depending on entry point.
+`RegeditWritePolicy` uses `SandboxWritePolicy` only when `BWC_E2E_SANDBOX_ROOT` names a valid
+sandbox root. Otherwise it uses `DenyAllWritePolicy`. The old placeholder root
+`HKCU\Software\BWC-E2E\unset` was writable and is no longer used.
 
-## 3. Case-insensitive names
+## A. Escape paths (writes that could land outside the sandbox)
 
-Registry key and value names are case-insensitive. `RegistryPath` equality, hashing, and
-descendant checks use `StringComparer.OrdinalIgnoreCase`. `HKCU\Software\Foo` equals
-`hkcu\software\foo`. The writer never lowercases or case-folds a name before sending it to the
-registry; it preserves the caller's spelling for creation while comparing case-insensitively
-for policy decisions.
+### A1. Path prefix confusion (`Foo` versus `Foobar`)
 
-## 4. Default value (`""`)
+`RegistryPath.IsDescendantOf` compares components, not strings. `Software\Foobar` is not a
+descendant of `Software\Foo`, and a sandbox root `...\run1` does not authorize `...\run10`.
+Enforced by `RegistryPath` and `SandboxWritePolicy`. Test: `SandboxPolicyAllowsOnlyItsSubtree`,
+`DescendantCheckComparesComponentsNotStringPrefixes`.
 
-The default value has an empty name. `SetValue` and `DeleteValue` accept `""` as the value name;
-`null` is rejected because the native APIs treat a null name differently and .NET nullability
-would hide the difference. Tests write and delete the default value through the real registry.
+### A2. Symbolic link above the sandbox root
 
-## 5. REG_LINK values and link keys
+Example: `HKCU\Software\BWC-E2E\<run-id>` is a link to `HKCU\Software\Elsewhere`. The sandbox root
+path passes the path check, but every write lands outside the sandbox. Intended behavior: the
+guard walks every component from the predefined root (`HKCU`, then `Software`, `BWC-E2E`,
+`<run-id>`, and so on) and refuses the write with access denied when any component is a link.
+Test: `LinkAboveSandboxRootIsRefused`.
 
-A value of type `REG_LINK` (6) is a symbolic link. `SandboxWritePolicy.AllowsLinkValues` is
-false, so `SetValue` inspects the type before calling native code and throws access denied. The
-check happens before any native mutation, so a refused link leaves no value behind. The shipping
-policy allows link values because the applications may need them, but no current caller writes
-one.
+### A3. Symbolic link at the sandbox root
 
-Link keys are created by passing `REG_OPTION_CREATE_LINK` to `RegCreateKeyEx`. `RegistryWriter`
-does not expose that option and never sets it. `CreateKey` only creates normal subkeys. The check
-script flags any raw `RegCreateKeyEx` usage outside the writer.
+Example: `HKCU\Software\BWC-E2E\<run-id>` is a link. Intended behavior: every write that targets the
+root or a descendant is refused. Test: `LinkAtSandboxRootIsRefused`.
 
-## 6. Hives (B8)
+### A4. Symbolic link inside the sandbox (intermediate component)
 
-`LoadHive`, `UnloadHive`, `SaveKey`, `ReplaceKey`, and `RestoreKey` touch files and can mount or
-replace whole hives. They are not implemented yet. Each method calls the write policy for the
-target path, then throws `NotImplementedException` naming B8. No native hive function is called.
-The native surface is present in `NativeMethods.txt` so the B8 work does not need to modify the
-generated interop setup.
+Example: `<root>\Mid` is a link to `<root>\..\Outside`. Writes to `<root>\Mid\Child` would reach
+the outside key. Intended behavior: the chain walk refuses. Test: `LinkInMiddleOfPathIsRefused`
+(SetValue, CreateKey, DeleteValue, DeleteKey, SaveKey, RestoreKey, ReplaceKey).
 
-## 7. Security descriptors (B8)
+### A5. Symbolic link at the leaf
 
-`SetKeySecurity` changes DACLs and can lock out the user or grant broad access. It calls the
-write policy, then throws `NotImplementedException` naming B8. `RegSetKeySecurity` and
-`RegGetKeySecurity` are in the native surface but are not called by the writer. This behavior is
-covered by the B8 guard.
+Example: `<root>\Leaf` is a link. Intended behavior: SetValue, DeleteValue, SetKeySecurity,
+CreateKey (which would open the link), DeleteKey (recursive or not), RenameKey, and SaveKey are
+refused when the target key is a link. Deleting or renaming a link node is refused too, because
+the guard does not assume that the native call stops at the link node. Tests:
+`LinkAtLeafIsRefusedForEveryKeyOperation`.
 
-## 8. Remote registry (B10)
+### A6. Link created by the code itself
 
-`RegConnectRegistry` can attach a remote hive. The writer exposes no remote method in this
-batch. Any future remote method must call the policy with `RegistryWriteOperation.Remote` and
-name B10 in its guard. The native surface includes `RegConnectRegistry` so that work can start
-without changing the interop file.
+The writer never sets `REG_OPTION_CREATE_LINK`, so it never creates a link key. The one way to
+make a link through the writer is `SetValue` with type `REG_LINK` (6) on the link value name.
+Intended behavior: the sandbox refuses `REG_LINK` values before native code runs, and the refusal
+leaves no value behind (test `LinkValueIsRefusedBeforeNativeCodeAndLeavesNoValue`). `CreateKey`
+opens an existing link node with `REG_OPTION_OPEN_LINK` and refuses it, so creating a key over a
+link cannot follow the link.
 
-`RegDisconnectRegistry` is not a documented or exported advapi32 function. Windows metadata does
-not contain it. Disconnecting a remote hive is done with `RegCloseKey`, which is what the safe
-handle already calls. Adding the name to `NativeMethods.txt` would fail source generation, so it
-is intentionally absent.
+### A7. Recursive delete whose subtree contains a link
 
-## 9. WOW64 view
+Example: `DeleteKey(<root>\Parent, recursive: true)` where `<root>\Parent\Link` is a link to a key
+outside the sandbox. `RegDeleteTree` opens children with ordinary (following) opens, so the guard
+does not rely on it to stop at the link. Intended behavior: the guard scans the whole subtree with
+non-following opens first and refuses the delete with access denied if any link is found. The
+target and the link stay in place. Test: `RecursiveDeleteOverLinkIsRefusedAndTargetSurvives`.
 
-Every `RegOpenKeyEx`, `RegCreateKeyEx`, and `RegDeleteKeyEx` call includes
-`KEY_WOW64_64KEY`. This keeps the writer on the 64-bit registry view even when the process is
-32-bit. `RegDeleteKeyEx` also receives `KEY_WOW64_64KEY` in its `samDesired` parameter because
-that parameter selects the view for the delete. Tests use `RegistryView.Registry64` for
-assertions.
+### A8. Rename of the sandbox root or an ancestor
 
-Mixing views would create or delete a key in a different view than the caller inspected. The
-writer never omits the flag and never uses `KEY_WOW64_32KEY`.
+Example: `RenameKey(<root>, "Renamed")` moves the sandbox root out of its name, so every descendant
+is outside the sandbox. Intended behavior: the sandbox policy refuses a rename whose path is the
+sandbox root. Ancestors fail the containment check and are refused. Renaming a link node is refused
+by A5. Tests: `RenameOfSandboxRootIsRefused`, `RenameOfAncestorIsRefused`.
 
-## 10. 32-bit emulation on ARM64
+### A9. CopyTree or CopyKey with a source outside the sandbox
 
-On ARM64 Windows, x86 and ARM32 processes can run under emulation. Registry redirection still
-applies. The explicit 64-bit view flag makes the writer independent of the process bitness. The
-ARM64 build is the native build used by acceptance. A 32-bit emulated caller would still reach
-the 64-bit view because of the flag.
+The copy reads the source tree and writes the destination. A source outside the sandbox can carry
+link keys into the sandbox, or can be used to read data the sandbox should not see. Intended
+behavior: the writer asks the policy about the source with `RegistryWriteOperation.CopyTree` as well
+as the destination, and `SandboxWritePolicy` refuses sources outside the sandbox. Test:
+`CopyFromOutsideTheSandboxIsRefusedBeforeNativeCode`.
 
-## 11. Open handle leaks
+### A10. CopyTree whose source tree contains a link
 
-Every opened key is wrapped in `SafeRegistryKeyHandle`, which releases with `RegCloseKey` and is
-consumed with `using`. Predefined roots are wrapped as non-owning handles so they are never
-closed. No public API returns a handle. A failed native call that produced a handle still
-disposes it.
+Intended behavior: the guard scans the source subtree and refuses the copy with access denied if
+any link is found, so no link key reaches the destination. Test:
+`CopyTreeWithLinkInSourceIsRefused`.
 
-`SafeRegistryKeyHandle` derives from `SafeHandleZeroOrMinusOneIsInvalid`, so a null or `-1`
-handle is not released and the finalizer path is safe.
+### A11. CopyTree with a destination equal to or inside the source
 
-## 12. Partial delete and partial copy
+Copying a tree into itself can recurse until the tree is huge. Intended behavior: the guard refuses
+it with `ArgumentException` before native code. This check applies only to the sandbox guard, which
+leaves shipping behavior unchanged. Test: `CopyIntoOwnSubtreeIsRefused`.
 
-`RegDeleteTree` can delete some children and then fail, for example on a protected subkey. The
-writer maps the error but cannot roll back the partial delete. `RegCopyTree` can copy some values
-and subkeys before failing, leaving a partial destination. The writer reports the Win32 error and
-does not attempt cleanup because cleanup itself could delete user data. Callers that need
-atomicity must copy to a new staging key and rename or delete it after success.
+### A12. RestoreKey or ReplaceKey with a hive file that contains a link
 
-`RegCopyTree` also copies the source key security descriptor. The destination handle therefore
-needs `WRITE_DAC` in addition to read and write access. With only `KEY_WRITE`, the call fails with
-ERROR_ACCESS_DENIED even though the value and subkey rights are present.
+A hive file can contain link key nodes. Restoring it would bring links into the sandbox. Intended
+behavior: before the native restore runs, `HiveFileLinkScanner` walks the key tree in the file
+(root key, subkey lists `lf`, `lh`, `li`, and `ri`, with cycle and depth limits) and refuses the
+restore with access denied when a node has the `KEY_SYM_LINK` flag. The target key is not
+touched. Tests: `RestoreOfHiveWithLinkIsRefusedAndTargetIsUnchanged`,
+`ReplaceOfHiveWithLinkIsRefusedBeforeBackup`.
 
-Recursive deletion of a predefined root is rejected before native code. Otherwise a policy that
-allowed the path could call `RegDeleteTree` on an entire hive.
+Interpretation: for file sources the question is the content of the file, not where the file is.
+A hive file is not a registry location, so the sandbox does not check its path. It checks the
+content.
 
-## 13. Rename across parents
+### A13. RestoreKey or ReplaceKey with a file the scanner cannot verify
 
-`RegRenameKey` renames a subkey within one parent. `RegistryWriter.RenameKey` takes a full path
-and a new name that must be a single component; it does not accept a destination path. This
-prevents an accidental cross-parent move, which `RegRenameKey` cannot perform in one call
-anyway. A name containing a backslash is rejected. A name that collides with an existing sibling
-maps to the native error.
+Example: a file that is not a `regf` hive, a truncated file, a cell whose size does not fit its
+`hbin`, or a subkey list that loops. Intended behavior: the guard refuses the restore with
+`ERROR_BAD_FORMAT` (11) and a detail that says the sandbox cannot verify the file. The guard fails
+closed: anything it cannot read is treated as possibly containing a link. Test:
+`RestoreOfUnverifiableFileIsRefused`.
 
-## 14. Value name length
+### A14. Hive mount and unmount in the sandbox
+
+`LoadHive` and `UnloadHive` mount at a direct child of `HKLM` or `HKU`. Intended behavior:
+`SandboxWritePolicy` refuses both before the privilege check, so a sandboxed test never mounts a
+hive. Test: `HiveMountsAreRefusedBeforeAnyPrivilegeCheck`.
+
+### A15. Predefined-handle aliases
+
+`HKCU`, `HKEY_CURRENT_USER`, `Computer\HKEY_CURRENT_USER`, and `HKU\<sid>` can name the same key.
+The sandbox compares the root identity, not the resolved key. Intended behavior: `HKCU` and
+`HKEY_CURRENT_USER` (with or without the `Computer\` prefix) are the same root and are allowed.
+`HKU\<sid>\Software\BWC-E2E\...` is a different root and is refused, even though it may resolve to
+the same hive. A refusal is the safe direction. Test: `PredefinedAliasesOfTheSandboxRoot`.
+
+### A16. Case, abbreviations, and trailing separators
+
+Names compare with `OrdinalIgnoreCase`, which matches the registry's own case-insensitive
+comparison for the ASCII names used here. `hkcu\software\bwc-e2e\run` is inside the sandbox. A
+trailing backslash, a doubled backslash, or a leading backslash is rejected by `RegistryPath.Parse`
+rather than trimmed, so two spellings of one path cannot compare differently. Tests:
+`ParseRejectsInvalidInput`, `EqualityIsCaseInsensitiveAcrossRootAndComponents`.
+
+### A17. `.`, `..`, and embedded NUL in names
+
+`RegistryPath` rejects `.` and `..` components, separators, and NUL. A name with NUL would be cut
+at the NUL by the native wide-string API, so the writer rejects it before native code. Tests:
+`AppendRejectsUnsafeComponents`, `ValueNamesWithNulAreRejectedBeforeNativeCode`.
+
+### A18. WOW64 redirection
+
+Every open passes `KEY_WOW64_64KEY`, including the guard's probe opens. The sandbox check and the
+open therefore see the same view, whatever the bitness of the process. Keys under
+`HKCU\Software\BWC-E2E` do not redirect. Shipping behavior is unchanged.
+
+### A19. Remote handles
+
+The writer never connects to a remote computer. `RegistryPath` cannot name one, and
+`RemoteRegistryConnection` is read-only. A future remote write must call the policy with
+`RegistryWriteOperation.Remote`.
+
+### A20. Raw handles and direct native calls
+
+`IRegistryWritePolicy` has no handle overload, and handles are internal. The checker blocks native
+write names outside `RegistryWriter*.cs` (section E).
+
+### A21. Deny-all
+
+`DenyAllWritePolicy` refuses every mutating operation before native code runs, so nothing is
+created. Reads are unaffected. Intended behavior when the sandbox root is missing or invalid: the
+`RegeditWritePolicy` uses `DenyAllWritePolicy` and never writes, including to the old placeholder
+`HKCU\Software\BWC-E2E\unset`, which is no longer used. Tests:
+`DenyAllRefusesEveryWriteWithoutTouchingTheRegistry`, `DenyAllRefusesTheUnsetPlaceholderPath`.
+`RegeditWritePolicy` itself is in the WinUI project and is not referenced by the registry tests, so
+its selection is checked by code review, not by a test.
+
+## B. Wrongful denials (writes that should succeed)
+
+### B1. Ordinary keys and values in the sandbox
+
+Creating, setting, reading back, renaming, and deleting ordinary keys and values in the run root
+must keep working. The E2E suite depends on this. The chain walk opens existing components with
+non-following opens and does not create anything. Tests: `CreateSetReadDeleteRenameAndCopyWork...`
+(existing), `TypedSettersRoundTripThroughTheRealRegistry` (existing).
+
+### B2. A missing component is not a denial
+
+A missing component produces the native not-found error (2 or 3), not access denied. A missing
+parent for `CreateKey` is still not found. Test: `MissingComponentReportsNotFoundNotDenied`.
+
+### B3. Shipping behavior
+
+`ShippingWritePolicy.RejectsSymbolicLinks` is false. Shipping writes follow links, use the native
+open path, and do not run the chain walk. Test: `ShippingShipsTheDenyAllPolicyAndKeepsLinkFollowingBehavior`
+(tests/Bwc.Registry.Shipping.Tests).
+
+### B4. Probe failures
+
+When the guard cannot read `SymbolicLinkValue` on a node (for example, the caller lacks
+`KEY_QUERY_VALUE`), the guard refuses. The sandbox keys are created with full access, so this does
+not affect the E2E suite. It is a deliberate fail-closed choice.
+
+### B5. Scanner false positives
+
+The hive scanner follows only subkey lists from the root key. It does not read value data, so a
+binary value that happens to contain `nk` bytes does not count as a key node. An unreachable key
+node is not loaded by a restore, and the scanner does not look at it.
+
+## C. Native behavior the design depends on
+
+These statements are the design's assumptions. Each one has a test in the suite that fails if the
+assumption is wrong. Items marked as measured were checked on this Windows build during development.
+
+- C1. `RegOpenKeyEx(predefined root, "")` returns a real key handle that serves as the base of the
+  walk. Covered by every guarded write test.
+- C2. Ordinary opens follow links (measured). `NtOpenKeyEx` with `REG_OPTION_OPEN_LINK` also
+  follows the link on this build, in both relative and absolute form (measured), so the guard does
+  not use it. The guard opens a child as a link node with `RegCreateKeyEx` and `REG_OPTION_OPEN_LINK`,
+  which returns the link node itself (measured). Covered by `ReadsFollowLinksIntoTheirTarget` and
+  every link refusal test.
+- C3. A link node holds a value named `SymbolicLinkValue` of type `REG_LINK`, and nothing else
+  marks it as a link. The guard uses that value to tell a link from an ordinary key. Covered by
+  `NormalKeyWithValueNamedLikeLinkIsNotALink`.
+- C4. `RegCreateKeyEx` with `REG_OPTION_OPEN_LINK` creates a normal key when no key exists. The
+  guard therefore confirms that the child is listed by its parent before it calls it, so a probe
+  never creates a key on the path it checks (see D2 for the residual race).
+- C5. `RegDeleteKeyEx` on a link name fails with access denied on this build (measured), so it
+  cannot remove a link. `NtDeleteKey` on a handle opened with `REG_OPTION_OPEN_LINK` removes only
+  the link node and leaves the target (measured). The test fixture uses the second form for cleanup,
+  and the writer never removes a link. Covered by `LinkNodeRemovalLeavesTheTargetAlone`.
+- C6. A key listed by enumeration of its parent is found by name, including a link node. The guard
+  uses that listing to confirm a name, so it does not depend on following the link.
+
+## D. Races (residual)
+
+- D1. A link or a rename created by another process after the walk. Handles that the writer already
+  holds refer to nodes it verified, so a link created at a component after verification is not
+  followed by those handles. A component renamed out of the sandbox after verification still
+  receives writes through the held handle. Processes running as the same user can write `HKCU`
+  directly anyway, so this is documented, not prevented.
+- D2. The guard checks a child by listing its parent and then opening it with `REG_OPTION_OPEN_LINK`.
+  A link or a deletion can appear between the two calls. If the child disappears in that window, the
+  open creates an empty normal key, and the probe leaves it in place. The key is inside the sandbox.
+  A later native call on that path then acts on the new empty key, so a delete reports success where
+  regedit would report not found. This is the one write the probe can make, and it happens only in
+  the race.
+- D3. The hive file can change between the scan and the native restore. The scanner reads the file,
+  and the native call reads it again by path.
+
+## E. Static guard (`scripts/check-registry-writer.js`)
+
+The checker scans every `.cs` file and every `NativeMethods.txt` under `src/` and `tests/`, skipping
+`bin/` and `obj/`. `tools/` and `spikes/` are not scanned; `tools/Bwc.Oracle.Capture` writes with
+`NtSetValueKey` by design and is a separate review. The writer files `RegistryWriter*.cs` in
+`src/Bwc.Registry` are exempt. `NativeMethods.txt` in `src/Bwc.Registry` is exempt because it lists
+the writer's own native surface.
+
+Exemptions are explicit and recorded in the checker with a reason:
+- Native write names: one file, `tests/Bwc.Registry.Tests/RegistryLinkFixture.cs`.
+- Managed writes: `src/` has none. In `tests/`, a fixed list of files, the registry test files
+  that seed sandbox keys and the E2E files that seed keys through the harness.
+- Reg process launches: none.
+
+- E1. Native write names, with `A`, `W`, `Ex`, `ExA`, and `ExW` suffixes: `RegSetValue`,
+  `RegSetValueEx`, `RegCreateKey`, `RegCreateKeyEx`, `RegCreateKeyTransacted`, `RegDeleteKey`,
+  `RegDeleteKeyEx`, `RegDeleteKeyTransacted`, `RegDeleteKeyValue`, `RegDeleteValue`, `RegDeleteTree`,
+  `RegRenameKey`, `RegCopyTree`, `RegLoadKey`, `RegLoadAppKey`, `RegUnLoadKey`, `RegSaveKey`,
+  `RegSaveKeyEx`, `RegReplaceKey`, `RegRestoreKey`, `RegSetKeySecurity`, `RegSetKeyValue`,
+  `RegOverridePredefKey`.
+- E2. Native NT and Zw writes: `NtSetValueKey`, `NtCreateKey`, `NtCreateKeyTransacted`,
+  `NtDeleteKey`, `NtDeleteKeyTransacted`, `NtDeleteValueKey`, `NtRenameKey`, `NtLoadKey`,
+  `NtLoadKey2`, `NtLoadKeyEx`, `NtUnloadKey`, `NtUnloadKey2`, `NtUnloadKeyEx`, `NtSaveKey`,
+  `NtSaveKeyEx`, `NtSaveMergedKeys`, `NtReplaceKey`, `NtRestoreKey`, `NtSetInformationKey`, and the
+  same names with `Zw`.
+- E3. Shell and shlwapi writes: `SHSetValue`, `SHDeleteKey`, `SHDeleteValue`, `SHCopyKey`,
+  `SHRegSetUSValue`, `SHRegWriteUSValue`, `SHRegDeleteUSValue`, `SHRegCreateUSKey`,
+  `SHRegOpenUSKey`, `SHRegDeleteEmptyUSKey`, `SHDeleteEmptyKey`, with `A` or `W`.
+- E4. A string literal whose whole content is one of the names above is matched. This covers
+  `EntryPoint = "RegSetValueExW"` in `DllImport` declarations. Prose inside string literals is not
+  matched, so a message such as `"RegSaveKey did not create the hive"` passes.
+- E5. Managed writes in files that reference managed registry types (`RegistryKey`,
+  `Microsoft.Win32.Registry`, `Registry.CurrentUser`, `Registry.SetValue`, and similar): `SetValue`,
+  `CreateSubKey`, `DeleteSubKey`, `DeleteSubKeyTree`, `DeleteValue`, `SetAccessControl`,
+  `OpenSubKey` with `writable: true` or a `true` second argument, and `ReadWriteSubTree`. In `src/`
+  nothing is exempt. In `tests/`, only the files named in the checker's allowlist are exempt, and
+  each entry records a reason.
+- E6. Process launches of `reg` or `regedit` with a write verb (`add`, `delete`, `copy`, `save`,
+  `restore`, `load`, `unload`, `import`) or with `/s`, and any `reg` or `regedit` executable literal
+  in a file that starts processes.
+- E7. Comments are stripped before matching. A line comment or a block comment never triggers the
+  checker.
+
+Known gaps: reflection, names built at run time, native libraries, generated code outside `obj/`,
+and managed writes through a `RegistryKey` that arrives without a registry-type reference in the
+same file. `tools/` and `spikes/` are not scanned.
+
+`--self-test` writes a temporary tree with violating files for each rule family (native names with
+`W`, `Ex`, `Nt`, and `SH` forms, a DllImport entry point literal, a NativeMethods entry, managed
+writes, a `reg.exe` launch, and a `reg add` command line), one file in the writer directory that
+must pass, and one clean file with only comments and prose. The scan must report exactly the expected
+violations and nothing from the clean file or the writer file. The self-test is embedded in the script.
+
+## F. Test and cleanup hazards
+
+- F1. Every test writes only under `HKCU\Software\BWC-E2E\<run-id>`. The "outside" keys that link
+  tests and copy tests use are sibling keys inside the same run tree, but outside the sandbox root
+  the policy was given, so a broken guard still cannot touch another run or another test.
+- F2. Link fixtures create and remove link nodes with native calls from one test file,
+  `RegistryLinkFixture.cs`, which is the only native-write exemption in the registry test project.
+  Cleanup removes link nodes with `NtDeleteKey` on a handle opened with `REG_OPTION_OPEN_LINK`
+  before the run root is deleted through the writer, because a recursive delete over a link is
+  refused by design.
+- F3. The elevated round trip (`ElevatedSaveAndRestoreRoundTripStaysInsideTheSandbox`) keeps only
+  the sandboxed `SaveKey` and `RestoreKey` parts. Hive mounts (`LoadHive` and `UnloadHive`) need
+  `HKLM` or `HKU`, which the sandbox refuses, so no unit test mounts a hive. The argument-validation
+  tests in `RegistryHiveTests` still use `ShippingWritePolicy`, because every call in them fails in
+  argument validation or the privilege check before any native call. No automated test in this
+  batch mounts a hive. The E2E hive suite only checks that a cancelled load leaves nothing mounted.
+  Mount behavior needs a manual elevated run, which is outside the acceptance run.
+- F4. Each test removes its run root in `finally`. The parent `HKCU\Software\BWC-E2E` may remain
+  empty, and the acceptance check looks for child keys.
+
+## G. Retained failure modes
+
+### G1. Value name length
 
 Registry value names are limited to 16383 characters. The writer rejects longer names with
-`ArgumentException` before native code. This keeps the failure deterministic instead of relying
-on `ERROR_MORE_DATA` or a truncated write. Key components are limited to 255 characters by
+`ArgumentException` before native code. Key components are limited to 255 characters by
 `RegistryPath`.
 
-## 15. Embedded NUL
+### G2. Default value
 
-A .NET string can contain U+0000. Native wide-string APIs stop at the first NUL, so a name such
-as `Foo\0Bar` would silently operate on `Foo`. `RegistryPath`, `Append`, `SetValue`,
-`DeleteValue`, and `RenameKey` reject embedded NUL. Tests cover a NUL in a path, a value name,
-and a rename component.
+The default value has an empty name. `SetValue` and `DeleteValue` accept `""`. `null` is rejected.
 
-## 16. ERROR_MORE_DATA
+### G3. ERROR_MORE_DATA
 
-Read APIs can return `ERROR_MORE_DATA` (234) when a buffer is too small. The writer is
-write-only, but the exception type preserves the raw Win32 code so a future reader can
-distinguish a retryable buffer problem from a permanent failure. The check script does not
-inspect read APIs. `RegistryOperationException.HResult` is `0x8007xxxx` so tooling can recover
-the Win32 code from the HRESULT.
+The writer is write-only. `RegistryOperationException` keeps the raw Win32 code, and its `HResult`
+is `0x8007xxxx`, so a retryable buffer problem can be told apart from a permanent failure.
 
-## 17. Policy bypass via raw handles
+### G4. Handle leaks
 
-`RegistryWriter` takes and returns only `RegistryPath`. Handles are internal to
-`Bwc.Registry`. The generated P/Invoke surface is internal. `IRegistryWritePolicy` has no
-handle-based overload, so a caller cannot pass an already-open handle to skip the path check.
+Every opened key is wrapped in `SafeRegistryKeyHandle`, which releases with `RegCloseKey`.
+Predefined roots are non-owning handles. The guard's probe handles and its root handle are
+disposed on every path, including failures.
 
-The remaining bypass is adding a new file that calls advapi32 directly. `scripts/check-registry-writer.js`
-scans every `.cs` file under `src/` except `RegistryWriter*.cs` and fails on the mutating API
-names. The script is a guard, not a security boundary: a determined author could use reflection,
-a differently named `DllImport` entry point, or a native library. Code review still matters.
+### G5. Partial delete and partial copy
 
-## 18. SandboxWritePolicy leaking into shipping
+`RegDeleteTree` and `RegCopyTree` can fail after changing some keys. The writer reports the Win32
+error and does not clean up, because cleanup could delete user data. The guard refuses trees with
+links before either call, so the partial state cannot include a link from the source.
 
-`SandboxWritePolicy` is compiled only when `BWC_E2E` is defined. The shipping test assembly is
-built without `BwcFlavor=E2E` and asserts by reflection that the type is absent. The E2E test
-project is built with `BwcFlavor=E2E` and asserts the sandbox behavior against the real registry.
-The shipping assembly also has no public API that constructs a sandbox policy, so a shipping
-caller cannot enable it at runtime.
+`RegCopyTree` copies the source security descriptor. The destination handle needs `WRITE_DAC`.
 
-## 19. Check script false positives and false negatives
+### G6. Rename across parents
 
-The script strips `//` and `/* */` comments while respecting string and character literals, so a
-URL such as `https://example` does not hide a later call on the same line. Identifiers inside
-string literals are still matched, which can produce a false positive for an error message or an
-`EntryPoint = "RegSetValueEx"` declaration. That is deliberate: a direct P/Invoke with a
-different method name would otherwise pass.
+`RenameKey` takes a single new name. A name with a separator is rejected, so a rename cannot move a
+key to another parent.
 
-False negatives remain for reflection, native libraries, generated code under `obj/`, and
-interpolated string holes whose contents are not parsed as code. Generated files under `bin/`
-and `obj/` are skipped.
+### G7. WOW64 view
 
-`--self-test` builds a temporary tree containing one violating file, runs the same scan function,
-requires exit code 1 and a reported violation, then deletes the tree. A self-test that silently
-passes would mean the scan is broken.
+Every open uses `KEY_WOW64_64KEY`. The writer never uses `KEY_WOW64_32KEY`.
 
-## 20. Test cleanup failure
+### G8. 32-bit emulation on ARM64
 
-Each registry test creates one `HKCU\Software\BWC-E2E\<guid>` root and deletes it in a `finally`
-block using the 64-bit view. If cleanup throws, the test fails instead of hiding the leak. The
-parent `HKCU\Software\BWC-E2E` may remain empty; the acceptance check looks for child keys. A
-crash that prevents `finally` from running leaves a key whose name contains the guid, which is
-easy to identify and remove by hand.
+The explicit 64-bit flag makes the writer independent of process bitness. The ARM64 build is the
+acceptance build.
+
+### G9. SandboxWritePolicy in shipping
+
+`SandboxWritePolicy` and the guard's sandbox-only code compile only under `BWC_E2E`. The shipping
+test asserts by reflection that the sandbox policy type is absent. `DenyAllWritePolicy` is public
+in both flavors because it refuses writes.
+
+### G10. Test cleanup failure
+
+Each registry test removes `HKCU\Software\BWC-E2E\<run-id>` in `finally`. If cleanup throws, the
+test fails instead of hiding the leak.
+
+## H. Checker self-test and false positives (retained)
+
+Comments are stripped while string and character literals are respected, so a URL such as
+`https://example` does not hide a later call on the same line. The checker's self-test is part of
+the acceptance run. A self-test that passes silently would mean the scan is broken.

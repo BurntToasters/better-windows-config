@@ -62,7 +62,10 @@ public sealed class HexEditor : UserControl
     {
         AutomationProperties.SetAutomationId(this, "HexEditor");
         AutomationProperties.SetName(this, "Hex editor");
+#if BWC_E2E
+        // E2E-only: the debug state string is UIA help text that screen readers must not announce in ship.
         AutomationProperties.SetHelpText(this, "Length=0;SelectedOffset=-1;SelectedLength=0");
+#endif
         IsTabStop = true;
         UseSystemFocusVisuals = true;
 
@@ -1047,6 +1050,8 @@ public sealed class HexEditor : UserControl
         AfterEdit(start, rowsChanged);
     }
 
+    // E2E-only: debug state as UIA help text. Conditional drops it from ship without leaving _clipboardIssue unread.
+    [System.Diagnostics.Conditional("BWC_E2E")]
     private void UpdateHelpText()
     {
         string text =

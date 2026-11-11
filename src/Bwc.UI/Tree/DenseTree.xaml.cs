@@ -3,7 +3,9 @@ using Bwc.UI.Theme;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
+#if BWC_E2E
 using Microsoft.UI.Xaml.Automation;
+#endif
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.Foundation;
@@ -824,7 +826,10 @@ public sealed partial class DenseTree : UserControl
 
     private void UpdateHelpText()
     {
+#if BWC_E2E
+        // E2E-only: debug counts in UIA help text would be announced by screen readers in ship builds.
         AutomationProperties.SetHelpText(this, $"Rows={_rows.Count};Selected={SelectedNode?.Name ?? string.Empty}");
+#endif
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)

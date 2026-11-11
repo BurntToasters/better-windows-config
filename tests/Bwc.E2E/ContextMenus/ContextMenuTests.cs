@@ -61,10 +61,12 @@ public sealed class ContextMenuTests
 
     [TestMethod]
     [TestCategory("ContextMenu")]
+    [TestCategory("Mutating")]
     public void ContextMenus_OpenAndInvokeCommands()
     {
         _checkStart = E2EResults.CheckCount;
         E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
 
         try
         {
@@ -109,13 +111,11 @@ public sealed class ContextMenuTests
                 navigated && seededRows,
                 $"navigated={navigated}, seededRows={seededRows}, rows=[{string.Join(",", ControlTestSupport.ListRowNames(session))}].");
 
-            if (navigated && seededRows)
-            {
-                CheckTreeMenu(session, driver, menus, sandbox, config);
-                CheckValueMenu(session, driver, menus, sandbox);
-                CheckBackgroundMenu(session, menus);
-                CheckKeyboard(session, driver, menus, sandbox, config);
-            }
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated && seededRows, "contextmenu.sandbox.navigate");
+            CheckTreeMenu(session, driver, menus, sandbox, config);
+            CheckValueMenu(session, driver, menus, sandbox);
+            CheckBackgroundMenu(session, menus);
+            CheckKeyboard(session, driver, menus, sandbox, config);
 
             FailIfNeeded();
         }
@@ -174,6 +174,7 @@ public sealed class ContextMenuTests
         row = FindTreeRow(session, config.RunId);
         bool newMenu = menus.RightClick(row) && menus.WaitForMenu(TreeMenuNames) is not null;
         bool submenu = newMenu && menus.OpenSubmenu(516) && menus.WaitForItem(663) is not null;
+        E2EGuards.RequireSandboxSelection(session, sandbox, "contextmenu.sandbox.newkey");
         bool newInvoked = submenu && menus.Invoke(663);
         bool dialog = newInvoked && driver.WaitForDialog();
         bool input = dialog && driver.WaitForElement("DialogTextInput") is not null;
@@ -211,9 +212,23 @@ public sealed class ContextMenuTests
         MenuEntry? modifyBinary = snapshot?.Find(917);
         E2EResults.Record(
             "contextmenu.value.enabled",
-            modify is { Enabled: false } && modifyBinary is { Enabled: true },
-            $"modifyEnabled={modify?.Enabled}, modifyBinaryEnabled={modifyBinary?.Enabled}.");
+            modifyBinary is { Enabled: true },
+            $"modifyBinaryEnabled={modifyBinary?.Enabled}.");
+        if (modify is null)
+        {
+            E2EResults.Record("contextmenu.value.modify", false, "Modify... was not found in the value menu.");
+        }
+        else
+        {
+            E2EResults.RecordOrKnownGap(
+                "contextmenu.value.modify",
+                matchesOracle: modify.Enabled,
+                workPackage: "RF1",
+                expectedOracleBehavior: "Modify... is enabled for every value type, including binary values.",
+                observed: $"Modify... enabled={modify.Enabled} on the REG_BINARY value.");
+        }
 
+        E2EGuards.RequireSandboxSelection(session, sandbox, "contextmenu.sandbox.modifybinary");
         bool binaryInvoked = menus.Invoke(917);
         bool dialog = binaryInvoked && driver.WaitForDialog();
         bool hexDialog = dialog && driver.WaitForElement("HexEditorDialog") is not null;
@@ -227,6 +242,7 @@ public sealed class ContextMenuTests
 
         row = FindListRow(session, BinaryValueName);
         bool renameMenu = menus.RightClick(row) && menus.WaitForMenu(ValueMenuNames) is not null;
+        E2EGuards.RequireSandboxSelection(session, sandbox, "contextmenu.sandbox.rename");
         bool renameInvoked = renameMenu && menus.Invoke(914);
         bool renameBox = renameInvoked && ControlTestSupport.WaitUntil(
             () => session.Find("ListRenameBox") is not null,
@@ -242,6 +258,7 @@ public sealed class ContextMenuTests
 
         row = FindListRow(session, BinaryValueName);
         bool deleteMenu = menus.RightClick(row) && menus.WaitForMenu(ValueMenuNames) is not null;
+        E2EGuards.RequireSandboxSelection(session, sandbox, "contextmenu.sandbox.delete");
         bool deleteInvoked = deleteMenu && menus.Invoke(913);
         bool deleteDialog = deleteInvoked && driver.WaitForDialog();
         bool deleteCancelled = deleteDialog &&
@@ -326,6 +343,8 @@ public sealed class ContextMenuTests
             () => ControlTestSupport.IsSelected(FindListRow(session, BinaryValueName)),
             TimeSpan.FromSeconds(5));
 
+        E2EGuards.RequireListRowSelected(session, BinaryValueName, "contextmenu.sandbox.keyboard.delete.row");
+        E2EGuards.RequireSandboxSelection(session, sandbox, "contextmenu.sandbox.keyboard.delete");
         bool deleteSent = SendKeys(session, "DELETE");
         bool deleteDialog = deleteSent && driver.WaitForDialog();
         bool deleteCancelled = deleteDialog &&
@@ -352,7 +371,7 @@ public sealed class ContextMenuTests
         bool refreshed = f5Sent &&
             ControlTestSupport.WaitForTreeSelection(session, config.RunId, TimeSpan.FromSeconds(15)) &&
             ControlTestSupport.WaitUntil(
-                () => ControlTestSupport.ListRowNames(session).Contains(BinaryValueName, StringComparer.Ordinal),
+                () => ControlTestSupport.ListRowNames(session).Contains(BinaryValueName, StringComparer.OrdinalIgnoreCase),
                 TimeSpan.FromSeconds(15));
         E2EResults.Record(
             "contextmenu.keyboard.f5",
@@ -444,7 +463,7 @@ public sealed class ContextMenuTests
     {
         foreach (string name in expected)
         {
-            if (!names.Contains(name, StringComparer.Ordinal))
+            if (!names.Contains(name, StringComparer.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -453,12 +472,13 @@ public sealed class ContextMenuTests
         return true;
     }
 
+    /// <summary>The copied text is a key path, and registry key paths are case-insensitive.</summary>
     private static bool WaitForClipboardText(string expected, TimeSpan timeout)
     {
         string text = string.Empty;
         return ControlTestSupport.WaitUntil(
             () => TryReadClipboardText(out text, out _) &&
-                string.Equals(text, expected, StringComparison.Ordinal),
+                string.Equals(text, expected, StringComparison.OrdinalIgnoreCase),
             timeout);
     }
 

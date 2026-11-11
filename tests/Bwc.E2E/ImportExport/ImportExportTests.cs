@@ -42,10 +42,12 @@ public sealed class ImportExportTests
 
     [TestMethod]
     [TestCategory("ImportExport")]
+    [TestCategory("Mutating")]
     public void ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox()
     {
         _checkStart = E2EResults.CheckCount;
         E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
 
         try
         {
@@ -89,16 +91,17 @@ public sealed class ImportExportTests
 
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
             bool seeded = ControlTestSupport.WaitUntil(
-                () => ControlTestSupport.ListRowNames(session).Contains("AlphaString", StringComparer.Ordinal),
+                () => ControlTestSupport.ListRowNames(session).Contains("AlphaString", StringComparer.OrdinalIgnoreCase),
                 TimeSpan.FromSeconds(15));
             E2EResults.Record(
                 "importexport.navigate",
                 navigated && seeded,
                 $"navigated={navigated}, seededRows={seeded}, rows=[{string.Join(",", ControlTestSupport.ListRowNames(session))}].");
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated && seeded, "importexport.sandbox.navigate");
 
             CheckExport(session, driver, dialogs, sandbox, exportFile);
             CheckImport(session, driver, dialogs, sandbox, importFile);
-            CheckCancel(session, driver, dialogs, cancelFile);
+            CheckCancel(session, driver, dialogs, sandbox, cancelFile);
 
             FailIfNeeded();
         }
@@ -116,6 +119,7 @@ public sealed class ImportExportTests
         SandboxRegistry sandbox,
         string exportFile)
     {
+        E2EGuards.RequireSandboxSelection(session, sandbox, "importexport.sandbox.export");
         if (!InvokeFileCommand(driver, dialogs, MenuFileExport, "importexport.export"))
         {
             return;
@@ -156,23 +160,26 @@ public sealed class ImportExportTests
             owned && disabled && set && accepted && closed,
             $"{setName} {acceptName} closed={closed}, cancelFallback={cancelFallback}.");
 
-        bool fileExists = File.Exists(exportFile);
-        byte[] bytes = fileExists ? File.ReadAllBytes(exportFile) : Array.Empty<byte>();
+        // The application writes the file on a background task, so it can appear after the dialog closes.
+        byte[]? stable = WaitForStableFile(exportFile, TimeSpan.FromSeconds(10));
+        bool fileExists = stable is not null;
+        byte[] bytes = stable ?? Array.Empty<byte>();
         bool bom = bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE;
         string text = bom ? Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2) : string.Empty;
         bool header = text.StartsWith(
             "Windows Registry Editor Version 5.00\r\n\r\n",
             StringComparison.Ordinal);
+        // Registry key names are case-insensitive, so the key header matches in any case.
         bool key = text.Contains(
             "[HKEY_CURRENT_USER\\" + sandbox.RunRootPath + "]\r\n",
-            StringComparison.Ordinal);
+            StringComparison.OrdinalIgnoreCase);
         bool value = text.Contains(
             "\"" + ExportValueName + "\"=\"exported\"\r\n",
             StringComparison.Ordinal);
         E2EResults.Record(
             "importexport.export.file",
             fileExists && bom && header && key && value,
-            $"exists={fileExists}, bom={bom}, header={header}, key={key}, value={value}, bytes={bytes.Length}.");
+            $"exists={fileExists}, presentNow={File.Exists(exportFile)}, bom={bom}, header={header}, key={key}, value={value}, bytes={bytes.Length}, file='{exportFile}'.");
 
         bool enabledAgain = ControlTestSupport.WaitUntil(
             () => Win32.IsWindowEnabled(session.MainHwnd),
@@ -190,6 +197,7 @@ public sealed class ImportExportTests
         SandboxRegistry sandbox,
         string importFile)
     {
+        E2EGuards.RequireSandboxSelection(session, sandbox, "importexport.sandbox.import");
         if (!InvokeFileCommand(driver, dialogs, MenuFileImport, "importexport.import"))
         {
             return;
@@ -238,7 +246,7 @@ public sealed class ImportExportTests
             SessionKeyName(sandbox),
             TimeSpan.FromSeconds(10));
         bool rootRow = ControlTestSupport.WaitUntil(
-            () => ControlTestSupport.ListRowNames(session).Contains(ImportedRootValue, StringComparer.Ordinal),
+            () => ControlTestSupport.ListRowNames(session).Contains(ImportedRootValue, StringComparer.OrdinalIgnoreCase),
             TimeSpan.FromSeconds(10));
 
         AutomationElement? runRow = ControlTestSupport.FindRowByName(
@@ -262,7 +270,7 @@ public sealed class ImportExportTests
             ImportedKeyName,
             TimeSpan.FromSeconds(10));
         bool childListRow = ControlTestSupport.WaitUntil(
-            () => ControlTestSupport.ListRowNames(session).Contains(ImportedChildValue, StringComparer.Ordinal),
+            () => ControlTestSupport.ListRowNames(session).Contains(ImportedChildValue, StringComparer.OrdinalIgnoreCase),
             TimeSpan.FromSeconds(10));
 
         E2EResults.Record(
@@ -275,8 +283,10 @@ public sealed class ImportExportTests
         AppSession session,
         EditingDriver driver,
         CommonDialogDriver dialogs,
+        SandboxRegistry sandbox,
         string cancelFile)
     {
+        E2EGuards.RequireSandboxSelection(session, sandbox, "importexport.sandbox.cancel");
         if (!InvokeFileCommand(driver, dialogs, MenuFileExport, "importexport.cancel"))
         {
             return;
@@ -364,6 +374,40 @@ public sealed class ImportExportTests
             checkPrefix + ".menu",
             found && enabled && activated,
             $"command={commandId}, {notes}.");
+    }
+
+    /// <summary>
+    /// Waits until the file exists, has content, and keeps the same size across two reads 250 ms apart.
+    /// Returns its bytes, or null when the file never settles within the timeout.
+    /// </summary>
+    private static byte[]? WaitForStableFile(string path, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        long lastLength = -1;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (File.Exists(path))
+            {
+                long length = new FileInfo(path).Length;
+                if (length > 0 && length == lastLength)
+                {
+                    try
+                    {
+                        return File.ReadAllBytes(path);
+                    }
+                    catch (IOException)
+                    {
+                        // The writer still holds the file. The next pass retries.
+                    }
+                }
+
+                lastLength = length;
+            }
+
+            Thread.Sleep(250);
+        }
+
+        return null;
     }
 
     private static bool SafeIsEnabled(AutomationElement element)
@@ -544,21 +588,46 @@ public sealed class ImportExportTests
 
             if (edit is not null && TrySetValue(edit, path))
             {
-                notes = $"fileNameEdit id='{SafeId(edit)}' name='{SafeName(edit)}' set through ValuePattern.";
+                notes = $"fileNameEdit id='{SafeId(edit)}' name='{SafeName(edit)}' set through ValuePattern and read back.";
                 return true;
             }
 
-            if (EnsureForeground(dialog))
+            // Keyboard fallback. Typing goes to whichever control has focus, so it counts only when the
+            // file name box reads back the full path. Accepting the dialog with any other text would save
+            // under the dialog's default name in its default folder, which is how a stray <run-id>.reg
+            // file ended up in Documents.
+            if (edit is not null && FocusEdit(edit) && EnsureForeground(dialog))
             {
                 Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
                 Keyboard.Type(path);
                 Thread.Sleep(200);
-                notes = "fileNameEdit not usable; typed the path with the keyboard.";
-                return true;
+                AutomationElement? after = FindFileNameEdit(dialog);
+                string readBack = after is null ? "(no file name box)" : ReadValue(after);
+                if (string.Equals(readBack, path, StringComparison.Ordinal))
+                {
+                    notes = "fileNameEdit not usable through ValuePattern; typed the path and read it back.";
+                    return true;
+                }
+
+                notes = $"typed the path, but the file name box reads '{readBack}'. Save is not pressed.";
+                return false;
             }
 
-            notes = "fileNameEdit not found and the dialog could not be focused.";
+            notes = "fileNameEdit not found or could not be focused. Save is not pressed.";
             return false;
+        }
+
+        private static bool FocusEdit(AutomationElement edit)
+        {
+            try
+            {
+                edit.Focus();
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         internal bool TryAccept(IntPtr dialog, string acceptText, out string notes)

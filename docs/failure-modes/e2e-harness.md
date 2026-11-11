@@ -2,7 +2,7 @@
 
 The E2E harness launches the Hub and the Registry Editor from a publish folder, drives them
 with UI Automation, writes sandbox state under `HKCU\Software\BWC-E2E\<runId>`, and writes
-`artifacts/e2e/result.json`. `scripts/test-e2e.js` is the entry point. This document lists the
+`artifacts/e2e/result-<rid>-<flavor>.json`. `scripts/test-e2e.js` is the entry point. This document lists the
 ways the harness can fail, how the failure is detected, and what the harness does about it.
 
 ## 1. Mutex abandoned or deadlocked
@@ -39,11 +39,18 @@ still appears, the window poll times out and the test fails without clicking the
 
 ## 4. Wrong architecture or publish folder
 
-`BWC_RID` selects `win-x64` or `win-arm64`, and `BWC_PUBLISH_DIR` selects the folder. If the rid
-does not match the running test host, or the folder belongs to another rid, the executables are
-missing or cannot start. `E2EConfig` validates the rid and flavor, resolves relative publish
-paths against the repository root, and `EnsureExecutablesExist` fails with the exact publish
-command to run. The executable check is recorded as a failed check, so `result.json` is written
+`BWC_RID` selects `win-x64` or `win-arm64`, and `BWC_PUBLISH_DIR` selects the folder. The test
+host and the app are separate. `scripts/test-e2e.js` builds and runs the test project for the host
+architecture (`process.arch`), and `--rid` only picks the app and its publish folder. The rule is
+that the app rid must be runnable on this machine: `win-x64` runs on x64 and ARM64 Windows (ARM64
+runs it under emulation), and `win-arm64` runs only on ARM64 Windows. `E2EConfig` checks this with
+`RuntimeInformation.OSArchitecture`, not the process architecture, so an x64 test host on an ARM64
+machine still accepts `win-x64`. An unrunnable rid fails assembly initialization, before any test
+runs and before the artifact is opened, so no artifact is written and `scripts/test-e2e.js` reports
+the missing artifact with the test output tail. If the folder belongs to another rid, the executables
+are missing or cannot start. `E2EConfig` validates the rid
+and flavor, resolves relative publish paths against the repository root, and `EnsureExecutablesExist`
+fails with the exact publish command to run. The executable check is recorded as a failed check, so `result-<rid>-<flavor>.json` is written
 with `pass: false` instead of the assembly crashing before the artifact exists.
 
 ## 5. Stale publish folder missing .pri files
@@ -99,7 +106,7 @@ run key or avoid running longer than the sweep threshold. The sweep never recurs
 Assembly cleanup calls `SandboxRegistry.Cleanup`, which deletes only the current run subtree and
 ignores a missing key. If deletion fails (for example because a handle is still open), the
 failure is recorded as `sandbox.cleanup` and the artifact is still written. A failed cleanup is
-visible in `result.json` and the run is not considered clean. The next run's stale sweep can
+visible in `result-<rid>-<flavor>.json` and the run is not considered clean. The next run's stale sweep can
 remove an old matching key after 24 hours. A harness self-test verifies the create, read, delete
 round trip.
 
@@ -107,7 +114,7 @@ round trip.
 
 The artifact is written in assembly cleanup, after all tests, and is not streamed incrementally.
 If the test host is killed or crashes hard, no artifact or a partial artifact remains.
-`scripts/test-e2e.js` deletes the previous `result.json` before starting the test host, then
+`scripts/test-e2e.js` deletes the previous `result-<rid>-<flavor>.json` before starting the test host, then
 requires both a zero test process exit code and a parseable artifact with `pass: true`. A missing
 or malformed artifact prints the tail of the test output and exits 1. This prevents an old
 successful artifact from masking a crashed run.
@@ -125,12 +132,12 @@ capture helper against a live window, checks that the PNG exists, and deletes it
 `scripts/test-e2e.js` looks for `dotnet` on `PATH` and falls back to
 `C:\Program Files\dotnet\dotnet.exe`. If neither exists, it prints an actionable message and
 exits nonzero before writing any artifact. A test host that cannot start never produces
-`result.json`, so the script reports the missing artifact and the output tail.
+`result-<rid>-<flavor>.json`, so the script reports the missing artifact and the output tail.
 
 ## 15. Filter matching zero tests
 
 A filter that matches no tests can make the test host exit successfully without running assembly
-initialize. The harness treats this as a failure: `result.json` is missing or has zero checks,
+initialize. The harness treats this as a failure: `result-<rid>-<flavor>.json` is missing or has zero checks,
 and `E2EResults` marks `pass` false whenever no checks were recorded. `scripts/test-e2e.js`
 exits 0 only when the test process succeeded and the artifact says `pass: true`, so a filter
 matching zero tests exits nonzero.
@@ -143,10 +150,69 @@ id and only deletes old matching keys, so one assembly cannot delete the other's
 Artifacts are written to the same path by design, which means the last assembly to finish wins.
 Run one E2E assembly at a time in CI if both artifact and registry history matter.
 
+## 17. A passing check that proves nothing
+
+A check is a pass or fail claim about an observed product or environment state. It is recorded
+with `E2EResults.Record(id, pass, notes)`. Three things are not checks, and the harness keeps
+them out of the pass count:
+
+- `E2EResults.Note(id, text)` records information only: a value that was read for the record,
+  a manual step that was not run, a bookkeeping step that succeeded (keys sent, the executable
+  found, the session launched), or an informational measurement. A note never affects `pass`.
+  A bookkeeping step that fails still records a failed check, so the run fails.
+- `E2EResults.KnownGap(id, workPackage, expectedOracleBehavior, observed)` records a difference
+  from classic Registry Editor that the parity plan already tracks. `workPackage` must be one of
+  `E1`, `E2`, `RF1`, `RF4`, `RF8`, `UF7`, and any other value throws. A known gap never counts as
+  a pass and never fails the run. It names the oracle behavior and the value observed, so the
+  artifact shows the difference instead of hiding it behind a pass.
+- `E2EResults.RecordOrKnownGap(id, matchesOracle, ...)` records a pass when the observed value
+  matches the oracle and a known gap when it does not. Use it for a difference the plan already
+  owns. When the product is fixed, the same check turns into a pass without a code change.
+
+A literal `true` is never a check. A check whose pass value is fixed by earlier code, such as
+a record after an early return, is rewritten so the value is computed at the record point, or it
+becomes a note. The artifact keeps the schema 1 `checks` array shape `{id, pass, notes}` for
+`scripts/test-all.js`, and adds `notes` (`{id, text}`) and `knownGaps`
+(`{id, workPackage, expectedOracleBehavior, observed}`).
+
+## 18. Density checks drift with the window DPI
+
+Menu, tree, list, address bar, and splitter geometry is compared with
+`docs/parity/oracle/regedit-metrics.json`. `OracleMetrics` reads that file. Its pixel values are
+device pixels at `dpi.window` (192, which is 200 percent), so a value converts to device pixels at
+window DPI `d` as `value * d / 192`. The tolerance is one DIP in device pixels, rounded and never
+below one pixel: 2 px at 200 percent and 1 px at 100 percent. The header label height has no oracle
+measurement, so its 12 DIP minimum is kept and scaled. The development machine runs at 200
+percent, so only that scale was run. The 100 percent expectations follow from the same formula
+but were not exercised here.
+
+## 19. Save and export writing outside artifacts
+
+Every file the suite writes goes under `artifacts/e2e`. Three guards cover the failure seen with
+a stray `<run-id>.reg` file in Documents:
+
+- The Save dialog only accepts after the file name box reads back the full path. The keyboard
+  fallback is checked the same way. A dialog accepted with its default name would save to the
+  dialog's default folder, which is Documents. Accepting with an unverified name is what produced
+  the stray file.
+- After an export the test waits up to 10 seconds until the file exists and keeps the same size
+  across two reads 250 ms apart. The application writes the file on a background task.
+- `files.outside-artifacts` fails the run when a `.reg` file in Documents, Desktop, the repository
+  root, or the publish folder was created or changed during the run. It does not count older files.
+
+Clipboard checks clear the clipboard before each copy, poll until the expected text appears, and
+compare the full hex text. A mismatch is a `UF7` known gap with the observed clipboard prefix and
+length. An unreadable clipboard is a failed check, because that is an environment problem.
+
 ## Verification artifact
 
-A successful harness run leaves `artifacts/e2e/result.json` with schema 1, the run id, rid,
-flavor, publish folder, timestamps, OS and architecture details, and every recorded check.
-`pass` is true only when at least one check ran and every check passed. A failed run leaves the
-same artifact with `pass: false`, failed check ids, notes, and screenshots under
-`artifacts/e2e/screenshots` when capture succeeded.
+A successful harness run leaves `artifacts/e2e/result-<rid>-<flavor>.json` with schema 2, the run
+id, `rid` and `appRid` (the app rid, the same value), flavor, publish folder, timestamps, OS and
+architecture details (`osArchitecture` is the machine, and `processArchitecture` is the test host
+process, which is Arm64 on an ARM64 machine even when `appRid` is `win-x64`), every recorded check,
+the `notes` array, and the `knownGaps` array (sections 17 to 19 describe each array).
+`pass` is true only when at least one check ran and every check passed. Known gaps and notes do
+not affect `pass`. A failed run leaves the same artifact with `pass: false`, failed check ids,
+notes, and screenshots under `artifacts/e2e/screenshots` when capture succeeded.
+`scripts/test-e2e.js` prints passed, failed, and total checks, the known gaps grouped by work
+package, and the notes count. It requires schema 2 and at least one check.

@@ -3,7 +3,7 @@
 `tests/Bwc.E2E/Shell/ShellTests.cs` drives the published Registry Editor through UI Automation
 and keyboard input. It checks the window structure, the classic metrics at the current DPI, the
 menu table, the address bar toggle, the splitter keys, and the Alt/F10 menu keyboard model.
-The checks are recorded in `artifacts/e2e/result.json`. This document lists the ways the harness
+The checks are recorded in `artifacts/e2e/result-<rid>-<flavor>.json`. This document lists the ways the harness
 or the shell can fail and how the tests handle each one.
 
 ## 1. UIA stale elements

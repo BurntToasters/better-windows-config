@@ -5,7 +5,7 @@ namespace Bwc.E2E;
 
 /// <summary>
 /// Launches the Hub and the Registry Editor and checks their main windows. Every check is also
-/// written to artifacts/e2e/result.json by assembly cleanup.
+/// written to artifacts/e2e/result-&lt;rid&gt;-&lt;flavor&gt;.json by assembly cleanup.
 /// </summary>
 [TestClass]
 public sealed class SmokeTests
@@ -22,7 +22,7 @@ public sealed class SmokeTests
         try
         {
             config.EnsureExecutablesExist();
-            E2EResults.Record("smoke.publish.executables", true, config.PublishDir);
+            E2EResults.Note("smoke.publish.executables", config.PublishDir);
         }
         catch (FileNotFoundException ex)
         {

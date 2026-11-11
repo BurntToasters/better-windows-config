@@ -57,7 +57,7 @@ public sealed class RegistryReaderTests
                 }
             }
 
-            var writer = new RegistryWriter(new ShippingWritePolicy());
+            var writer = new RegistryWriter(new SandboxWritePolicy(runRoot));
 
             void AddRaw(string name, uint type, byte[] data)
             {

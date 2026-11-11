@@ -1,6 +1,4 @@
-using System.ComponentModel;
 using System.Globalization;
-using System.Runtime.InteropServices;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
@@ -25,7 +23,8 @@ public sealed class HexViewerTests
     private const string PatternValueName = "Pattern300";
     private const string StringValueName = "HexString";
     private const string StringText = "HelloHex";
-    private const uint CfUnicodeText = 13;
+    private const string CopyBehavior =
+        "Ctrl+C after Ctrl+A copies all 300 selected bytes as space separated hex text, in the same format as the hex column.";
 
     private static int _checkStart;
 
@@ -38,10 +37,12 @@ public sealed class HexViewerTests
 
     [TestMethod]
     [TestCategory("Hex")]
+    [TestCategory("E2EOnly")]
     public void HexViewer_ShowsRawBytesSelectsAndReturnsFocus()
     {
         _checkStart = E2EResults.CheckCount;
         E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
 
         try
         {
@@ -161,8 +162,6 @@ public sealed class HexViewerTests
         }
 
         bool selectAll = false;
-        bool clipboardMatches = false;
-        string clipboardNote = "not attempted";
         if (focused)
         {
             Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
@@ -170,33 +169,29 @@ public sealed class HexViewerTests
                 () => HelpTextOf(editorElement).Contains("SelectedLength=300", StringComparison.Ordinal),
                 TimeSpan.FromSeconds(5));
 
+            // The clipboard is cleared first, so only this copy can put text on it.
+            _ = ClipboardProbe.Clear();
             Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_C);
-            string clipboardText = string.Empty;
-            string? clipboardError = null;
-            bool clipboardRead = ControlTestSupport.WaitUntil(
-                () => TryReadClipboardText(out clipboardText, out clipboardError),
-                TimeSpan.FromSeconds(3));
-            string expectedClipboard = string.Join(
-                " ",
-                pattern.Select(value => value.ToString("X2", CultureInfo.InvariantCulture)));
-            clipboardMatches = clipboardRead &&
-                string.Equals(clipboardText, expectedClipboard, StringComparison.Ordinal);
-            clipboardNote = clipboardRead
-                ? $"clipboard read, matches={clipboardMatches}, length={clipboardText.Length}."
-                : "informational: clipboard unavailable: " + clipboardError;
+            string expectedClipboard = HexText(pattern);
+            ClipboardProbe.Reading copied = ClipboardProbe.WaitForText(expectedClipboard, TimeSpan.FromSeconds(3));
+            if (selectAll)
+            {
+                ClipboardProbe.RecordCopy("hex.binary.clipboard", copied, expectedClipboard, CopyBehavior);
+            }
+            else
+            {
+                E2EResults.Note("hex.binary.clipboard", "not compared: select all did not reach 300 bytes (see hex.binary.selectall).");
+            }
         }
         else
         {
-            clipboardNote = "informational: hex editor did not take UIA keyboard focus.";
+            E2EResults.Note("hex.binary.clipboard", "not attempted: the hex editor did not take UIA keyboard focus (see hex.binary.selectall).");
         }
 
         E2EResults.Record(
             "hex.binary.selectall",
             selectAll,
             $"editorFocused={focused}, help='{HelpTextOf(editorElement)}'.");
-
-        // Clipboard access is environmental. The selection check above is the hard assertion.
-        E2EResults.Record("hex.binary.clipboard", true, clipboardNote);
 
         Keyboard.Press(VirtualKeyShort.ESCAPE);
         bool closed = driver.WaitForNoDialog();
@@ -297,7 +292,7 @@ public sealed class HexViewerTests
     {
         foreach (string name in expected)
         {
-            if (!names.Contains(name, StringComparer.Ordinal))
+            if (!names.Contains(name, StringComparer.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -390,49 +385,6 @@ public sealed class HexViewerTests
         }
     }
 
-    private static bool TryReadClipboardText(out string text, out string? error)
-    {
-        text = string.Empty;
-        error = null;
-
-        if (!OpenClipboard(IntPtr.Zero))
-        {
-            error = new Win32Exception(Marshal.GetLastWin32Error()).Message;
-            return false;
-        }
-
-        try
-        {
-            IntPtr handle = GetClipboardData(CfUnicodeText);
-            if (handle == IntPtr.Zero)
-            {
-                error = "The clipboard has no Unicode text.";
-                return false;
-            }
-
-            IntPtr pointer = GlobalLock(handle);
-            if (pointer == IntPtr.Zero)
-            {
-                error = new Win32Exception(Marshal.GetLastWin32Error()).Message;
-                return false;
-            }
-
-            try
-            {
-                text = Marshal.PtrToStringUni(pointer) ?? string.Empty;
-                return true;
-            }
-            finally
-            {
-                _ = GlobalUnlock(handle);
-            }
-        }
-        finally
-        {
-            _ = CloseClipboard();
-        }
-    }
-
     private static void FailIfNeeded()
     {
         var failures = E2EResults.FailedChecksSince(_checkStart);
@@ -442,18 +394,6 @@ public sealed class HexViewerTests
             $"Hex checks failed:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
     }
 
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool OpenClipboard(IntPtr newOwner);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool CloseClipboard();
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr GetClipboardData(uint format);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr GlobalLock(IntPtr memory);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GlobalUnlock(IntPtr memory);
+    private static string HexText(byte[] bytes) =>
+        string.Join(" ", bytes.Select(value => value.ToString("X2", CultureInfo.InvariantCulture)));
 }

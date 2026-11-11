@@ -5,6 +5,10 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  checkPublishFlavor,
+  formatFlavorReport,
+} from "./flavor-metadata.js";
 
 const SCRIPT = "scripts/dotnet-build.js";
 const REPO_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -33,6 +37,10 @@ function printHelp() {
 
 Publishes Bwc.Hub, Bwc.Regedit.App, then Bwc.Update into
 publish/<rid> (ship) or publish/<rid>-e2e (e2e).
+
+After the publish, every managed Bwc* and BetterWindowsConfig* assembly in the
+folder root must carry BwcFlavor=ship (ship) or BwcFlavor=E2E (e2e). A missing or
+mismatched value exits 1. The result is recorded as flavorCheck in artifacts/build.
 
 Options:
   --rid <rid>        Required. win-x64 or win-arm64.
@@ -315,6 +323,7 @@ function main(argv = process.argv) {
   const knownFiles = new Map();
   let fileCount = 0;
   let errorMessage = null;
+  let flavorCheck = null;
 
   try {
     fs.rmSync(outDir, { recursive: true, force: true });
@@ -380,11 +389,21 @@ function main(argv = process.argv) {
         break;
       }
     }
+
+    if (!errorMessage) {
+      flavorCheck = checkPublishFlavor(outDir, flavor);
+      for (const line of formatFlavorReport(flavorCheck)) {
+        console.log(line);
+      }
+      if (!flavorCheck.ok) {
+        errorMessage = `flavor check failed: ${flavorCheck.problems[0]}`;
+      }
+    }
   }
 
   const pass = errorMessage === null;
   const artifact = {
-    schema: 1,
+    schema: 2,
     version,
     rid,
     flavor,
@@ -396,6 +415,9 @@ function main(argv = process.argv) {
     fileCount,
     collisions,
   };
+  if (flavorCheck) {
+    artifact.flavorCheck = flavorCheck;
+  }
   if (!pass) {
     artifact.error = errorMessage;
   }

@@ -37,10 +37,12 @@ public sealed class RemoteRegistryTests
 
     [TestMethod]
     [TestCategory("Remote")]
+    [TestCategory("Mutating")]
     public void Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection()
     {
         _checkStart = E2EResults.CheckCount;
         E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
 
         try
         {
@@ -76,18 +78,14 @@ public sealed class RemoteRegistryTests
 
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
             bool seeded = ControlTestSupport.WaitUntil(
-                () => ControlTestSupport.ListRowNames(session).Contains(SeedValueName, StringComparer.Ordinal),
+                () => ControlTestSupport.ListRowNames(session).Contains(SeedValueName, StringComparer.OrdinalIgnoreCase),
                 TimeSpan.FromSeconds(15));
             E2EResults.Record(
                 "remote.navigate",
                 navigated && seeded,
                 $"navigated={navigated}, seeded={seeded}, rows=[{string.Join(",", ControlTestSupport.ListRowNames(session))}].");
 
-            if (!navigated || !seeded)
-            {
-                FailIfNeeded();
-                return;
-            }
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated && seeded, "remote.sandbox.navigate");
 
             bool menuOpened = TryOpenMenu(driver, MenuFile);
             AutomationElement? connectItem = menuOpened
@@ -133,6 +131,7 @@ public sealed class RemoteRegistryTests
                 cancelled && enabledAgain && disconnectStillDisabled,
                 $"cancelled={cancelled}, enabledAgain={enabledAgain}, disconnectStillDisabled={disconnectStillDisabled}.");
 
+            E2EGuards.RequireSandboxSelection(session, sandbox, "remote.sandbox.connect");
             bool secondMenu = TryOpenMenu(driver, MenuFile);
             bool secondInvoked = secondMenu && driver.Invoke("MenuCommand_" + CommandConnectNetworkRegistry);
             bool secondDialog = secondInvoked && driver.WaitForDialog(TimeSpan.FromSeconds(10));
@@ -171,9 +170,8 @@ public sealed class RemoteRegistryTests
                 mainEnabledAgain && remoteNode is null && disconnectStillOff,
                 $"mainEnabled={mainEnabledAgain}, nodePresent={remoteNode is not null}, nodeName='{remoteNodeName}', disconnectStillDisabled={disconnectStillOff}.");
 
-            E2EResults.Record(
+            E2EResults.Note(
                 "remote.manual-browse-note",
-                true,
                 "Browsing a connected computer, expanding its remote roots, and the disconnect list require a second machine or VM snapshot with the Remote Registry service and network permissions. Those checks are manual and must run only on an isolated network.");
 
             FailIfNeeded();

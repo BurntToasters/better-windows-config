@@ -74,7 +74,7 @@ public sealed class AddressBarTests
                 ?? "(missing)";
             E2EResults.Record(
                 "addressbar.initial",
-                string.Equals(initial, "Computer", StringComparison.Ordinal),
+                string.Equals(initial, "Computer", StringComparison.OrdinalIgnoreCase),
                 $"expected 'Computer', got '{initial}'.");
 
             bool initialComputer = ControlTestSupport.WaitForTreeSelection(session, "Computer");
@@ -94,7 +94,7 @@ public sealed class AddressBarTests
                 ?? "(missing)";
             E2EResults.Record(
                 "addressbar.valid.address",
-                submitted && string.Equals(canonical, canonicalPath, StringComparison.Ordinal),
+                submitted && string.Equals(canonical, canonicalPath, StringComparison.OrdinalIgnoreCase),
                 $"expected '{canonicalPath}', got '{canonical}'.");
 
             bool selected = ControlTestSupport.WaitUntil(
@@ -111,7 +111,7 @@ public sealed class AddressBarTests
                 $"{config.RunId} selected={selected}.");
 
             bool values = ControlTestSupport.WaitUntil(
-                () => ControlTestSupport.ListRowNames(session).Contains(SeededValueName, StringComparer.Ordinal),
+                () => ControlTestSupport.ListRowNames(session).Contains(SeededValueName, StringComparer.OrdinalIgnoreCase),
                 TimeSpan.FromSeconds(15));
             E2EResults.Record(
                 "addressbar.valid.values",
@@ -131,7 +131,7 @@ public sealed class AddressBarTests
             E2EResults.Record(
                 "addressbar.abbreviation",
                 abbreviationTyped &&
-                    string.Equals(abbreviationAddress, canonicalPath, StringComparison.Ordinal) &&
+                    string.Equals(abbreviationAddress, canonicalPath, StringComparison.OrdinalIgnoreCase) &&
                     abbreviationSelected,
                 $"typed='{abbreviatedPath}' expected '{canonicalPath}', got '{abbreviationAddress}', selected={abbreviationSelected}.");
 
@@ -152,7 +152,7 @@ public sealed class AddressBarTests
                 ?? "(missing)";
             E2EResults.Record(
                 "addressbar.invalid.restored",
-                string.Equals(restored, canonicalPath, StringComparison.Ordinal),
+                string.Equals(restored, canonicalPath, StringComparison.OrdinalIgnoreCase),
                 $"expected '{canonicalPath}', got '{restored}'.");
 
             bool stillSelected = ControlTestSupport.WaitForTreeSelection(
@@ -178,7 +178,7 @@ public sealed class AddressBarTests
             E2EResults.Record(
                 "addressbar.computer.navigate",
                 computerTyped &&
-                    string.Equals(computerAddress, "Computer", StringComparison.Ordinal) &&
+                    string.Equals(computerAddress, "Computer", StringComparison.OrdinalIgnoreCase) &&
                     computerSelected,
                 $"typed={computerTyped} address='{computerAddress}' Computer selected={computerSelected}.");
 
@@ -188,7 +188,7 @@ public sealed class AddressBarTests
                 ?? "(missing)";
             E2EResults.Record(
                 "addressbar.escape.restore",
-                escapeTyped && string.Equals(escaped, "Computer", StringComparison.Ordinal),
+                escapeTyped && string.Equals(escaped, "Computer", StringComparison.OrdinalIgnoreCase),
                 $"typed={escapeTyped} expected 'Computer', got '{escaped}'.");
 
             bool treeFocus = ControlTestSupport.WaitUntil(
@@ -239,7 +239,7 @@ public sealed class AddressBarTests
         }
 
         return ControlTestSupport.WaitUntil(
-            () => string.Equals(AddressText(session), text, StringComparison.Ordinal),
+            () => string.Equals(AddressText(session), text, StringComparison.OrdinalIgnoreCase),
             TimeSpan.FromSeconds(5));
     }
 

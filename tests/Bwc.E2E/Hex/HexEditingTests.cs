@@ -1,6 +1,4 @@
-using System.ComponentModel;
 using System.Globalization;
-using System.Runtime.InteropServices;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
@@ -24,7 +22,10 @@ public sealed class HexEditingTests
     private const string StringValueName = "EditableString";
     private const string StringText = "HexEdit";
     private const int PatternLength = 0x30;
-    private const uint CfUnicodeText = 13;
+    private const string CopyBehavior =
+        "Ctrl+C after Ctrl+A copies all 48 selected bytes as space separated hex text, in the same format as the hex column.";
+    private static readonly string OriginalHex = HexText(CreatePattern());
+    private static readonly string EditedHex = HexText(EditedPattern());
 
     private static int _checkStart;
 
@@ -37,10 +38,13 @@ public sealed class HexEditingTests
 
     [TestMethod]
     [TestCategory("HexEdit")]
+    [TestCategory("Mutating")]
+    [TestCategory("E2EOnly")]
     public void HexEditing_EditsCancelsAndCopies()
     {
         _checkStart = E2EResults.CheckCount;
         E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
 
         try
         {
@@ -82,6 +86,7 @@ public sealed class HexEditingTests
                 "hexedit.navigate",
                 navigated && seededRows,
                 $"navigated={navigated}, seededRows={seededRows}, rows=[{string.Join(",", ControlTestSupport.ListRowNames(session))}].");
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated && seededRows, "hexedit.sandbox.navigate");
 
             CheckOpenAndEdit(session, driver, sandbox);
             CheckInsertDeleteCancel(session, driver, sandbox);
@@ -107,6 +112,7 @@ public sealed class HexEditingTests
             selected,
             $"binary row selected={selected}.");
 
+        E2EGuards.RequireSandboxSelection(session, sandbox, "hexedit.sandbox.open");
         bool opened = OpenEditor(session, driver, BinaryValueName);
         E2EResults.Record(
             "hexedit.dialog",
@@ -130,7 +136,6 @@ public sealed class HexEditingTests
         AutomationElement? editor = driver.WaitForElement("HexEditor");
         bool focused = FocusEditor(session, firstRow, editor);
         bool selectAll = false;
-        string clipboardNote = "not attempted";
         if (focused)
         {
             Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
@@ -138,28 +143,28 @@ public sealed class HexEditingTests
                 () => HelpTextOf(editor).Contains("SelectedLength=48", StringComparison.Ordinal),
                 TimeSpan.FromSeconds(5));
 
+            // The clipboard is cleared first, so only this copy can put text on it.
+            _ = ClipboardProbe.Clear();
             Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_C);
-            string clipboardText = string.Empty;
-            string? clipboardError = null;
-            bool clipboardRead = ControlTestSupport.WaitUntil(
-                () => TryReadClipboardText(out clipboardText, out clipboardError),
-                TimeSpan.FromSeconds(3));
-            bool startsCorrectly = clipboardRead &&
-                clipboardText.StartsWith("00 01", StringComparison.Ordinal);
-            clipboardNote = clipboardRead
-                ? $"informational: clipboard starts='{Prefix(clipboardText)}', expected '00 01', matches={startsCorrectly}."
-                : "informational: clipboard unavailable: " + clipboardError;
+            ClipboardProbe.Reading original = ClipboardProbe.WaitForText(OriginalHex, TimeSpan.FromSeconds(3));
+            if (selectAll)
+            {
+                ClipboardProbe.RecordCopy("hexedit.clipboard.original", original, OriginalHex, CopyBehavior);
+            }
+            else
+            {
+                E2EResults.Note("hexedit.clipboard.original", "not compared: select all did not reach 48 bytes (see hexedit.selectall).");
+            }
         }
         else
         {
-            clipboardNote = "informational: hex editor did not take UIA keyboard focus.";
+            E2EResults.Note("hexedit.clipboard.original", "not attempted: the hex editor did not take UIA keyboard focus (see hexedit.selectall).");
         }
 
         E2EResults.Record(
             "hexedit.selectall",
             selectAll,
             $"editorFocused={focused}, help='{HelpTextOf(editor)}'.");
-        E2EResults.Record("hexedit.clipboard.original", true, clipboardNote);
 
         // Ctrl+Home moves from the select all range to byte 0, then AABB overwrites the first
         // two bytes. The dialog keeps its own buffer until OK. Keyboard input goes directly to
@@ -209,6 +214,7 @@ public sealed class HexEditingTests
             () => ControlTestSupport.IsSelected(FindRow(session, BinaryValueName)),
             TimeSpan.FromSeconds(5));
 
+        E2EGuards.RequireSandboxSelection(session, sandbox, "hexedit.sandbox.reopen");
         bool opened = OpenEditor(session, driver, BinaryValueName);
         string status = driver.TextOf("HexStatus");
         AutomationElement? editor = driver.WaitForElement("HexEditor");
@@ -287,13 +293,13 @@ public sealed class HexEditingTests
             () => ControlTestSupport.IsSelected(FindRow(session, BinaryValueName)),
             TimeSpan.FromSeconds(5));
 
+        E2EGuards.RequireSandboxSelection(session, sandbox, "hexedit.sandbox.copy");
         bool opened = OpenEditor(session, driver, BinaryValueName);
         AutomationElement? editor = driver.WaitForElement("HexEditor");
         AutomationElement? firstRow = driver.WaitForElement("HexRow_0");
         bool focused = opened && FocusEditor(session, firstRow, editor);
 
         bool selectAll = false;
-        string clipboardNote = "informational: editor did not take focus.";
         if (focused)
         {
             Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
@@ -301,24 +307,28 @@ public sealed class HexEditingTests
                 () => HelpTextOf(editor).Contains("SelectedLength=48", StringComparison.Ordinal),
                 TimeSpan.FromSeconds(5));
 
+            // The copy must carry the edited bytes from CheckOpenAndEdit, not the original pattern.
+            _ = ClipboardProbe.Clear();
             Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_C);
-            string clipboardText = string.Empty;
-            string? clipboardError = null;
-            bool clipboardRead = ControlTestSupport.WaitUntil(
-                () => TryReadClipboardText(out clipboardText, out clipboardError),
-                TimeSpan.FromSeconds(3));
-            bool startsCorrectly = clipboardRead &&
-                clipboardText.StartsWith("AA BB 02", StringComparison.Ordinal);
-            clipboardNote = clipboardRead
-                ? $"informational: edited clipboard starts='{Prefix(clipboardText)}', expected 'AA BB 02', matches={startsCorrectly}."
-                : "informational: clipboard unavailable: " + clipboardError;
+            ClipboardProbe.Reading edited = ClipboardProbe.WaitForText(EditedHex, TimeSpan.FromSeconds(3));
+            if (selectAll)
+            {
+                ClipboardProbe.RecordCopy("hexedit.clipboard.afteredit", edited, EditedHex, CopyBehavior);
+            }
+            else
+            {
+                E2EResults.Note("hexedit.clipboard.afteredit", "not compared: select all did not reach 48 bytes (see hexedit.copy.afteredit).");
+            }
+        }
+        else
+        {
+            E2EResults.Note("hexedit.clipboard.afteredit", "not attempted: the hex editor did not take focus (see hexedit.copy.afteredit).");
         }
 
         E2EResults.Record(
             "hexedit.copy.afteredit",
             selectAll,
             $"focused={focused}, selectAll={selectAll}, help='{HelpTextOf(editor)}'.");
-        E2EResults.Record("hexedit.clipboard.afteredit", true, clipboardNote);
 
         Keyboard.Press(VirtualKeyShort.ESCAPE);
         bool closed = driver.WaitForNoDialog();
@@ -410,6 +420,18 @@ public sealed class HexEditingTests
         return pattern;
     }
 
+    /// <summary>The pattern after the edit in CheckOpenAndEdit: the first two bytes become AA BB.</summary>
+    private static byte[] EditedPattern()
+    {
+        byte[] expected = CreatePattern();
+        expected[0] = 0xAA;
+        expected[1] = 0xBB;
+        return expected;
+    }
+
+    private static string HexText(byte[] bytes) =>
+        string.Join(" ", bytes.Select(value => value.ToString("X2", CultureInfo.InvariantCulture)));
+
     private static void Seed(SandboxRegistry sandbox)
     {
         using var root = sandbox.CreateSubKey(string.Empty);
@@ -434,7 +456,7 @@ public sealed class HexEditingTests
     {
         foreach (string name in expected)
         {
-            if (!names.Contains(name, StringComparer.Ordinal))
+            if (!names.Contains(name, StringComparer.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -442,9 +464,6 @@ public sealed class HexEditingTests
 
         return true;
     }
-
-    private static string Prefix(string text) =>
-        text.Length <= 24 ? text : text[..24];
 
     private static string HelpTextOf(AutomationElement? element)
     {
@@ -513,49 +532,6 @@ public sealed class HexEditingTests
         }
     }
 
-    private static bool TryReadClipboardText(out string text, out string? error)
-    {
-        text = string.Empty;
-        error = null;
-
-        if (!OpenClipboard(IntPtr.Zero))
-        {
-            error = new Win32Exception(Marshal.GetLastWin32Error()).Message;
-            return false;
-        }
-
-        try
-        {
-            IntPtr handle = GetClipboardData(CfUnicodeText);
-            if (handle == IntPtr.Zero)
-            {
-                error = "The clipboard has no Unicode text.";
-                return false;
-            }
-
-            IntPtr pointer = GlobalLock(handle);
-            if (pointer == IntPtr.Zero)
-            {
-                error = new Win32Exception(Marshal.GetLastWin32Error()).Message;
-                return false;
-            }
-
-            try
-            {
-                text = Marshal.PtrToStringUni(pointer) ?? string.Empty;
-                return true;
-            }
-            finally
-            {
-                _ = GlobalUnlock(handle);
-            }
-        }
-        finally
-        {
-            _ = CloseClipboard();
-        }
-    }
-
     private static void FailIfNeeded()
     {
         var failures = E2EResults.FailedChecksSince(_checkStart);
@@ -564,19 +540,4 @@ public sealed class HexEditingTests
             failures.Count,
             $"Hex editing checks failed:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
     }
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool OpenClipboard(IntPtr newOwner);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool CloseClipboard();
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr GetClipboardData(uint format);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr GlobalLock(IntPtr memory);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GlobalUnlock(IntPtr memory);
 }

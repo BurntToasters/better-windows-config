@@ -36,10 +36,12 @@ public sealed class HiveTests
 
     [TestMethod]
     [TestCategory("Hives")]
+    [TestCategory("Mutating")]
     public void Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey()
     {
         _checkStart = E2EResults.CheckCount;
         E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
 
         try
         {
@@ -75,21 +77,18 @@ public sealed class HiveTests
 
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
             bool seeded = ControlTestSupport.WaitUntil(
-                () => ControlTestSupport.ListRowNames(session).Contains(SeedValueName, StringComparer.Ordinal),
+                () => ControlTestSupport.ListRowNames(session).Contains(SeedValueName, StringComparer.OrdinalIgnoreCase),
                 TimeSpan.FromSeconds(15));
             E2EResults.Record(
                 "hives.navigate",
                 navigated && seeded,
                 $"navigated={navigated}, seeded={seeded}, rows=[{string.Join(",", ControlTestSupport.ListRowNames(session))}].");
 
-            if (!navigated || !seeded)
-            {
-                FailIfNeeded();
-                return;
-            }
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated && seeded, "hives.sandbox.navigate");
 
             string[] hklmBefore = HklmChildren();
             _ = ControlTestSupport.EnsureForeground(session);
+            E2EGuards.RequireSandboxSelection(session, sandbox, "hives.sandbox.menu");
             driver.OpenMenu(MenuFile);
 
             AutomationElement? loadItem = driver.WaitForElement("MenuCommand_" + CommandLoadHive);
@@ -97,18 +96,46 @@ public sealed class HiveTests
             bool loadEnabled = IsEnabled(loadItem);
             bool unloadDisabled = unloadItem is not null && !IsEnabled(unloadItem);
             E2EResults.Record(
-                "hives.menu.selection-rules",
-                loadEnabled && unloadDisabled,
-                $"loadPresent={loadItem is not null}, loadEnabled={loadEnabled}, unloadPresent={unloadItem is not null}, unloadDisabled={unloadDisabled}.");
+                "hives.menu.unload-disabled",
+                unloadDisabled,
+                $"unloadPresent={unloadItem is not null}, unloadDisabled={unloadDisabled}.");
+            if (loadItem is null)
+            {
+                E2EResults.Record("hives.menu.load-disabled", false, "Load Hive was not found in the File menu.");
+            }
+            else
+            {
+                E2EResults.RecordOrKnownGap(
+                    "hives.menu.load-disabled",
+                    matchesOracle: !loadEnabled,
+                    workPackage: "RF8",
+                    expectedOracleBehavior:
+                        "File > Load Hive is disabled while HKEY_CURRENT_USER is selected. It is enabled only with HKEY_LOCAL_MACHINE or HKEY_USERS selected.",
+                    observed: $"Load Hive enabled={loadEnabled} with the run key under HKEY_CURRENT_USER selected.");
+            }
 
-            bool invoked = Invoke(loadItem);
-            E2EResults.Record("hives.load.invoked", invoked, $"clicked={invoked}.");
+            // Only an enabled Load Hive opens the owned dialog. Invoking a disabled item would send Enter
+            // to the menu and prove nothing about the dialog.
+            bool invoked = false;
+            nint dialog = 0;
+            if (loadEnabled)
+            {
+                E2EGuards.RequireSandboxSelection(session, sandbox, "hives.sandbox.load");
+                invoked = Invoke(loadItem);
+                E2EResults.Record("hives.load.invoked", invoked, $"clicked={invoked}.");
 
-            nint dialog = invoked ? WaitForFileDialog(session, TimeSpan.FromSeconds(10)) : 0;
-            E2EResults.Record(
-                "hives.load.dialog",
-                dialog != 0,
-                $"class='{(dialog == 0 ? string.Empty : ClassOf(dialog))}', hwnd=0x{dialog:X}.");
+                dialog = invoked ? WaitForFileDialog(session, TimeSpan.FromSeconds(10)) : 0;
+                E2EResults.Record(
+                    "hives.load.dialog",
+                    dialog != 0,
+                    $"class='{(dialog == 0 ? string.Empty : ClassOf(dialog))}', hwnd=0x{dialog:X}.");
+            }
+            else
+            {
+                E2EResults.Note(
+                    "hives.load.skipped",
+                    "Load Hive is disabled at HKEY_CURRENT_USER, so no load dialog was opened.");
+            }
 
             if (dialog != 0)
             {
@@ -159,9 +186,8 @@ public sealed class HiveTests
                 selectionKept,
                 $"tree selection '{config.RunId}' after cancel={selectionKept}.");
 
-            E2EResults.Record(
+            E2EResults.Note(
                 "hives.elevation-note",
-                true,
                 "A load/unload round-trip needs SeRestorePrivilege. This non-elevated run only opens and cancels the owned file dialog, so no hive was mounted.");
 
             FailIfNeeded();

@@ -9,8 +9,6 @@ namespace Bwc.Regedit.Registry;
 /// </summary>
 public static class RegeditWritePolicy
 {
-    private const string DenyAllSandboxRoot = @"HKCU\Software\BWC-E2E\unset";
-
     public static RegistryStore CreateStore()
     {
         IRegistryWritePolicy policy;
@@ -28,14 +26,14 @@ public static class RegeditWritePolicy
             }
             catch (ArgumentException ex)
             {
-                policy = new SandboxWritePolicy(RegistryPath.Parse(DenyAllSandboxRoot));
-                description = "SandboxWritePolicy(deny all, invalid BWC_E2E_SANDBOX_ROOT: " + ex.Message + ")";
+                policy = new DenyAllWritePolicy();
+                description = "DenyAllWritePolicy (invalid BWC_E2E_SANDBOX_ROOT: " + ex.Message + ")";
             }
         }
         else
         {
-            policy = new SandboxWritePolicy(RegistryPath.Parse(DenyAllSandboxRoot));
-            description = "SandboxWritePolicy(deny all, BWC_E2E_SANDBOX_ROOT is not set)";
+            policy = new DenyAllWritePolicy();
+            description = "DenyAllWritePolicy (BWC_E2E_SANDBOX_ROOT is not set)";
         }
 #else
         policy = new ShippingWritePolicy();

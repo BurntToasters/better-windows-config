@@ -8,7 +8,7 @@ namespace Bwc.E2E.Controls;
 /// <summary>
 /// Drives the dense tree in the shipped Registry Editor against a seeded HKCU sandbox: expand,
 /// type-ahead navigation, real registry values, a 2,000 child chunked expand, and the F2 rename
-/// cancel path. Every check is also written to result.json.
+/// cancel path. Every check is also written to artifacts/e2e/result-&lt;rid&gt;-&lt;flavor&gt;.json.
 /// </summary>
 [TestClass]
 public sealed class TreeTests
@@ -26,10 +26,13 @@ public sealed class TreeTests
 
     [TestMethod]
     [TestCategory("Controls")]
+    [TestCategory("Mutating")]
+    [TestCategory("E2EOnly")]
     public void Tree_ExpandsNavigatesAndCancelsRename()
     {
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
         try
         {
             config.EnsureExecutablesExist();
@@ -43,12 +46,17 @@ public sealed class TreeTests
 
         try
         {
-            ControlTestSupport.SeedRegistry(config, RegeditWideChildCount);
+            var sandbox = ControlTestSupport.SeedRegistry(config, RegeditWideChildCount);
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = config.DataRootFor("controls-tree"),
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+            };
 
             using var session = new AppSession(
                 config,
                 config.RegeditExePath,
-                environment: config.DataRootEnvironment("controls-tree"));
+                environment: environment);
 
             var tree = session.Find(ControlTestSupport.TreeControl);
             bool found = tree is not null;
@@ -131,6 +139,7 @@ public sealed class TreeTests
                 "controls.tree.typeahead.run",
                 runSelected,
                 $"type-ahead selected the full run id={runSelected}.");
+            E2EGuards.RequireSandboxNavigation(session, sandbox, runSelected, "controls.tree.sandbox");
 
             bool valuesOk = ControlTestSupport.WaitUntil(
                 () => ContainsAll(
@@ -224,6 +233,11 @@ public sealed class TreeTests
                 computerSelected,
                 $"Home selected Computer={computerSelected}.");
 
+            // The rename starts on the run key inside the sandbox. The virtual Computer node is never a target.
+            ControlTestSupport.TypeAhead(session, config.RunId);
+            bool renameTargetSelected = ControlTestSupport.WaitForTreeSelection(session, config.RunId);
+            E2EGuards.RequireSandboxNavigation(session, sandbox, renameTargetSelected, "controls.tree.sandbox.rename");
+
             ControlTestSupport.SendKeys(session, "F2");
             bool renameOpened = ControlTestSupport.WaitUntil(
                 () => session.Find("TreeRenameBox") is not null,
@@ -259,7 +273,7 @@ public sealed class TreeTests
     {
         foreach (string name in expected)
         {
-            if (!names.Contains(name, StringComparer.Ordinal))
+            if (!names.Contains(name, StringComparer.OrdinalIgnoreCase))
             {
                 return false;
             }

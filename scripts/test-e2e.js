@@ -8,23 +8,35 @@ import { fileURLToPath } from "node:url";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const artifactsDir = path.join(repoRoot, "artifacts", "e2e");
-const resultPath = path.join(artifactsDir, "result.json");
 const dotnetFallback = "C:\\Program Files\\dotnet\\dotnet.exe";
+// The ship publish writes the real registry (ShippingWritePolicy), so it only runs tests that are
+// neither mutating nor e2e-only. A user --filter can narrow this further but never widen it.
+const SHIP_FILTER = "TestCategory!=Mutating&TestCategory!=E2EOnly";
 
 const usage = `Usage: node scripts/test-e2e.js [options]
 
-Runs the Bwc.E2E test project against a publish folder.
+Runs the Bwc.E2E test project against a publish folder. The test project always
+builds and runs for the host architecture (process.arch). --rid only picks the
+app: its publish folder and BWC_RID. An x64 app runs on an ARM64 machine under
+emulation, so --rid win-x64 works there. An ARM64 app cannot run on x64 Windows.
 
 Options:
-  --rid win-x64|win-arm64   Target runtime identifier (default from process.arch)
+  --rid win-x64|win-arm64   App runtime identifier (default from process.arch)
   --flavor ship|e2e         Publish flavor (default e2e)
   --build                   Run scripts/dotnet-build.js first
-  --filter <pattern>        Pass a filter to dotnet test
+  --filter <pattern>        Pass a filter to dotnet test. With --flavor ship the
+                            filter is combined with ${SHIP_FILTER}
   --help                    Show this help
 
 Environment:
   BWC_PUBLISH_DIR           Override the publish folder (relative to the repo root)
+
+Output: artifacts/e2e/result-<rid>-<flavor>.json
 `;
+
+function resultPathFor(rid, flavor) {
+  return path.join(artifactsDir, `result-${rid}-${flavor}.json`);
+}
 
 function parseArgs(argv) {
   const options = {
@@ -83,6 +95,19 @@ function defaultRid() {
   return undefined;
 }
 
+// The test project runs on the host architecture, whatever the app rid is.
+function hostPlatform() {
+  if (process.arch === "arm64") {
+    return "ARM64";
+  }
+
+  if (process.arch === "x64") {
+    return "x64";
+  }
+
+  return undefined;
+}
+
 function findOnPath(name) {
   const pathValue = process.env.PATH ?? "";
   const extensions = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
@@ -134,8 +159,13 @@ function tail(text, lines = 60) {
   return all.slice(Math.max(0, all.length - lines)).join("\n");
 }
 
+// Known gaps are listed in this order. Each one cites a work package from the parity plan.
+const knownGapOrder = ["E1", "E2", "RF1", "RF4", "RF8", "UF7"];
+
 function printResult(result) {
   const checks = Array.isArray(result.checks) ? result.checks : [];
+  const notes = Array.isArray(result.notes) ? result.notes : [];
+  const knownGaps = Array.isArray(result.knownGaps) ? result.knownGaps : [];
   const passed = checks.filter((check) => check.pass === true);
   const failed = checks.filter((check) => check.pass !== true);
 
@@ -145,6 +175,15 @@ function printResult(result) {
   console.log(`rid: ${result.rid}  flavor: ${result.flavor}`);
   console.log(`publishDir: ${result.publishDir}`);
   console.log(`checks: ${passed.length} passed, ${failed.length} failed, ${checks.length} total`);
+  console.log(`known gaps: ${knownGaps.length} (documented differences from the oracle; not passes, do not fail the run)`);
+  for (const workPackage of groupedWorkPackages(knownGaps)) {
+    const gaps = knownGaps.filter((gap) => gap.workPackage === workPackage);
+    console.log(`  ${workPackage}: ${gaps.length}`);
+    for (const gap of gaps) {
+      console.log(`    - ${gap.id}: ${String(gap.observed ?? "").replace(/\r?\n/g, " ")}`);
+    }
+  }
+  console.log(`notes: ${notes.length} (information only)`);
 
   if (failed.length > 0) {
     console.log("failed checks:");
@@ -154,6 +193,13 @@ function printResult(result) {
   }
 
   console.log(`artifact: ${resultPath}`);
+}
+
+function groupedWorkPackages(knownGaps) {
+  const present = new Set(knownGaps.map((gap) => String(gap.workPackage)));
+  const known = knownGapOrder.filter((workPackage) => present.has(workPackage));
+  const unknown = [...present].filter((workPackage) => !knownGapOrder.includes(workPackage)).sort();
+  return [...known, ...unknown];
 }
 
 let options;
@@ -184,7 +230,14 @@ if (flavor !== "ship" && flavor !== "e2e") {
   process.exit(2);
 }
 
-const platform = rid === "win-arm64" ? "ARM64" : "x64";
+const testHost = hostPlatform();
+if (testHost === undefined) {
+  console.error(`Unsupported process.arch '${process.arch}'. The test host needs arm64 or x64.`);
+  console.error(usage);
+  process.exit(2);
+}
+
+const resultPath = resultPathFor(rid, flavor);
 const defaultFolder = flavor === "e2e" ? `${rid}-e2e` : rid;
 const configuredPublish = process.env.BWC_PUBLISH_DIR?.trim();
 const publishDir = configuredPublish
@@ -193,7 +246,7 @@ const publishDir = configuredPublish
 
 const runId = `${stamp(new Date())}-${randomBytes(4).toString("hex")}`;
 
-console.log(`E2E rid=${rid} flavor=${flavor} platform=${platform}`);
+console.log(`E2E rid=${rid} testHost=${testHost} flavor=${flavor}`);
 console.log(`runId=${runId}`);
 console.log(`publishDir=${publishDir}`);
 
@@ -240,7 +293,7 @@ const testArgs = [
   "tests/Bwc.E2E/Bwc.E2E.csproj",
   "-c",
   "Release",
-  `-p:Platform=${platform}`,
+  `-p:Platform=${testHost}`,
   "--nologo",
 ];
 if (flavor === "e2e") {
@@ -248,9 +301,16 @@ if (flavor === "e2e") {
   // its bin/obj out of the shipping folders (see Directory.Build.props).
   testArgs.push("-p:BwcFlavor=E2E");
 }
-if (options.filter !== undefined) {
-  testArgs.push("--filter", options.filter);
+let filter = options.filter;
+if (flavor === "ship") {
+  filter = options.filter === undefined
+    ? SHIP_FILTER
+    : `(${options.filter})&${SHIP_FILTER}`;
 }
+if (filter !== undefined) {
+  testArgs.push("--filter", filter);
+}
+console.log(`filter: ${filter ?? "(none)"}`);
 
 const childEnv = {
   ...process.env,
@@ -280,11 +340,21 @@ try {
   process.exit(1);
 }
 
+if (result.schema !== 2) {
+  console.error(`Result artifact schema is ${JSON.stringify(result.schema)}, expected 2.`);
+  process.exit(1);
+}
+
 printResult(result);
 
 if (testRun.code !== 0) {
   console.error(`dotnet test exited with code ${testRun.code}.`);
   process.exit(testRun.code ?? 1);
+}
+
+if (!Array.isArray(result.checks) || result.checks.length === 0) {
+  console.error("Result artifact has no checks. A run with no checks is not evidence.");
+  process.exit(1);
 }
 
 if (result.pass !== true) {

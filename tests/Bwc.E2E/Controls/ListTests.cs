@@ -10,15 +10,11 @@ namespace Bwc.E2E.Controls;
 /// <summary>
 /// Drives the details list in the shipped Registry Editor against a seeded HKCU sandbox: real
 /// values, sorting, Ctrl multi-select, the F2 rename cancel path, and the measured tree and list
-/// row heights at 200 percent scale.
+/// row heights at the window scale. The expected heights come from the oracle metrics file.
 /// </summary>
 [TestClass]
 public sealed class ListTests
 {
-    private const double ExpectedTreeRowPx = 34;
-    private const double ExpectedListRowPx = 36;
-    private const double HeightTolerancePx = 1;
-
     private static int _checkStart;
 
     [ClassInitialize]
@@ -30,10 +26,12 @@ public sealed class ListTests
 
     [TestMethod]
     [TestCategory("Controls")]
+    [TestCategory("Mutating")]
     public void List_SortsMultiSelectsAndCancelsRename()
     {
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
         try
         {
             config.EnsureExecutablesExist();
@@ -47,12 +45,17 @@ public sealed class ListTests
 
         try
         {
-            ControlTestSupport.SeedRegistry(config, wideChildCount: 0);
+            var sandbox = ControlTestSupport.SeedRegistry(config, wideChildCount: 0);
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = config.DataRootFor("controls-list"),
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+            };
 
             using var session = new AppSession(
                 config,
                 config.RegeditExePath,
-                environment: config.DataRootEnvironment("controls-list"));
+                environment: environment);
 
             var list = session.Find(ControlTestSupport.ListControl);
             bool found = list is not null;
@@ -71,6 +74,7 @@ public sealed class ListTests
                 "controls.list.navigate",
                 navigated,
                 $"navigated to '{config.RunId}' through expand and type-ahead={navigated}.");
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "controls.list.sandbox");
 
             bool valuesOk = ControlTestSupport.WaitUntil(
                 () => ContainsAll(
@@ -96,12 +100,19 @@ public sealed class ListTests
                 $"name='{ControlTestSupport.SafeName(row0)}' id='{ControlTestSupport.SafeId(row0)}'.");
 
             double listHeight = ControlTestSupport.HeightOf(row0);
-            bool treeHeightOk = Math.Abs(treeHeight - ExpectedTreeRowPx) <= HeightTolerancePx;
-            bool listHeightOk = Math.Abs(listHeight - ExpectedListRowPx) <= HeightTolerancePx;
+            uint dpi = ControlTestSupport.WindowDpi(session);
+            var oracle = OracleMetrics.Load(config);
+            double expectedTree = oracle.DevicePixels(oracle.TreeItemHeight, dpi);
+            double expectedList = oracle.DevicePixels(oracle.ListRowHeight, dpi);
+            int tolerance = OracleMetrics.ToleranceDevicePixels(dpi);
+            bool treeHeightOk = Math.Abs(treeHeight - expectedTree) <= tolerance;
+            bool listHeightOk = Math.Abs(listHeight - expectedList) <= tolerance;
             E2EResults.Record(
                 "controls.list.row.heights",
                 treeHeightOk && listHeightOk,
-                $"treePx={treeHeight:0.##} (expected {ExpectedTreeRowPx}), listPx={listHeight:0.##} (expected {ExpectedListRowPx}), tolerance {HeightTolerancePx}.");
+                $"treePx={treeHeight:0.##} (expected {expectedTree:0.##}, oracle treeItemHeight {oracle.TreeItemHeight}), " +
+                $"listPx={listHeight:0.##} (expected {expectedList:0.##}, oracle listRowHeight {oracle.ListRowHeight}), " +
+                $"tolerance {tolerance} px (1 DIP) at {dpi} DPI, source {oracle.Describe()}.");
 
             var header = session.Find("HeaderName");
             bool headerFound = header is not null;
@@ -179,6 +190,8 @@ public sealed class ListTests
             ControlTestSupport.Select(session.Find("ListRow_0"));
             _ = ControlTestSupport.WaitUntil(() => ControlTestSupport.IsSelected(session.Find("ListRow_0")), TimeSpan.FromSeconds(3));
 
+            E2EGuards.RequireListRowIdSelected(session, "ListRow_0", "controls.list.rename.row");
+            E2EGuards.RequireSandboxSelection(session, sandbox, "controls.list.rename");
             ControlTestSupport.SendKeys(session, "F2");
             bool renameOpened = ControlTestSupport.WaitUntil(
                 () => session.Find("ListRenameBox") is not null,
@@ -203,7 +216,7 @@ public sealed class ListTests
     {
         foreach (string name in expected)
         {
-            if (!names.Contains(name, StringComparer.Ordinal))
+            if (!names.Contains(name, StringComparer.OrdinalIgnoreCase))
             {
                 return false;
             }

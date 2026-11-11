@@ -3143,6 +3143,8 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
 
     private static IReadOnlyList<RegistryPath>? ResolveFindRoots()
     {
+#if BWC_E2E
+        // E2E-only: the sandbox variable narrows Find to the test run key, so ship builds never read it.
         string? configured = Environment.GetEnvironmentVariable("BWC_E2E_SANDBOX_ROOT");
         if (string.IsNullOrWhiteSpace(configured))
         {
@@ -3152,6 +3154,9 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         return RegistryPath.TryParse(configured.Trim(), out RegistryPath? root) && root is not null
             ? new[] { root }
             : null;
+#else
+        return null;
+#endif
     }
 
     private async Task LoadValuesAsync(TreeNode node, string? selectDisplayName = null)

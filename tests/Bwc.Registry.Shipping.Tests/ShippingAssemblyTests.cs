@@ -22,4 +22,18 @@ public sealed class ShippingAssemblyTests
         Assert.IsNotNull(policyContract);
         Assert.IsTrue(policyContract!.IsPublic);
     }
+
+    [TestMethod]
+    public void ShippingShipsTheDenyAllPolicyAndKeepsLinkFollowingBehavior()
+    {
+        var assembly = typeof(RegistryWriter).Assembly;
+
+        Type? denyAll = assembly.GetType("Bwc.Registry.DenyAllWritePolicy", throwOnError: false);
+        Assert.IsNotNull(denyAll, "DenyAllWritePolicy refuses writes and must ship in every flavor.");
+        Assert.IsTrue(denyAll!.IsPublic);
+
+        IRegistryWritePolicy shipping = new ShippingWritePolicy();
+        Assert.IsFalse(shipping.RejectsSymbolicLinks, "Shipping writes follow symbolic links as regedit does.");
+        Assert.IsTrue(shipping.AllowsLinkValues);
+    }
 }

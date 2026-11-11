@@ -38,10 +38,12 @@ public sealed class FindTests
 
     [TestMethod]
     [TestCategory("Find")]
+    [TestCategory("E2EOnly")]
     public void Find_SearchesKeysValuesAndData()
     {
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
         try
         {
             config.EnsureExecutablesExist();

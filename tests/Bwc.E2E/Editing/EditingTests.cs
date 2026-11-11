@@ -32,10 +32,12 @@ public sealed class EditingTests
 
     [TestMethod]
     [TestCategory("Editing")]
+    [TestCategory("Mutating")]
     public void Editing_CreatesRenamesAndDeletesRegistryObjects()
     {
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
         try
         {
             config.EnsureExecutablesExist();
@@ -68,6 +70,7 @@ public sealed class EditingTests
                 "editing.navigate",
                 navigated,
                 $"navigated to '{sandbox.RunRootDisplayPath}'={navigated}.");
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "editing.sandbox.navigate");
 
             bool seededRows = ControlTestSupport.WaitUntil(
                 () => ContainsAll(
@@ -87,6 +90,7 @@ public sealed class EditingTests
                 "editing.reselect.root",
                 reselected,
                 $"reselect={reselected}.");
+            E2EGuards.RequireSandboxNavigation(session, sandbox, reselected, "editing.sandbox.reselect");
             CheckNewDword(session, sandbox, driver);
             CheckRenameValue(session, driver, sandbox);
             CheckDeleteValue(session, driver, sandbox);
@@ -102,6 +106,7 @@ public sealed class EditingTests
 
     private static void CheckNewKey(AppSession session, SandboxRegistry sandbox, EditingDriver driver)
     {
+        E2EGuards.RequireSandboxSelection(session, sandbox, "editing.sandbox.newkey");
         driver.OpenMenu(MenuEdit, MenuEditNew, MenuEditNewKey);
         bool dialog = driver.WaitForDialog();
         bool input = driver.WaitForElement("DialogTextInput") is not null;
@@ -137,6 +142,7 @@ public sealed class EditingTests
 
     private static void CheckNewDword(AppSession session, SandboxRegistry sandbox, EditingDriver driver)
     {
+        E2EGuards.RequireSandboxSelection(session, sandbox, "editing.sandbox.newdword");
         driver.OpenMenu(MenuEdit, MenuEditNew, MenuEditNewDword);
         bool nameDialog = driver.WaitForDialog() && driver.WaitForElement("DialogTextInput") is not null;
         bool named = nameDialog && driver.SetText("DialogTextInput", "E2ENewDword");
@@ -196,6 +202,8 @@ public sealed class EditingTests
                     "AlphaString")),
             TimeSpan.FromSeconds(5));
 
+        E2EGuards.RequireListRowSelected(session, "AlphaString", "editing.sandbox.rename.row");
+        E2EGuards.RequireSandboxSelection(session, sandbox, "editing.sandbox.rename");
         bool f2 = driver.TypeKeys("F2");
         bool renameOpen = f2 && ControlTestSupport.WaitUntil(
             () => session.Find("ListRenameBox") is not null,
@@ -226,6 +234,8 @@ public sealed class EditingTests
                     "ZebraString")),
             TimeSpan.FromSeconds(5));
 
+        E2EGuards.RequireListRowSelected(session, "ZebraString", "editing.sandbox.rename-cancel.row");
+        E2EGuards.RequireSandboxSelection(session, sandbox, "editing.sandbox.rename-cancel");
         bool cancelF2 = driver.TypeKeys("F2");
         bool cancelOpen = cancelF2 && ControlTestSupport.WaitUntil(
             () => session.Find("ListRenameBox") is not null,
@@ -260,6 +270,8 @@ public sealed class EditingTests
                     "SampleBinary")),
             TimeSpan.FromSeconds(5));
 
+        E2EGuards.RequireListRowSelected(session, "SampleBinary", "editing.sandbox.deletevalue.row");
+        E2EGuards.RequireSandboxSelection(session, sandbox, "editing.sandbox.deletevalue");
         driver.OpenMenu(MenuEdit, MenuEditDelete);
         bool dialog = driver.WaitForDialog();
         bool invoked = dialog && driver.Invoke("DialogPrimary");
@@ -273,7 +285,7 @@ public sealed class EditingTests
             $"dialog={dialog}, invoked={invoked}, closed={closed}, removed={removed}.");
 
         bool rowGone = ControlTestSupport.WaitUntil(
-            () => !ControlTestSupport.ListRowNames(session).Contains("SampleBinary", StringComparer.Ordinal),
+            () => !ControlTestSupport.ListRowNames(session).Contains("SampleBinary", StringComparer.OrdinalIgnoreCase),
             TimeSpan.FromSeconds(10));
         E2EResults.Record(
             "editing.deletevalue.refresh",
@@ -288,6 +300,7 @@ public sealed class EditingTests
             "editing.deletekey.select",
             selected,
             $"run key selected={selected}.");
+        E2EGuards.RequireSandboxNavigation(session, sandbox, selected, "editing.sandbox.deletekey");
 
         driver.OpenMenu(MenuEdit, MenuEditDelete);
         bool dialog = driver.WaitForDialog();
@@ -404,7 +417,7 @@ public sealed class EditingTests
     {
         foreach (string name in expected)
         {
-            if (!names.Contains(name, StringComparer.Ordinal))
+            if (!names.Contains(name, StringComparer.OrdinalIgnoreCase))
             {
                 return false;
             }

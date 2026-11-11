@@ -4,9 +4,12 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Bwc.Registry.Tests;
 
 /// <summary>
-/// Covers hive policy, argument, and file validation without elevation, then runs one conditional
-/// save/load/read/unload round-trip when the process token holds the restore privilege. Every
-/// temporary file and key is removed in a finally block.
+/// Covers hive policy, argument, and file validation without elevation. The argument and privilege
+/// tests use <see cref="ShippingWritePolicy"/> on HKLM and HKU targets because every call they make
+/// fails in argument validation or the privilege check before any native hive call. Those checks
+/// run after the policy check, and the sandbox refuses HKLM and HKU, so the sandbox policy cannot be
+/// used there. The one elevated round trip runs inside the sandbox. Every temporary file and key is
+/// removed in a finally block.
 /// </summary>
 [TestClass]
 public sealed class RegistryHiveTests
@@ -171,26 +174,36 @@ public sealed class RegistryHiveTests
         Assert.IsFalse(reader.KeyExists(target), "A failed privilege check must not mount the hive.");
     }
 
+#if BWC_E2E
+    /// <summary>
+    /// Saves and restores a sandboxed key through a real hive file. The mount half of the round trip
+    /// is not run here: LoadHive and UnloadHive target HKLM or HKU, which SandboxWritePolicy refuses
+    /// by design, so no unit test mounts a hive.
+    /// </summary>
     [TestMethod]
-    public void ElevatedSaveLoadReadUnloadAndDeleteRoundTrip()
+    public void ElevatedSaveAndRestoreRoundTripStaysInsideTheSandbox()
     {
         if (!PrivilegeScope.IsAvailable(PrivilegeScope.BackupPrivilege) ||
             !PrivilegeScope.IsAvailable(PrivilegeScope.RestorePrivilege))
         {
             Assert.Inconclusive(
-                "The hive round-trip requires an elevated token with SeBackupPrivilege and SeRestorePrivilege.");
+                "The save and restore round-trip requires an elevated token with SeBackupPrivilege and SeRestorePrivilege.");
         }
 
         using var temp = new TempHiveDirectory();
         string id = Guid.NewGuid().ToString("N");
         string hiveFile = Path.Combine(temp.Path, "roundtrip.hiv");
-        RegistryPath source = RegistryPath.Parse(@"HKCU\Software\BwcHiveRoundTrip-" + id);
-        RegistryPath mounted = RegistryPath.Parse(@"HKU\BwcHiveRoundTrip-" + id);
-        var store = new RegistryStore(new ShippingWritePolicy());
-        var loaded = false;
+        RegistryPath runRoot = RegistryPath.Parse(@"HKCU\Software\BWC-E2E\hive-" + id);
+        RegistryPath source = runRoot.Append("Source");
+
+        RegistryPath sandboxBase = RegistryPath.Parse(@"HKCU\Software\BWC-E2E");
+        new RegistryWriter(new SandboxWritePolicy(sandboxBase)).CreateKey(sandboxBase);
+
+        var store = new RegistryStore(new SandboxWritePolicy(runRoot));
 
         try
         {
+            store.CreateKey(runRoot);
             store.CreateKey(source);
             store.SetString(source, "Text", "from-save-key");
             store.SetDword(source, "Number", 42);
@@ -199,47 +212,31 @@ public sealed class RegistryHiveTests
             Assert.IsTrue(File.Exists(hiveFile), "RegSaveKey did not create the hive file.");
             Assert.IsTrue(new FileInfo(hiveFile).Length > 0, "The saved hive file is empty.");
 
-            store.LoadHive(mounted, hiveFile);
-            loaded = true;
+            store.DeleteValue(source, "Text");
+            Assert.IsNull(store.Reader.ReadValue(source, "Text"), "The value delete did not reach the sandbox key.");
 
-            RegistryValueInfo? text = store.Reader.ReadValue(mounted, "Text");
-            RegistryValueInfo? number = store.Reader.ReadValue(mounted, "Number");
-            Assert.IsNotNull(text, "The loaded hive is missing the saved string value.");
-            Assert.IsNotNull(number, "The loaded hive is missing the saved DWORD value.");
+            store.RestoreKey(source, hiveFile);
+
+            RegistryValueInfo? text = store.Reader.ReadValue(source, "Text");
+            RegistryValueInfo? number = store.Reader.ReadValue(source, "Number");
+            Assert.IsNotNull(text, "The restored key is missing the saved string value.");
+            Assert.IsNotNull(number, "The restored key is missing the saved DWORD value.");
             Assert.AreEqual("from-save-key", RegistryValueCodec.DecodeString(text!.Data));
             Assert.AreEqual(42u, RegistryValueCodec.DecodeDword(number!.Data));
-
-            store.DeleteValue(mounted, "Text");
-            Assert.IsNull(store.Reader.ReadValue(mounted, "Text"), "The value delete did not reach the loaded hive.");
-
-            store.UnloadHive(mounted);
-            loaded = false;
-            Assert.IsFalse(store.Reader.KeyExists(mounted), "The mounted hive key still exists after unload.");
         }
         finally
         {
-            if (loaded)
-            {
-                try
-                {
-                    store.UnloadHive(mounted);
-                }
-                catch (RegistryOperationException)
-                {
-                    // The original failure is more useful than the cleanup failure.
-                }
-            }
-
             try
             {
-                store.DeleteKey(source, recursive: true);
+                store.DeleteKey(runRoot, recursive: true);
             }
-            catch (RegistryOperationException)
+            catch (RegistryOperationException error) when (error.Win32Error == 2)
             {
-                // The source key may not have been created.
+                // The run key was never created.
             }
         }
     }
+#endif
 
     private static void AssertPolicyDenied(
         Action action,

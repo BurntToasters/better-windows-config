@@ -67,5 +67,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: e2e-result
-          path: artifacts/e2e/result.json
+          path: artifacts/e2e/result-win-x64-e2e.json
           if-no-files-found: ignore

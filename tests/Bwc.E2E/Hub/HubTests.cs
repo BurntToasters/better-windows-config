@@ -30,7 +30,7 @@ public sealed class HubTests
         try
         {
             config.EnsureExecutablesExist();
-            E2EResults.Record("hub.publish.executables", true, config.PublishDir);
+            E2EResults.Note("hub.publish.executables", config.PublishDir);
         }
         catch (FileNotFoundException ex)
         {
@@ -147,7 +147,7 @@ public sealed class HubTests
         try
         {
             launch.Invoke();
-            E2EResults.Record("hub.regedit.invoke", true, "Launch_regedit invoked.");
+            E2EResults.Note("hub.regedit.invoke", "Launch_regedit invoked.");
         }
         catch (Exception ex)
         {
@@ -159,34 +159,28 @@ public sealed class HubTests
         try
         {
             child = WaitForNewRegedit(before, startedUtc, ProcessTimeout);
-            if (child is null)
-            {
-                E2EResults.Record(
-                    "hub.regedit.process",
-                    false,
-                    "No new BwcRegedit process appeared within 15 s.");
-                return;
-            }
-
             E2EResults.Record(
                 "hub.regedit.process",
-                true,
-                $"Started BwcRegedit pid {child.Id}.");
-
-            var handle = WaitForMainWindow(child, ProcessTimeout);
-            if (handle == IntPtr.Zero)
+                child is not null,
+                child is null
+                    ? "No new BwcRegedit process appeared within 15 s."
+                    : $"Started BwcRegedit pid {child.Id}.");
+            if (child is null)
             {
-                E2EResults.Record(
-                    "hub.regedit.window",
-                    false,
-                    $"BwcRegedit pid {child.Id} showed no main window within 15 s.");
                 return;
             }
 
+            var handle = WaitForMainWindow(child, ProcessTimeout);
             E2EResults.Record(
                 "hub.regedit.window",
-                true,
-                $"BwcRegedit pid {child.Id} main window is 0x{handle.ToInt64():X}.");
+                handle != IntPtr.Zero,
+                handle == IntPtr.Zero
+                    ? $"BwcRegedit pid {child.Id} showed no main window within 15 s."
+                    : $"BwcRegedit pid {child.Id} main window is 0x{handle.ToInt64():X}.");
+            if (handle == IntPtr.Zero)
+            {
+                return;
+            }
 
             var windowTitle = ReadWindowTitle(handle, TimeSpan.FromSeconds(5));
             E2EResults.Record(

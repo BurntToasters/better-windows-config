@@ -20,10 +20,12 @@ public sealed class CommandLineTests
 
     [TestMethod]
     [TestCategory("CommandLine")]
+    [TestCategory("Mutating")]
     public void CommandLine_ExportsImportsAndRejectsOutsideSandbox()
     {
         _checkStart = E2EResults.CheckCount;
         E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
 
         try
         {
@@ -41,6 +43,18 @@ public sealed class CommandLineTests
         string v5File = Path.Combine(tempDir, "export-v5.reg");
         string regedit4File = Path.Combine(tempDir, "export-4.reg");
         string outsideFile = Path.Combine(tempDir, "outside.reg");
+
+        // The outside key is removed in finally only when this test created it. A key that already
+        // exists belongs to someone else, so the test fails before any write and leaves it alone.
+        bool outsidePreexisted = OutsideKeyExists();
+        E2EResults.Record(
+            "commandline.outside.absent",
+            !outsidePreexisted,
+            $"HKCU\\{OutsideSubKey} existed before the test={outsidePreexisted}.");
+        if (outsidePreexisted)
+        {
+            Assert.Fail($"HKCU\\{OutsideSubKey} already exists. The test will not modify or delete it.");
+        }
 
         try
         {
@@ -70,8 +84,8 @@ public sealed class CommandLineTests
             bool v5Content = v5Text.StartsWith(
                     "Windows Registry Editor Version 5.00\r\n\r\n",
                     StringComparison.Ordinal)
-                && v5Text.Contains("[" + expectedRoot + "]", StringComparison.Ordinal)
-                && v5Text.Contains("[" + expectedChild + "]", StringComparison.Ordinal)
+                && v5Text.Contains("[" + expectedRoot + "]", StringComparison.OrdinalIgnoreCase)
+                && v5Text.Contains("[" + expectedChild + "]", StringComparison.OrdinalIgnoreCase)
                 && v5Text.Contains("@=\"default text\"", StringComparison.Ordinal)
                 && v5Text.Contains("\"Text\"=\"hello\"", StringComparison.Ordinal)
                 && v5Text.Contains("\"Dword\"=dword:01020304", StringComparison.Ordinal)
@@ -88,7 +102,7 @@ public sealed class CommandLineTests
             bool noBom = ansiBytes.Length > 0 && !(ansiBytes[0] == 0xFF && ansiBytes[1] == 0xFE);
             string ansiText = ansiBytes.Length == 0 ? string.Empty : Encoding.ASCII.GetString(ansiBytes);
             bool ansiContent = ansiText.StartsWith("REGEDIT4\r\n\r\n", StringComparison.Ordinal)
-                && ansiText.Contains("[" + expectedRoot + "]", StringComparison.Ordinal)
+                && ansiText.Contains("[" + expectedRoot + "]", StringComparison.OrdinalIgnoreCase)
                 && ansiText.Contains("\"Text\"=\"hello\"", StringComparison.Ordinal);
             E2EResults.Record(
                 "commandline.export.regedit4",
@@ -102,6 +116,7 @@ public sealed class CommandLineTests
                 deleted,
                 $"run root exists after delete={!deleted}.");
 
+            E2EGuards.RequireImportFileInsideSandbox(v5File, sandbox, "commandline.import.target");
             CommandResult import = Run(config, sandbox, "/s", v5File);
             bool restored = sandbox.Exists(string.Empty)
                 && sandbox.ReadString(string.Empty, "Text") == "hello"
@@ -120,30 +135,20 @@ public sealed class CommandLineTests
                 import.Exited && import.ExitCode == 0 && restored && binaryRestored,
                 $"exit={import.ExitCode}, restored={restored}, binary={binaryRestored}, stderr='{import.StandardError.Trim()}'.");
 
-            if (config.Flavor == "e2e")
-            {
-                string outsideText =
-                    "Windows Registry Editor Version 5.00\r\n\r\n"
-                    + "[HKEY_CURRENT_USER\\" + OutsideSubKey + "]\r\n"
-                    + "\"Value\"=\"outside\"\r\n";
-                File.WriteAllBytes(outsideFile, EncodeV5(outsideText));
+            // Deliberate probe: this import targets a key outside the sandbox. It is the fail-closed
+            // assertion for SandboxWritePolicy, so it only ever runs on the e2e flavor (guarded above).
+            string outsideText =
+                "Windows Registry Editor Version 5.00\r\n\r\n"
+                + "[HKEY_CURRENT_USER\\" + OutsideSubKey + "]\r\n"
+                + "\"Value\"=\"outside\"\r\n";
+            File.WriteAllBytes(outsideFile, EncodeV5(outsideText));
 
-                CommandResult denied = Run(config, sandbox, "/s", outsideFile);
-                bool outsideCreated = OutsideKeyExists();
-                E2EResults.Record(
-                    "commandline.import.outside.denied",
-                    denied.Exited && denied.ExitCode != 0 && !outsideCreated,
-                    $"exit={denied.ExitCode}, outsideCreated={outsideCreated}, stderr='{denied.StandardError.Trim()}'.");
-            }
-            else
-            {
-                // The ship flavor intentionally uses ShippingWritePolicy; the fail-closed
-                // sandbox assertion belongs to the e2e flavor only.
-                E2EResults.Record(
-                    "commandline.import.outside.denied",
-                    true,
-                    "informational: ship flavor uses ShippingWritePolicy; sandbox denial is asserted on the e2e flavor.");
-            }
+            CommandResult denied = Run(config, sandbox, "/s", outsideFile);
+            bool outsideCreated = OutsideKeyExists();
+            E2EResults.Record(
+                "commandline.import.outside.denied",
+                denied.Exited && denied.ExitCode != 0 && !outsideCreated,
+                $"exit={denied.ExitCode}, outsideCreated={outsideCreated}, stderr='{denied.StandardError.Trim()}'.");
 
             CommandResult unknown = Run(config, sandbox, "/z");
             E2EResults.Record(
@@ -160,7 +165,11 @@ public sealed class CommandLineTests
         finally
         {
             sandbox.Cleanup();
-            DeleteOutsideKey();
+            if (!outsidePreexisted)
+            {
+                DeleteOutsideKey();
+            }
+
             try
             {
                 if (Directory.Exists(tempDir))

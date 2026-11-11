@@ -75,7 +75,7 @@ harness or quarantine the specific check.
 ## Artifact overwrite
 
 Every run rewrites `artifacts/gate/result.json`, and the full gate also rewrites
-`artifacts/e2e/result.json` and the publish folder. Two concurrent runs can
+`artifacts/e2e/result-<rid>-<flavor>.json` and the publish folder. Two concurrent runs can
 overwrite each other. CI uses a per-ref concurrency group with cancel-in-progress.
 Local runs should be serialized by the operator.
 
