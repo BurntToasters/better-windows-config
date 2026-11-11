@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.System;
 
 namespace Bwc.UI.Shell;
@@ -44,6 +45,34 @@ public sealed partial class ClassicWindowShell : UserControl
         InitializeComponent();
         _currentPath = AddressBox.Text;
         ApplyMetrics();
+
+        // The palette is applied here on the UI thread, after the Dense.xaml brushes exist.
+        BwcTheme.EnsureInitialized();
+        RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
+
+        // Fallback for the WinRT theme events, which an unpackaged app can be refused. A change of
+        // the effective Windows theme changes this element's ActualTheme, so the palette re-reads.
+        ActualThemeChanged += (_, _) => BwcTheme.RefreshSystem();
+
+        // The system focus visual draws a rounded rectangle around the whole pane. The focus
+        // rectangle is drawn on the focused row instead, so the system visual is switched off.
+        TreeControl.UseSystemFocusVisuals = false;
+        ListControl.UseSystemFocusVisuals = false;
+
+        // The list header band is outside DetailsHeaderPanel and keeps the Fluent layer color
+        // unless it is set here. It uses the window brush, like the oracle header.
+        if (ListControl.FindName("HeaderHost") is Border headerHost)
+        {
+            headerHost.Background = BwcBrushes.Window;
+        }
+
+        TreeControl.GotFocus += OnPaneFocusEvent;
+        TreeControl.LostFocus += OnPaneFocusEvent;
+        ListControl.GotFocus += OnPaneFocusEvent;
+        ListControl.LostFocus += OnPaneFocusEvent;
+        TreeControl.SelectionChanged += (_, _) => RefreshPaneFocus();
+        ListControl.SelectionChanged += (_, _) => RefreshPaneFocus();
+
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         MenuBarRoot.PreviewKeyDown += OnMenuPreviewKeyDown;
@@ -147,7 +176,10 @@ public sealed partial class ClassicWindowShell : UserControl
             _metricsSubscribed = true;
         }
 
+        BwcTheme.Changed += OnThemeChanged;
+        RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
         ApplyMetrics();
+        RefreshPaneFocus();
         if (_topHwnd != 0)
         {
             CreateMenuKeyboard();
@@ -162,7 +194,52 @@ public sealed partial class ClassicWindowShell : UserControl
             _metricsSubscribed = false;
         }
 
+        BwcTheme.Changed -= OnThemeChanged;
         DetachMenuKeyboard();
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
+    }
+
+    /// <summary>
+    /// Focus events arrive before the focused element has moved in some paths, so the read of the
+    /// focused element is deferred to the dispatcher queue.
+    /// </summary>
+    private void OnPaneFocusEvent(object sender, RoutedEventArgs e)
+    {
+        _ = DispatcherQueue.TryEnqueue(RefreshPaneFocus);
+    }
+
+    /// <summary>
+    /// Reports which pane has keyboard focus to the theme. A pane has focus when the focused element
+    /// is inside its pane border, so a rename box inside the tree still counts as the tree. The
+    /// focus rectangle is shown only with a selected tree row, or with exactly one selected list row.
+    /// </summary>
+    private void RefreshPaneFocus()
+    {
+        DependencyObject? focused = XamlRoot is { } root
+            ? FocusManager.GetFocusedElement(root) as DependencyObject
+            : null;
+
+        bool tree = IsWithin(focused, TreePaneBorder);
+        bool list = IsWithin(focused, ListPaneBorder);
+        BwcTheme.SetPaneState(BwcPane.Tree, tree, tree && TreeControl.SelectedNode is not null);
+        BwcTheme.SetPaneState(BwcPane.List, list, list && ListControl.SelectedRows.Count == 1);
+    }
+
+    private static bool IsWithin(DependencyObject? element, DependencyObject pane)
+    {
+        for (var current = element; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (ReferenceEquals(current, pane))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void OnMetricsChanged(object? sender, EventArgs e)

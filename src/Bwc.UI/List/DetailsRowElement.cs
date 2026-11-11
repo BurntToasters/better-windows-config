@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Automation.Provider;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using Windows.Foundation;
 
 namespace Bwc.UI.List;
@@ -22,10 +23,14 @@ public sealed class DetailsRowElement : Panel
     private bool _selected;
     private double _rowHeight = -1;
     private double _fontSize = -1;
+    private readonly Rectangle _focusRect;
 
     public DetailsRowElement()
     {
         Background = DenseTheme.Transparent;
+        // Visible only on the single selected row while the list has focus. The brush does the
+        // gating, so a focus change never needs to re-apply rows. See BwcTheme.SetPaneState.
+        _focusRect = BwcFocusRect.Create(DenseTheme.ListFocusRect);
         PointerPressed += OnPointerPressed;
         DoubleTapped += OnDoubleTapped;
         RightTapped += OnRightTapped;
@@ -83,12 +88,14 @@ public sealed class DetailsRowElement : Panel
 
     internal void ApplyTheme()
     {
-        Background = _selected ? DenseTheme.SelectionBackground : DenseTheme.Transparent;
-        Brush foreground = _selected ? DenseTheme.SelectionForeground : DenseTheme.Text;
+        Background = _selected ? DenseTheme.ListSelectionBackground : DenseTheme.Transparent;
+        Brush foreground = _selected ? DenseTheme.ListSelectionForeground : DenseTheme.Text;
         foreach (var cell in _cells)
         {
             cell.Foreground = foreground;
         }
+
+        _focusRect.Stroke = _selected ? DenseTheme.ListFocusRect : DenseTheme.Transparent;
     }
 
     internal void SetSelected(bool selected)
@@ -119,6 +126,7 @@ public sealed class DetailsRowElement : Panel
         }
 
         double width = double.IsInfinity(availableSize.Width) ? total : Math.Max(total, availableSize.Width);
+        BwcFocusRect.Measure(_focusRect, this, new Size(width, height));
         return new Size(width, height);
     }
 
@@ -146,6 +154,7 @@ public sealed class DetailsRowElement : Panel
             left += Owner.Columns[i].Width;
         }
 
+        BwcFocusRect.Arrange(_focusRect, this, new Size(finalSize.Width, height));
         return finalSize;
     }
 
@@ -187,6 +196,9 @@ public sealed class DetailsRowElement : Panel
             _cells[i] = cell;
             Children.Add(cell);
         }
+
+        // Clear removed the overlay too, so add it back after the cells.
+        Children.Add(_focusRect);
     }
 
     private void ApplyMetricsCore()

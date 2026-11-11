@@ -7,7 +7,7 @@
     xmlns:tree="using:Bwc.UI.Tree"
     AutomationProperties.AutomationId="ClassicWindowShell"
     AutomationProperties.Name="Classic window shell"
-    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+    Background="{StaticResource BwcFaceBrush}"
     IsTabStop="True"
     UseSystemFocusVisuals="False">
 
@@ -45,7 +45,7 @@
                 x:Name="TreePaneBorder"
                 AutomationProperties.AutomationId="TreePane"
                 AutomationProperties.Name="Tree pane"
-                Background="{ThemeResource LayerFillColorDefaultBrush}">
+                Background="{StaticResource BwcWindowBrush}">
                 <Grid x:Name="TreeBody" AutomationProperties.AutomationId="TreeBody">
                     <tree:DenseTree x:Name="TreeControl" />
                 </Grid>
@@ -64,7 +64,10 @@
                 LostFocus="OnSplitterLostFocus">
                 <primitives:Thumb.Template>
                     <ControlTemplate TargetType="primitives:Thumb">
-                        <Border Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                        <Border
+                            Background="{StaticResource BwcFaceBrush}"
+                            BorderBrush="{StaticResource BwcHighlight3DBrush}"
+                            BorderThickness="1,0,0,0" />
                     </ControlTemplate>
                 </primitives:Thumb.Template>
             </primitives:Thumb>
@@ -74,7 +77,7 @@
                 Grid.Column="2"
                 AutomationProperties.AutomationId="ListPane"
                 AutomationProperties.Name="List pane"
-                Background="{ThemeResource LayerFillColorDefaultBrush}">
+                Background="{StaticResource BwcWindowBrush}">
                 <list:DetailsList x:Name="ListControl" />
             </Border>
         </Grid>

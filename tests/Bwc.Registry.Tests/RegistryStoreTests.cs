@@ -1,5 +1,4 @@
 #if BWC_E2E
-using System.Globalization;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Win32;
@@ -100,7 +99,7 @@ public sealed class RegistryStoreTests
             RegistryValueInfo defaultValue = reader.ReadDefaultValue(runRoot)!;
 
             Assert.AreEqual(
-                0x01020304u.ToString(CultureInfo.InvariantCulture),
+                "0x01020304 (16909060)",
                 RegistryValueDisplay.FormatData(dword));
             Assert.AreEqual("11 22 33 44", RegistryValueDisplay.FormatData(bigEndian));
             Assert.AreEqual("one  two", RegistryValueDisplay.FormatData(multi));

@@ -8,12 +8,15 @@ namespace Bwc.Registry;
 public static class RegFileExporter
 {
     private const int ErrorAccessDenied = 5;
+    private const int ErrorInvalidName = 123;
+    private const string ExportValueNameOperation = "ExportValueName";
     private const string ComputerPrefix = "Computer\\";
 
     /// <summary>
     /// Exports <paramref name="startKey"/> and every readable descendant. An unreadable
     /// descendant is skipped with its subtree; an unreadable start key throws
-    /// <see cref="RegistryOperationException"/>.
+    /// <see cref="RegistryOperationException"/>. A value whose name contains an embedded NUL also
+    /// throws, with operation <c>ExportValueName</c>, and no document is returned.
     /// </summary>
     public static RegFileDocument Export(
         RegistryReader reader,
@@ -55,6 +58,18 @@ public static class RegFileExporter
             foreach (RegistryValueInfo value in values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                // A .reg name cannot hold a NUL. Writing it would produce a name that is not the
+                // registry's, and classic regedit stops the export at such a value without an error.
+                if (value.Name.Contains('\0'))
+                {
+                    throw new RegistryOperationException(
+                        ExportValueNameOperation,
+                        path,
+                        ErrorInvalidName,
+                        "A value name contains an embedded NUL and cannot be written to a .reg file.");
+                }
+
                 fileValues.Add(new RegFileValue(value.Name, value.Type, value.Data));
             }
 

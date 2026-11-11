@@ -31,27 +31,74 @@ public sealed class RegistryValueDisplayTests
     {
         var oddDword = new RegistryValueInfo("OddDword", 4, new byte[] { 1, 2, 3 });
         var emptyDword = new RegistryValueInfo("EmptyDword", 4, Array.Empty<byte>());
+        var longDword = new RegistryValueInfo("LongDword", 4, new byte[5]);
         var oddQword = new RegistryValueInfo("OddQword", 11, new byte[7]);
         var emptyQword = new RegistryValueInfo("EmptyQword", 11, Array.Empty<byte>());
+        var longQword = new RegistryValueInfo("LongQword", 11, new byte[9]);
 
         Assert.AreEqual("(invalid DWORD (32-bit) value)", RegistryValueDisplay.FormatData(oddDword));
         Assert.AreEqual("(invalid DWORD (32-bit) value)", RegistryValueDisplay.FormatData(emptyDword));
+        Assert.AreEqual("(invalid DWORD (32-bit) value)", RegistryValueDisplay.FormatData(longDword));
         Assert.AreEqual("(invalid QWORD (64-bit) value)", RegistryValueDisplay.FormatData(oddQword));
         Assert.AreEqual("(invalid QWORD (64-bit) value)", RegistryValueDisplay.FormatData(emptyQword));
+        Assert.AreEqual("(invalid QWORD (64-bit) value)", RegistryValueDisplay.FormatData(longQword));
     }
 
     [TestMethod]
-    public void ValidDwordAndQwordShowDecimal()
+    public void DwordShowsOracleHexWidthAndUnsignedDecimal()
     {
-        var dword = new RegistryValueInfo("Dword", 4, BitConverter.GetBytes(42u));
-        const ulong QwordValue = 0x1122334455667788UL;
-        var qword = new RegistryValueInfo("Qword", 11, BitConverter.GetBytes(QwordValue));
-
-        Assert.AreEqual("42", RegistryValueDisplay.FormatData(dword));
-        Assert.AreEqual(
-            QwordValue.ToString(CultureInfo.InvariantCulture),
-            RegistryValueDisplay.FormatData(qword));
+        // Oracle string 29 is "0x%1!08x! (%1!u!)": lowercase, at least eight digits, unsigned.
+        Assert.AreEqual("0x00001388 (5000)", RegistryValueDisplay.FormatData(Dword(5000u)));
+        Assert.AreEqual("0x00000000 (0)", RegistryValueDisplay.FormatData(Dword(0u)));
+        Assert.AreEqual("0x00000001 (1)", RegistryValueDisplay.FormatData(Dword(1u)));
+        Assert.AreEqual("0x80000000 (2147483648)", RegistryValueDisplay.FormatData(Dword(0x80000000u)));
+        Assert.AreEqual("0xffffffff (4294967295)", RegistryValueDisplay.FormatData(Dword(uint.MaxValue)));
+        Assert.AreEqual("0xabcdef01 (2882400001)", RegistryValueDisplay.FormatData(Dword(0xABCDEF01u)));
     }
+
+    [TestMethod]
+    public void QwordShowsOracleHexWidthAndUnsignedDecimal()
+    {
+        // Oracle string 32 is "0x%1!08I64x! (%1!I64u!)". The width is a minimum of eight digits, so
+        // the 16-digit form in the brief is not what classic regedit prints on this build.
+        Assert.AreEqual("0x00001388 (5000)", RegistryValueDisplay.FormatData(Qword(5000UL)));
+        Assert.AreEqual("0x00000000 (0)", RegistryValueDisplay.FormatData(Qword(0UL)));
+        Assert.AreEqual("0x100000000 (4294967296)", RegistryValueDisplay.FormatData(Qword(0x100000000UL)));
+        Assert.AreEqual(
+            "0x1122334455667788 (1234605616436508552)",
+            RegistryValueDisplay.FormatData(Qword(0x1122334455667788UL)));
+        Assert.AreEqual(
+            "0xffffffffffffffff (18446744073709551615)",
+            RegistryValueDisplay.FormatData(Qword(ulong.MaxValue)));
+    }
+
+    [TestMethod]
+    public void DwordBudgetKeepsTheEllipsisInside()
+    {
+        var value = Dword(5000u);
+
+        Assert.AreEqual("0x00001...", RegistryValueDisplay.FormatData(value, 10));
+        Assert.AreEqual("0x00001388 (5000)", RegistryValueDisplay.FormatData(value, 17));
+    }
+
+    [TestMethod]
+    public void NoneAndResourceTypesShowHexBytesOrTheZeroLengthMessage()
+    {
+        foreach (uint type in new uint[] { 0, 8, 9, 10, 0x1234 })
+        {
+            var value = new RegistryValueInfo("Blob", type, new byte[] { 0x0A, 0xFF });
+            var empty = new RegistryValueInfo("Blob", type, Array.Empty<byte>());
+
+            Assert.AreEqual("0A FF", RegistryValueDisplay.FormatData(value), type.ToString(CultureInfo.InvariantCulture));
+            Assert.AreEqual("(zero-length binary value)", RegistryValueDisplay.FormatData(empty), type.ToString(CultureInfo.InvariantCulture));
+        }
+    }
+
+    private static RegistryValueInfo Dword(uint value) =>
+        new("Dword", 4, BitConverter.GetBytes(value));
+
+    private static RegistryValueInfo Qword(ulong value) =>
+        new("Qword", 11, BitConverter.GetBytes(value));
 
     [TestMethod]
     public void StringValuesShowTextWithoutTheTerminator()

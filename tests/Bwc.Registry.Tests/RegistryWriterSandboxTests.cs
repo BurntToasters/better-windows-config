@@ -211,6 +211,30 @@ public sealed class RegistryWriterSandboxTests
     }
 
     [TestMethod]
+    public void DeleteValueRefusesNulNamesInsteadOfDeletingTheTruncatedName()
+    {
+        string runId = NewRunId();
+        RegistryPath runRoot = RunRoot(runId);
+
+        try
+        {
+            var writer = new RegistryWriter(new SandboxWritePolicy(runRoot));
+            writer.CreateKey(runRoot);
+            writer.SetValue(runRoot, "abc", 1, Encoding.Unicode.GetBytes("keep\0"));
+
+            // RegDeleteValueW would read "abc\0def" as "abc" and delete the wrong value.
+            Assert.ThrowsExactly<ArgumentException>(() => writer.DeleteValue(runRoot, "abc\0def"));
+
+            using RegistryKey key = RequireRunKey(runId);
+            Assert.AreEqual("keep", key.GetValue("abc"));
+        }
+        finally
+        {
+            DeleteRunRoot(runId);
+        }
+    }
+
+    [TestMethod]
     public void SandboxPolicyAllowsOnlyItsSubtree()
     {
         RegistryPath runRoot = RunRoot(NewRunId());
