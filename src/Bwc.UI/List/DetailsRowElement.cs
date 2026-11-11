@@ -26,6 +26,7 @@ public sealed class DetailsRowElement : Panel
     private TextBlock[] _cells = [];
     private int _index = -1;
     private bool _selected;
+    private bool _focused;
     private double _rowHeight = -1;
     private double _fontSize = -1;
     private readonly Rectangle _focusRect;
@@ -35,9 +36,9 @@ public sealed class DetailsRowElement : Panel
     public DetailsRowElement()
     {
         Background = DenseTheme.Transparent;
-        // Visible only on the single selected row while the list has focus. The brush does the
-        // gating, so a focus change never needs to re-apply rows. See BwcTheme.SetPaneState.
-        _focusRect = BwcFocusRect.Create(DenseTheme.ListFocusRect);
+        // The focus rectangle belongs to the focused row, which may be unselected. The list sets
+        // the state on each row; the stroke is the transparent brush unless this row has focus.
+        _focusRect = BwcFocusRect.Create(DenseTheme.Transparent);
         _icon = new Image
         {
             Width = Icons.IconProvider.IconDip,
@@ -58,7 +59,7 @@ public sealed class DetailsRowElement : Panel
 
     internal int Index => _index;
 
-    internal void Attach(DetailsList owner, int index, DetailsRow row, bool selected)
+    internal void Attach(DetailsList owner, int index, DetailsRow row, bool selected, bool focused)
     {
         Owner = owner;
         _index = index;
@@ -87,7 +88,9 @@ public sealed class DetailsRowElement : Panel
         }
 
         ApplyIcon();
-        SetSelected(selected);
+        _selected = selected;
+        _focused = focused;
+        ApplyTheme();
     }
 
     internal void Detach()
@@ -112,18 +115,24 @@ public sealed class DetailsRowElement : Panel
             cell.Foreground = foreground;
         }
 
-        _focusRect.Stroke = _selected ? DenseTheme.ListFocusRect : DenseTheme.Transparent;
+        // A focused selected row draws the rectangle in the selection text color, as classic does.
+        // A focused unselected row draws it in the window text color.
+        _focusRect.Stroke = _focused
+            ? (_selected ? DenseTheme.ListSelectionForeground : DenseTheme.Text)
+            : DenseTheme.Transparent;
         _selectionBorder.Stroke = _selected ? DenseTheme.ListSelectionBorder : DenseTheme.Transparent;
     }
 
-    internal void SetSelected(bool selected)
+    /// <summary>Applies the selection and focus state. Only a change re-applies the brushes.</summary>
+    internal void SetState(bool selected, bool focused)
     {
-        if (_selected == selected)
+        if (_selected == selected && _focused == focused)
         {
             return;
         }
 
         _selected = selected;
+        _focused = focused;
         ApplyTheme();
     }
 
@@ -307,7 +316,7 @@ internal sealed class DetailsRowAutomationPeer :
 
     public bool IsSelected => _row.Owner?.IsRowSelected(_row.Index) == true;
 
-    public IRawElementProviderSimple SelectionContainer => null!;
+    public IRawElementProviderSimple SelectionContainer => OwnerProvider();
 
     public int Column => 0;
 
@@ -317,7 +326,7 @@ internal sealed class DetailsRowAutomationPeer :
 
     public int RowSpan => 1;
 
-    public IRawElementProviderSimple ContainingGrid => null!;
+    public IRawElementProviderSimple ContainingGrid => OwnerProvider();
 
     protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.DataItem;
 
@@ -363,5 +372,19 @@ internal sealed class DetailsRowAutomationPeer :
     public void ScrollIntoView()
     {
         _row.Owner?.RevealIndex(_row.Index);
+    }
+
+    /// <summary>The list's peer as a provider. Falls back to this row when the list is not attached.</summary>
+    private IRawElementProviderSimple OwnerProvider()
+    {
+        DetailsList? owner = _row.Owner;
+        if (owner is null)
+        {
+            return ProviderFromPeer(this);
+        }
+
+        AutomationPeer? peer = FrameworkElementAutomationPeer.FromElement(owner)
+            ?? FrameworkElementAutomationPeer.CreatePeerForElement(owner);
+        return peer is null ? ProviderFromPeer(this) : ProviderFromPeer(peer);
     }
 }
