@@ -24,6 +24,8 @@ public static class OracleWin32 {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint f);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint f);
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
   [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr v);
   [DllImport("user32.dll")] public static extern IntPtr FindWindowEx(IntPtr p, IntPtr c, string cls, string t);
@@ -137,6 +139,17 @@ function Edge-Colors($g, [System.Drawing.Rectangle]$box) {
 
 function Fmt($r) { if ($r) { "$($r.Left),$($r.Top),$($r.Right),$($r.Bottom)" } else { 'none' } }
 
+# Keystrokes go to the foreground window, so they are sent only after classic regedit is confirmed foreground.
+# Another application covering it would otherwise receive them, including Alt+F4.
+function Assert-Foreground($h) {
+    for ($i = 0; $i -lt 6 -and [OracleWin32]::GetForegroundWindow().ToInt64() -ne $h.ToInt64(); $i++) {
+        [void][OracleWin32]::SetForegroundWindow($h); Start-Sleep -Milliseconds 200
+    }
+    if ([OracleWin32]::GetForegroundWindow().ToInt64() -ne $h.ToInt64()) {
+        throw 'classic regedit is not the foreground window; no keys were sent'
+    }
+}
+
 $CE8 = 0xCCE8FF
 $BLUE = 0x0078D4
 $out = [ordered]@{ generator = 'tests/Bwc.E2E/Theme/classic-selection-oracle.ps1'; read_only = $true }
@@ -154,12 +167,15 @@ try {
         Remove-Item Env:\__COMPAT_LAYER
     }
     $hwnd = Get-RegEditWindow
+    # Kept above other applications until the finally block clears it (flags NOMOVE|NOSIZE|NOACTIVATE).
+    [void][OracleWin32]::SetWindowPos($hwnd, [IntPtr](-1), 0, 0, 0, 0, 0x0013)
     Start-Sleep -Milliseconds 1500
     [void][OracleWin32]::SetForegroundWindow($hwnd); Start-Sleep -Milliseconds 400
     $tree = Get-ChildRect $hwnd 'SysTreeView32'
     $list = Get-ChildRect $hwnd 'SysListView32'
 
     # Navigate: Computer -> HKEY_CURRENT_USER (expand) -> AppEvents -> Console.
+    Assert-Foreground $hwnd
     foreach ($k in '{HOME}', '{DOWN}', '{DOWN}', '{RIGHT}', '{DOWN}', '{DOWN}') {
         [System.Windows.Forms.SendKeys]::SendWait($k); Start-Sleep -Milliseconds 180
     }
@@ -174,6 +190,7 @@ try {
     $focus.Bmp.Save((Join-Path $OutDir 'classic-main-tree-focus.png'), [System.Drawing.Imaging.ImageFormat]::Png)
 
     # Tab to the list and select the first value.
+    Assert-Foreground $hwnd
     [System.Windows.Forms.SendKeys]::SendWait('{TAB}'); Start-Sleep -Milliseconds 300
     [System.Windows.Forms.SendKeys]::SendWait('{DOWN}'); Start-Sleep -Milliseconds 500
     $listFocus = Grab-Window $hwnd
@@ -186,6 +203,7 @@ try {
 
     # Tab back to the tree. The list keeps its selection but draws none.
     for ($i = 0; $i -lt 3; $i++) {
+        Assert-Foreground $hwnd
         [System.Windows.Forms.SendKeys]::SendWait('{TAB}'); Start-Sleep -Milliseconds 350
         if (Box-Of (Grab-Window $hwnd) $tree $CE8) { break }
     }
@@ -217,7 +235,9 @@ try {
 finally {
     if ($hwnd -ne [IntPtr]::Zero) {
         try {
-            [void][OracleWin32]::SetForegroundWindow($hwnd); Start-Sleep -Milliseconds 300
+            [void][OracleWin32]::SetWindowPos($hwnd, [IntPtr](-2), 0, 0, 0, 0, 0x0013)
+            # Alt+F4 is sent only to the confirmed foreground window, so it cannot close another application.
+            Assert-Foreground $hwnd
             [System.Windows.Forms.SendKeys]::SendWait('%{F4}'); Start-Sleep -Milliseconds 800
         } catch { Write-Host "close failed: $($_.Exception.Message)" }
     }

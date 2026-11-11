@@ -556,8 +556,14 @@ public sealed class HubTests
         }
         AutomationElement? beta = HubUi.WaitWithin(window, "UpdateChannelBeta", DialogTimeout);
         AutomationElement? startup = HubUi.WaitWithin(window, "UpdateStartupCheck", DialogTimeout);
-        beta?.Click();
-        startup?.Click();
+
+        // The two toggles are mouse clicks, so they are sent only once the dialog is confirmed foreground.
+        // Otherwise a click lands on the Hub or on a window that covers it, and the saved-settings check fails.
+        if (HubUi.RaiseDialog((IntPtr)window.Properties.NativeWindowHandle.ValueOrDefault, TimeSpan.FromSeconds(3)))
+        {
+            beta?.Click();
+            startup?.Click();
+        }
 
         AutomationElement? save = HubUi.WaitWithin(window, "UpdateSettingsOk", DialogTimeout);
         if (save is not null)
@@ -678,7 +684,7 @@ public sealed class HubTests
     private static void CaptureDialog(AutomationElement window, string fileName, string checkId, string theme)
     {
         IntPtr hwnd = (IntPtr)window.Properties.NativeWindowHandle.ValueOrDefault;
-        _ = HubUi.Foreground(hwnd, TimeSpan.FromSeconds(3));
+        _ = HubUi.RaiseDialog(hwnd, TimeSpan.FromSeconds(3));
         Thread.Sleep(500);
         string saved = HubUi.CaptureWindow(hwnd, Path.Combine(HubUi.VisualDir(GuiGate.Config), fileName));
         E2EResults.Note("hub.capture." + Path.GetFileNameWithoutExtension(fileName), saved);

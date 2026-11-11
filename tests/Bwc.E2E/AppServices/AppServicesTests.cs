@@ -713,10 +713,30 @@ public sealed class AppServicesTests
 
     private static string Get(JsonObject obj, string key) => obj[key]?.ToJsonString() ?? "(missing)";
 
+    /// <summary>
+    /// Reads the first log file. The running app can hold the file for a moment while it writes, which raises a
+    /// sharing violation, so the read is retried for a short bounded time. The content checked is unchanged.
+    /// </summary>
     private static string ReadFirstLog(string logDir)
     {
         string? file = Directory.EnumerateFiles(logDir, "log-*.txt").OrderBy(f => f, StringComparer.Ordinal).FirstOrDefault();
-        return file is null ? string.Empty : File.ReadAllText(file);
+        if (file is null)
+        {
+            return string.Empty;
+        }
+
+        DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (true)
+        {
+            try
+            {
+                return File.ReadAllText(file);
+            }
+            catch (IOException) when (DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(100);
+            }
+        }
     }
 
     /// <summary>The product version from the built executable, without build metadata.</summary>

@@ -153,14 +153,7 @@ internal static class ClassicRegeditCapture
     /// </summary>
     private static void RequireForeground(AppSession session)
     {
-        for (var attempt = 0; attempt < 3 && !Win32.IsForeground(session.MainHwnd); attempt++)
-        {
-            _ = Win32.ShowWindow(session.MainHwnd, Win32.SwRestore);
-            _ = Win32.SetForegroundWindow(session.MainHwnd);
-            _ = ControlTestSupport.WaitUntil(() => Win32.IsForeground(session.MainHwnd), TimeSpan.FromMilliseconds(500));
-        }
-
-        if (!Win32.IsForeground(session.MainHwnd))
+        if (!session.EnsureForeground(TimeSpan.FromSeconds(3)))
         {
             throw new InvalidOperationException("The classic window did not come to the foreground, so a capture would show another window.");
         }

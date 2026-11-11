@@ -947,45 +947,8 @@ public sealed class ImportExportTests
             }
         }
 
-        private static bool EnsureForeground(IntPtr hwnd)
-        {
-            if (Win32.IsForeground(hwnd))
-            {
-                return true;
-            }
-
-            Win32.ShowWindow(hwnd, Win32.SwRestore);
-            _ = Win32.SetForegroundWindow(hwnd);
-            if (ControlTestSupport.WaitUntil(
-                    () => Win32.IsForeground(hwnd),
-                    TimeSpan.FromMilliseconds(500)))
-            {
-                return true;
-            }
-
-            IntPtr foreground = Win32.GetForegroundWindow();
-            uint foregroundThread = GetWindowThreadProcessId(foreground, out _);
-            uint currentThread = GetCurrentThreadId();
-            bool attached = foregroundThread != 0 &&
-                foregroundThread != currentThread &&
-                AttachThreadInput(currentThread, foregroundThread, true);
-
-            try
-            {
-                _ = Win32.SetForegroundWindow(hwnd);
-            }
-            finally
-            {
-                if (attached)
-                {
-                    _ = AttachThreadInput(currentThread, foregroundThread, false);
-                }
-            }
-
-            return ControlTestSupport.WaitUntil(
-                () => Win32.IsForeground(hwnd),
-                TimeSpan.FromSeconds(2));
-        }
+        /// <summary>Confirms a dialog is foreground before input. Delegates to <see cref="Win32.ForceForeground"/>.</summary>
+        private static bool EnsureForeground(IntPtr hwnd) => Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(2));
     }
 
 #pragma warning disable SYSLIB1054 // The small test-only P/Invoke surface does not need LibraryImport plumbing.
@@ -1001,10 +964,5 @@ public sealed class ImportExportTests
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetClassName(IntPtr hwnd, StringBuilder className, int maxCount);
 
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
-    [DllImport("kernel32.dll")]
-    private static extern uint GetCurrentThreadId();
 #pragma warning restore SYSLIB1054
 }
