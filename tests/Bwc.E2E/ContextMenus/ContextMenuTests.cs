@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Bwc.E2E.Controls;
+using Bwc.E2E.Dialogs;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
@@ -178,14 +179,16 @@ public sealed class ContextMenuTests
         bool newInvoked = submenu && menus.Invoke(663);
         bool dialog = newInvoked && driver.WaitForDialog();
         bool input = dialog && driver.WaitForElement("DialogTextInput") is not null;
-        string heading = dialog ? driver.TextOf("DialogHeading") : string.Empty;
+        // The classic prompt has no heading. Its window title is the New Key caption.
+        AutomationElement? promptRoot = dialog ? driver.WaitForElement("DialogRoot") : null;
+        string heading = promptRoot is null ? string.Empty : ControlTestSupport.SafeName(ClassicDialogTests.WindowOf(promptRoot));
         bool cancelled = input && driver.Invoke("DialogSecondary") && driver.WaitForNoDialog();
         bool keyAbsent = !sandbox.Exists(NewKeyName);
         E2EResults.Record(
             "contextmenu.tree.newkey",
             submenu && newInvoked && dialog && heading.StartsWith("New Key", StringComparison.Ordinal) &&
                 cancelled && keyAbsent,
-            $"submenu={submenu}, invoked={newInvoked}, dialog={dialog}, heading='{heading}', cancelled={cancelled}, keyAbsent={keyAbsent}.");
+            $"submenu={submenu}, invoked={newInvoked}, dialog={dialog}, title='{heading}', cancelled={cancelled}, keyAbsent={keyAbsent}.");
     }
 
     private static void CheckValueMenu(
@@ -229,7 +232,10 @@ public sealed class ContextMenuTests
         E2EGuards.RequireSandboxSelection(session, sandbox, "contextmenu.sandbox.modifybinary");
         bool binaryInvoked = menus.Invoke(917);
         bool dialog = binaryInvoked && driver.WaitForDialog();
-        bool hexDialog = dialog && driver.WaitForElement("HexEditorDialog") is not null;
+        // The hex editor is a classic dialog, so its root is DialogRoot. Its window title tells it apart from the other dialogs.
+        AutomationElement? hexRoot = dialog ? driver.WaitForElement("DialogRoot") : null;
+        bool hexDialog = hexRoot is not null &&
+            string.Equals(ControlTestSupport.SafeName(ClassicDialogTests.WindowOf(hexRoot)), "Edit Binary Value", StringComparison.Ordinal);
         bool hexEditor = dialog && driver.WaitForElement("HexEditor") is not null;
         bool cancelled = hexEditor && driver.Invoke("DialogSecondary") && driver.WaitForNoDialog();
         bool unchanged = sandbox.ReadBinary(string.Empty, BinaryValueName) is { Length: 5 };

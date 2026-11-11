@@ -53,6 +53,32 @@ public sealed class RegeditSettings
 
     /// <summary>The text the finder matched for the last hit.</summary>
     public string? FindLastHitText { get; set; }
+
+    /// <summary>Left edge of the normal (not maximized) window in physical pixels. Null until saved.</summary>
+    public int? WindowX { get; set; }
+
+    /// <summary>Top edge of the normal window in physical pixels. Null until saved.</summary>
+    public int? WindowY { get; set; }
+
+    /// <summary>Width of the normal window in physical pixels. Null until saved.</summary>
+    public int? WindowWidth { get; set; }
+
+    /// <summary>Height of the normal window in physical pixels. Null until saved.</summary>
+    public int? WindowHeight { get; set; }
+
+    /// <summary>True when the window was maximized at close. The normal rectangle is kept beside it.</summary>
+    public bool WindowMaximized { get; set; }
+
+    /// <summary>
+    /// The tree pane width in DIPs at close. The splitter is set to it at startup. Null when no width was saved.
+    /// </summary>
+    public double? TreePaneWidth { get; set; }
+
+    /// <summary>The font size in DIPs chosen with View > Font. 12 is the oracle size (9 point).</summary>
+    public double FontSize { get; set; } = 12;
+
+    /// <summary>The View > Theme choice: System, Light, or Dark.</summary>
+    public string ThemeOverride { get; set; } = "System";
 }
 
 [JsonSourceGenerationOptions(WriteIndented = true)]

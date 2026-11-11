@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Globalization;
 using Bwc.Core;
 using Bwc.Registry;
+using Bwc.Regedit.Controllers;
 using Bwc.Regedit.Registry;
 
 namespace Bwc.Regedit.CommandLine;
@@ -35,6 +37,7 @@ public static class RegeditCommandLine
         Operation operation = Operation.None;
         string? file = null;
         string? key = null;
+        string? startupRegFile = null;
 
         for (var index = 0; index < arguments.Count; index += 1)
         {
@@ -42,6 +45,18 @@ public static class RegeditCommandLine
 
             if (IsSwitch(argument, "/m"))
             {
+                continue;
+            }
+
+            // A single .reg path opens the window and asks to import it, as classic regedit does.
+            if (IsRegFileArgument(argument))
+            {
+                if (startupRegFile is not null)
+                {
+                    return UsageError(out exitCode);
+                }
+
+                startupRegFile = argument;
                 continue;
             }
 
@@ -85,11 +100,11 @@ public static class RegeditCommandLine
 
         if (operation == Operation.None)
         {
-            // No arguments, or /m alone: this is the normal window path.
+            // No arguments, /m alone, or one .reg path: this is the normal window path.
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(file))
+        if (startupRegFile is not null || string.IsNullOrWhiteSpace(file))
         {
             return UsageError(out exitCode);
         }
@@ -107,9 +122,8 @@ public static class RegeditCommandLine
 
             if (operation == Operation.SilentImport)
             {
-                RegFileImporter.ApplyFile(store, file, CancellationToken.None);
-                Log.Info("Registry Editor silent import succeeded: " + file);
-                return 0;
+                RegFileImportResult result = RegFileImporter.ApplyFile(store, file, CancellationToken.None);
+                return ReportSilentImport(file, result);
             }
 
             RegFileFormat format = operation == Operation.ExportV5
@@ -149,6 +163,26 @@ public static class RegeditCommandLine
         }
     }
 
+    /// <summary>
+    /// Logs the outcome of a silent import. A refused file or a rejected write exits 1 and writes the classic
+    /// text to standard error. A skipped line exits 0, because classic regedit skips it without a message.
+    /// </summary>
+    private static int ReportSilentImport(string file, RegFileImportResult result)
+    {
+        RegFileImportReport.LogOutcome(file, result);
+        if (!RegFileImportReport.IsFailure(result))
+        {
+            return 0;
+        }
+
+        string text = string.Format(
+            CultureInfo.CurrentCulture,
+            RegeditStrings.Get(RegFileImportReport.MessageKey(result)),
+            file);
+        WriteStandardError("BwcRegedit: " + text);
+        return 1;
+    }
+
     private static bool UsageError(out int exitCode)
     {
         exitCode = 2;
@@ -167,6 +201,26 @@ public static class RegeditCommandLine
         {
             Trace.WriteLine("BwcRegedit could not write to standard error: " + ex.Message);
         }
+    }
+
+    /// <summary>True when the argument is a positional path ending in .reg (case insensitive).</summary>
+    public static bool IsRegFileArgument(string argument) =>
+        !string.IsNullOrWhiteSpace(argument)
+        && !LooksLikeSwitch(argument)
+        && argument.EndsWith(".reg", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The .reg path given on the command line for a window launch, or null.</summary>
+    public static string? StartupRegFile(IReadOnlyList<string> arguments)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        return arguments.FirstOrDefault(IsRegFileArgument);
+    }
+
+    /// <summary>True when /m is present. Such a launch never joins the single-instance gate.</summary>
+    public static bool AllowsMultipleInstances(IReadOnlyList<string> arguments)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        return arguments.Any(argument => IsSwitch(argument ?? string.Empty, "/m"));
     }
 
     private static bool IsSwitch(string argument, string expected) =>

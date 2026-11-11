@@ -170,6 +170,50 @@ The editor keeps focus while typing. Rebuilding the repeater on insert or delete
 focus to another control. Clicking a row still focuses the editor before applying the selection,
 so the first typed character after a click is not lost.
 
+## Classic layout (UF7)
+
+Classic Edit Binary Value (RT_DIALOG 103) shows eight bytes per row. The offset column shows four
+hex digits (`0000`, `0008`, ...), and each row is the hex pairs followed by the ASCII column.
+
+### Offset column clipped
+
+The offset column is sized for four hex digits, and the text is `X4`. An offset above `FFFF` needs
+more digits, so the column grows to fit the digits the current length needs and is never clipped.
+Test: `OffsetColumnFourDigits` and `OffsetColumnGrowsAbove64K`.
+
+### Row width not eight bytes
+
+`BytesPerRow` is 8. A 16-byte row would make the offsets and the ASCII column disagree with the
+classic dialog. Test: `RowHoldsEightBytes`.
+
+### Append at the end
+
+Typing or pasting at the end of the buffer appends. In overwrite mode the caret after the last byte
+is not an overwrite target, so the append inserts; in insert mode it inserts too. Test:
+`AppendAtEnd`.
+
+### Editing an empty value
+
+An empty value has no row. Paste into an empty value adds bytes, and typing a hex digit does nothing
+because there is no position. Test: `EmptyValuePasteOnly`.
+
+### Shift selection and mouse selection
+
+Shift+Left, Shift+Right, Shift+Up, Shift+Down, and a shift-click extend the selection from the
+anchor. A drag and a shift-click select the same range. The E2E test uses raw `keybd_event` so the
+modifier reaches the control as the real key state. Test: `ShiftArrowSelection`.
+
+### Copy and paste of hex text
+
+Ctrl+C copies the selection as hex pairs separated by spaces. Ctrl+V reads hex pairs from the
+clipboard and ignores separators. Text that is not hex is not pasted, and the clipboard issue is
+reported in the status, not in the value. Test: `CopyPasteHexText`.
+
+### Backspace and Delete
+
+Delete and Backspace follow the rules in "Delete and Backspace" above, with the offset column
+kept at its width. Test: `BackspaceDeleteKeys`.
+
 ## E2E and cleanup
 
 ### Editing test

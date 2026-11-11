@@ -148,12 +148,17 @@ oracle golden covers that combination.
 
 ## 11. Malformed input
 
-`RegFileReader` throws `RegFileParseException` with a one-based `Line` and `Column` and a message
-that names the problem. The cases covered by tests are:
+`RegFileReader` has a strict and a lenient entry point for each input. `Parse` and `ParseFile`
+are strict: they throw `RegFileParseException` at the first malformed line, with a one-based `Line`
+and `Column` and a message that names the problem. `ParseLenient` and `ParseFileLenient` are the
+entry points the importer uses, and they match classic regedit. A malformed line is skipped and
+listed in `RegFileDocument.Problems`, and the rest of the file is parsed. Only a file-level problem
+throws from the lenient entry points, with `RegFileParseException.Refusal` set to
+`NotRegistryFile` or `InvalidKeyPath`. The cases covered by tests are:
 
-- missing or wrong header
-- a key line without `]`
-- an invalid key path or an unknown root
+- missing or wrong header (file-level: the whole file is refused)
+- an unknown root, or a `.`, `..`, or `]` in a key path (file-level: `InvalidKeyPath`)
+- a key line without `]` (line-level: the section is not started)
 - a value line before any key section
 - a value name that is not quoted and is not `@`
 - a missing `=`
@@ -164,14 +169,21 @@ that names the problem. The cases covered by tests are:
 - a `dword:` with the wrong number of digits
 
 Argument problems (a null stream or path) raise `ArgumentNullException`. File system failures
-from `ParseFile` propagate as the original I/O exception and are not wrapped as parse errors.
+from `ParseFile` and `ParseFileLenient` propagate as the original I/O exception and are not wrapped
+as parse errors. `RegFileImporter.ApplyFile` maps them to `RegFileRefusal.ReadFailed`.
 
 ## 12. Partial parse
 
-Parsing builds the whole document in memory and returns it only after the last line succeeds.
-A malformed file therefore yields no partial document. This parser never writes to the registry,
-so "partial apply" is not possible in this layer. A future importer must apply one complete key
-section at a time and stop between sections, as the registry engine contract requires.
+Parsing builds the whole document in memory and returns it only after the last line is read. The
+strict entry points throw on the first malformed line, so they return no partial document. The
+lenient entry points return every line that parsed, plus the `Problems` list for the lines that did
+not. A refused file returns no document. This parser never writes to the registry, so a partial
+apply is not possible in this layer.
+
+The importer applies the document one key section at a time, in file order. A rejected write does
+not stop it: the write is recorded in `RegFileImportResult.Failures` and the next line is applied.
+Cancellation is checked between sections, as the registry engine contract requires
+(`docs/contracts/registry-engine.md`, Import).
 
 ## 13. Huge values
 

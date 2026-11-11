@@ -7,8 +7,8 @@ using Windows.Foundation;
 namespace Bwc.UI.Hex;
 
 /// <summary>
-/// UIA peer for the hex editor. The grid has one row per sixteen bytes and eighteen columns: the
-/// offset, sixteen byte columns, and the ASCII column. Only realized rows have row peers; asking for
+/// UIA peer for the hex editor. The grid has one row per eight bytes and eighteen columns: the
+/// offset, eight byte columns, and the ASCII column. Only realized rows have row peers; asking for
 /// a distant row returns the editor instead of forcing the virtualized row into existence.
 /// </summary>
 internal sealed class HexEditorAutomationPeer : FrameworkElementAutomationPeer, IGridProvider

@@ -65,19 +65,107 @@ internal static class DialogContrast
         int width = client.Right;
         int height = client.Bottom;
         int[] pixels = Capture(origin, width, height);
-        CheckFace(checkId, pixels, width, expectedFace);
+        List<Rectangle> edits = EditRectangles(window, origin, width, height);
+        CheckFace(checkId, pixels, width, height, expectedFace, edits);
+        CheckEdits(checkId, pixels, width, edits, expectedFace);
         CheckText(checkId, window, pixels, width, height, origin);
     }
 
-    private static void CheckFace(string checkId, int[] pixels, int width, Color expectedFace)
+    /// <summary>
+    /// The face is the most common color outside the edit boxes. An edit box is painted in the palette window
+    /// color, so it is checked on its own in <see cref="CheckEdits"/>.
+    /// </summary>
+    private static void CheckFace(string checkId, int[] pixels, int width, int height, Color expectedFace, List<Rectangle> edits)
     {
-        int dominant = MostCommon(pixels, width, new Rectangle(0, 0, width, pixels.Length / width));
+        int dominant = MostCommonOutside(pixels, width, height, edits);
         Color actual = FromRgb(dominant);
         bool matches = Within(actual, expectedFace, FaceTolerance);
         E2EResults.Record(
             checkId + ".background",
             matches,
-            $"Most common client color is {Hex(actual)}, expected the palette face {Hex(expectedFace)} within {FaceTolerance} per channel.");
+            $"Most common client color outside the edit boxes is {Hex(actual)}, expected the palette face {Hex(expectedFace)} within {FaceTolerance} per channel.");
+    }
+
+    /// <summary>Each edit box must be painted in the palette window color (COLOR_WINDOW on the light palette).</summary>
+    private static void CheckEdits(string checkId, int[] pixels, int width, List<Rectangle> edits, Color expectedFace)
+    {
+        Color expectedWindow = expectedFace == DarkFace ? DarkWindow : SystemWindow();
+        var problems = new List<string>();
+        foreach (Rectangle edit in edits)
+        {
+            Rectangle inner = Rectangle.Inflate(edit, -3, -3);
+            if (inner.Width <= 0 || inner.Height <= 0)
+            {
+                continue;
+            }
+
+            Color actual = FromRgb(MostCommon(pixels, width, inner));
+            if (!Within(actual, expectedWindow, FaceTolerance))
+            {
+                problems.Add($"edit {edit.Left},{edit.Top},{edit.Width}x{edit.Height} is {Hex(actual)}");
+            }
+        }
+
+        E2EResults.Record(
+            checkId + ".edit-background",
+            problems.Count == 0,
+            $"{edits.Count} edit box(es), expected the palette window color {Hex(expectedWindow)}. " +
+            (problems.Count == 0 ? "All edit boxes use it." : string.Join("; ", problems)));
+    }
+
+    /// <summary>The edit boxes of the window as client rectangles, clipped to the client area.</summary>
+    private static List<Rectangle> EditRectangles(AutomationElement window, Point origin, int width, int height)
+    {
+        var result = new List<Rectangle>();
+        foreach (AutomationElement edit in window.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Edit)))
+        {
+            System.Drawing.Rectangle screen = edit.BoundingRectangle;
+            if (screen.Width <= 0 || screen.Height <= 0)
+            {
+                continue;
+            }
+
+            Rectangle local = Rectangle.Intersect(
+                new Rectangle(screen.Left - origin.X, screen.Top - origin.Y, screen.Width, screen.Height),
+                new Rectangle(0, 0, width, height));
+            if (local.Width > 0 && local.Height > 0)
+            {
+                result.Add(local);
+            }
+        }
+
+        return result;
+    }
+
+    private static int MostCommonOutside(int[] pixels, int width, int height, List<Rectangle> excluded)
+    {
+        var counts = new Dictionary<int, int>();
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                if (excluded.Any(rect => rect.Contains(x, y)))
+                {
+                    continue;
+                }
+
+                int value = pixels[(y * width) + x];
+                counts[value] = counts.TryGetValue(value, out int seen) ? seen + 1 : 1;
+            }
+        }
+
+        int best = 0;
+        int bestCount = -1;
+        foreach (KeyValuePair<int, int> pair in counts)
+        {
+            if (pair.Value > bestCount)
+            {
+                best = pair.Key;
+                bestCount = pair.Value;
+            }
+        }
+
+        return best;
     }
 
     private static void CheckText(
@@ -247,6 +335,18 @@ internal static class DialogContrast
     private static Color SystemFace()
     {
         uint colorRef = GetSysColor(Color3DFace);
+        return Color.FromArgb(0xFF, (int)(colorRef & 0xFF), (int)((colorRef >> 8) & 0xFF), (int)((colorRef >> 16) & 0xFF));
+    }
+
+    /// <summary>The palette window color of the dark palette (BwcSystemColors.DarkWindow).</summary>
+    private static readonly Color DarkWindow = Color.FromArgb(0xFF, 0x1E, 0x1E, 0x1E);
+
+    /// <summary>COLOR_WINDOW, the edit box color on the light palette.</summary>
+    private const int ColorWindow = 5;
+
+    private static Color SystemWindow()
+    {
+        uint colorRef = GetSysColor(ColorWindow);
         return Color.FromArgb(0xFF, (int)(colorRef & 0xFF), (int)((colorRef >> 8) & 0xFF), (int)((colorRef >> 16) & 0xFF));
     }
 

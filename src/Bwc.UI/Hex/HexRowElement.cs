@@ -14,7 +14,7 @@ using Windows.UI.Core;
 namespace Bwc.UI.Hex;
 
 /// <summary>
-/// One realized hex row. The panel arranges an offset cell, sixteen hex byte cells, and sixteen ASCII
+/// One realized hex row. The panel arranges an offset cell, eight hex byte cells, and eight ASCII
 /// cells directly, so the row has no per-item chrome and no nested layout cost. Selection is painted
 /// on the byte cells only.
 /// </summary>
@@ -171,7 +171,7 @@ internal sealed class HexRowElement : Panel
         ReadOnlySpan<byte> data = Owner.Data.Span;
         var text = new StringBuilder(8 + 2 + (HexEditor.BytesPerRow * 3) + 2 + HexEditor.BytesPerRow);
 
-        _offsetText.Text = offset.ToString("X8", CultureInfo.InvariantCulture);
+        _offsetText.Text = offset.ToString("X" + Owner.OffsetDigits.ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
         _offsetText.FontFamily = Owner.MonospaceFont;
         _offsetText.FontSize = Owner.MonospaceFontSize;
         text.Append(_offsetText.Text).Append("  ");

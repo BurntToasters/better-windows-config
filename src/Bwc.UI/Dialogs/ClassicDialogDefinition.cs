@@ -29,6 +29,9 @@ public enum ClassicControlKind
 
     /// <summary>Combo box. Items are added by the dialog after construction.</summary>
     ComboBox,
+
+    /// <summary>The classic HEX control (Edit Binary Value), a hex editor at the template size.</summary>
+    HexEditor,
 }
 
 /// <summary>
@@ -70,6 +73,9 @@ public sealed record ClassicControlDefinition(
 
     /// <summary>True when the control starts disabled (WS_DISABLED).</summary>
     public bool Disabled { get; init; }
+
+    /// <summary>True for a list box that accepts several selections (LBS_MULTIPLESEL).</summary>
+    public bool MultiSelect { get; init; }
 }
 
 /// <summary>

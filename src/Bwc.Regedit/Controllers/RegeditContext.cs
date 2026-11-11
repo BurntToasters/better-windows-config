@@ -369,6 +369,35 @@ internal sealed class RegeditContext
         path.Components.Count == 1 &&
         path.Root is RegistryRoot.LocalMachine or RegistryRoot.Users;
 
+    /// <summary>
+    /// The roots Load Hive accepts: HKEY_LOCAL_MACHINE and HKEY_USERS themselves. The hive loads
+    /// under the root that is selected.
+    /// </summary>
+    public static bool IsLoadHiveRoot(RegistryPath path) =>
+        path.IsRoot && path.Root is RegistryRoot.LocalMachine or RegistryRoot.Users;
+
+    /// <summary>
+    /// Hive roots that Windows loads at boot. They are not loaded by a user, so Unload Hive stays
+    /// disabled for them. The list is the rule for "loaded hive root" in the parity plan (OQ-21).
+    /// </summary>
+    private static readonly HashSet<string> BootHiveNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "SAM",
+        "SECURITY",
+        "SOFTWARE",
+        "SYSTEM",
+        "HARDWARE",
+        "COMPONENTS",
+        ".DEFAULT",
+        "S-1-5-18",
+        "S-1-5-19",
+        "S-1-5-20",
+    };
+
+    /// <summary>True for a user-loadable hive root: a direct child of HKLM or HKU that is not a boot hive.</summary>
+    public static bool IsUnloadableHiveRoot(RegistryPath path) =>
+        IsHiveRootChild(path) && !BootHiveNames.Contains(path.Components[0]);
+
     /// <summary>Refreshes the enabled state of every command that depends on the selection.</summary>
     public void UpdateCommandStates()
     {
@@ -395,11 +424,11 @@ internal sealed class RegeditContext
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 679, singleRealValue);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 678, hasKey && !hasRows);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 675, hasKey);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 680, true);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 680, hasKey && IsLoadHiveRoot(key));
         RegeditMenu.SetCommandEnabled(
             Shell.MenuBar,
             681,
-            hasKey && !hasRows && IsHiveRootChild(key));
+            hasKey && !hasRows && IsUnloadableHiveRoot(key));
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 657, true);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 768, RemoteConnections.Count > 0);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 912, singleRow);

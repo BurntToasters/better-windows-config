@@ -18,6 +18,9 @@ namespace Bwc.E2E.Hex;
 [TestClass]
 public sealed class HexViewerTests
 {
+    /// <summary>Classic Edit Binary Value and Display Binary Data show eight bytes per row (hex-editor.md).</summary>
+    private const int BytesPerRow = 8;
+
     private const int MenuView = 514;
     private const int MenuViewDisplayBinaryData = 679;
     private const string PatternValueName = "Pattern300";
@@ -138,10 +141,10 @@ public sealed class HexViewerTests
         string rowText = ControlTestSupport.SafeName(firstRow);
         string expectedHex = string.Join(
             " ",
-            pattern.Take(16).Select(value => value.ToString("X2", CultureInfo.InvariantCulture)));
-        bool rowOk = rowText.Contains("00000000", StringComparison.Ordinal) &&
+            pattern.Take(BytesPerRow).Select(value => value.ToString("X2", CultureInfo.InvariantCulture)));
+        bool rowOk = rowText.StartsWith("0000  ", StringComparison.Ordinal) &&
             rowText.Contains(expectedHex, StringComparison.Ordinal) &&
-            rowText.Contains("................", StringComparison.Ordinal);
+            rowText.Contains(new string('.', BytesPerRow), StringComparison.Ordinal);
         E2EResults.Record(
             "hex.binary.row0",
             rowOk,
@@ -234,7 +237,7 @@ public sealed class HexViewerTests
         byte[] stringBytes = System.Text.Encoding.Unicode.GetBytes(StringText);
         string expectedHex = string.Join(
             " ",
-            stringBytes.Take(16).Select(value => value.ToString("X2", CultureInfo.InvariantCulture)));
+            stringBytes.Take(BytesPerRow).Select(value => value.ToString("X2", CultureInfo.InvariantCulture)));
         bool rowOk = rowText.Contains(expectedHex, StringComparison.Ordinal);
         int expectedLength = stringBytes.Length + 2;
         bool statusOk = status.Contains(expectedLength.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal) &&

@@ -184,6 +184,131 @@ public sealed class CommandLineTests
         }
     }
 
+    /// <summary>
+    /// Silent import exit codes. A refused file exits 1 and writes nothing. A file with one malformed line exits 0
+    /// and imports the rest, as classic regedit does. A file with one line the write policy refuses exits 1 and
+    /// still imports the lines that can be written. None of the runs shows a window.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("CommandLine")]
+    [TestCategory("Mutating")]
+    public void CommandLine_SilentImportExitCodesFollowTheResult()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+
+        try
+        {
+            config.EnsureExecutablesExist();
+        }
+        catch (Exception ex)
+        {
+            E2EResults.Record("commandline.silent.publish", false, ex.Message);
+            Assert.Fail(ex.Message);
+            return;
+        }
+
+        var sandbox = new SandboxRegistry(config);
+        string tempDir = Path.Combine(config.ArtifactsDir, "command-line-silent", config.RunId);
+        bool outsidePreexisted = OutsideKeyExists();
+        E2EResults.Record(
+            "commandline.silent.outsideAbsent",
+            !outsidePreexisted,
+            $"HKCU\\{OutsideSubKey} existed before the test={outsidePreexisted}.");
+        if (outsidePreexisted)
+        {
+            Assert.Fail($"HKCU\\{OutsideSubKey} already exists. The test will not modify or delete it.");
+        }
+
+        try
+        {
+            sandbox.Cleanup();
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+
+            Directory.CreateDirectory(tempDir);
+            string sandboxRoot = @"HKEY_CURRENT_USER\" + sandbox.RunRootPath;
+
+            // Refused: no version header, so the whole file is refused and nothing is written.
+            string refusedFile = Path.Combine(tempDir, "refused.reg");
+            File.WriteAllBytes(refusedFile, EncodeV5(
+                "[" + sandboxRoot + "\\Import\\Refused]\r\n"
+                + "\"Value\"=\"refused\"\r\n"));
+            CommandResult refused = Run(config, sandbox, "/s", refusedFile);
+            bool refusedWritten = sandbox.Exists("Import\\Refused");
+            E2EResults.Record(
+                "commandline.silent.refused.exit",
+                refused.Exited && refused.ExitCode == 1 && !refused.SawWindow && !refusedWritten,
+                $"exited={refused.Exited}, exit={refused.ExitCode}, sawWindow={refused.SawWindow}, written={refusedWritten}.");
+            E2EResults.Record(
+                "commandline.silent.refused.text",
+                refused.StandardError.Contains("is not a registry file", StringComparison.Ordinal),
+                $"stderr='{refused.StandardError.Trim()}'.");
+
+            // One malformed line: the sections around it import and the exit code is 0.
+            string malformedFile = Path.Combine(tempDir, "malformed.reg");
+            File.WriteAllBytes(malformedFile, EncodeV5(
+                "Windows Registry Editor Version 5.00\r\n\r\n"
+                + "[" + sandboxRoot + "\\Import\\Before]\r\n"
+                + "\"Value\"=\"before\"\r\n\r\n"
+                + "this line is not a registry entry\r\n\r\n"
+                + "[" + sandboxRoot + "\\Import\\After]\r\n"
+                + "\"Value\"=\"after\"\r\n"));
+            CommandResult malformed = Run(config, sandbox, "/s", malformedFile);
+            bool malformedRest = sandbox.ReadString("Import\\Before", "Value") == "before"
+                && sandbox.ReadString("Import\\After", "Value") == "after";
+            E2EResults.Record(
+                "commandline.silent.malformed.exit",
+                malformed.Exited && malformed.ExitCode == 0 && !malformed.SawWindow && malformedRest,
+                $"exited={malformed.Exited}, exit={malformed.ExitCode}, sawWindow={malformed.SawWindow}, rest imported={malformedRest}.");
+
+            // One line the write policy refuses: the section that can be written still imports, and the exit code is 1.
+            string deniedFile = Path.Combine(tempDir, "denied.reg");
+            File.WriteAllBytes(deniedFile, EncodeV5(
+                "Windows Registry Editor Version 5.00\r\n\r\n"
+                + "[" + sandboxRoot + "\\Import\\Good]\r\n"
+                + "\"Value\"=\"good\"\r\n\r\n"
+                + "[HKEY_CURRENT_USER\\" + OutsideSubKey + "]\r\n"
+                + "\"Value\"=\"outside\"\r\n"));
+            CommandResult denied = Run(config, sandbox, "/s", deniedFile);
+            bool goodWritten = sandbox.ReadString("Import\\Good", "Value") == "good";
+            bool outsideAbsent = !OutsideKeyExists();
+            E2EResults.Record(
+                "commandline.silent.denied.exit",
+                denied.Exited && denied.ExitCode == 1 && !denied.SawWindow && goodWritten && outsideAbsent,
+                $"exited={denied.Exited}, exit={denied.ExitCode}, sawWindow={denied.SawWindow}, good written={goodWritten}, outside absent={outsideAbsent}.");
+            E2EResults.Record(
+                "commandline.silent.denied.text",
+                denied.StandardError.Contains("Not all data was successfully written", StringComparison.Ordinal),
+                $"stderr='{denied.StandardError.Trim()}'.");
+
+            FailIfNeeded();
+        }
+        finally
+        {
+            sandbox.Cleanup();
+            if (!outsidePreexisted)
+            {
+                DeleteOutsideKey();
+            }
+
+            try
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, recursive: true);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                E2EResults.Record("commandline.silent.cleanup.temp", false, ex.Message);
+            }
+        }
+    }
+
     private static void SeedSandbox(SandboxRegistry sandbox)
     {
         using (RegistryKey key = sandbox.CreateSubKey(string.Empty))

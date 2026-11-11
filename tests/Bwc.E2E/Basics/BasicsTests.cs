@@ -48,7 +48,7 @@ public sealed class BasicsTests
     private const string EditMultiCaption = "Edit Multi-String";
     private const string EditDwordCaption = "Edit DWORD (32-bit) Value";
     private const string EditQwordCaption = "Edit QWORD (64-bit) Value";
-    private const string EditBinaryCaption = "Edit Binary Data";
+    private const string EditBinaryCaption = "Edit Binary Value";
     private const string ConfirmKeyCaption = "Confirm Key Delete";
     private const string ConfirmValueCaption = "Confirm Value Delete";
 

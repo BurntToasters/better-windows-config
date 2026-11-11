@@ -18,6 +18,10 @@ namespace Bwc.UI.Theme;
 public static class BwcTheme
 {
     private static BwcThemeOverride _override = BwcThemeOverride.System;
+#if BWC_E2E
+    /// <summary>The E2E-only launch override. It wins over the app override, so a persisted choice cannot replace it.</summary>
+    private static BwcThemeOverride? _e2eOverride;
+#endif
     private static BwcPalette _current;
     private static bool _initialized;
     private static DispatcherQueue? _queue;
@@ -111,7 +115,7 @@ public static class BwcTheme
 
 #if BWC_E2E
         // E2E-only override. The variable is read at launch, never in a ship build.
-        _override = ParseE2EOverride(Environment.GetEnvironmentVariable("BWC_E2E_THEME")) ?? _override;
+        _e2eOverride = ParseE2EOverride(Environment.GetEnvironmentVariable("BWC_E2E_THEME"));
 #endif
 
         ApplyPalette(raise: false);
@@ -167,7 +171,7 @@ public static class BwcTheme
 
     private static void RefreshIfChanged()
     {
-        if (Resolve(_override, IsHighContrast()) == _current)
+        if (Resolve(EffectiveOverride(), IsHighContrast()) == _current)
         {
             return;
         }
@@ -175,9 +179,21 @@ public static class BwcTheme
         ApplyPalette(raise: true);
     }
 
+    /// <summary>The override that picks the palette: the E2E launch override when set, otherwise the app override.</summary>
+    private static BwcThemeOverride EffectiveOverride()
+    {
+#if BWC_E2E
+        if (_e2eOverride is { } forced)
+        {
+            return forced;
+        }
+#endif
+        return _override;
+    }
+
     private static void ApplyPalette(bool raise)
     {
-        BwcPalette palette = Resolve(_override, IsHighContrast());
+        BwcPalette palette = Resolve(EffectiveOverride(), IsHighContrast());
         _current = palette;
         BwcBrushes.Apply(palette, _tree, _list);
 

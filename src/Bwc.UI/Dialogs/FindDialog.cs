@@ -1,10 +1,8 @@
-using System.Globalization;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
 using Windows.System;
+using WinRT.Interop;
 
 namespace Bwc.UI.Dialogs;
 
@@ -77,11 +75,12 @@ public sealed class FindDialogRequestEventArgs : EventArgs
 }
 
 /// <summary>
-/// Classic Find dialog (oracle DLG-010 to DLG-012). Find Next stays open and raises
+/// Classic Find dialog (RT_DIALOG 106, oracle DLG-010 to DLG-012). Find Next stays open and raises
 /// <see cref="FindRequested"/>; the host runs the engine on a background thread and calls one of
-/// the completion methods. Cancel closes and cancels the request token.
+/// the completion methods. Cancel closes and cancels the request token. The template has no status
+/// line, so a finished search or an error is shown in a classic message box. A hit is not announced.
 /// </summary>
-public sealed class FindDialog : ModalDialogWindow
+public sealed class FindDialog : ClassicDialog
 {
     private readonly FindDialogLabels _labels;
     private readonly TextBox _findText;
@@ -90,110 +89,40 @@ public sealed class FindDialog : ModalDialogWindow
     private readonly CheckBox _data;
     private readonly CheckBox _wholeString;
     private readonly CheckBox _subtree;
-    private readonly TextBlock _status;
+    private readonly Button _primaryButton;
     private CancellationTokenSource? _searchCts;
-    private Button? _primaryButton;
     private bool _searching;
     private bool _closed;
 
     public FindDialog(FindDialogLabels labels, FindDialogOptions initial)
-    {
-        ArgumentNullException.ThrowIfNull(labels);
-        ArgumentNullException.ThrowIfNull(initial);
-
-        _labels = labels;
-        Title = labels.Title;
-        SetHeading(labels.Title);
-        PrimaryText = labels.FindNext;
-        SecondaryText = labels.Cancel;
-        SetPreferredSize(440, 330);
-
-        _findText = new TextBox
-        {
-            Text = initial.SearchText,
-            AcceptsReturn = false,
-            IsSpellCheckEnabled = false,
-            IsTextPredictionEnabled = false,
-            MinHeight = 0,
-            Padding = new Thickness(6, 3, 6, 3),
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 12,
-        };
-
-        AutomationProperties.SetAutomationId(_findText, "FindText");
-        AutomationProperties.SetName(_findText, labels.FindWhat);
-
-        _keys = CreateCheckBox("FindKeys", labels.Keys, initial.LookAtKeys);
-        _values = CreateCheckBox("FindValues", labels.Values, initial.LookAtValues);
-        _data = CreateCheckBox("FindData", labels.Data, initial.LookAtData);
-        _wholeString = CreateCheckBox(
-            "FindWholeString",
+        : base(ClassicDialogTemplates.Find(
+            labels?.Title ?? throw new ArgumentNullException(nameof(labels)),
+            labels.FindWhat,
+            labels.LookAt,
+            labels.Keys,
+            labels.Values,
+            labels.Data,
             labels.MatchWholeString,
-            initial.MatchWholeStringOnly);
-        _subtree = CreateCheckBox("FindSubtree", labels.SearchInSubtree, initial.SearchInSubtree);
+            labels.SearchInSubtree,
+            labels.FindNext,
+            labels.Cancel,
+            initial?.SearchInSubtree ?? throw new ArgumentNullException(nameof(initial))))
+    {
+        _labels = labels;
 
-        _status = new TextBlock
-        {
-            TextWrapping = TextWrapping.Wrap,
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 12,
-            Text = string.Empty,
-        };
-
-        AutomationProperties.SetAutomationId(_status, "FindStatus");
-
-        var lookAt = new StackPanel { Spacing = 2 };
-        lookAt.Children.Add(new TextBlock
-        {
-            Text = labels.LookAt,
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 12,
-        });
-        lookAt.Children.Add(_keys);
-        lookAt.Children.Add(_values);
-        lookAt.Children.Add(_data);
-
-        var body = new Grid { RowSpacing = 6, ColumnSpacing = 8 };
-        body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        body.ColumnDefinitions.Add(new ColumnDefinition
-        {
-            Width = new GridLength(1, GridUnitType.Star),
-        });
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        var findWhat = new TextBlock
-        {
-            Text = labels.FindWhat,
-            VerticalAlignment = VerticalAlignment.Center,
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 12,
-        };
-
-        Grid.SetRow(findWhat, 0);
-        Grid.SetColumn(findWhat, 0);
-        Grid.SetRow(_findText, 0);
-        Grid.SetColumn(_findText, 1);
-        Grid.SetRow(lookAt, 1);
-        Grid.SetColumn(lookAt, 1);
-        Grid.SetRow(_wholeString, 2);
-        Grid.SetColumnSpan(_wholeString, 2);
-        Grid.SetRow(_subtree, 3);
-        Grid.SetColumnSpan(_subtree, 2);
-        Grid.SetRow(_status, 4);
-        Grid.SetColumnSpan(_status, 2);
-
-        body.Children.Add(findWhat);
-        body.Children.Add(_findText);
-        body.Children.Add(lookAt);
-        body.Children.Add(_wholeString);
-        body.Children.Add(_subtree);
-        body.Children.Add(_status);
-
-        SetBody(body);
+        _findText = RequireControl<TextBox>("FindText");
+        _findText.Text = initial.SearchText;
+        _keys = RequireControl<CheckBox>("FindKeys");
+        _values = RequireControl<CheckBox>("FindValues");
+        _data = RequireControl<CheckBox>("FindData");
+        _wholeString = RequireControl<CheckBox>("FindWholeString");
+        _subtree = RequireControl<CheckBox>("FindSubtree");
+        _keys.IsChecked = initial.LookAtKeys;
+        _values.IsChecked = initial.LookAtValues;
+        _data.IsChecked = initial.LookAtData;
+        _wholeString.IsChecked = initial.MatchWholeStringOnly;
+        _subtree.IsChecked = initial.SearchInSubtree;
+        _primaryButton = RequireControl<Button>("DialogPrimary");
 
         Closed += OnFindDialogClosed;
         Activated += OnFindDialogActivated;
@@ -220,7 +149,7 @@ public sealed class FindDialog : ModalDialogWindow
     /// <summary>True from the moment Find Next is pressed until a completion method runs.</summary>
     public bool IsSearching => _searching;
 
-    /// <summary>Shows Found: text and re-enables Find Next.</summary>
+    /// <summary>Re-enables Find Next after a hit. The hit is shown in the registry tree, as in classic.</summary>
     public void CompleteSearch(string foundDisplayText)
     {
         ArgumentNullException.ThrowIfNull(foundDisplayText);
@@ -231,13 +160,9 @@ public sealed class FindDialog : ModalDialogWindow
 
         _searching = false;
         SetPrimaryEnabled(true);
-        SetStatus(string.Format(
-            CultureInfo.CurrentCulture,
-            _labels.FoundFormat,
-            foundDisplayText));
     }
 
-    /// <summary>Shows the oracle finished message and re-enables Find Next.</summary>
+    /// <summary>Shows the classic "finished" message and re-enables Find Next.</summary>
     public void ShowFinished()
     {
         if (!_searching)
@@ -247,7 +172,7 @@ public sealed class FindDialog : ModalDialogWindow
 
         _searching = false;
         SetPrimaryEnabled(true);
-        SetStatus(_labels.Finished);
+        ShowMessage(_labels.Finished, ClassicMessageIcon.Information);
     }
 
     /// <summary>Shows an engine or navigation failure and re-enables Find Next.</summary>
@@ -260,36 +185,32 @@ public sealed class FindDialog : ModalDialogWindow
 
         _searching = false;
         SetPrimaryEnabled(true);
-        SetStatus(message ?? string.Empty);
+        ShowMessage(message ?? string.Empty, ClassicMessageIcon.Error);
     }
 
+    /// <summary>Find Next starts the search and keeps the dialog open. Cancel closes it.</summary>
     protected override bool TryAccept()
     {
         StartFind();
         return false;
     }
 
-    protected override void OnDialogLoaded()
+    protected override void OnCommand(int id, string automationId)
     {
-        _primaryButton = FindButton("DialogPrimary");
-        _findText.Focus(FocusState.Programmatic);
-        _findText.SelectAll();
+        if (id == 1)
+        {
+            StartFind();
+        }
+        else if (id == 2)
+        {
+            Cancel();
+        }
     }
 
-    private static CheckBox CreateCheckBox(string automationId, string text, bool isChecked)
+    protected override void OnDialogLoaded()
     {
-        var checkBox = new CheckBox
-        {
-            Content = text,
-            IsChecked = isChecked,
-            MinHeight = 0,
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 12,
-        };
-
-        AutomationProperties.SetAutomationId(checkBox, automationId);
-        AutomationProperties.SetName(checkBox, text);
-        return checkBox;
+        _ = _findText.Focus(FocusState.Programmatic);
+        _findText.SelectAll();
     }
 
     private void StartFind()
@@ -302,19 +223,16 @@ public sealed class FindDialog : ModalDialogWindow
         string text = _findText.Text ?? string.Empty;
         if (text.Length == 0)
         {
-            ShowValidation(_labels.EmptyText);
-            _ = _findText.Focus(FocusState.Programmatic);
+            ShowMessage(_labels.EmptyText, ClassicMessageIcon.Error, refocus: _findText);
             return;
         }
 
         FindDialogOptions options = Options;
         if (!options.LookAtKeys && !options.LookAtValues && !options.LookAtData)
         {
-            ShowValidation(_labels.NoScope);
+            ShowMessage(_labels.NoScope, ClassicMessageIcon.Error, refocus: _findText);
             return;
         }
-
-        ShowValidation(null);
 
         _searchCts?.Cancel();
         _searchCts?.Dispose();
@@ -322,14 +240,12 @@ public sealed class FindDialog : ModalDialogWindow
 
         _searching = true;
         SetPrimaryEnabled(false);
-        SetStatus(_labels.Searching);
 
         EventHandler<FindDialogRequestEventArgs>? handler = FindRequested;
         if (handler is null)
         {
             _searching = false;
             SetPrimaryEnabled(true);
-            SetStatus(string.Empty);
             return;
         }
 
@@ -338,27 +254,18 @@ public sealed class FindDialog : ModalDialogWindow
             new FindDialogRequestEventArgs(options, _searchCts.Token));
     }
 
-    private void OnFindKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    private void OnFindKeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (_closed)
         {
             return;
         }
 
-        switch (e.Key)
+        // Escape and Enter are routed by ClassicDialog. F3 repeats Find Next, as the classic dialog does.
+        if (e.Key == VirtualKey.F3)
         {
-            case VirtualKey.Escape:
-                e.Handled = true;
-                Cancel();
-                break;
-            case VirtualKey.Enter:
-                e.Handled = true;
-                StartFind();
-                break;
-            case VirtualKey.F3:
-                e.Handled = true;
-                StartFind();
-                break;
+            e.Handled = true;
+            StartFind();
         }
     }
 
@@ -382,51 +289,22 @@ public sealed class FindDialog : ModalDialogWindow
 
     private void SetPrimaryEnabled(bool isEnabled)
     {
-        if (_primaryButton is not null)
-        {
-            _primaryButton.IsEnabled = isEnabled;
-        }
+        _primaryButton.IsEnabled = isEnabled;
     }
 
-    private void SetStatus(string text)
+    /// <summary>Shows a message owned by this dialog. The dialog stays disabled until the message closes.</summary>
+    private void ShowMessage(string text, ClassicMessageIcon icon, FrameworkElement? refocus = null)
     {
-        _status.Text = text;
+        _ = ShowMessageAsync(text, icon, refocus);
     }
 
-    private Button? FindButton(string automationId)
+    private async Task ShowMessageAsync(string text, ClassicMessageIcon icon, FrameworkElement? refocus)
     {
-        if (Content is not DependencyObject root)
+        var box = new ClassicMessageBox(_labels.Title, text, icon, ClassicMessageButtons.Ok);
+        _ = await box.ShowAsync(WindowNative.GetWindowHandle(this));
+        if (refocus is not null)
         {
-            return null;
+            _ = refocus.Focus(FocusState.Programmatic);
         }
-
-        return FindDescendant<Button>(
-            root,
-            button => string.Equals(
-                AutomationProperties.GetAutomationId(button),
-                automationId,
-                StringComparison.Ordinal));
-    }
-
-    private static T? FindDescendant<T>(DependencyObject root, Func<T, bool> predicate)
-        where T : DependencyObject
-    {
-        int count = VisualTreeHelper.GetChildrenCount(root);
-        for (var index = 0; index < count; index += 1)
-        {
-            DependencyObject child = VisualTreeHelper.GetChild(root, index);
-            if (child is T typed && predicate(typed))
-            {
-                return typed;
-            }
-
-            T? nested = FindDescendant(child, predicate);
-            if (nested is not null)
-            {
-                return nested;
-            }
-        }
-
-        return null;
     }
 }

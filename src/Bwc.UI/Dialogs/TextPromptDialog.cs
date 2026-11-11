@@ -1,11 +1,13 @@
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using WinRT.Interop;
 
 namespace Bwc.UI.Dialogs;
 
-/// <summary>One line text prompt used for key and value names.</summary>
-public sealed class TextPromptDialog : ModalDialogWindow
+/// <summary>
+/// One line text prompt for a key or value name, in the classic Load Hive layout (RT_DIALOG 104).
+/// A rejected value shows the error in its own message box and keeps the prompt open.
+/// </summary>
+public sealed class TextPromptDialog : ClassicDialog
 {
     private readonly TextBox _input;
     private readonly Func<string, string?>? _validate;
@@ -15,38 +17,15 @@ public sealed class TextPromptDialog : ModalDialogWindow
         string label,
         string initialText = "",
         Func<string, string?>? validate = null)
+        : base(ClassicDialogTemplates.TextPrompt(title, label))
     {
         ArgumentException.ThrowIfNullOrEmpty(title);
         ArgumentException.ThrowIfNullOrEmpty(label);
 
         _validate = validate;
-        Title = title;
-        SetHeading(title);
-        PrimaryText = "OK";
-        SecondaryText = "Cancel";
-        SetPreferredSize(440, 220);
-
-        _input = new TextBox
-        {
-            Text = initialText,
-            AcceptsReturn = false,
-            IsSpellCheckEnabled = false,
-            IsTextPredictionEnabled = false,
-            MinHeight = 0,
-            Padding = new Thickness(6, 3, 6, 3),
-            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe UI"),
-            FontSize = 12,
-        };
-
-        AutomationProperties.SetAutomationId(_input, "DialogTextInput");
-        AutomationProperties.SetName(_input, label);
-
-        var body = new StackPanel { Spacing = 6 };
-        body.Children.Add(new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap });
-        body.Children.Add(_input);
-        SetBody(body);
-
-        Value = initialText;
+        _input = RequireControl<TextBox>("DialogTextInput");
+        _input.Text = initialText ?? string.Empty;
+        Value = initialText ?? string.Empty;
     }
 
     /// <summary>The text after a successful primary action.</summary>
@@ -54,7 +33,7 @@ public sealed class TextPromptDialog : ModalDialogWindow
 
     protected override void OnDialogLoaded()
     {
-        _input.Focus(FocusState.Programmatic);
+        _ = _input.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
         _input.SelectAll();
     }
 
@@ -64,12 +43,21 @@ public sealed class TextPromptDialog : ModalDialogWindow
         string? error = _validate?.Invoke(text);
         if (error is not null)
         {
-            ShowValidation(error);
-            _input.Focus(FocusState.Programmatic);
+            _ = ShowErrorAsync(error);
             return false;
         }
 
         Value = text;
         return true;
+    }
+
+    private async Task ShowErrorAsync(string message)
+    {
+        // The error is owned by this prompt, so the prompt stays disabled until the error closes.
+        ModalDialogWindow error = ErrorDialog.ForMessage(Title, message);
+        _ = await error.ShowAsync(WindowNative.GetWindowHandle(this));
+
+        _ = _input.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
+        _input.SelectAll();
     }
 }

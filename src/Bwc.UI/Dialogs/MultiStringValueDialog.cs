@@ -1,69 +1,74 @@
+using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using WinRT.Interop;
 
 namespace Bwc.UI.Dialogs;
 
 /// <summary>
-/// Multi-string editor. One string per line. Empty lines produce empty strings and show a warning
-/// without blocking the save, matching the classic editor.
+/// Edit Multi-String (RT_DIALOG 114). One string per line. OK with empty lines shows the classic
+/// warning (string 116 for one empty string, 117 for more), and the empty strings are removed
+/// when the warning is answered. The warning has only OK, so Escape answers it the same way.
 /// </summary>
-public sealed class MultiStringValueDialog : ValueEditorDialog
+public sealed class MultiStringValueDialog : ClassicDialog
 {
-    public MultiStringValueDialog(string title, string initialText = "")
-        : base(title, "Value data")
+    /// <summary>Oracle string 116: one empty string.</summary>
+    private const string OneEmptyStringWarning =
+        "Data of type REG_MULTI_SZ cannot contain empty strings.\r\nRegistry Editor will remove the empty string found.";
+
+    /// <summary>Oracle string 117: more than one empty string.</summary>
+    private const string ManyEmptyStringsWarning =
+        "Data of type REG_MULTI_SZ cannot contain empty strings.\r\nRegistry Editor will remove all empty strings found.";
+
+    private readonly TextBox _input;
+    private bool _emptyStringsRemoved;
+
+    /// <param name="title">The caption, from the caller's resource map.</param>
+    /// <param name="initialText">The lines of the value, one string per line.</param>
+    /// <param name="valueName">The value name shown read-only. Empty when the caller does not supply it.</param>
+    public MultiStringValueDialog(string title, string initialText = "", string valueName = "")
+        : base(ClassicDialogTemplates.EditMultiString(title))
     {
-        Input.Text = initialText;
-        Input.AcceptsReturn = true;
-        Input.TextWrapping = TextWrapping.Wrap;
-        Input.Height = 170;
-        SubmitsOnEnter = false;
-        SetPreferredSize(470, 350);
-        Input.TextChanged += OnTextChanged;
-        UpdateHint();
+        _input = RequireControl<TextBox>("ValueEditorInput");
+        _input.Text = initialText ?? string.Empty;
+        RequireControl<TextBox>("ValueNameInput").Text = valueName ?? string.Empty;
     }
 
-    /// <summary>The strings after a successful primary action.</summary>
+    /// <summary>The strings after a successful primary action. Empty strings are removed after the warning.</summary>
     public IReadOnlyList<string> Value { get; private set; } = Array.Empty<string>();
 
     protected override bool TryAccept()
     {
-        Value = ValueTextParser.SplitLines(Input.Text);
+        string[] lines = ValueTextParser.SplitLines(_input.Text);
+        int empty = lines.Count(line => line.Length == 0);
+        if (empty > 0 && !_emptyStringsRemoved)
+        {
+            _ = ConfirmEmptyStringsAsync(empty);
+            return false;
+        }
+
+        Value = _emptyStringsRemoved ? lines.Where(line => line.Length > 0).ToArray() : lines;
         return true;
     }
 
-    private void OnTextChanged(object sender, TextChangedEventArgs e)
+    /// <summary>Focuses the value, as the classic dialog does when it opens.</summary>
+    protected override void OnDialogLoaded()
     {
-        UpdateHint();
-        ShowValidation(null);
+        _ = _input.Focus(FocusState.Programmatic);
     }
 
-    private void UpdateHint()
+    private async Task ConfirmEmptyStringsAsync(int empty)
     {
-        string[] lines = ValueTextParser.SplitLines(Input.Text);
-        if (lines.Length == 0)
-        {
-            SetHint("No strings. An empty list is saved.");
-            return;
-        }
+        string text = empty == 1 ? OneEmptyStringWarning : ManyEmptyStringsWarning;
+        var warning = new ClassicMessageBox(
+            "Registry Editor",
+            text,
+            ClassicMessageIcon.Warning,
+            ClassicMessageButtons.Ok);
 
-        bool hasEmpty = false;
-        foreach (string line in lines)
-        {
-            if (line.Length == 0)
-            {
-                hasEmpty = true;
-                break;
-            }
-        }
-
-        if (hasEmpty)
-        {
-            SetHint(
-                "One or more lines are empty. Empty strings will be saved as part of the multi-string value.",
-                warning: true);
-            return;
-        }
-
-        SetHint($"{lines.Length} string(s).");
+        // The warning is owned by this dialog, so this dialog stays disabled until the box closes.
+        _ = await warning.ShowAsync(WindowNative.GetWindowHandle(this));
+        _emptyStringsRemoved = true;
+        Accept();
     }
 }

@@ -41,6 +41,9 @@ public sealed class MenuTests
     private const string ToggleFlyoutItemClass = "ToggleMenuFlyoutItem";
     private const string ClassicPopupClass = "#32768";
     private const string MenuMetricsRelativePath = @"docs\parity\oracle\regedit-menu-metrics.json";
+    /// <summary>The classic View menu has 5 items (oracle). BWC View adds View > Theme, so it has 6.</summary>
+    private const int BwcViewItems = 6;
+
     private const string SummaryFileName = "measurements.json";
 
     // Pixel thresholds. Contrast is the sum of the three channel differences. A separator row has most of
@@ -213,7 +216,7 @@ public sealed class MenuTests
         using (var bwc = OpenBwc(config, "menus-check-bwc"))
         {
             bool visible = AddressBarVisible(bwc);
-            var popup = OpenBwcPopup(bwc, "View", expectedItems: 5);
+            var popup = OpenBwcPopup(bwc, "View", expectedItems: BwcViewItems);
             bool ink = CheckMarkInk(popup, metrics, ControlTestSupport.WindowDpi(bwc) / 96.0);
             checks.Record(
                 "bwc.addressBar",
@@ -253,7 +256,7 @@ public sealed class MenuTests
 
         // View is open; B is the access key of "Address &Bar", a command. The letter runs it and closes the menu.
         bool before = AddressBarVisible(session);
-        OpenBwcPopup(session, "View", expectedItems: 5);
+        OpenBwcPopup(session, "View", expectedItems: BwcViewItems);
         SendRaw("b");
         bool toggled = WaitUntil(() => AddressBarVisible(session) != before, MenuTimeout);
         bool closed = WaitUntil(() => FlyoutItems(session).Length == 0, MenuTimeout);
@@ -262,7 +265,7 @@ public sealed class MenuTests
         CloseBwcMenus(session);
 
         // A second run of the same command restores the address bar.
-        OpenBwcPopup(session, "View", expectedItems: 5);
+        OpenBwcPopup(session, "View", expectedItems: BwcViewItems);
         SendRaw("b");
         bool restored = WaitUntil(() => AddressBarVisible(session) == before, MenuTimeout);
         checks.Record("restored", restored, $"A second View > B restored the address bar to visible={before}.");
@@ -500,7 +503,7 @@ public sealed class MenuTests
         {
             CaptureBwcPopup(bwc, "File", 8, Path.Combine(dir, "bwc-file-menu.png"), checks, "bwc.file");
             CloseBwcMenus(bwc);
-            CaptureBwcPopup(bwc, "View", 5, Path.Combine(dir, "bwc-view-menu.png"), checks, "bwc.view");
+            CaptureBwcPopup(bwc, "View", BwcViewItems, Path.Combine(dir, "bwc-view-menu.png"), checks, "bwc.view");
             CloseBwcMenus(bwc);
             CaptureBwcPopup(bwc, "Edit", 7, Path.Combine(dir, "bwc-edit-menu.png"), checks, "bwc.edit");
             CloseBwcMenus(bwc);

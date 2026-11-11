@@ -258,14 +258,8 @@ public sealed class ShellTests
             CheckMenuItemState(checks, session, command.Id, command.Name, command.Enabled);
         }
 
-        CheckMenuItemGap(
-            checks,
-            session,
-            "loadHive",
-            "Load Hive...",
-            oracleEnabled: false,
-            workPackage: "RF8",
-            oracleBehavior: "File > Load Hive is disabled while Computer is selected. It is enabled only with HKEY_LOCAL_MACHINE or HKEY_USERS selected.");
+        // Computer is selected, so Load Hive is disabled (only HKEY_LOCAL_MACHINE and HKEY_USERS enable it).
+        CheckMenuItemState(checks, session, "loadHive", "Load Hive...", false);
 
         Collapse(file);
 
@@ -342,14 +336,7 @@ public sealed class ShellTests
         CheckMenuItemState(checks, session, "view.split", "Split", true);
         CheckMenuItemState(checks, session, "view.displayBinaryData", "Display Binary Data...", false);
         CheckMenuItemState(checks, session, "view.refresh", "Refresh", true);
-        CheckMenuItemGap(
-            checks,
-            session,
-            "view.font",
-            "Font",
-            oracleEnabled: true,
-            workPackage: "RF4",
-            oracleBehavior: "View > Font is enabled and opens the font chooser (RF4).");
+        CheckMenuItemState(checks, session, "view.font", "Font", true);
         Collapse(view);
 
         var favorites = WaitForTopLevel(session, "Favorites");
@@ -669,31 +656,6 @@ public sealed class ShellTests
     /// Records a menu item's enabled state against the oracle. A matching state is a pass. A state that
     /// differs is a known gap for the named work package, so it does not fail the test.
     /// </summary>
-    private static void CheckMenuItemGap(
-        Checks checks,
-        AppSession session,
-        string id,
-        string name,
-        bool oracleEnabled,
-        string workPackage,
-        string oracleBehavior)
-    {
-        var item = WaitForMenuItem(session, name);
-        if (item is null)
-        {
-            checks.Record(id, false, $"'{name}' was not found as a menu item.");
-            return;
-        }
-
-        var actual = SafeBool(() => item.IsEnabled);
-        checks.RecordOrKnownGap(
-            id,
-            actual == oracleEnabled,
-            workPackage,
-            oracleBehavior,
-            $"'{name}' enabled={actual}; oracle enabled={oracleEnabled}.");
-    }
-
     private static void CheckMenuItemState(Checks checks, AppSession session, string id, string name, bool expectedEnabled)
     {
         var item = WaitForMenuItem(session, name);

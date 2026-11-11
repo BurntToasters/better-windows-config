@@ -1,9 +1,12 @@
+using Bwc.Core;
 using Bwc.Regedit.Commands;
 using Bwc.Regedit.Controllers;
+using Bwc.Regedit.Dialogs;
 using Bwc.Regedit.Registry;
 using Bwc.Registry;
 using Bwc.UI.List;
 using Bwc.UI.Shell;
+using Bwc.UI.Theme;
 using Bwc.UI.Tree;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
@@ -84,7 +87,10 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
             loadHive: LoadHive,
             unloadHive: UnloadHive,
             connectNetworkRegistry: ConnectNetworkRegistry,
-            disconnectNetworkRegistry: DisconnectNetworkRegistry);
+            disconnectNetworkRegistry: DisconnectNetworkRegistry,
+            font: ShowFont,
+            about: ShowAbout,
+            setTheme: SetTheme);
         RegeditMenu.Populate(Shell.MenuBar, commands);
         _favoritesController.ReloadOnStartup();
 
@@ -117,6 +123,9 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
     /// <summary>Raised when File > Exit is chosen. The window owns the actual close.</summary>
     public event EventHandler? ExitRequested;
 
+    /// <summary>Raised when View > Font or View > Theme changes a setting, so the window saves at once.</summary>
+    public event EventHandler? SettingsChanged;
+
     /// <summary>The in-memory view state. Updated by selection changes, not written to disk.</summary>
     public RegeditSettings Settings => _context.Settings;
 
@@ -129,6 +138,12 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
 
     /// <summary>Copies the current key, address bar state, and column widths for saving.</summary>
     public RegeditSettings CaptureSettings() => _persistence.CaptureSettings();
+
+    /// <summary>
+    /// Imports a .reg file given on the command line, or sent by a second launch. The user is asked
+    /// first, as classic regedit does.
+    /// </summary>
+    public void OpenRegistryFile(string filePath) => _importExport.ImportRegistryFile(filePath);
 
     /// <summary>Creates the menu keyboard router after the window handle is known.</summary>
     public void AttachMenuKeyboard(nint hwnd)
@@ -204,6 +219,70 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
     private void RemoveFavorite() => _favoritesController.RemoveFavorite();
 
     private static RegistryStore CreateStore() => RegeditWritePolicy.CreateStore();
+
+    /// <summary>
+    /// View > Font. The system dialog picks a point size, which is converted to DIPs and applied to the
+    /// tree and the list. The size is saved when the window closes.
+    /// </summary>
+    private void ShowFont()
+    {
+        if (_context.DialogOpen || _context.FileDialogOpen || _context.WindowHwnd == 0)
+        {
+            Log.Warn("Registry Editor ignored Font because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        FontChoice? choice;
+        _context.DialogOpen = true;
+        try
+        {
+            choice = FontChooser.Show(_context.WindowHwnd, DenseMetrics.FontSize * 72.0 / 96.0);
+        }
+        finally
+        {
+            _context.DialogOpen = false;
+        }
+
+        if (choice is not { } picked)
+        {
+            return;
+        }
+
+        double dip = AppearanceSettings.ValidFontSizeDip(AppearanceSettings.PointsToDip(picked.PointSize));
+        DenseMetrics.ApplyFont(dip);
+        _context.Settings.FontSize = dip;
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
+        _context.FocusTreeAfterDialog();
+    }
+
+    /// <summary>Help > About. Shows the native About box with the product, version, and copyright.</summary>
+    private void ShowAbout()
+    {
+        if (_context.DialogOpen || _context.FileDialogOpen || _context.WindowHwnd == 0)
+        {
+            Log.Warn("Registry Editor ignored About because another modal is open or the window handle is not attached.");
+            return;
+        }
+
+        _context.DialogOpen = true;
+        try
+        {
+            _ = AboutBox.Show(_context.WindowHwnd, RegeditStrings.Get("RegeditTitle"), Environment.ProcessPath ?? string.Empty);
+        }
+        finally
+        {
+            _context.DialogOpen = false;
+        }
+    }
+
+    /// <summary>View > Theme. Applies the override at once and remembers it for the next launch.</summary>
+    private void SetTheme(BwcThemeOverride value)
+    {
+        BwcTheme.SetOverride(value);
+        _context.Settings.ThemeOverride = AppearanceSettings.FormatTheme(value);
+        RegeditMenu.SetThemeChecked(Shell.MenuBar, value);
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     private void OnTreeSelectionChanged(object? sender, TreeNodeEventArgs e) =>
         _viewCommands.HandleTreeSelectionChanged(e.Node);

@@ -1,25 +1,28 @@
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
+using Bwc.UI.Hex;
 
 namespace Bwc.UI.Dialogs;
 
 /// <summary>
-/// Binary editor. Hex bytes may be separated by spaces, tabs, commas, or line breaks. An odd digit
-/// count or a non-hex character blocks the save; empty input writes a zero-length value.
+/// Edit Binary Value for a new REG_BINARY value. The classic HEX control starts with the bytes
+/// parsed from <paramref name="initialText"/> (hex pairs, separated by spaces or commas), or empty
+/// when the text does not parse. The value name is read-only and empty for a new value.
 /// </summary>
-public sealed class BinaryValueDialog : ValueEditorDialog
+public sealed class BinaryValueDialog : ClassicDialog
 {
+    private readonly HexEditor _editor;
+
     public BinaryValueDialog(string title, string initialText = "")
-        : base(title, "Value data")
+        : base(ClassicDialogTemplates.EditBinary(HexEditorDialog.ClassicCaption))
     {
-        Input.Text = initialText;
-        Input.AcceptsReturn = true;
-        Input.TextWrapping = TextWrapping.Wrap;
-        Input.Height = 170;
-        SubmitsOnEnter = false;
-        SetPreferredSize(500, 340);
-        Input.TextChanged += OnTextChanged;
-        UpdateHint();
+        ArgumentException.ThrowIfNullOrEmpty(title);
+
+        _editor = RequireControl<HexEditor>("HexEditor");
+        _editor.IsReadOnly = false;
+
+        byte[] initial = ValueTextParser.TryParseBinary(initialText ?? string.Empty, out byte[] parsed, out _)
+            ? parsed
+            : Array.Empty<byte>();
+        _editor.SetData(initial);
     }
 
     /// <summary>The bytes after a successful primary action.</summary>
@@ -27,30 +30,12 @@ public sealed class BinaryValueDialog : ValueEditorDialog
 
     protected override bool TryAccept()
     {
-        if (!ValueTextParser.TryParseBinary(Input.Text, out byte[] value, out string? error))
-        {
-            ShowValidation(error);
-            return false;
-        }
-
-        Value = value;
+        Value = _editor.GetBytes();
         return true;
     }
 
-    private void OnTextChanged(object sender, TextChangedEventArgs e)
+    protected override void OnDialogLoaded()
     {
-        UpdateHint();
-        ShowValidation(null);
-    }
-
-    private void UpdateHint()
-    {
-        if (ValueTextParser.TryParseBinary(Input.Text, out byte[] value, out _))
-        {
-            SetHint($"{value.Length} byte(s).");
-            return;
-        }
-
-        SetHint("Enter hexadecimal bytes separated by spaces or commas.");
+        _editor.FocusEditor();
     }
 }

@@ -12,7 +12,9 @@ internal static class RawKeyboard
 {
     internal const ushort Shift = 0x10;
     internal const ushort Control = 0x11;
+    internal const ushort Alt = 0x12;
     internal const ushort Space = 0x20;
+    internal const ushort F4 = 0x73;
     internal const ushort Down = 0x28;
     internal const ushort A = 0x41;
 
