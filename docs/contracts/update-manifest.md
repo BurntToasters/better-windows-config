@@ -99,7 +99,9 @@ Example installer trusted comment:
 BwcUpdate.exe --check --manifest-url <https url> --signature-url <https url> --channel stable|beta --current-version <semver>
 ```
 
-Stdout is one JSON line: `{"ok":true|false,"failure":"<UpdateFailure>","detail":"...","version":"..."}`.
+Stdout is one JSON line: `{"ok":true|false,"failure":"<UpdateFailure>","detail":"...","version":"...","notesUrl":"..."}`.
+`notesUrl` is additive: it is the manifest's optional `notesUrl` when the check is ready and the
+manifest has one, otherwise `null`. Consumers must ignore unknown properties.
 Exit codes: `0` ready, `1` refused, `2` usage. The architecture is the running process's
 (`win-x64` or `win-arm64`).
 

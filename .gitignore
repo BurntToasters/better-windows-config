@@ -21,3 +21,10 @@ node_modules/
 
 # Agent worktrees created by Claude Code
 .claude/worktrees/
+
+# Microsoft regedit content (resource dump, screenshot, dialog captures). Regenerated locally by `npm run oracle`.
+docs/parity/oracle/regedit-resources.json
+docs/parity/oracle/regedit-resources.md
+docs/parity/oracle/regedit-100dpi.png
+docs/parity/oracle/dialogs/
+docs/parity/oracle/local/

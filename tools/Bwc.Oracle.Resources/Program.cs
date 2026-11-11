@@ -75,8 +75,9 @@ internal static class Program
             string jsonPath = Path.Combine(outDir, JsonFileName);
             string markdownPath = Path.Combine(outDir, MarkdownFileName);
             var utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
-            File.WriteAllText(jsonPath, GoldenJson.Serialize(golden), utf8NoBom);
-            File.WriteAllText(markdownPath, GoldenMarkdown.Render(golden), utf8NoBom);
+            // Write to temporary files and rename, so a reader never sees a partial dump.
+            WriteAtomic(jsonPath, GoldenJson.Serialize(golden), utf8NoBom);
+            WriteAtomic(markdownPath, GoldenMarkdown.Render(golden), utf8NoBom);
 
             Console.WriteLine($"wrote {jsonPath}");
             Console.WriteLine($"wrote {markdownPath}");
@@ -94,6 +95,13 @@ internal static class Program
             Console.Error.WriteLine($"error: {ex.Message}");
             return 1;
         }
+    }
+
+    private static void WriteAtomic(string path, string text, Encoding encoding)
+    {
+        string temp = path + ".tmp";
+        File.WriteAllText(temp, text, encoding);
+        File.Move(temp, path, overwrite: true);
     }
 
     private static SourceInfo DescribeSource(string module, string path)

@@ -1,8 +1,8 @@
 # Hub failure modes
 
-Scope: `src/Bwc.Hub` startup, the launcher window, tool launching, settings, single instance
-activation, and the Hub E2E checks. This document describes how each failure is detected and what
-the Hub does about it.
+Scope: `src/Bwc.Hub` startup, the launcher window, the menu bar and tool list, tool launching,
+the About dialog, the update check and install, settings, single instance activation, and the Hub
+E2E checks. This document describes how each failure is detected and what the Hub does about it.
 
 ## Startup and identity
 
@@ -13,7 +13,37 @@ not stop startup.
 
 `Log.Initialize("hub")` runs first, then `CrashHandler.Install("hub", showDialog: true)`, then the
 single-instance gate. A startup log entry records that the Hub opened. If the log directory cannot
-be created, logging falls back to `Trace` and startup continues.
+be created, logging falls back to `Trace` and startup continues. The window icon is `bwc.ico`
+beside the executable, and the exe carries the same icon through `ApplicationIcon`. A missing icon
+file leaves the default window icon and does not stop startup.
+
+## Tool registry and tool icons
+
+`ToolCatalog.Tools` (in `Bwc.Core`) is the registry: id, display name, executable name, and
+description. The Hub keeps no second list. The tool icon is not stored in the registry. It is read
+at run time from the tool executable's own icon through the shell thumbnail API at 32 DIP. When the
+executable is missing or the shell returns nothing, the row shows no icon and the name and
+description still show.
+
+The Status column shows `Installed` when the executable exists beside the Hub and `Not installed`
+otherwise. The status is read when the window opens and again before each launch. A missing
+executable never removes the row, so the list has the same shape on every machine.
+
+## Menu bar and keyboard
+
+The menu bar is built from `Strings/en-US/Resources.resw`. Each mnemonic is an ampersand in the
+resource text. The menu router is `Bwc.UI.Menu.ClassicMenuKeyboard`, created when the window root
+loads and disposed when the window closes. Alt followed by a mnemonic opens a top level menu (Alt+H
+opens Help), Alt alone or F10 activates the bar, Left and Right move between top level items, Down
+opens the flyout, and Escape closes the flyout and restores the previous focus.
+
+The tool list is a `ListView` in single selection mode. Enter and a double click launch the
+selected row. The Launch button launches the same row. The list is the first tab stop when the
+window opens. Tab moves to the Launch button and then the status line, so every command is reachable
+without a pointer.
+
+If the menu router cannot be created (the window handle is not available), the menu bar still
+works with a pointer, the Hub writes a warning to the log, and only the Alt mnemonics are lost.
 
 ## Missing tool executable
 
@@ -43,6 +73,79 @@ and does not try to elevate itself. If the user cancels the consent prompt, `Pro
 with the cancelled error and that text appears in `HubStatus`. E2E runs set `__COMPAT_LAYER` to
 `RunAsInvoker` so the same code path is tested without a prompt.
 
+The update helper (`BwcUpdate.exe`) is started with `UseShellExecute = false` and
+`CreateNoWindow = true`. Its manifest is `asInvoker`, so it never raises a prompt. E2E runs set
+`__COMPAT_LAYER` to `RunAsInvoker` on the helper as well.
+
+## About dialog
+
+About is a classic message box with the product name, the short version, the copyright, and the
+license (MPL-2.0 with its URL). The short version is the display version without build metadata:
+`0.1.0`, plus the prerelease label when one is set (`0.1.0-beta.1`), plus ` (commit abc1234)` when
+the build recorded a full commit hash. The full 40-character hash is never shown. A missing or
+non-hexadecimal commit omits the commit part.
+
+When `THIRD-PARTY-NOTICES.txt` is in the install folder, About shows a second button that opens
+that file with the shell. When the file is absent, the button is not shown and the text says that
+no notices file is included. A failure to open the file is logged and the About dialog stays open.
+
+## Update check
+
+Help > Check for Updates runs `BwcUpdate.exe --check --manifest-url <url> --signature-url <url>.minisig
+--channel <stable|beta> --current-version <version>` on a worker task. The UI thread never waits for
+it. The progress dialog has one Cancel button. Cancel kills the helper's process tree and reports
+nothing, so no result dialog follows a cancel. The check never blocks the window.
+
+Outcomes, in the order the Hub checks them:
+
+1. No manifest URL is configured (none in the build, none in settings, no E2E override). The Hub
+   shows the "not configured" message and starts no process.
+2. The helper is not in the Hub folder. The Hub shows the expected path and starts no process.
+3. The helper cannot be started. The Win32 message is shown and logged.
+4. The helper does not finish within 3 minutes. Its process tree is killed and the Hub shows a
+   timeout message.
+5. The helper prints no JSON line, or the line is not the expected shape. The Hub shows the exit
+   code and that no result was returned.
+6. `TrustedKeysInvalid` (the release key is still the placeholder). The Hub shows the same
+   deliberate "not configured" message as case 1, not an error, because the build has no release key
+   yet.
+7. `SameVersion`, `Downgrade`, or `PrereleaseOnStable`: nothing newer is offered for this channel.
+   The Hub shows "up to date".
+8. `ok: true`: an update is staged and verified by the helper. The Hub shows the version, the
+   release notes link from the manifest (only the https URL the helper validated), and the buttons
+   "Download and Install" and "Later".
+9. Any other failure (URL rejected, download failed, signature invalid, and so on): the Hub shows
+   the failure name and the helper's detail text.
+
+The staged folder is found by the `receipt.json` version match under `%TEMP%\BWC-Update`. The Hub
+never runs an installer itself.
+
+## Update install
+
+Download and Install starts `BwcUpdate.exe --apply <installer.exe> --receipt <receipt.json>
+--current-version <version> --install-dir <Hub folder> --wait-pid <Hub pid>`. Before starting it,
+the Hub checks whether any tool process runs from the Hub folder. If one does, the Hub shows a
+message that names it and stops. The helper would otherwise refuse with `ProcessesStillRunning`
+after the Hub has already closed, and the user would see nothing happen.
+
+When the helper starts, the Hub closes its window and exits so the installer can replace files. If
+the helper cannot be started, the Hub stays open and shows the error. The Hub does not wait for the
+helper and does not elevate. The helper's own exit codes (refused, installer failed, Hub not
+started) are logged by the helper and are not shown in the Hub, which has already exited.
+
+If the staged folder is gone (the temp folder was cleaned after the check), the Hub shows "The
+update is no longer staged. Check for updates again." and starts nothing.
+
+## Update settings
+
+Help > Update Settings... stores the channel (`stable` or `beta`, default `stable`) and the startup
+check flag (default off) in the Hub settings. An unknown channel value loads as `stable`. Cancel
+changes nothing. A save failure is shown in the dialog and logged.
+
+When the startup check is on and a manifest URL is configured, the Hub starts a check after the
+window opens. An available update opens the update dialog. Other results (up to date, not
+configured, or a failure) only set the status line, so startup never shows an error dialog.
+
 ## Single instance race
 
 The first Hub instance creates the named mutex and starts the pipe server. A second instance opens
@@ -67,21 +170,21 @@ message handler and disposes the gate so a later start is a clean first instance
 
 ## Duplicate launch
 
-Every Launch click starts a new child process. The Hub does not serialize clicks or keep a child
-handle, so two clicks produce two processes. Whether the second process becomes another window or
-activates an existing one is up to the tool. The status line reflects the most recent click. The
-Launch buttons are ordinary buttons, so Enter and Space activate them, Tab moves through the rows,
-and the first Launch button receives focus when the window loads.
+Every launch (button, Enter, or double click) starts a new child process. The Hub does not
+serialize launches or keep a child handle, so two launches produce two processes. Whether the
+second process becomes another window or activates an existing one is up to the tool. The status
+line reflects the most recent launch.
 
 ## Settings corruption
 
-Window bounds load from `AppPaths.SettingsFile("hub")` through the source-generated
-`HubSettingsContext`. `SettingsStore` moves malformed JSON aside to a `.bad-<timestamp>` file and
-returns default settings. An IO error is logged and the Hub opens with default bounds. Bounds are
-clamped to the current display work area, with a 640 by 480 minimum where space allows, so a saved
-position from a removed monitor cannot put the window off screen. Saving during close is best
-effort: a failure is logged and does not block the close, and a minimized window does not overwrite
-the last normal bounds.
+Window bounds and update settings load from `AppPaths.SettingsFile("hub")` through the
+source-generated `HubSettingsContext`. `SettingsStore` moves malformed JSON aside to a
+`.bad-<timestamp>` file and returns default settings. An IO error is logged and the Hub opens with
+default settings. Bounds are clamped to the current display work area, with a minimum size where
+space allows, so a saved position from a removed monitor cannot put the window off screen. Saving
+during close is best effort: a failure is logged and does not block the close, and a minimized
+window does not overwrite the last normal bounds. The settings file lives under `BWC_DATA_ROOT`
+when that variable is set.
 
 ## Crash handler
 
@@ -95,43 +198,56 @@ because the process is already shutting down and a late failure should still be 
 
 Every `Log` call is non-throwing. If initialization failed, or the disk, permissions, or an
 antivirus lock blocks a write, entries go to `Trace` instead. Startup, launch errors, settings
-warnings, and shutdown still run; only the file destination is lost. `Log.Shutdown` runs after the
-window closes and is safe to call more than once.
-
-## Version string
-
-The header reads `AssemblyInformationalVersionAttribute` from the running assembly. The SDK may add
-build metadata after a `+` sign, and that full value is displayed as the informational version.
-When the attribute is absent, `Assembly.GetName().Version` is used. If both are unavailable, the
-header shows `unknown`. The version is display only: the Hub performs no network call and starts no
-process for it. The E2E check only requires a non-empty `HubVersion`.
+warnings, update results, and shutdown still run; only the file destination is lost. `Log.Shutdown`
+runs after the window closes and is safe to call more than once.
 
 ## High contrast and DPI
 
-The window uses 12 DIP Segoe UI text and the shared `Bwc.UI` Dense theme resources. It does not add
-a second theme dictionary. Secondary text uses Fluent theme brushes, so the high contrast palette
-replaces them when high contrast is enabled. The manifest declares PerMonitorV2 awareness, and
+The window uses 12 DIP Segoe UI text and the shared `Bwc.UI` Dense theme resources. The palette
+comes from `BwcTheme`, so light, dark, and high contrast follow Windows, and the window's
+`RequestedTheme` follows `BwcTheme.Changed`. The manifest declares PerMonitorV2 awareness, and
 layout uses auto and star columns with wrapping text, so 200 percent scale and a narrow work area
-keep the name, description, and Launch button readable. Window bounds are clamped to the display
-work area on restore.
+keep the name, description, and status readable. Window bounds are clamped to the display work area
+on restore.
 
 ## Stale process matching in E2E
 
-The Hub test snapshots `BwcRegedit` process ids immediately before invoking `Launch_regedit`, and
-then only considers ids that did not exist before and whose start time is not older than the test
-start. This prevents the test from closing a Registry Editor window that the user or another test
-opened. If no matching process appears within 15 seconds, the test records a failed check and
-closes nothing. A matched child is closed with `CloseMainWindow` first; a kill is only used on that
-specific new pid and only after the graceful close times out. The Hub itself is closed through its
-`AppSession`.
+The Hub test snapshots `BwcRegedit` process ids immediately before it presses Enter on the Registry
+Editor row, and then only considers ids that did not exist before and whose start time is not older
+than the test start. This prevents the test from closing a Registry Editor window that the user or
+another test opened. If no matching process appears within 15 seconds, the test records a failed
+check and closes nothing. A matched child is closed with `CloseMainWindow` first; a kill is only
+used on that specific new pid and only after the graceful close times out. The Hub itself is closed
+through its `AppSession`.
+
+## E2E-only seams
+
+These seams are compiled only in the E2E flavor (`BWC_E2E`). A ship build ignores the variables
+and never reads them.
+
+- `BWC_E2E_UPDATE_MANIFEST_URL` (Hub): replaces the configured manifest URL. The signature URL is
+  the same URL with `.minisig` appended. The value must be an http or https URL on loopback.
+- `BWC_E2E_UPDATE_TRUSTED_KEY` (BwcUpdate, E2E builds only): base64 of a minisign public key text.
+  When set, the check trusts only this key instead of the placeholder list.
+- `BWC_E2E_UPDATE_ALLOW_HTTP` (BwcUpdate, E2E builds only): when `1`, the check accepts http URLs.
+  Only the check honors it; the apply command still requires https.
+
+The E2E test generates the key pair, the signed manifests, and the signed installer files in a
+temporary folder at run time, serves them from a loopback listener in the test process, and
+removes the folder afterwards. No private key is committed.
 
 ## Verification
 
-`tests/Bwc.E2E/Hub/HubTests.cs` covers the window title, the stable automation ids, the version
-text, the Launch button state, the About text, the child window title, and cleanup of the child and
-the Hub. Release builds with `-p:Platform=ARM64` must have zero warnings. Run the checks with:
+`tests/Bwc.E2E/Hub/HubTests.cs` covers: the window title, the stable automation ids, the version
+text (short form, no 40-character hash), the tool list with Registry Editor, Enter on the tool row
+launching BwcRegedit and the child window title, the Launch button, the About text and its notices
+button state, Alt+H opening Help, the "not configured" check result, the "update available" result
+for a higher version, the "up to date" result for the same version, and cleanup of the child and
+the Hub. Captures go to `artifacts/e2e/visual/hub/`: the main window in light and dark, About, the
+progress dialog, and the update dialogs. Release builds with `-p:Platform=ARM64` must have zero
+warnings. Run the checks with:
 
 ```
-node scripts/dotnet-build.js --rid win-arm64 --flavor ship
-node scripts/test-e2e.js --rid win-arm64 --flavor ship --filter Hub
+node scripts/dotnet-build.js --rid win-arm64 --flavor e2e
+node scripts/test-e2e.js --rid win-arm64 --flavor e2e --filter Hub
 ```

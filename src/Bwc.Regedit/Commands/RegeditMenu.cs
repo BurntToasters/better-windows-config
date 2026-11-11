@@ -19,6 +19,11 @@ public static class RegeditMenu
 {
     private const string MenuBarItemStyleKey = "BwcMenuBarItemStyle";
     private const string MenuFlyoutItemStyleKey = "BwcMenuFlyoutItemStyle";
+    private const string MenuFlyoutSubItemStyleKey = "BwcMenuFlyoutSubItemStyle";
+    private const string ToggleMenuFlyoutItemStyleKey = "BwcToggleMenuFlyoutItemStyle";
+
+    /// <summary>Oracle command id of View &gt; Address Bar (RT_MENU 103, id 668), the one toggle item.</summary>
+    private const int AddressBarCommandId = 668;
     private const string MenuFlyoutSeparatorStyleKey = "BwcMenuFlyoutSeparatorStyle";
 
     /// <summary>The AutomationId prefix for the dynamic favorite entries after the two commands.</summary>
@@ -392,15 +397,17 @@ public static class RegeditMenu
                 subItem.Items.Add(BuildFlyoutItem(child, automationPrefix));
             }
 
+            ApplyStyle(subItem, MenuFlyoutSubItemStyleKey);
             return subItem;
         }
 
-        var item = new MenuFlyoutItem
-        {
-            Text = command.Text,
-            IsEnabled = command.IsEnabled,
-            Tag = command.Id,
-        };
+        // View > Address Bar is a toggle, so it is a ToggleMenuFlyoutItem and carries the check mark.
+        MenuFlyoutItem item = command.Id == AddressBarCommandId
+            ? new ToggleMenuFlyoutItem()
+            : new MenuFlyoutItem();
+        item.Text = command.Text;
+        item.IsEnabled = command.IsEnabled;
+        item.Tag = command.Id;
 
         AutomationProperties.SetAutomationId(item, automationPrefix + command.Id);
 
@@ -418,9 +425,10 @@ public static class RegeditMenu
         {
             var invoke = command.Invoke;
             item.Click += (_, _) => invoke();
+            MenuItemActions.Register(item, invoke);
         }
 
-        ApplyStyle(item, MenuFlyoutItemStyleKey);
+        ApplyStyle(item, item is ToggleMenuFlyoutItem ? ToggleMenuFlyoutItemStyleKey : MenuFlyoutItemStyleKey);
         return item;
     }
 

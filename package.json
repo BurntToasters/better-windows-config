@@ -18,6 +18,7 @@
     "sync-version": "node scripts/sync-version.js",
     "test:e2e": "node scripts/test-e2e.js",
     "test:all": "node scripts/test-all.js",
+    "oracle": "node scripts/oracle.js",
     "gate": "node scripts/test-all.js",
     "validate": "node scripts/validate-no-em-dash.js && node scripts/validate-changelog-version.js && node scripts/lint-comments.mjs"
   }
