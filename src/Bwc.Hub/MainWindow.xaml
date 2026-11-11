@@ -23,6 +23,7 @@
             Style="{StaticResource BwcMenuBarStyle}" />
 
         <Border
+            x:Name="ListFrame"
             Grid.Row="1"
             Margin="6,4,6,0"
             Background="{StaticResource BwcWindowBrush}"

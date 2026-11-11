@@ -32,8 +32,12 @@ executable never removes the row, so the list has the same shape on every machin
 ## Menu bar and keyboard
 
 The menu bar is built from `Strings/en-US/Resources.resw`. Each mnemonic is an ampersand in the
-resource text. The menu router is `Bwc.UI.Menu.ClassicMenuKeyboard`, created when the window root
-loads and disposed when the window closes. Alt followed by a mnemonic opens a top level menu (Alt+H
+resource text. The menu bar and its items use the shared Dense styles (`BwcMenuBarStyle`,
+`BwcMenuBarItemStyle`, `BwcMenuFlyoutItemStyle`), looked up through the merged theme dictionaries.
+Each leaf registers its action with `Bwc.UI.Menu.MenuItemActions`, so a mnemonic letter runs the
+same action as a click. A menu command that throws is logged and the window stays open, because a
+fire-and-forget task would otherwise drop the exception. The menu router is
+`Bwc.UI.Menu.ClassicMenuKeyboard`, created when the window root loads and disposed when the window closes. Alt followed by a mnemonic opens a top level menu (Alt+H
 opens Help), Alt alone or F10 activates the bar, Left and Right move between top level items, Down
 opens the flyout, and Escape closes the flyout and restores the previous focus.
 
@@ -79,8 +83,9 @@ The update helper (`BwcUpdate.exe`) is started with `UseShellExecute = false` an
 
 ## About dialog
 
-About is a classic message box with the product name, the short version, the copyright, and the
-license (MPL-2.0 with its URL). The short version is the display version without build metadata:
+About is a classic dialog (`ClassicDialog`, owned by the Hub window, which is disabled while it is
+open) with the product name, the short version, the copyright, and the license (MPL-2.0 with its
+URL). Every update message is a `ClassicMessageBox` or the update dialogs in `Dialogs/UpdateDialogs.cs`. The short version is the display version without build metadata:
 `0.1.0`, plus the prerelease label when one is set (`0.1.0-beta.1`), plus ` (commit abc1234)` when
 the build recorded a full commit hash. The full 40-character hash is never shown. A missing or
 non-hexadecimal commit omits the commit part.
@@ -88,6 +93,14 @@ non-hexadecimal commit omits the commit part.
 When `THIRD-PARTY-NOTICES.txt` is in the install folder, About shows a second button that opens
 that file with the shell. When the file is absent, the button is not shown and the text says that
 no notices file is included. A failure to open the file is logged and the About dialog stays open.
+
+## Window size and position
+
+The window restores its saved bounds (physical pixels, clamped to the work area and to the minimum
+size) from the Hub settings, and saves them when it closes. On the first run there are no saved
+bounds, so the window is sized to fit the tool list: the list is as tall as its header and rows, with
+no empty band under the last row. The width is 600 DIP, and the height is measured from the layout
+after the first pass, so the client area matches the content at the current DPI.
 
 ## Update check
 
@@ -243,8 +256,15 @@ text (short form, no 40-character hash), the tool list with Registry Editor, Ent
 launching BwcRegedit and the child window title, the Launch button, the About text and its notices
 button state, Alt+H opening Help, the "not configured" check result, the "update available" result
 for a higher version, the "up to date" result for the same version, and cleanup of the child and
-the Hub. Captures go to `artifacts/e2e/visual/hub/`: the main window in light and dark, About, the
-progress dialog, and the update dialogs. Release builds with `-p:Platform=ARM64` must have zero
+the Hub, and the update settings save. The test process is per-monitor DPI aware, and the Hub's
+windows are found by enumerating the visible windows of the Hub's process, because the dialogs are
+owned windows that the UIA desktop list can miss. A mouse click on a flyout item hovers the item first
+and is repeated while the item is still showing, because a click that arrives with the first pointer
+move was sometimes dropped. The interactive check's progress window has the same title as its result
+message, so the result lookup waits for the window that holds the message text. Captures go to
+`artifacts/e2e/visual/hub/`: each capture is the window's visible frame read from the screen, so the
+whole window is in the image. The captures are the main window in light and dark, About, the progress
+dialog, and the update dialogs. Release builds with `-p:Platform=ARM64` must have zero
 warnings. Run the checks with:
 
 ```

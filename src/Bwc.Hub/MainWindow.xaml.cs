@@ -27,10 +27,12 @@ namespace Bwc.Hub;
 public sealed partial class MainWindow : Window
 {
     private const string ToolId = "hub";
-    private const int DefaultWidthDip = 640;
-    private const int DefaultHeightDip = 420;
+    private const int DefaultWidthDip = 600;
     private const int MinimumWidth = 420;
-    private const int MinimumHeight = 300;
+    private const int MinimumHeight = 160;
+    private const double ListFrameBorderDip = 2;
+    private const double ListHeaderDividerDip = 1;
+    private const int MaxSizingAttempts = 20;
     private const double IconDip = 16;
     private const double IconColumnDip = 24;
     private const double NameColumnDip = 170;
@@ -351,6 +353,7 @@ public sealed partial class MainWindow : Window
 
     private void OnHubRootLoaded(object sender, RoutedEventArgs e)
     {
+        ApplyMenuBarMetrics();
         if (!_initialSizeApplied)
         {
             _initialSizeApplied = true;
@@ -361,7 +364,7 @@ public sealed partial class MainWindow : Window
         if (!_startupCheckQueued && _settings.CheckForUpdatesOnStartup)
         {
             _startupCheckQueued = true;
-            _ = CheckForUpdatesAsync(interactive: false);
+            RunCommand(() => CheckForUpdatesAsync(interactive: false));
         }
 
         if (ToolList.Items.Count > 0 && ToolList.SelectedItem is null)
@@ -388,22 +391,44 @@ public sealed partial class MainWindow : Window
     private static extern uint GetDpiForWindow(nint hwnd);
 #pragma warning restore SYSLIB1054
 
-    private void ApplyDefaultSizeIfNone()
+    /// <summary>
+    /// Sizes a first-run window so the tool list is exactly as tall as its rows, with no empty band
+    /// under the last row. The height the list needs is computed from the dense metrics; the rest of
+    /// the client area (menu bar, Launch row, status line) keeps the height it was laid out with.
+    /// </summary>
+    private void ApplyDefaultSizeIfNone(int attempt = 0)
     {
         if (_settings.WindowBounds is not null)
         {
             return;
         }
 
+        double chromeDip = HubRoot.ActualHeight - ListFrame.ActualHeight;
+        if (ListFrame.ActualHeight <= 0 || chromeDip <= 0)
+        {
+            // The first layout pass has not run yet. Try again after it, a few times at most.
+            if (attempt < MaxSizingAttempts)
+            {
+                _ = DispatcherQueue.TryEnqueue(() => ApplyDefaultSizeIfNone(attempt + 1));
+            }
+
+            return;
+        }
+
+        double listDip = ListFrameBorderDip + DenseMetrics.HeaderHeight + ListHeaderDividerDip +
+            ToolList.Items.Count * DenseMetrics.ListRowHeight;
         double scale = WindowScale();
-        AppWindow.Resize(new SizeInt32(
+        AppWindow.ResizeClient(new SizeInt32(
             (int)Math.Round(DefaultWidthDip * scale),
-            (int)Math.Round(DefaultHeightDip * scale)));
+            (int)Math.Round((chromeDip + listDip) * scale)));
     }
 
     private void ApplyTheme()
     {
         HubRoot.RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
+
+        // The menu brushes are derived from the palette, so they are recomputed with it.
+        ClassicMenuBrushes.Refresh();
     }
 
     private void OnThemeChanged(object? sender, EventArgs e)

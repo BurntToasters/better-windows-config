@@ -10,14 +10,12 @@ using FlaUI.UIA3;
 namespace Bwc.E2E.Hub;
 
 /// <summary>
-/// UI helpers for the Hub tests. Popups and dialogs are separate top-level windows, so they are
-/// found from the desktop and filtered to the Hub's process id. Captures are PrintWindow bitmaps
-/// saved under artifacts/e2e/visual/hub.
+/// UI helpers for the Hub tests. Popups and dialogs are separate top-level windows, some owned by the
+/// Hub's main window, so they are found by enumerating the visible windows of the Hub's process id.
+/// Captures are screen copies of each window's visible frame, saved under artifacts/e2e/visual/hub.
 /// </summary>
 internal static class HubUi
 {
-    private const uint PwRenderFullContent = 0x00000002;
-
     public static string VisualDir(E2EConfig config) => Path.Combine(config.ArtifactsDir, "visual", "hub");
 
     /// <summary>Finds an element by automation id in a top-level window or popup of the process.</summary>
@@ -26,7 +24,7 @@ internal static class HubUi
         DateTime deadline = DateTime.UtcNow + timeout;
         do
         {
-            foreach (AutomationElement window in DesktopChildren(automation))
+            foreach (AutomationElement window in ProcessWindows(automation, processId))
             {
                 if (!IsProcess(window, processId))
                 {
@@ -60,11 +58,53 @@ internal static class HubUi
         DateTime deadline = DateTime.UtcNow + timeout;
         do
         {
-            foreach (AutomationElement window in DesktopChildren(automation))
+            foreach (AutomationElement window in ProcessWindows(automation, processId))
             {
                 if (IsProcess(window, processId) && string.Equals(SafeName(window), title, StringComparison.Ordinal))
                 {
                     return window;
+                }
+            }
+
+            Thread.Sleep(100);
+        }
+        while (DateTime.UtcNow < deadline);
+
+        return null;
+    }
+
+    /// <summary>
+    /// Finds a top-level window of the process that has the title and holds an element with the automation
+    /// id. Two windows can share a title: an interactive check shows the progress window "Check for Updates"
+    /// first, and the result message box uses the same title, so a title-only lookup can return the progress.
+    /// </summary>
+    public static AutomationElement? FindWindowWithChild(
+        UIA3Automation automation,
+        int processId,
+        string title,
+        string automationId,
+        TimeSpan timeout)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        do
+        {
+            foreach (AutomationElement window in ProcessWindows(automation, processId))
+            {
+                if (!string.Equals(SafeName(window), title, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (window.FindFirstDescendant(cf => cf.ByAutomationId(automationId)) is not null)
+                    {
+                        return window;
+                    }
+                }
+                catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException)
+                {
+                    // The window is still loading or has closed.
                 }
             }
 
@@ -82,7 +122,7 @@ internal static class HubUi
         do
         {
             bool present = false;
-            foreach (AutomationElement window in DesktopChildren(automation))
+            foreach (AutomationElement window in ProcessWindows(automation, processId))
             {
                 if (IsProcess(window, processId) && string.Equals(SafeName(window), title, StringComparison.Ordinal))
                 {
@@ -148,17 +188,40 @@ internal static class HubUi
         Thread.Sleep(400);
     }
 
-    /// <summary>The top level windows and popups of the desktop. A UIA error on one window yields none.</summary>
-    private static AutomationElement[] DesktopChildren(UIA3Automation automation)
+    /// <summary>
+    /// The visible top-level windows of one process, read by window handle. The UIA desktop children
+    /// do not reliably include a window that is owned by another window, and the Hub's dialogs are
+    /// owned by the Hub's main window, so the desktop list missed them. An error on one window skips it.
+    /// </summary>
+    private static AutomationElement[] ProcessWindows(UIA3Automation automation, int processId)
     {
-        try
+        var handles = new List<IntPtr>();
+        _ = EnumWindows(
+            (hwnd, _) =>
+            {
+                if (IsWindowVisible(hwnd) && GetWindowThreadProcessId(hwnd, out uint owner) != 0 && owner == unchecked((uint)processId))
+                {
+                    handles.Add(hwnd);
+                }
+
+                return true;
+            },
+            IntPtr.Zero);
+
+        var windows = new List<AutomationElement>(handles.Count);
+        foreach (IntPtr hwnd in handles)
         {
-            return automation.GetDesktop().FindAllChildren();
+            try
+            {
+                windows.Add(automation.FromHandle(hwnd));
+            }
+            catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException)
+            {
+                // The window closed between the enumeration and the lookup.
+            }
         }
-        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException)
-        {
-            return [];
-        }
+
+        return windows.ToArray();
     }
 
     /// <summary>Presses Alt+H, which opens the Help menu through the menu router.</summary>
@@ -196,8 +259,79 @@ internal static class HubUi
     /// </summary>
     public static void ClickMenuItem(AutomationElement? element)
     {
-        element?.Click();
-        Thread.Sleep(200);
+        if (element is null)
+        {
+            return;
+        }
+
+        // The pointer must rest on the item before the press: a press that arrives with the first move
+        // was dropped on some runs, and the flyout stayed open with nothing run. The click is repeated while
+        // the item is still showing, which means the flyout did not close and the command did not run.
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            if (attempt > 0 && !IsShowing(element))
+            {
+                return;
+            }
+
+            WaitForSettledBounds(element, TimeSpan.FromSeconds(2));
+            try
+            {
+                Rectangle bounds = element.BoundingRectangle;
+                Mouse.MoveTo(new Point(bounds.Left + (bounds.Width / 2), bounds.Top + (bounds.Height / 2)));
+                Thread.Sleep(150);
+                element.Click();
+            }
+            catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException)
+            {
+                // The item left the tree while it was clicked, which is what a successful click does.
+                return;
+            }
+
+            Thread.Sleep(400);
+        }
+    }
+
+    /// <summary>True while an element is still on screen. An element that cannot be read has left the tree.</summary>
+    private static bool IsShowing(AutomationElement element)
+    {
+        try
+        {
+            return !element.Properties.IsOffscreen.Value;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Waits until an element's rectangle stops changing. A flyout animates into place after it opens, and a
+    /// click sent to the item's first position misses it: the Help menu then stayed open and nothing ran.
+    /// </summary>
+    private static void WaitForSettledBounds(AutomationElement element, TimeSpan timeout)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        Rectangle? last = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                Rectangle current = element.BoundingRectangle;
+                if (current.Width > 0 && current == last)
+                {
+                    return;
+                }
+
+                last = current;
+            }
+            catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException)
+            {
+                last = null;
+            }
+
+            Thread.Sleep(150);
+        }
     }
 
     /// <summary>Waits for a descendant of a window to load, because dialog content appears after the window.</summary>
@@ -231,14 +365,15 @@ internal static class HubUi
         return null;
     }
 
-    /// <summary>Saves a PrintWindow capture of a window. Returns the path written.</summary>
+    /// <summary>
+    /// Saves a capture of a window's visible frame. The bounds are the DWM extended frame bounds, which
+    /// leave out the invisible resize border that GetWindowRect includes, and the pixels are read from
+    /// the screen. The caller brings the window to the foreground first. PrintWindow was not used: it
+    /// returned only part of the XAML content, so the captures were cropped. Returns the path written.
+    /// </summary>
     public static string CaptureWindow(IntPtr hwnd, string path)
     {
-        if (!Win32.GetWindowRect(hwnd, out Win32.NativeRect rect))
-        {
-            throw new InvalidOperationException("GetWindowRect failed for the captured window.");
-        }
-
+        Win32.NativeRect rect = VisibleFrame(hwnd);
         int width = rect.Right - rect.Left;
         int height = rect.Bottom - rect.Top;
         if (width <= 0 || height <= 0)
@@ -250,22 +385,27 @@ internal static class HubUi
         using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
         using (Graphics graphics = Graphics.FromImage(bitmap))
         {
-            IntPtr hdc = graphics.GetHdc();
-            try
-            {
-                if (!PrintWindow(hwnd, hdc, PwRenderFullContent))
-                {
-                    throw new InvalidOperationException("PrintWindow failed for the captured window.");
-                }
-            }
-            finally
-            {
-                graphics.ReleaseHdc(hdc);
-            }
+            graphics.CopyFromScreen(rect.Left, rect.Top, 0, 0, new Size(width, height), CopyPixelOperation.SourceCopy);
         }
 
         bitmap.Save(path, ImageFormat.Png);
         return path;
+    }
+
+    /// <summary>The visible frame of a window in screen pixels, falling back to GetWindowRect when DWM has none.</summary>
+    private static Win32.NativeRect VisibleFrame(IntPtr hwnd)
+    {
+        if (DwmGetWindowAttribute(hwnd, DwmwaExtendedFrameBounds, out Win32.NativeRect frame, Marshal.SizeOf<Win32.NativeRect>()) == 0)
+        {
+            return frame;
+        }
+
+        if (!Win32.GetWindowRect(hwnd, out Win32.NativeRect rect))
+        {
+            throw new InvalidOperationException("GetWindowRect failed for the captured window.");
+        }
+
+        return rect;
     }
 
     /// <summary>The average brightness (0 to 255) of a sample of pixels inside a capture.</summary>
@@ -312,8 +452,22 @@ internal static class HubUi
     }
 
 #pragma warning disable SYSLIB1054
-    [DllImport("user32.dll", SetLastError = true)]
+    private const uint DwmwaExtendedFrameBounds = 9;
+
+    private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
+    private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr hwnd, uint attribute, out Win32.NativeRect value, int size);
 #pragma warning restore SYSLIB1054
 }

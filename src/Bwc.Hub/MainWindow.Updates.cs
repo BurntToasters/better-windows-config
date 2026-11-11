@@ -227,6 +227,7 @@ public sealed partial class MainWindow
             icon,
             ClassicMessageButtons.Ok,
             primaryText: HubStrings.Get("AboutOkButton"));
+        HubDialogTheme.Apply(box);
         _ = await box.ShowAsync(_hwnd);
     }
 
