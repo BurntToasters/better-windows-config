@@ -70,7 +70,13 @@ the owning package records the observed behavior as a golden before implementing
 ## Symbolic links and redirection
 
 - Keys are opened with default semantics, so symbolic link keys are followed transparently,
-  as in regedit. The engine never passes `REG_OPTION_OPEN_LINK`.
+  as in regedit. The shipping policy keeps that behavior.
+- Under a policy that sets `RejectsSymbolicLinks` (the E2E sandbox), a write never follows a link.
+  The writer walks the path from its predefined root, opens each component as a link node, and
+  refuses the write with access denied when any component is a link. Creating a key over a link,
+  deleting or renaming a link, deleting a tree that contains a link, and copying a tree that contains
+  a link are all refused. `REG_OPTION_OPEN_LINK` is passed only by these guard probes, never by a
+  write itself. Section A and C of `docs/failure-modes/registry-writer.md` list the cases.
 - No WOW64 view switching. regedit shows the native view; so does BWC (64-bit view on x64 and
   ARM64 builds). `KEY_WOW64_64KEY` is passed explicitly on every open so an x64 build running
   under emulation on ARM64 still sees the native registry.
@@ -85,6 +91,15 @@ the owning package records the observed behavior as a golden before implementing
   The E2E build flavor's policy accepts only paths under the `--sandbox-root` key and throws
   before calling native code for anything else, including relative opens that would escape the
   root.
+- The E2E sandbox also refuses: renaming the sandbox root; a copy whose source is outside the
+  sandbox; a copy into the source's own subtree; a restore or replace whose hive file contains a
+  symbolic link key or cannot be verified as a hive; and any hive mount (`HKLM` or `HKU`).
+- `DenyAllWritePolicy` refuses every write before native code runs. The Registry Editor uses it in
+  E2E builds when `BWC_E2E_SANDBOX_ROOT` is missing or invalid, so nothing is written.
+- `scripts/check-registry-writer.js` fails the build when a file outside `RegistryWriter*.cs`
+  names a native write API (including `W`, `Ex`, `Nt*`, `Zw*`, and `SH*` variants), when managed
+  registry writes appear outside the checker's allowlist, or when `reg.exe` or `regedit.exe` is
+  launched to write.
 - Rename of a key uses `RegRenameKey`. Rename of a value is copy then delete, as in regedit
   (there is no native value rename); if the delete fails the copy is removed.
 

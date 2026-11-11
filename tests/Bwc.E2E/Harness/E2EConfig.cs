@@ -31,6 +31,7 @@ public sealed class E2EConfig
 
     public string PublishDir { get; }
 
+    /// <summary>App runtime identifier of the publish folder. It can differ from the test host architecture.</summary>
     public string Rid { get; }
 
     public string Flavor { get; }
@@ -153,6 +154,7 @@ public sealed class E2EConfig
                     $"BWC_RID '{configured}' is invalid. Expected win-x64 or win-arm64.");
             }
 
+            RequireRunnableOnThisMachine(rid);
             return rid;
         }
 
@@ -163,6 +165,26 @@ public sealed class E2EConfig
             var architecture => throw new InvalidOperationException(
                 $"Cannot infer a Windows rid from process architecture '{architecture}'. Set BWC_RID to win-x64 or win-arm64."),
         };
+    }
+
+    /// <summary>
+    /// The test host may be a different architecture from the app. An x64 app runs on ARM64 Windows
+    /// under emulation, but an ARM64 app cannot run on x64 Windows. The check uses the operating
+    /// system architecture, because an x64 test process on an ARM64 machine still reports the OS as ARM64.
+    /// </summary>
+    private static void RequireRunnableOnThisMachine(string rid)
+    {
+        var os = RuntimeInformation.OSArchitecture;
+        var runnable = rid == "win-arm64"
+            ? os == Architecture.Arm64
+            : os is Architecture.X64 or Architecture.Arm64;
+        if (runnable)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"BWC_RID '{rid}' cannot run on this {os} machine. Use win-x64 on x64 or ARM64 Windows, or win-arm64 on ARM64 Windows.");
     }
 
     private static string ReadFlavor()

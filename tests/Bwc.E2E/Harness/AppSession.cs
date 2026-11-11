@@ -203,9 +203,10 @@ public sealed class AppSession : IDisposable
             throw new InvalidOperationException(notes);
         }
 
+        // The first successful input per session is logged once as a note. Failures stay checks.
         if (!_foregroundRecorded)
         {
-            E2EResults.Record(checkId, true, $"Target HWND 0x{MainHwnd.ToInt64():X} is foreground.");
+            E2EResults.Note(checkId, $"Target HWND 0x{MainHwnd.ToInt64():X} is foreground.");
             _foregroundRecorded = true;
         }
 

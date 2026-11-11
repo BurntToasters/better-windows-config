@@ -115,11 +115,18 @@ internal static class ControlTestSupport
         }
     }
 
+    /// <summary>
+    /// Finds a tree or list row by its name. Registry key and value names are case-insensitive, so
+    /// the comparison ignores case.
+    /// </summary>
     internal static AutomationElement? FindRowByName(AppSession session, string rootId, ControlType controlType, string name)
     {
         var rows = Rows(session, rootId, controlType);
-        return rows.FirstOrDefault(row => string.Equals(SafeName(row), name, StringComparison.Ordinal));
+        return rows.FirstOrDefault(row => string.Equals(SafeName(row), name, StringComparison.OrdinalIgnoreCase));
     }
+
+    /// <summary>DPI of the session's main window, as reported by GetDpiForWindow. Zero when unavailable.</summary>
+    internal static uint WindowDpi(AppSession session) => GetDpiForWindow(session.MainHwnd);
 
     internal static AutomationElement? FindRowById(AppSession session, string rowId)
     {
@@ -362,7 +369,11 @@ internal static class ControlTestSupport
         return sandbox;
     }
 
-    /// <summary>Deletes the run subtree and removes the empty BWC-E2E parent when possible.</summary>
+    /// <summary>
+    /// Deletes this run's key (HKCU\Software\BWC-E2E\&lt;run-id&gt;) and nothing else. The BWC-E2E parent
+    /// is removed only when it is empty. The parent delete is non-recursive, so a key that another
+    /// run creates between the check and the delete makes the delete fail instead of being removed.
+    /// </summary>
     internal static void CleanupRegistry(E2EConfig config)
     {
         var sandbox = new SandboxRegistry(config);
@@ -371,20 +382,21 @@ internal static class ControlTestSupport
         try
         {
             bool empty;
-            using (var parent = Registry.CurrentUser.OpenSubKey(@"Software\BWC-E2E", writable: true))
+            using (var parent = Registry.CurrentUser.OpenSubKey(@"Software\BWC-E2E", writable: false))
             {
-                empty = parent is not null && parent.SubKeyCount == 0 && parent.ValueCount == 0;
+                empty = parent is null || (parent.SubKeyCount == 0 && parent.ValueCount == 0);
             }
 
             if (empty)
             {
-                Registry.CurrentUser.DeleteSubKeyTree(@"Software\BWC-E2E", throwOnMissingSubKey: false);
+                // Non-recursive: the registry refuses the delete when a child key appears in the meantime.
+                Registry.CurrentUser.DeleteSubKey(@"Software\BWC-E2E", throwOnMissingSubKey: false);
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException)
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or SecurityException)
         {
-            // The run subtree is gone. Another process still holding the parent is not a test
-            // failure; the assembly cleanup retries the same delete.
+            // The parent still holds another run's key (or a handle is open). That is expected
+            // while runs overlap, and the next run's cleanup retries the same delete.
         }
     }
 
@@ -467,6 +479,68 @@ internal static class ControlTestSupport
             timeout ?? ExpandTimeout);
     }
 
+    /// <summary>
+    /// Waits until the main window is foreground and keyboard focus is on the named tree row or the
+    /// tree control. Each pass brings the window forward and focuses the row again, so focus that a
+    /// closed dialog took is handed back. Returns false when that does not hold before the timeout,
+    /// and the caller must not send keyboard input in that case.
+    /// </summary>
+    internal static bool WaitForTreeKeyboardFocus(AppSession session, string rowName, TimeSpan timeout)
+    {
+        return WaitUntil(
+            () =>
+            {
+                _ = EnsureForeground(session);
+                FocusRow(session, rowName);
+                return IsTreeKeyboardFocused(session, rowName);
+            },
+            timeout);
+    }
+
+    /// <summary>
+    /// True when the main window is foreground and the tree control or the named row has keyboard focus.
+    /// </summary>
+    internal static bool IsTreeKeyboardFocused(AppSession session, string rowName)
+    {
+        if (!Win32.IsForeground(session.MainHwnd))
+        {
+            return false;
+        }
+
+        return HasKeyboardFocus(session.Find(TreeControl)) ||
+            HasKeyboardFocus(FindRowByName(session, TreeControl, ControlType.TreeItem, rowName));
+    }
+
+    private static void FocusRow(AppSession session, string rowName)
+    {
+        AutomationElement? row = FindRowByName(session, TreeControl, ControlType.TreeItem, rowName);
+        try
+        {
+            row?.Focus();
+        }
+        catch (Exception)
+        {
+            // IsTreeKeyboardFocused reports a focus that did not stick.
+        }
+    }
+
+    private static bool HasKeyboardFocus(AutomationElement? element)
+    {
+        if (element is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return element.Properties.HasKeyboardFocus.Value;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     internal static string[] ListRowNames(AppSession session)
     {
         return Rows(session, ListControl, ControlType.DataItem)
@@ -480,4 +554,7 @@ internal static class ControlTestSupport
 
     [DllImport("user32.dll")]
     private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr value);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
 }

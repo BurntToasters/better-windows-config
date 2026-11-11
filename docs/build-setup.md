@@ -54,3 +54,52 @@ architecture.
 
 A minimal self-contained WinUI app published this way is about 280 MB (x64) and 305 MB
 (ARM64) before the installer compresses it.
+
+## Quality gate evidence
+
+`node scripts/test-all.js` runs the gate steps in order and stops at the first failure.
+`--rid win-x64|win-arm64|all` picks the target (default from `process.arch`), and
+`--quick` runs only the builds and the three test projects. `--rid all` runs the shared
+steps once and the publish, flavor, and E2E steps once for each RID.
+
+The three test projects always build and run for the host architecture (`process.arch`:
+ARM64 or x64), whatever `--rid` is. `--rid` only picks the app RID for the publish and E2E
+steps. On an ARM64 machine, `--rid win-x64` therefore runs the tests as ARM64 against the
+x64 app, which runs under emulation. The x64 app is self-contained, so no x64 .NET runtime
+is needed. Both app builds (`build-arm64` and `build-x64`) still compile in every run.
+
+Each run removes the previous run's outputs first, then writes:
+
+| Path | Contents |
+|---|---|
+| `artifacts/gate/result.json` | Gate result, schema 2 (fields below) |
+| `artifacts/gate/logs/<NN>-<step>.log` | Full stdout and stderr of one step, with a header (step, RID, command, start time) and a footer (exit code, duration, pass) |
+
+Schema 2 fields of `result.json`:
+
+- `schema`, `startedUtc`, `durationMs`, `rid` (requested: `win-x64`, `win-arm64`, or `all`), `testPlatform` (the host architecture the three test projects ran as: `ARM64` or `x64`), `quick`, `pass`
+- `git`: `commit` (full SHA), `branch`, `dirty`, `dirtyPaths` (from `git status --porcelain -z`; a rename reads `new (from old)`), `error`
+- `environment`: `node` (version), `dotnet` (`version`, `error` from `dotnet --version`), `os` (`type`, `version`, `release`), `arch` (`process.arch`)
+- `rids`: one entry per requested RID with `platform`, `status` (`pass`, `fail`, `not-run` after an earlier failure, or `skipped` in quick mode), and its step names
+- `steps`: every step that ran, in order, with `name`, `rid` (null for shared steps), `command`, `pass`, `exitCode`, `durationMs`, `summary`, `log` (repo-relative path), and `e2eResult` (set on the two E2E steps of each RID, null otherwise)
+
+`e2eResult` is `{ path, exists, pass, passed, failed, total, error }`. `path` is
+`artifacts/e2e/result-<rid>-<flavor>.json`. Counts are read only when that file exists,
+and the step exit code still decides pass or fail. The gate deletes that file before each
+E2E step, so a result left by an earlier run cannot be counted.
+
+### Flavor verification
+
+Every assembly carries `BwcFlavor` from `Directory.Build.props`: `ship` in ship builds and
+`E2E` in E2E builds. `scripts/flavor-metadata.js` checks the root of a publish folder:
+
+- Every managed `Bwc*` and `BetterWindowsConfig*` `.dll` or `.exe` must carry exactly the
+  folder's value: `publish/<rid>` expects `ship`, and `publish/<rid>-e2e` expects `E2E`.
+  A missing value, a value from the other flavor, or two values fails the check.
+- The three project main assemblies (`BetterWindowsConfig.dll`, `BwcRegedit.dll`,
+  `BwcUpdate.dll`) must be present.
+- Native apphost `.exe` files have no managed metadata and are listed as skipped.
+
+The check runs at the end of every `scripts/dotnet-build.js` publish, where it is recorded
+as `flavorCheck` in `artifacts/build/<name>.json` (schema 2). The gate also runs it as the
+steps `verify-flavor-ship` and `verify-flavor-e2e`.

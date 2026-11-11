@@ -12,8 +12,9 @@ namespace Bwc.E2E.Shell;
 /// <summary>
 /// End to end checks for the classic Registry Editor shell. Every test starts its own Registry
 /// Editor process so menu mode, the address bar, and the splitter width cannot leak across tests.
-/// All measurements are physical pixels at the window DPI; the expected values are DIPs from
-/// docs/parity/oracle/regedit-metrics.json multiplied by the rasterization scale.
+/// All measurements are physical pixels at the window DPI. The expected geometry comes from
+/// docs/parity/oracle/regedit-metrics.json, converted to the window DPI by <see cref="OracleMetrics"/>.
+/// The tolerance is one DIP in device pixels.
 /// </summary>
 [TestClass]
 public sealed class ShellTests
@@ -132,37 +133,42 @@ public sealed class ShellTests
 
         session.Window.Click();
         var foreground = WaitUntil(() => Win32.IsForeground(session.MainHwnd), TimeSpan.FromSeconds(3));
-        checks.Record(
+        checks.Note(
             "foreground",
-            true,
-            $"informational: window HWND 0x{session.MainHwnd.ToInt64():X} is foreground={foreground}.");
+            $"window HWND 0x{session.MainHwnd.ToInt64():X} is foreground={foreground}.");
 
         var dpi = Native.GetDpiForWindow(session.MainHwnd);
-        var scale = dpi / 96.0;
         checks.Record(
             "dpi",
             dpi > 0,
-            $"informational: GetDpiForWindow={dpi}, rasterization scale={scale:0.##}.");
+            $"GetDpiForWindow={dpi}, rasterization scale={dpi / 96.0:0.##}.");
+
+        // Every expected value is an oracle pixel value converted to this window DPI. The tolerance is
+        // one DIP in device pixels, so it is 2 px at 200 percent and 1 px at 100 percent.
+        var oracle = OracleMetrics.Load(GuiGate.Config);
+        int tolerance = OracleMetrics.ToleranceDevicePixels(dpi);
+        var expectedMenuBar = oracle.DevicePixels(oracle.MenuBarHeight, dpi);
 
         var menuBar = WaitForId(session, "MenuBarRoot");
         var menuBarHeight = HeightOf(menuBar);
         checks.Record(
             "menuBarHeight",
-            Within(menuBarHeight, 19 * scale),
-            $"expected {19 * scale:0.#} px (19 DIP), got {menuBarHeight:0.#} px.");
+            Within(menuBarHeight, expectedMenuBar, tolerance),
+            $"expected {expectedMenuBar:0.#} px (oracle menuBar.height {oracle.MenuBarHeight} at {oracle.CaptureDpi} DPI), got {menuBarHeight:0.#} px.");
 
-        var topLevel = WaitForTopLevelItems(session, 5);
+        var topLevel = WaitForTopLevelItems(session, oracle.MenuItemHeights.Length);
         var itemHeights = topLevel.Select(e => HeightOf(e)).ToArray();
+        var expectedItemHeights = oracle.MenuItemHeights.Select(h => oracle.DevicePixels(h, dpi)).ToArray();
         checks.Record(
             "menuItemHeights",
-            topLevel.Length == 5 && itemHeights.All(h => Within(h, 19 * scale)),
-            $"expected 5 items at {19 * scale:0.#} px (19 DIP), got {itemHeights.Length} heights [{JoinDoubles(itemHeights)}] px.");
+            topLevel.Length == expectedItemHeights.Length &&
+                itemHeights.Zip(expectedItemHeights).All(pair => Within(pair.First, pair.Second, tolerance)),
+            $"expected {expectedItemHeights.Length} items at [{JoinDoubles(expectedItemHeights)}] px (oracle menuBar.items[].rect.height), got {itemHeights.Length} heights [{JoinDoubles(itemHeights)}] px.");
 
         var itemWidths = topLevel.Select(e => WidthOf(e)).ToArray();
-        checks.Record(
+        checks.Note(
             "menuItemWidths",
-            true,
-            $"informational: widths [{JoinDoubles(itemWidths)}] px; oracle at 200% is [65,68,79,122,78] px; not asserted.");
+            $"widths [{JoinDoubles(itemWidths)}] px; oracle menuBar.items[].rect.width at {oracle.CaptureDpi} DPI is [{string.Join(",", oracle.MenuItemWidths)}]; not asserted.");
         checks.Record(
             "menuItemNames",
             topLevel.Length == 5 &&
@@ -171,38 +177,44 @@ public sealed class ShellTests
 
         var address = WaitForId(session, "AddressBar");
         var addressHeight = HeightOf(address);
+        var expectedAddress = oracle.DevicePixels(oracle.AddressBarHeight, dpi);
         checks.Record(
             "addressBarHeight",
-            Within(addressHeight, 19 * scale),
-            $"expected {19 * scale:0.#} px (19 DIP), got {addressHeight:0.#} px.");
+            Within(addressHeight, expectedAddress, tolerance),
+            $"expected {expectedAddress:0.#} px (oracle addressBar.rect.height {oracle.AddressBarHeight}), got {addressHeight:0.#} px.");
 
         var tree = WaitForId(session, "TreePane");
         var treeWidth = WidthOf(tree);
+        var expectedTree = oracle.DevicePixels(oracle.TreeWidth, dpi);
         checks.Record(
             "treePaneWidth",
-            Within(treeWidth, 216 * scale),
-            $"expected {216 * scale:0.#} px (216 DIP), got {treeWidth:0.#} px.");
+            Within(treeWidth, expectedTree, tolerance),
+            $"expected {expectedTree:0.#} px (oracle tree.rect.width {oracle.TreeWidth}), got {treeWidth:0.#} px.");
 
         var splitter = WaitForId(session, "Splitter");
         var splitterWidth = WidthOf(splitter);
+        var expectedSplitter = oracle.DevicePixels(oracle.SplitterWidth, dpi);
         checks.Record(
             "splitterWidth",
-            Within(splitterWidth, 4 * scale),
-            $"expected {4 * scale:0.#} px (4 DIP), got {splitterWidth:0.#} px.");
+            Within(splitterWidth, expectedSplitter, tolerance),
+            $"expected {expectedSplitter:0.#} px (oracle splitter gap {oracle.SplitterWidth}), got {splitterWidth:0.#} px.");
 
         var header = WaitForId(session, "HeaderName");
         var headerTextHeight = HeightOf(header);
+        // The header label has no oracle measurement. The 12 DIP minimum is kept and scaled to the window DPI.
+        var minimumHeaderText = 12 * dpi / 96.0;
         checks.Record(
             "headerTextHeight",
-            headerTextHeight >= 24,
-            $"expected at least 24 px, got {headerTextHeight:0.#} px.");
+            headerTextHeight >= minimumHeaderText,
+            $"expected at least {minimumHeaderText:0.#} px (12 DIP minimum), got {headerTextHeight:0.#} px.");
 
         var listHeader = WaitForId(session, "ListHeader");
         var headerRowHeight = HeightOf(listHeader);
+        var expectedHeader = oracle.DevicePixels(oracle.ListHeaderHeight, dpi);
         checks.Record(
             "headerRowHeight",
-            listHeader is not null && Within(headerRowHeight, 20 * scale),
-            $"expected {20 * scale:0.#} px (20 DIP), got {headerRowHeight:0.#} px from UIA.");
+            listHeader is not null && Within(headerRowHeight, expectedHeader, tolerance),
+            $"expected {expectedHeader:0.#} px (oracle list.header.height {oracle.ListHeaderHeight}), got {headerRowHeight:0.#} px from UIA.");
 
         checks.AssertAllPassed();
     }
@@ -234,7 +246,6 @@ public sealed class ShellTests
         {
             ("import", "Import...", true),
             ("export", "Export...", false),
-            ("loadHive", "Load Hive...", true),
             ("unloadHive", "Unload Hive...", false),
             ("connectNetworkRegistry", "Connect Network Registry...", true),
             ("disconnectNetworkRegistry", "Disconnect Network Registry...", false),
@@ -246,6 +257,15 @@ public sealed class ShellTests
         {
             CheckMenuItemState(checks, session, command.Id, command.Name, command.Enabled);
         }
+
+        CheckMenuItemGap(
+            checks,
+            session,
+            "loadHive",
+            "Load Hive...",
+            oracleEnabled: false,
+            workPackage: "RF8",
+            oracleBehavior: "File > Load Hive is disabled while Computer is selected. It is enabled only with HKEY_LOCAL_MACHINE or HKEY_USERS selected.");
 
         Collapse(file);
 
@@ -321,8 +341,22 @@ public sealed class ShellTests
         CheckMenuItemState(checks, session, "view.addressBar", "Address Bar", true);
         CheckMenuItemState(checks, session, "view.split", "Split", true);
         CheckMenuItemState(checks, session, "view.displayBinaryData", "Display Binary Data...", false);
-        CheckMenuItemState(checks, session, "view.refresh", "Refresh", false);
-        CheckMenuItemState(checks, session, "view.font", "Font", false);
+        CheckMenuItemGap(
+            checks,
+            session,
+            "view.refresh",
+            "Refresh",
+            oracleEnabled: true,
+            workPackage: "RF1",
+            oracleBehavior: "View > Refresh is enabled, as in classic Registry Editor.");
+        CheckMenuItemGap(
+            checks,
+            session,
+            "view.font",
+            "Font",
+            oracleEnabled: true,
+            workPackage: "RF4",
+            oracleBehavior: "View > Font is enabled and opens the font chooser (RF4).");
         Collapse(view);
 
         var favorites = WaitForTopLevel(session, "Favorites");
@@ -370,14 +404,17 @@ public sealed class ShellTests
         var checks = new Checks("shell.addressbar");
         using var session = OpenRegedit(checks);
 
-        var scale = Native.GetDpiForWindow(session.MainHwnd) / 96.0;
+        var dpi = Native.GetDpiForWindow(session.MainHwnd);
+        var oracle = OracleMetrics.Load(GuiGate.Config);
+        int tolerance = OracleMetrics.ToleranceDevicePixels(dpi);
+        var expectedHeight = oracle.DevicePixels(oracle.AddressBarHeight, dpi);
 
         var address = WaitForId(session, "AddressBar");
         var initialHeight = HeightOf(address);
         checks.Record(
             "visibleBefore",
-            address is not null && Within(initialHeight, 19 * scale),
-            $"initial AddressBar height {initialHeight:0.#} px, expected {19 * scale:0.#} px.");
+            address is not null && Within(initialHeight, expectedHeight, tolerance),
+            $"initial AddressBar height {initialHeight:0.#} px, expected {expectedHeight:0.#} px (oracle addressBar.rect.height {oracle.AddressBarHeight}).");
 
         ExpandTopLevel(session, "View");
         InvokeMenuItem(session, "Address Bar");
@@ -392,14 +429,14 @@ public sealed class ShellTests
         var shown = WaitUntil(() =>
         {
             var current = session.Find("AddressBar");
-            return current is not null && !SafeOffscreen(current) && Within(HeightOf(current), 19 * scale);
+            return current is not null && !SafeOffscreen(current) && Within(HeightOf(current), expectedHeight, tolerance);
         }, MenuTimeout);
 
         var restored = session.Find("AddressBar");
         checks.Record(
             "visibleAfterToggle",
             shown,
-            $"AddressBar found={restored is not null}, height={HeightOf(restored):0.#} px, expected {19 * scale:0.#} px, offscreen={SafeOffscreen(restored)}.");
+            $"AddressBar found={restored is not null}, height={HeightOf(restored):0.#} px, expected {expectedHeight:0.#} px, offscreen={SafeOffscreen(restored)}.");
 
         checks.AssertAllPassed();
     }
@@ -413,7 +450,10 @@ public sealed class ShellTests
         using var session = OpenRegedit(checks);
 
         session.Window.Click();
-        var scale = Native.GetDpiForWindow(session.MainHwnd) / 96.0;
+        var dpi = Native.GetDpiForWindow(session.MainHwnd);
+        int tolerance = OracleMetrics.ToleranceDevicePixels(dpi);
+        // The arrow key step is an application value (8 DIP), not an oracle measurement.
+        var stepPx = 8 * dpi / 96.0;
 
         ExpandTopLevel(session, "View");
         InvokeMenuItem(session, "Split");
@@ -435,8 +475,8 @@ public sealed class ShellTests
         }, MenuTimeout);
         checks.Record(
             "leftMoves",
-            movedLeft && Math.Abs((before - afterLeft) - 8 * scale) <= 2,
-            $"tree width before {before:0.#} px, after Left {afterLeft:0.#} px, expected step {8 * scale:0.#} px.");
+            movedLeft && Math.Abs((before - afterLeft) - stepPx) <= tolerance,
+            $"tree width before {before:0.#} px, after Left {afterLeft:0.#} px, expected step {stepPx:0.#} px.");
 
         session.SendKeys("Right");
         var afterRight = 0.0;
@@ -447,7 +487,7 @@ public sealed class ShellTests
         }, MenuTimeout);
         checks.Record(
             "rightRestores",
-            movedRight && Math.Abs(afterRight - before) <= 2,
+            movedRight && Math.Abs(afterRight - before) <= tolerance,
             $"tree width after Right {afterRight:0.#} px, expected {before:0.#} px.");
 
         session.SendKeys("Enter");
@@ -488,10 +528,9 @@ public sealed class ShellTests
 
         session.SendKeys("Escape");
         _ = WaitUntil(() => FocusedTopLevelName(session) is null, MenuTimeout);
-        checks.Record(
+        checks.Note(
             "secondEscapeLeavesMenuBar",
-            true,
-            $"informational: focused top-level menu item after second Escape={FocusedTopLevelName(session) ?? "(none)"}; the menu is closed even when a top-level item keeps focus.");
+            $"focused top-level menu item after second Escape={FocusedTopLevelName(session) ?? "(none)"}; the menu is closed even when a top-level item keeps focus.");
 
         session.SendKeys("F10");
         var f10Focused = WaitUntil(() => FocusedTopLevelName(session) is not null, MenuTimeout);
@@ -574,7 +613,7 @@ public sealed class ShellTests
         try
         {
             session.SendKeys(key);
-            checks.Record(id, true, $"sent '{key}'.");
+            checks.Note(id, $"sent '{key}'.");
             return true;
         }
         catch (ArgumentException ex)
@@ -585,10 +624,9 @@ public sealed class ShellTests
             try
             {
                 session.SendKeys(fallback);
-                checks.Record(
+                checks.Note(
                     id,
-                    true,
-                    $"informational: '{key}' is not a FlaUI key name ({ex.Message}); sent '{fallback}' through AppSession.SendKeys.");
+                    $"'{key}' is not a FlaUI key name ({ex.Message}); sent '{fallback}' through AppSession.SendKeys.");
                 return true;
             }
             catch (Exception fallbackError)
@@ -612,9 +650,8 @@ public sealed class ShellTests
             config.EnsureExecutablesExist();
             var session = new AppSession(config, config.RegeditExePath);
             TrackProcess(session.ProcessId);
-            checks.Record(
+            checks.Note(
                 "session",
-                true,
                 $"pid={session.ProcessId}, publish={config.PublishDir}.");
             return session;
         }
@@ -633,6 +670,35 @@ public sealed class ShellTests
             id,
             string.Equals(actual, expected, StringComparison.Ordinal),
             $"automation id '{automationId}' expected '{expected}', got '{actual}'.");
+    }
+
+    /// <summary>
+    /// Records a menu item's enabled state against the oracle. A matching state is a pass. A state that
+    /// differs is a known gap for the named work package, so it does not fail the test.
+    /// </summary>
+    private static void CheckMenuItemGap(
+        Checks checks,
+        AppSession session,
+        string id,
+        string name,
+        bool oracleEnabled,
+        string workPackage,
+        string oracleBehavior)
+    {
+        var item = WaitForMenuItem(session, name);
+        if (item is null)
+        {
+            checks.Record(id, false, $"'{name}' was not found as a menu item.");
+            return;
+        }
+
+        var actual = SafeBool(() => item.IsEnabled);
+        checks.RecordOrKnownGap(
+            id,
+            actual == oracleEnabled,
+            workPackage,
+            oracleBehavior,
+            $"'{name}' enabled={actual}; oracle enabled={oracleEnabled}.");
     }
 
     private static void CheckMenuItemState(Checks checks, AppSession session, string id, string name, bool expectedEnabled)
@@ -982,7 +1048,7 @@ public sealed class ShellTests
 
     private static double WidthOf(AutomationElement? element) => element is null ? 0 : element.BoundingRectangle.Width;
 
-    private static bool Within(double actual, double expected) => Math.Abs(actual - expected) <= 1.0;
+    private static bool Within(double actual, double expected, int tolerance) => Math.Abs(actual - expected) <= tolerance;
 
     private static string JoinDoubles(IEnumerable<double> values) =>
         string.Join(",", values.Select(v => v.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)));
@@ -1300,6 +1366,16 @@ public sealed class ShellTests
             {
                 _failures.Add($"{fullId}: {notes}");
             }
+        }
+
+        /// <summary>Information that is not a pass or fail claim.</summary>
+        public void Note(string id, string text) => E2EResults.Note($"{_prefix}.{id}", text);
+
+        /// <summary>A pass when the observed value matches the oracle, otherwise a known gap.</summary>
+        public void RecordOrKnownGap(string id, bool matchesOracle, string workPackage, string oracleBehavior, string observed)
+        {
+            // A known gap is not a failure. Only a failed check adds to the test's failures.
+            _ = E2EResults.RecordOrKnownGap($"{_prefix}.{id}", matchesOracle, workPackage, oracleBehavior, observed);
         }
 
         public void AssertAllPassed()

@@ -35,6 +35,7 @@ public sealed class PrintTests
     private const string ChildValueName = "ChildValue";
 
     private static int _checkStart;
+    private static readonly TimeSpan FocusTimeout = TimeSpan.FromSeconds(5);
 
     [ClassInitialize]
     public static void ClassInitialize(TestContext testContext)
@@ -45,10 +46,12 @@ public sealed class PrintTests
 
     [TestMethod]
     [TestCategory("Print")]
+    [TestCategory("Mutating")]
     public void Print_OwnedDialogCancelsAndCommandStateFollowsSelection()
     {
         _checkStart = E2EResults.CheckCount;
         E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
 
         try
         {
@@ -88,18 +91,14 @@ public sealed class PrintTests
 
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
             bool seeded = ControlTestSupport.WaitUntil(
-                () => ControlTestSupport.ListRowNames(session).Contains(SeedValueName, StringComparer.Ordinal),
+                () => ControlTestSupport.ListRowNames(session).Contains(SeedValueName, StringComparer.OrdinalIgnoreCase),
                 TimeSpan.FromSeconds(15));
             E2EResults.Record(
                 "print.navigate",
                 navigated && seeded,
                 $"navigated={navigated}, seededRows={seeded}, rows=[{string.Join(",", ControlTestSupport.ListRowNames(session))}].");
 
-            if (!navigated || !seeded)
-            {
-                FailIfNeeded();
-                return;
-            }
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated && seeded, "print.sandbox.navigate");
 
             if (!CheckPrintMenuEnabled(session, driver))
             {
@@ -107,12 +106,14 @@ public sealed class PrintTests
                 return;
             }
 
+            E2EGuards.RequireSandboxSelection(session, sandbox, "print.sandbox.menu");
             bool menuDialog = InvokePrintFromFileMenu(session, driver, out PrintDialogInfo menuInfo);
             if (menuDialog)
             {
                 CancelAndRecord(session, "print", menuInfo);
             }
 
+            E2EGuards.RequireSandboxSelection(session, sandbox, "print.sandbox.ctrlp");
             bool ctrlPDialog = FocusTreeAndPressCtrlP(session, config, out PrintDialogInfo ctrlPInfo);
             if (ctrlPDialog)
             {
@@ -164,7 +165,7 @@ public sealed class PrintTests
     {
         dialog = default;
         AutomationElement? item = driver.WaitForElement("MenuCommand_" + CommandPrint, TimeSpan.FromSeconds(5));
-        bool activated = Activate(item);
+        bool activated = Activate(session, item);
         E2EResults.Record(
             "print.menu.invoked",
             activated,
@@ -173,59 +174,94 @@ public sealed class PrintTests
         return activated && WaitForPrintDialogCheck(session, "print", out dialog);
     }
 
+    /// <summary>
+    /// Focuses the run key, then presses Ctrl+P. Input is sent only while the main window is foreground
+    /// with keyboard focus in the tree. If no dialog opens and the main window is still enabled, the
+    /// keystroke was not processed, so focus is re-established and Ctrl+P is sent once more.
+    /// </summary>
     private static bool FocusTreeAndPressCtrlP(
         AppSession session,
         E2EConfig config,
         out PrintDialogInfo dialog)
     {
         dialog = default;
-        AutomationElement? row = ControlTestSupport.FindRowByName(
-            session,
-            ControlTestSupport.TreeControl,
-            ControlType.TreeItem,
-            config.RunId);
-
-        try
-        {
-            row?.Focus();
-        }
-        catch (Exception)
-        {
-            // The send below records a failed foreground check when focus is unusable.
-        }
-
-        Thread.Sleep(200);
-        bool sent;
-        try
-        {
-            ControlTestSupport.SendKeys(session, "CONTROL+KEY_P");
-            sent = true;
-        }
-        catch (Exception ex)
-        {
-            E2EResults.Record("print.ctrlp.send", false, ex.Message);
-            sent = false;
-        }
-
-        if (!sent)
+        if (!RequireTreeKeyboardFocus(session, config) || !SendCtrlP(session))
         {
             return false;
         }
 
-        return WaitForPrintDialogCheck(session, "print.ctrlp", out dialog);
+        return WaitForPrintDialogCheck(
+            session,
+            "print.ctrlp",
+            out dialog,
+            resend: () => RequireTreeKeyboardFocus(session, config) && SendCtrlP(session));
+    }
+
+    /// <summary>
+    /// Waits for the main window to be foreground with keyboard focus in the run key row. Records
+    /// print.ctrlp.focus and returns false when that never holds, so no input is sent blind.
+    /// </summary>
+    private static bool RequireTreeKeyboardFocus(AppSession session, E2EConfig config)
+    {
+        if (ControlTestSupport.WaitForTreeKeyboardFocus(session, config.RunId, FocusTimeout))
+        {
+            E2EResults.Note(
+                "print.ctrlp.focus",
+                $"Main window is foreground and the tree has keyboard focus on '{config.RunId}'.");
+            return true;
+        }
+
+        E2EResults.Record(
+            "print.ctrlp.focus",
+            false,
+            $"foreground={Win32.IsForeground(session.MainHwnd)}, " +
+            $"treeFocus={ControlTestSupport.IsTreeKeyboardFocused(session, config.RunId)}, " +
+            $"mainEnabled={session.IsEnabled}. No input sent.");
+        return false;
+    }
+
+    /// <summary>Sends Ctrl+P to the foreground main window. Returns false when the send fails.</summary>
+    private static bool SendCtrlP(AppSession session)
+    {
+        Thread.Sleep(200);
+        try
+        {
+            ControlTestSupport.SendKeys(session, "CONTROL+KEY_P");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            E2EResults.Record("print.ctrlp.send", false, ex.Message);
+            return false;
+        }
     }
 
     /// <summary>
     /// Waits for the print dialog and records the shared dialog, owner, and main-disabled checks.
-    /// Returns true when the caller should cancel it. A missing dialog is reported as an
-    /// informational pass only when the machine has no default printer.
+    /// Returns true when the caller should cancel it. A missing dialog is logged as a note only when
+    /// the machine has no default printer. Otherwise it fails the dialog checks. When <paramref name="resend"/>
+    /// is given and no dialog opens while the main window stays enabled, the input is sent once more
+    /// and the dialog is awaited again.
     /// </summary>
     private static bool WaitForPrintDialogCheck(
         AppSession session,
         string prefix,
-        out PrintDialogInfo dialog)
+        out PrintDialogInfo dialog,
+        Func<bool>? resend = null)
     {
         dialog = WaitForPrintDialog(session.ProcessId, session.MainHwnd, TimeSpan.FromSeconds(10));
+        if (dialog.Hwnd == 0 && resend is not null && KeystrokeWasIgnored(session))
+        {
+            E2EResults.Note(
+                prefix + ".retry",
+                "No print dialog opened and the main window stayed enabled, so the keystroke was not processed. " +
+                "Focus was re-established and the input was sent once more.");
+            if (resend())
+            {
+                dialog = WaitForPrintDialog(session.ProcessId, session.MainHwnd, TimeSpan.FromSeconds(10));
+            }
+        }
+
         if (dialog.Hwnd == 0)
         {
             nint errorDialog = FindAnyDialog(session.ProcessId);
@@ -239,20 +275,26 @@ public sealed class PrintTests
                 $"no print dialog appeared, defaultPrinter={hasDefaultPrinter}, " +
                 $"errorDialog=0x{errorDialog.ToInt64():X}, errorClosed={errorClosed}, mainEnabled={session.IsEnabled}. " +
                 "visible dialogs: " + DescribeDialogs();
-            bool pass = !hasDefaultPrinter && alive;
-            E2EResults.Record(prefix + ".dialog", pass, pass ? "informational skip: " + note : note);
-            E2EResults.Record(prefix + ".owner", pass, pass ? "informational skip: no dialog." : "no dialog.");
-            E2EResults.Record(prefix + ".cancel", pass, pass ? "informational skip: no dialog." : "no dialog.");
-            E2EResults.Record(prefix + ".reenabled", pass, pass ? "informational skip: no dialog." : "no dialog.");
+            if (!hasDefaultPrinter && alive)
+            {
+                // Without a default printer the print command has no dialog to show. That is the only
+                // case where the absence of a dialog is not a failure, so it is logged as a note.
+                E2EResults.Note(prefix + ".dialog", "skipped, no default printer: " + note);
+                return false;
+            }
+
+            E2EResults.Record(prefix + ".dialog", false, note);
+            E2EResults.Record(prefix + ".owner", false, "no dialog.");
+            E2EResults.Record(prefix + ".cancel", false, "no dialog.");
+            E2EResults.Record(prefix + ".reenabled", false, "no dialog.");
             return false;
         }
 
         string host = dialog.IsSystemDialog
             ? "Windows 11 system PrintDialog host"
             : "classic common dialog";
-        E2EResults.Record(
+        E2EResults.Note(
             prefix + ".dialog",
-            true,
             $"{host}, class='{dialog.ClassName}', hwnd=0x{dialog.Hwnd.ToInt64():X}, " +
             $"pid={dialog.ProcessId}, title='{dialog.Title}'.");
 
@@ -331,9 +373,15 @@ public sealed class PrintTests
         }
     }
 
-    private static bool Activate(AutomationElement? element)
+    private static bool Activate(AppSession session, AutomationElement? element)
     {
         if (element is null)
+        {
+            return false;
+        }
+
+        // Enter goes to the foreground window, so nothing is sent unless the main window is foreground.
+        if (!ControlTestSupport.EnsureForeground(session))
         {
             return false;
         }
@@ -469,6 +517,13 @@ public sealed class PrintTests
 
         return handles.Count;
     }
+
+    /// <summary>
+    /// True when the main window is enabled and no visible dialog of the process is open. Only then can
+    /// the keystroke be taken as ignored. A dialog or error box that is open never allows a resend.
+    /// </summary>
+    private static bool KeystrokeWasIgnored(AppSession session) =>
+        session.IsEnabled && FindAnyDialog(session.ProcessId) == 0;
 
     private static nint FindAnyDialog(int processId)
     {

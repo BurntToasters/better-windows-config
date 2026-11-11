@@ -11,9 +11,9 @@ namespace Bwc.E2E.Favorites;
 
 /// <summary>
 /// Drives the Registry Editor Favorites menu against a run-scoped favorites key. The classic
-/// Favorites key is read before and after to prove the isolated run never touches it. On a ship
-/// build the registry assertions are skipped because the ship application intentionally uses the
-/// real classic key.
+/// Favorites key is read before and after to prove the isolated run never touches it. The test is
+/// mutating and runs only on the e2e flavor, because the ship application writes the real classic
+/// key.
 /// </summary>
 [TestClass]
 public sealed class FavoritesTests
@@ -39,10 +39,12 @@ public sealed class FavoritesTests
 
     [TestMethod]
     [TestCategory("Favorites")]
+    [TestCategory("Mutating")]
     public void Favorites_AddRemoveNavigateAndReportMissingPath()
     {
         _checkStart = E2EResults.CheckCount;
         E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
 
         try
         {
@@ -52,15 +54,6 @@ public sealed class FavoritesTests
         {
             E2EResults.Record("favorites.publish", false, ex.Message);
             Assert.Fail(ex.Message);
-            return;
-        }
-
-        if (!string.Equals(config.Flavor, "e2e", StringComparison.OrdinalIgnoreCase))
-        {
-            E2EResults.Record(
-                "favorites.ship.skip",
-                true,
-                "Ship flavor uses the real classic Favorites key on purpose. Run with --flavor e2e for the isolated assertions.");
             return;
         }
 
@@ -98,9 +91,11 @@ public sealed class FavoritesTests
             string address = session.WaitForText("AddressBar", targetDisplay, UiTimeout) ?? "(missing)";
             E2EResults.Record(
                 "favorites.navigate.target",
-                navigated && selected && string.Equals(address, targetDisplay, StringComparison.Ordinal),
+                navigated && selected && string.Equals(address, targetDisplay, StringComparison.OrdinalIgnoreCase),
                 $"navigated={navigated}, selected={selected}, expected='{targetDisplay}', got='{address}'.");
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated && selected, "favorites.sandbox.navigate");
 
+            E2EGuards.RequireSandboxSelection(session, sandbox, "favorites.sandbox.add");
             bool addMenu = TryOpenMenu(driver, 517, 1281);
             bool addDialog = addMenu && driver.WaitForDialog();
             string heading = addDialog ? driver.TextOf("DialogHeading") : string.Empty;
@@ -112,10 +107,10 @@ public sealed class FavoritesTests
             E2EResults.Record(
                 "favorites.add",
                 addDialog &&
-                    string.Equals(heading, "Add to Favorites", StringComparison.Ordinal) &&
-                    string.Equals(suggested, TargetKeyName, StringComparison.Ordinal) &&
+                    string.Equals(heading, "Add to Favorites", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(suggested, TargetKeyName, StringComparison.OrdinalIgnoreCase) &&
                     accepted &&
-                    string.Equals(stored, targetDisplay, StringComparison.Ordinal),
+                    string.Equals(stored, targetDisplay, StringComparison.OrdinalIgnoreCase),
                 $"menu={addMenu}, dialog={addDialog}, heading='{heading}', suggested='{suggested}', accepted={accepted}, stored='{stored}', expected='{targetDisplay}'.");
 
             string[] namesAfterAdd = ReadFavoriteEntryNames(session, driver, automation, expectedCount: 2);
@@ -127,16 +122,17 @@ public sealed class FavoritesTests
             bool selectedRunRoot = SelectTreeRow(session, config.RunId);
             bool atRunRoot = selectedRunRoot &&
                 session.WaitForText("AddressBar", runRootDisplay, UiTimeout) is { } runRootAddress &&
-                string.Equals(runRootAddress, runRootDisplay, StringComparison.Ordinal);
+                string.Equals(runRootAddress, runRootDisplay, StringComparison.OrdinalIgnoreCase);
             E2EResults.Record(
                 "favorites.prepare.click",
                 atRunRoot,
                 $"selectedRunRoot={selectedRunRoot}, address='{AddressText(session)}', expected='{runRootDisplay}'.");
 
+            E2EGuards.RequireSandboxSelection(session, sandbox, "favorites.sandbox.click");
             bool clicked = InvokeFavoriteEntry(session, driver, automation, FavoriteName);
             bool navigatedByFavorite = clicked &&
                 ControlTestSupport.WaitUntil(
-                    () => string.Equals(AddressText(session), targetDisplay, StringComparison.Ordinal) &&
+                    () => string.Equals(AddressText(session), targetDisplay, StringComparison.OrdinalIgnoreCase) &&
                         ControlTestSupport.IsSelected(
                             ControlTestSupport.FindRowByName(
                                 session,
@@ -149,6 +145,7 @@ public sealed class FavoritesTests
                 navigatedByFavorite,
                 $"clicked={clicked}, address='{AddressText(session)}', expected='{targetDisplay}', selected={ControlTestSupport.IsSelected(ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, TargetKeyName))}.");
 
+            E2EGuards.RequireSandboxSelection(session, sandbox, "favorites.sandbox.duplicate");
             bool duplicateMenu = TryOpenMenu(driver, 517, 1281);
             bool duplicateDialog = duplicateMenu && driver.WaitForDialog();
             bool duplicateTyped = duplicateDialog && driver.SetText("DialogTextInput", FavoriteName);
@@ -157,7 +154,7 @@ public sealed class FavoritesTests
                 () => string.Equals(
                     driver.TextOf("DialogValidationText"),
                     "There is already a favorite with that name.",
-                    StringComparison.Ordinal),
+                    StringComparison.OrdinalIgnoreCase),
                 TimeSpan.FromSeconds(10));
             string duplicateText = duplicateMessage ? driver.TextOf("DialogValidationText") : string.Empty;
             bool duplicateCancelled = duplicateMessage &&
@@ -167,9 +164,10 @@ public sealed class FavoritesTests
             E2EResults.Record(
                 "favorites.add.duplicate",
                 duplicateDialog && duplicateMessage && duplicateCancelled &&
-                    string.Equals(stillStored, targetDisplay, StringComparison.Ordinal),
+                    string.Equals(stillStored, targetDisplay, StringComparison.OrdinalIgnoreCase),
                 $"dialog={duplicateDialog}, message='{duplicateText}', cancelled={duplicateCancelled}, stillStored='{stillStored}'.");
 
+            E2EGuards.RequireSandboxSelection(session, sandbox, "favorites.sandbox.remove");
             bool removeMenu = TryOpenMenu(driver, 517, 1280);
             bool removeDialog = removeMenu && driver.WaitForDialog();
             AutomationElement? list = removeDialog ? driver.WaitForElement("FavoritesList") : null;
@@ -192,15 +190,16 @@ public sealed class FavoritesTests
             E2EResults.Record(
                 "favorites.menu.removed",
                 namesAfterRemove.Length == 1 &&
-                    string.Equals(namesAfterRemove[0], MissingFavoriteName, StringComparison.Ordinal),
+                    string.Equals(namesAfterRemove[0], MissingFavoriteName, StringComparison.OrdinalIgnoreCase),
                 $"entries=[{string.Join(",", namesAfterRemove)}].");
 
             string addressBeforeMissing = AddressText(session);
+            E2EGuards.RequireSandboxSelection(session, sandbox, "favorites.sandbox.missing");
             bool missingClicked = InvokeFavoriteEntry(session, driver, automation, MissingFavoriteName);
             bool errorDialog = missingClicked && driver.WaitForDialog();
             string errorText = errorDialog ? driver.TextOf("DialogErrorText") : string.Empty;
-            bool errorNamesPath = errorText.Contains("Path:", StringComparison.Ordinal) &&
-                errorText.Contains(missingDisplay, StringComparison.Ordinal);
+            bool errorNamesPath = errorText.Contains("Path:", StringComparison.OrdinalIgnoreCase) &&
+                errorText.Contains(missingDisplay, StringComparison.OrdinalIgnoreCase);
             bool errorDismissed = errorDialog &&
                 driver.Invoke("DialogPrimary") &&
                 driver.WaitForNoDialog();
@@ -213,15 +212,17 @@ public sealed class FavoritesTests
                     errorNamesPath &&
                     errorDismissed &&
                     stillAlive &&
-                    string.Equals(addressAfterMissing, addressBeforeMissing, StringComparison.Ordinal),
+                    string.Equals(addressAfterMissing, addressBeforeMissing, StringComparison.OrdinalIgnoreCase),
                 $"clicked={missingClicked}, dialog={errorDialog}, namesPath={errorNamesPath}, dismissed={errorDismissed}, alive={stillAlive}, addressBefore='{addressBeforeMissing}', addressAfter='{addressAfterMissing}', error='{errorText}'.");
 
+            // Deliberate exemption from the sandbox proof: Computer is not a registry key, and the Add
+            // command refuses it before any write. Selecting it cannot reach the registry.
             bool computerSelected = SelectTreeRow(session, "Computer");
             bool computerAddMenu = computerSelected && TryOpenMenu(driver, 517, 1281);
             bool computerDialog = computerAddMenu && driver.WaitForDialog();
             string computerText = computerDialog ? driver.TextOf("DialogErrorText") : string.Empty;
             bool computerMessage = computerDialog &&
-                computerText.Contains("Computer cannot be added to favorites", StringComparison.Ordinal);
+                computerText.Contains("Computer cannot be added to favorites", StringComparison.OrdinalIgnoreCase);
             bool computerDismissed = computerMessage &&
                 driver.Invoke("DialogPrimary") &&
                 driver.WaitForNoDialog();
@@ -315,7 +316,7 @@ public sealed class FavoritesTests
                     .FirstOrDefault(element => string.Equals(
                         ControlTestSupport.SafeName(element),
                         name,
-                        StringComparison.Ordinal));
+                        StringComparison.OrdinalIgnoreCase));
                 return entry is not null;
             },
             UiTimeout);
@@ -409,7 +410,7 @@ public sealed class FavoritesTests
                 {
                     string automationId = element.AutomationId ?? string.Empty;
                     if (element.Properties.ProcessId.Value != session.ProcessId ||
-                        !automationId.StartsWith(FavoritesAutomationPrefix, StringComparison.Ordinal) ||
+                        !automationId.StartsWith(FavoritesAutomationPrefix, StringComparison.OrdinalIgnoreCase) ||
                         element.Properties.IsOffscreen.Value)
                     {
                         continue;
@@ -479,7 +480,7 @@ public sealed class FavoritesTests
                 .FirstOrDefault(element => string.Equals(
                     ControlTestSupport.SafeName(element),
                     name,
-                    StringComparison.Ordinal));
+                    StringComparison.OrdinalIgnoreCase));
             if (item is null)
             {
                 return false;
@@ -557,7 +558,7 @@ public sealed class FavoritesTests
 
         for (var index = 0; index < expected.Length; index += 1)
         {
-            if (!string.Equals(actual[index], expected[index], StringComparison.Ordinal))
+            if (!string.Equals(actual[index], expected[index], StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -572,7 +573,7 @@ public sealed class FavoritesTests
         {
             using RegistryKey? key = Registry.CurrentUser.OpenSubKey(ClassicFavoritesKey, writable: false);
             string[] names = key?.GetValueNames() ?? Array.Empty<string>();
-            Array.Sort(names, StringComparer.Ordinal);
+            Array.Sort(names, StringComparer.OrdinalIgnoreCase);
             return names;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -590,7 +591,7 @@ public sealed class FavoritesTests
 
         for (var index = 0; index < left.Count; index += 1)
         {
-            if (!string.Equals(left[index], right[index], StringComparison.Ordinal))
+            if (!string.Equals(left[index], right[index], StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }

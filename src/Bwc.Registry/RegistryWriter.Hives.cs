@@ -53,6 +53,12 @@ public sealed partial class RegistryWriter
         RejectRoot(path, "A predefined registry root cannot be saved to a hive file.");
         _policy.EnsureWriteAllowed(path, RegistryWriteOperation.SaveKey);
 
+        if (_policy.RejectsSymbolicLinks)
+        {
+            // Check the key before the file is created or any privilege is taken.
+            EnsureKeyIsReachable(path, Operation);
+        }
+
         string fullPath = ResolveSaveDestination(filePath, Operation, path, nameof(filePath));
         using PrivilegeScope privilegeScope = EnableHivePrivileges(Operation, path);
 
@@ -76,11 +82,23 @@ public sealed partial class RegistryWriter
         RejectRoot(path, "A predefined registry root cannot be replaced from a hive file.");
         _policy.EnsureWriteAllowed(path, RegistryWriteOperation.ReplaceKey);
 
+        if (_policy.RejectsSymbolicLinks)
+        {
+            EnsureKeyIsReachable(path, Operation);
+        }
+
         string newFullPath = ResolveExistingHiveFile(
             newFileName,
             Operation,
             path,
             nameof(newFileName));
+
+        if (_policy.RejectsSymbolicLinks)
+        {
+            // Refuse before the backup file is created, so a refused replace leaves no files behind.
+            EnsureHiveFileHasNoLinks(newFullPath, Operation, path);
+        }
+
         string backupFullPath = ResolveBackupDestination(
             backupFileName,
             newFullPath,
@@ -109,7 +127,19 @@ public sealed partial class RegistryWriter
         RejectRoot(path, "A predefined registry root cannot be restored from a hive file.");
         _policy.EnsureWriteAllowed(path, RegistryWriteOperation.RestoreKey);
 
+        if (_policy.RejectsSymbolicLinks)
+        {
+            EnsureKeyIsReachable(path, Operation);
+        }
+
         string fullPath = ResolveExistingHiveFile(filePath, Operation, path, nameof(filePath));
+
+        if (_policy.RejectsSymbolicLinks)
+        {
+            // Refuse before the native restore, so a refused restore leaves the target untouched.
+            EnsureHiveFileHasNoLinks(fullPath, Operation, path);
+        }
+
         using PrivilegeScope privilegeScope = EnableHivePrivileges(Operation, path);
 
         using SafeRegistryKeyHandle handle = OpenKey(

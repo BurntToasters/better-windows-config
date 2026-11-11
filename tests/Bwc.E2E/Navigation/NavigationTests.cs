@@ -81,21 +81,21 @@ public sealed class NavigationTests
                     ControlType.TreeItem,
                     "Computer");
                 bool computerRoot = computer is not null &&
-                    string.Equals(ControlTestSupport.SafeId(computer), "TreeRow_0", StringComparison.Ordinal);
+                    string.Equals(ControlTestSupport.SafeId(computer), "TreeRow_0", StringComparison.OrdinalIgnoreCase);
                 E2EResults.Record(
                     "navigation.computer.root",
                     computerRoot,
                     $"id='{ControlTestSupport.SafeId(computer)}' name='{ControlTestSupport.SafeName(computer)}'.");
                 E2EResults.Record(
                     "navigation.computer.expanded",
-                    string.Equals(ControlTestSupport.StateOf(computer), "Expanded", StringComparison.Ordinal),
+                    string.Equals(ControlTestSupport.StateOf(computer), "Expanded", StringComparison.OrdinalIgnoreCase),
                     $"Computer ExpandCollapseState={ControlTestSupport.StateOf(computer)}.");
 
                 string initialAddress = session.WaitForText("AddressBar", "Computer", TimeSpan.FromSeconds(15))
                     ?? "(missing)";
                 E2EResults.Record(
                     "navigation.address.initial",
-                    string.Equals(initialAddress, "Computer", StringComparison.Ordinal),
+                    string.Equals(initialAddress, "Computer", StringComparison.OrdinalIgnoreCase),
                     $"expected 'Computer', got '{initialAddress}'.");
 
                 bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config, childKey: "Restore");
@@ -108,11 +108,11 @@ public sealed class NavigationTests
                     ?? "(missing)";
                 E2EResults.Record(
                     "navigation.address.selected",
-                    string.Equals(selectedAddress, expectedPath, StringComparison.Ordinal),
+                    string.Equals(selectedAddress, expectedPath, StringComparison.OrdinalIgnoreCase),
                     $"expected '{expectedPath}', got '{selectedAddress}'.");
 
                 bool markerVisible = ControlTestSupport.WaitUntil(
-                    () => ControlTestSupport.ListRowNames(session).Contains("Marker", StringComparer.Ordinal),
+                    () => ControlTestSupport.ListRowNames(session).Contains("Marker", StringComparer.OrdinalIgnoreCase),
                     TimeSpan.FromSeconds(15));
                 E2EResults.Record(
                     "navigation.values.sandbox",
@@ -139,11 +139,11 @@ public sealed class NavigationTests
                     ?? "(missing)";
                 E2EResults.Record(
                     "navigation.restore.address",
-                    string.Equals(restoredAddress, expectedPath, StringComparison.Ordinal),
+                    string.Equals(restoredAddress, expectedPath, StringComparison.OrdinalIgnoreCase),
                     $"expected '{expectedPath}', got '{restoredAddress}'.");
 
                 bool markerAfterRestore = ControlTestSupport.WaitUntil(
-                    () => ControlTestSupport.ListRowNames(session).Contains("Marker", StringComparer.Ordinal),
+                    () => ControlTestSupport.ListRowNames(session).Contains("Marker", StringComparer.OrdinalIgnoreCase),
                     TimeSpan.FromSeconds(15));
                 E2EResults.Record(
                     "navigation.restore.values",

@@ -1,3 +1,4 @@
+using Bwc.E2E.Controls;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Bwc.E2E.Harness;
@@ -21,6 +22,7 @@ public sealed class GuiGate
     private static SandboxRegistry? _sandbox;
     private static bool _resultsStarted;
     private static volatile bool _isHeld;
+    private static DateTime _runStartedUtc;
 
     public static bool IsHeld => _isHeld;
 
@@ -33,12 +35,13 @@ public sealed class GuiGate
         _config = E2EConfig.Create();
         E2EResults.Begin(_config);
         _resultsStarted = true;
+        _runStartedUtc = DateTime.UtcNow;
 
         _sandbox = new SandboxRegistry(_config);
         try
         {
             _sandbox.SweepStale(TimeSpan.FromHours(24));
-            E2EResults.Record("sandbox.sweep", true, "Removed only stale matching run keys.");
+            E2EResults.Note("sandbox.sweep", "Removed only stale matching run keys.");
         }
         catch (Exception ex)
         {
@@ -55,8 +58,9 @@ public sealed class GuiGate
         {
             try
             {
-                _sandbox.Cleanup();
-                E2EResults.Record("sandbox.cleanup", true, $"Removed {_sandbox.RunRootDisplayPath}.");
+                // Removes this run's subtree, then the BWC-E2E parent only when it is empty.
+                ControlTestSupport.CleanupRegistry(Config);
+                E2EResults.Note("sandbox.cleanup", $"Removed {_sandbox.RunRootDisplayPath}.");
             }
             catch (Exception ex)
             {
@@ -66,15 +70,65 @@ public sealed class GuiGate
 
         try
         {
-            if (_resultsStarted)
+            if (_resultsStarted && _config is not null)
             {
-                E2EResults.Finish();
+                RecordStrayRegFiles(_config);
             }
         }
         finally
         {
-            ReleaseGate();
+            try
+            {
+                if (_resultsStarted)
+                {
+                    E2EResults.Finish();
+                }
+            }
+            finally
+            {
+                ReleaseGate();
+            }
         }
+    }
+
+    /// <summary>
+    /// Fails when a .reg file was created or changed in a user folder during this run. The suite must
+    /// write every file under artifacts/e2e, so a save dialog that falls back to a default folder shows
+    /// up here. Files older than the run are not counted.
+    /// </summary>
+    private static void RecordStrayRegFiles(E2EConfig config)
+    {
+        var folders = new[]
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                config.RepoRoot,
+                config.PublishDir,
+            }
+            .Where(folder => !string.IsNullOrEmpty(folder) && Directory.Exists(folder))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var since = _runStartedUtc.AddSeconds(-1);
+        var strays = new List<string>();
+        foreach (string folder in folders)
+        {
+            foreach (string file in Directory.EnumerateFiles(folder, "*.reg", SearchOption.TopDirectoryOnly))
+            {
+                var info = new FileInfo(file);
+                if (info.CreationTimeUtc >= since || info.LastWriteTimeUtc >= since)
+                {
+                    strays.Add(file);
+                }
+            }
+        }
+
+        E2EResults.Record(
+            "files.outside-artifacts",
+            strays.Count == 0,
+            strays.Count == 0
+                ? $"No .reg file was written during the run in {folders.Length} folders."
+                : $"Written outside artifacts/e2e during the run: {string.Join(", ", strays)}.");
     }
 
     private static void AcquireGate()
@@ -103,7 +157,7 @@ public sealed class GuiGate
             throw new InvalidOperationException($"Could not acquire {GateName}.", _gateError);
         }
 
-        E2EResults.Record("gate.acquire", true, $"Acquired {GateName}.");
+        E2EResults.Note("gate.acquire", $"Acquired {GateName}.");
     }
 
     private static void GateThread()

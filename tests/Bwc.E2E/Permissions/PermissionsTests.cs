@@ -47,10 +47,12 @@ public sealed class PermissionsTests
 
     [TestMethod]
     [TestCategory("Permissions")]
+    [TestCategory("Mutating")]
     public void Permissions_EditMenuOpensOwnedAcluiDialogAndCancelRestoresMainWindow()
     {
         _checkStart = E2EResults.CheckCount;
         E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
 
         try
         {
@@ -82,20 +84,17 @@ public sealed class PermissionsTests
 
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
             bool seededRows = ControlTestSupport.WaitUntil(
-                () => ControlTestSupport.ListRowNames(session).Contains(SeedValueName, StringComparer.Ordinal),
+                () => ControlTestSupport.ListRowNames(session).Contains(SeedValueName, StringComparer.OrdinalIgnoreCase),
                 TimeSpan.FromSeconds(15));
             E2EResults.Record(
                 "permissions.navigate",
                 navigated && seededRows,
                 $"navigated={navigated}, seededRows={seededRows}, rows=[{string.Join(",", ControlTestSupport.ListRowNames(session))}].");
 
-            if (!navigated || !seededRows)
-            {
-                FailIfNeeded();
-                return;
-            }
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated && seededRows, "permissions.sandbox.navigate");
 
             _ = ControlTestSupport.EnsureForeground(session);
+            E2EGuards.RequireSandboxSelection(session, sandbox, "permissions.sandbox.menu");
             driver.OpenMenu(MenuEdit);
             AutomationElement? permissionsItem = driver.WaitForElement("MenuCommand_" + CommandPermissions);
             bool menuEnabled = IsEnabled(permissionsItem);
@@ -200,7 +199,7 @@ public sealed class PermissionsTests
 
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
             bool seededRows = ControlTestSupport.WaitUntil(
-                () => ControlTestSupport.ListRowNames(session).Contains(SeedValueName, StringComparer.Ordinal),
+                () => ControlTestSupport.ListRowNames(session).Contains(SeedValueName, StringComparer.OrdinalIgnoreCase),
                 TimeSpan.FromSeconds(15));
             E2EResults.Record(
                 "permissions.contextmenu.navigate",

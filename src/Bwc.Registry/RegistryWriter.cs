@@ -41,6 +41,16 @@ public sealed partial class RegistryWriter
             Operation,
             path);
 
+        // Under a link-rejecting policy the leaf is opened as a link node, so an existing link is
+        // seen and refused instead of followed. A missing leaf is still created as a normal key.
+        bool guarded = _policy.RejectsSymbolicLinks;
+        REG_OPEN_CREATE_OPTIONS options = guarded
+            ? REG_OPEN_CREATE_OPTIONS.REG_OPTION_NON_VOLATILE | (REG_OPEN_CREATE_OPTIONS)RegOptionOpenLink
+            : REG_OPEN_CREATE_OPTIONS.REG_OPTION_NON_VOLATILE;
+        REG_SAM_FLAGS access = guarded
+            ? REG_SAM_FLAGS.KEY_WRITE | REG_SAM_FLAGS.KEY_QUERY_VALUE | REG_SAM_FLAGS.KEY_WOW64_64KEY
+            : REG_SAM_FLAGS.KEY_WRITE | REG_SAM_FLAGS.KEY_WOW64_64KEY;
+
         SafeRegistryHandle? created = null;
         try
         {
@@ -48,13 +58,18 @@ public sealed partial class RegistryWriter
                 parent,
                 path.Components[^1],
                 default,
-                REG_OPEN_CREATE_OPTIONS.REG_OPTION_NON_VOLATILE,
-                REG_SAM_FLAGS.KEY_WRITE | REG_SAM_FLAGS.KEY_WOW64_64KEY,
+                options,
+                access,
                 null,
                 out SafeRegistryHandle createdHandle);
 
             created = createdHandle;
             ThrowIfFailed(error, Operation, path);
+
+            if (guarded)
+            {
+                RefuseIfSymbolicLink(createdHandle, path.ToAbbreviatedString(), Operation, path);
+            }
         }
         finally
         {
@@ -118,6 +133,11 @@ public sealed partial class RegistryWriter
             path);
 
         string leaf = path.Components[^1];
+        if (_policy.RejectsSymbolicLinks)
+        {
+            EnsureChildIsNotLink(parent, path.Parent!.ToAbbreviatedString(), leaf, recursive, Operation, path);
+        }
+
         WIN32_ERROR error = recursive
             ? PInvoke.RegDeleteTree(parent, leaf)
             : PInvoke.RegDeleteKeyEx(parent, leaf, (uint)REG_SAM_FLAGS.KEY_WOW64_64KEY);
@@ -140,6 +160,11 @@ public sealed partial class RegistryWriter
             Operation,
             path);
 
+        if (_policy.RejectsSymbolicLinks)
+        {
+            EnsureChildIsNotLink(parent, path.Parent!.ToAbbreviatedString(), path.Components[^1], recursive: false, Operation, path);
+        }
+
         WIN32_ERROR error = PInvoke.RegRenameKey(parent, path.Components[^1], newName);
         ThrowIfFailed(error, Operation, path);
     }
@@ -151,12 +176,29 @@ public sealed partial class RegistryWriter
 
         const string Operation = nameof(RegistryWriteOperation.CopyTree);
         _policy.EnsureWriteAllowed(destination, RegistryWriteOperation.CopyTree);
+        // The source is checked as well, so a policy can refuse to copy from outside its sandbox.
+        _policy.EnsureWriteAllowed(source, RegistryWriteOperation.CopyTree);
+
+        if (_policy.RejectsSymbolicLinks && (destination.Equals(source) || destination.IsDescendantOf(source)))
+        {
+            throw new ArgumentException(
+                "A key tree cannot be copied onto itself or into one of its own subkeys.",
+                nameof(destination));
+        }
 
         using SafeRegistryKeyHandle sourceHandle = OpenKey(
             source,
             REG_SAM_FLAGS.KEY_READ,
             Operation,
             source);
+
+        if (_policy.RejectsSymbolicLinks)
+        {
+            // RegCopyTree opens the children of the source with ordinary (following) opens, so a
+            // link below the source would bring a link key, or a copy of a foreign target, into the
+            // destination. Refuse the whole copy instead.
+            EnsureSubtreeHasNoSymbolicLinks(sourceHandle, source.ToAbbreviatedString(), Operation, source, depth: 0);
+        }
 
         // RegCopyTree copies the source security descriptor. The destination handle needs
         // WRITE_DAC in addition to read and write access, although that right is easy to miss
@@ -236,6 +278,11 @@ public sealed partial class RegistryWriter
         string operation,
         RegistryPath errorPath)
     {
+        if (_policy.RejectsSymbolicLinks)
+        {
+            return OpenGuardedKey(path, access, operation, errorPath);
+        }
+
         WIN32_ERROR error = NativeRegistry.TryOpenKey(path, access, out SafeRegistryKeyHandle? handle);
         if (error != WIN32_ERROR.ERROR_SUCCESS)
         {

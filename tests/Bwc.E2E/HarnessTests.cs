@@ -139,7 +139,7 @@ public sealed class HarnessTests
         try
         {
             action();
-            E2EResults.Record(id, true, "ok");
+            E2EResults.Note(id, "ok");
         }
         catch (Exception ex)
         {
