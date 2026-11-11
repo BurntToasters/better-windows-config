@@ -187,9 +187,11 @@ public sealed class RegistryTreeSource : ITreeNodeSource
                 cancellationToken.ThrowIfCancellationRequested();
 
                 string childPath;
+                RegistryPath childKey;
                 try
                 {
-                    childPath = path.Append(name).ToDisplayString();
+                    childKey = path.Append(name);
+                    childPath = childKey.ToDisplayString();
                 }
                 catch (ArgumentException ex)
                 {
@@ -201,7 +203,11 @@ public sealed class RegistryTreeSource : ITreeNodeSource
                     continue;
                 }
 
-                children.Add(new TreeNode(name, childPath, hasChildren: true, source: this));
+                children.Add(new TreeNode(
+                    name,
+                    childPath,
+                    hasChildren: HasSubKeys(childKey, cancellationToken),
+                    source: this));
             }
 
             return children;
@@ -211,6 +217,22 @@ public sealed class RegistryTreeSource : ITreeNodeSource
             Log.Warn(
                 $"Registry tree could not enumerate '{path.ToDisplayString()}': Win32 {ex.Win32Error} ({ex.Message}).");
             return NoChildren;
+        }
+    }
+
+    /// <summary>
+    /// True when the key has at least one subkey, from RegQueryInfoKey. A key that cannot be opened
+    /// keeps its expander, as classic regedit does: expanding it shows nothing.
+    /// </summary>
+    private bool HasSubKeys(RegistryPath key, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return _reader.GetKeyInfo(key, cancellationToken).SubKeyCount > 0;
+        }
+        catch (RegistryOperationException)
+        {
+            return true;
         }
     }
 

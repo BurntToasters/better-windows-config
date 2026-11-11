@@ -53,7 +53,7 @@ public sealed class EditingTests
         try
         {
             sandbox.Cleanup();
-            Seed(sandbox);
+            SeedSandbox(sandbox);
 
             string dataRoot = CreateFreshDataRoot(config, "editing");
             var environment = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -179,28 +179,7 @@ public sealed class EditingTests
 
     private static void CheckRenameValue(AppSession session, EditingDriver driver, SandboxRegistry sandbox)
     {
-        ControlTestSupport.WaitUntil(
-            () => ControlTestSupport.FindRowByName(
-                session,
-                ControlTestSupport.ListControl,
-                ControlType.DataItem,
-                "AlphaString") is not null,
-            TimeSpan.FromSeconds(10));
-
-        AutomationElement? row = ControlTestSupport.FindRowByName(
-            session,
-            ControlTestSupport.ListControl,
-            ControlType.DataItem,
-            "AlphaString");
-        ControlTestSupport.Select(row);
-        _ = ControlTestSupport.WaitUntil(
-            () => ControlTestSupport.IsSelected(
-                ControlTestSupport.FindRowByName(
-                    session,
-                    ControlTestSupport.ListControl,
-                    ControlType.DataItem,
-                    "AlphaString")),
-            TimeSpan.FromSeconds(5));
+        _ = SelectListRowStable(session, "AlphaString");
 
         E2EGuards.RequireListRowSelected(session, "AlphaString", "editing.sandbox.rename.row");
         E2EGuards.RequireSandboxSelection(session, sandbox, "editing.sandbox.rename");
@@ -219,20 +198,14 @@ public sealed class EditingTests
             renameOpen && typed && committed && renamed,
             $"renameOpen={renameOpen}, typed={typed}, committed={committed}, renamed={renamed}.");
 
-        AutomationElement? cancelRow = ControlTestSupport.FindRowByName(
-            session,
-            ControlTestSupport.ListControl,
-            ControlType.DataItem,
-            "ZebraString");
-        ControlTestSupport.Select(cancelRow);
-        _ = ControlTestSupport.WaitUntil(
-            () => ControlTestSupport.IsSelected(
-                ControlTestSupport.FindRowByName(
-                    session,
-                    ControlTestSupport.ListControl,
-                    ControlType.DataItem,
-                    "ZebraString")),
-            TimeSpan.FromSeconds(5));
+        // The list refreshes asynchronously after the commit. Wait for the refreshed rows before the
+        // next selection, because a row selected earlier is replaced by the refresh.
+        bool refreshed = WaitForListRows(session, present: "AlphaRenamed", absent: "AlphaString");
+        E2EResults.Note(
+            "editing.renamevalue.refresh",
+            $"list refreshed={refreshed}, rows=[{string.Join(",", ControlTestSupport.ListRowNames(session))}].");
+
+        _ = SelectListRowStable(session, "ZebraString");
 
         E2EGuards.RequireListRowSelected(session, "ZebraString", "editing.sandbox.rename-cancel.row");
         E2EGuards.RequireSandboxSelection(session, sandbox, "editing.sandbox.rename-cancel");
@@ -255,20 +228,7 @@ public sealed class EditingTests
 
     private static void CheckDeleteValue(AppSession session, EditingDriver driver, SandboxRegistry sandbox)
     {
-        AutomationElement? row = ControlTestSupport.FindRowByName(
-            session,
-            ControlTestSupport.ListControl,
-            ControlType.DataItem,
-            "SampleBinary");
-        ControlTestSupport.Select(row);
-        _ = ControlTestSupport.WaitUntil(
-            () => ControlTestSupport.IsSelected(
-                ControlTestSupport.FindRowByName(
-                    session,
-                    ControlTestSupport.ListControl,
-                    ControlType.DataItem,
-                    "SampleBinary")),
-            TimeSpan.FromSeconds(5));
+        _ = SelectListRowStable(session, "SampleBinary");
 
         E2EGuards.RequireListRowSelected(session, "SampleBinary", "editing.sandbox.deletevalue.row");
         E2EGuards.RequireSandboxSelection(session, sandbox, "editing.sandbox.deletevalue");
@@ -306,7 +266,7 @@ public sealed class EditingTests
         bool dialog = driver.WaitForDialog();
         string message = driver.TextOf("DialogMessage");
         bool warned = message.Contains(
-            "Deleting this key will delete all of its subkeys.",
+            "Are you sure you want to permanently delete this key and all of its subkeys?",
             StringComparison.Ordinal);
         E2EResults.Record(
             "editing.deletekey.warning",
@@ -337,21 +297,68 @@ public sealed class EditingTests
     private static bool SelectRunKey(AppSession session, SandboxRegistry sandbox)
     {
         string runId = SandboxRunId(sandbox);
-        AutomationElement? row = ControlTestSupport.FindRowByName(
-            session,
-            ControlTestSupport.TreeControl,
-            ControlType.TreeItem,
-            runId);
-        if (row is null)
-        {
-            return false;
-        }
-
-        ControlTestSupport.Select(row);
-        return ControlTestSupport.WaitForTreeSelection(session, runId);
+        return ControlTestSupport.WaitUntil(
+            () =>
+            {
+                // Re-find the row each time: the tree can rebuild its nodes after a refresh.
+                AutomationElement? row = ControlTestSupport.FindRowByName(
+                    session,
+                    ControlTestSupport.TreeControl,
+                    ControlType.TreeItem,
+                    runId);
+                ControlTestSupport.Select(row);
+                return ControlTestSupport.IsSelected(
+                    ControlTestSupport.FindRowByName(
+                        session,
+                        ControlTestSupport.TreeControl,
+                        ControlType.TreeItem,
+                        runId));
+            },
+            TimeSpan.FromSeconds(10));
     }
 
-    private static void Seed(SandboxRegistry sandbox)
+    /// <summary>
+    /// Selects a value row by name and retries until the row is selected. The row is found again on
+    /// every attempt, because the list refresh can replace the element a selection was sent to.
+    /// </summary>
+    private static bool SelectListRowStable(AppSession session, string rowName) =>
+        ControlTestSupport.WaitUntil(
+            () =>
+            {
+                AutomationElement? row = ControlTestSupport.FindRowByName(
+                    session,
+                    ControlTestSupport.ListControl,
+                    ControlType.DataItem,
+                    rowName);
+                ControlTestSupport.Select(row);
+                return ControlTestSupport.IsSelected(
+                    ControlTestSupport.FindRowByName(
+                        session,
+                        ControlTestSupport.ListControl,
+                        ControlType.DataItem,
+                        rowName));
+            },
+            TimeSpan.FromSeconds(10));
+
+    /// <summary>
+    /// Waits until the value list shows the refreshed rows: <paramref name="present"/> is listed and
+    /// <paramref name="absent"/> is not. Returns false when the refresh does not finish in time.
+    /// </summary>
+    private static bool WaitForListRows(AppSession session, string present, string absent) =>
+        ControlTestSupport.WaitUntil(
+            () =>
+            {
+                string[] names = ControlTestSupport.ListRowNames(session);
+                return names.Contains(present, StringComparer.OrdinalIgnoreCase) &&
+                    !names.Contains(absent, StringComparer.OrdinalIgnoreCase);
+            },
+            TimeSpan.FromSeconds(10));
+
+    /// <summary>
+    /// Seeds the run sandbox with the values and the child key that the editing and message checks
+    /// use. Shared so that other suites seed the same state.
+    /// </summary>
+    internal static void SeedSandbox(SandboxRegistry sandbox)
     {
         using (var root = sandbox.CreateSubKey(string.Empty))
         {

@@ -98,19 +98,13 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.ReadValue, ValueLabel(rawName));
             return;
         }
 
         if (value is null)
         {
-            string valueLabel = rawName.Length == 0 ? MessageCatalog.DefaultValueLabel : rawName;
-            await _context.ShowErrorAsync(ErrorDialog.ForOperation(
-                Get("DialogErrorTitle"),
-                MessageCatalog.QueryValueOperation,
-                key.ToDisplayString(),
-                2,
-                MessageCatalog.ValueLinePrefix + valueLabel));
+            await ShowValueReadErrorAsync(rawName, forEdit: false);
             return;
         }
 
@@ -161,13 +155,13 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.ReadValue, ValueLabel(rawName));
             return;
         }
 
         if (value is null)
         {
-            await ShowQueryValueErrorAsync(key, rawName);
+            await ShowValueReadErrorAsync(rawName, forEdit: true);
             return;
         }
 
@@ -196,7 +190,7 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.EditValue, ValueLabel(rawName));
             return;
         }
 
@@ -256,13 +250,13 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.ReadValue, ValueLabel(rawName));
             return;
         }
 
         if (value is null)
         {
-            await ShowQueryValueErrorAsync(key, rawName);
+            await ShowValueReadErrorAsync(rawName, forEdit: true);
             return;
         }
 
@@ -329,7 +323,7 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.EditValue, ValueLabel(rawName));
             return false;
         }
     }
@@ -360,7 +354,7 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.EditValue, ValueLabel(rawName));
             return false;
         }
     }
@@ -391,7 +385,7 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.EditValue, ValueLabel(rawName));
             return false;
         }
     }
@@ -417,21 +411,21 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.EditValue, ValueLabel(rawName));
             return false;
         }
     }
 
-    private Task ShowQueryValueErrorAsync(RegistryPath key, string rawName)
+    /// <summary>Shows the classic read error for a value whose data cannot be read.</summary>
+    private Task ShowValueReadErrorAsync(string rawName, bool forEdit)
     {
-        string valueLabel = rawName.Length == 0 ? MessageCatalog.DefaultValueLabel : rawName;
-        return _context.ShowErrorAsync(ErrorDialog.ForOperation(
-            Get("DialogErrorTitle"),
-            MessageCatalog.QueryValueOperation,
-            key.ToDisplayString(),
-            2,
-            MessageCatalog.ValueLinePrefix + valueLabel));
+        Log.Warn($"Registry Editor could not read the data of value '{ValueLabel(rawName)}'.");
+        return _context.ShowErrorAsync(_context.Messages.ForValueRead(ValueLabel(rawName), forEdit).ToErrorDialog());
     }
+
+    /// <summary>The name a value message names: the display name, or the default value label.</summary>
+    private static string ValueLabel(string rawName) =>
+        rawName.Length == 0 ? MessageCatalog.DefaultValueLabel : RegistryValueDisplay.FormatName(rawName);
 
     private async Task NewValueAsync(NewValueKind kind)
     {
@@ -446,7 +440,7 @@ internal sealed class ValueCommands
             Get("DialogNewValueTitle"),
             Get("DialogValueNameLabel"),
             suggested,
-            value => ValidateNewValueName(key, value, oldName: null));
+            value => ValidateNewValueName(key, value));
 
         if (!await _context.ShowDialogAsync(nameDialog))
         {
@@ -498,7 +492,7 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.CreateValue, ValueLabel(valueName));
             return false;
         }
     }
@@ -520,7 +514,7 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.CreateValue, ValueLabel(valueName));
             return false;
         }
     }
@@ -542,7 +536,7 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.CreateValue, ValueLabel(valueName));
             return false;
         }
     }
@@ -562,7 +556,7 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.CreateValue, ValueLabel(valueName));
             return false;
         }
     }
@@ -582,7 +576,7 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.CreateValue, ValueLabel(valueName));
             return false;
         }
     }
@@ -611,9 +605,10 @@ internal sealed class ValueCommands
             return;
         }
 
+        // Several values use the plural text, one value the singular text. Both use the same caption.
         var dialog = new ConfirmDialog(
-            Get("DialogDeleteValueTitle"),
-            Get("DialogDeleteValueMessage"),
+            Get("MsgCaptionConfirmValueDelete"),
+            Get(rawNames.Count > 1 ? "MsgDeleteValuesConfirm" : "MsgDeleteValueConfirm"),
             Get("DialogYes"),
             Get("DialogNo"));
 
@@ -631,7 +626,7 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.DeleteValues, ValueLabel(rawNames[0]));
             return;
         }
 
@@ -676,7 +671,7 @@ internal sealed class ValueCommands
         string? error = ValidateRenameValue(key, oldName, newName);
         if (error is not null)
         {
-            await _context.ShowMessageAsync(error);
+            await _context.ShowMessageAsync(Get("MsgCaptionRenameValueError"), error);
             return;
         }
 
@@ -686,25 +681,20 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.RenameValue, ValueLabel(oldName));
             return;
         }
 
         await _context.RefreshValuesAsync(newName);
     }
 
-    private string? ValidateNewValueName(RegistryPath key, string name, string? oldName)
+    /// <summary>The text for a new value name that cannot be used, or null when it can.</summary>
+    private string? ValidateNewValueName(RegistryPath key, string name)
     {
-        string? invalid = ValidateValueName(name, allowEmpty: true);
+        string? invalid = ValidateValueName(name);
         if (invalid is not null)
         {
             return invalid;
-        }
-
-        if (oldName is not null &&
-            string.Equals(oldName, name, StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
         }
 
         try
@@ -713,13 +703,23 @@ internal sealed class ValueCommands
         }
         catch (RegistryOperationException ex)
         {
-            return ex.Message;
+            return ValidationFailure(ex, RegistryAction.ReadValue, ValueLabel(name));
         }
     }
 
+    /// <summary>
+    /// The text for a rename that cannot proceed. The classic rename texts name the old value, so the
+    /// subject is the current name. Null when the new name is acceptable.
+    /// </summary>
     private string? ValidateRenameValue(RegistryPath key, string oldName, string newName)
     {
-        string? invalid = ValidateValueName(newName, allowEmpty: false);
+        string subject = ValueLabel(oldName);
+        if (newName.Length == 0)
+        {
+            return string.Format(CultureInfo.CurrentCulture, Get("MsgRenameValueEmpty"), subject);
+        }
+
+        string? invalid = ValidateValueName(newName);
         if (invalid is not null)
         {
             return invalid;
@@ -730,22 +730,34 @@ internal sealed class ValueCommands
             return null;
         }
 
-        return ValidateNewValueName(key, newName, oldName);
+        try
+        {
+            return _context.Store.Reader.ValueExists(key, newName)
+                ? string.Format(CultureInfo.CurrentCulture, Get("MsgRenameValueExists"), subject)
+                : null;
+        }
+        catch (RegistryOperationException ex)
+        {
+            return ValidationFailure(ex, RegistryAction.RenameValue, subject);
+        }
     }
 
-    private string? ValidateValueName(string name, bool allowEmpty)
+    /// <summary>Checks the value name limits. Empty names are checked by the callers.</summary>
+    private string? ValidateValueName(string name)
     {
-        if (!allowEmpty && name.Length == 0)
-        {
-            return Get("DialogInvalidValueName");
-        }
-
         if (name.Length > RegeditContext.MaxValueNameLength || name.Contains('\0'))
         {
             return Get("DialogInvalidValueName");
         }
 
         return null;
+    }
+
+    /// <summary>Logs a failed check and returns the classic text for it, for a prompt to show.</summary>
+    private string ValidationFailure(RegistryOperationException ex, RegistryAction action, string subject)
+    {
+        Log.Warn($"Registry Editor could not check a value name: {ex.Operation} for {ex.Path.ToDisplayString()}, Win32 {ex.Win32Error}: {ex.Message}");
+        return _context.Messages.ForRegistryError(action, ex, subject).Text;
     }
 
     private string NextUniqueValueName(RegistryPath key)

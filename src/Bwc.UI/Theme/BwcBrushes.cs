@@ -28,9 +28,11 @@ internal static class BwcBrushes
     private const string TreeSelectionKey = "BwcTreeSelectionBrush";
     private const string TreeSelectionTextKey = "BwcTreeSelectionTextBrush";
     private const string TreeFocusRectKey = "BwcTreeFocusRectBrush";
+    private const string TreeSelectionBorderKey = "BwcTreeSelectionBorderBrush";
     private const string ListSelectionKey = "BwcListSelectionBrush";
     private const string ListSelectionTextKey = "BwcListSelectionTextBrush";
     private const string ListFocusRectKey = "BwcListFocusRectBrush";
+    private const string ListSelectionBorderKey = "BwcListSelectionBorderBrush";
 
     private static readonly Dictionary<string, SolidColorBrush> Cache = new(StringComparer.Ordinal);
 
@@ -58,20 +60,26 @@ internal static class BwcBrushes
     /// <summary>Text on <see cref="Selection"/>.</summary>
     public static SolidColorBrush SelectionText => Get(SelectionTextKey);
 
-    /// <summary>Tree selection fill: COLOR_HIGHLIGHT when the tree has focus, else COLOR_BTNFACE.</summary>
+    /// <summary>Tree selection fill: the Explorer tree selection when the tree has focus, else its unfocused fill.</summary>
     public static SolidColorBrush TreeSelection => Get(TreeSelectionKey);
 
-    /// <summary>Tree selected text: COLOR_HIGHLIGHTTEXT when focused, else COLOR_WINDOWTEXT.</summary>
+    /// <summary>Tree selected text: COLOR_WINDOWTEXT on the light palette, the palette text otherwise.</summary>
     public static SolidColorBrush TreeSelectionText => Get(TreeSelectionTextKey);
 
-    /// <summary>Tree focus rectangle: the highlight text color on the focused row, else transparent.</summary>
+    /// <summary>Tree selection border, one device pixel. Transparent when the palette draws none.</summary>
+    public static SolidColorBrush TreeSelectionBorder => Get(TreeSelectionBorderKey);
+
+    /// <summary>Tree focus rectangle: the selection text color on the focused row, else transparent.</summary>
     public static SolidColorBrush TreeFocusRect => Get(TreeFocusRectKey);
 
-    /// <summary>List selection fill: COLOR_HIGHLIGHT when the list has focus, else COLOR_BTNFACE.</summary>
+    /// <summary>List selection fill: COLOR_HIGHLIGHT when the list has focus, else COLOR_WINDOW (hidden).</summary>
     public static SolidColorBrush ListSelection => Get(ListSelectionKey);
 
     /// <summary>List selected text: COLOR_HIGHLIGHTTEXT when focused, else COLOR_WINDOWTEXT.</summary>
     public static SolidColorBrush ListSelectionText => Get(ListSelectionTextKey);
+
+    /// <summary>List selection border, one device pixel. Transparent on the classic list.</summary>
+    public static SolidColorBrush ListSelectionBorder => Get(ListSelectionBorderKey);
 
     /// <summary>List focus rectangle: shown only with one selected row and list focus.</summary>
     public static SolidColorBrush ListFocusRect => Get(ListFocusRectKey);
@@ -91,23 +99,26 @@ internal static class BwcBrushes
         ApplyPane(palette, BwcPane.List, list);
     }
 
-    /// <summary>Writes the selection and focus brushes of one pane. Rows are not touched.</summary>
+    /// <summary>Writes the selection, border and focus brushes of one pane. Rows are not touched.</summary>
     public static void ApplyPane(BwcPalette palette, BwcPane pane, BwcPaneState state)
     {
-        Color selection = state.HasFocus ? palette.Highlight : palette.InactiveSelection;
-        Color selectionText = state.HasFocus ? palette.HighlightText : palette.WindowText;
-        Color focusRect = state.HasFocus && state.ShowFocusRect ? palette.HighlightText : Microsoft.UI.Colors.Transparent;
+        BwcSelection selection = pane == BwcPane.Tree
+            ? (state.HasFocus ? palette.TreeFocused : palette.TreeInactive)
+            : (state.HasFocus ? palette.ListFocused : palette.ListInactive);
+        Color focusRect = state.HasFocus && state.ShowFocusRect ? selection.Text : Microsoft.UI.Colors.Transparent;
 
         if (pane == BwcPane.Tree)
         {
-            TreeSelection.Color = selection;
-            TreeSelectionText.Color = selectionText;
+            TreeSelection.Color = selection.Fill;
+            TreeSelectionText.Color = selection.Text;
+            TreeSelectionBorder.Color = selection.Border;
             TreeFocusRect.Color = focusRect;
         }
         else
         {
-            ListSelection.Color = selection;
-            ListSelectionText.Color = selectionText;
+            ListSelection.Color = selection.Fill;
+            ListSelectionText.Color = selection.Text;
+            ListSelectionBorder.Color = selection.Border;
             ListFocusRect.Color = focusRect;
         }
     }

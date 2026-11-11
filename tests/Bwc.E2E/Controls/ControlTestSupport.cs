@@ -1,9 +1,12 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security;
+using System.Text;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
+using FlaUI.Core.Input;
+using FlaUI.UIA3;
 using Microsoft.Win32;
 
 namespace Bwc.E2E.Controls;
@@ -407,13 +410,122 @@ internal static class ControlTestSupport
             timeout ?? TimeSpan.FromSeconds(5));
     }
 
+    private const string AddressBarId = "AddressBar";
+    private const int NavigationAttempts = 2;
+    private const int MaxMenuCloses = 4;
+    private const uint KeyEventKeyUp = 0x0002;
+    private static readonly TimeSpan KeyboardFocusTimeout = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan TypeAheadGap = TimeSpan.FromMilliseconds(600);
+
+    // Shift, Ctrl and Alt, both sides. A stuck one of these turns typed letters into shortcuts or menu keys.
+    private static readonly int[] ModifierKeys = [0x10, 0x11, 0x12, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5];
+
     /// <summary>
-    /// Expands HKCU, Software, BWC-E2E, and the run key using keyboard Right and type-ahead. An
-    /// optional child is selected under the run key. Returns false at the first missing row.
+    /// Selects the run key, or a child of it, in the tree. The address bar is the primary route: the
+    /// full path is typed and Enter is pressed. Type-ahead through the tree is the fallback. Before
+    /// each route, stuck Shift, Ctrl and Alt are released and open menus are closed, so typed letters
+    /// are not read as menu keys. Each route checks the address bar before it reports success. When
+    /// both routes fail, the whole navigation is retried once from the root. Returns false when no
+    /// attempt ends with the target selected.
     /// </summary>
     internal static bool NavigateToSandboxKey(AppSession session, E2EConfig config, string? childKey = null)
     {
-        var hkcu = FindRowByName(session, TreeControl, ControlType.TreeItem, "HKEY_CURRENT_USER");
+        string leaf = childKey ?? config.RunId;
+        string typedPath = @"HKEY_CURRENT_USER\Software\BWC-E2E\" + config.RunId;
+        if (childKey is not null)
+        {
+            typedPath += @"\" + childKey;
+        }
+
+        for (var attempt = 1; attempt <= NavigationAttempts; attempt++)
+        {
+            if (attempt > 1)
+            {
+                E2EResults.Note("navigate.retry", $"Retrying navigation to '{typedPath}' from the root (attempt {attempt}).");
+                _ = NavigateViaAddressBar(session, "Computer", "Computer");
+            }
+
+            if (NavigateViaAddressBar(session, typedPath, leaf))
+            {
+                E2EResults.Note("navigate.route", $"'{typedPath}' selected through the address bar (attempt {attempt}).");
+                return true;
+            }
+
+            if (NavigateViaTypeAhead(session, config, childKey, typedPath))
+            {
+                E2EResults.Note("navigate.route", $"'{typedPath}' selected through type-ahead (attempt {attempt}).");
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Types a path into the address bar and presses Enter. Succeeds when the address bar shows the
+    /// path and the expected row is selected with keyboard focus back in the tree.
+    /// </summary>
+    private static bool NavigateViaAddressBar(AppSession session, string typedPath, string selectedRow)
+    {
+        if (!ClearInput(session) || !FocusAddressBar(session))
+        {
+            return false;
+        }
+
+        AutomationElement? address = session.Find(AddressBarId);
+        if (address is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            address.AsTextBox().Text = string.Empty;
+            if (!EnsureForeground(session))
+            {
+                return false;
+            }
+
+            Keyboard.Type(typedPath);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+
+        if (!WaitUntil(
+                () => string.Equals(ReadAddress(session), typedPath, StringComparison.OrdinalIgnoreCase),
+                TimeSpan.FromSeconds(5)))
+        {
+            return false;
+        }
+
+        try
+        {
+            session.SendKeys("Enter");
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+
+        bool arrived = WaitUntil(
+            () => string.Equals(
+                    E2EGuards.NormalizeKeyPath(ReadAddress(session)),
+                    E2EGuards.NormalizeKeyPath(typedPath),
+                    StringComparison.OrdinalIgnoreCase) &&
+                IsSelected(FindRowByName(session, TreeControl, ControlType.TreeItem, selectedRow)),
+            TimeSpan.FromSeconds(5));
+        return arrived && WaitForTreeKeyboardFocus(session, selectedRow, KeyboardFocusTimeout);
+    }
+
+    /// <summary>
+    /// Expands HKCU, Software, BWC-E2E and the run key with Right, then selects each row by type-ahead.
+    /// Every key goes through PrepareTreeKeyboard. Succeeds when the address bar shows the target.
+    /// </summary>
+    private static bool NavigateViaTypeAhead(AppSession session, E2EConfig config, string? childKey, string typedPath)
+    {
+        AutomationElement? hkcu = FindRowByName(session, TreeControl, ControlType.TreeItem, "HKEY_CURRENT_USER");
         if (hkcu is null)
         {
             return false;
@@ -421,55 +533,256 @@ internal static class ControlTestSupport
 
         Select(hkcu);
         _ = WaitForTreeSelection(session, "HKEY_CURRENT_USER");
-        SendKeys(session, "Right");
-        if (!WaitForTreeRow(session, "Software"))
+
+        var path = new List<string> { "Software", "BWC-E2E", config.RunId };
+        if (childKey is not null)
+        {
+            path.Add(childKey);
+        }
+
+        string focused = "HKEY_CURRENT_USER";
+        foreach (string next in path)
+        {
+            if (!TreeKeys(session, focused, "Right") || !WaitForTreeRow(session, next))
+            {
+                return false;
+            }
+
+            Thread.Sleep(TypeAheadGap);
+            if (!TypeText(session, focused, next) || !WaitForTreeSelection(session, next))
+            {
+                return false;
+            }
+
+            focused = next;
+        }
+
+        return WaitUntil(
+            () => string.Equals(
+                E2EGuards.NormalizeKeyPath(ReadAddress(session)),
+                E2EGuards.NormalizeKeyPath(typedPath),
+                StringComparison.OrdinalIgnoreCase),
+            TimeSpan.FromSeconds(5));
+    }
+
+    /// <summary>Clears stuck modifiers and open menus, then makes the named tree row the keyboard target.</summary>
+    private static bool PrepareTreeKeyboard(AppSession session, string rowName)
+    {
+        return ClearInput(session) && WaitForTreeKeyboardFocus(session, rowName, KeyboardFocusTimeout);
+    }
+
+    private static bool TreeKeys(AppSession session, string focusRow, string key)
+    {
+        if (!PrepareTreeKeyboard(session, focusRow))
         {
             return false;
         }
 
-        SendKeys(session, "Software");
-        if (!WaitForTreeSelection(session, "Software"))
+        try
         {
-            return false;
-        }
-
-        SendKeys(session, "Right");
-        if (!WaitForTreeRow(session, "BWC-E2E"))
-        {
-            return false;
-        }
-
-        TypeAhead(session, "BWC-E2E");
-        if (!WaitForTreeSelection(session, "BWC-E2E"))
-        {
-            return false;
-        }
-
-        SendKeys(session, "Right");
-        if (!WaitForTreeRow(session, config.RunId))
-        {
-            return false;
-        }
-
-        TypeAhead(session, config.RunId);
-        if (!WaitForTreeSelection(session, config.RunId))
-        {
-            return false;
-        }
-
-        if (childKey is null)
-        {
+            session.SendKeys(key);
             return true;
         }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
 
-        SendKeys(session, "Right");
-        if (!WaitForTreeRow(session, childKey))
+    private static bool TypeText(AppSession session, string focusRow, string text)
+    {
+        if (!PrepareTreeKeyboard(session, focusRow))
         {
             return false;
         }
 
-        TypeAhead(session, childKey);
-        return WaitForTreeSelection(session, childKey);
+        try
+        {
+            Keyboard.Type(text);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Releases stuck modifiers and closes open menus. Returns false when a menu stays open.</summary>
+    private static bool ClearInput(AppSession session)
+    {
+        _ = ReleaseStuckModifiers();
+        bool clear = CloseOpenMenus(session);
+        _ = ReleaseStuckModifiers();
+        return clear;
+    }
+
+    /// <summary>
+    /// Sends a key-up for each of Shift, Ctrl and Alt that the system reports as down. Returns true
+    /// when any key was released.
+    /// </summary>
+    internal static bool ReleaseStuckModifiers()
+    {
+        bool released = false;
+        foreach (int key in ModifierKeys)
+        {
+            if ((unchecked((ushort)GetAsyncKeyState(key)) & 0x8000) == 0)
+            {
+                continue;
+            }
+
+            keybd_event(unchecked((byte)key), 0, KeyEventKeyUp, UIntPtr.Zero);
+            released = true;
+        }
+
+        if (released)
+        {
+            E2EResults.Note("navigate.modifiers", "Released a stuck Shift, Ctrl or Alt before keyboard input.");
+        }
+
+        return released;
+    }
+
+    /// <summary>
+    /// Escape until no menu or flyout owned by the session is visible, at most MaxMenuCloses times.
+    /// Escape is sent only while a menu is visible, so an idle tree never receives it.
+    /// </summary>
+    internal static bool CloseOpenMenus(AppSession session)
+    {
+        for (var attempt = 0; attempt < MaxMenuCloses; attempt++)
+        {
+            if (!MenuOpen(session))
+            {
+                return true;
+            }
+
+            E2EResults.Note("navigate.menu", $"Closing an open menu before input (escape {attempt + 1}).");
+            try
+            {
+                session.SendKeys("Escape");
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+
+            _ = WaitUntil(() => !MenuOpen(session), TimeSpan.FromMilliseconds(400));
+        }
+
+        return !MenuOpen(session);
+    }
+
+    /// <summary>
+    /// True when a visible top-level window of the session's process is a Win32 menu (#32768) or holds
+    /// a menu item, such as a MenuFlyout. Tooltips hold no menu items, so they do not count.
+    /// </summary>
+    internal static bool MenuOpen(AppSession session)
+    {
+        var owned = new List<IntPtr>();
+        uint pid = unchecked((uint)session.ProcessId);
+        _ = EnumWindows(
+            (hwnd, lParam) =>
+            {
+                if (hwnd != session.MainHwnd && IsWindowVisible(hwnd))
+                {
+                    _ = GetWindowThreadProcessId(hwnd, out uint owner);
+                    if (owner == pid)
+                    {
+                        owned.Add(hwnd);
+                    }
+                }
+
+                return true;
+            },
+            IntPtr.Zero);
+
+        if (owned.Count == 0)
+        {
+            return false;
+        }
+
+        using var automation = new UIA3Automation();
+        foreach (IntPtr hwnd in owned)
+        {
+            if (string.Equals(ClassNameOf(hwnd), "#32768", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            try
+            {
+                AutomationElement? element = automation.FromHandle(hwnd);
+                if (element?.FindFirstDescendant(cf => cf.ByControlType(ControlType.MenuItem)) is not null)
+                {
+                    return true;
+                }
+            }
+            catch (Exception)
+            {
+                // The window closed while it was being inspected.
+            }
+        }
+
+        return false;
+    }
+
+    private static string ClassNameOf(IntPtr hwnd)
+    {
+        var buffer = new StringBuilder(256);
+        int length = GetClassName(hwnd, buffer, buffer.Capacity);
+        return length > 0 ? buffer.ToString() : string.Empty;
+    }
+
+    private static bool FocusAddressBar(AppSession session)
+    {
+        if (!EnsureForeground(session))
+        {
+            return false;
+        }
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            AutomationElement? address = session.Find(AddressBarId);
+            if (address is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                address.Focus();
+            }
+            catch (Exception)
+            {
+                try
+                {
+                    address.Click();
+                }
+                catch (Exception)
+                {
+                    // The next attempt reacquires the element.
+                }
+            }
+
+            if (WaitUntil(() => HasKeyboardFocus(session.Find(AddressBarId)), TimeSpan.FromMilliseconds(500)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string ReadAddress(AppSession session)
+    {
+        try
+        {
+            AutomationElement? address = session.Find(AddressBarId);
+            return address is null ? string.Empty : session.TextOf(address);
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
     }
 
     internal static bool WaitForTreeRow(AppSession session, string name, TimeSpan? timeout = null)
@@ -549,6 +862,127 @@ internal static class ControlTestSupport
             .ToArray();
     }
 
+    /// <summary>The applet key classic regedit writes LastKey and view state to when it exits.</summary>
+    internal const string AppletKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Applets\Regedit";
+
+    internal readonly record struct AppletValue(RegistryValueKind Kind, object? Data);
+
+    /// <summary>
+    /// The values under the applet key at one moment. KeyExisted records whether the key itself was
+    /// there, so a restore can tell values it created from values that were already there.
+    /// </summary>
+    internal sealed record AppletSnapshot(bool KeyExisted, IReadOnlyDictionary<string, AppletValue> Values);
+
+    /// <summary>Reads every value under HKCU\...\Applets\Regedit. Read only.</summary>
+    internal static AppletSnapshot SnapshotAppletValues()
+    {
+        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(AppletKeyPath, writable: false);
+        var values = new Dictionary<string, AppletValue>(StringComparer.OrdinalIgnoreCase);
+        if (key is not null)
+        {
+            foreach (string name in key.GetValueNames())
+            {
+                values[name] = new AppletValue(
+                    key.GetValueKind(name),
+                    key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames));
+            }
+        }
+
+        return new AppletSnapshot(key is not null, values);
+    }
+
+    /// <summary>
+    /// Puts the applet values back as they were in <paramref name="before"/>. Values that were not in the
+    /// snapshot are deleted, because classic regedit created them. Values that were in it are written
+    /// back with their kind and data. The key itself is left in place. Returns null when the values
+    /// match the snapshot afterwards, or a description of the first difference.
+    /// </summary>
+    internal static string? RestoreAppletValues(AppletSnapshot before)
+    {
+        bool present;
+        using (RegistryKey? probe = Registry.CurrentUser.OpenSubKey(AppletKeyPath, writable: false))
+        {
+            present = probe is not null;
+        }
+
+        if (!present && before.Values.Count == 0)
+        {
+            return null;
+        }
+
+        using (RegistryKey key = Registry.CurrentUser.CreateSubKey(AppletKeyPath, writable: true)
+            ?? throw new InvalidOperationException($@"Could not open HKCU\{AppletKeyPath} for writing."))
+        {
+            string[] names = key.GetValueNames();
+            foreach (string name in names)
+            {
+                if (!before.Values.ContainsKey(name))
+                {
+                    key.DeleteValue(name, throwOnMissingValue: false);
+                }
+            }
+
+            foreach (KeyValuePair<string, AppletValue> pair in before.Values)
+            {
+                bool exists = names.Contains(pair.Key, StringComparer.OrdinalIgnoreCase);
+                if (exists && SameAppletValue(key, pair.Key, pair.Value))
+                {
+                    continue;
+                }
+
+                key.SetValue(pair.Key, pair.Value.Data ?? Array.Empty<byte>(), pair.Value.Kind);
+            }
+        }
+
+        return FindAppletMismatch(before);
+    }
+
+    private static string? FindAppletMismatch(AppletSnapshot expected)
+    {
+        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(AppletKeyPath, writable: false);
+        string[] names = key?.GetValueNames() ?? Array.Empty<string>();
+        foreach (string name in names)
+        {
+            if (!expected.Values.ContainsKey(name))
+            {
+                return $"value '{name}' was not in the snapshot";
+            }
+        }
+
+        foreach (KeyValuePair<string, AppletValue> pair in expected.Values)
+        {
+            if (key is null || !names.Contains(pair.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                return $"value '{pair.Key}' is missing";
+            }
+
+            if (!SameAppletValue(key, pair.Key, pair.Value))
+            {
+                return $"value '{pair.Key}' differs in kind or data";
+            }
+        }
+
+        return null;
+    }
+
+    private static bool SameAppletValue(RegistryKey key, string name, AppletValue expected)
+    {
+        if (key.GetValueKind(name) != expected.Kind)
+        {
+            return false;
+        }
+
+        object? current = key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+        return (current, expected.Data) switch
+        {
+            (byte[] left, byte[] right) => left.AsSpan().SequenceEqual(right),
+            (string[] left, string[] right) => left.AsSpan().SequenceEqual(right),
+            _ => Equals(current, expected.Data),
+        };
+    }
+
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
     [DllImport("user32.dll")]
     private static extern bool SetProcessDpiAwarenessContext(IntPtr value);
 
@@ -557,4 +991,24 @@ internal static class ControlTestSupport
 
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
+
+    [DllImport("user32.dll")]
+    private static extern void keybd_event(byte virtualKey, byte scanCode, uint flags, UIntPtr extraInfo);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd, StringBuilder className, int maxCount);
 }

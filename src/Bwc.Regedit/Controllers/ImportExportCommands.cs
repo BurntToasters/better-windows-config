@@ -2,7 +2,6 @@ using System.Text;
 using Bwc.Core;
 using Bwc.Regedit.Registry;
 using Bwc.Registry;
-using Bwc.UI.Dialogs;
 
 namespace Bwc.Regedit.Controllers;
 
@@ -43,7 +42,7 @@ internal sealed class ImportExportCommands
         catch (Exception ex) when (IsFileOperationFailure(ex))
         {
             LogFileOperationFailure("import", filePath, ex);
-            await ShowFileOperationErrorAsync(filePath, ex);
+            await ShowFileOperationErrorAsync(RegistryAction.ImportFile, filePath, ex);
             return;
         }
 
@@ -84,7 +83,7 @@ internal sealed class ImportExportCommands
         catch (Exception ex) when (IsFileOperationFailure(ex))
         {
             LogFileOperationFailure("export", filePath, ex);
-            await ShowFileOperationErrorAsync(filePath, ex);
+            await ShowFileOperationErrorAsync(RegistryAction.ExportFile, filePath, ex);
         }
     }
 
@@ -117,21 +116,10 @@ internal sealed class ImportExportCommands
         Log.Warn(
             $"Registry Editor {operation} of '{path}' failed: {exception.GetType().Name}: {exception.Message}");
 
-    private async Task ShowFileOperationErrorAsync(string filePath, Exception exception)
-    {
-        if (exception is RegistryOperationException operation)
-        {
-            await _context.ShowErrorAsync(ErrorDialog.ForOperation(
-                Get("DialogErrorTitle"),
-                operation.Operation,
-                operation.Path.ToDisplayString(),
-                operation.Win32Error,
-                MessageCatalog.FileLinePrefix + filePath));
-            return;
-        }
-
-        await _context.ShowErrorAsync(ErrorDialog.ForMessage(
-            Get("DialogErrorTitle"),
-            MessageCatalog.FileLinePrefix + filePath + Environment.NewLine + Environment.NewLine + exception.Message));
-    }
+    /// <summary>
+    /// Shows the classic text for a failed import or export. The text names the file the user chose.
+    /// The engine detail stays in the log.
+    /// </summary>
+    private Task ShowFileOperationErrorAsync(RegistryAction action, string filePath, Exception exception) =>
+        _context.ShowErrorAsync(_context.Messages.ForFileError(action, exception, filePath).ToErrorDialog());
 }

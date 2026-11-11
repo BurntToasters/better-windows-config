@@ -1,8 +1,6 @@
-using System.Globalization;
 using Bwc.Core;
 using Bwc.Regedit.Printing;
 using Bwc.Registry;
-using Bwc.UI.Dialogs;
 using Microsoft.UI.Xaml;
 
 namespace Bwc.Regedit.Controllers;
@@ -96,14 +94,12 @@ internal sealed class PrintController
             return;
         }
 
-        string message = string.Format(
-            CultureInfo.InvariantCulture,
-            Get("DialogPrintFailed"),
-            key.ToDisplayString(),
-            result.ErrorCode,
-            result.Message);
-
-        await _context.ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogErrorTitle"), message));
+        // The engine detail stays in the log. The dialog shows the classic print text.
+        Log.Warn(
+            $"Registry Editor print of '{key.ToDisplayString()}' failed: code {result.ErrorCode}: {result.Message}");
+        await _context.ShowErrorAsync(new ClassicMessage(
+            Get("DialogErrorTitle"),
+            Get("MsgPrintFailed")).ToErrorDialog());
     }
 
     private void FocusAfterPrint(bool listHadFocus)

@@ -28,6 +28,17 @@ internal static class BwcFocusRect
         Stroke = stroke,
     };
 
+    /// <summary>
+    /// Creates a selection border: a solid one device pixel rectangle on the same inset as the focus
+    /// rectangle. Measure and Arrange place it the same way.
+    /// </summary>
+    public static Rectangle CreateBorder(Brush stroke) => new()
+    {
+        IsHitTestVisible = false,
+        Fill = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+        Stroke = stroke,
+    };
+
     /// <summary>Sizes the overlay for a row and measures it. The stroke is one device pixel.</summary>
     public static void Measure(Rectangle rect, UIElement owner, Size rowSize)
     {

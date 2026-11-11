@@ -17,16 +17,23 @@ namespace Bwc.UI.Tree;
 /// </summary>
 public sealed class TreeRowElement : Panel
 {
+    // Offsets from the start of the row's indent, in DIPs. Measured on classic regedit at 200 percent
+    // (docs/parity/oracle/regedit-row-metrics.json): the expander is centered at indent + 10.5, the
+    // icon starts at indent + 18, and the first text ink is at indent + 37.5 (the glyph bearing adds
+    // about half a DIP to the layout origin, so the layout origin is indent + 37).
     private const double ChevronSize = 16;
-    private const double ChevronGap = 2;
-    private const double TextGap = 3;
+    private const double ChevronInset = 2.5;
+    private const double IconInset = 18;
+    private const double TextInset = 37;
 
     private static readonly FontFamily IconFont = new("Segoe Fluent Icons");
 
     private readonly Grid _chevronHost;
     private readonly FontIcon _chevron;
+    private readonly Image _icon;
     private readonly TextBlock _label;
     private readonly Rectangle _focusRect;
+    private readonly Rectangle _selectionBorder;
     private bool _selected;
     private double _indentWidth;
     private double _rowHeight = -1;
@@ -56,6 +63,15 @@ public sealed class TreeRowElement : Panel
         _chevronHost.Children.Add(_chevron);
         _chevronHost.Tapped += OnChevronTapped;
 
+        _icon = new Image
+        {
+            Width = Icons.IconProvider.IconDip,
+            Height = Icons.IconProvider.IconDip,
+            Stretch = Stretch.Fill,
+            IsHitTestVisible = false,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
         _label = new TextBlock
         {
             TextWrapping = TextWrapping.NoWrap,
@@ -70,12 +86,16 @@ public sealed class TreeRowElement : Panel
         // The focus rectangle is visible only on the selected row, and its brush is transparent
         // unless the tree has focus. It is the last child so it draws over the selection fill.
         _focusRect = BwcFocusRect.Create(DenseTheme.TreeFocusRect);
+        _selectionBorder = BwcFocusRect.CreateBorder(DenseTheme.TreeSelectionBorder);
 
         Children.Add(_chevronHost);
+        Children.Add(_icon);
         Children.Add(_label);
+        Children.Add(_selectionBorder);
         Children.Add(_focusRect);
         Tapped += OnRowTapped;
         RightTapped += OnRowRightTapped;
+        Loaded += (_, _) => ApplyIcon();
         Height = DenseMetrics.TreeRowHeight;
     }
 
@@ -98,6 +118,7 @@ public sealed class TreeRowElement : Panel
         _indentWidth = indent;
         ApplyMetricsCore();
         ApplyChevron();
+        ApplyIcon();
         ApplyTheme();
 
         if (layoutChanged)
@@ -140,6 +161,7 @@ public sealed class TreeRowElement : Panel
         _label.Foreground = foreground;
         _chevron.Foreground = foreground;
         _focusRect.Stroke = _selected ? DenseTheme.TreeFocusRect : DenseTheme.Transparent;
+        _selectionBorder.Stroke = _selected ? DenseTheme.TreeSelectionBorder : DenseTheme.Transparent;
     }
 
     internal void SetSelected(bool selected)
@@ -161,8 +183,9 @@ public sealed class TreeRowElement : Panel
     protected override Size MeasureOverride(Size availableSize)
     {
         double height = DenseMetrics.TreeRowHeight;
-        double textX = _indentWidth + ChevronSize + TextGap;
+        double textX = _indentWidth + TextInset;
         _chevronHost.Measure(new Size(ChevronSize, ChevronSize));
+        _icon.Measure(new Size(Icons.IconProvider.IconDip, Icons.IconProvider.IconDip));
 
         double availableText = double.IsInfinity(availableSize.Width)
             ? double.PositiveInfinity
@@ -172,6 +195,7 @@ public sealed class TreeRowElement : Panel
         double width = double.IsInfinity(availableSize.Width)
             ? textX + _label.DesiredSize.Width
             : availableSize.Width;
+        BwcFocusRect.Measure(_selectionBorder, this, new Size(width, height));
         BwcFocusRect.Measure(_focusRect, this, new Size(width, height));
         return new Size(width, height);
     }
@@ -179,12 +203,16 @@ public sealed class TreeRowElement : Panel
     protected override Size ArrangeOverride(Size finalSize)
     {
         double height = Math.Min(finalSize.Height, DenseMetrics.TreeRowHeight);
-        _chevronHost.Arrange(new Rect(_indentWidth, (height - ChevronSize) / 2, ChevronSize, ChevronSize));
+        _chevronHost.Arrange(new Rect(_indentWidth + ChevronInset, (height - ChevronSize) / 2, ChevronSize, ChevronSize));
 
-        double textX = _indentWidth + ChevronSize + TextGap;
+        double iconSize = Icons.IconProvider.IconDip;
+        _icon.Arrange(new Rect(_indentWidth + IconInset, (height - iconSize) / 2, iconSize, iconSize));
+
+        double textX = _indentWidth + TextInset;
         double textWidth = Math.Max(0, finalSize.Width - textX - 2);
         double labelHeight = Math.Min(height, _label.DesiredSize.Height);
         _label.Arrange(new Rect(textX, (height - labelHeight) / 2, textWidth, labelHeight));
+        BwcFocusRect.Arrange(_selectionBorder, this, new Size(finalSize.Width, height));
         BwcFocusRect.Arrange(_focusRect, this, new Size(finalSize.Width, height));
         return finalSize;
     }
@@ -209,6 +237,22 @@ public sealed class TreeRowElement : Panel
         {
             Height = rowHeight;
         }
+    }
+
+    /// <summary>
+    /// The root is the computer icon. Every key uses the closed folder, which classic regedit shows
+    /// for the selected and expanded keys too, so the icon never changes with expansion.
+    /// </summary>
+    private void ApplyIcon()
+    {
+        if (Node is null)
+        {
+            return;
+        }
+
+        var kind = Node.Parent is null ? Icons.IconKind.Computer : Icons.IconKind.ClosedFolder;
+        double scale = XamlRoot?.RasterizationScale ?? 1.0;
+        _icon.Source = Icons.IconProvider.Get(kind, scale);
     }
 
     private void ApplyChevron()

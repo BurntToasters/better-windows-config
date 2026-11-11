@@ -1,4 +1,3 @@
-using System.Globalization;
 using Bwc.Core;
 using Bwc.Regedit.Dialogs;
 using Bwc.Regedit.Registry;
@@ -87,17 +86,11 @@ internal sealed class HiveRemoteCommands
             return;
         }
 
+        // The dialog reports an HRESULT. The Win32 code is its low word when the facility is Win32.
         uint hresult = (uint)result;
-        string win32Text = (hresult & 0xFFFF0000u) == 0x80070000u
-            ? (hresult & 0xFFFFu).ToString(CultureInfo.InvariantCulture)
-            : "n/a";
-        string message = string.Format(
-            CultureInfo.InvariantCulture,
-            Get("DialogPermissionsFailed"),
-            hresult,
-            win32Text);
-
-        await _context.ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogErrorTitle"), message));
+        int win32 = (hresult & 0xFFFF0000u) == 0x80070000u ? (int)(hresult & 0xFFFFu) : -1;
+        Log.Warn($"Registry Editor could not show the permissions for '{path.ToDisplayString()}': HRESULT 0x{hresult:X8}.");
+        await _context.ShowErrorAsync(_context.Messages.ForPermissions(win32).ToErrorDialog());
     }
 
     private async Task LoadHiveAsync()
@@ -134,7 +127,7 @@ internal sealed class HiveRemoteCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.LoadHive, target.ToDisplayString());
             return;
         }
 
@@ -158,7 +151,8 @@ internal sealed class HiveRemoteCommands
         }
         catch (RegistryOperationException ex)
         {
-            return ex.Message;
+            Log.Warn($"Registry Editor could not check a hive name: {ex.Operation} for {ex.Path.ToDisplayString()}, Win32 {ex.Win32Error}: {ex.Message}");
+            return _context.Messages.ForRegistryError(RegistryAction.LoadHive, ex, target.ToDisplayString()).Text;
         }
     }
 
@@ -180,11 +174,8 @@ internal sealed class HiveRemoteCommands
         }
 
         var dialog = new ConfirmDialog(
-            Get("DialogUnloadHiveTitle"),
-            string.Format(
-                CultureInfo.CurrentCulture,
-                Get("DialogUnloadHiveMessage"),
-                path.ToDisplayString()),
+            Get("MsgCaptionConfirmUnloadHive"),
+            Get("MsgUnloadHiveConfirm"),
             Get("DialogYes"),
             Get("DialogNo"));
 
@@ -199,7 +190,7 @@ internal sealed class HiveRemoteCommands
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex);
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.UnloadHive, path.ToDisplayString());
             return;
         }
 
@@ -236,12 +227,14 @@ internal sealed class HiveRemoteCommands
         }
         catch (RemoteRegistryException ex)
         {
-            await _context.ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogConnectFailedTitle"), ex.Message));
+            Log.Warn($"Registry Editor could not connect to '{computerName}': {ex.Reason}, Win32 {ex.Win32Error}: {ex.Message}");
+            await _context.ShowErrorAsync(_context.Messages.ForConnect(ex.Reason, ex.Win32Error, computerName).ToErrorDialog());
             return;
         }
         catch (ArgumentException ex)
         {
-            await _context.ShowErrorAsync(ErrorDialog.ForMessage(Get("DialogConnectFailedTitle"), ex.Message));
+            Log.Warn($"Registry Editor could not connect to '{computerName}': {ex.Message}");
+            await _context.ShowErrorAsync(_context.Messages.ForConnect(RemoteRegistryFailureReason.ConnectFailed, 0, computerName).ToErrorDialog());
             return;
         }
 
