@@ -77,7 +77,6 @@ internal sealed class AboutDialog : ClassicDialog
         layout.Children.Add(body);
         layout.Children.Add(buttons);
         SetFlowContent(layout);
-        HubDialogTheme.Apply(this);
     }
 
     /// <summary>True when the user asked to open the third-party notices file.</summary>

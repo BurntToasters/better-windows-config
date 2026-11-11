@@ -1,3 +1,4 @@
+using Bwc.UI.Theme;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -93,7 +94,7 @@ public class ClassicMessageBox : ClassicDialog
             IsTextSelectionEnabled = selectableText,
             FontFamily = new FontFamily(ClassicFontSpec.MessageFont.Face),
             FontSize = ClassicFontSpec.MessageFont.DipSize,
-            Foreground = BrushFor("TextFillColorPrimaryBrush", new SolidColorBrush(Colors.Black)),
+            Foreground = BwcBrushes.WindowText,
         };
         AutomationProperties.SetAutomationId(_text, textAutomationId);
         AutomationProperties.SetName(_text, text);
@@ -366,7 +367,7 @@ public class ClassicMessageBox : ClassicDialog
                         new(2, 30),
                     },
                     Fill = BrushFor("SystemFillColorCautionBrush", new SolidColorBrush(Colors.Gold)),
-                    Stroke = BrushFor("TextFillColorPrimaryBrush", new SolidColorBrush(Colors.Black)),
+                    Stroke = BwcBrushes.WindowText,
                     StrokeThickness = 1,
                 });
                 holder.Children.Add(GlyphText("!", Colors.Black, 18));

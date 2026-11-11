@@ -1,3 +1,4 @@
+using Bwc.UI.Theme;
 using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
@@ -79,6 +80,9 @@ public class ClassicDialog : ModalDialogWindow
         };
         AutomationProperties.SetAutomationId(_root, "DialogRoot");
         _root.Style = StyleFor("BwcClassicRootStyle") ?? _root.Style;
+        ApplyPalette();
+        BwcTheme.Changed += OnPaletteChanged;
+        Closed += OnDialogClosed;
         _root.KeyDown += OnRootKeyDown;
         _root.KeyUp += OnRootKeyUp;
         _root.Loaded += OnRootLoaded;
@@ -87,7 +91,9 @@ public class ClassicDialog : ModalDialogWindow
         if (template is not null)
         {
             ValidateTemplate(template);
-            _canvas = new Canvas();
+            // The surface paints the face itself. A ContentControl background is not painted on this root,
+            // so the window backing (black) showed through and the palette text was drawn on it.
+            _canvas = new Canvas { Background = BwcBrushes.Face };
             _root.Content = _canvas;
             foreach (ClassicControlDefinition definition in template.Controls)
             {
@@ -132,7 +138,29 @@ public class ClassicDialog : ModalDialogWindow
             throw new InvalidOperationException("A template dialog places its own controls.");
         }
 
-        _root.Content = content;
+        var surface = new Grid { Background = BwcBrushes.Face };
+        surface.Children.Add(content);
+        _root.Content = surface;
+    }
+
+    /// <summary>
+    /// Paints the dialog from the BWC palette rather than from the app's Fluent theme keys. The face and text are
+    /// the palette brushes, which are live, so a palette change repaints them. The element theme follows the palette
+    /// so the Fluent buttons, links, and text boxes match it, whatever the Windows app mode is.
+    /// </summary>
+    private void ApplyPalette()
+    {
+        _root.RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
+        _root.Background = BwcBrushes.Face;
+        _root.Foreground = BwcBrushes.WindowText;
+    }
+
+    private void OnPaletteChanged(object? sender, EventArgs e) => ApplyPalette();
+
+    private void OnDialogClosed(object? sender, WindowEventArgs args)
+    {
+        Closed -= OnDialogClosed;
+        BwcTheme.Changed -= OnPaletteChanged;
     }
 
     /// <summary>Returns the control with this automation id, or null when the dialog has none.</summary>

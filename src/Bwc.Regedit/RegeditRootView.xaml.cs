@@ -94,10 +94,15 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         Shell.ListContent.RenameRequested += OnListRenameRequested;
         Shell.ListContent.RowActivated += OnListRowActivated;
         Shell.TreeContent.ContextRequested += OnTreeContextRequested;
-        Shell.TreeContent.DeleteRequested += OnSelectionDeleteRequested;
+        Shell.TreeContent.DeleteRequested += OnTreeDeleteRequested;
         Shell.TreeContent.CopyKeyNameRequested += OnCopyKeyNameRequested;
         Shell.ListContent.ContextRequested += OnListContextRequested;
-        Shell.ListContent.DeleteRequested += OnSelectionDeleteRequested;
+        Shell.ListContent.DeleteRequested += OnListDeleteRequested;
+
+        // Delete, Rename, and the Edit menu act on the pane that has focus. When the menu bar has focus,
+        // the last pane that had focus is used instead.
+        Shell.TreeContent.GotFocus += OnTreeGotFocus;
+        Shell.ListContent.GotFocus += OnListGotFocus;
         Shell.AddressBarSubmitted += OnAddressBarSubmitted;
         Shell.TreeContent.SetRoots(_context.TreeSource.Roots);
         Shell.TreeContent.SelectNode(_context.TreeSource.Computer);
@@ -161,6 +166,14 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
 
     public void RenameSelection() => _viewCommands.RenameSelection();
 
+    public void ModifySelectedValue() => _valueCommands.ModifySelectedValue();
+
+    public void ModifyBinaryData() => _valueCommands.ModifyBinaryData();
+
+    public void CopyKeyName() => _keyCommands.CopySelectedKeyName();
+
+    public void Refresh() => _viewCommands.Refresh();
+
     public void Import() => _importExport.Import();
 
     public void Export() => _importExport.Export();
@@ -206,7 +219,19 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
     private void OnListRowActivated(object? sender, DetailsRowActivatedEventArgs e) =>
         _valueCommands.ActivateValue(e.Row);
 
-    private void OnSelectionDeleteRequested(object? sender, EventArgs e) => DeleteSelection();
+    private void OnTreeDeleteRequested(object? sender, EventArgs e) => _viewCommands.DeleteFrom(RegeditContext.Pane.Tree);
+
+    private void OnListDeleteRequested(object? sender, EventArgs e) => _viewCommands.DeleteFrom(RegeditContext.Pane.List);
+
+    private void OnTreeGotFocus(object sender, RoutedEventArgs e) => SetFocusedPane(RegeditContext.Pane.Tree);
+
+    private void OnListGotFocus(object sender, RoutedEventArgs e) => SetFocusedPane(RegeditContext.Pane.List);
+
+    private void SetFocusedPane(RegeditContext.Pane pane)
+    {
+        _context.LastFocusedPane = pane;
+        _context.UpdateCommandStates();
+    }
 
     private void OnCopyKeyNameRequested(object? sender, EventArgs e) => _keyCommands.CopySelectedKeyName();
 

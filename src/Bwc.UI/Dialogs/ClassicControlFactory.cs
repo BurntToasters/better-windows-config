@@ -1,3 +1,4 @@
+using Bwc.UI.Theme;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -174,6 +175,7 @@ internal static class ClassicControlFactory
             FontFamily = new FontFamily(font.Face),
             FontSize = font.DipSize,
             TextWrapping = TextWrapping.NoWrap,
+            Foreground = BwcBrushes.WindowText,
         };
         if (styleKey is not null)
         {
@@ -267,10 +269,10 @@ internal sealed class ClassicFrame : ContentControl
     {
         ArgumentNullException.ThrowIfNull(caption);
 
-        Brush stroke = ClassicMessageBox.BrushFor("ControlStrokeColorDefaultBrush", new SolidColorBrush(Colors.Gray));
+        // The classic group box is drawn in COLOR_3DSHADOW, and its caption in the window text color.
         foreach (Rectangle line in new[] { _topLeft, _topRight, _left, _right, _bottom })
         {
-            line.Fill = stroke;
+            line.Fill = BwcBrushes.Shadow;
             _layer.Children.Add(line);
         }
 
@@ -281,6 +283,7 @@ internal sealed class ClassicFrame : ContentControl
             FontFamily = new FontFamily(font.Face),
             FontSize = font.DipSize,
             TextWrapping = TextWrapping.NoWrap,
+            Foreground = BwcBrushes.WindowText,
         };
         _layer.Children.Add(_caption);
         Content = _layer;

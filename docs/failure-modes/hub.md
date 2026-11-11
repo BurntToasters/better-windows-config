@@ -90,6 +90,12 @@ URL). Every update message is a `ClassicMessageBox` or the update dialogs in `Di
 the build recorded a full commit hash. The full 40-character hash is never shown. A missing or
 non-hexadecimal commit omits the commit part.
 
+The About and update dialogs paint the palette face and palette text through `ClassicDialog`, so
+their text is readable in light and dark. A dialog that paints its text without its face (black
+text on the window backing) passes UI Automation text checks, so the E2E checks also read the
+client-area pixels: the most common color must be the palette face, and each static text control
+must have strong contrast against it. A failure names the dialog and the text rectangle.
+
 When `THIRD-PARTY-NOTICES.txt` is in the install folder, About shows a second button that opens
 that file with the shell. When the file is absent, the button is not shown and the text says that
 no notices file is included. A failure to open the file is logged and the About dialog stays open.
@@ -263,8 +269,11 @@ and is repeated while the item is still showing, because a click that arrives wi
 move was sometimes dropped. The interactive check's progress window has the same title as its result
 message, so the result lookup waits for the window that holds the message text. Captures go to
 `artifacts/e2e/visual/hub/`: each capture is the window's visible frame read from the screen, so the
-whole window is in the image. The captures are the main window in light and dark, About, the progress
-dialog, and the update dialogs. Release builds with `-p:Platform=ARM64` must have zero
+whole window is in the image. The captures are the main window in light and dark, About in light and
+dark, the progress dialog, and the update dialogs. Every dialog check also runs `DialogContrast` on the
+client area (see the About section). `Hub_DarkTheme_DialogsAreReadable` covers About and the
+not-configured message in the dark palette. The loopback update checks
+run in light only. Release builds with `-p:Platform=ARM64` must have zero
 warnings. Run the checks with:
 
 ```

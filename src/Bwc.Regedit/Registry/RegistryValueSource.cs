@@ -1,4 +1,5 @@
 using Bwc.Core;
+using Bwc.Regedit.Controllers;
 using Bwc.Registry;
 using Bwc.UI.List;
 
@@ -11,6 +12,9 @@ namespace Bwc.Regedit.Registry;
 /// </summary>
 public sealed class RegistryValueSource
 {
+    /// <summary>Type column text of the synthetic default row (classic regedit shows REG_SZ).</summary>
+    private static readonly string SyntheticDefaultType = RegistryValueTypeExtensions.ToTypeName((uint)RegistryValueType.String);
+    private static readonly string SyntheticDefaultData = MessageCatalog.ValueNotSetData;
     private static readonly StringComparer NameComparer = StringComparer.CurrentCultureIgnoreCase;
     private static readonly IReadOnlyList<DetailsRow> NoRows = Array.Empty<DetailsRow>();
     private static readonly IReadOnlyDictionary<string, string> NoRawNames =
@@ -50,8 +54,19 @@ public sealed class RegistryValueSource
                 .ThenBy(value => value.Name, NameComparer)
                 .ToList();
 
-            var rows = new List<DetailsRow>(sorted.Count);
+            var rows = new List<DetailsRow>(sorted.Count + 1);
             var rawNames = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            // Classic regedit lists (Default) for every key. A key without a default value gets a
+            // synthetic first row with no registry value behind it, so it is not in the raw name map.
+            if (sorted.Count == 0 || sorted[0].Name.Length > 0)
+            {
+                rows.Add(new DetailsRow(
+                    MessageCatalog.DefaultValueLabel,
+                    SyntheticDefaultType,
+                    SyntheticDefaultData,
+                    renameable: false));
+            }
 
             foreach (RegistryValueInfo value in sorted)
             {

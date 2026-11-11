@@ -26,7 +26,6 @@ internal sealed class UpdateProgressDialog : ClassicMessageBox
             primaryText: HubStrings.Get("UpdateCancelButton"),
             textAutomationId: "UpdateProgressText")
     {
-        HubDialogTheme.Apply(this);
     }
 
     /// <summary>True once the worker has closed the window itself.</summary>
@@ -120,7 +119,6 @@ internal sealed class UpdateAvailableDialog : ClassicDialog
 
         layout.Children.Add(buttons);
         SetFlowContent(layout);
-        HubDialogTheme.Apply(this);
     }
 
     protected override void OnDialogLoaded()
@@ -261,7 +259,6 @@ internal sealed class UpdateSettingsDialog : ClassicDialog
         }));
         layout.Children.Add(buttons);
         SetFlowContent(layout);
-        HubDialogTheme.Apply(this);
     }
 
     /// <summary>"beta" when the beta radio button is checked, otherwise "stable".</summary>

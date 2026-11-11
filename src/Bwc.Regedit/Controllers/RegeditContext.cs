@@ -6,6 +6,7 @@ using Bwc.UI.Dialogs;
 using Bwc.UI.List;
 using Bwc.UI.Shell;
 using Bwc.UI.Tree;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Automation.Provider;
@@ -23,6 +24,19 @@ internal sealed class RegeditContext
 {
     /// <summary>The longest value name the registry accepts, in characters.</summary>
     public const int MaxValueNameLength = 16383;
+
+    /// <summary>The two panes that Delete, Rename, and the Edit menu act on.</summary>
+    public enum Pane
+    {
+        Tree,
+        List,
+    }
+
+    /// <summary>
+    /// List rows and scroll position to restore after a refresh. The rows are applied when the
+    /// value list for the new tree selection arrives.
+    /// </summary>
+    public sealed record PendingListView(IReadOnlyList<string> RowNames, double ListOffset);
 
     public RegeditContext(
         ClassicWindowShell shell,
@@ -85,6 +99,51 @@ internal sealed class RegeditContext
     public int ValueGeneration { get; set; }
 
     public CancellationTokenSource? ValueLoad { get; set; }
+
+    /// <summary>The pane that most recently had keyboard focus. Menu commands use it while the menu bar has focus.</summary>
+    public Pane LastFocusedPane { get; set; } = Pane.Tree;
+
+    /// <summary>Set by a keep-view refresh. The next value list to load restores these rows and this scroll.</summary>
+    public PendingListView? PendingList { get; set; }
+
+    /// <summary>The pane with keyboard focus, or the last pane that had it when neither pane has focus.</summary>
+    public Pane FocusedPane()
+    {
+        if (IsFocusWithin(Shell.ListContent))
+        {
+            return Pane.List;
+        }
+
+        if (IsFocusWithin(Shell.TreeContent))
+        {
+            return Pane.Tree;
+        }
+
+        return LastFocusedPane;
+    }
+
+    /// <summary>
+    /// The list row for the synthetic (Default) row: the registry has no default value, so the row has
+    /// no raw name. It is listed for every key, as classic regedit does.
+    /// </summary>
+    public bool IsSyntheticDefault(DetailsRow row) =>
+        string.Equals(row.Name, MessageCatalog.DefaultValueLabel, StringComparison.Ordinal) &&
+        !ValueSource.RawNamesByName.ContainsKey(MessageCatalog.DefaultValueLabel);
+
+    /// <summary>Number of selected rows that have a registry value behind them.</summary>
+    public int SelectedRealValueCount()
+    {
+        int count = 0;
+        foreach (DetailsRow row in Shell.ListContent.SelectedRows)
+        {
+            if (!IsSyntheticDefault(row))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
 
     /// <summary>
     /// Runs one command and reports its failure. Callers do not await the result: the command runs
@@ -283,6 +342,10 @@ internal sealed class RegeditContext
         return true;
     }
 
+    /// <summary>
+    /// The registry value name behind a list row. False for the synthetic (Default) row, which has no
+    /// value behind it.
+    /// </summary>
     public bool TryGetRawValueName(DetailsRow row, out string rawName)
     {
         if (ValueSource.RawNamesByName.TryGetValue(row.Name, out string? mapped) && mapped is not null)
@@ -294,7 +357,7 @@ internal sealed class RegeditContext
         if (string.Equals(row.Name, MessageCatalog.DefaultValueLabel, StringComparison.Ordinal))
         {
             rawName = string.Empty;
-            return true;
+            return false;
         }
 
         rawName = row.Name;
@@ -312,33 +375,38 @@ internal sealed class RegeditContext
         bool hasKey = TryGetSelectedKeyPath(out RegistryPath key);
         bool mutableKey = hasKey && !key.IsRoot;
         IReadOnlyList<DetailsRow> rows = Shell.ListContent.SelectedRows;
-        bool hasValue = rows.Count > 0;
+        bool hasRows = rows.Count > 0;
+        int realValues = SelectedRealValueCount();
+        bool singleRow = rows.Count == 1;
+        bool singleRealValue = singleRow && realValues == 1;
+
+        // Delete and Rename act on the pane with focus. The list state applies only when the list is
+        // the target, so a selected value does not enable Delete for a key that has focus.
+        bool treeTarget = FocusedPane() == Pane.Tree;
 
         foreach (int id in new[] { 663, 664, 665, 674, 688, 676, 677 })
         {
             RegeditMenu.SetCommandEnabled(Shell.MenuBar, id, hasKey);
         }
 
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 913, hasValue || mutableKey);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 913, treeTarget ? mutableKey : realValues > 0);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 659, hasKey);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 660, hasKey);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 679, hasValue && rows.Count == 1);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 678, hasKey && !hasValue);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 679, singleRealValue);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 678, hasKey && !hasRows);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 675, hasKey);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 680, true);
         RegeditMenu.SetCommandEnabled(
             Shell.MenuBar,
             681,
-            hasKey && !hasValue && IsHiveRootChild(key));
+            hasKey && !hasRows && IsHiveRootChild(key));
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 657, true);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 768, RemoteConnections.Count > 0);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 912, singleRow);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 917, singleRealValue);
+        RegeditMenu.SetValueCommandsVisible(Shell.MenuBar, hasRows);
 
-        bool canRename = mutableKey;
-        if (hasValue)
-        {
-            canRename = rows.Count == 1 &&
-                !string.Equals(rows[0].Name, MessageCatalog.DefaultValueLabel, StringComparison.Ordinal);
-        }
-
+        bool canRename = treeTarget || !hasRows ? mutableKey : singleRow && rows[0].Renameable;
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 914, canRename);
     }
 
@@ -369,21 +437,163 @@ internal sealed class RegeditContext
         }
     }
 
-    /// <summary>Rebuilds the tree from the current sources and selects the path, or Computer when it is gone.</summary>
-    public async Task RefreshTreeAsync(string? selectDisplayPath)
+    /// <summary>
+    /// Rebuilds the tree from the current sources, keeps every key that was expanded expanded, and
+    /// selects the path, or Computer when it is gone. With <paramref name="keepView"/> (F5), the list
+    /// selection and the scroll positions of the tree and the list are kept as well.
+    /// </summary>
+    public async Task RefreshTreeAsync(string? selectDisplayPath, bool keepView = false)
     {
-        var source = new RegistryTreeSource(Store.Reader, RemoteConnections);
-        TreeNode? target = null;
+        IReadOnlyList<string> expanded = CollectExpandedPaths(TreeSource.Roots);
+        double treeOffset = FindDescendant<ScrollViewer>(Shell.TreeContent)?.VerticalOffset ?? 0;
+        double listOffset = FindDescendant<ScrollViewer>(Shell.ListContent)?.VerticalOffset ?? 0;
+        string[] listRowNames = keepView
+            ? Shell.ListContent.SelectedRows.Select(row => row.Name).ToArray()
+            : Array.Empty<string>();
 
-        if (!string.IsNullOrWhiteSpace(selectDisplayPath))
+        var source = new RegistryTreeSource(Store.Reader, RemoteConnections);
+        foreach (string path in expanded)
         {
-            target = await source.FindPathAsync(selectDisplayPath);
+            TreeNode? node = await ResolveNodeAsync(source.Computer, path, expandAncestors: false);
+            if (node is { HasChildren: true })
+            {
+                _ = await node.LoadChildrenAsync(CancellationToken.None);
+                node.IsExpanded = true;
+            }
         }
 
+        TreeNode? target = string.IsNullOrWhiteSpace(selectDisplayPath)
+            ? null
+            : await ResolveNodeAsync(source.Computer, selectDisplayPath, expandAncestors: true);
+
         TreeSource = source;
+        if (keepView)
+        {
+            // Set before the selection, because the selection starts the value load that applies it.
+            PendingList = new PendingListView(listRowNames, listOffset);
+        }
+
         Shell.TreeContent.SetRoots(source.Roots);
         Shell.TreeContent.SelectNode(target ?? source.Computer);
+        if (keepView)
+        {
+            RestoreScrollOffset(Shell.TreeContent, treeOffset);
+        }
+
         UpdateCommandStates();
+    }
+
+    /// <summary>Refreshes the tree and the value list for F5, keeping the view. See <see cref="RefreshTreeAsync"/>.</summary>
+    public Task RefreshViewAsync() =>
+        RefreshTreeAsync(Shell.TreeContent.SelectedNode?.RegistryPath, keepView: true);
+
+    /// <summary>
+    /// The display paths of every expanded key, parents before children. Computer has no path and is
+    /// skipped, because it is always expanded.
+    /// </summary>
+    private static List<string> CollectExpandedPaths(IEnumerable<TreeNode> nodes)
+    {
+        var paths = new List<string>();
+        CollectExpandedPaths(nodes, paths);
+        return paths;
+    }
+
+    private static void CollectExpandedPaths(IEnumerable<TreeNode> nodes, List<string> paths)
+    {
+        foreach (TreeNode node in nodes)
+        {
+            if (node.IsExpanded && node.RegistryPath is { Length: > 0 } path)
+            {
+                paths.Add(path);
+            }
+
+            CollectExpandedPaths(node.Children, paths);
+        }
+    }
+
+    /// <summary>
+    /// Finds the node for a display path by walking the names from Computer. Each level is loaded on the
+    /// way down, so the walk works for local and remote paths alike. Null when a name is missing. With
+    /// <paramref name="expandAncestors"/>, every node on the way is expanded, so the result is visible.
+    /// </summary>
+    private static async Task<TreeNode?> ResolveNodeAsync(TreeNode computer, string displayPath, bool expandAncestors)
+    {
+        TreeNode current = computer;
+        foreach (string name in SplitDisplayPath(displayPath))
+        {
+            IReadOnlyList<TreeNode> children = await current.LoadChildrenAsync(CancellationToken.None);
+            TreeNode? next = null;
+            foreach (TreeNode child in children)
+            {
+                if (string.Equals(child.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    next = child;
+                    break;
+                }
+            }
+
+            if (next is null)
+            {
+                return null;
+            }
+
+            if (expandAncestors)
+            {
+                current.IsExpanded = true;
+            }
+
+            current = next;
+        }
+
+        return current;
+    }
+
+    /// <summary>
+    /// Splits a tree display path into node names below Computer. A local path is
+    /// <c>Computer\HKEY...\name</c>. A remote path is <c>\\COMPUTER\HKEY...\name</c>, and its first name
+    /// is the remote computer node.
+    /// </summary>
+    private static List<string> SplitDisplayPath(string displayPath)
+    {
+        var names = new List<string>();
+        string rest = displayPath.Trim();
+        if (rest.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            int separator = rest.IndexOf('\\', 2);
+            if (separator < 0)
+            {
+                names.Add(rest);
+                return names;
+            }
+
+            names.Add(rest[..separator]);
+            rest = rest[(separator + 1)..];
+        }
+        else if (string.Equals(rest, "Computer", StringComparison.OrdinalIgnoreCase))
+        {
+            return names;
+        }
+        else if (rest.StartsWith("Computer\\", StringComparison.OrdinalIgnoreCase))
+        {
+            rest = rest["Computer\\".Length..];
+        }
+
+        names.AddRange(rest.Split('\\', StringSplitOptions.RemoveEmptyEntries));
+        return names;
+    }
+
+    /// <summary>
+    /// Sets the vertical scroll offset of the scroll viewer inside a pane. The offset is applied on a
+    /// later dispatcher turn, after the pane has measured its new rows, so a long list is not clamped
+    /// to the old height.
+    /// </summary>
+    private void RestoreScrollOffset(UIElement pane, double offset)
+    {
+        _ = Shell.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            ScrollViewer? viewer = FindDescendant<ScrollViewer>(pane);
+            _ = viewer?.ChangeView(null, offset, null, disableAnimation: true);
+        });
     }
 
     /// <summary>Reloads the list rows for the selected key. Stale results are dropped by generation.</summary>
@@ -505,6 +715,8 @@ internal sealed class RegeditContext
         {
             if (generation == ValueGeneration)
             {
+                PendingListView? pending = PendingList;
+                PendingList = null;
                 Shell.ListContent.SetRows(rows);
                 if (unreadablePath is not null && unreadable is not null)
                 {
@@ -512,7 +724,12 @@ internal sealed class RegeditContext
                     return;
                 }
 
-                if (!string.IsNullOrEmpty(selectDisplayName))
+                if (pending is not null)
+                {
+                    SelectListRows(rows, pending.RowNames);
+                    RestoreScrollOffset(Shell.ListContent, pending.ListOffset);
+                }
+                else if (!string.IsNullOrEmpty(selectDisplayName))
                 {
                     SelectListRow(rows, selectDisplayName);
                 }
@@ -542,19 +759,33 @@ internal sealed class RegeditContext
     /// Selects a row by display name through the row peer. The list control has no public select
     /// API, and the row peer's SelectionItem pattern is the supported path from another control.
     /// </summary>
-    private void SelectListRow(IReadOnlyList<DetailsRow> rows, string displayName)
+    private void SelectListRow(IReadOnlyList<DetailsRow> rows, string displayName) =>
+        SelectListRows(rows, new[] { displayName });
+
+    /// <summary>
+    /// Selects the rows with these display names, in the order given. The first row is selected alone
+    /// and the rest are added to the selection. Names that are no longer in the list are skipped.
+    /// </summary>
+    private void SelectListRows(IReadOnlyList<DetailsRow> rows, IReadOnlyList<string> displayNames)
     {
-        int index = -1;
-        for (var i = 0; i < rows.Count; i += 1)
+        var indices = new List<int>();
+        foreach (string displayName in displayNames)
         {
-            if (string.Equals(rows[i].Name, displayName, StringComparison.Ordinal))
+            for (var i = 0; i < rows.Count; i += 1)
             {
-                index = i;
-                break;
+                if (string.Equals(rows[i].Name, displayName, StringComparison.Ordinal))
+                {
+                    if (!indices.Contains(i))
+                    {
+                        indices.Add(i);
+                    }
+
+                    break;
+                }
             }
         }
 
-        if (index < 0)
+        if (indices.Count == 0)
         {
             return;
         }
@@ -569,23 +800,34 @@ internal sealed class RegeditContext
                     return;
                 }
 
-                UIElement element = repeater.GetOrCreateElement(index);
-                if (element is not FrameworkElement frameworkElement)
+                for (var position = 0; position < indices.Count; position += 1)
                 {
-                    return;
-                }
+                    int index = indices[position];
+                    UIElement element = repeater.GetOrCreateElement(index);
+                    if (element is not FrameworkElement frameworkElement)
+                    {
+                        continue;
+                    }
 
-                AutomationPeer? peer = FrameworkElementAutomationPeer.CreatePeerForElement(frameworkElement);
-                if (peer is not null &&
-                    string.Equals(peer.GetName(), displayName, StringComparison.Ordinal) &&
-                    peer.GetPattern(PatternInterface.SelectionItem) is ISelectionItemProvider provider)
-                {
-                    provider.Select();
+                    AutomationPeer? peer = FrameworkElementAutomationPeer.CreatePeerForElement(frameworkElement);
+                    if (peer is not null &&
+                        string.Equals(peer.GetName(), rows[index].Name, StringComparison.Ordinal) &&
+                        peer.GetPattern(PatternInterface.SelectionItem) is ISelectionItemProvider provider)
+                    {
+                        if (position == 0)
+                        {
+                            provider.Select();
+                        }
+                        else
+                        {
+                            provider.AddToSelection();
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Log.Warn($"Registry Editor could not select the refreshed row '{displayName}': {ex.Message}");
+                Log.Warn($"Registry Editor could not select the refreshed rows: {ex.Message}");
             }
         });
     }

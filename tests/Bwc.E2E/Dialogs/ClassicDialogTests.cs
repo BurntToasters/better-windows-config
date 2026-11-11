@@ -19,7 +19,8 @@ namespace Bwc.E2E.Dialogs;
 /// row) and checks them against the classic templates: no heading, control rectangles within 1 DIP
 /// of the template converted with MapDialogRect at the dialog DPI, tab order, Alt+mnemonic focus,
 /// Enter and Escape, owner disabled while open, and the Base radio conversion. Each dialog is saved
-/// to artifacts/e2e/visual/dialogs.
+/// to artifacts/e2e/visual/dialogs. Each dialog's client area is also read as pixels (<see cref="DialogContrast"/>),
+/// so text drawn in the face color fails even when UI Automation reports the text.
 /// </summary>
 [TestClass]
 public sealed class ClassicDialogTests
@@ -188,6 +189,7 @@ public sealed class ClassicDialogTests
 
         string screenshot = SaveScreenshot(dialog, Path.Combine(artifacts, "edit-string.png"));
         E2EResults.Record("dialogs.string.screenshot", File.Exists(screenshot), $"saved '{screenshot}'.");
+        DialogContrast.Check("dialogs.string.contrast", WindowOf(dialog), hwnd, DialogContrast.FaceForSystem());
 
         _ = SendAltLetter('V');
         bool typed = ControlTestSupport.WaitUntil(() => FocusedId(automation) == ValueInput, TimeSpan.FromSeconds(2));
@@ -278,6 +280,7 @@ public sealed class ClassicDialogTests
 
         string screenshot = SaveScreenshot(dialog, Path.Combine(artifacts, "edit-dword.png"));
         E2EResults.Record("dialogs.dword.screenshot", File.Exists(screenshot), $"saved '{screenshot}'.");
+        DialogContrast.Check("dialogs.dword.contrast", WindowOf(dialog), hwnd, DialogContrast.FaceForSystem());
 
         _ = SendAltLetter('D');
         bool decSelected = ControlTestSupport.WaitUntil(
@@ -752,6 +755,9 @@ public sealed class ClassicDialogTests
             "dialogs.messagebox.screenshot",
             File.Exists(screenshot) && message.Length > 0,
             $"message text='{message}', saved '{screenshot}'.");
+        IntPtr hwnd = DialogHandle(dialog);
+        _ = EnsureForeground(hwnd);
+        DialogContrast.Check("dialogs.messagebox.contrast", WindowOf(dialog), hwnd, DialogContrast.FaceForSystem());
 
         bool chose = driver.Invoke("DialogSecondary");
         bool closed = driver.WaitForNoDialog();

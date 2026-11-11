@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Bwc.E2E.Controls;
+using Bwc.E2E.Dialogs;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Input;
@@ -15,7 +16,8 @@ namespace Bwc.E2E.Hub;
 /// <summary>
 /// Drives the Hub from its published output. Covers the classic window and tool list, Enter and the
 /// Alt+H keyboard path, About, the update check in three states (not configured, up to date, update
-/// available), cancel, the update settings, and the light and dark captures. Update checks run
+/// available), cancel, the update settings, the light and dark captures, and the pixel contrast of every
+/// dialog (<see cref="DialogContrast"/>), in light and in dark. Update checks run
 /// against a loopback server that serves signed fixtures generated for the run; nothing reaches the
 /// network. Captures are written to artifacts/e2e/visual/hub.
 /// </summary>
@@ -117,7 +119,7 @@ public sealed class HubTests
             lightBrightness >= LightBrightnessFloor,
             $"Light capture average brightness {lightBrightness:0.0}, expected at least {LightBrightnessFloor}.");
 
-        CheckAboutDialog(hub, automation, semVer);
+        CheckAboutDialog(hub, automation, semVer, LightTheme, "about.png", "hub.about");
 
         if (row is not null)
         {
@@ -145,9 +147,26 @@ public sealed class HubTests
         E2EResults.CurrentSession = hub;
         using var automation = new UIA3Automation();
 
+        CheckNotConfiguredDialog(hub, automation, LightTheme, "update-not-configured.png", "hub.update.unconfigured");
+
+        hub.Close();
+        AssertNoFailures("Hub not-configured checks");
+    }
+
+    /// <summary>
+    /// Runs Help > Check for Updates on a Hub with no update server, checks the message and the status line,
+    /// and captures the message window in the given theme. <paramref name="checkPrefix"/> names the checks.
+    /// </summary>
+    private static void CheckNotConfiguredDialog(
+        AppSession hub,
+        UIA3Automation automation,
+        string theme,
+        string fileName,
+        string checkPrefix)
+    {
         HubUi.OpenHelpMenuByMouse(hub, automation);
         AutomationElement? item = HubUi.FindInProcess(automation, hub.ProcessId, "MenuItem_CheckForUpdates", ElementTimeout);
-        E2EResults.Record("hub.update.unconfigured.menu", item is not null, "Help > Check for Updates was found.");
+        E2EResults.Record(checkPrefix + ".menu", item is not null, "Help > Check for Updates was found.");
         HubUi.ClickMenuItem(item);
 
         AutomationElement? dialog = HubUi.FindWindowInProcess(automation, hub.ProcessId, CheckTitle, DialogTimeout);
@@ -156,13 +175,13 @@ public sealed class HubTests
         bool deliberate = text.Contains("not configured for this build yet", StringComparison.Ordinal) &&
             !text.Contains("error", StringComparison.OrdinalIgnoreCase);
         E2EResults.Record(
-            "hub.update.unconfigured.dialog",
+            checkPrefix + ".dialog",
             deliberate,
             $"Check for Updates message was '{text}'.");
 
         if (dialog is not null)
         {
-            CaptureDialog(dialog, "update-not-configured.png");
+            CaptureDialog(dialog, fileName, checkPrefix + ".contrast", theme);
             AutomationElement? ok = HubUi.WaitWithin(dialog, "DialogPrimary", DialogTimeout);
             if (ok is not null)
             {
@@ -171,16 +190,13 @@ public sealed class HubTests
         }
 
         bool gone = HubUi.WaitForWindowGone(automation, hub.ProcessId, CheckTitle, DialogTimeout);
-        E2EResults.Record("hub.update.unconfigured.closed", gone, "The message window closed.");
+        E2EResults.Record(checkPrefix + ".closed", gone, "The message window closed.");
 
         string status = WaitForText(hub, "HubStatus");
         E2EResults.Record(
-            "hub.update.unconfigured.status",
+            checkPrefix + ".status",
             string.Equals(status, "Updates are not configured.", StringComparison.Ordinal),
             $"HubStatus after the check was '{status}'.");
-
-        hub.Close();
-        AssertNoFailures("Hub not-configured checks");
     }
 
     [TestMethod]
@@ -218,7 +234,7 @@ public sealed class HubTests
             $"Up-to-date message was '{upToDateText}'.");
         if (upToDate is not null)
         {
-            CaptureDialog(upToDate, "update-up-to-date.png");
+            CaptureDialog(upToDate, "update-up-to-date.png", "hub.update.uptodate.contrast", LightTheme);
             HubUi.InvokeButton(HubUi.WaitWithin(upToDate, "DialogPrimary", DialogTimeout));
         }
 
@@ -246,7 +262,7 @@ public sealed class HubTests
             progressText is null ? "The progress window did not show." : "The progress window showed while the check ran.");
         if (progress is not null)
         {
-            CaptureDialog(progress, "update-progress.png");
+            CaptureDialog(progress, "update-progress.png", "hub.update.progress.contrast", LightTheme);
         }
 
         AutomationElement? available = HubUi.FindWindowInProcess(automation, hub.ProcessId, AvailableTitle, DialogTimeout);
@@ -273,7 +289,7 @@ public sealed class HubTests
                 install is not null,
                 install is null ? "Download and Install is missing." : "Download and Install is shown.");
 
-            CaptureDialog(available, "update-available.png");
+            CaptureDialog(available, "update-available.png", "hub.update.available.contrast", LightTheme);
             AutomationElement? later = HubUi.WaitWithin(available, "UpdateLater", DialogTimeout);
             if (later is not null)
             {
@@ -351,6 +367,26 @@ public sealed class HubTests
         AssertNoFailures("Hub dark theme checks");
     }
 
+    [TestMethod]
+    [TestCategory("Hub")]
+    public void Hub_DarkTheme_DialogsAreReadable()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        EnsureExecutables(config);
+        string semVer = ReadSemVer(config);
+
+        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, DarkScope, DarkTheme));
+        E2EResults.CurrentSession = hub;
+        using var automation = new UIA3Automation();
+
+        CheckAboutDialog(hub, automation, semVer, DarkTheme, "about-dark.png", "hub.dark.about");
+        CheckNotConfiguredDialog(hub, automation, DarkTheme, "update-not-configured-dark.png", "hub.dark.update.unconfigured");
+
+        hub.Close();
+        AssertNoFailures("Hub dark dialog checks");
+    }
+
     private static void CheckHelpMenuOpensWithAltH(AppSession hub, UIA3Automation automation)
     {
         HubUi.OpenHelpMenu(hub.MainHwnd);
@@ -363,14 +399,24 @@ public sealed class HubTests
         Thread.Sleep(200);
     }
 
-    private static void CheckAboutDialog(AppSession hub, UIA3Automation automation, string semVer)
+    /// <summary>
+    /// Opens Help > About, checks its text, captures it in the given theme, and closes it. <paramref name="checkPrefix"/>
+    /// names the checks, so the light and dark runs record different ids.
+    /// </summary>
+    private static void CheckAboutDialog(
+        AppSession hub,
+        UIA3Automation automation,
+        string semVer,
+        string theme,
+        string fileName,
+        string checkPrefix)
     {
         HubUi.OpenHelpMenuByMouse(hub, automation);
         AutomationElement? about = HubUi.FindInProcess(automation, hub.ProcessId, "MenuItem_About", ElementTimeout);
         HubUi.ClickMenuItem(about);
 
         AutomationElement? window = HubUi.FindWindowInProcess(automation, hub.ProcessId, AboutTitle, DialogTimeout);
-        E2EResults.Record("hub.about.open", window is not null, window is null ? "About did not open." : "About opened.");
+        E2EResults.Record(checkPrefix + ".open", window is not null, window is null ? "About did not open." : "About opened.");
         if (window is null)
         {
             return;
@@ -378,22 +424,22 @@ public sealed class HubTests
 
         string text = HubUi.TextOf(HubUi.WaitWithin(window, "AboutText", DialogTimeout) ?? window);
         E2EResults.Record(
-            "hub.about.version",
+            checkPrefix + ".version",
             text.Contains(semVer, StringComparison.Ordinal) && !FullCommitPattern.IsMatch(text),
             $"About text does not carry the full 40-character hash and shows {semVer}.");
         E2EResults.Record(
-            "hub.about.license",
+            checkPrefix + ".license",
             text.Contains("MPL-2.0", StringComparison.Ordinal),
             "About shows the MPL-2.0 license.");
 
         bool noNotices = HubUi.WaitWithin(window, "AboutNotices", TimeSpan.FromSeconds(2)) is null &&
             text.Contains("does not include a third-party notices file", StringComparison.Ordinal);
         E2EResults.Record(
-            "hub.about.notices",
+            checkPrefix + ".notices",
             noNotices,
             "With no THIRD-PARTY-NOTICES.txt beside the Hub, About shows no notices button and says so.");
 
-        CaptureDialog(window, "about.png");
+        CaptureDialog(window, fileName, checkPrefix + ".contrast", theme);
         AutomationElement? ok = HubUi.WaitWithin(window, "AboutOk", DialogTimeout);
         if (ok is not null)
         {
@@ -401,7 +447,7 @@ public sealed class HubTests
         }
 
         E2EResults.Record(
-            "hub.about.closed",
+            checkPrefix + ".closed",
             HubUi.WaitForWindowGone(automation, hub.ProcessId, AboutTitle, DialogTimeout),
             "About closed.");
     }
@@ -419,7 +465,7 @@ public sealed class HubTests
             return;
         }
 
-        CaptureDialog(window, "update-settings.png");
+        CaptureDialog(window, "update-settings.png", "hub.settings.contrast", LightTheme);
         AutomationElement? beta = HubUi.WaitWithin(window, "UpdateChannelBeta", DialogTimeout);
         AutomationElement? startup = HubUi.WaitWithin(window, "UpdateStartupCheck", DialogTimeout);
         beta?.Click();
@@ -537,13 +583,18 @@ public sealed class HubTests
         return saved;
     }
 
-    private static void CaptureDialog(AutomationElement window, string fileName)
+    /// <summary>
+    /// Saves the frame capture of a dialog, then checks its pixels for readable text in the theme the test ran with.
+    /// The contrast check reads the client area of the same window, so the failure names the dialog that lost its text.
+    /// </summary>
+    private static void CaptureDialog(AutomationElement window, string fileName, string checkId, string theme)
     {
         IntPtr hwnd = (IntPtr)window.Properties.NativeWindowHandle.ValueOrDefault;
         _ = HubUi.Foreground(hwnd, TimeSpan.FromSeconds(3));
         Thread.Sleep(500);
         string saved = HubUi.CaptureWindow(hwnd, Path.Combine(HubUi.VisualDir(GuiGate.Config), fileName));
         E2EResults.Note("hub.capture." + Path.GetFileNameWithoutExtension(fileName), saved);
+        DialogContrast.Check(checkId, window, hwnd, DialogContrast.FaceFor(theme == DarkTheme));
     }
 
     private static string MessageText(AutomationElement? window)
