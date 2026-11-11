@@ -99,7 +99,63 @@ Every assembly carries `BwcFlavor` from `Directory.Build.props`: `ship` in ship 
 - The three project main assemblies (`BetterWindowsConfig.dll`, `BwcRegedit.dll`,
   `BwcUpdate.dll`) must be present.
 - Native apphost `.exe` files have no managed metadata and are listed as skipped.
+- Each exe head's embedded manifest (`BwcRegedit.exe`, `BetterWindowsConfig.exe`,
+  `BwcUpdate.exe`) must declare one `requestedExecutionLevel`. In `publish/<rid>-e2e` it must be
+  `asInvoker`. In `publish/<rid>` it must be the level in that project's source manifest:
+  `highestAvailable` (`src/Bwc.Regedit.App/app.manifest`), `asInvoker` (`src/Bwc.Hub/app.manifest`),
+  and `requireAdministrator` (`src/Bwc.Update/app.manifest`). The check reads the manifest bytes
+  in both ASCII and UTF-16LE. It ignores closing tags.
 
 The check runs at the end of every `scripts/dotnet-build.js` publish, where it is recorded
 as `flavorCheck` in `artifacts/build/<name>.json` (schema 2). The gate also runs it as the
-steps `verify-flavor-ship` and `verify-flavor-e2e`.
+steps `verify-flavor-ship` and `verify-flavor-e2e`. To check one folder by hand:
+
+```
+node scripts/flavor-metadata.js --rid win-arm64 --flavor e2e
+```
+
+### E2E flavor never elevates
+
+The E2E flavor must not raise UAC when an agent or developer starts an exe directly.
+`src/Bwc.Regedit.App/Bwc.Regedit.App.csproj` and `src/Bwc.Update/Bwc.Update.csproj` select
+`app.e2e.manifest` (asInvoker) instead of their ship manifest when `BwcFlavor` is `E2E`.
+`src/Bwc.Hub` needs no override because its ship manifest is already asInvoker. The flavor
+check above enforces these levels.
+
+The apphost and merged manifest in `obj` are shared by both flavors, and the SDK does not
+rebuild them when only the manifest selection changes. The two projects that select a
+different manifest (Regedit and Update) therefore run `BwcDropFlavorManifestOutputs` before
+`PrepareForBuild`. It records the last flavor in
+`obj/.../bwc-flavor.txt` and deletes the `Manifests` folder and `apphost.exe` when the flavor
+changes. Without it, the ship publish kept `asInvoker` after an E2E build.
+
+Adding a new exe head or changing a manifest level: set the ship level in its source
+manifest, and add an `app.e2e.manifest` with `asInvoker` if the level differs. Then add the
+head to `EXE_HEADS` in `scripts/flavor-metadata.js`.
+
+### Launching without a UAC prompt
+
+Start a built exe with `scripts/launch-unelevated.js`, not by double-clicking or running it
+directly from a shell:
+
+```
+node scripts/launch-unelevated.js publish\win-arm64-e2e\BwcRegedit.exe
+node scripts/launch-unelevated.js --wait C:\Windows\regedit.exe
+```
+
+The helper sets `__COMPAT_LAYER=RunAsInvoker` on the child only, runs the file directly
+(`shell: false`), and starts it detached. `--wait` waits and returns the program's exit code.
+It refuses a path that is not an existing `.exe` file, and it refuses to run from an elevated
+shell, because RunAsInvoker keeps the caller's token. It does not drop privileges from an
+elevated caller. `scripts/run-app.js` also starts the app with RunAsInvoker, and its
+`--elevated` option launches through `Start-Process -Verb RunAs`. That option prompts for
+UAC, so use it by hand only.
+
+### Elevated tests
+
+Tests that need an administrator token are tagged `[TestCategory("Elevated")]`. The ship
+filter, the default E2E filter, and the registry test steps of `scripts/test-all.js` all
+exclude them. `node scripts/test-e2e.js --filter TestCategory=Elevated` runs only those tests.
+It needs `--flavor e2e` and an elevated process. In a normal shell it exits 3 with NOT RUN,
+and it exits 3 when no E2E test carries the tag. The runner that does this unattended is
+described in [elevated-runner.md](elevated-runner.md).
