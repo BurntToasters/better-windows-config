@@ -38,8 +38,8 @@ public sealed class TreeRowElement : Panel
     private double _indentWidth;
     private double _rowHeight = -1;
     private double _fontSize = -1;
-    private double _overlayWidth = -1;
-    private double _overlayHeight = -1;
+    private double _overlayPixel = -1;
+    private double _overlayRowHeight = -1;
     private ExpandCollapseState _expandState = ExpandCollapseState.LeafNode;
 
     public TreeRowElement()
@@ -100,8 +100,19 @@ public sealed class TreeRowElement : Panel
         Tapped += OnRowTapped;
         DoubleTapped += OnRowDoubleTapped;
         RightTapped += OnRowRightTapped;
-        Loaded += (_, _) => ApplyIcon();
-        Height = DenseMetrics.TreeRowHeight;
+        Loaded += (_, _) =>
+        {
+            ApplyIcon();
+            ApplyOverlayMetrics(DenseMetrics.TreeRowHeight);
+        };
+
+        // The overlays stretch across the row and take their height from the metric. Their margin is the
+        // device pixel inset, so no overlay is resized inside a layout pass.
+        _focusRect.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _focusRect.VerticalAlignment = VerticalAlignment.Top;
+        _selectionBorder.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _selectionBorder.VerticalAlignment = VerticalAlignment.Top;
+        ApplyOverlayMetrics(DenseMetrics.TreeRowHeight);
     }
 
     internal DenseTree? Owner { get; private set; }
@@ -121,7 +132,13 @@ public sealed class TreeRowElement : Panel
         double indent = Math.Max(0, node.Depth) * DenseMetrics.TreeIndent;
         bool layoutChanged = indent != _indentWidth || _rowHeight != DenseMetrics.TreeRowHeight;
         _indentWidth = indent;
-        ApplyMetricsCore();
+        if (MetricsStale())
+        {
+            // Attach runs inside the ItemsRepeater layout pass, so a metric change is queued instead of
+            // written here. The queued ApplyMetrics runs outside layout.
+            _ = DispatcherQueue.TryEnqueue(ApplyMetrics);
+        }
+
         ApplyChevron();
         ApplyIcon();
         ApplyTheme();
@@ -223,9 +240,13 @@ public sealed class TreeRowElement : Panel
             : Math.Max(0, availableSize.Width - textX);
         _label.Measure(new Size(availableText, height));
 
+        // A row measured without a bound (horizontal scrolling) measures to its label. The overlays
+        // are measured to the same width, so the row, its label and its overlays agree.
         double width = double.IsInfinity(availableSize.Width)
             ? textX + _label.DesiredSize.Width
             : availableSize.Width;
+        _selectionBorder.Measure(new Size(width, height));
+        _focusRect.Measure(new Size(width, height));
         return new Size(width, height);
     }
 
@@ -241,41 +262,58 @@ public sealed class TreeRowElement : Panel
         double textWidth = Math.Max(0, finalSize.Width - textX - 2);
         double labelHeight = Math.Min(height, _label.DesiredSize.Height);
         _label.Arrange(new Rect(textX, (height - labelHeight) / 2, textWidth, labelHeight));
-        if (finalSize.Width != _overlayWidth || height != _overlayHeight)
-        {
-            // The overlays take their size from the width they are measured with. A row measured without
-            // a bound (horizontal scrolling) measures to its label, so the overlays are sized here from the
-            // width the row was arranged to, which spans the whole content.
-            BwcFocusRect.Measure(_selectionBorder, this, new Size(finalSize.Width, height));
-            BwcFocusRect.Measure(_focusRect, this, new Size(finalSize.Width, height));
-            _overlayWidth = finalSize.Width;
-            _overlayHeight = height;
-        }
 
-        BwcFocusRect.Arrange(_selectionBorder, this, new Size(finalSize.Width, height));
-        BwcFocusRect.Arrange(_focusRect, this, new Size(finalSize.Width, height));
+        // The overlays were sized by their margin and stretch, so arrange only places them in the row.
+        _selectionBorder.Arrange(new Rect(0, 0, finalSize.Width, height));
+        _focusRect.Arrange(new Rect(0, 0, finalSize.Width, height));
         return finalSize;
     }
 
     protected override AutomationPeer OnCreateAutomationPeer() => new TreeRowAutomationPeer(this);
 
+    private bool MetricsStale() =>
+        DenseMetrics.FontSize != _fontSize || DenseMetrics.TreeRowHeight != _rowHeight;
+
+    /// <summary>
+    /// Applies the font and the overlay geometry. Only call this outside a layout pass. The row's height
+    /// is not a property: <see cref="MeasureOverride"/> returns the metric height.
+    /// </summary>
     private void ApplyMetricsCore()
     {
         double fontSize = DenseMetrics.FontSize;
         double rowHeight = DenseMetrics.TreeRowHeight;
-        bool fontChanged = fontSize != _fontSize;
-        bool heightChanged = rowHeight != _rowHeight;
-
-        _fontSize = fontSize;
-        _rowHeight = rowHeight;
-        if (fontChanged)
+        if (fontSize != _fontSize)
         {
             _label.FontSize = fontSize;
         }
 
-        if (heightChanged)
+        _fontSize = fontSize;
+        _rowHeight = rowHeight;
+        ApplyOverlayMetrics(rowHeight);
+    }
+
+    /// <summary>
+    /// The overlay stroke is one device pixel, inset by half a pixel from the row edge, the same inset
+    /// <see cref="BwcFocusRect"/> uses. Its width comes from the stretch, so only the height is set here.
+    /// </summary>
+    private void ApplyOverlayMetrics(double rowHeight)
+    {
+        double pixel = BwcFocusRect.DevicePixel(this);
+        if (pixel == _overlayPixel && rowHeight == _overlayRowHeight)
         {
-            Height = rowHeight;
+            return;
+        }
+
+        _overlayPixel = pixel;
+        _overlayRowHeight = rowHeight;
+        double inset = pixel * 0.5;
+        var margin = new Thickness(inset);
+        double overlayHeight = Math.Max(0, rowHeight - (inset * 2));
+        foreach (Rectangle overlay in new[] { _selectionBorder, _focusRect })
+        {
+            overlay.StrokeThickness = pixel;
+            overlay.Margin = margin;
+            overlay.Height = overlayHeight;
         }
     }
 
