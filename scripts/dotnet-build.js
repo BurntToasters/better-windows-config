@@ -38,6 +38,9 @@ function printHelp() {
 Publishes Bwc.Hub, Bwc.Regedit.App, then Bwc.Update into
 publish/<rid> (ship) or publish/<rid>-e2e (e2e).
 
+Before each project publishes, its stale ReadyToRun intermediates
+(obj/<platform>/Release/<tfm>/<rid>/R2R) are deleted and logged.
+
 After the publish, every managed Bwc* and BetterWindowsConfig* assembly in the
 folder root must carry BwcFlavor=ship (ship) or BwcFlavor=E2E (e2e). A missing or
 mismatched value exits 1. The result is recorded as flavorCheck in artifacts/build.
@@ -216,6 +219,26 @@ function invokeDotnet(args) {
   return { result, usedFallback };
 }
 
+/**
+ * Deletes ReadyToRun intermediates left by an earlier publish, for example output from an older
+ * SDK. Stale R2R files made the shared-folder collision check fail on
+ * Microsoft.Graphics.Imaging.Projection.dll. Returns the repo-relative folders it removed.
+ */
+function removeStaleReadyToRun({ project, rid, platform }) {
+  const projectDir = path.dirname(path.join(REPO_ROOT, project));
+  const releaseDir = path.join(projectDir, "obj", platform, "Release");
+  if (!fs.existsSync(releaseDir)) return [];
+  const removed = [];
+  for (const entry of fs.readdirSync(releaseDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const r2rDir = path.join(releaseDir, entry.name, rid, "R2R");
+    if (!fs.existsSync(r2rDir)) continue;
+    fs.rmSync(r2rDir, { recursive: true, force: true });
+    removed.push(path.relative(REPO_ROOT, r2rDir).split(path.sep).join("/"));
+  }
+  return removed;
+}
+
 function publishProject({ project, rid, platform, flavor, outDir }) {
   const args = [
     "publish",
@@ -333,6 +356,26 @@ function main(argv = process.argv) {
 
   if (!errorMessage) {
     for (const project of PROJECTS) {
+      let r2rRemoved = [];
+      try {
+        r2rRemoved = removeStaleReadyToRun({
+          project: project.project,
+          rid,
+          platform,
+        });
+      } catch (error) {
+        errorMessage = `${project.name}: could not remove stale ReadyToRun output: ${error instanceof Error ? error.message : String(error)}`;
+        break;
+      }
+      console.log(
+        r2rRemoved.length === 0
+          ? `${project.name}: no stale ReadyToRun output to remove`
+          : `${project.name}: removed ${r2rRemoved.length} stale ReadyToRun folder(s)`,
+      );
+      for (const removedPath of r2rRemoved) {
+        console.log(`  removed ${removedPath}`);
+      }
+
       const result = publishProject({
         project: project.project,
         rid,
@@ -345,6 +388,7 @@ function main(argv = process.argv) {
         name: project.name,
         exitCode: result.exitCode,
         warnings: result.warnings,
+        staleReadyToRunRemoved: r2rRemoved,
       });
 
       const status =

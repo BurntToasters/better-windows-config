@@ -13,6 +13,8 @@
     "build:win:x64": "node scripts/dotnet-build.js --rid win-x64",
     "build:win:arm64": "node scripts/dotnet-build.js --rid win-arm64",
     "build:win:e2e": "node scripts/dotnet-build.js --rid win-arm64 --flavor e2e",
+    "installer:x64": "node scripts/build-installer.js --rid win-x64",
+    "installer:arm64": "node scripts/build-installer.js --rid win-arm64",
     "run:hub": "node scripts/run-app.js hub",
     "run:regedit": "node scripts/run-app.js regedit",
     "sync-version": "node scripts/sync-version.js",
