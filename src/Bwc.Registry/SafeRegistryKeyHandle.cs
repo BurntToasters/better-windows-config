@@ -19,6 +19,8 @@ internal sealed class SafeRegistryKeyHandle : SafeHandleZeroOrMinusOneIsInvalid
 
     internal static SafeRegistryKeyHandle FromOwned(nint handle) => new(handle, ownsHandle: true);
 
+    internal static SafeRegistryKeyHandle FromBorrowed(nint handle) => new(handle, ownsHandle: false);
+
     internal static SafeRegistryKeyHandle FromPredefined(RegistryRoot root) =>
         new(root.ToHkey(), ownsHandle: false);
 

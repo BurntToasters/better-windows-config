@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices.ComTypes;
 using Windows.Win32;
 using Windows.Win32.Foundation;
+using Windows.Win32.Security;
 using Windows.Win32.System.Registry;
 
 namespace Bwc.Registry;
@@ -16,6 +17,23 @@ public sealed class RegistryReader
     private const string EnumKeyOperation = "EnumKey";
     private const string EnumValueOperation = "EnumValue";
     private const string QueryValueOperation = "QueryValue";
+    private const string GetKeySecurityOperation = "GetKeySecurity";
+    private const uint ReadControlStandardRight = 0x00020000;
+    private const int ErrorNotEnoughMemory = 8;
+    private const int ErrorInvalidSecurityDescriptor = 1338;
+    private const int MaxSecurityDescriptorAttempts = 8;
+
+    private readonly RemoteRegistryConnection? _remote;
+
+    public RegistryReader()
+    {
+    }
+
+    public RegistryReader(RemoteRegistryConnection connection)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        _remote = connection;
+    }
 
     public RegistryKeyInfo GetKeyInfo(RegistryPath path, CancellationToken cancellationToken = default)
     {
@@ -243,9 +261,11 @@ public sealed class RegistryReader
         ArgumentNullException.ThrowIfNull(path);
         cancellationToken.ThrowIfCancellationRequested();
 
+        SafeRegistryKeyHandle? rootOverride = _remote?.GetRoot(path.Root);
         WIN32_ERROR error = NativeRegistry.TryOpenKey(
             path,
             REG_SAM_FLAGS.KEY_READ,
+            rootOverride,
             out SafeRegistryKeyHandle? handle);
 
         try
@@ -268,6 +288,118 @@ public sealed class RegistryReader
         }
     }
 
+    public byte[] GetKeySecurity(
+        RegistryPath path,
+        RegistrySecurityInformation information,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (information == RegistrySecurityInformation.None)
+        {
+            throw new ArgumentException(
+                "At least one security information flag is required.",
+                nameof(information));
+        }
+
+        WIN32_ERROR error = NativeRegistry.TryOpenKey(
+            path,
+            (REG_SAM_FLAGS)ReadControlStandardRight,
+            _remote?.GetRoot(path.Root),
+            out SafeRegistryKeyHandle? handle);
+
+        if (error != WIN32_ERROR.ERROR_SUCCESS)
+        {
+            handle?.Dispose();
+            throw new RegistryOperationException(GetKeySecurityOperation, path, (int)error);
+        }
+
+        using SafeRegistryKeyHandle ownedHandle = handle!;
+        var requested = (OBJECT_SECURITY_INFORMATION)(uint)information;
+        uint size = 0;
+
+        error = PInvoke.RegGetKeySecurity(ownedHandle, requested, default, ref size);
+
+        if (error != WIN32_ERROR.ERROR_SUCCESS && error != WIN32_ERROR.ERROR_INSUFFICIENT_BUFFER)
+        {
+            throw new RegistryOperationException(GetKeySecurityOperation, path, (int)error);
+        }
+
+        for (var attempt = 0; attempt < MaxSecurityDescriptorAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (size == 0)
+            {
+                throw InvalidSecurityDescriptor(path);
+            }
+
+            if (size > int.MaxValue)
+            {
+                throw new RegistryOperationException(
+                    GetKeySecurityOperation,
+                    path,
+                    ErrorNotEnoughMemory,
+                    "The security descriptor reported by the registry is too large.");
+            }
+
+            byte[] buffer = new byte[(int)size];
+            uint actualLength = size;
+
+            unsafe
+            {
+                fixed (byte* pointer = buffer)
+                {
+                    error = PInvoke.RegGetKeySecurity(
+                        ownedHandle,
+                        requested,
+                        new PSECURITY_DESCRIPTOR(pointer),
+                        ref actualLength);
+                }
+            }
+
+            if (error == WIN32_ERROR.ERROR_SUCCESS)
+            {
+                if (actualLength == 0 || actualLength > buffer.Length)
+                {
+                    throw InvalidSecurityDescriptor(path);
+                }
+
+                byte[] descriptor = buffer.AsSpan(0, (int)actualLength).ToArray();
+                if (!RegistrySecurityDescriptor.TryGetLength(descriptor, out int declaredLength) ||
+                    declaredLength != descriptor.Length)
+                {
+                    throw InvalidSecurityDescriptor(path);
+                }
+
+                return descriptor;
+            }
+
+            if (error != WIN32_ERROR.ERROR_INSUFFICIENT_BUFFER)
+            {
+                throw new RegistryOperationException(GetKeySecurityOperation, path, (int)error);
+            }
+
+            if (actualLength <= size)
+            {
+                throw new RegistryOperationException(
+                    GetKeySecurityOperation,
+                    path,
+                    (int)WIN32_ERROR.ERROR_INSUFFICIENT_BUFFER,
+                    "The security descriptor did not grow between size queries.");
+            }
+
+            size = actualLength;
+        }
+
+        throw new RegistryOperationException(
+            GetKeySecurityOperation,
+            path,
+            (int)WIN32_ERROR.ERROR_INSUFFICIENT_BUFFER,
+            "The security descriptor kept changing between size queries.");
+    }
+
     public bool ValueExists(
         RegistryPath path,
         string valueName,
@@ -280,6 +412,7 @@ public sealed class RegistryReader
         WIN32_ERROR openError = NativeRegistry.TryOpenKey(
             path,
             REG_SAM_FLAGS.KEY_READ,
+            _remote?.GetRoot(path.Root),
             out SafeRegistryKeyHandle? handle);
 
         if (openError != WIN32_ERROR.ERROR_SUCCESS)
@@ -377,15 +510,18 @@ public sealed class RegistryReader
         }
     }
 
-    private static SafeRegistryKeyHandle OpenKey(
+    private SafeRegistryKeyHandle OpenKey(
         RegistryPath path,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        SafeRegistryKeyHandle? rootOverride = _remote?.GetRoot(path.Root);
+
         WIN32_ERROR error = NativeRegistry.TryOpenKey(
             path,
             REG_SAM_FLAGS.KEY_READ,
+            rootOverride,
             out SafeRegistryKeyHandle? handle);
 
         if (error != WIN32_ERROR.ERROR_SUCCESS)
@@ -439,4 +575,11 @@ public sealed class RegistryReader
 
         return current == int.MaxValue ? int.MaxValue : Math.Max(next, current + 1);
     }
+
+    private static RegistryOperationException InvalidSecurityDescriptor(RegistryPath path) =>
+        new(
+            GetKeySecurityOperation,
+            path,
+            ErrorInvalidSecurityDescriptor,
+            "The registry returned a security descriptor that is not valid self-relative data.");
 }

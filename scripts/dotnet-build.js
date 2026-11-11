@@ -188,6 +188,14 @@ function invokeDotnet(args) {
     encoding: "utf8",
     windowsHide: true,
     maxBuffer: 128 * 1024 * 1024,
+    // Do not let a lingering MSBuild/compiler server inherit the publish pipe. Node's
+    // spawnSync waits for the pipe to close, so node reuse turns a finished publish into a
+    // hung build step.
+    env: {
+      ...process.env,
+      MSBUILDDISABLENODEREUSE: "1",
+      DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: "1",
+    },
   };
   let result = spawnSync("dotnet", args, options);
   let usedFallback = false;

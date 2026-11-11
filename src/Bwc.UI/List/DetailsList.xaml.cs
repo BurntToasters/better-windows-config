@@ -26,6 +26,38 @@ public sealed class ListRenameRequestedEventArgs : EventArgs
     public string NewName { get; }
 }
 
+/// <summary>A row was double tapped after it became the single selection.</summary>
+public sealed class DetailsRowActivatedEventArgs : EventArgs
+{
+    public DetailsRowActivatedEventArgs(DetailsRow row, int index)
+    {
+        Row = row;
+        Index = index;
+    }
+
+    public DetailsRow Row { get; }
+
+    public int Index { get; }
+}
+
+/// <summary>A right-click or menu key request for a details row or the empty list body.</summary>
+public sealed class DetailsRowContextRequestedEventArgs : EventArgs
+{
+    public DetailsRowContextRequestedEventArgs(DetailsRow? row, FrameworkElement element, Point point)
+    {
+        Row = row;
+        Element = element;
+        Point = point;
+    }
+
+    /// <summary>The row under the pointer, or null when the request came from the empty body.</summary>
+    public DetailsRow? Row { get; }
+
+    public FrameworkElement Element { get; }
+
+    public Point Point { get; }
+}
+
 /// <summary>
 /// Classic details list. A fixed header row sits above a virtualized ItemsRepeater inside a
 /// ScrollViewer. Rows are 18 DIP, columns resize with a shared width model, and sorting of large
@@ -87,6 +119,7 @@ public sealed partial class DetailsList : UserControl
         Body.ViewChanged += OnBodyViewChanged;
         SizeChanged += OnSizeChanged;
         KeyDown += OnKeyDown;
+        RightTapped += OnBackgroundRightTapped;
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         ActualThemeChanged += OnActualThemeChanged;
@@ -147,6 +180,22 @@ public sealed partial class DetailsList : UserControl
 
     /// <summary>Raised when F2 rename is committed with Enter.</summary>
     public event EventHandler<ListRenameRequestedEventArgs>? RenameRequested;
+
+    /// <summary>
+    /// Raised when a row is double tapped. The row is the single selection at that point; header
+    /// clicks, the rename box, and multi-selection gestures do not raise it.
+    /// </summary>
+    public event EventHandler<DetailsRowActivatedEventArgs>? RowActivated;
+
+    /// <summary>
+    /// Raised for a right-click on a row or on the empty list body, and for a keyboard menu
+    /// request. A row request carries the row; a background request carries null. The member
+    /// hides the UIElement event of the same name because the payload is list specific.
+    /// </summary>
+    public new event EventHandler<DetailsRowContextRequestedEventArgs>? ContextRequested;
+
+    /// <summary>Raised when Delete is pressed with at least one selected value.</summary>
+    public event EventHandler? DeleteRequested;
 
     /// <summary>Replaces the rows and clears selection and the sort indicator.</summary>
     public void SetRows(IEnumerable<DetailsRow> rows)
@@ -215,6 +264,9 @@ public sealed partial class DetailsList : UserControl
             SetColumnWidth(index, width);
         }
     }
+
+    /// <summary>Starts the inline rename box for the focused or single selected row. F2 uses the same path.</summary>
+    public void BeginRenameSelected() => BeginRename();
 
     internal int IndexOfRow(DetailsRow row) => _rows.IndexOf(row);
 
@@ -393,6 +445,44 @@ public sealed partial class DetailsList : UserControl
         e.Handled = true;
     }
 
+    internal void RowRightTapped(DetailsRowElement row, RightTappedRoutedEventArgs e)
+    {
+        int index = row.Index;
+        if (_renaming || index < 0 || index >= _rows.Count)
+        {
+            return;
+        }
+
+        SetSingle(index);
+        _focus = index;
+        _ = Focus(FocusState.Pointer);
+        ContextRequested?.Invoke(
+            this,
+            new DetailsRowContextRequestedEventArgs(_rows[index], row, e.GetPosition(row)));
+    }
+
+    /// <summary>
+    /// Called by a row element on double tap. PointerPressed has already applied the selection,
+    /// so the event sees the row as selected. Multi-selection and rename are ignored.
+    /// </summary>
+    internal void RowDoubleTapped(DetailsRowElement row, DoubleTappedRoutedEventArgs e)
+    {
+        int index = row.Index;
+        if (_renaming || index < 0 || index >= _rows.Count)
+        {
+            return;
+        }
+
+        if (_selected.Count != 1 || !_selected.Contains(index))
+        {
+            return;
+        }
+
+        _focus = index;
+        e.Handled = true;
+        RowActivated?.Invoke(this, new DetailsRowActivatedEventArgs(_rows[index], index));
+    }
+
     private void OnElementPrepared(ItemsRepeater sender, ItemsRepeaterElementPreparedEventArgs args)
     {
         if (args.Element is not DetailsRowElement row || args.Index < 0 || args.Index >= _rows.Count)
@@ -458,7 +548,88 @@ public sealed partial class DetailsList : UserControl
                 BeginRename();
                 e.Handled = true;
                 break;
+            case VirtualKey.Delete:
+                if (_selected.Count > 0)
+                {
+                    DeleteRequested?.Invoke(this, EventArgs.Empty);
+                    e.Handled = true;
+                }
+
+                break;
+            case VirtualKey.Enter:
+                if (_selected.Count == 1)
+                {
+                    int index = _selected.First();
+                    if (index >= 0 && index < _rows.Count)
+                    {
+                        _focus = index;
+                        RowActivated?.Invoke(this, new DetailsRowActivatedEventArgs(_rows[index], index));
+                        e.Handled = true;
+                    }
+                }
+
+                break;
+            case VirtualKey.F10 when shift:
+            case VirtualKey.Application:
+                RaiseContextAtSelection();
+                e.Handled = true;
+                break;
         }
+    }
+
+    private void RaiseContextAtSelection()
+    {
+        int index = _focus;
+        if (index < 0 && _selected.Count == 1)
+        {
+            index = _selected.First();
+        }
+
+        if (index < 0 || index >= _rows.Count)
+        {
+            return;
+        }
+
+        double y = DenseMetrics.HeaderHeight + (index * DenseMetrics.ListRowHeight) -
+            Body.VerticalOffset + (DenseMetrics.ListRowHeight / 2);
+        double minimum = DenseMetrics.HeaderHeight + 4;
+        var point = new Point(
+            24,
+            Math.Clamp(y, minimum, Math.Max(minimum, ActualHeight - 4)));
+        ContextRequested?.Invoke(
+            this,
+            new DetailsRowContextRequestedEventArgs(_rows[index], this, point));
+    }
+
+    private void OnBackgroundRightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        if (e.Handled || _renaming ||
+            IsWithin(e.OriginalSource, HeaderHost) ||
+            IsWithin(e.OriginalSource, RenameBox))
+        {
+            return;
+        }
+
+        _ = Focus(FocusState.Pointer);
+        ContextRequested?.Invoke(
+            this,
+            new DetailsRowContextRequestedEventArgs(null, this, e.GetPosition(this)));
+        e.Handled = true;
+    }
+
+    private static bool IsWithin(object? source, DependencyObject container)
+    {
+        for (var current = source as DependencyObject;
+            current is not null;
+            current = VisualTreeHelper.GetParent(current))
+        {
+            if (ReferenceEquals(current, container))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void MoveTo(int target, bool extend)

@@ -247,7 +247,13 @@ function spawnOptions() {
     windowsHide: true,
     maxBuffer: MAX_BUFFER,
     timeout: STEP_TIMEOUT_MS,
-    env: process.env,
+    env: {
+      ...process.env,
+      // A lingering build server can hold the child's output pipe open after the command
+      // itself finishes, which makes spawnSync look hung. Disable node reuse for the gate.
+      MSBUILDDISABLENODEREUSE: "1",
+      DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: "1",
+    },
   };
 }
 

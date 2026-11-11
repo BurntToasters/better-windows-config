@@ -234,9 +234,9 @@ public sealed class ShellTests
         {
             ("import", "Import...", true),
             ("export", "Export...", false),
-            ("loadHive", "Load Hive...", false),
+            ("loadHive", "Load Hive...", true),
             ("unloadHive", "Unload Hive...", false),
-            ("connectNetworkRegistry", "Connect Network Registry...", false),
+            ("connectNetworkRegistry", "Connect Network Registry...", true),
             ("disconnectNetworkRegistry", "Disconnect Network Registry...", false),
             ("print", "Print...", false),
             ("exit", "Exit", true),

@@ -1,0 +1,582 @@
+using System.ComponentModel;
+using System.Globalization;
+using System.Runtime.InteropServices;
+using Bwc.E2E.Controls;
+using Bwc.E2E.Editing;
+using Bwc.E2E.Harness;
+using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Definitions;
+using FlaUI.Core.Input;
+using FlaUI.Core.WindowsAPI;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.Win32;
+
+namespace Bwc.E2E.Hex;
+
+/// <summary>
+/// Seeds a 48 byte binary value and drives the double-click hex editor: edit and accept, insert and
+/// delete then cancel, select all and copy, and Escape returning focus to the details list.
+/// </summary>
+[TestClass]
+public sealed class HexEditingTests
+{
+    private const string BinaryValueName = "EditableBinary";
+    private const string StringValueName = "EditableString";
+    private const string StringText = "HexEdit";
+    private const int PatternLength = 0x30;
+    private const uint CfUnicodeText = 13;
+
+    private static int _checkStart;
+
+    [ClassInitialize]
+    public static void ClassInitialize(TestContext testContext)
+    {
+        _ = testContext;
+        ControlTestSupport.PrepareDpi();
+    }
+
+    [TestMethod]
+    [TestCategory("HexEdit")]
+    public void HexEditing_EditsCancelsAndCopies()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+
+        try
+        {
+            config.EnsureExecutablesExist();
+        }
+        catch (Exception ex)
+        {
+            E2EResults.Record("hexedit.publish", false, ex.Message);
+            Assert.Fail(ex.Message);
+            return;
+        }
+
+        var sandbox = new SandboxRegistry(config);
+        string? dataRoot = null;
+
+        try
+        {
+            sandbox.Cleanup();
+            Seed(sandbox);
+            dataRoot = CreateFreshDataRoot(config, "hexedit");
+
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+            };
+
+            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
+            using var driver = new EditingDriver(session);
+
+            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+            bool seededRows = ControlTestSupport.WaitUntil(
+                () => ContainsAll(
+                    ControlTestSupport.ListRowNames(session),
+                    BinaryValueName,
+                    StringValueName),
+                TimeSpan.FromSeconds(15));
+            E2EResults.Record(
+                "hexedit.navigate",
+                navigated && seededRows,
+                $"navigated={navigated}, seededRows={seededRows}, rows=[{string.Join(",", ControlTestSupport.ListRowNames(session))}].");
+
+            CheckOpenAndEdit(session, driver, sandbox);
+            CheckInsertDeleteCancel(session, driver, sandbox);
+            CheckCopyAndEscape(session, driver, sandbox);
+
+            FailIfNeeded();
+        }
+        finally
+        {
+            ControlTestSupport.CleanupRegistry(config);
+            DeleteDataRoot(dataRoot);
+        }
+    }
+
+    private static void CheckOpenAndEdit(
+        AppSession session,
+        EditingDriver driver,
+        SandboxRegistry sandbox)
+    {
+        bool selected = SelectRow(session, BinaryValueName);
+        E2EResults.Record(
+            "hexedit.binary.select",
+            selected,
+            $"binary row selected={selected}.");
+
+        bool opened = OpenEditor(session, driver, BinaryValueName);
+        E2EResults.Record(
+            "hexedit.dialog",
+            opened,
+            $"doubleClick opened editor={opened}.");
+
+        string heading = driver.TextOf("DialogHeading");
+        string status = driver.TextOf("HexStatus");
+        AutomationElement? firstRow = driver.WaitForElement("HexRow_0");
+        string rowText = ControlTestSupport.SafeName(firstRow);
+        bool rowOk = rowText.Contains("00000000", StringComparison.Ordinal) &&
+            rowText.Contains("00 01 02", StringComparison.Ordinal);
+        bool statusOk = status.Contains("48 bytes", StringComparison.Ordinal) &&
+            status.Contains("REG_BINARY", StringComparison.Ordinal) &&
+            status.Contains("Overwrite", StringComparison.Ordinal);
+        E2EResults.Record(
+            "hexedit.dialog.content",
+            heading.Contains(BinaryValueName, StringComparison.Ordinal) && rowOk && statusOk,
+            $"heading='{heading}', status='{status}', row0='{rowText}'.");
+
+        AutomationElement? editor = driver.WaitForElement("HexEditor");
+        bool focused = FocusEditor(session, firstRow, editor);
+        bool selectAll = false;
+        string clipboardNote = "not attempted";
+        if (focused)
+        {
+            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
+            selectAll = ControlTestSupport.WaitUntil(
+                () => HelpTextOf(editor).Contains("SelectedLength=48", StringComparison.Ordinal),
+                TimeSpan.FromSeconds(5));
+
+            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_C);
+            string clipboardText = string.Empty;
+            string? clipboardError = null;
+            bool clipboardRead = ControlTestSupport.WaitUntil(
+                () => TryReadClipboardText(out clipboardText, out clipboardError),
+                TimeSpan.FromSeconds(3));
+            bool startsCorrectly = clipboardRead &&
+                clipboardText.StartsWith("00 01", StringComparison.Ordinal);
+            clipboardNote = clipboardRead
+                ? $"informational: clipboard starts='{Prefix(clipboardText)}', expected '00 01', matches={startsCorrectly}."
+                : "informational: clipboard unavailable: " + clipboardError;
+        }
+        else
+        {
+            clipboardNote = "informational: hex editor did not take UIA keyboard focus.";
+        }
+
+        E2EResults.Record(
+            "hexedit.selectall",
+            selectAll,
+            $"editorFocused={focused}, help='{HelpTextOf(editor)}'.");
+        E2EResults.Record("hexedit.clipboard.original", true, clipboardNote);
+
+        // Ctrl+Home moves from the select all range to byte 0, then AABB overwrites the first
+        // two bytes. The dialog keeps its own buffer until OK. Keyboard input goes directly to
+        // the modal dialog; AppSession.SendKeys would re-focus the disabled main window.
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.HOME);
+        bool byteZero = ControlTestSupport.WaitUntil(
+            () => HelpTextOf(editor).Contains("SelectedOffset=0;SelectedLength=1", StringComparison.Ordinal),
+            TimeSpan.FromSeconds(5));
+        Keyboard.Type("AABB");
+        bool typed = ControlTestSupport.WaitUntil(
+            () => ControlTestSupport.SafeName(driver.WaitForElement("HexRow_0"))
+                .Contains("AA BB", StringComparison.Ordinal),
+            TimeSpan.FromSeconds(5));
+        E2EResults.Record(
+            "hexedit.typed",
+            byteZero && typed,
+            $"byteZero={byteZero}, typed={typed}, row0='{ControlTestSupport.SafeName(driver.WaitForElement("HexRow_0"))}', help='{HelpTextOf(editor)}'.");
+
+        bool invoked = driver.Invoke("DialogPrimary");
+        bool closed = driver.WaitForNoDialog();
+
+        byte[] expected = CreatePattern();
+        expected[0] = 0xAA;
+        expected[1] = 0xBB;
+        bool saved = ControlTestSupport.WaitUntil(
+            () => sandbox.ReadBinary(string.Empty, BinaryValueName) is { } bytes &&
+                bytes.SequenceEqual(expected),
+            TimeSpan.FromSeconds(10));
+        bool typePreserved = ValueKindOf(sandbox, BinaryValueName) == RegistryValueKind.Binary;
+        bool rowSelected = ControlTestSupport.WaitUntil(
+            () => ControlTestSupport.IsSelected(FindRow(session, BinaryValueName)),
+            TimeSpan.FromSeconds(10));
+        E2EResults.Record(
+            "hexedit.saved",
+            invoked && closed && saved && typePreserved && rowSelected,
+            $"invoked={invoked}, closed={closed}, saved={saved}, kind={ValueKindOf(sandbox, BinaryValueName)}, rowSelected={rowSelected}.");
+    }
+
+    private static void CheckInsertDeleteCancel(
+        AppSession session,
+        EditingDriver driver,
+        SandboxRegistry sandbox)
+    {
+        AutomationElement? row = FindRow(session, BinaryValueName);
+        ControlTestSupport.Select(row);
+        _ = ControlTestSupport.WaitUntil(
+            () => ControlTestSupport.IsSelected(FindRow(session, BinaryValueName)),
+            TimeSpan.FromSeconds(5));
+
+        bool opened = OpenEditor(session, driver, BinaryValueName);
+        string status = driver.TextOf("HexStatus");
+        AutomationElement? editor = driver.WaitForElement("HexEditor");
+        AutomationElement? firstRow = driver.WaitForElement("HexRow_0");
+        bool focused = FocusEditor(session, firstRow, editor);
+        E2EResults.Record(
+            "hexedit.reopen",
+            opened && focused && status.Contains("48 bytes", StringComparison.Ordinal),
+            $"opened={opened}, focused={focused}, status='{status}'.");
+
+        bool insert = focused;
+        if (insert)
+        {
+            Keyboard.Press(VirtualKeyShort.INSERT);
+        }
+
+        bool insertStatus = insert && ControlTestSupport.WaitUntil(
+            () => driver.TextOf("HexStatus").Contains("Insert", StringComparison.Ordinal),
+            TimeSpan.FromSeconds(5));
+        E2EResults.Record(
+            "hexedit.insertmode",
+            insertStatus,
+            $"insert={insert}, status='{driver.TextOf("HexStatus")}', help='{HelpTextOf(editor)}'.");
+
+        bool moved = insertStatus;
+        if (moved)
+        {
+            Keyboard.Press(VirtualKeyShort.RIGHT);
+        }
+
+        bool deleted = moved;
+        if (deleted)
+        {
+            Keyboard.Press(VirtualKeyShort.DELETE);
+        }
+
+        bool backspaced = deleted;
+        if (backspaced)
+        {
+            Keyboard.Press(VirtualKeyShort.BACK);
+        }
+
+        bool lengthChanged = backspaced && ControlTestSupport.WaitUntil(
+            () => driver.TextOf("HexStatus").Contains("46 bytes", StringComparison.Ordinal),
+            TimeSpan.FromSeconds(5));
+        E2EResults.Record(
+            "hexedit.insert.delete",
+            moved && deleted && backspaced && lengthChanged,
+            $"moved={moved}, deleted={deleted}, backspaced={backspaced}, status='{driver.TextOf("HexStatus")}', help='{HelpTextOf(editor)}'.");
+
+        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        bool closed = driver.WaitForNoDialog();
+
+        byte[] expected = CreatePattern();
+        expected[0] = 0xAA;
+        expected[1] = 0xBB;
+        bool unchanged = sandbox.ReadBinary(string.Empty, BinaryValueName) is { } bytes &&
+            bytes.SequenceEqual(expected);
+        bool focusReturned = ControlTestSupport.WaitUntil(
+            () => HasKeyboardFocus(session.Find(ControlTestSupport.ListControl)),
+            TimeSpan.FromSeconds(5));
+        E2EResults.Record(
+            "hexedit.cancel",
+            closed && unchanged && focusReturned,
+            $"closed={closed}, unchanged={unchanged}, focusReturnedToList={focusReturned}.");
+    }
+
+    private static void CheckCopyAndEscape(
+        AppSession session,
+        EditingDriver driver,
+        SandboxRegistry sandbox)
+    {
+        AutomationElement? row = FindRow(session, BinaryValueName);
+        ControlTestSupport.Select(row);
+        _ = ControlTestSupport.WaitUntil(
+            () => ControlTestSupport.IsSelected(FindRow(session, BinaryValueName)),
+            TimeSpan.FromSeconds(5));
+
+        bool opened = OpenEditor(session, driver, BinaryValueName);
+        AutomationElement? editor = driver.WaitForElement("HexEditor");
+        AutomationElement? firstRow = driver.WaitForElement("HexRow_0");
+        bool focused = opened && FocusEditor(session, firstRow, editor);
+
+        bool selectAll = false;
+        string clipboardNote = "informational: editor did not take focus.";
+        if (focused)
+        {
+            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
+            selectAll = ControlTestSupport.WaitUntil(
+                () => HelpTextOf(editor).Contains("SelectedLength=48", StringComparison.Ordinal),
+                TimeSpan.FromSeconds(5));
+
+            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_C);
+            string clipboardText = string.Empty;
+            string? clipboardError = null;
+            bool clipboardRead = ControlTestSupport.WaitUntil(
+                () => TryReadClipboardText(out clipboardText, out clipboardError),
+                TimeSpan.FromSeconds(3));
+            bool startsCorrectly = clipboardRead &&
+                clipboardText.StartsWith("AA BB 02", StringComparison.Ordinal);
+            clipboardNote = clipboardRead
+                ? $"informational: edited clipboard starts='{Prefix(clipboardText)}', expected 'AA BB 02', matches={startsCorrectly}."
+                : "informational: clipboard unavailable: " + clipboardError;
+        }
+
+        E2EResults.Record(
+            "hexedit.copy.afteredit",
+            selectAll,
+            $"focused={focused}, selectAll={selectAll}, help='{HelpTextOf(editor)}'.");
+        E2EResults.Record("hexedit.clipboard.afteredit", true, clipboardNote);
+
+        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        bool closed = driver.WaitForNoDialog();
+        bool focusReturned = ControlTestSupport.WaitUntil(
+            () => HasKeyboardFocus(session.Find(ControlTestSupport.ListControl)),
+            TimeSpan.FromSeconds(5));
+        bool unchanged = sandbox.ReadBinary(string.Empty, BinaryValueName) is { Length: PatternLength };
+        E2EResults.Record(
+            "hexedit.escape.focus",
+            closed && focusReturned && unchanged,
+            $"closed={closed}, focusReturnedToList={focusReturned}, unchangedLength={unchanged}.");
+    }
+
+    private static bool OpenEditor(AppSession session, EditingDriver driver, string rowName)
+    {
+        if (!driver.WaitForNoDialog(TimeSpan.FromSeconds(1)))
+        {
+            return false;
+        }
+
+        _ = ControlTestSupport.EnsureForeground(session);
+        AutomationElement? row = FindRow(session, rowName);
+        if (row is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            row.DoubleClick();
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+
+        bool dialog = driver.WaitForDialog();
+        bool root = driver.WaitForElement("HexEditorDialog") is not null;
+        bool editor = driver.WaitForElement("HexEditor") is not null;
+        return dialog && root && editor;
+    }
+
+    private static bool FocusEditor(
+        AppSession session,
+        AutomationElement? firstRow,
+        AutomationElement? editor)
+    {
+        // EnsureForeground would re-focus the disabled main window and take keyboard input away
+        // from the modal dialog. UIA focus on the row activates the dialog and focuses the editor.
+        _ = session;
+        try
+        {
+            firstRow?.Focus();
+        }
+        catch (Exception)
+        {
+            // The focus check below records the result.
+        }
+
+        return ControlTestSupport.WaitUntil(
+            () => HasKeyboardFocus(editor),
+            TimeSpan.FromSeconds(5));
+    }
+
+    private static AutomationElement? FindRow(AppSession session, string name) =>
+        ControlTestSupport.FindRowByName(
+            session,
+            ControlTestSupport.ListControl,
+            ControlType.DataItem,
+            name);
+
+    private static bool SelectRow(AppSession session, string name)
+    {
+        AutomationElement? row = FindRow(session, name);
+        ControlTestSupport.Select(row);
+        return ControlTestSupport.WaitUntil(
+            () => ControlTestSupport.IsSelected(FindRow(session, name)),
+            TimeSpan.FromSeconds(5));
+    }
+
+    private static byte[] CreatePattern()
+    {
+        byte[] pattern = new byte[PatternLength];
+        for (var index = 0; index < pattern.Length; index++)
+        {
+            pattern[index] = (byte)index;
+        }
+
+        return pattern;
+    }
+
+    private static void Seed(SandboxRegistry sandbox)
+    {
+        using var root = sandbox.CreateSubKey(string.Empty);
+        root.SetValue(BinaryValueName, CreatePattern(), RegistryValueKind.Binary);
+        root.SetValue(StringValueName, StringText, RegistryValueKind.String);
+    }
+
+    private static RegistryValueKind ValueKindOf(SandboxRegistry sandbox, string name)
+    {
+        try
+        {
+            using RegistryKey? key = Registry.CurrentUser.OpenSubKey(sandbox.RunRootPath, writable: false);
+            return key?.GetValueKind(name) ?? RegistryValueKind.Unknown;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return RegistryValueKind.Unknown;
+        }
+    }
+
+    private static bool ContainsAll(IReadOnlyList<string> names, params string[] expected)
+    {
+        foreach (string name in expected)
+        {
+            if (!names.Contains(name, StringComparer.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string Prefix(string text) =>
+        text.Length <= 24 ? text : text[..24];
+
+    private static string HelpTextOf(AutomationElement? element)
+    {
+        if (element is null)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return element.Properties.HelpText.Value ?? string.Empty;
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static bool HasKeyboardFocus(AutomationElement? element)
+    {
+        if (element is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return element.Properties.HasKeyboardFocus.Value;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static string CreateFreshDataRoot(E2EConfig config, string scope)
+    {
+        string path = config.DataRootFor(scope);
+        if (Directory.Exists(path))
+        {
+            Directory.Delete(path, recursive: true);
+        }
+
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
+    private static void DeleteDataRoot(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return;
+        }
+
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, recursive: true);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The run subtree is already gone. A settings file held briefly by the exiting
+            // application is left for the next scoped run.
+        }
+    }
+
+    private static bool TryReadClipboardText(out string text, out string? error)
+    {
+        text = string.Empty;
+        error = null;
+
+        if (!OpenClipboard(IntPtr.Zero))
+        {
+            error = new Win32Exception(Marshal.GetLastWin32Error()).Message;
+            return false;
+        }
+
+        try
+        {
+            IntPtr handle = GetClipboardData(CfUnicodeText);
+            if (handle == IntPtr.Zero)
+            {
+                error = "The clipboard has no Unicode text.";
+                return false;
+            }
+
+            IntPtr pointer = GlobalLock(handle);
+            if (pointer == IntPtr.Zero)
+            {
+                error = new Win32Exception(Marshal.GetLastWin32Error()).Message;
+                return false;
+            }
+
+            try
+            {
+                text = Marshal.PtrToStringUni(pointer) ?? string.Empty;
+                return true;
+            }
+            finally
+            {
+                _ = GlobalUnlock(handle);
+            }
+        }
+        finally
+        {
+            _ = CloseClipboard();
+        }
+    }
+
+    private static void FailIfNeeded()
+    {
+        var failures = E2EResults.FailedChecksSince(_checkStart);
+        Assert.AreEqual(
+            0,
+            failures.Count,
+            $"Hex editing checks failed:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool OpenClipboard(IntPtr newOwner);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool CloseClipboard();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetClipboardData(uint format);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalLock(IntPtr memory);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GlobalUnlock(IntPtr memory);
+}

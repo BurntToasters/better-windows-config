@@ -1,11 +1,14 @@
 using System.Text;
 using Bwc.UI.Theme;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Windows.Foundation;
 using Windows.System;
+using Windows.UI.Core;
 
 namespace Bwc.UI.Tree;
 
@@ -32,6 +35,23 @@ public sealed class TreeRenameRequestedEventArgs : EventArgs
     public TreeNode Node { get; }
 
     public string NewName { get; }
+}
+
+/// <summary>A right-click or menu key request for one tree row.</summary>
+public sealed class TreeNodeContextRequestedEventArgs : EventArgs
+{
+    public TreeNodeContextRequestedEventArgs(TreeNode node, FrameworkElement element, Point point)
+    {
+        Node = node;
+        Element = element;
+        Point = point;
+    }
+
+    public TreeNode Node { get; }
+
+    public FrameworkElement Element { get; }
+
+    public Point Point { get; }
 }
 
 /// <summary>
@@ -88,6 +108,19 @@ public sealed partial class DenseTree : UserControl
 
     /// <summary>Raised when F2 rename is committed with Enter. The demo host does not write the registry.</summary>
     public event EventHandler<TreeRenameRequestedEventArgs>? RenameRequested;
+
+    /// <summary>
+    /// Raised for a right-click on a row or a keyboard menu request. The row is selected before
+    /// the event fires. The member hides the UIElement event of the same name because the payload
+    /// is row specific.
+    /// </summary>
+    public new event EventHandler<TreeNodeContextRequestedEventArgs>? ContextRequested;
+
+    /// <summary>Raised when Delete is pressed with a selected node.</summary>
+    public event EventHandler? DeleteRequested;
+
+    /// <summary>Raised when Ctrl+C is pressed with a selected node.</summary>
+    public event EventHandler? CopyKeyNameRequested;
 
     /// <summary>
     /// Replaces the roots. A root that was already expanded before the call is shown with its
@@ -209,6 +242,32 @@ public sealed partial class DenseTree : UserControl
     internal void ExpandFromAutomation(TreeNode node)
     {
         _ = ExpandNodeAsync(node);
+    }
+
+    /// <summary>Expands the selected node when it has children and is collapsed.</summary>
+    public void ExpandSelected()
+    {
+        if (SelectedNode is { HasChildren: true, IsExpanded: false } node)
+        {
+            _ = ExpandNodeAsync(node);
+        }
+    }
+
+    /// <summary>Starts the inline rename box for the selected node. F2 uses the same path.</summary>
+    public void BeginRenameSelected() => BeginRename();
+
+    internal void RowRightTapped(TreeRowElement row, RightTappedRoutedEventArgs e)
+    {
+        if (row.Node is not { } node)
+        {
+            return;
+        }
+
+        SelectNode(node, scroll: false);
+        _ = Focus(FocusState.Pointer);
+        ContextRequested?.Invoke(
+            this,
+            new TreeNodeContextRequestedEventArgs(node, row, e.GetPosition(row)));
     }
 
     internal void RevealNode(TreeNode node)
@@ -463,6 +522,8 @@ public sealed partial class DenseTree : UserControl
 
         int page = Math.Max(1, (int)(Scroller.ViewportHeight / DenseMetrics.TreeRowHeight) - 1);
         int current = SelectedNode is null ? -1 : _rows.IndexOf(SelectedNode);
+        bool shift = IsKeyDown(VirtualKey.Shift);
+        bool control = IsKeyDown(VirtualKey.Control);
 
         switch (e.Key)
         {
@@ -506,8 +567,54 @@ public sealed partial class DenseTree : UserControl
                 BeginRename();
                 e.Handled = true;
                 break;
+            case VirtualKey.Delete:
+                if (SelectedNode is not null)
+                {
+                    DeleteRequested?.Invoke(this, EventArgs.Empty);
+                    e.Handled = true;
+                }
+
+                break;
+            case VirtualKey.C when control:
+                if (SelectedNode is not null)
+                {
+                    CopyKeyNameRequested?.Invoke(this, EventArgs.Empty);
+                    e.Handled = true;
+                }
+
+                break;
+            case VirtualKey.F10 when shift:
+            case VirtualKey.Application:
+                RaiseContextAtSelection();
+                e.Handled = true;
+                break;
         }
     }
+
+    private void RaiseContextAtSelection()
+    {
+        if (SelectedNode is not { } node)
+        {
+            return;
+        }
+
+        int index = _rows.IndexOf(node);
+        if (index < 0)
+        {
+            return;
+        }
+
+        double y = (index * DenseMetrics.TreeRowHeight) - Scroller.VerticalOffset +
+            (DenseMetrics.TreeRowHeight / 2);
+        var point = new Point(24, Math.Clamp(y, 4, Math.Max(4, ActualHeight - 4)));
+        ContextRequested?.Invoke(
+            this,
+            new TreeNodeContextRequestedEventArgs(node, this, point));
+    }
+
+    private static bool IsKeyDown(VirtualKey key) =>
+        (InputKeyboardSource.GetKeyStateForCurrentThread(key) & CoreVirtualKeyStates.Down) ==
+        CoreVirtualKeyStates.Down;
 
     private void CollapseOrGoToParent()
     {
