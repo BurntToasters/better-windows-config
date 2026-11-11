@@ -29,6 +29,9 @@ internal sealed class RegeditProcess : IDisposable
         _process = process;
         _automation = automation;
         MainHwnd = mainHwnd;
+
+        // Same rule as AppSession: the window stays above other applications until Close.
+        _ = Win32.SetTopmost(mainHwnd, true);
     }
 
     public IntPtr MainHwnd { get; }
@@ -201,6 +204,7 @@ internal sealed class RegeditProcess : IDisposable
             return;
         }
 
+        _ = Win32.SetTopmost(MainHwnd, false);
         try
         {
             _ = _process.CloseMainWindow();
@@ -363,21 +367,7 @@ internal static class AppServicesSupport
     }
 
     /// <summary>Activates a window. Returns true when it became the foreground window within the wait.</summary>
-    internal static bool ForceForeground(IntPtr hwnd)
-    {
-        if (IsForeground(hwnd))
-        {
-            return true;
-        }
-
-        if (IsMinimized(hwnd))
-        {
-            Restore(hwnd);
-        }
-
-        _ = SetForegroundWindow(hwnd);
-        return WaitUntil(() => IsForeground(hwnd), TimeSpan.FromSeconds(2));
-    }
+    internal static bool ForceForeground(IntPtr hwnd) => Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(2));
 
     /// <summary>
     /// Dismisses a modal message with Enter, its default button. Enter is sent only after the message
@@ -625,10 +615,6 @@ internal static class AppServicesSupport
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetForegroundWindow(IntPtr hwnd);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

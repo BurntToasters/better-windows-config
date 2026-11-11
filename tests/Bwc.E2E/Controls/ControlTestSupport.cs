@@ -31,50 +31,12 @@ internal static class ControlTestSupport
     }
 
     /// <summary>
-    /// Brings the target window to the foreground before synthetic input. SetForegroundWindow can
-    /// be refused by the foreground lock, so a click on the window is the fallback that always
-    /// activates it.
+    /// Brings the target window to the foreground before synthetic input and returns true when it is foreground.
+    /// Callers check the result before they send input. The routine is <see cref="AppSession.EnsureForeground"/>,
+    /// which never clicks into the window: a click on a window another application covers would land on that
+    /// application.
     /// </summary>
-    internal static bool EnsureForeground(AppSession session)
-    {
-        for (var attempt = 0; attempt < 3; attempt++)
-        {
-            if (Win32.IsForeground(session.MainHwnd))
-            {
-                return true;
-            }
-
-            try
-            {
-                session.Window.SetForeground();
-            }
-            catch (Exception)
-            {
-                // The click below may still succeed.
-            }
-
-            if (WaitUntil(() => Win32.IsForeground(session.MainHwnd), TimeSpan.FromMilliseconds(400)))
-            {
-                return true;
-            }
-
-            try
-            {
-                session.Window.Click();
-            }
-            catch (Exception)
-            {
-                // The next attempt retries.
-            }
-
-            if (WaitUntil(() => Win32.IsForeground(session.MainHwnd), TimeSpan.FromMilliseconds(1200)))
-            {
-                return true;
-            }
-        }
-
-        return Win32.IsForeground(session.MainHwnd);
-    }
+    internal static bool EnsureForeground(AppSession session) => session.EnsureForeground(TimeSpan.FromSeconds(3));
 
     internal static void SendKeys(AppSession session, params string[] keys)
     {

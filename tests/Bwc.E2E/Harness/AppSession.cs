@@ -82,6 +82,11 @@ public sealed class AppSession : IDisposable
             throw;
         }
 
+        // The app under test stays above other applications for the whole session, so a window the user
+        // runs cannot cover it and take the keystrokes. Owned dialogs of this window stay above it.
+        // Close clears the flag before the window is closed.
+        _ = Win32.SetTopmost(MainHwnd, true);
+
         ProcessId = process.Id;
         E2EResults.CurrentSession = this;
     }
@@ -223,6 +228,7 @@ public sealed class AppSession : IDisposable
             return;
         }
 
+        _ = Win32.SetTopmost(MainHwnd, false);
         try
         {
             _process.CloseMainWindow();
@@ -353,35 +359,29 @@ public sealed class AppSession : IDisposable
         }
     }
 
-    private bool EnsureForeground(TimeSpan timeout)
+    /// <summary>
+    /// Makes the main window the foreground window and returns true once it is, within the timeout. This is the
+    /// harness's one foreground routine: every keystroke batch and every mouse click aimed at the app is preceded by
+    /// a check through it. The window is kept topmost, activated through UI Automation, and then through the
+    /// attached-thread path in <see cref="Win32.ForceForeground"/> when Windows refuses the plain request.
+    /// </summary>
+    internal bool EnsureForeground(TimeSpan? timeout = null)
     {
         if (Win32.IsForeground(MainHwnd))
         {
             return true;
         }
 
-        Win32.ShowWindow(MainHwnd, Win32.SwRestore);
-        Win32.SetForegroundWindow(MainHwnd);
+        _ = Win32.SetTopmost(MainHwnd, true);
         try
         {
             Window.SetForeground();
         }
         catch (Exception)
         {
-            // SetForegroundWindow above may still have succeeded.
+            // The attached-thread request below still runs.
         }
 
-        var deadline = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < deadline)
-        {
-            if (Win32.IsForeground(MainHwnd))
-            {
-                return true;
-            }
-
-            Thread.Sleep(50);
-        }
-
-        return Win32.IsForeground(MainHwnd);
+        return Win32.ForceForeground(MainHwnd, timeout ?? TimeSpan.FromSeconds(3));
     }
 }

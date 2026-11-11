@@ -549,29 +549,15 @@ public sealed class ClassicDialogTests
         return IntPtr.Zero;
     }
 
-    internal static bool EnsureForeground(IntPtr hwnd)
-    {
-        for (int attempt = 0; attempt < 3; attempt++)
-        {
-            if (Win32.IsForeground(hwnd))
-            {
-                return true;
-            }
-
-            _ = Win32.SetForegroundWindow(hwnd);
-            if (ControlTestSupport.WaitUntil(() => Win32.IsForeground(hwnd), TimeSpan.FromMilliseconds(500)))
-            {
-                return true;
-            }
-        }
-
-        return Win32.IsForeground(hwnd);
-    }
+    /// <summary>Makes a classic dialog the foreground window before input, via <see cref="Win32.ForceForeground"/>.</summary>
+    internal static bool EnsureForeground(IntPtr hwnd) => Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(2));
 
     /// <summary>Saves the whole dialog window, including its caption and frame, as a PNG.</summary>
     internal static string SaveScreenshot(AutomationElement dialog, string path)
     {
         AutomationElement window = WindowOf(dialog);
+        // A screen copy shows whatever is above the dialog, so the dialog is raised above the topmost main window first.
+        _ = Win32.SetTopmost((IntPtr)window.Properties.NativeWindowHandle.Value, true);
         using (var image = Capture.Element(window))
         {
             image.ToFile(path);

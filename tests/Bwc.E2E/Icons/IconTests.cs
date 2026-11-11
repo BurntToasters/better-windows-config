@@ -92,27 +92,58 @@ public sealed class IconTests
             E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "icons.sandbox.navigate");
 
             // Expand the run key so its children (Leaf, Parent) are rows. The selection stays on the run key.
-            ControlTestSupport.SendKeys(session, "Right");
-            bool childrenShown = ControlTestSupport.WaitForTreeRow(session, "Leaf", ControlTestSupport.ExpandTimeout) &&
+            // The arrow key is sent only while the tree holds keyboard focus on the run key, so it cannot reach
+            // another window or move the selection somewhere else.
+            bool treeFocused = ControlTestSupport.WaitForTreeKeyboardFocus(session, config.RunId, ControlTestSupport.UiTimeout);
+            if (treeFocused)
+            {
+                ControlTestSupport.SendKeys(session, "Right");
+            }
+
+            bool childrenShown = treeFocused &&
+                ControlTestSupport.WaitForTreeRow(session, "Leaf", ControlTestSupport.ExpandTimeout) &&
                 ControlTestSupport.WaitForTreeRow(session, "Parent", ControlTestSupport.ExpandTimeout);
-            E2EResults.Record("icons.tree.children", childrenShown, $"Leaf and Parent rows visible={childrenShown}.");
+            E2EResults.Record("icons.tree.children", childrenShown, $"Leaf and Parent rows visible={childrenShown}, tree focused={treeFocused}.");
             if (!childrenShown)
             {
                 FailIfNeeded();
                 return;
             }
 
-            AutomationElement? computer = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "Computer");
-            AutomationElement? hkcu = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "HKEY_CURRENT_USER");
-            AutomationElement? parent = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "Parent");
-            AutomationElement? leaf = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "Leaf");
-            AutomationElement? alpha = ControlTestSupport.FindRowByName(session, ControlTestSupport.ListControl, ControlType.DataItem, "AlphaString");
-            AutomationElement? binary = ControlTestSupport.FindRowByName(session, ControlTestSupport.ListControl, ControlType.DataItem, "SampleBinary");
-            AutomationElement? dword = ControlTestSupport.FindRowByName(session, ControlTestSupport.ListControl, ControlType.DataItem, "SampleDword");
-            bool rowsFound = computer is not null && hkcu is not null && parent is not null && leaf is not null &&
-                alpha is not null && binary is not null && dword is not null;
+            // The tree and list rows are read after the expand has painted them. Each lookup is retried until the
+            // timeout, so a row that arrives a moment later is found and a row that never arrives still fails.
+            AutomationElement? computer = null;
+            AutomationElement? hkcu = null;
+            AutomationElement? parent = null;
+            AutomationElement? leaf = null;
+            AutomationElement? alpha = null;
+            AutomationElement? binary = null;
+            AutomationElement? dword = null;
+            bool rowsFound = ControlTestSupport.WaitUntil(
+                () =>
+                {
+                    computer = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "Computer");
+                    hkcu = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "HKEY_CURRENT_USER");
+                    parent = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "Parent");
+                    leaf = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "Leaf");
+                    alpha = ControlTestSupport.FindRowByName(session, ControlTestSupport.ListControl, ControlType.DataItem, "AlphaString");
+                    binary = ControlTestSupport.FindRowByName(session, ControlTestSupport.ListControl, ControlType.DataItem, "SampleBinary");
+                    dword = ControlTestSupport.FindRowByName(session, ControlTestSupport.ListControl, ControlType.DataItem, "SampleDword");
+                    return computer is not null && hkcu is not null && parent is not null && leaf is not null &&
+                        alpha is not null && binary is not null && dword is not null;
+                },
+                ControlTestSupport.UiTimeout);
             E2EResults.Record("icons.rows.found", rowsFound, $"all tree and list rows found={rowsFound}.");
             if (!rowsFound)
+            {
+                FailIfNeeded();
+                return;
+            }
+
+            // The capture is a screen copy, so it is taken only while the window is confirmed foreground.
+            bool captureForeground = ControlTestSupport.EnsureForeground(session);
+            E2EResults.Record("icons.capture.foreground", captureForeground, $"window foreground for the capture={captureForeground}.");
+            if (!captureForeground)
             {
                 FailIfNeeded();
                 return;

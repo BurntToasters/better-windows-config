@@ -419,6 +419,7 @@ public sealed class TreeBehaviorTests
             E2EResults.Record("tree.uia.patterns", expanded && patterns, $"Tree item supports ExpandCollapse, SelectionItem and ScrollItem={patterns}.");
 
             bool startCollapsed = WaitForState(session, "Tree", "Collapsed");
+            _ = ControlTestSupport.EnsureForeground(session);
             ControlTestSupport.Expand(Row(session, "Tree"));
             bool expandedByPattern = WaitForRowPresent(session, "Level1") && WaitForState(session, "Tree", "Expanded");
             E2EResults.Record(
@@ -426,6 +427,7 @@ public sealed class TreeBehaviorTests
                 startCollapsed && expandedByPattern,
                 $"Start collapsed={startCollapsed}; Expand() shows Level1 and state Expanded={expandedByPattern}.");
 
+            _ = ControlTestSupport.EnsureForeground(session);
             ControlTestSupport.Collapse(Row(session, "Tree"));
             bool collapsedByPattern = WaitForRowAbsent(session, "Level1") && WaitForState(session, "Tree", "Collapsed");
             E2EResults.Record("tree.uia.collapse-pattern", collapsedByPattern, $"Collapse() removes Level1 and state Collapsed={collapsedByPattern}.");

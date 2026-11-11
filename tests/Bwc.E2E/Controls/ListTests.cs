@@ -119,11 +119,16 @@ public sealed class ListTests
             bool headerFound = header is not null;
             E2EResults.Record("controls.list.header.name", headerFound, $"HeaderName present={headerFound}.");
 
-            _ = ControlTestSupport.EnsureForeground(session);
             if (header is not null)
             {
                 try
                 {
+                    // The click is a mouse input, so it is sent only after the window is confirmed foreground.
+                    if (!ControlTestSupport.EnsureForeground(session))
+                    {
+                        throw new InvalidOperationException("The Registry Editor window did not come to the foreground, so the header was not clicked.");
+                    }
+
                     header.Click();
                     Thread.Sleep(300);
                 }
@@ -148,12 +153,17 @@ public sealed class ListTests
 
             first = session.Find("ListRow_0");
             second = session.Find("ListRow_1");
-            _ = ControlTestSupport.EnsureForeground(session);
-            using (Keyboard.Pressing(VirtualKeyShort.CONTROL))
+
+            // Ctrl+click is sent only while the window is confirmed foreground. Without it the multi-select check
+            // below fails on its own, as a recorded check.
+            if (ControlTestSupport.EnsureForeground(session))
             {
-                if (second is not null)
+                using (Keyboard.Pressing(VirtualKeyShort.CONTROL))
                 {
-                    second.Click();
+                    if (second is not null)
+                    {
+                        second.Click();
+                    }
                 }
             }
 

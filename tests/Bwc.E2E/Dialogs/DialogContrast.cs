@@ -54,6 +54,11 @@ internal static class DialogContrast
             return;
         }
 
+        // The main window is topmost, which puts a non-topmost dialog beneath it. The capture is a screen copy, so the
+        // dialog is raised above the main window and activated first; otherwise the sample shows the main window.
+        _ = Win32.SetTopmost(hwnd, true);
+        _ = Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(2));
+
         var origin = new Point(0, 0);
         if (!ClientToScreen(hwnd, ref origin))
         {

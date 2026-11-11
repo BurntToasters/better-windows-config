@@ -155,60 +155,21 @@ internal static class HubUi
         }
     }
 
-    /// <summary>Brings a window to the foreground so keystrokes reach it. Returns false when it cannot.</summary>
-    public static bool Foreground(IntPtr hwnd, TimeSpan timeout)
-    {
-        DateTime deadline = DateTime.UtcNow + timeout;
-        while (true)
-        {
-            if (Win32.IsForeground(hwnd))
-            {
-                return true;
-            }
-
-            Win32.ShowWindow(hwnd, Win32.SwRestore);
-            _ = Win32.SetForegroundWindow(hwnd);
-            Thread.Sleep(100);
-            if (DateTime.UtcNow >= deadline)
-            {
-                return Win32.IsForeground(hwnd);
-            }
-        }
-    }
+    /// <summary>Brings a window to the foreground so keystrokes reach it. See <see cref="Win32.Foreground"/>.</summary>
+    public static bool Foreground(IntPtr hwnd, TimeSpan timeout) => Win32.Foreground(hwnd, timeout);
 
     /// <summary>
-    /// Brings the window to the foreground. When Windows refuses the plain request, this thread is attached to the
-    /// foreground thread for the request, which lets the Hub take focus back from another window. Returns true once
-    /// the window is the foreground window within the timeout.
+    /// Raises a Hub dialog above the topmost Hub window and activates it. Clicks and screen copies aimed at the
+    /// dialog are sent only after this returns true, so they cannot land on the Hub or on a window that covers it.
     /// </summary>
-    public static bool ForceForeground(IntPtr hwnd, TimeSpan timeout)
+    public static bool RaiseDialog(IntPtr hwnd, TimeSpan timeout)
     {
-        if (Foreground(hwnd, TimeSpan.FromMilliseconds(500)))
-        {
-            return true;
-        }
-
-        IntPtr foreground = GetForegroundWindow();
-        uint currentThread = GetCurrentThreadId();
-        uint foregroundThread = GetWindowThreadProcessId(foreground, out _);
-        bool attached = foregroundThread != 0 && foregroundThread != currentThread &&
-            AttachThreadInput(currentThread, foregroundThread, true);
-        try
-        {
-            Win32.ShowWindow(hwnd, Win32.SwRestore);
-            _ = BringWindowToTop(hwnd);
-            _ = Win32.SetForegroundWindow(hwnd);
-        }
-        finally
-        {
-            if (attached)
-            {
-                _ = AttachThreadInput(currentThread, foregroundThread, false);
-            }
-        }
-
-        return Foreground(hwnd, timeout);
+        _ = Win32.SetTopmost(hwnd, true);
+        return Win32.ForceForeground(hwnd, timeout);
     }
+
+    /// <summary>Brings a window to the foreground, attaching to its thread when refused.</summary>
+    public static bool ForceForeground(IntPtr hwnd, TimeSpan timeout) => Win32.ForceForeground(hwnd, timeout);
 
     /// <summary>
     /// Names the foreground window, its process, and whether a Registry Editor process is still running. The text goes
@@ -530,15 +491,5 @@ internal static class HubUi
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
 
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool attach);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool BringWindowToTop(IntPtr hwnd);
-
-    [DllImport("kernel32.dll")]
-    private static extern uint GetCurrentThreadId();
 #pragma warning restore SYSLIB1054
 }

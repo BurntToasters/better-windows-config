@@ -559,28 +559,44 @@ public sealed class PrintTests
                 cf => cf.ByName("Cancel").And(cf.ByControlType(ControlType.Button)));
             if (cancel is not null)
             {
+                // The pattern press does not need the foreground. A mouse click does, so it is sent only after the
+                // dialog is confirmed foreground; otherwise the click would land on whatever window covers it.
+                bool pressed = false;
                 try
                 {
                     if (cancel.Patterns.Invoke.IsSupported)
                     {
                         cancel.Patterns.Invoke.Pattern.Invoke();
-                    }
-                    else
-                    {
-                        cancel.Click();
+                        pressed = true;
                     }
                 }
                 catch (Exception)
                 {
-                    cancel.Click();
+                    // The mouse path below is tried.
                 }
 
-                method = "cancel-button";
-                if (ControlTestSupport.WaitUntil(
-                        () => !IsDialogVisible(dialog),
-                        TimeSpan.FromSeconds(4)))
+                if (!pressed && EnsureForeground(dialog))
                 {
-                    return true;
+                    try
+                    {
+                        cancel.Click();
+                        pressed = true;
+                    }
+                    catch (Exception)
+                    {
+                        // The Escape path below is tried.
+                    }
+                }
+
+                if (pressed)
+                {
+                    method = "cancel-button";
+                    if (ControlTestSupport.WaitUntil(
+                            () => !IsDialogVisible(dialog),
+                            TimeSpan.FromSeconds(4)))
+                    {
+                        return true;
+                    }
                 }
             }
         }
@@ -621,45 +637,12 @@ public sealed class PrintTests
     private static bool IsDialogVisible(nint hwnd) =>
         Win32.IsWindow(hwnd) && IsWindowVisible(hwnd);
 
-    private static bool EnsureForeground(nint hwnd)
-    {
-        if (Win32.IsForeground(hwnd))
-        {
-            return true;
-        }
-
-        Win32.ShowWindow(hwnd, Win32.SwRestore);
-        _ = Win32.SetForegroundWindow(hwnd);
-        if (ControlTestSupport.WaitUntil(
-                () => Win32.IsForeground(hwnd),
-                TimeSpan.FromMilliseconds(600)))
-        {
-            return true;
-        }
-
-        nint foreground = Win32.GetForegroundWindow();
-        uint foregroundThread = GetWindowThreadProcessId(foreground, out _);
-        uint currentThread = GetCurrentThreadId();
-        bool attached = foregroundThread != 0 &&
-            foregroundThread != currentThread &&
-            AttachThreadInput(currentThread, foregroundThread, true);
-
-        try
-        {
-            _ = Win32.SetForegroundWindow(hwnd);
-        }
-        finally
-        {
-            if (attached)
-            {
-                _ = AttachThreadInput(currentThread, foregroundThread, false);
-            }
-        }
-
-        return ControlTestSupport.WaitUntil(
-            () => Win32.IsForeground(hwnd),
-            TimeSpan.FromSeconds(2));
-    }
+    /// <summary>
+    /// Confirms a dialog is the foreground window before any keystroke or mouse input is sent to it. The shared
+    /// routine is <see cref="Win32.ForceForeground"/>, which also attaches to the foreground thread when Windows
+    /// refuses the plain request.
+    /// </summary>
+    private static bool EnsureForeground(nint hwnd) => Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(2));
 
     private static bool HasDefaultPrinter()
     {
@@ -810,13 +793,6 @@ public sealed class PrintTests
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsWindowVisible(nint hwnd);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
-
-    [DllImport("kernel32.dll")]
-    private static extern uint GetCurrentThreadId();
 
     [DllImport("winspool.drv", CharSet = CharSet.Unicode, EntryPoint = "GetDefaultPrinterW", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
