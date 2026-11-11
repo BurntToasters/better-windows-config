@@ -16,12 +16,35 @@
     <x:Double x:Key="BwcTreeIndent">16</x:Double>
     <x:Double x:Key="BwcTreePaneWidth">216</x:Double>
 
+    <!--
+        Palette brushes. Each is a live SolidColorBrush: Bwc.UI.Theme.BwcBrushes looks these keys up
+        and BwcTheme writes Color on them, so every element that uses a key changes at once. The
+        values here are the light system colors on the reference machine, so the first frame is
+        already classic before the palette is applied. Keep the keys in step with BwcBrushes.
+    -->
+    <SolidColorBrush x:Key="BwcWindowBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="BwcWindowTextBrush" Color="#FF000000" />
+    <SolidColorBrush x:Key="BwcFaceBrush" Color="#FFF0F0F0" />
+    <SolidColorBrush x:Key="BwcShadowBrush" Color="#FFA0A0A0" />
+    <SolidColorBrush x:Key="BwcHighlight3DBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="BwcGrayTextBrush" Color="#FF6D6D6D" />
+    <SolidColorBrush x:Key="BwcSelectionBrush" Color="#FF0078D4" />
+    <SolidColorBrush x:Key="BwcSelectionTextBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="BwcTreeSelectionBrush" Color="#FFF0F0F0" />
+    <SolidColorBrush x:Key="BwcTreeSelectionTextBrush" Color="#FF000000" />
+    <SolidColorBrush x:Key="BwcTreeFocusRectBrush" Color="#00000000" />
+    <SolidColorBrush x:Key="BwcListSelectionBrush" Color="#FFF0F0F0" />
+    <SolidColorBrush x:Key="BwcListSelectionTextBrush" Color="#FF000000" />
+    <SolidColorBrush x:Key="BwcListFocusRectBrush" Color="#00000000" />
+
     <!-- Keyed styles: ordinary controls elsewhere keep the Fluent defaults. -->
     <Style x:Key="BwcMenuBarStyle" TargetType="MenuBar">
         <Setter Property="Height" Value="{StaticResource BwcMenuBarHeight}" />
         <Setter Property="MinHeight" Value="0" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="FontSize" Value="{StaticResource BwcFontSize}" />
+        <Setter Property="Background" Value="{StaticResource BwcWindowBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource BwcWindowTextBrush}" />
     </Style>
 
     <Style x:Key="BwcMenuBarItemStyle" TargetType="MenuBarItem">
@@ -30,6 +53,7 @@
         <Setter Property="Padding" Value="6,0" />
         <Setter Property="Margin" Value="0" />
         <Setter Property="FontSize" Value="{StaticResource BwcFontSize}" />
+        <Setter Property="Foreground" Value="{StaticResource BwcWindowTextBrush}" />
     </Style>
 
     <Style x:Key="BwcMenuFlyoutItemStyle" TargetType="MenuFlyoutItem">
@@ -53,6 +77,9 @@
         <Setter Property="Padding" Value="2,1" />
         <Setter Property="FontSize" Value="{StaticResource BwcFontSize}" />
         <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{StaticResource BwcShadowBrush}" />
+        <Setter Property="Background" Value="{StaticResource BwcWindowBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource BwcWindowTextBrush}" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
 

@@ -1,14 +1,14 @@
 namespace Bwc.UI.Dialogs;
 
-/// <summary>DWORD editor. Accepts decimal digits or a 0x hexadecimal prefix.</summary>
-public sealed class DwordValueDialog : ValueEditorDialog
+/// <summary>
+/// Edit DWORD (32-bit) Value. Hexadecimal is selected by default. Decimal and hexadecimal are the
+/// two bases, and switching converts the shown value. Accepts 0 to FFFFFFFF in the current base.
+/// </summary>
+public sealed class DwordValueDialog : ClassicNumberDialog
 {
-    public DwordValueDialog(string title, string initialText = "0")
-        : base(title, "Value data")
+    public DwordValueDialog(string title, string initialText = "0", string valueName = "")
+        : base(ClassicDialogTemplates.EditDword(title), 32, initialText, valueName)
     {
-        Input.Text = initialText;
-        SetPreferredSize(440, 230);
-        SetHint("Enter a decimal number or a hexadecimal number with the 0x prefix. The value is 32 bits.");
     }
 
     /// <summary>The parsed value after a successful primary action.</summary>
@@ -16,13 +16,12 @@ public sealed class DwordValueDialog : ValueEditorDialog
 
     protected override bool TryAccept()
     {
-        if (!ValueTextParser.TryParseDword(Input.Text, out uint value, out string? error))
+        if (!base.TryAccept())
         {
-            ShowValidation(error);
             return false;
         }
 
-        Value = value;
+        Value = (uint)AcceptedValue;
         return true;
     }
 }

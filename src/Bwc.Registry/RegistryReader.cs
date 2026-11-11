@@ -22,6 +22,9 @@ public sealed class RegistryReader
     private const int ErrorNotEnoughMemory = 8;
     private const int ErrorInvalidSecurityDescriptor = 1338;
     private const int MaxSecurityDescriptorAttempts = 8;
+    private const int MaxEnumerationAttempts = 16;
+    private const int MaxValueNameChars = 32768;
+    private const int ErrorMoreData = 234;
 
     private readonly RemoteRegistryConnection? _remote;
 
@@ -122,6 +125,7 @@ public sealed class RegistryReader
             out _,
             out uint maxSubKeyNameLength,
             out _,
+            out _,
             out _);
 
         int bufferLength = maxSubKeyNameLength >= (uint)int.MaxValue
@@ -181,13 +185,14 @@ public sealed class RegistryReader
             out _,
             out _,
             out uint valueCount,
-            out uint maxValueNameLength);
+            out uint maxValueNameLength,
+            out uint maxValueDataLength);
 
-        int nameBufferLength = maxValueNameLength >= (uint)int.MaxValue
-            ? int.MaxValue
-            : (int)maxValueNameLength + 1;
-
-        char[] nameBuffer = new char[Math.Max(1, nameBufferLength)];
+        // The name and data come from the same RegEnumValueW call, so a name with an embedded NUL
+        // is never re-queried by its truncated form. Buffers start at the reported maximums and grow
+        // only on ERROR_MORE_DATA.
+        char[] nameBuffer = new char[(int)Math.Min(maxValueNameLength, (uint)MaxValueNameChars) + 1];
+        byte[] dataBuffer = new byte[Math.Max(1, ClampDataLength(maxValueDataLength, path))];
         var values = new List<RegistryValueInfo>(
             valueCount > (uint)int.MaxValue ? 0 : (int)valueCount);
         uint index = 0;
@@ -196,43 +201,21 @@ public sealed class RegistryReader
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            uint nameLength = (uint)nameBuffer.Length;
-            WIN32_ERROR error = PInvoke.RegEnumValue(
+            RegistryValueInfo? value = ReadValueAtIndex(
                 handle,
+                path,
                 index,
-                nameBuffer,
-                ref nameLength,
-                Span<byte>.Empty);
+                ref nameBuffer,
+                ref dataBuffer,
+                cancellationToken);
 
-            if (error == WIN32_ERROR.ERROR_SUCCESS)
-            {
-                string name = new(nameBuffer, 0, (int)nameLength);
-                RegistryValueInfo? value = QueryValueData(handle, path, name, cancellationToken);
-
-                if (value is null)
-                {
-                    // The value disappeared between enumeration and the data query. Retry the
-                    // same index: the next value has shifted into it, or the list is empty.
-                    continue;
-                }
-
-                values.Add(value);
-                index += 1;
-                continue;
-            }
-
-            if (error == WIN32_ERROR.ERROR_MORE_DATA)
-            {
-                Array.Resize(ref nameBuffer, GrowBuffer(nameLength, nameBuffer.Length));
-                continue;
-            }
-
-            if (error == WIN32_ERROR.ERROR_NO_MORE_ITEMS)
+            if (value is null)
             {
                 break;
             }
 
-            throw new RegistryOperationException(EnumValueOperation, path, (int)error);
+            values.Add(value);
+            index += 1;
         }
 
         return values;
@@ -475,14 +458,13 @@ public sealed class RegistryReader
             throw new RegistryOperationException(QueryValueOperation, path, (int)error);
         }
 
-        int bufferLength = size == 0 ? 1 : checked((int)size);
-        byte[] data = new byte[bufferLength];
-        uint dataLength = (uint)data.Length;
+        byte[] data = new byte[Math.Max(1, ClampDataLength(size, path, QueryValueOperation))];
 
-        while (true)
+        for (int attempt = 0; attempt < MaxEnumerationAttempts; attempt += 1)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            uint dataLength = (uint)data.Length;
             error = PInvoke.RegQueryValueEx(handle, valueName, out type, data, ref dataLength);
 
             if (error == WIN32_ERROR.ERROR_SUCCESS)
@@ -501,13 +483,150 @@ public sealed class RegistryReader
 
             if (error == WIN32_ERROR.ERROR_MORE_DATA)
             {
-                Array.Resize(ref data, GrowBuffer(dataLength, data.Length));
-                dataLength = (uint)data.Length;
+                data = new byte[GrownDataLength(dataLength, data.Length, path, QueryValueOperation)];
                 continue;
             }
 
             throw new RegistryOperationException(QueryValueOperation, path, (int)error);
         }
+
+        throw new RegistryOperationException(
+            QueryValueOperation,
+            path,
+            ErrorMoreData,
+            "The value kept changing size between reads.");
+    }
+
+    /// <summary>
+    /// Reads the value at <paramref name="index"/> with <c>RegEnumValueW</c>, which returns the
+    /// name, type, and data together. Returns null when the index is past the last value.
+    /// </summary>
+    private static unsafe RegistryValueInfo? ReadValueAtIndex(
+        SafeRegistryKeyHandle handle,
+        RegistryPath path,
+        uint index,
+        ref char[] nameBuffer,
+        ref byte[] dataBuffer,
+        CancellationToken cancellationToken)
+    {
+        for (int attempt = 0; attempt < MaxEnumerationAttempts; attempt += 1)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            uint nameLength = (uint)nameBuffer.Length;
+            uint dataLength = (uint)dataBuffer.Length;
+            uint type = 0;
+            WIN32_ERROR error;
+
+            fixed (char* namePointer = nameBuffer)
+            fixed (byte* dataPointer = dataBuffer)
+            {
+                error = PInvoke.RegEnumValue(
+                    new HKEY(handle.DangerousGetHandle()),
+                    index,
+                    new PWSTR(namePointer),
+                    &nameLength,
+                    null,
+                    &type,
+                    dataPointer,
+                    &dataLength);
+            }
+
+            if (error == WIN32_ERROR.ERROR_SUCCESS)
+            {
+                // The lengths are counted, so an embedded NUL stays inside the name.
+                int nameChars = (int)Math.Min(nameLength, (uint)nameBuffer.Length);
+                int dataBytes = (int)Math.Min(dataLength, (uint)dataBuffer.Length);
+                string name = new(nameBuffer, 0, nameChars);
+                byte[] data = dataBytes == 0
+                    ? Array.Empty<byte>()
+                    : dataBuffer.AsSpan(0, dataBytes).ToArray();
+
+                return new RegistryValueInfo(name, (uint)type, data);
+            }
+
+            if (error == WIN32_ERROR.ERROR_NO_MORE_ITEMS)
+            {
+                return null;
+            }
+
+            if (error != WIN32_ERROR.ERROR_MORE_DATA)
+            {
+                throw new RegistryOperationException(EnumValueOperation, path, (int)error);
+            }
+
+            // Grow whichever buffer the call reports as too small. When it reports neither,
+            // double both so the attempt cap, not the loop, decides when to stop.
+            bool grew = false;
+
+            if ((long)nameLength + 1 > nameBuffer.Length)
+            {
+                nameBuffer = new char[GrownNameLength(nameLength + 1L, nameBuffer.Length, path)];
+                grew = true;
+            }
+
+            if (dataLength > dataBuffer.Length)
+            {
+                dataBuffer = new byte[GrownDataLength(dataLength, dataBuffer.Length, path, EnumValueOperation)];
+                grew = true;
+            }
+
+            if (!grew)
+            {
+                nameBuffer = new char[GrownNameLength(nameBuffer.Length + 1L, nameBuffer.Length, path)];
+                dataBuffer = new byte[GrownDataLength(dataBuffer.Length + 1L, dataBuffer.Length, path, EnumValueOperation)];
+            }
+        }
+
+        throw new RegistryOperationException(
+            EnumValueOperation,
+            path,
+            ErrorMoreData,
+            "The value kept changing size between reads.");
+    }
+
+    private static int ClampDataLength(uint length, RegistryPath path, string operation = EnumValueOperation)
+    {
+        if (length > (uint)Array.MaxLength)
+        {
+            throw new RegistryOperationException(
+                operation,
+                path,
+                ErrorNotEnoughMemory,
+                "The registry reported a value too large to read.");
+        }
+
+        return (int)length;
+    }
+
+    private static int GrownDataLength(long required, int current, RegistryPath path, string operation)
+    {
+        long next = Math.Max(required, Math.Max((long)current * 2, current + 1L));
+        if (next > Array.MaxLength)
+        {
+            throw new RegistryOperationException(
+                operation,
+                path,
+                ErrorNotEnoughMemory,
+                "The registry reported a value too large to read.");
+        }
+
+        return (int)next;
+    }
+
+    private static int GrownNameLength(long required, int current, RegistryPath path)
+    {
+        long next = Math.Max(required, Math.Max((long)current * 2, current + 1L));
+        if (next > MaxValueNameChars + 1L)
+        {
+            throw new RegistryOperationException(
+                EnumValueOperation,
+                path,
+                ErrorMoreData,
+                "The registry reported a value name longer than the reader accepts.");
+        }
+
+        return (int)next;
     }
 
     private SafeRegistryKeyHandle OpenKey(
@@ -539,7 +658,8 @@ public sealed class RegistryReader
         out uint subKeyCount,
         out uint maxSubKeyNameLength,
         out uint valueCount,
-        out uint maxValueNameLength)
+        out uint maxValueNameLength,
+        out uint maxValueDataLength)
     {
         // Only GetKeyInfo needs the class name. A class longer than this buffer makes the call
         // return ERROR_MORE_DATA, but the count and length outputs are still usable here.
@@ -555,7 +675,7 @@ public sealed class RegistryReader
             out _,
             out valueCount,
             out maxValueNameLength,
-            out _,
+            out maxValueDataLength,
             out _,
             out _);
 

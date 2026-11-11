@@ -1,26 +1,22 @@
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace Bwc.UI.Dialogs;
 
 /// <summary>
-/// String and expandable string editor. String uses one line; expandable string uses a
-/// multi-line box because environment variable text can be long. The caller encodes the value.
+/// Edit String and Edit Expandable String. Classic regedit edits REG_EXPAND_SZ with the same Edit String
+/// dialog as REG_SZ, so both use the Edit String template. The caller encodes the value. The value name is
+/// read-only. <paramref name="multiline"/> is kept for existing callers and does not change the template.
 /// </summary>
-public sealed class StringValueDialog : ValueEditorDialog
+public sealed class StringValueDialog : ClassicDialog
 {
-    public StringValueDialog(string title, bool multiline, string initialText = "")
-        : base(title, "Value data")
+    private readonly TextBox _input;
+
+    public StringValueDialog(string title, bool multiline, string initialText = "", string valueName = "")
+        : base(ClassicDialogTemplates.EditString(title))
     {
-        Input.Text = initialText;
-        Input.AcceptsReturn = multiline;
-        Input.TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap;
-        Input.Height = multiline ? 150 : double.NaN;
-        SubmitsOnEnter = !multiline;
-        SetPreferredSize(multiline ? 470 : 440, multiline ? 330 : 210);
-        SetHint(multiline
-            ? "Enter the expandable string. Environment variables such as %SystemRoot% are expanded when read."
-            : "Enter the string value. An empty string is saved as an empty REG_SZ value.");
+        _input = RequireControl<TextBox>("ValueEditorInput");
+        _input.Text = initialText ?? string.Empty;
+        RequireControl<TextBox>("ValueNameInput").Text = valueName ?? string.Empty;
     }
 
     /// <summary>The entered text after a successful primary action.</summary>
@@ -28,7 +24,14 @@ public sealed class StringValueDialog : ValueEditorDialog
 
     protected override bool TryAccept()
     {
-        Value = Input.Text ?? string.Empty;
+        Value = _input.Text ?? string.Empty;
         return true;
+    }
+
+    /// <summary>Selects the whole value and focuses it, as the classic dialog does when it opens.</summary>
+    protected override void OnDialogLoaded()
+    {
+        _ = _input.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
+        _input.SelectAll();
     }
 }

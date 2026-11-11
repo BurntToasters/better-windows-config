@@ -15,4 +15,13 @@
     <RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- .NET 10 has no Ed25519 or BLAKE2b in the BCL (see spikes/S5-minisign/README.md). -->
+    <PackageReference Include="BouncyCastle.Cryptography" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Bwc.Core\Bwc.Core.csproj" />
+  </ItemGroup>
+
 </Project>

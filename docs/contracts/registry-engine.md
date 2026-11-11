@@ -38,7 +38,9 @@ the owning package records the observed behavior as a golden before implementing
 - Key and value names are .NET `string` values obtained through the Win32 API
   (`RegEnumKeyExW`, `RegEnumValueW`). The engine does not use `NtEnumerateKey` or counted-string
   native APIs. Keys whose names contain an embedded NUL are therefore reached exactly as far as
-  regedit reaches them, no further.
+  regedit reaches them, no further. Value names with an embedded NUL are read with their own data
+  (see Values), but reads and deletes by name cannot address them, so `RegistryWriter` refuses
+  such names.
 - Limits come from the platform: key name component 255 characters, value name 16,383
   characters, nesting depth 512. The engine does not pre-validate them; it passes the request
   to Windows and reports the Win32 error, so error paths match regedit.
@@ -66,6 +68,23 @@ the owning package records the observed behavior as a golden before implementing
   codec (package B4). Display strings for the Data column follow regedit exactly, including
   `(value not set)`, `(zero-length binary value)`, and `(invalid DWORD (32-bit) value)`; the
   exact strings come from the oracle string table.
+- Numeric Data-column formats (oracle strings 29 and 32, verified against the installed
+  `regedit.exe` and MUI with `LoadStringW`):
+  - REG_DWORD: `0x%08x (%u)`, for example `0x00001388 (5000)` and `0xffffffff (4294967295)`.
+  - REG_QWORD: `0x%08I64x (%I64u)`. The width is a minimum of eight digits, not sixteen, so
+    5000 shows as `0x00001388 (5000)` and only values above 32 bits print more digits.
+  - The hex part is lowercase and the decimal part is unsigned.
+  - A DWORD whose length is not 4 shows `(invalid DWORD (32-bit) value)`; a QWORD whose length
+    is not 8 shows `(invalid QWORD (64-bit) value)`. Length 0 uses the same messages. Classic
+    regedit's rule for lengths above 4 and 8 is not in the oracle; the BWC rule is unconfirmed.
+- REG_DWORD_BIG_ENDIAN (5) has no name in the oracle type table (ids 8000 to 8012 skip 8005),
+  so it shows type `REG_UNKNOWN` and hex bytes in stored order. REG_NONE, the three resource
+  types, and unknown numbers show hex bytes, or `(zero-length binary value)` when empty.
+- Enumeration reads each value's name, type, and data in one `RegEnumValueW` call. A name with
+  an embedded NUL returns its own data and never re-queries its truncated form. Buffers grow on
+  `ERROR_MORE_DATA` with a cap of 16 attempts per value; a name longer than 32,768 characters or
+  data larger than the managed array limit throws `RegistryOperationException`. Reads by name
+  (`ReadValue`) use the same bounded retry.
 
 ## Symbolic links and redirection
 
@@ -136,6 +155,10 @@ the owning package records the observed behavior as a golden before implementing
 - Export reproduces regedit's lossy cases exactly as the goldens show them (for example a
   `REG_SZ` with an embedded NUL exports truncated at the NUL). Byte-exact means identical to
   regedit's output, not lossless.
+- A value whose name contains an embedded NUL cannot be written to a `.reg` file. The exporter
+  throws `RegistryOperationException` (operation `ExportValueName`, error 123) and returns no
+  document. Classic regedit does not refuse it: a probe export stopped silently at such a value
+  and did not exit, so copying that output is not an option.
 - The parser accepts everything regedit accepts, including `-` key deletion lines,
   `"name"=-` value deletion, `hex(N):` for any type, and continuation lines. Error behavior for
   malformed files is *verify against oracle*.

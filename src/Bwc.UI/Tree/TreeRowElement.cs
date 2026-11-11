@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Automation.Provider;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using Windows.Foundation;
 
 namespace Bwc.UI.Tree;
@@ -25,6 +26,7 @@ public sealed class TreeRowElement : Panel
     private readonly Grid _chevronHost;
     private readonly FontIcon _chevron;
     private readonly TextBlock _label;
+    private readonly Rectangle _focusRect;
     private bool _selected;
     private double _indentWidth;
     private double _rowHeight = -1;
@@ -65,8 +67,13 @@ public sealed class TreeRowElement : Panel
             Foreground = DenseTheme.Text,
         };
 
+        // The focus rectangle is visible only on the selected row, and its brush is transparent
+        // unless the tree has focus. It is the last child so it draws over the selection fill.
+        _focusRect = BwcFocusRect.Create(DenseTheme.TreeFocusRect);
+
         Children.Add(_chevronHost);
         Children.Add(_label);
+        Children.Add(_focusRect);
         Tapped += OnRowTapped;
         RightTapped += OnRowRightTapped;
         Height = DenseMetrics.TreeRowHeight;
@@ -128,10 +135,11 @@ public sealed class TreeRowElement : Panel
 
     internal void ApplyTheme()
     {
-        Background = _selected ? DenseTheme.SelectionBackground : DenseTheme.Transparent;
-        Brush foreground = _selected ? DenseTheme.SelectionForeground : DenseTheme.Text;
+        Background = _selected ? DenseTheme.TreeSelectionBackground : DenseTheme.Transparent;
+        Brush foreground = _selected ? DenseTheme.TreeSelectionForeground : DenseTheme.Text;
         _label.Foreground = foreground;
         _chevron.Foreground = foreground;
+        _focusRect.Stroke = _selected ? DenseTheme.TreeFocusRect : DenseTheme.Transparent;
     }
 
     internal void SetSelected(bool selected)
@@ -164,6 +172,7 @@ public sealed class TreeRowElement : Panel
         double width = double.IsInfinity(availableSize.Width)
             ? textX + _label.DesiredSize.Width
             : availableSize.Width;
+        BwcFocusRect.Measure(_focusRect, this, new Size(width, height));
         return new Size(width, height);
     }
 
@@ -176,6 +185,7 @@ public sealed class TreeRowElement : Panel
         double textWidth = Math.Max(0, finalSize.Width - textX - 2);
         double labelHeight = Math.Min(height, _label.DesiredSize.Height);
         _label.Arrange(new Rect(textX, (height - labelHeight) / 2, textWidth, labelHeight));
+        BwcFocusRect.Arrange(_focusRect, this, new Size(finalSize.Width, height));
         return finalSize;
     }
 

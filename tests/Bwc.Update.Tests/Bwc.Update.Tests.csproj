@@ -1,0 +1,24 @@
+<Project Sdk="MSTest.Sdk/4.5.2">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Bwc.Update.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Bwc.Core\Bwc.Core.csproj" />
+    <PackageReference Include="BouncyCastle.Cryptography" />
+  </ItemGroup>
+
+  <!--
+    Bwc.Update is a self-contained exe, and a framework-dependent project cannot reference it
+    (NETSDK1150). The verifier source is compiled into this test assembly instead. Program.cs is
+    the entry point and is not included.
+  -->
+  <ItemGroup>
+    <Compile Include="..\..\src\Bwc.Update\**\*.cs"
+             Exclude="..\..\src\Bwc.Update\Program.cs;..\..\src\Bwc.Update\obj\**;..\..\src\Bwc.Update\bin\**" />
+  </ItemGroup>
+
+</Project>

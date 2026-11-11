@@ -1,14 +1,14 @@
 namespace Bwc.UI.Dialogs;
 
-/// <summary>QWORD editor. Accepts decimal digits or a 0x hexadecimal prefix.</summary>
-public sealed class QwordValueDialog : ValueEditorDialog
+/// <summary>
+/// Edit QWORD (64-bit) Value. Hexadecimal is selected by default. Decimal and hexadecimal are the
+/// two bases, and switching converts the shown value. Accepts 0 to FFFFFFFFFFFFFFFF in the current base.
+/// </summary>
+public sealed class QwordValueDialog : ClassicNumberDialog
 {
-    public QwordValueDialog(string title, string initialText = "0")
-        : base(title, "Value data")
+    public QwordValueDialog(string title, string initialText = "0", string valueName = "")
+        : base(ClassicDialogTemplates.EditQword(title), 64, initialText, valueName)
     {
-        Input.Text = initialText;
-        SetPreferredSize(440, 230);
-        SetHint("Enter a decimal number or a hexadecimal number with the 0x prefix. The value is 64 bits.");
     }
 
     /// <summary>The parsed value after a successful primary action.</summary>
@@ -16,13 +16,12 @@ public sealed class QwordValueDialog : ValueEditorDialog
 
     protected override bool TryAccept()
     {
-        if (!ValueTextParser.TryParseQword(Input.Text, out ulong value, out string? error))
+        if (!base.TryAccept())
         {
-            ShowValidation(error);
             return false;
         }
 
-        Value = value;
+        Value = AcceptedValue;
         return true;
     }
 }

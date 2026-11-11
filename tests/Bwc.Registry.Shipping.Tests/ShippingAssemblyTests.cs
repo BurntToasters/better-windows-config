@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Bwc.Registry.Shipping.Tests;
@@ -21,6 +22,19 @@ public sealed class ShippingAssemblyTests
         Type? policyContract = assembly.GetType("Bwc.Registry.IRegistryWritePolicy", throwOnError: false);
         Assert.IsNotNull(policyContract);
         Assert.IsTrue(policyContract!.IsPublic);
+    }
+
+    [TestMethod]
+    public void ShippingAssemblyHasNoCountedNameWriteSeam()
+    {
+        // The E2E-only counted-name seam (NtSetValueKey and NtDeleteValueKey) must not reach a
+        // shipping build. Shipping names reach native code only through RegSetValueExW and
+        // RegDeleteValueW, which cannot pass an embedded NUL.
+        Type writer = typeof(RegistryWriter);
+        const BindingFlags All = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+
+        Assert.IsNull(writer.GetMethod("SetValueWithCountedName", All));
+        Assert.IsNull(writer.GetMethod("DeleteValueWithCountedName", All));
     }
 
     [TestMethod]

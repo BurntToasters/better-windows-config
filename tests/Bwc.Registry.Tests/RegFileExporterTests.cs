@@ -190,6 +190,39 @@ public sealed class RegFileExporterTests
         }
     }
 
+    [TestMethod]
+    public void ExportRefusesValueNamesWithEmbeddedNulInEveryFormat()
+    {
+        string runId = NewRunId();
+        RegistryPath runRoot = RunRoot(runId);
+        const string NulName = "abc\0def";
+
+        try
+        {
+            var writer = new RegistryWriter(new SandboxWritePolicy(runRoot));
+            writer.CreateKey(runRoot);
+            writer.SetValue(runRoot, "plain", 1, Encoding.Unicode.GetBytes("x\0"));
+            writer.SetValueWithCountedName(runRoot, NulName, 4, BitConverter.GetBytes(0x1388u));
+
+            var reader = new RegistryReader();
+
+            foreach (RegFileFormat format in new[] { RegFileFormat.V5, RegFileFormat.Regedit4 })
+            {
+                var error = Assert.ThrowsExactly<RegistryOperationException>(
+                    () => RegFileExporter.Export(reader, runRoot, format, CancellationToken.None));
+
+                Assert.AreEqual("ExportValueName", error.Operation, format.ToString());
+                Assert.AreEqual(123, error.Win32Error, format.ToString());
+                Assert.AreEqual(runRoot, error.Path, format.ToString());
+            }
+        }
+        finally
+        {
+            new RegistryWriter(new SandboxWritePolicy(runRoot)).DeleteValueWithCountedName(runRoot, NulName);
+            DeleteRunRoot(runId);
+        }
+    }
+
     private static string[] EnumeratePreOrder(RegistryReader reader, RegistryPath start)
     {
         var paths = new List<string>();

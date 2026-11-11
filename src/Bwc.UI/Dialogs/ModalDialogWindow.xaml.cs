@@ -24,7 +24,21 @@ public partial class ModalDialogWindow : Window
     private double _preferredHeightDip = 220;
 
     public ModalDialogWindow()
+        : this(fluentLayout: true)
     {
+    }
+
+    /// <summary>
+    /// Creates the window. A classic dialog passes <c>false</c> and sets its own content, so the
+    /// Fluent layout is never built for it. Owner handling and the result task are shared.
+    /// </summary>
+    protected ModalDialogWindow(bool fluentLayout)
+    {
+        if (!fluentLayout)
+        {
+            return;
+        }
+
         InitializeComponent();
         DialogRoot.KeyDown += OnRootKeyDown;
         ((FrameworkElement)Content).Loaded += OnContentLoaded;
@@ -194,7 +208,12 @@ public partial class ModalDialogWindow : Window
         Close();
     }
 
-    private void ApplySizeAndPosition(nint ownerHwnd)
+    /// <summary>
+    /// Sizes and places the window before it is activated. Runs while the owner is still enabled,
+    /// so a throw here leaves nothing to restore. Classic dialogs override it to size the client
+    /// area from the template and to clamp the position to the work area.
+    /// </summary>
+    protected virtual void ApplySizeAndPosition(nint ownerHwnd)
     {
         double scale = Win32Dialog.ScaleForWindow(ownerHwnd);
         int width = Math.Max(1, (int)Math.Round(_preferredWidthDip * scale));
@@ -264,3 +283,4 @@ public partial class ModalDialogWindow : Window
         _ = Win32Dialog.SetActiveWindow(_ownerHwnd);
     }
 }
+
