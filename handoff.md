@@ -13,8 +13,9 @@ audit. Nothing in the working tree is committed; do not commit or push unless th
   - E2E ship and e2e: **345 checks, 0 failed** in the recorded e2e flavor. The gate also ran the
     ship flavor with the same result.
 - `dotnet test tests/Bwc.Registry.Tests ... -p:BwcFlavor=E2E`: **119 total, 118 passed,
-  1 skipped**. The skip is `ElevatedSaveLoadReadUnloadAndDeleteRoundTrip`, which needs
-  `SeBackupPrivilege` and `SeRestorePrivilege`.
+  1 skipped**. The skip is `ElevatedSaveAndRestoreRoundTripStaysInsideTheSandbox`, which needs
+  `SeBackupPrivilege` and `SeRestorePrivilege`. It is tagged `[TestCategory("Elevated")]`, so
+  the gate's registry steps exclude it. It runs only from an elevated shell.
 - `Bwc.Core.Tests`: 18/18. `Bwc.Registry.Shipping.Tests`: 1/1.
 - `dotnet build BetterWindowsConfig.slnx -c Release -p:Platform=ARM64` and x64: 0 warnings.
 - `node scripts/check-registry-writer.js` and `--self-test`: pass.
@@ -56,6 +57,8 @@ Safety/build:
 
 - `Directory.Build.props` records `BwcFlavor` before `CoreCompile`, so ship/e2e switching always
   recompiles and cannot leave `SandboxWritePolicy` in a shipping DLL.
+- The exe heads that differ by flavor (Regedit, Update) drop their shared apphost and manifest
+  outputs when the flavor changes. The flavor check verifies each head's `requestedExecutionLevel`.
 - E2E flavor refuses writes outside `BWC_E2E_SANDBOX_ROOT`.
 - `scripts/dotnet-build.js` and `scripts/test-all.js` disable MSBuild node reuse and build servers
   to prevent the publish-step hang.
@@ -94,7 +97,10 @@ unimplemented. The app and tests are green.
    GnuPG are not installed, so D1/D8 need the user to install software. D2/D3 can be implemented
    and tested locally without signing.
 3. **Manual checks owed by the user or a release VM:**
-   - elevated hive load/save/unload round-trip;
+   - elevated hive load/save/unload round-trip. The Elevated tests run through the opt-in
+     runner once installed (`docs/elevated-runner.md`). That runner covers only `Bwc.E2E`, so
+     the registry round trip needs an elevated shell. No E2E test is tagged Elevated yet;
+     the hive mount round trip is not automated;
    - remote connect, browse, and disconnect against a second machine or VM snapshot with the
      Remote Registry service;
    - elevated S4 suite and a clean x64 VM Program Files install;
@@ -111,8 +117,9 @@ unimplemented. The app and tests are green.
 - Set `MSBUILDDISABLENODEREUSE=1` and `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1` for dotnet commands.
 - NSIS and GnuPG are not installed. ImageMagick is at
   `C:\Program Files\ImageMagick-7.1.2-Q16-HDRI\magick.exe`; the icon source is `resources/bwc.png`.
-- GUI tests share the desktop. Hold `Local\BwcGuiTestLock` around any GUI launch. Launch
-  `highestAvailable` exes with `__COMPAT_LAYER=RunAsInvoker`; never trigger UAC.
+- GUI tests share the desktop. Hold `Local\BwcGuiTestLock` around any GUI launch. Start built
+  exes with `node scripts/launch-unelevated.js <exe>`, which sets `__COMPAT_LAYER=RunAsInvoker`
+  on the child only. Never trigger UAC.
 - Test writes are limited to `HKCU\Software\BWC-E2E\<run-id>` in E2E, or the oracle key. Classic
   regedit may write `FindFlags` under its Applets key on exit; remove it if it was absent.
 - Worker model used for implementation: `opencode-go/deepseek-v4.1-flash#max`, subagent `general`,
@@ -132,6 +139,11 @@ unimplemented. The app and tests are green.
 - Remote registry is read-only by design. Do not route `RegistryWriter` calls to a remote
   connection.
 - Hive APIs need `SeBackupPrivilege`/`SeRestorePrivilege`. Do not elevate automatically.
+- E2E-flavor exes are `asInvoker` (Regedit and Update override their manifests; Hub is already
+  `asInvoker`). The flavor check reads each exe's manifest. Ship exes keep their levels.
+- Elevated tests (`TestCategory=Elevated`) run only through `scripts/elevated-runner/run.js`, from
+  the checkout the task was installed for. The task is disabled unless enabled for a run.
+  See `docs/elevated-runner.md`. Never create the task or write `%ProgramData%` from an agent.
 
 ## Key files and APIs
 
@@ -153,6 +165,9 @@ unimplemented. The app and tests are green.
 - `tests/Bwc.E2E/`: Shell, Editing, ImportExport, Find, Favorites, Hives, Remote, Permissions,
   Print, Hex, ContextMenus, Navigation, Controls.
 - `scripts/test-all.js`, `scripts/dotnet-build.js`, `scripts/check-registry-writer.js`.
+- `scripts/launch-unelevated.js`: start one exe without UAC. `scripts/elevated-runner/`: the opt-in
+  elevated task (`install.ps1`, `run.js`, `run-elevated.ps1`, `uninstall.ps1`).
+- `docs/build-setup.md` (flavor check, E2E manifests, launch helper) and `docs/elevated-runner.md`.
 
 ## Known gaps and declared differences
 

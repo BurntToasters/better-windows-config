@@ -181,6 +181,7 @@ public sealed class RegistryHiveTests
     /// by design, so no unit test mounts a hive.
     /// </summary>
     [TestMethod]
+    [TestCategory("Elevated")]
     public void ElevatedSaveAndRestoreRoundTripStaysInsideTheSandbox()
     {
         if (!PrivilegeScope.IsAvailable(PrivilegeScope.BackupPrivilege) ||

@@ -4,14 +4,23 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { elevationState } from "./elevated-runner/elevation.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const artifactsDir = path.join(repoRoot, "artifacts", "e2e");
 const dotnetFallback = "C:\\Program Files\\dotnet\\dotnet.exe";
+const NOT_RUN_EXIT_CODE = 3;
+// dotnet test exits with this code when the filter selects no tests.
+const DOTNET_ZERO_TESTS_EXIT_CODE = 8;
 // The ship publish writes the real registry (ShippingWritePolicy), so it only runs tests that are
-// neither mutating nor e2e-only. A user --filter can narrow this further but never widen it.
-const SHIP_FILTER = "TestCategory!=Mutating&TestCategory!=E2EOnly";
+// neither mutating, e2e-only, nor elevated. A user --filter can narrow this further but never widen it.
+const SHIP_FILTER = "TestCategory!=Mutating&TestCategory!=E2EOnly&TestCategory!=Elevated";
+// Normal e2e runs skip Elevated tests so they never need an administrator token.
+const E2E_FILTER = "TestCategory!=Elevated";
+// A filter that names the Elevated category selects the elevated run. That run needs an elevated
+// process, and it is never combined with the exclusion above.
+const ELEVATED_SELECTOR = /TestCategory=Elevated(?![A-Za-z0-9_])/;
 
 const usage = `Usage: node scripts/test-e2e.js [options]
 
@@ -25,13 +34,21 @@ Options:
   --flavor ship|e2e         Publish flavor (default e2e)
   --build                   Run scripts/dotnet-build.js first
   --filter <pattern>        Pass a filter to dotnet test. With --flavor ship the
-                            filter is combined with ${SHIP_FILTER}
+                            filter is combined with ${SHIP_FILTER}. Otherwise it is
+                            combined with ${E2E_FILTER}, unless it names
+                            TestCategory=Elevated.
   --help                    Show this help
+
+Elevated tests: --filter TestCategory=Elevated runs only the tests tagged Elevated.
+It needs --flavor e2e and an elevated process. Start it through
+scripts/elevated-runner/run.js, not from an elevated shell by hand. A process that is
+not elevated, or a run with no Elevated tests, exits ${NOT_RUN_EXIT_CODE} and reports NOT RUN.
 
 Environment:
   BWC_PUBLISH_DIR           Override the publish folder (relative to the repo root)
 
 Output: artifacts/e2e/result-<rid>-<flavor>.json
+Exit codes: 0 pass, 1 fail, 2 usage error, ${NOT_RUN_EXIT_CODE} not run.
 `;
 
 function resultPathFor(rid, flavor) {
@@ -246,9 +263,31 @@ const publishDir = configuredPublish
 
 const runId = `${stamp(new Date())}-${randomBytes(4).toString("hex")}`;
 
+// Elevated tests never run in a process that is not elevated. They report NOT RUN instead.
+const elevatedRun = options.filter !== undefined && ELEVATED_SELECTOR.test(options.filter);
+if (elevatedRun && flavor !== "e2e") {
+  console.error("Elevated tests run only with --flavor e2e.");
+  process.exit(2);
+}
+if (elevatedRun) {
+  const elevation = elevationState();
+  if (!elevation.known) {
+    console.error(`NOT RUN: could not check whether this process is elevated (${elevation.detail}).`);
+    process.exit(NOT_RUN_EXIT_CODE);
+  }
+  if (!elevation.elevated) {
+    console.error("NOT RUN: this process is not elevated, so the Elevated E2E tests did not run.");
+    console.error("Start them with: node scripts/elevated-runner/run.js");
+    process.exit(NOT_RUN_EXIT_CODE);
+  }
+}
+
 console.log(`E2E rid=${rid} testHost=${testHost} flavor=${flavor}`);
 console.log(`runId=${runId}`);
 console.log(`publishDir=${publishDir}`);
+if (elevatedRun) {
+  console.log("elevated: yes (TestCategory=Elevated run)");
+}
 
 if (options.build) {
   const buildScript = path.join(repoRoot, "scripts", "dotnet-build.js");
@@ -306,6 +345,10 @@ if (flavor === "ship") {
   filter = options.filter === undefined
     ? SHIP_FILTER
     : `(${options.filter})&${SHIP_FILTER}`;
+} else if (!elevatedRun) {
+  filter = options.filter === undefined
+    ? E2E_FILTER
+    : `(${options.filter})&${E2E_FILTER}`;
 }
 if (filter !== undefined) {
   testArgs.push("--filter", filter);
@@ -328,6 +371,11 @@ try {
 } catch (error) {
   console.error(`Could not start dotnet test: ${error.message}`);
   process.exit(1);
+}
+
+if (elevatedRun && testRun.code === DOTNET_ZERO_TESTS_EXIT_CODE) {
+  console.error("NOT RUN: no E2E test is tagged TestCategory=Elevated, so no elevated test ran.");
+  process.exit(NOT_RUN_EXIT_CODE);
 }
 
 let result;

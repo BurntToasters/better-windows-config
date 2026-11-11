@@ -60,11 +60,13 @@ artifacts/gate/logs/<NN>-<step-name>.log; logs from earlier runs are removed fir
 The default RID comes from process.arch, never PROCESSOR_ARCHITECTURE.
 
 Steps: sync-version, registry-writer, no-em-dash, changelog-version, comment-lint,
-build-arm64, build-x64, test-core, test-registry-e2e, test-registry-shipping.
+build-arm64, build-x64, test-core, test-registry-e2e, test-registry-shipping,
+test-update.
 Unless --quick, each RID then runs publish-ship, verify-flavor-ship, e2e-ship,
 publish-e2e, verify-flavor-e2e, e2e-flavor. verify-flavor-* checks the BwcFlavor
 metadata of the publish folder. E2E steps also record the counts from
-artifacts/e2e/result-<rid>-<flavor>.json when that file exists.
+artifacts/e2e/result-<rid>-<flavor>.json when that file exists. Tests tagged
+Elevated are skipped by every step; scripts/elevated-runner/run.js runs them.
 
 Options:
   --rid <rid>  win-x64, win-arm64, or all. Default from process.arch.
@@ -195,6 +197,9 @@ function e2eStep(name, rid, flavor) {
   };
 }
 
+// Normal gate runs skip tests tagged Elevated, so the gate never needs an administrator token.
+const NORMAL_TEST_FILTER = "TestCategory!=Elevated";
+
 function sharedSteps(testPlatform) {
   return [
     nodeStep("sync-version", "scripts/sync-version.js", ["--check"]),
@@ -227,6 +232,8 @@ function sharedSteps(testPlatform) {
         "Release",
         `-p:Platform=${testPlatform}`,
         "--nologo",
+        "--filter",
+        NORMAL_TEST_FILTER,
       ]),
       project: "tests/Bwc.Core.Tests/Bwc.Core.Tests.csproj",
     },
@@ -239,6 +246,8 @@ function sharedSteps(testPlatform) {
         `-p:Platform=${testPlatform}`,
         "-p:BwcFlavor=E2E",
         "--nologo",
+        "--filter",
+        NORMAL_TEST_FILTER,
       ]),
       project: "tests/Bwc.Registry.Tests/Bwc.Registry.Tests.csproj",
     },
@@ -250,8 +259,23 @@ function sharedSteps(testPlatform) {
         "Release",
         `-p:Platform=${testPlatform}`,
         "--nologo",
+        "--filter",
+        NORMAL_TEST_FILTER,
       ]),
       project: "tests/Bwc.Registry.Shipping.Tests/Bwc.Registry.Shipping.Tests.csproj",
+    },
+    {
+      ...dotnetStep("test-update", [
+        "test",
+        "tests/Bwc.Update.Tests/Bwc.Update.Tests.csproj",
+        "-c",
+        "Release",
+        `-p:Platform=${testPlatform}`,
+        "--nologo",
+        "--filter",
+        NORMAL_TEST_FILTER,
+      ]),
+      project: "tests/Bwc.Update.Tests/Bwc.Update.Tests.csproj",
     },
   ].map((step) => ({ ...step, rid: null }));
 }
