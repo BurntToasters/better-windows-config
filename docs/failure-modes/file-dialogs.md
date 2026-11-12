@@ -2,8 +2,8 @@
 
 This document covers the COM common item dialogs that back File > Import and File > Export in
 the Registry Editor. The dialog code lives in `src/Bwc.UI/Dialogs/CommonFileDialogs.cs`; the
-commands and refresh behavior live in `src/Bwc.Regedit/RegeditRootView.xaml.cs`. The registry and
-`.reg` engine behavior stays in `import-export.md` and `reg-files.md`.
+commands and refresh behavior live in `src/Bwc.Regedit/Controllers/ImportExportCommands.cs`. The
+registry and `.reg` engine behavior stays in `import-export.md` and `reg-files.md`.
 
 ## 1. Why COM instead of a WinRT picker
 
@@ -41,19 +41,22 @@ change the current selection.
 
 ## 4. Filters
 
-Both dialogs register two filter pairs:
+The open dialog registers one filter pair and the save dialog registers three:
 
-| Name | Pattern |
-| --- | --- |
-| `Registration Files (*.reg)` | `*.reg` |
-| `All Files` | `*.*` |
+| Dialog | Name | Pattern |
+| --- | --- | --- |
+| Open | `Registration Files (*.reg)` | `*.reg` |
+| Save | `Registration Files (*.reg)` | `*.reg` |
+| Save | `Text Files (*.txt)` | `*.txt` |
+| Save | `Win9x/NT4 Registration Files (*.reg)` | `*.reg` |
 
 The first filter is selected by default through `SetFileTypeIndex(1)`. The strings are passed as
 `COMDLG_FILTERSPEC` pairs and freed with `CoTaskMemFree` after `Show` returns. They are not the
 Win32 `Name|Pattern` string form.
 
-The filter is a convenience, not a validation gate. A user can pick any file through All Files.
-Import then parses whatever file was chosen and reports a parse error if it is not a `.reg` file.
+The filter is a convenience, not a validation gate. Import parses whatever file the user types and
+reports string 133 when it is not a registry file. On Export, the selected save filter chooses the
+writer: v5, text, or REGEDIT4. See `import-export.md` section 14.
 
 ## 5. Paths with Unicode and spaces
 
@@ -91,12 +94,12 @@ dialog ownership assertions are the same at either integrity level.
 missing file, an unreadable file, or a bad key path in the file causes no registry change.
 
 Once applying starts, the import is not transactional. A native failure in the middle of a
-section leaves the calls that already succeeded applied, and later sections do not run. The same
-is true for a write policy denial: the rejected entry performs no write, but earlier entries stay
-applied. This is the engine contract documented in `import-export.md`.
+section leaves the calls that already succeeded applied, and the importer continues with the next
+line or section. A write policy denial performs no write for the rejected entry, but earlier
+entries stay applied. This is the engine contract documented in `import-export.md`.
 
-The UI reports the failure with the file path, the failing registry operation when one is
-available, the Win32 code, and the message. It does not attempt to roll back.
+The UI reports the failure with the file path and the classic string 132. It does not attempt to
+roll back.
 
 ## 9. Import parse errors
 
@@ -107,27 +110,32 @@ nothing was written.
 An unrelated `IOException`, `UnauthorizedAccessException`, or argument error is also reported
 with the file path. The tree and list are left as they were.
 
-## 10. Import threading and refresh
+## 10. Import threading, progress, and refresh
 
 The parse and apply call runs on the thread pool. The UI thread is not blocked while a large file
-is imported, so the window remains responsive for repaint and input.
+is imported, so the window remains responsive for repaint and input. A classic owned progress
+dialog shows completed key sections out of the total. Cancel stops between sections, keeps the
+sections that already finished, and closes the dialog. The window then refreshes the tree and the
+list and shows string 132.
 
 On success the view rebuilds the tree source and selects the key that was selected before the
 import when that key still exists. If the import deleted it, the view falls back to Computer. The
 value list is then reloaded for the selected key. The current value row selection is not restored;
 only the key selection is.
 
-## 11. Export access denied
+## 11. Export access denied and progress
 
 Export reads the selected key and every readable descendant on the thread pool. An unreadable
 descendant is skipped with its subtree by the engine. An unreadable start key throws
 `RegistryOperationException`, and the UI reports it with the path and Win32 code. No file is
 written when the document could not be built.
 
-The final write happens after the complete document was serialized to memory. A failure while
-writing the destination, such as access denied, a full disk, or a read-only file, is reported with
-the destination path. The existing destination may already have been truncated by the final write
-in that case.
+The complete document is serialized to a temporary file in the destination folder, and the file is
+moved into place only after the writer finished. A failure while writing the destination, such as
+access denied, a full disk, or a read-only file, is reported with the destination path. The
+temporary file is deleted, so the previous destination is not truncated. A classic owned progress
+dialog reports running key and value counts. Cancel requests the export token, the temporary file
+is deleted, and the destination is left absent or unchanged.
 
 ## 12. File overwrite prompt
 
@@ -140,13 +148,15 @@ layout of the overwrite prompt.
 
 ## 13. Computer and scope
 
-Classic regedit can export the whole registry or a selected branch. This implementation exports
-only the selected key and never the whole registry silently.
+Classic regedit can export the whole registry or a selected branch. The save dialog adds the
+classic "Export range" group through `IFileDialogCustomize`. "Selected branch" is the default and
+exports the selected key. "All" calls `RegFileExporter.ExportWholeRegistry`.
 
-When the virtual Computer node is selected, `TryGetSelectedKeyPath` fails because Computer is not
-a registry path. File > Export is disabled in that state. If the command is reached anyway, it
-shows a selection message and returns. File > Import stays enabled because importing does not need
-a selection.
+When the virtual Computer node is selected, All is selected and enabled, and Selected branch is
+visible but disabled with `SetControlState`; the export code also ignores the branch choice because
+Computer is not a registry path. File > Export is enabled in that state. For a remote machine node,
+which has no local path and no whole-registry meaning, the command shows the selection message and
+returns. File > Import stays enabled because importing does not need a selection.
 
 ## 14. Sandbox policy
 
@@ -166,22 +176,26 @@ and only then looks for the file name edit and the accept button.
 
 The File command is activated by focusing the menu item and pressing Enter. A UIA `Invoke` would
 block inside the modal `IFileDialog.Show` call and then time out, so the test does not use it to
-open the dialog.
+open the dialog. The file name, file type, range radio, and accept button are driven with real
+keyboard and mouse input after a foreground check. UIA patterns read the selected radio and filter
+state; they do not set the file name or invoke a control.
 
-The dialog needs a moment to create its shell view. A missing edit is retried rather than treated
-as a different dialog. If the expected controls are not found, the test sets the file name through
-the keyboard as a fallback and records that it did so. If automation still fails, the test sends
-Escape and waits for the window to disappear so no modal dialog is left open.
+The dialog needs a moment to create its shell view. A missing edit, combo, or radio is retried
+rather than treated as a different dialog. If automation still fails, the test sends Escape and
+waits for the window to disappear so no modal dialog is left open.
 
 Escape is sent only after the dialog is confirmed foreground, with one retry, because the first
 Escape can arrive before the shell view has keyboard focus.
 
 ## 16. Temp files and cleanup
 
-Import and export tests create their files under `artifacts/e2e/import-export/<runId>`. The test
-deletes that directory in a `finally` block, deletes the run key under
-`HKCU\Software\BWC-E2E`, and disposes the application session, which closes the process. No test
-writes a file outside that directory and no test touches a key outside the run key.
+Import and export tests create their files under
+`artifacts/e2e/import-export/<runId>/<scope>`. The export range artifacts stay under
+`artifacts/e2e/import-export/<runId>/range`, the canceled import file under `import-cancel`, and
+the canceled export destination under `export-cancel`. The tests delete their run key under
+`HKCU\Software\BWC-E2E` and dispose the application session. The basic import/export test removes
+only its own `basic` folder; the range artifacts remain for review. No test writes a file outside
+`artifacts/e2e` and no test touches a key outside the run key.
 
 The E2E assembly cleanup sweeps stale run keys and the shared gate ensures one GUI test assembly
 runs at a time.

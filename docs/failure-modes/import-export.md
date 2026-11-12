@@ -183,6 +183,11 @@ In the window, a refused file shows string 133, 125, or 129 with the file path. 
 shows string 132 after the rest of the file has been applied. A file that imports with only skipped
 lines shows string 228. The window does not show a message for a skipped line.
 
+A canceled import has no `RegFileImportResult`, because the importer throws
+`OperationCanceledException` between sections. The window keeps every section that finished before
+the cancel, refreshes the tree and list, and shows string 132 with the file path. The same partial
+text is the only result message after a cancel, whether zero or many sections had finished.
+
 Errors go to the log through `Bwc.Core.Log` and to standard error when that handle is available.
 The log writer flushes each entry itself; standard error is flushed before `Environment.Exit`
 so a redirected parent sees the message.
@@ -198,3 +203,61 @@ under the E2E artifacts folder, and removes them in a `finally` block. The outsi
 prove policy denial is `HKCU\Software\BWC-CLI-Outside`; the test asserts it does not exist and
 removes it only if a failed run somehow created it. The E2E assembly cleanup removes the run
 sandbox, and the test kills any `BwcRegedit` process that does not exit within its timeout.
+
+## 14. The classic import and export dialogs
+
+The window exports through the system `IFileSaveDialog`; it is never replaced by a custom window.
+`IFileDialogCustomize` adds one visual group, "Export range", with two radio buttons, "&All" and
+"S&elected branch" (oracle DLG-001). "Selected branch" is selected by default and exports the
+selected key with `RegistryExportScope.Selection`. "All" selects
+`RegistryExportScope.WholeRegistry`, which calls `RegFileExporter.ExportWholeRegistry` and writes
+every classic root in root order. When the tree selection is the virtual Computer node, "All" is
+selected and enabled, and "Selected branch" is visible but disabled, because Computer has no
+registry path of its own. The shell cannot disable one item of an option group and keep the other
+interactive, so Computer uses two single-item option groups inside the same visual group; the
+branch group is disabled with `SetControlState`. The command also ignores the branch choice
+whenever no key is selected, so a Computer export is always the whole registry. Selecting any key
+uses one option group with both choices enabled and Selected branch selected by default. File >
+Export stays enabled on Computer for this reason; for a remote machine node, which has neither a
+local path nor a whole-registry meaning, the command keeps the existing selection message.
+
+The save dialog registers three filter pairs:
+
+| Name | Pattern | Format |
+| --- | --- | --- |
+| `Registration Files (*.reg)` | `*.reg` | v5, UTF-16LE with BOM |
+| `Text Files (*.txt)` | `*.txt` | `RegistryTextExporter`, UTF-16LE with BOM |
+| `Win9x/NT4 Registration Files (*.reg)` | `*.reg` | `REGEDIT4`, ANSI |
+
+The first filter is selected when the dialog opens. The filter that is selected when the user
+accepts the dialog chooses the writer. The open dialog registers only the `.reg` filter; an import
+still parses whatever path the user types, so a non-registry file is refused with string 133 rather
+than blocked by the dialog.
+
+Classic regedit shows no success message after an export, and the oracle has no export success
+string. BWC keeps that behavior: a completed export closes the progress dialog and shows no
+message. The import result messages stay the oracle strings: 228 for success, 132 for a rejected
+write or a cancel, 133 for a file that is not a registry file, 125 for an invalid key path, and 129
+for a file that cannot be opened. String 128 is the remote-computer success text used by the
+existing import path; it is unchanged.
+
+Both directions show a classic owned progress dialog with a Cancel button. The registry work runs
+on the thread pool and progress is marshalled back to the UI thread, so the window keeps painting
+and responding while a large file is applied or exported. The import dialog reports completed key
+sections out of the total and is driven by `IProgress<ImportProgress>`. Cancel requests the
+cancellation token; the importer finishes the section already in progress, keeps every completed
+write, then stops. The export dialog is driven by `IProgress<ExportProgress>` and reports running
+key and value counts; Cancel requests the export token, which the engine checks before each key,
+value, and subkey.
+
+Export always writes to a temporary file in the destination folder and moves it into place only
+after the writer finished. A canceled or failed export deletes that temporary file, so the
+destination is absent or still has its previous contents; an existing destination is never
+truncated by a canceled export. Import has no temporary file and no rollback: a canceled import
+leaves the completed writes applied, which is the classic behavior described in section 4.
+
+In an E2E build with `BWC_E2E_SANDBOX_ROOT` set, "All" still calls
+`RegFileExporter.ExportWholeRegistry`, but the source exposes the five classic roots with the
+`HKEY_CURRENT_USER` subtree mapped to the run sandbox and the other roots empty. This keeps a GUI
+test from reading the developer's whole registry into a test artifact and keeps the export bounded.
+The production build uses the live reader and exports the real registry.

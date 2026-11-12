@@ -293,6 +293,46 @@ internal sealed class RegeditContext
             ErrorDialog.ForMessage(Messages.Get("DialogErrorTitle"), string.Join(Environment.NewLine, lines)));
     }
 
+    /// <summary>True when the virtual Computer node is selected, the only selection that can export every root.</summary>
+    public bool IsComputerSelected =>
+        Shell.TreeContent.SelectedNode is { Parent: null } node &&
+        string.Equals(node.Name, "Computer", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Shows the Export save dialog with the range panel and the export filters. Returns null when
+    /// cancelled or when another modal is open.
+    /// </summary>
+    public ExportFileDialogResult? ShowExportFileDialog(string? defaultFileName, bool hasSelectedKey)
+    {
+        if (DialogOpen || FileDialogOpen)
+        {
+            Log.Warn("Registry Editor ignored a file dialog request because another modal is already open.");
+            return null;
+        }
+
+        if (WindowHwnd == 0)
+        {
+            Log.Warn("Registry Editor ignored a file dialog request because the window handle is not attached.");
+            return null;
+        }
+
+        FileDialogOpen = true;
+        try
+        {
+            return CommonFileDialogs.ShowExportSave(WindowHwnd, defaultFileName, hasSelectedKey);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Registry Editor could not show a file dialog: " + ex.Message);
+            _ = ShowErrorAsync(Messages.ForCommandFailure().ToErrorDialog());
+            return null;
+        }
+        finally
+        {
+            FileDialogOpen = false;
+        }
+    }
+
     /// <summary>Shows the open or save dialog. Returns null when cancelled or when another modal is open.</summary>
     public string? ShowFileDialog(bool save, string? defaultFileName)
     {
@@ -419,7 +459,8 @@ internal sealed class RegeditContext
         }
 
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 913, treeTarget ? mutableKey : realValues > 0);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 659, hasKey);
+        // Export on Computer is the classic whole-registry export; every other key is a branch.
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 659, hasKey || IsComputerSelected);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 660, hasKey);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 679, singleRealValue);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 678, hasKey && !hasRows);

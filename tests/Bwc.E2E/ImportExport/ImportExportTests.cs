@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Text;
 using Bwc.E2E.AppServices;
 using Bwc.E2E.Controls;
@@ -8,7 +7,6 @@ using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
-using FlaUI.UIA3;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Win32;
 
@@ -26,7 +24,6 @@ public sealed class ImportExportTests
     private const int MenuFile = 512;
     private const int MenuFileImport = 658;
     private const int MenuFileExport = 659;
-    private const string CommonDialogClass = "#32770";
     private const string ImportedKeyName = "Imported";
     private const string ImportedRootValue = "ImportedAtRoot";
     private const string ImportedChildValue = "ImportedValue";
@@ -62,7 +59,7 @@ public sealed class ImportExportTests
         }
 
         var sandbox = new SandboxRegistry(config);
-        string tempDir = Path.Combine(config.ArtifactsDir, "import-export", config.RunId);
+        string tempDir = Path.Combine(config.ArtifactsDir, "import-export", config.RunId, "basic");
         string exportFile = Path.Combine(tempDir, "exported key with spaces.reg");
         string importFile = Path.Combine(tempDir, "import source.reg");
         string cancelFile = Path.Combine(tempDir, "cancel me.reg");
@@ -88,7 +85,7 @@ public sealed class ImportExportTests
 
             using var session = new AppSession(config, config.RegeditExePath, environment: environment);
             using var driver = new EditingDriver(session);
-            using var dialogs = new CommonDialogDriver(session);
+            using var dialogs = new SystemFileDialogDriver(session);
 
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
             bool seeded = ControlTestSupport.WaitUntil(
@@ -116,7 +113,7 @@ public sealed class ImportExportTests
     private static void CheckExport(
         AppSession session,
         EditingDriver driver,
-        CommonDialogDriver dialogs,
+        SystemFileDialogDriver dialogs,
         SandboxRegistry sandbox,
         string exportFile)
     {
@@ -194,7 +191,7 @@ public sealed class ImportExportTests
     private static void CheckImport(
         AppSession session,
         EditingDriver driver,
-        CommonDialogDriver dialogs,
+        SystemFileDialogDriver dialogs,
         SandboxRegistry sandbox,
         string importFile)
     {
@@ -243,8 +240,13 @@ public sealed class ImportExportTests
             $"rootValue={rootValue}, childValue={childValue}.");
 
         // The result message (RT_STRING 228) is modal. It is read and dismissed here, before the tree and list checks.
-        IntPtr result = AppServicesSupport.WaitForOwnedWindow(
-            session.MainHwnd, null, "Registry Editor", TimeSpan.FromSeconds(10), dialog);
+        // The import progress dialog has the same title and closes first, so the text picks the result.
+        IntPtr result = ImportExportWindows.WaitForResult(
+            session.MainHwnd,
+            text => text.Contains("Cannot import", StringComparison.Ordinal) ||
+                text.Contains("successfully added to the registry", StringComparison.Ordinal),
+            TimeSpan.FromSeconds(10),
+            dialog);
         bool resultText = result != IntPtr.Zero
             && AppServicesSupport.WaitForDialogText(
                 result,
@@ -306,7 +308,7 @@ public sealed class ImportExportTests
     private static void CheckCancel(
         AppSession session,
         EditingDriver driver,
-        CommonDialogDriver dialogs,
+        SystemFileDialogDriver dialogs,
         SandboxRegistry sandbox,
         string cancelFile)
     {
@@ -342,7 +344,7 @@ public sealed class ImportExportTests
 
     private static bool InvokeFileCommand(
         EditingDriver driver,
-        CommonDialogDriver dialogs,
+        SystemFileDialogDriver dialogs,
         int commandId,
         string checkPrefix)
     {
@@ -523,451 +525,4 @@ public sealed class ImportExportTests
             $"Import and export checks failed:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
     }
 
-    /// <summary>
-    /// Finds the COM dialog window by process and class, then drives its file name field and accept
-    /// button. UIA can see the shell view; raw Win32 confirms ownership and the disabled owner.
-    /// </summary>
-    private sealed class CommonDialogDriver : IDisposable
-    {
-        private readonly AppSession _session;
-        private readonly UIA3Automation _automation;
-
-        internal CommonDialogDriver(AppSession session)
-        {
-            _session = session;
-            _automation = new UIA3Automation();
-        }
-
-        internal IntPtr WaitForDialog(TimeSpan timeout)
-        {
-            IntPtr found = IntPtr.Zero;
-            _ = ControlTestSupport.WaitUntil(
-                () => (found = FindDialog()) != IntPtr.Zero,
-                timeout);
-            return found;
-        }
-
-        internal AutomationElement? FindProcessElement(string automationId)
-        {
-            try
-            {
-                AutomationElement desktop = _automation.GetDesktop();
-
-                foreach (AutomationElement window in desktop.FindAllChildren(cf => cf.ByControlType(ControlType.Window)))
-                {
-                    int processId;
-                    try
-                    {
-                        processId = window.Properties.ProcessId.Value;
-                    }
-                    catch (Exception)
-                    {
-                        continue;
-                    }
-
-                    if (processId != _session.ProcessId)
-                    {
-                        continue;
-                    }
-
-                    try
-                    {
-                        AutomationElement? found = window.FindFirstDescendant(
-                            cf => cf.ByAutomationId(automationId));
-                        if (found is not null)
-                        {
-                            return found;
-                        }
-                    }
-                    catch (Exception)
-                    {
-                        // A window that disappeared during enumeration is skipped.
-                    }
-                }
-
-                AutomationElement? global = desktop.FindFirstDescendant(
-                    cf => cf.ByAutomationId(automationId));
-                if (global is not null && global.Properties.ProcessId.Value == _session.ProcessId)
-                {
-                    return global;
-                }
-            }
-            catch (Exception)
-            {
-                // UIA can throw while a flyout is opening or closing.
-            }
-
-            return null;
-        }
-
-        internal bool WaitGone(IntPtr dialog, TimeSpan timeout) =>
-            ControlTestSupport.WaitUntil(() => !Win32.IsWindow(dialog), timeout);
-
-        internal bool TrySetFileName(IntPtr dialog, string path, out string notes)
-        {
-            AutomationElement? edit = null;
-            _ = ControlTestSupport.WaitUntil(
-                () => (edit = FindFileNameEdit(dialog)) is not null,
-                TimeSpan.FromSeconds(8));
-
-            if (edit is not null && TrySetValue(edit, path))
-            {
-                notes = $"fileNameEdit id='{SafeId(edit)}' name='{SafeName(edit)}' set through ValuePattern and read back.";
-                return true;
-            }
-
-            // Keyboard fallback. Typing goes to whichever control has focus, so it counts only when the
-            // file name box reads back the full path. Accepting the dialog with any other text would save
-            // under the dialog's default name in its default folder, which is how a stray <run-id>.reg
-            // file ended up in Documents.
-            if (edit is not null && FocusEdit(edit) && EnsureForeground(dialog))
-            {
-                Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
-                Keyboard.Type(path);
-                Thread.Sleep(200);
-                AutomationElement? after = FindFileNameEdit(dialog);
-                string readBack = after is null ? "(no file name box)" : ReadValue(after);
-                if (string.Equals(readBack, path, StringComparison.Ordinal))
-                {
-                    notes = "fileNameEdit not usable through ValuePattern; typed the path and read it back.";
-                    return true;
-                }
-
-                notes = $"typed the path, but the file name box reads '{readBack}'. Save is not pressed.";
-                return false;
-            }
-
-            notes = "fileNameEdit not found or could not be focused. Save is not pressed.";
-            return false;
-        }
-
-        private static bool FocusEdit(AutomationElement edit)
-        {
-            try
-            {
-                edit.Focus();
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        internal bool TryAccept(IntPtr dialog, string acceptText, out string notes)
-        {
-            AutomationElement? window = WindowElement(dialog);
-            AutomationElement? button = window is null ? null : FindAcceptButton(window, acceptText);
-            if (button is not null)
-            {
-                try
-                {
-                    if (button.Patterns.Invoke.IsSupported)
-                    {
-                        button.Patterns.Invoke.Pattern.Invoke();
-                    }
-                    else
-                    {
-                        button.Click();
-                    }
-
-                    notes = $"acceptButton id='{SafeId(button)}' name='{SafeName(button)}' invoked.";
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    notes = "acceptButton invoke failed: " + ex.Message;
-                }
-            }
-
-            if (EnsureForeground(dialog))
-            {
-                Keyboard.Type(VirtualKeyShort.RETURN);
-                notes = "acceptButton not found; pressed Enter.";
-                return true;
-            }
-
-            notes = "acceptButton not found and the dialog could not be focused.";
-            return false;
-        }
-
-        internal bool TryCancel(IntPtr dialog)
-        {
-            for (var attempt = 0; attempt < 2; attempt++)
-            {
-                if (!EnsureForeground(dialog))
-                {
-                    return false;
-                }
-
-                Thread.Sleep(300);
-                Keyboard.Type(VirtualKeyShort.ESCAPE);
-                if (WaitGone(dialog, TimeSpan.FromSeconds(3)))
-                {
-                    return true;
-                }
-            }
-
-            return !Win32.IsWindow(dialog);
-        }
-
-        public void Dispose() => _automation.Dispose();
-
-        private IntPtr FindDialog()
-        {
-            IntPtr found = IntPtr.Zero;
-            _ = EnumWindows(
-                (hwnd, _) =>
-                {
-                    GetWindowThreadProcessId(hwnd, out uint processId);
-                    if (processId != (uint)_session.ProcessId)
-                    {
-                        return true;
-                    }
-
-                    var className = new StringBuilder(64);
-                    _ = GetClassName(hwnd, className, className.Capacity);
-                    if (!string.Equals(className.ToString(), CommonDialogClass, StringComparison.Ordinal))
-                    {
-                        return true;
-                    }
-
-                    found = hwnd;
-                    return false;
-                },
-                IntPtr.Zero);
-
-            return found;
-        }
-
-        private AutomationElement? WindowElement(IntPtr dialog)
-        {
-            try
-            {
-                return _automation.FromHandle(dialog);
-            }
-            catch (Exception)
-            {
-                return null;
-            }
-        }
-
-        private AutomationElement? FindFileNameEdit(IntPtr dialog)
-        {
-            try
-            {
-                AutomationElement window = _automation.FromHandle(dialog);
-                AutomationElement[] edits = FindAll(window, ControlType.Edit);
-                return ChooseFileNameEdit(edits);
-            }
-            catch (Exception)
-            {
-                return null;
-            }
-        }
-
-        private static AutomationElement? ChooseFileNameEdit(AutomationElement[] edits)
-        {
-            AutomationElement? bottomMost = null;
-            double bottomMostTop = double.MinValue;
-
-            foreach (AutomationElement edit in edits)
-            {
-                if (!IsUsableEdit(edit))
-                {
-                    continue;
-                }
-
-                if (LooksLikeFileNameEdit(edit))
-                {
-                    return edit;
-                }
-
-                double top = TopOf(edit);
-                if (top > bottomMostTop)
-                {
-                    bottomMost = edit;
-                    bottomMostTop = top;
-                }
-            }
-
-            return bottomMost;
-        }
-
-        private static bool IsUsableEdit(AutomationElement edit)
-        {
-            try
-            {
-                return edit.IsEnabled
-                    && !edit.Properties.IsOffscreen.ValueOrDefault
-                    && edit.Patterns.Value.IsSupported;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        private static bool LooksLikeFileNameEdit(AutomationElement edit)
-        {
-            string id = SafeId(edit);
-            if (id is "1001" or "1148" or "1152" or "FileNameControl" or "FileNameControlHost")
-            {
-                return true;
-            }
-
-            if (SafeName(edit).Contains("file name", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            try
-            {
-                AutomationElement? parent = edit.Parent;
-                for (var depth = 0; parent is not null && depth < 3; depth++)
-                {
-                    if (parent.ControlType == ControlType.ComboBox &&
-                        SafeName(parent).Contains("file name", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-
-                    parent = parent.Parent;
-                }
-            }
-            catch (Exception)
-            {
-                // Ancestor navigation is best effort; the bottom-most fallback still applies.
-            }
-
-            return false;
-        }
-
-        private static double TopOf(AutomationElement element)
-        {
-            try
-            {
-                return element.BoundingRectangle.Top;
-            }
-            catch (Exception)
-            {
-                return double.MinValue;
-            }
-        }
-
-        private static AutomationElement? FindAcceptButton(AutomationElement window, string acceptText)
-        {
-            AutomationElement[] buttons = FindAll(window, ControlType.Button);
-            foreach (AutomationElement button in buttons)
-            {
-                if (SafeId(button) == "1" && IsUsableButton(button))
-                {
-                    return button;
-                }
-            }
-
-            foreach (AutomationElement button in buttons)
-            {
-                string name = SafeName(button).Replace("&", string.Empty, StringComparison.Ordinal).Trim();
-                if (string.Equals(name, acceptText, StringComparison.OrdinalIgnoreCase) &&
-                    IsUsableButton(button))
-                {
-                    return button;
-                }
-            }
-
-            return null;
-        }
-
-        private static bool IsUsableButton(AutomationElement button)
-        {
-            try
-            {
-                return button.IsEnabled && !button.Properties.IsOffscreen.ValueOrDefault;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        private static AutomationElement[] FindAll(AutomationElement root, ControlType controlType)
-        {
-            try
-            {
-                return root.FindAllDescendants(cf => cf.ByControlType(controlType));
-            }
-            catch (Exception)
-            {
-                return Array.Empty<AutomationElement>();
-            }
-        }
-
-        private static bool TrySetValue(AutomationElement edit, string value)
-        {
-            try
-            {
-                edit.Patterns.Value.Pattern.SetValue(value);
-                return string.Equals(ReadValue(edit), value, StringComparison.Ordinal);
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        private static string ReadValue(AutomationElement edit)
-        {
-            try
-            {
-                return edit.Patterns.Value.Pattern.Value.Value ?? string.Empty;
-            }
-            catch (Exception)
-            {
-                return string.Empty;
-            }
-        }
-
-        private static string SafeId(AutomationElement element)
-        {
-            try
-            {
-                return element.AutomationId ?? string.Empty;
-            }
-            catch (Exception)
-            {
-                return string.Empty;
-            }
-        }
-
-        private static string SafeName(AutomationElement element)
-        {
-            try
-            {
-                return element.Name ?? string.Empty;
-            }
-            catch (Exception)
-            {
-                return string.Empty;
-            }
-        }
-
-        /// <summary>Confirms a dialog is foreground before input. Delegates to <see cref="Win32.ForceForeground"/>.</summary>
-        private static bool EnsureForeground(IntPtr hwnd) => Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(2));
-    }
-
-#pragma warning disable SYSLIB1054 // The small test-only P/Invoke surface does not need LibraryImport plumbing.
-    private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
-
-    [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int GetClassName(IntPtr hwnd, StringBuilder className, int maxCount);
-
-#pragma warning restore SYSLIB1054
 }
