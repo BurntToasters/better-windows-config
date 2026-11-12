@@ -552,6 +552,9 @@ public sealed class RobustnessTests
             + valueLine + "\r\n"));
         E2EGuards.RequireImportFileInsideSandbox(file, sandbox, "robust.seed.target");
 
+        // The import may create keys only inside the run root, so it cannot create HKCU\Software\BWC-E2E when
+        // Cleanup removed it. The run root is created here first, as every other seed path does.
+        sandbox.CreateKey(string.Empty);
         (int exit, bool exited, string stderr) = RunRegedit(config, sandbox, environment: null, "/s", file);
         E2EResults.Record(
             "robust.seed." + fileName,

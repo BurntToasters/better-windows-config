@@ -302,11 +302,18 @@ internal sealed class SystemFileDialogDriver : IDisposable
     }
 
     /// <summary>
-    /// Selects the filter at the zero-based position with the keyboard: click the combo, Home to the
-    /// first filter, Down for each step, Enter to commit. The selected name is read back.
+    /// Selects the filter at the one-based <paramref name="index"/> (1 is the first filter, as the
+    /// shell reports it through GetFileTypeIndex) with the keyboard: click the combo, Home to the
+    /// first filter, Down for each step after the first, Enter to commit. The selected name is read back.
     /// </summary>
     internal bool SelectFileType(IntPtr dialog, int index, string expectedNameContains, out string notes)
     {
+        if (index < 1)
+        {
+            notes = $"file type index {index} is invalid; indexes are one-based.";
+            return false;
+        }
+
         AutomationElement? combo = WaitForFileTypeCombo(dialog, TimeSpan.FromSeconds(8));
         if (combo is null)
         {
@@ -322,7 +329,7 @@ internal sealed class SystemFileDialogDriver : IDisposable
 
         Thread.Sleep(200);
         Keyboard.Press(VirtualKeyShort.HOME);
-        for (var step = 0; step < index; step++)
+        for (var step = 1; step < index; step++)
         {
             Keyboard.Press(VirtualKeyShort.DOWN);
             Thread.Sleep(50);

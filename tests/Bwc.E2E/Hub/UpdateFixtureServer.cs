@@ -14,12 +14,14 @@ internal sealed class UpdateFixtureServer : IDisposable
 {
     private const string ManifestPath = "/manifest.json";
     private const string SignaturePath = "/manifest.json.minisig";
+    private static readonly TimeSpan HoldLimit = TimeSpan.FromSeconds(60);
 
     private readonly TcpListener _listener;
     private readonly CancellationTokenSource _stop = new();
     private readonly ConcurrentDictionary<string, byte[]> _routes = new(StringComparer.Ordinal);
     private readonly Task _accepting;
     private volatile int _manifestDelayMilliseconds;
+    private volatile TaskCompletionSource? _manifestHold;
 
     public UpdateFixtureServer()
     {
@@ -41,6 +43,22 @@ internal sealed class UpdateFixtureServer : IDisposable
     {
         get => _manifestDelayMilliseconds;
         set => _manifestDelayMilliseconds = value;
+    }
+
+    /// <summary>
+    /// Holds every manifest response until <see cref="ReleaseManifest"/> is called, or until the hold limit
+    /// (60 seconds) passes, so a test controls when the check can finish. The hold is for the progress window,
+    /// which closes when the check ends.
+    /// </summary>
+    public void HoldManifest()
+    {
+        _manifestHold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    /// <summary>Lets the held manifest responses go out now, and later ones too, until the next hold.</summary>
+    public void ReleaseManifest()
+    {
+        _manifestHold?.TrySetResult();
     }
 
     /// <summary>Serves a manifest and its signature for the next checks, and the installer files.</summary>
@@ -121,6 +139,11 @@ internal sealed class UpdateFixtureServer : IDisposable
                     await Task.Delay(ManifestDelayMilliseconds, _stop.Token);
                 }
 
+                if (target == ManifestPath)
+                {
+                    await WaitForReleaseAsync();
+                }
+
                 if (_routes.TryGetValue(target, out byte[]? body))
                 {
                     await WriteResponseAsync(stream, "200 OK", body);
@@ -135,6 +158,18 @@ internal sealed class UpdateFixtureServer : IDisposable
                 // The client closed the connection, for example when a check is canceled.
             }
         }
+    }
+
+    /// <summary>Waits for the test to release a held manifest, until the hold limit or the server stopping.</summary>
+    private async Task WaitForReleaseAsync()
+    {
+        TaskCompletionSource? hold = _manifestHold;
+        if (hold is null)
+        {
+            return;
+        }
+
+        _ = await Task.WhenAny(hold.Task, Task.Delay(HoldLimit, _stop.Token));
     }
 
     private static async Task WriteResponseAsync(NetworkStream stream, string status, byte[] body)

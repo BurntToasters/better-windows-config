@@ -183,10 +183,9 @@ In the window, a refused file shows string 133, 125, or 129 with the file path. 
 shows string 132 after the rest of the file has been applied. A file that imports with only skipped
 lines shows string 228. The window does not show a message for a skipped line.
 
-A canceled import has no `RegFileImportResult`, because the importer throws
-`OperationCanceledException` between sections. The window keeps every section that finished before
-the cancel, refreshes the tree and list, and shows string 132 with the file path. The same partial
-text is the only result message after a cancel, whether zero or many sections had finished.
+The import window has no Cancel button and no close box (section 14), so the window never cancels an
+import. The importer still stops between sections when a caller passes a canceled token, but the window
+passes none, so a window import always runs to the end and shows string 228, 132, or 133 for its result.
 
 Errors go to the log through `Bwc.Core.Log` and to standard error when that handle is available.
 The log writer flushes each entry itself; standard error is flushed before `Environment.Exit`
@@ -241,20 +240,19 @@ write or a cancel, 133 for a file that is not a registry file, 125 for an invali
 for a file that cannot be opened. String 128 is the remote-computer success text used by the
 existing import path; it is unchanged.
 
-Both directions show a classic owned progress dialog with a Cancel button. The registry work runs
-on the thread pool and progress is marshalled back to the UI thread, so the window keeps painting
-and responding while a large file is applied or exported. The import dialog reports completed key
-sections out of the total and is driven by `IProgress<ImportProgress>`. Cancel requests the
-cancellation token; the importer finishes the section already in progress, keeps every completed
-write, then stops. The export dialog is driven by `IProgress<ExportProgress>` and reports running
-key and value counts; Cancel requests the export token, which the engine checks before each key,
-value, and subkey.
+The export progress dialog has a Cancel button. The import progress dialog (DLG-019) has no Cancel
+button and no default button, as the oracle shows. Both run the registry work on the thread pool and
+marshal progress back to the UI thread, so the window keeps painting and responding while a large
+file is applied or exported. The import dialog reports completed key sections out of the total and is
+driven by `IProgress<ImportProgress>`. The export dialog is driven by `IProgress<ExportProgress>` and
+reports running key and value counts; Cancel requests the export token, which the engine checks before
+each key, value, and subkey.
 
 Export always writes to a temporary file in the destination folder and moves it into place only
 after the writer finished. A canceled or failed export deletes that temporary file, so the
 destination is absent or still has its previous contents; an existing destination is never
-truncated by a canceled export. Import has no temporary file and no rollback: a canceled import
-leaves the completed writes applied, which is the classic behavior described in section 4.
+truncated by a canceled export. Import has no temporary file and no rollback: the completed writes of
+an import stay applied, which is the classic behavior described in section 4.
 
 In an E2E build with `BWC_E2E_SANDBOX_ROOT` set, "All" still calls
 `RegFileExporter.ExportWholeRegistry`, but the source exposes the five classic roots with the
@@ -274,3 +272,10 @@ The production build uses the live reader and exports the real registry.
 | Import progress caption is the product name | Caption is string 300, `Import Registry File`, and the label is `File:` |
 | Status texts are hard-coded in code | All status and caption text comes from `Resources.resw` |
 | Export progress and import progress texts are inline | Moved to `Resources.resw` with the same wording |
+| E2E finds the import progress window by the title `Registry Editor` | The import progress caption is `Import Registry File`, so the lookup finds the window by its `ProgressBar` id for both directions |
+| E2E export cancel runs against a branch that finishes in about two seconds | The cancel branch seeds 5000 keys and the E2E-only pause `BWC_E2E_SLOW_EXPORT_MS=2` (per key) keeps the export running until Cancel |
+| E2E pause variables are read in the ship build | `BWC_E2E_SLOW_EXPORT_MS` and `BWC_E2E_SLOW_IMPORT_MS` are read only under `#if BWC_E2E`; the ship build never reads them and runs at full speed |
+| E2E pause variable is not a number, is negative, or is too large | Non-numeric or negative values mean no pause; values above 1000 are clamped to 1000 ms per key or section |
+| Cancel arrives during the export pause | The pause waits on the cancellation token, so Cancel ends the wait at once; the export stops and the partial file is deleted |
+| An E2E seed grows the user's `NTUSER.DAT` without a bound | Test seeds are capped at 5000 keys; the import file has 1000 sections and the export branch has 5000 keys |
+| E2E import test checks the cancel controls | Replaced: the test checks the classic window (caption `Import Registry File`, no push button except the title bar Close, which the host refuses until the import ends; bar advance; main window disabled while it runs; completion message; imported keys) |

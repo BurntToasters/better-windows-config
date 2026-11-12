@@ -44,7 +44,6 @@ public sealed class HubTests
     private const double LightBrightnessFloor = 150;
     private const double DarkBrightnessCeiling = 90;
     private const int HeldManifestMilliseconds = 60_000;
-    private const int ProgressManifestMilliseconds = 2_000;
     private const int AboutOpenAttempts = 2;
     private static readonly TimeSpan ElementTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromSeconds(15);
@@ -301,9 +300,10 @@ public sealed class HubTests
             string.Equals(WaitForText(hub, "HubStatus"), "Up to date.", StringComparison.Ordinal),
             "HubStatus reports Up to date.");
 
-        // Newer version, with the manifest held long enough to capture the progress window.
+        // Newer version. The progress window closes when the check ends, so the manifest is held until the window
+        // has been checked and captured. The hold is released right after the capture, whatever the machine's speed.
         server.Offer(newerManifest, newerSignature, fixture.Installer);
-        server.ManifestDelayMilliseconds = ProgressManifestMilliseconds;
+        server.HoldManifest();
         HubUi.OpenHelpMenuByMouse(hub, automation);
         AutomationElement? checkItem = HubUi.FindInProcess(automation, hub.ProcessId, "MenuItem_CheckForUpdates", ElementTimeout);
         HubUi.ClickMenuItem(checkItem);
@@ -318,6 +318,9 @@ public sealed class HubTests
         {
             CaptureDialog(progress, "update-progress.png", "hub.update.progress.contrast", LightTheme);
         }
+
+        // The check may finish now: the progress window has been checked, and the manifest answer closes it.
+        server.ReleaseManifest();
 
         AutomationElement? available = HubUi.FindWindowInProcess(automation, hub.ProcessId, AvailableTitle, DialogTimeout);
         E2EResults.Record(

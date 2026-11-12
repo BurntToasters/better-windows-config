@@ -236,7 +236,11 @@ internal static class DialogContrast
         {
             try
             {
-                if (element.Properties.IsOffscreen.ValueOrDefault || string.IsNullOrEmpty(element.Name))
+                // Name is not supported by every text or document peer. Such an element has no name to report, so it is
+                // skipped, and the pixels of the rectangles that remain are still judged.
+                if (element.Properties.IsOffscreen.ValueOrDefault ||
+                    !element.Properties.Name.TryGetValue(out string? name) ||
+                    string.IsNullOrEmpty(name))
                 {
                     continue;
                 }

@@ -285,7 +285,11 @@ windows are found by enumerating the visible windows of the Hub's process, becau
 owned windows that the UIA desktop list can miss. A mouse click on a flyout item hovers the item first
 and is repeated while the item is still showing, because a click that arrives with the first pointer
 move was sometimes dropped. The interactive check's progress window has the same title as its result
-message, so the result lookup waits for the window that holds the message text. Captures go to
+message, so the result lookup waits for the window that holds the message text. The progress window is held
+open by the fixture: the manifest response waits until the test has checked and captured the window, then it
+is released (`UpdateFixtureServer.HoldManifest` and `ReleaseManifest`, bounded at 60 seconds). A window that
+closes before its capture fails the contrast checks with "no client area" (`e2e-harness.md` section 27).
+Captures go to
 `artifacts/e2e/visual/hub/`: each capture is the window's visible frame read from the screen, so the
 whole window is in the image. The captures are the main window in light and dark, About in light and
 dark, the progress dialog, and the update dialogs. Every dialog check also runs `DialogContrast` on the

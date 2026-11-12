@@ -28,6 +28,7 @@ public sealed class PermissionsTests
     private const string ReplaceCheckBoxFragment = "Replace all child object permission entries";
     private const string ThisKeyAndSubkeysText = "This key and subkeys";
     private const string ReplaceConfirmFragment = "Do you want to replace the permission on all existing subkeys within";
+    private const string AcluiReplaceConfirmFragment = "This will replace explicitly defined permissions";
 
     private static readonly string[] TreeMenuNames =
     [
@@ -109,6 +110,8 @@ public sealed class PermissionsTests
                 menuEnabled,
                 $"itemPresent={permissionsItem is not null}, enabled={menuEnabled}.");
 
+            bool settled = WaitForItemToSettle(permissionsItem);
+            E2EResults.Record("permissions.editmenu.settled", settled, $"settled={settled}.");
             bool clicked = ClickElement(permissionsItem);
             E2EResults.Record("permissions.editmenu.invoked", clicked, $"clicked={clicked}.");
 
@@ -309,6 +312,8 @@ public sealed class PermissionsTests
             E2EGuards.RequireSandboxSelection(session, sandbox, "permissions.propagation.sandbox.menu");
             driver.OpenMenu(MenuEdit);
             AutomationElement? permissionsItem = driver.WaitForElement("MenuCommand_" + CommandPermissions);
+            bool settled = WaitForItemToSettle(permissionsItem);
+            E2EResults.Record("permissions.propagation.settled", settled, $"settled={settled}.");
             bool clicked = ClickElement(permissionsItem);
 
             nint sheet = clicked ? WaitForOwnedDialogOf(session.ProcessId, session.MainHwnd, TimeSpan.FromSeconds(10)) : 0;
@@ -344,6 +349,16 @@ public sealed class PermissionsTests
 
                     bool advancedOk = replaceChecked && ClickButtonNamed(advanced, "OK");
                     E2EResults.Record("permissions.propagation.advanced.ok", advancedOk, $"clicked={advancedOk}.");
+
+                    // aclui asks its own question when Advanced OK is pressed with the replace box checked. The
+                    // question is a #32770 window titled "Windows Security", owned by the Advanced window.
+                    nint aclConfirm = advancedOk ? WaitForOwnedDialogOf(session.ProcessId, advanced, TimeSpan.FromSeconds(10)) : 0;
+                    bool aclConfirmText = aclConfirm != 0 && ContainsText(aclConfirm, AcluiReplaceConfirmFragment);
+                    bool aclConfirmYes = aclConfirmText && ClickButtonNamed(aclConfirm, "Yes");
+                    E2EResults.Record(
+                        "permissions.propagation.advanced.replace-confirm",
+                        aclConfirmYes,
+                        $"shown=0x{aclConfirm:X}, textMatched={aclConfirmText}, yesClicked={aclConfirmYes}.");
 
                     bool advancedGone = ControlTestSupport.WaitUntil(
                         () => !PermissionsNative.IsWindow(advanced),
@@ -411,6 +426,58 @@ public sealed class PermissionsTests
             return false;
         }
     }
+
+    /// <summary>
+    /// Waits until the menu item is enabled and its bounding rectangle holds still across two reads 150 ms
+    /// apart. A flyout drops a press that arrives while it is still opening, so the real click waits for the
+    /// settle. The wait is at least 300 ms and gives up after 5 s.
+    /// </summary>
+    private static bool WaitForItemToSettle(AutomationElement? item)
+    {
+        if (item is null)
+        {
+            return false;
+        }
+
+        long start = Environment.TickCount64;
+        System.Drawing.Rectangle previous;
+        try
+        {
+            previous = item.BoundingRectangle;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+
+        while (true)
+        {
+            Thread.Sleep(150);
+            long elapsed = Environment.TickCount64 - start;
+            System.Drawing.Rectangle current;
+            try
+            {
+                current = item.BoundingRectangle;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            if (current == previous && elapsed >= 300 && IsEnabled(item))
+            {
+                return true;
+            }
+
+            if (elapsed >= 5000)
+            {
+                return false;
+            }
+
+            previous = current;
+        }
+    }
+
 
     private static bool ClickElement(AutomationElement? element)
     {

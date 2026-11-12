@@ -19,6 +19,14 @@ ones were checked on classic regedit.
 - A double-click on an unselected row selects that row first, then toggles it.
 - A double-click while a chunked expand is still inserting rows cancels nothing unexpected: a
   second toggle collapses through the normal collapse path and cancels the pending chunks.
+- A pointer press on a row moves XAML focus from the tree to a ScrollViewer: an outer one that wraps
+  the tree, or the tree's own. The move happens after the double-tap is handled, so a double-click
+  expand or collapse ends with the ScrollViewer focused. UI Automation does not expose it, so the
+  tree reads as unfocused (UIA showed an InputSiteWindowClass pane) and type-ahead and arrow keys
+  looked dead. Observed on the E2E run: focus was on the tree after the first double-click and on
+  the ScrollViewer after the second. A keyboard collapse or expand never moved it. Fix:
+  `DenseTree` answers `LosingFocus` by keeping focus on the tree when the new owner is a ScrollViewer
+  that contains the tree or sits inside it. The rename box is excluded; it takes focus on purpose.
 
 ## Numpad keys (+, -, *)
 

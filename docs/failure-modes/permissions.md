@@ -309,3 +309,46 @@ nothing and returns `E_ABORT` to aclui. The question is shown on the UI thread f
 thread and cannot wait for a ContentDialog. The text is `MsgReplaceSubkeysConfirm`; the caption is
 `MsgCaptionRegistryEditor`. Test: the E2E permissions test records `permissions.propagation.replace-confirm`.
 Whether aclui shows its own message after `E_ABORT` is not verified on this machine.
+
+## 28. Edit > Permissions activation in the E2E path
+
+The Edit > Permissions item is enabled when a key is the target, and it runs `Permissions()` when
+activated. These are the ways the E2E path can fail before the aclui dialog exists:
+
+- The item is found and enabled, but a raw mouse click at the center of its bounding rectangle lands
+  on a separator or on padding while the flyout is still opening. The command does not run, the flyout
+  stays open, and no dialog appears. The E2E test clicks the item with the real mouse 0 ms after the flyout opens;
+  that press does not activate the item. Measured: a 300 ms or 1000 ms settle before the same click passes.
+- The command runs while a value row is selected in the list. Section 1 applies: the list target is
+  refused with the classic "no selection" message and no aclui dialog opens.
+- The command runs while another modal is open or the window handle is zero. `PermissionsAsync` logs
+  and returns, so no dialog opens.
+- The aclui dialog opens but is not owned by the main window, is not a #32770 window, or is not visible.
+  The E2E finder accepts only a visible #32770 window of the Regedit process owned by the main window.
+- The dialog opens after the 10 second wait. The E2E records it as missing.
+- The Advanced sheet or the replace confirmation is not found. The child then keeps its explicit entry,
+  so the child check fails as a consequence of the missing sheet. The propagation itself did not run.
+
+## 29. Input during the flyout's opening (E2E settle)
+
+WinUI drops a press that arrives while a menu flyout is still opening: the flyout stays open and the item
+does not run. Classic menus accept a press at once. Measured on this machine with a real mouse click on
+Edit > Permissions: a press 0 ms after the flyout opens did nothing; a press after 300 ms or 1000 ms opened
+the dialog. The item's bounding rectangle was identical at 0 ms and 1000 ms. The WinUI cause was not
+diagnosed. The E2E waits until the item is enabled and its bounds hold across two reads 150 ms apart
+(at least 300 ms, at most 5 s) before the real mouse click. A press inside that window is lost to the user.
+Test: `permissions.editmenu.settled` and `permissions.propagation.settled`.
+
+## 30. Applies-to label for container and object inherit entries
+
+Registry entries that HKCU inherits carry `CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE` (flags 0x3), as a
+probe of a scratch key shows. The Advanced list labels an entry with the inherit type whose flags match it
+exactly. `RegistryInheritanceModes.ThisKeyAndSubkeys` is 0x2, so those entries are labelled "Special" and
+"This key and subkeys" is not shown (read through UIA on this build: Applies-to cell reads "Special").
+Candidate fix: `ThisKeyAndSubkeys = 0x3` and `SubkeysOnly = 0x3 | 0x8`. That changes the unit test
+`InheritModesUseTheWin32AceFlags` in `tests/Bwc.Registry.Tests`, which is outside this worker's scope, so it
+is not applied. Status: open.
+
+Replace flow: pressing Advanced OK with the replace box checked makes aclui ask its own question, a
+`#32770` window titled "Windows Security" owned by the Advanced window. The test answers it with Yes. The
+classic MSG-178 question is then shown by the Registry Editor when the permissions sheet OK is pressed.

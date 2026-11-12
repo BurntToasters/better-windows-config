@@ -160,6 +160,11 @@ A leaf is invoked through `IInvokeProvider` on the item's automation peer, so th
 path runs as a click. A submenu is expanded through `IExpandCollapseProvider`. Calling `Click`
 directly would skip the flyout close and leave the popup open.
 
+Failure seen in the Edit E2E: `MenuCommand_516` (Edit > New) was on screen in the open Edit flyout,
+but Invoke did not expand it, so `MenuCommand_663` (New Key) never appeared. The driver must call
+`ExpandCollapse.Expand` on a `MenuFlyoutSubItem` and use Invoke only for leaves and bar items. A
+missing command now reports the `MenuCommand_` ids that are on screen, so this case shows at once.
+
 ## Window edge
 
 ### Black strip on the right and bottom edges

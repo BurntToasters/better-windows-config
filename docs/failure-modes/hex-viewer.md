@@ -167,6 +167,21 @@ sends Ctrl+A and Ctrl+C. If the test session cannot read the clipboard, the test
 informational check with the clipboard exception and still asserts the selected length through the
 editor help text. Clipboard availability does not decide the selection result.
 
+### Contrast of the viewer's text
+
+`HexViewer_ClassicBinaryDataFollowsTheFormats` runs `DialogContrast` on the viewer's client pixels. The
+ways this can fail:
+
+- A text or document element of the viewer does not expose a UIA name. Reading `Name` threw
+  `PropertyNotSupportedException` and aborted the test before any row was checked. The check must skip
+  such an element (`e2e-harness.md` section 28), not fail on the exception.
+- The viewer's text is painted in the dialog face, so the text contrast check finds fewer than twelve strong
+  pixels in a text rectangle. That is a product failure: the row text must use the window text color.
+- The capture is read before the viewer's paint settles. The settle rule of `e2e-harness.md` section 26 applies,
+  and the check is not judged from a changing copy.
+- Every text rectangle is skipped. The check then reports "No visible static text control was found", so an
+  empty viewer cannot pass by having no text.
+
 ### Cleanup
 
 The Hex E2E test seeds only `HKCU\Software\BWC-E2E\<runId>`, launches the published application
