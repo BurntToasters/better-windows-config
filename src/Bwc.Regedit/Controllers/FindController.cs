@@ -4,15 +4,30 @@ using Bwc.Registry;
 using Bwc.UI.Dialogs;
 using Bwc.UI.List;
 using Bwc.UI.Tree;
+using Microsoft.UI.Xaml;
 
 namespace Bwc.Regedit.Controllers;
 
 /// <summary>Find, Find Next, and the persisted find state.</summary>
 internal sealed class FindController
 {
+#if BWC_E2E
+    // E2E-only: a search over a tiny sandbox finishes before UIA can see the progress dialog. Keeping
+    // the classic two-window sequence visible for a moment makes the sequence observable.
+    private static readonly TimeSpan ProgressMinimum =
+        TimeSpan.FromMilliseconds(2000);
+#else
+    private static readonly TimeSpan ProgressMinimum =
+        TimeSpan.FromMilliseconds(250);
+#endif
+
+    /// <summary>
+    /// The progress line from RT_DIALOG 109. The shared resource map has no key for it, and the
+    /// resource map is outside this package.
+    /// </summary>
+    private const string SearchingRegistryText = "Searching the registry...";
+
     private readonly RegeditContext _context;
-    private FindDialog? _findDialog;
-    private CancellationTokenSource? _silentFind;
     private RegistryFindQuery? _lastFindQuery;
     private RegistryFindHit? _lastFindHit;
     private bool _findExhausted;
@@ -28,6 +43,13 @@ internal sealed class FindController
 
     public void FindNext()
     {
+        if (_context.DialogOpen || _context.WindowHwnd == 0)
+        {
+            Log.Warn(
+                "Registry Editor ignored Find Next because another modal is open or the window handle is not attached.");
+            return;
+        }
+
         if (_lastFindQuery is null)
         {
             Find();
@@ -36,32 +58,12 @@ internal sealed class FindController
 
         if (_findExhausted)
         {
-            _context.StartCommand(() => _context.ShowMessageAsync(Get("DialogFindFinished")));
+            _context.StartCommand(ShowFinishedMessageAsync);
             return;
         }
 
-        _silentFind?.Cancel();
-        _silentFind?.Dispose();
-        var tokenSource = new CancellationTokenSource();
-        _silentFind = tokenSource;
         RegistryFindQuery query = _lastFindQuery;
-        CancellationToken token = tokenSource.Token;
-        _context.StartCommand(async () =>
-        {
-            try
-            {
-                await RunFindAsync(null, ToOptions(query), token);
-            }
-            finally
-            {
-                if (ReferenceEquals(_silentFind, tokenSource))
-                {
-                    _silentFind = null;
-                }
-
-                tokenSource.Dispose();
-            }
-        });
+        _context.StartCommand(() => RunFindAsync(ToOptions(query)));
     }
 
     /// <summary>
@@ -104,66 +106,66 @@ internal sealed class FindController
         }
 
         var dialog = new FindDialog(CreateFindLabels(), OptionsFromSettings());
-        dialog.FindRequested += OnFindRequested;
-        _findDialog = dialog;
-
+        bool accepted;
         try
         {
-            _ = await _context.ShowDialogAsync(dialog);
+            accepted = await _context.ShowDialogAsync(dialog);
         }
         finally
         {
-            dialog.FindRequested -= OnFindRequested;
             FindDialogOptions options = dialog.Options;
             _context.Settings.FindText = options.SearchText;
             _context.Settings.FindFlags = ToFlags(options);
+        }
 
-            if (ReferenceEquals(_findDialog, dialog))
-            {
-                _findDialog = null;
-            }
+        if (accepted)
+        {
+            await RunFindAsync(dialog.AcceptedOptions);
         }
     }
 
     private FindDialogLabels CreateFindLabels() => new()
     {
         Title = Get("DialogFindTitle"),
-        FindWhat = Get("DialogFindWhat"),
+        FindWhat = Mnemonic(Get("DialogFindWhat"), "nd"),
         LookAt = Get("DialogFindLookAt"),
-        Keys = Get("DialogFindKeys"),
-        Values = Get("DialogFindValues"),
-        Data = Get("DialogFindData"),
-        MatchWholeString = Get("DialogFindMatchWhole"),
-        SearchInSubtree = Get("DialogFindSubtree"),
-        FindNext = Get("DialogFindNext"),
+        Keys = Mnemonic(Get("DialogFindKeys"), "Keys"),
+        Values = Mnemonic(Get("DialogFindValues"), "Values"),
+        Data = Mnemonic(Get("DialogFindData"), "Data"),
+        MatchWholeString = Mnemonic(Get("DialogFindMatchWhole"), "whole"),
+        SearchInSubtree = Mnemonic(Get("DialogFindSubtree"), "subtree"),
+        FindNext = Mnemonic(Get("DialogFindNext"), "Find Next"),
         Cancel = Get("DialogFindCancel"),
-        Searching = Get("DialogFindSearching"),
-        FoundFormat = Get("DialogFindFound"),
+        Searching = SearchingRegistryText,
         Finished = Get("DialogFindFinished"),
         EmptyText = Get("DialogFindEmptyText"),
         NoScope = Get("DialogFindNoScope"),
     };
 
-    private void OnFindRequested(object? sender, FindDialogRequestEventArgs e)
+    /// <summary>
+    /// Marks the template mnemonic letter. The resource strings carry no ampersands, and the shared
+    /// resource map is outside this package. A marker is used when the letter is not the first one.
+    /// </summary>
+    private static string Mnemonic(string text, string marker)
     {
-        if (sender is FindDialog dialog)
+        if (text.Contains('&', StringComparison.Ordinal))
         {
-            _ = RunFindAsync(dialog, e.Options, e.CancellationToken);
+            return text;
         }
+
+        int index = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        return index < 0 ? text : text.Insert(index, "&");
     }
 
     /// <summary>
-    /// Runs one request. The engine call is on the thread pool. A result is applied only while its
-    /// token is current, so Cancel or a newer request cannot be overwritten by a late hit.
+    /// Runs one find request. The engine call runs on the thread pool while the classic progress
+    /// dialog is open. The dialog closes before the hit is applied, so Find Next never reopens Find.
     /// </summary>
-    private async Task RunFindAsync(
-        FindDialog? dialog,
-        FindDialogOptions options,
-        CancellationToken cancellationToken)
+    private async Task RunFindAsync(FindDialogOptions options)
     {
         if (!TryBuildQuery(options, out RegistryFindQuery? query) || query is null)
         {
-            dialog?.ShowSearchError(Get("DialogFindNoScope"));
+            await ShowFindErrorAsync(Get("DialogFindNoScope"));
             return;
         }
 
@@ -179,15 +181,7 @@ internal sealed class FindController
         }
         else if (repeatsLastQuery && _findExhausted)
         {
-            if (dialog is not null)
-            {
-                dialog.ShowFinished();
-            }
-            else
-            {
-                await _context.ShowMessageAsync(Get("DialogFindFinished"));
-            }
-
+            await ShowFinishedMessageAsync();
             return;
         }
         else
@@ -195,84 +189,103 @@ internal sealed class FindController
             cursor = CreateSelectionCursor();
         }
 
-        RegistryFindHit? hit;
-        try
-        {
-            hit = await _context.RunRegistryAsync(
-                () => _context.Finder.Find(query, cursor, cancellationToken),
-                cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
-        catch (Exception ex)
-        {
-            Log.Warn("Registry Editor find failed: " + ex.Message);
-            if (dialog is not null)
-            {
-                dialog.ShowSearchError(Get("DialogFindSearchFailed"));
-            }
-            else
-            {
-                await _context.ShowMessageAsync(Get("DialogFindSearchFailed"));
-            }
+        FindProgressResult result = await FindWithProgressAsync(query, cursor);
 
+        if (result.Error is not null)
+        {
+            Log.Warn("Registry Editor find failed: " + result.Error.Message);
+            await ShowFindErrorAsync(Get("DialogFindSearchFailed"));
             return;
         }
 
-        if (cancellationToken.IsCancellationRequested)
+        if (result.Cancelled)
         {
             return;
         }
 
+        RegistryFindHit? hit = result.Hit;
         _lastFindQuery = query;
         _findExhausted = hit is null;
-
-        if (hit is not null)
-        {
-            _lastFindHit = hit;
-        }
-
+        _lastFindHit = hit;
         PersistFindHit(query, hit);
 
         if (hit is null)
         {
-            if (dialog is not null)
-            {
-                dialog.ShowFinished();
-            }
-            else
-            {
-                await _context.ShowMessageAsync(Get("DialogFindFinished"));
-            }
-
+            await ShowFinishedMessageAsync();
             return;
         }
 
-        bool applied = await ApplyFindHitAsync(hit, cancellationToken);
-        if (cancellationToken.IsCancellationRequested)
+        bool applied = await ApplyFindHitAsync(hit, CancellationToken.None);
+        if (!applied)
         {
-            return;
-        }
-
-        if (dialog is not null)
-        {
-            if (applied)
-            {
-                dialog.CompleteSearch(hit.DisplayText);
-            }
-            else
-            {
-                dialog.ShowFinished();
-            }
+            await ShowFinishedMessageAsync();
         }
     }
 
     /// <summary>
+    /// Shows the classic progress dialog and runs the engine behind it. Cancel, Escape, Enter on the
+    /// default Cancel button, or the close box cancels the token. The dialog always closes before the
+    /// result is returned, so the owner is restored for the message box or selection update.
+    /// </summary>
+    private async Task<FindProgressResult> FindWithProgressAsync(
+        RegistryFindQuery query,
+        RegistryFindCursor? cursor)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var progress = new FindProgressDialog(
+            Get("DialogFindTitle"),
+            SearchingRegistryText,
+            Get("DialogFindCancel"),
+            cancellation.Cancel);
+
+        Task<bool> dialogTask = _context.ShowDialogAsync(progress);
+        Task<RegistryFindHit?> searchTask = _context.RunRegistryAsync(
+            () => _context.Finder.Find(query, cursor, cancellation.Token),
+            cancellation.Token);
+
+        RegistryFindHit? hit = null;
+        bool completed = false;
+        bool cancelled = false;
+        Exception? error = null;
+
+        try
+        {
+            // The delay is a floor, not a timeout: the engine result and the minimum visibility both
+            // have to finish before the dialog closes.
+            await Task.WhenAll(searchTask, Task.Delay(ProgressMinimum));
+            hit = await searchTask;
+            completed = true;
+        }
+        catch (OperationCanceledException)
+        {
+            cancelled = true;
+        }
+        catch (Exception ex)
+        {
+            error = ex;
+        }
+        finally
+        {
+            if (completed && !progress.Cancelled)
+            {
+                progress.CompleteFromHost();
+            }
+            else
+            {
+                cancellation.Cancel();
+                CloseQuietly(progress);
+            }
+        }
+
+        _ = await dialogTask;
+        cancelled = cancelled || progress.Cancelled || !completed;
+        return new FindProgressResult(hit, cancelled, error);
+    }
+
+    /// <summary>
     /// Resolves a hit key through the tree source, rebuilds the visible rows with the hit
-    /// ancestors expanded, selects the key, and selects the matching value row when there is one.
-    /// Focus is deliberately left alone so a modal Find dialog keeps keyboard focus.
+    /// ancestors expanded, and selects the key. The matching value row is selected when the hit
+    /// names a value. Focus is left alone so the window that owns the restored selection keeps it.
     /// </summary>
     private async Task<bool> ApplyFindHitAsync(RegistryFindHit hit, CancellationToken cancellationToken)
     {
@@ -535,4 +548,35 @@ internal sealed class FindController
         settings.FindLastHitKind = (int)hit.Kind;
         settings.FindLastHitText = hit.MatchedText;
     }
+
+    private Task ShowFinishedMessageAsync() =>
+        _context.ShowDialogAsync(new ClassicMessageBox(
+            Get("DialogFindTitle"),
+            Get("DialogFindFinished"),
+            ClassicMessageIcon.Information,
+            ClassicMessageButtons.Ok));
+
+    private Task ShowFindErrorAsync(string message) =>
+        _context.ShowDialogAsync(new ClassicMessageBox(
+            Get("DialogFindTitle"),
+            message,
+            ClassicMessageIcon.Error,
+            ClassicMessageButtons.Ok));
+
+    private static void CloseQuietly(Window window)
+    {
+        try
+        {
+            window.Close();
+        }
+        catch (Exception)
+        {
+            // The dialog was already closed or never shown. There is nothing else to release.
+        }
+    }
+
+    private readonly record struct FindProgressResult(
+        RegistryFindHit? Hit,
+        bool Cancelled,
+        Exception? Error);
 }

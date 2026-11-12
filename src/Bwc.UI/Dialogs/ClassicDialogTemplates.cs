@@ -115,6 +115,29 @@ public static class ClassicDialogTemplates
         };
 
     /// <summary>
+    /// Find progress (RT_DIALOG 109, oracle DLG-017/018): the searching line and the Cancel button.
+    /// 170 x 64 DLU. The template's icon static is drawn by <see cref="FindProgressDialog"/>, because
+    /// the classic icon is a stock icon and this template model carries text controls only.
+    /// </summary>
+    public static ClassicDialogDefinition FindProgress(
+        string caption,
+        string searchingText,
+        string cancelText) =>
+        new(
+            caption,
+            "RT_DIALOG 109 (en-US regedit.exe.mui)",
+            170,
+            64,
+            [
+                Button("DialogSecondary", 2, cancelText, 114, 43, 50, 14, isDefault: true),
+                Label("FindProgressText", searchingText, 47, 12, 116, 10),
+            ])
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
+    /// <summary>
     /// Remove Favorites (RT_DIALOG 113): a multi-select, sorted list with OK and Cancel at the right.
     /// 194 x 103 DLU. The list label is the caller's text.
     /// </summary>

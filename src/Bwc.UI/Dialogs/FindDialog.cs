@@ -48,10 +48,8 @@ public sealed class FindDialogLabels
 
     public required string Cancel { get; init; }
 
+    /// <summary>The progress dialog line, "Searching the registry...".</summary>
     public required string Searching { get; init; }
-
-    /// <summary>A composite format string with one argument, the hit display text.</summary>
-    public required string FoundFormat { get; init; }
 
     public required string Finished { get; init; }
 
@@ -60,25 +58,11 @@ public sealed class FindDialogLabels
     public required string NoScope { get; init; }
 }
 
-/// <summary>One Find Next request. The host must observe the token and complete the dialog.</summary>
-public sealed class FindDialogRequestEventArgs : EventArgs
-{
-    internal FindDialogRequestEventArgs(FindDialogOptions options, CancellationToken cancellationToken)
-    {
-        Options = options;
-        CancellationToken = cancellationToken;
-    }
-
-    public FindDialogOptions Options { get; }
-
-    public CancellationToken CancellationToken { get; }
-}
-
 /// <summary>
-/// Classic Find dialog (RT_DIALOG 106, oracle DLG-010 to DLG-012). Find Next stays open and raises
-/// <see cref="FindRequested"/>; the host runs the engine on a background thread and calls one of
-/// the completion methods. Cancel closes and cancels the request token. The template has no status
-/// line, so a finished search or an error is shown in a classic message box. A hit is not announced.
+/// Classic Find dialog (RT_DIALOG 106, oracle DLG-010 to DLG-012). Find Next validates the text and
+/// the look-at flags, accepts, and closes. The host then shows the classic progress dialog and runs
+/// the search on a worker thread, as regedit does. Cancel closes without searching. The template
+/// has no status line, so a finished search or an error is shown in a classic message box.
 /// </summary>
 public sealed class FindDialog : ClassicDialog
 {
@@ -89,10 +73,7 @@ public sealed class FindDialog : ClassicDialog
     private readonly CheckBox _data;
     private readonly CheckBox _wholeString;
     private readonly CheckBox _subtree;
-    private readonly Button _primaryButton;
-    private CancellationTokenSource? _searchCts;
-    private bool _searching;
-    private bool _closed;
+    private FindDialogOptions? _acceptedOptions;
 
     public FindDialog(FindDialogLabels labels, FindDialogOptions initial)
         : base(ClassicDialogTemplates.Find(
@@ -122,9 +103,7 @@ public sealed class FindDialog : ClassicDialog
         _data.IsChecked = initial.LookAtData;
         _wholeString.IsChecked = initial.MatchWholeStringOnly;
         _subtree.IsChecked = initial.SearchInSubtree;
-        _primaryButton = RequireControl<Button>("DialogPrimary");
 
-        Closed += OnFindDialogClosed;
         Activated += OnFindDialogActivated;
         ((FrameworkElement)Content).AddHandler(
             UIElement.KeyDownEvent,
@@ -132,10 +111,7 @@ public sealed class FindDialog : ClassicDialog
             handledEventsToo: true);
     }
 
-    /// <summary>Raised on the UI thread when Find Next starts. One request is in flight at a time.</summary>
-    public event EventHandler<FindDialogRequestEventArgs>? FindRequested;
-
-    /// <summary>The current control values, used to persist an unsubmitted edit on close.</summary>
+    /// <summary>The current control values. Read after the dialog closes to persist the draft.</summary>
     public FindDialogOptions Options => new()
     {
         SearchText = _findText.Text ?? string.Empty,
@@ -146,65 +122,28 @@ public sealed class FindDialog : ClassicDialog
         SearchInSubtree = _subtree.IsChecked == true,
     };
 
-    /// <summary>True from the moment Find Next is pressed until a completion method runs.</summary>
-    public bool IsSearching => _searching;
+    /// <summary>The options accepted by Find Next, or the current controls when it never accepted.</summary>
+    public FindDialogOptions AcceptedOptions => _acceptedOptions ?? Options;
 
-    /// <summary>Re-enables Find Next after a hit. The hit is shown in the registry tree, as in classic.</summary>
-    public void CompleteSearch(string foundDisplayText)
-    {
-        ArgumentNullException.ThrowIfNull(foundDisplayText);
-        if (!_searching)
-        {
-            return;
-        }
-
-        _searching = false;
-        SetPrimaryEnabled(true);
-    }
-
-    /// <summary>Shows the classic "finished" message and re-enables Find Next.</summary>
-    public void ShowFinished()
-    {
-        if (!_searching)
-        {
-            return;
-        }
-
-        _searching = false;
-        SetPrimaryEnabled(true);
-        ShowMessage(_labels.Finished, ClassicMessageIcon.Information);
-    }
-
-    /// <summary>Shows an engine or navigation failure and re-enables Find Next.</summary>
-    public void ShowSearchError(string message)
-    {
-        if (!_searching)
-        {
-            return;
-        }
-
-        _searching = false;
-        SetPrimaryEnabled(true);
-        ShowMessage(message ?? string.Empty, ClassicMessageIcon.Error);
-    }
-
-    /// <summary>Find Next starts the search and keeps the dialog open. Cancel closes it.</summary>
+    /// <summary>Find Next validates and closes the dialog. Cancel closes it without a search.</summary>
     protected override bool TryAccept()
     {
-        StartFind();
-        return false;
-    }
+        string text = _findText.Text ?? string.Empty;
+        if (text.Length == 0)
+        {
+            ShowMessage(_labels.EmptyText, ClassicMessageIcon.Error, refocus: _findText);
+            return false;
+        }
 
-    protected override void OnCommand(int id, string automationId)
-    {
-        if (id == 1)
+        FindDialogOptions options = Options;
+        if (!options.LookAtKeys && !options.LookAtValues && !options.LookAtData)
         {
-            StartFind();
+            ShowMessage(_labels.NoScope, ClassicMessageIcon.Error, refocus: _findText);
+            return false;
         }
-        else if (id == 2)
-        {
-            Cancel();
-        }
+
+        _acceptedOptions = options;
+        return true;
     }
 
     protected override void OnDialogLoaded()
@@ -213,59 +152,13 @@ public sealed class FindDialog : ClassicDialog
         _findText.SelectAll();
     }
 
-    private void StartFind()
-    {
-        if (_searching)
-        {
-            return;
-        }
-
-        string text = _findText.Text ?? string.Empty;
-        if (text.Length == 0)
-        {
-            ShowMessage(_labels.EmptyText, ClassicMessageIcon.Error, refocus: _findText);
-            return;
-        }
-
-        FindDialogOptions options = Options;
-        if (!options.LookAtKeys && !options.LookAtValues && !options.LookAtData)
-        {
-            ShowMessage(_labels.NoScope, ClassicMessageIcon.Error, refocus: _findText);
-            return;
-        }
-
-        _searchCts?.Cancel();
-        _searchCts?.Dispose();
-        _searchCts = new CancellationTokenSource();
-
-        _searching = true;
-        SetPrimaryEnabled(false);
-
-        EventHandler<FindDialogRequestEventArgs>? handler = FindRequested;
-        if (handler is null)
-        {
-            _searching = false;
-            SetPrimaryEnabled(true);
-            return;
-        }
-
-        handler(
-            this,
-            new FindDialogRequestEventArgs(options, _searchCts.Token));
-    }
-
     private void OnFindKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (_closed)
-        {
-            return;
-        }
-
-        // Escape and Enter are routed by ClassicDialog. F3 repeats Find Next, as the classic dialog does.
+        // Enter and Escape are routed by ClassicDialog. F3 inside Find starts Find Next, as classic does.
         if (e.Key == VirtualKey.F3)
         {
             e.Handled = true;
-            StartFind();
+            Accept();
         }
     }
 
@@ -277,22 +170,7 @@ public sealed class FindDialog : ClassicDialog
         }
     }
 
-    private void OnFindDialogClosed(object sender, WindowEventArgs args)
-    {
-        _closed = true;
-        Closed -= OnFindDialogClosed;
-        _searchCts?.Cancel();
-        _searchCts?.Dispose();
-        _searchCts = null;
-        _searching = false;
-    }
-
-    private void SetPrimaryEnabled(bool isEnabled)
-    {
-        _primaryButton.IsEnabled = isEnabled;
-    }
-
-    /// <summary>Shows a message owned by this dialog. The dialog stays disabled until the message closes.</summary>
+    /// <summary>Shows a validation message owned by this dialog. The dialog stays disabled until the message closes.</summary>
     private void ShowMessage(string text, ClassicMessageIcon icon, FrameworkElement? refocus = null)
     {
         _ = ShowMessageAsync(text, icon, refocus);

@@ -1,4 +1,5 @@
 using Bwc.E2E.Controls;
+using Bwc.E2E.Dialogs;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
@@ -13,19 +14,22 @@ using System.Text;
 namespace Bwc.E2E.Find;
 
 /// <summary>
-/// Drives the classic Find dialog against an isolated sandbox subtree. The run root is the only
-/// search root because the process receives BWC_E2E_SANDBOX_ROOT, so the checks do not depend on
-/// unrelated machine registry contents and the no-hit search finishes in bounded time.
+/// Drives the classic Find sequence against an isolated sandbox subtree: Find opens, Find Next
+/// closes it and shows the separate progress dialog, the search runs behind that dialog, and the
+/// result is either a selection or the finished message box. The run root is the only search root
+/// because the process receives BWC_E2E_SANDBOX_ROOT, so the checks do not depend on unrelated
+/// machine registry contents and the no-hit search finishes in bounded time.
 /// </summary>
 [TestClass]
 public sealed class FindTests
 {
-    private const string RunRootDataValue = "AlphaValue";
     private const string ValueHitName = "DataNeedle";
     private const string DataHitName = "DataNeedle";
     private const string DataSearchText = "needle";
     private const string MissingText = "NoSuchText";
+    private const string PersistText = "PersistMe";
     private const string FinishedMessage = "Finished searching through the registry.";
+    private const string SearchingMessage = "Searching the registry...";
 
     private static int _checkStart;
 
@@ -39,7 +43,7 @@ public sealed class FindTests
     [TestMethod]
     [TestCategory("Find")]
     [TestCategory("E2EOnly")]
-    public void Find_SearchesKeysValuesAndData()
+    public void Find_FollowsTheClassicTwoDialogSequence()
     {
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
@@ -57,204 +61,361 @@ public sealed class FindTests
 
         var sandbox = SeedSandbox(config);
         string dataRoot = CreateFreshDataRoot(config, "find");
+        string visualDir = Path.Combine(config.ArtifactsDir, "visual", "find");
+        Directory.CreateDirectory(visualDir);
         var environment = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
             ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
         };
 
+        AppletFindFlags beforeFindFlags = ReadFindFlags();
+
         try
         {
-            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
-            using var driver = new FindDialogDriver(session);
-
-            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
-            Record("find.navigate.runRoot", navigated, $"navigated to run root={navigated}.");
-
-            // F3 with no prior query opens Find instead of starting an invisible search.
-            bool f3Opened = SendAccelerator(session, "F3") && driver.WaitForOpen();
-            Record("find.f3.noPriorOpens", f3Opened, $"Find dialog after F3 opened={f3Opened}.");
-            if (f3Opened)
+            using (var session = new AppSession(config, config.RegeditExePath, environment: environment))
+            using (var driver = new FindDialogDriver(session))
             {
-                bool cancelled = driver.Invoke("DialogSecondary") && driver.WaitForClosed();
-                Record("find.f3.cancelCloses", cancelled, $"Cancel closed={cancelled}.");
+                bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+                Record("find.navigate.runRoot", navigated, $"navigated to run root={navigated}.");
+
+                // F3 with no prior query opens Find. A first Find Next must not start an invisible search.
+                bool f3Opened = SendAccelerator(session, "F3") && driver.WaitForFindOpen();
+                Record("find.f3.noPriorOpens", f3Opened, $"Find after F3 opened={f3Opened}.");
+                if (!f3Opened)
+                {
+                    FailIfNeeded();
+                    return;
+                }
+
+                bool ownerDisabled = ControlTestSupport.WaitUntil(
+                    () => !session.IsEnabled,
+                    TimeSpan.FromSeconds(3));
+                bool stillOpen = !ControlTestSupport.WaitUntil(
+                    () => !driver.FindOpen,
+                    TimeSpan.FromMilliseconds(700));
+                Record(
+                    "find.open.staysOpen",
+                    ownerDisabled && stillOpen,
+                    $"owner disabled={ownerDisabled}, Find still open={stillOpen}.");
+
+                bool controls = driver.ControlPresent("FindText") &&
+                    driver.ControlPresent("FindKeys") &&
+                    driver.ControlPresent("FindValues") &&
+                    driver.ControlPresent("FindData") &&
+                    driver.ControlPresent("FindWholeString") &&
+                    driver.ControlPresent("FindSubtree") &&
+                    driver.ControlPresent("DialogPrimary") &&
+                    driver.ControlPresent("DialogSecondary");
+                bool defaults = driver.IsChecked("FindKeys") &&
+                    driver.IsChecked("FindValues") &&
+                    driver.IsChecked("FindData") &&
+                    !driver.IsChecked("FindWholeString") &&
+                    driver.IsChecked("FindSubtree") &&
+                    !driver.IsOffscreen("FindSubtree");
+                Record(
+                    "find.controls.present",
+                    controls && defaults,
+                    $"controls={controls}, Keys/Values/Data/Subtree defaults={defaults}.");
+
+                string findShot = SaveScreenshot(
+                    driver.FindWindowElement,
+                    Path.Combine(visualDir, "find-dialog.png"));
+                Record(
+                    "find.visual.dialog",
+                    findShot.Length > 0,
+                    $"Find screenshot='{findShot}'.");
+
+                // Alt+K reaches the Keys checkbox through its template mnemonic, then again restores it.
+                bool mnemonicToggle = driver.SendAltMnemonic('K') &&
+                    driver.WaitForChecked("FindKeys", false);
+                bool mnemonicRestore = mnemonicToggle &&
+                    driver.SendAltMnemonic('K') &&
+                    driver.WaitForChecked("FindKeys", true);
+                Record(
+                    "find.mnemonics.keys",
+                    mnemonicToggle && mnemonicRestore,
+                    $"Alt+K toggled={mnemonicToggle}, restored={mnemonicRestore}.");
+
+                bool escapeSent = driver.SendFindKey(VirtualKeyShort.ESCAPE);
+                bool escapeClosed = escapeSent && driver.WaitForFindClosed();
+                bool ownerRestored = escapeClosed && WaitForOwnerEnabled(session);
+                Record(
+                    "find.open.cancelCloses",
+                    escapeClosed && ownerRestored,
+                    $"Escape closed={escapeClosed}, owner restored={ownerRestored}.");
+
+                // Keys search through real typing and a real mouse click on Find Next.
+                bool ctrlFOpened = SendAccelerator(session, "CONTROL+KEY_F") && driver.WaitForFindOpen();
+                Record("find.ctrlF.open", ctrlFOpened, $"Ctrl+F opened={ctrlFOpened}.");
+                if (!ctrlFOpened)
+                {
+                    FailIfNeeded();
+                    return;
+                }
+
+                bool preparedKeys = driver.SetChecked("FindValues", false) &&
+                    driver.SetChecked("FindData", false) &&
+                    driver.SetChecked("FindWholeString", false) &&
+                    driver.TypeFindText("Alpha");
+                Record("find.keys.prepare", preparedKeys, $"FindText='{driver.TextOf("FindText")}'.");
+
+                bool foreground = driver.EnsureFindForeground();
+                Record("find.keys.foreground", foreground, $"Find foreground={foreground}.");
+
+                bool nextClicked = foreground && driver.Click("DialogPrimary");
+                bool findClosed = nextClicked && driver.WaitForFindClosed();
+                bool progressOpened = findClosed && driver.WaitForProgressOpen();
+                bool progressText = progressOpened &&
+                    string.Equals(driver.ProgressText(), SearchingMessage, StringComparison.Ordinal);
+                Record(
+                    "find.next.closes",
+                    nextClicked && findClosed,
+                    $"Find Next clicked={nextClicked}, Find closed={findClosed}.");
+
+                string progressShot = progressOpened
+                    ? SaveScreenshot(
+                        driver.ProgressWindowElement,
+                        Path.Combine(visualDir, "find-progress.png"))
+                    : string.Empty;
+                Record(
+                    "find.progress.opens",
+                    progressOpened && progressText && driver.ControlPresent("DialogSecondary"),
+                    $"progress opened={progressOpened}, text='{driver.ProgressText()}'.");
+                Record(
+                    "find.visual.progress",
+                    progressShot.Length > 0,
+                    $"progress screenshot='{progressShot}'.");
+
+                bool progressClosed = driver.WaitForProgressClosed(TimeSpan.FromSeconds(10));
+                bool alphaSelected = ControlTestSupport.WaitForTreeSelection(
+                    session,
+                    "Alpha",
+                    TimeSpan.FromSeconds(30));
+                bool findStayedClosed = !ControlTestSupport.WaitUntil(
+                    () => driver.FindOpen,
+                    TimeSpan.FromMilliseconds(700));
+                Record(
+                    "find.keys.first",
+                    progressClosed && alphaSelected && findStayedClosed,
+                    $"progress closed={progressClosed}, Alpha selected={alphaSelected}, Find reopened={!findStayedClosed}.");
+
+                // F3 repeats the last query without reopening Find.
+                bool f3Sent = WaitForOwnerEnabled(session) && SendAccelerator(session, "F3");
+                bool f3Progress = f3Sent && driver.WaitForProgressOpen();
+                bool findHiddenDuringF3 = f3Progress && !driver.FindOpen;
+                Record(
+                    "find.f3.progress",
+                    f3Progress && findHiddenDuringF3,
+                    $"F3 progress={f3Progress}, Find hidden={findHiddenDuringF3}.");
+
+                bool f3ProgressClosed = driver.WaitForProgressClosed(TimeSpan.FromSeconds(10));
+                bool alphabetSelected = ControlTestSupport.WaitForTreeSelection(
+                    session,
+                    "Alphabet",
+                    TimeSpan.FromSeconds(30));
+                Record(
+                    "find.f3.next",
+                    f3ProgressClosed && alphabetSelected,
+                    $"progress closed={f3ProgressClosed}, Alphabet selected={alphabetSelected}.");
+
+                // Values search: the value name matches and its row is selected.
+                bool resetForValue = WaitForOwnerEnabled(session) && SelectRunRoot(session, config);
+                bool valueOpened = resetForValue &&
+                    SendAccelerator(session, "CONTROL+KEY_F") &&
+                    driver.WaitForFindOpen();
+                bool preparedValue = valueOpened &&
+                    driver.SetChecked("FindKeys", false) &&
+                    driver.SetChecked("FindValues", true) &&
+                    driver.SetChecked("FindData", false) &&
+                    driver.TypeFindText(ValueHitName);
+                bool valueClicked = preparedValue && driver.Click("DialogPrimary");
+                bool valueFindClosed = valueClicked && driver.WaitForFindClosed();
+                bool valueProgressClosed = valueFindClosed &&
+                    driver.WaitForProgressClosed(TimeSpan.FromSeconds(15));
+                bool valueRowSelected = ControlTestSupport.WaitUntil(
+                    () => ControlTestSupport.IsSelected(
+                        ControlTestSupport.FindRowByName(
+                            session,
+                            ControlTestSupport.ListControl,
+                            ControlType.DataItem,
+                            ValueHitName)),
+                    TimeSpan.FromSeconds(30));
+                Record(
+                    "find.values.hit",
+                    valueFindClosed && valueProgressClosed && valueRowSelected,
+                    $"Find closed={valueFindClosed}, progress closed={valueProgressClosed}, row '{ValueHitName}' selected={valueRowSelected}.");
+
+                // Data search: the value data matches and maps back to its row.
+                bool resetForData = SelectRunRoot(session, config);
+                bool dataOpened = resetForData &&
+                    SendAccelerator(session, "CONTROL+KEY_F") &&
+                    driver.WaitForFindOpen();
+                bool preparedData = dataOpened &&
+                    driver.SetChecked("FindKeys", false) &&
+                    driver.SetChecked("FindValues", false) &&
+                    driver.SetChecked("FindData", true) &&
+                    driver.TypeFindText(DataSearchText);
+                bool dataClicked = preparedData && driver.SendFindKey(VirtualKeyShort.RETURN);
+                bool dataFindClosed = dataClicked && driver.WaitForFindClosed();
+                bool dataProgressClosed = dataFindClosed &&
+                    driver.WaitForProgressClosed(TimeSpan.FromSeconds(15));
+                bool dataRowSelected = ControlTestSupport.WaitUntil(
+                    () => ControlTestSupport.IsSelected(
+                        ControlTestSupport.FindRowByName(
+                            session,
+                            ControlTestSupport.ListControl,
+                            ControlType.DataItem,
+                            DataHitName)),
+                    TimeSpan.FromSeconds(30));
+                Record(
+                    "find.data.hit",
+                    dataFindClosed && dataProgressClosed && dataRowSelected,
+                    $"Find closed={dataFindClosed}, progress closed={dataProgressClosed}, row '{DataHitName}' selected={dataRowSelected}.");
+
+                // Cancel while the progress dialog is open suppresses the hit and restores the owner.
+                bool resetForCancel = SelectRunRoot(session, config);
+                bool cancelOpened = resetForCancel &&
+                    SendAccelerator(session, "CONTROL+KEY_F") &&
+                    driver.WaitForFindOpen();
+                bool preparedCancel = cancelOpened &&
+                    driver.SetChecked("FindKeys", true) &&
+                    driver.SetChecked("FindValues", false) &&
+                    driver.SetChecked("FindData", false) &&
+                    driver.TypeFindText("Alpha");
+                bool cancelClicked = preparedCancel && driver.Click("DialogPrimary");
+                bool cancelProgressOpened = cancelClicked && driver.WaitForProgressOpen();
+                bool cancelForeground = cancelProgressOpened && driver.EnsureProgressForeground();
+                bool cancelInvoked = cancelForeground && driver.Click("DialogSecondary");
+                bool cancelProgressClosed = cancelInvoked && driver.WaitForProgressClosed();
+                bool cancelOwnerRestored = cancelProgressClosed && WaitForOwnerEnabled(session);
+                bool cancelNoHit = cancelOwnerRestored &&
+                    ControlTestSupport.WaitForTreeSelection(session, config.RunId, TimeSpan.FromSeconds(5));
+                bool cancelNoMessage = !driver.MessageOpen;
+                Record(
+                    "find.cancel",
+                    cancelProgressOpened && cancelInvoked && cancelProgressClosed && cancelOwnerRestored &&
+                        cancelNoHit && cancelNoMessage,
+                    $"progress={cancelProgressOpened}, cancel={cancelInvoked}, closed={cancelProgressClosed}, owner={cancelOwnerRestored}, hit suppressed={cancelNoHit}, no message={cancelNoMessage}.");
+
+                // No hit: progress closes, then the classic finished message box appears.
+                bool resetForMiss = SelectRunRoot(session, config);
+                bool missOpened = resetForMiss &&
+                    SendAccelerator(session, "CONTROL+KEY_F") &&
+                    driver.WaitForFindOpen();
+                bool preparedMiss = missOpened &&
+                    driver.SetChecked("FindKeys", true) &&
+                    driver.SetChecked("FindValues", false) &&
+                    driver.SetChecked("FindData", false) &&
+                    driver.TypeFindText(MissingText);
+                bool missClicked = preparedMiss && driver.Click("DialogPrimary");
+                bool missFindClosed = missClicked && driver.WaitForFindClosed();
+                bool missProgressOpened = missFindClosed && driver.WaitForProgressOpen();
+                bool missProgressClosed = missProgressOpened &&
+                    driver.WaitForProgressClosed(TimeSpan.FromSeconds(15));
+                bool missMessage = missProgressClosed && driver.WaitForMessageText(
+                    FinishedMessage,
+                    TimeSpan.FromSeconds(15));
+                string caption = missMessage ? driver.MessageCaption() : "(missing)";
+                Record(
+                    "find.miss.finished",
+                    missFindClosed && missProgressOpened && missProgressClosed && missMessage &&
+                        string.Equals(caption, "Find", StringComparison.Ordinal),
+                    $"Find closed={missFindClosed}, progress={missProgressOpened}, closed={missProgressClosed}, message='{driver.MessageText()}', caption='{caption}'.");
+
+                string finishedShot = missMessage
+                    ? SaveScreenshot(
+                        driver.MessageWindowElement,
+                        Path.Combine(visualDir, "find-finished.png"))
+                    : string.Empty;
+                Record(
+                    "find.visual.finished",
+                    finishedShot.Length > 0,
+                    $"finished screenshot='{finishedShot}'.");
+
+                bool dismissed = missMessage && driver.DismissMessage();
+                Record("find.miss.dismiss", dismissed, $"message dismissed={dismissed}.");
+
+                // A second Find Next with the exhausted query reports the same finished message. No wrap.
+                bool repeatSent = dismissed && SendAccelerator(session, "F3");
+                bool repeatFinished = repeatSent && driver.WaitForMessageText(
+                    FinishedMessage,
+                    TimeSpan.FromSeconds(10));
+                bool repeatCaption = repeatFinished && string.Equals(
+                    driver.MessageCaption(),
+                    "Find",
+                    StringComparison.Ordinal);
+                Record(
+                    "find.miss.noWrap",
+                    repeatFinished && repeatCaption,
+                    $"second finished message={repeatFinished}, caption='{driver.MessageCaption()}'.");
+                _ = driver.DismissMessage();
+
+                // Persist a draft and its flags, then cancel without searching.
+                bool persistOpened = SendAccelerator(session, "CONTROL+KEY_F") &&
+                    driver.WaitForFindOpen();
+                bool persistPrepared = persistOpened &&
+                    driver.SetChecked("FindKeys", false) &&
+                    driver.SetChecked("FindValues", true) &&
+                    driver.SetChecked("FindData", false) &&
+                    driver.SetChecked("FindWholeString", true) &&
+                    driver.SetChecked("FindSubtree", false) &&
+                    driver.TypeFindText(PersistText);
+                bool persistCancel = persistPrepared && driver.Click("DialogSecondary");
+                bool persistClosed = persistCancel && driver.WaitForFindClosed();
+                Record(
+                    "find.persist.draft",
+                    persistPrepared && persistClosed,
+                    $"draft text='{driver.TextOf("FindText")}', Find closed={persistClosed}.");
             }
 
-            // The Edit > Find menu command is wired to the same dialog.
-            bool menuOpened = driver.OpenMenu(513, 662) && driver.WaitForOpen();
-            Record("find.menu.open", menuOpened, $"Edit > Find opened={menuOpened}.");
-            if (menuOpened)
+            AppletFindFlags afterFirstRun = ReadFindFlags();
+            Record(
+                "find.findFlags.notWritten",
+                beforeFindFlags.Equals(afterFirstRun),
+                $"FindFlags before={beforeFindFlags}, after={afterFirstRun}.");
+
+            // Restart the app against the same settings root. The dialog text and flags must return.
+            using (var session = new AppSession(config, config.RegeditExePath, environment: environment))
+            using (var driver = new FindDialogDriver(session))
             {
-                bool menuCancelled = driver.Invoke("DialogSecondary") && driver.WaitForClosed();
-                Record("find.menu.cancelCloses", menuCancelled, $"Cancel closed={menuCancelled}.");
+                _ = ControlTestSupport.NavigateToSandboxKey(session, config);
+
+                bool reopened = SendAccelerator(session, "CONTROL+KEY_F") && driver.WaitForFindOpen();
+                string restoredText = reopened ? driver.TextOf("FindText") : "(missing)";
+                bool restoredFlags = reopened &&
+                    !driver.IsChecked("FindKeys") &&
+                    driver.IsChecked("FindValues") &&
+                    !driver.IsChecked("FindData") &&
+                    driver.IsChecked("FindWholeString") &&
+                    !driver.IsChecked("FindSubtree");
+                Record(
+                    "find.persist.restored",
+                    reopened &&
+                        string.Equals(restoredText, PersistText, StringComparison.Ordinal) &&
+                        restoredFlags,
+                    $"text='{restoredText}', flags restored={restoredFlags}.");
+
+                bool restartClosed = reopened && driver.SendFindKey(VirtualKeyShort.ESCAPE) &&
+                    driver.WaitForFindClosed();
+                Record(
+                    "find.persist.close",
+                    restartClosed,
+                    $"Find closed after restart={restartClosed}.");
             }
 
-            bool controlFOpened = SendAccelerator(session, "CONTROL+KEY_F") && driver.WaitForOpen();
-            Record("find.ctrlF.open", controlFOpened, $"Ctrl+F opened={controlFOpened}.");
-            if (!controlFOpened)
-            {
-                FailIfNeeded();
-                return;
-            }
-
-            // Keys only: the first hit is the Alpha key, the next hit is Alphabet.
-            bool preparedKeys = driver.SetText("FindText", "Alpha") &&
-                driver.SetChecked("FindKeys", true) &&
-                driver.SetChecked("FindValues", false) &&
-                driver.SetChecked("FindData", false) &&
-                driver.SetChecked("FindWholeString", false);
-            Record("find.keys.prepare", preparedKeys, "FindText=Alpha, Keys only.");
-
-            bool entered = preparedKeys && driver.Focus("FindText") && driver.SendEnter();
-            Record("find.keys.enter", entered, $"Enter sent={entered}.");
-            bool alphaStatus = driver.WaitForSearchIdle(TimeSpan.FromSeconds(30));
-            bool alphaSelected = ControlTestSupport.WaitForTreeSelection(
-                session,
-                "Alpha",
-                TimeSpan.FromSeconds(30));
+            AppletFindFlags afterRestart = ReadFindFlags();
             Record(
-                "find.keys.first",
-                alphaStatus && alphaSelected,
-                $"status='{driver.StatusText()}', Alpha selected={alphaSelected}.");
-
-            bool nextClicked = driver.Invoke("DialogPrimary");
-            bool alphabetStatus = nextClicked && driver.WaitForSearchIdle(TimeSpan.FromSeconds(30));
-            bool alphabetSelected = ControlTestSupport.WaitForTreeSelection(
-                session,
-                "Alphabet",
-                TimeSpan.FromSeconds(30));
-            Record(
-                "find.keys.second",
-                alphabetStatus && alphabetSelected,
-                $"status='{driver.StatusText()}', Alphabet selected={alphabetSelected}.");
-
-            // Values only: DataNeedle's value name matches and its list row is selected.
-            bool resetForValue = SelectRunRoot(session, config);
-            Record("find.values.reset", resetForValue, $"run root reselected={resetForValue}.");
-
-            bool preparedValue = driver.SetText("FindText", ValueHitName) &&
-                driver.SetChecked("FindKeys", false) &&
-                driver.SetChecked("FindValues", true) &&
-                driver.SetChecked("FindData", false);
-            bool valueClicked = preparedValue && driver.Invoke("DialogPrimary");
-            bool valueStatus = valueClicked && driver.WaitForSearchIdle(TimeSpan.FromSeconds(30));
-            bool valueRowSelected = ControlTestSupport.WaitUntil(
-                () => ControlTestSupport.IsSelected(
-                    ControlTestSupport.FindRowByName(
-                        session,
-                        ControlTestSupport.ListControl,
-                        ControlType.DataItem,
-                        ValueHitName)),
-                TimeSpan.FromSeconds(30));
-            Record(
-                "find.values.hit",
-                valueStatus && valueRowSelected,
-                $"status='{driver.StatusText()}', row '{ValueHitName}' selected={valueRowSelected}.");
-
-            // Data only: the value data contains the needle text and maps back to its row.
-            bool resetForData = SelectRunRoot(session, config);
-            Record("find.data.reset", resetForData, $"run root reselected={resetForData}.");
-
-            bool preparedData = driver.SetText("FindText", DataSearchText) &&
-                driver.SetChecked("FindKeys", false) &&
-                driver.SetChecked("FindValues", false) &&
-                driver.SetChecked("FindData", true);
-            bool dataClicked = preparedData && driver.Invoke("DialogPrimary");
-            bool dataStatus = dataClicked && driver.WaitForSearchIdle(TimeSpan.FromSeconds(30));
-            bool dataRowSelected = ControlTestSupport.WaitUntil(
-                () => ControlTestSupport.IsSelected(
-                    ControlTestSupport.FindRowByName(
-                        session,
-                        ControlTestSupport.ListControl,
-                        ControlType.DataItem,
-                        DataHitName)),
-                TimeSpan.FromSeconds(30));
-            Record(
-                "find.data.hit",
-                dataStatus && dataRowSelected,
-                $"status='{driver.StatusText()}', row '{DataHitName}' selected={dataRowSelected}.");
-
-            // No hit: the oracle finished message is shown and the dialog stays open.
-            bool resetForMiss = SelectRunRoot(session, config);
-            Record("find.miss.reset", resetForMiss, $"run root reselected={resetForMiss}.");
-
-            bool preparedMiss = driver.SetText("FindText", MissingText) &&
-                driver.SetChecked("FindKeys", true) &&
-                driver.SetChecked("FindValues", false) &&
-                driver.SetChecked("FindData", false);
-            bool missClicked = preparedMiss && driver.Invoke("DialogPrimary");
-            bool finished = missClicked && driver.WaitForStatusText(
-                FinishedMessage,
-                TimeSpan.FromSeconds(30));
-            bool staysOpen = driver.IsOpen;
-            Record(
-                "find.miss.finished",
-                finished && staysOpen,
-                $"status='{driver.StatusText()}', dialog open={staysOpen}.");
-
-            // The finished message is modal to the Find dialog, so it is dismissed with OK before Find Next again.
-            Keyboard.Type(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
-            bool dismissed = ControlTestSupport.WaitUntil(() => driver.StatusText() != FinishedMessage, TimeSpan.FromSeconds(10));
-            bool missAgain = dismissed && driver.Invoke("DialogPrimary") && driver.WaitForStatusText(
-                FinishedMessage,
-                TimeSpan.FromSeconds(10));
-            Record(
-                "find.miss.noWrap",
-                missAgain,
-                $"second Find Next status='{driver.StatusText()}'.");
-
-            bool cancelClosed = driver.Invoke("DialogSecondary") && driver.WaitForClosed();
-            Record("find.miss.cancelCloses", cancelClosed, $"Cancel closed={cancelClosed}.");
-
-            // Reopening restores the text and flags from the in-memory settings.
-            bool reopened = SendAccelerator(session, "CONTROL+KEY_F") && driver.WaitForOpen();
-            string restoredText = reopened ? driver.TextOf("FindText") : "(missing)";
-            bool restoredFlags = reopened &&
-                driver.IsChecked("FindKeys") &&
-                !driver.IsChecked("FindValues") &&
-                !driver.IsChecked("FindData");
-            Record(
-                "find.reopen.restored",
-                reopened && string.Equals(restoredText, MissingText, StringComparison.Ordinal) && restoredFlags,
-                $"text='{restoredText}', keys/values/data restored={restoredFlags}.");
-
-            bool escapeSent = reopened && driver.Focus("FindText") && driver.SendEscape();
-            bool escapeClosed = escapeSent && driver.WaitForClosed();
-            Record(
-                "find.escape.closes",
-                escapeClosed,
-                $"Escape sent={escapeSent}, closed={escapeClosed}.");
-
-            // F3 repeats the last completed query from the last hit.
-            bool f3Reopened = SendAccelerator(session, "CONTROL+KEY_F") && driver.WaitForOpen();
-            bool f3Prepared = f3Reopened &&
-                driver.SetText("FindText", "Alpha") &&
-                driver.SetChecked("FindKeys", true) &&
-                driver.SetChecked("FindValues", false) &&
-                driver.SetChecked("FindData", false);
-            bool f3First = f3Prepared && driver.Invoke("DialogPrimary") &&
-                ControlTestSupport.WaitForTreeSelection(session, "Alpha", TimeSpan.FromSeconds(30));
-            Record("find.f3.prepare", f3First, $"Alpha selected={f3First}.");
-            bool f3Cancelled = driver.Invoke("DialogSecondary") && driver.WaitForClosed();
-            Record("find.f3.cancel", f3Cancelled, $"Cancel closed={f3Cancelled}.");
-
-            bool f3Sent = f3Cancelled && FocusRunRootRow(session, config) &&
-                SendAccelerator(session, "F3");
-            bool f3Next = f3Sent && ControlTestSupport.WaitForTreeSelection(
-                session,
-                "Alphabet",
-                TimeSpan.FromSeconds(30));
-            Record(
-                "find.f3.next",
-                f3Next,
-                $"F3 sent={f3Sent}, Alphabet selected={f3Next}.");
-
-            FailIfNeeded();
+                "find.findFlags.notWrittenAfterRestart",
+                beforeFindFlags.Equals(afterRestart),
+                $"FindFlags before={beforeFindFlags}, after={afterRestart}.");
         }
         finally
         {
             ControlTestSupport.CleanupRegistry(config);
         }
+
+        FailIfNeeded();
     }
 
     private static SandboxRegistry SeedSandbox(E2EConfig config)
@@ -264,7 +425,7 @@ public sealed class FindTests
 
         using (var root = sandbox.CreateSubKey(string.Empty))
         {
-            root.SetValue(RunRootDataValue, "alpha value", RegistryValueKind.String);
+            root.SetValue("AlphaValue", "alpha value", RegistryValueKind.String);
             root.SetValue(ValueHitName, "needle", RegistryValueKind.String);
             root.SetValue(
                 "MultiNeedle",
@@ -290,12 +451,12 @@ public sealed class FindTests
     }
 
     /// <summary>
-    /// Selects Beta and then the run root. The two selections force DetailsList.SetRows, which
-    /// clears any selected value row so the next search starts at the run key name.
+    /// Selects Beta and then the run root with real mouse clicks. The two selections force
+    /// DetailsList.SetRows, which clears any selected value row so the next search starts at the key.
     /// </summary>
     private static bool SelectRunRoot(AppSession session, E2EConfig config)
     {
-        if (!ControlTestSupport.WaitForTreeSelection(session, "Beta", TimeSpan.FromMilliseconds(250)))
+        if (!ClickTreeRow(session, "Beta"))
         {
             var beta = ControlTestSupport.FindRowByName(
                 session,
@@ -306,23 +467,16 @@ public sealed class FindTests
             _ = ControlTestSupport.WaitForTreeSelection(session, "Beta");
         }
 
-        var runRoot = ControlTestSupport.FindRowByName(
-            session,
-            ControlTestSupport.TreeControl,
-            ControlType.TreeItem,
-            config.RunId);
-        ControlTestSupport.Select(runRoot);
-        return ControlTestSupport.WaitForTreeSelection(session, config.RunId);
+        return ClickTreeRow(session, config.RunId);
     }
 
-    /// <summary>Gives the main window keyboard focus before an accelerator is sent.</summary>
-    private static bool FocusRunRootRow(AppSession session, E2EConfig config)
+    private static bool ClickTreeRow(AppSession session, string name)
     {
-        var row = ControlTestSupport.FindRowByName(
+        AutomationElement? row = ControlTestSupport.FindRowByName(
             session,
             ControlTestSupport.TreeControl,
             ControlType.TreeItem,
-            config.RunId);
+            name);
         if (row is null)
         {
             return false;
@@ -337,8 +491,11 @@ public sealed class FindTests
             return false;
         }
 
-        return ControlTestSupport.WaitForTreeSelection(session, config.RunId);
+        return ControlTestSupport.WaitForTreeSelection(session, name);
     }
+
+    private static bool WaitForOwnerEnabled(AppSession session) =>
+        ControlTestSupport.WaitUntil(() => session.IsEnabled, TimeSpan.FromSeconds(5));
 
     private static bool SendAccelerator(AppSession session, string key)
     {
@@ -354,6 +511,25 @@ public sealed class FindTests
         }
     }
 
+    private static string SaveScreenshot(AutomationElement? window, string path)
+    {
+        if (window is null)
+        {
+            E2EResults.Record("find.screenshot", false, $"No window to capture for '{path}'.");
+            return string.Empty;
+        }
+
+        try
+        {
+            return ClassicDialogTests.SaveScreenshot(window, path);
+        }
+        catch (Exception ex)
+        {
+            E2EResults.Record("find.screenshot", false, $"'{path}' failed: {ex.Message}");
+            return string.Empty;
+        }
+    }
+
     private static string CreateFreshDataRoot(E2EConfig config, string scope)
     {
         string path = config.DataRootFor(scope);
@@ -364,6 +540,17 @@ public sealed class FindTests
 
         Directory.CreateDirectory(path);
         return path;
+    }
+
+    private static AppletFindFlags ReadFindFlags()
+    {
+        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(
+            @"Software\Microsoft\Windows\CurrentVersion\Applets\Regedit",
+            writable: false);
+        object? value = key?.GetValue("FindFlags");
+        return value is int flags
+            ? new AppletFindFlags(true, flags)
+            : new AppletFindFlags(false, 0);
     }
 
     private static void Record(string id, bool pass, string notes) =>
@@ -378,11 +565,13 @@ public sealed class FindTests
             $"Find checks failed:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
     }
 
+    private readonly record struct AppletFindFlags(bool Present, int Value);
+
     /// <summary>
-    /// Finds the modal Find controls and the real dialog HWND. UIA reports the owned dialog's
-    /// contents under the main window element and reports the main HWND as the window handle, so
-    /// keyboard input must use the Win32 Find window found by title. The UIA root stays the main
-    /// window handle that carries DialogRoot and the dialog controls.
+    /// Drives the modal Find dialog, the progress dialog, and the finished message box. Each dialog
+    /// is found by a control id that only it has, so the shared "Find" caption is not ambiguous.
+    /// Keyboard input goes to the real Find HWND and every keyboard or mouse action checks that its
+    /// window is foreground first.
     /// </summary>
     private sealed class FindDialogDriver : IDisposable
     {
@@ -390,8 +579,9 @@ public sealed class FindTests
 
         private readonly AppSession _session;
         private readonly UIA3Automation _automation;
-        private nint _uiHwnd;
-        private nint _dialogHwnd;
+        private nint _findHwnd;
+        private nint _progressHwnd;
+        private nint _messageHwnd;
 
         internal FindDialogDriver(AppSession session)
         {
@@ -399,166 +589,146 @@ public sealed class FindTests
             _automation = new UIA3Automation();
         }
 
-        internal bool IsOpen => FindWin32DialogWindow() != 0;
+        internal bool FindOpen => FindWindowNow("FindText") is not null;
 
-        internal bool WaitForOpen(TimeSpan? timeout = null)
+        internal bool MessageOpen => FindWindowNow("DialogMessage") is not null;
+
+        internal AutomationElement? FindWindowElement =>
+            ElementForHandle(_findHwnd) ?? FindWindowNow("FindText");
+
+        internal AutomationElement? ProgressWindowElement =>
+            ElementForHandle(_progressHwnd) ?? FindWindowNow("FindProgressText");
+
+        internal AutomationElement? MessageWindowElement =>
+            ElementForHandle(_messageHwnd) ?? FindWindowNow("DialogMessage");
+
+        internal bool WaitForFindOpen(TimeSpan? timeout = null)
         {
-            Window? found = null;
-            _ = ControlTestSupport.WaitUntil(
-                () => (found = FindDialogWindow()) is not null,
-                timeout ?? UiTimeout);
-
+            AutomationElement? found = WaitForWindow("FindText", timeout ?? UiTimeout);
             if (found is null)
             {
                 return false;
             }
 
-            _uiHwnd = found.Properties.NativeWindowHandle.Value;
-            _dialogHwnd = FindWin32DialogWindow();
-            if (_dialogHwnd == 0)
+            _findHwnd = FindWin32DialogWindow();
+            if (_findHwnd == 0)
             {
-                _ = ControlTestSupport.WaitUntil(
-                    () => (_dialogHwnd = FindWin32DialogWindow()) != 0,
-                    timeout ?? UiTimeout);
+                _findHwnd = HwndOf(found);
             }
 
-            if (_dialogHwnd == 0)
-            {
-                _dialogHwnd = _uiHwnd;
-            }
-
-            _ = WaitForElement("FindText", UiTimeout);
-            return _uiHwnd != 0;
+            return WaitForElement("FindText", UiTimeout) is not null && _findHwnd != 0;
         }
 
-        internal bool WaitForClosed(TimeSpan? timeout = null) =>
+        internal bool WaitForFindClosed(TimeSpan? timeout = null) =>
             ControlTestSupport.WaitUntil(
-                () => FindDialogWindow() is null && FindWin32DialogWindow() == 0,
+                () => FindWindowNow("FindText") is null,
                 timeout ?? TimeSpan.FromSeconds(10));
 
-        internal bool OpenMenu(params int[] commandIds)
+        internal bool WaitForProgressOpen(TimeSpan? timeout = null)
         {
-            if (!ControlTestSupport.EnsureForeground(_session))
+            AutomationElement? found = WaitForWindow("FindProgressText", timeout ?? UiTimeout);
+            if (found is null)
             {
                 return false;
             }
 
-            foreach (int commandId in commandIds)
+            _progressHwnd = FindWin32DialogWindow();
+            if (_progressHwnd == 0)
             {
-                AutomationElement? element = WaitForElementAcrossWindows(
-                    "MenuCommand_" + commandId,
-                    UiTimeout);
-                if (element is null)
-                {
-                    return false;
-                }
-
-                try
-                {
-                    if (element.Patterns.Invoke.IsSupported)
-                    {
-                        element.Patterns.Invoke.Pattern.Invoke();
-                    }
-                    else
-                    {
-                        element.Click();
-                    }
-                }
-                catch (Exception)
-                {
-                    try
-                    {
-                        element.Click();
-                    }
-                    catch (Exception)
-                    {
-                        return false;
-                    }
-                }
+                _progressHwnd = HwndOf(found);
             }
 
-            return true;
+            return WaitForElement("FindProgressText", UiTimeout) is not null;
         }
 
-        internal bool SetText(string automationId, string text)
+        internal bool WaitForProgressClosed(TimeSpan? timeout = null) =>
+            ControlTestSupport.WaitUntil(
+                () => FindWindowNow("FindProgressText") is null,
+                timeout ?? TimeSpan.FromSeconds(10));
+
+        internal bool WaitForMessageText(string expected, TimeSpan timeout)
         {
-            AutomationElement? element = WaitForElement(automationId, UiTimeout);
-            if (element is null)
+            AutomationElement? found = null;
+            bool matched = ControlTestSupport.WaitUntil(
+                () =>
+                {
+                    found = FindWindowNow("DialogMessage");
+                    return found is not null &&
+                        string.Equals(MessageElementText(found), expected, StringComparison.Ordinal);
+                },
+                timeout);
+            if (!matched || found is null)
+            {
+                return false;
+            }
+
+            _messageHwnd = FindWin32DialogWindow();
+            if (_messageHwnd == 0)
+            {
+                _messageHwnd = HwndOf(found);
+            }
+
+            return _messageHwnd != 0;
+        }
+
+        internal string MessageText()
+        {
+            AutomationElement? message = FindWindowNow("DialogMessage");
+            return message is null ? string.Empty : MessageElementText(message);
+        }
+
+        internal string MessageCaption()
+        {
+            if (_messageHwnd == 0 || !Win32.IsWindow(_messageHwnd))
+            {
+                return string.Empty;
+            }
+
+            var title = new StringBuilder(128);
+            _ = GetWindowText(_messageHwnd, title, title.Capacity);
+            return title.ToString();
+        }
+
+        internal string ProgressText()
+        {
+            AutomationElement? text = WaitForElement("FindProgressText", UiTimeout);
+            return text is null ? string.Empty : ControlTestSupport.SafeName(text);
+        }
+
+        internal bool DismissMessage()
+        {
+            AutomationElement? message = FindWindowNow("DialogMessage");
+            if (message is null)
+            {
+                return false;
+            }
+
+            AutomationElement? button = FindInWindow(message, "DialogPrimary");
+            if (button is null || !EnsureWindowForeground(_messageHwnd))
             {
                 return false;
             }
 
             try
             {
-                element.AsTextBox().Text = text;
-                return true;
+                button.Click();
             }
             catch (Exception)
             {
                 return false;
             }
+
+            return ControlTestSupport.WaitUntil(
+                () => FindWindowNow("DialogMessage") is null,
+                TimeSpan.FromSeconds(10));
         }
 
-        internal bool Focus(string automationId)
-        {
-            AutomationElement? element = WaitForElement(automationId, UiTimeout);
-            if (element is null)
-            {
-                return false;
-            }
-
-            try
-            {
-                element.Focus();
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        internal bool SetChecked(string automationId, bool isChecked)
-        {
-            AutomationElement? element = WaitForElement(automationId, UiTimeout);
-            if (element is null)
-            {
-                return false;
-            }
-
-            try
-            {
-                if (element.Patterns.Toggle.IsSupported &&
-                    element.Patterns.Toggle.Pattern.ToggleState.Value is { } state)
-                {
-                    bool current = state == ToggleState.On;
-                    if (current != isChecked)
-                    {
-                        element.Patterns.Toggle.Pattern.Toggle();
-                    }
-
-                    return true;
-                }
-            }
-            catch (Exception)
-            {
-                // Fall back to a click.
-            }
-
-            try
-            {
-                element.Click();
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
+        internal bool ControlPresent(string automationId) =>
+            WaitForElement(automationId, TimeSpan.FromSeconds(1)) is not null;
 
         internal bool IsChecked(string automationId)
         {
-            AutomationElement? element = FindElement(automationId);
+            AutomationElement? element = WaitForElement(automationId, TimeSpan.FromSeconds(1));
             if (element is null)
             {
                 return false;
@@ -574,47 +744,33 @@ public sealed class FindTests
             }
             catch (Exception)
             {
-                // Fall through to invalid.
+                // Fall through to false.
             }
 
             return false;
         }
 
-        internal bool Invoke(string automationId)
+        internal bool IsOffscreen(string automationId)
         {
-            AutomationElement? element = WaitForElement(automationId, UiTimeout);
+            AutomationElement? element = WaitForElement(automationId, TimeSpan.FromSeconds(1));
             if (element is null)
             {
-                return false;
-            }
-
-            try
-            {
-                if (element.Patterns.Invoke.IsSupported)
-                {
-                    element.Patterns.Invoke.Pattern.Invoke();
-                    return true;
-                }
-            }
-            catch (Exception)
-            {
-                // Fall back to a click.
-            }
-
-            try
-            {
-                element.Click();
                 return true;
             }
+
+            try
+            {
+                return element.Properties.IsOffscreen.Value;
+            }
             catch (Exception)
             {
-                return false;
+                return true;
             }
         }
 
         internal string TextOf(string automationId)
         {
-            AutomationElement? element = FindElement(automationId);
+            AutomationElement? element = WaitForElement(automationId, TimeSpan.FromSeconds(1));
             if (element is null)
             {
                 return string.Empty;
@@ -629,7 +785,7 @@ public sealed class FindTests
             }
             catch (Exception)
             {
-                // TextBlock exposes its text as Name.
+                // The element has no value pattern.
             }
 
             try
@@ -642,124 +798,141 @@ public sealed class FindTests
             }
         }
 
-        /// <summary>
-        /// The classic Find dialog has no status line. A finished search is a message box, so its text is
-        /// the status. A status line, when present, is read as before.
-        /// </summary>
-        internal string StatusText()
+        internal bool SetChecked(string automationId, bool isChecked)
         {
-            AutomationElement? message = FindAcrossWindows("DialogMessage");
-            if (message is not null)
+            if (WaitForChecked(automationId, isChecked, TimeSpan.FromMilliseconds(300)))
             {
-                return ControlTestSupport.SafeName(message);
+                return true;
             }
 
-            return TextOf("FindStatus");
+            return Click(automationId) &&
+                WaitForChecked(automationId, isChecked, TimeSpan.FromSeconds(3));
         }
 
-        /// <summary>A hit leaves the dialog open with Find Next enabled again; the search is idle when it is.</summary>
-        internal bool WaitForSearchIdle(TimeSpan timeout) =>
+        internal bool WaitForChecked(string automationId, bool expected, TimeSpan? timeout = null) =>
             ControlTestSupport.WaitUntil(
-                () => FindElement("DialogPrimary") is { IsEnabled: true },
-                timeout);
+                () => IsChecked(automationId) == expected,
+                timeout ?? TimeSpan.FromSeconds(3));
 
-        internal bool WaitForStatus(string fragment, TimeSpan timeout) =>
-            ControlTestSupport.WaitUntil(
-                () => StatusText().Contains(fragment, StringComparison.Ordinal),
-                timeout);
-
-        internal bool WaitForStatusText(string expected, TimeSpan timeout) =>
-            ControlTestSupport.WaitUntil(
-                () => string.Equals(StatusText(), expected, StringComparison.Ordinal),
-                timeout);
-
-        internal bool SendEnter() => SendVirtualKey(VirtualKeyShort.RETURN);
-
-        internal bool SendEscape() => SendVirtualKey(VirtualKeyShort.ESCAPE);
-
-        public void Dispose()
+        internal bool TypeFindText(string text)
         {
-            _automation.Dispose();
-        }
-
-        private bool SendVirtualKey(VirtualKeyShort key)
-        {
-            if (_dialogHwnd == 0 || !Win32.IsWindow(_dialogHwnd))
+            AutomationElement? edit = WaitForElement("FindText", UiTimeout);
+            if (edit is null || !EnsureFindForeground())
             {
                 return false;
             }
 
-            if (!Win32.IsForeground(_dialogHwnd))
+            try
             {
-                _ = Win32.ShowWindow(_dialogHwnd, Win32.SwRestore);
-                _ = Win32.SetForegroundWindow(_dialogHwnd);
+                edit.Click();
+            }
+            catch (Exception)
+            {
+                return false;
             }
 
-            if (!ControlTestSupport.WaitUntil(
-                () => Win32.IsForeground(_dialogHwnd),
-                TimeSpan.FromSeconds(2)))
-            {
-                // SetForegroundWindow can be refused while the owner is disabled. A click on the
-                // edit is the activation fallback that always works on the interactive desktop.
-                AutomationElement? edit = FindElement("FindText");
-                if (edit is null)
-                {
-                    return false;
-                }
+            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
+            Keyboard.Type(text);
+            return ControlTestSupport.WaitUntil(
+                () => string.Equals(TextOf("FindText"), text, StringComparison.Ordinal),
+                TimeSpan.FromSeconds(3));
+        }
 
+        internal bool Click(string automationId)
+        {
+            AutomationElement? element = WaitForElement(automationId, UiTimeout);
+            if (element is null)
+            {
+                return false;
+            }
+
+            nint hwnd = HwndOfWindow(element);
+            if (!EnsureWindowForeground(hwnd))
+            {
+                return false;
+            }
+
+            try
+            {
+                element.Click();
+                return true;
+            }
+            catch (Exception)
+            {
                 try
                 {
-                    edit.Click();
+                    if (element.Patterns.Invoke.IsSupported)
+                    {
+                        element.Patterns.Invoke.Pattern.Invoke();
+                        return true;
+                    }
                 }
                 catch (Exception)
                 {
-                    return false;
+                    // The control is gone.
                 }
 
-                if (!ControlTestSupport.WaitUntil(
-                    () => Win32.IsForeground(_dialogHwnd),
-                    TimeSpan.FromSeconds(2)))
-                {
-                    return false;
-                }
+                return false;
+            }
+        }
+
+        internal bool SendFindKey(VirtualKeyShort key)
+        {
+            if (!EnsureFindForeground())
+            {
+                return false;
             }
 
             Keyboard.Press(key);
             return true;
         }
 
+        internal bool SendAltMnemonic(char letter)
+        {
+            if (!EnsureFindForeground())
+            {
+                return false;
+            }
+
+            Keyboard.TypeSimultaneously(
+                VirtualKeyShort.ALT,
+                (VirtualKeyShort)char.ToUpperInvariant(letter));
+            return true;
+        }
+
+        internal bool EnsureFindForeground() => EnsureWindowForeground(_findHwnd);
+
+        internal bool EnsureProgressForeground() => EnsureWindowForeground(_progressHwnd);
+
+        public void Dispose()
+        {
+            _automation.Dispose();
+        }
+
+        private static bool EnsureWindowForeground(nint hwnd)
+        {
+            if (hwnd == 0 || !Win32.IsWindow(hwnd))
+            {
+                return false;
+            }
+
+            return Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(3)) && Win32.IsForeground(hwnd);
+        }
+
         private AutomationElement? WaitForElement(string automationId, TimeSpan timeout)
         {
             AutomationElement? result = null;
             _ = ControlTestSupport.WaitUntil(
-                () => (result = FindElement(automationId)) is not null,
+                () => (result = FindAcrossWindows(automationId)) is not null,
                 timeout);
             return result;
         }
 
-        private AutomationElement? FindElement(string automationId)
-        {
-            if (_uiHwnd == 0 || !Win32.IsWindow(_uiHwnd))
-            {
-                return null;
-            }
-
-            try
-            {
-                var window = _automation.FromHandle(_uiHwnd).AsWindow();
-                return window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
-            }
-            catch (Exception)
-            {
-                return null;
-            }
-        }
-
-        private AutomationElement? WaitForElementAcrossWindows(string automationId, TimeSpan timeout)
+        private AutomationElement? WaitForWindow(string automationId, TimeSpan timeout)
         {
             AutomationElement? result = null;
             _ = ControlTestSupport.WaitUntil(
-                () => (result = FindAcrossWindows(automationId)) is not null,
+                () => (result = FindWindowNow(automationId)) is not null,
                 timeout);
             return result;
         }
@@ -779,8 +952,7 @@ public sealed class FindTests
                             continue;
                         }
 
-                        AutomationElement? found = window.FindFirstDescendant(
-                            cf => cf.ByAutomationId(automationId));
+                        AutomationElement? found = FindInWindow(window, automationId);
                         if (found is not null)
                         {
                             return found;
@@ -798,6 +970,101 @@ public sealed class FindTests
             }
 
             return null;
+        }
+
+        private AutomationElement? FindWindowNow(string automationId)
+        {
+            try
+            {
+                AutomationElement desktop = _automation.GetDesktop();
+                foreach (AutomationElement window in desktop.FindAllChildren(
+                    cf => cf.ByControlType(ControlType.Window)))
+                {
+                    try
+                    {
+                        if (window.Properties.ProcessId.Value != _session.ProcessId)
+                        {
+                            continue;
+                        }
+
+                        if (FindInWindow(window, automationId) is not null)
+                        {
+                            return window;
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // A window that disappeared during enumeration is skipped.
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // UIA can throw while a window is created or destroyed.
+            }
+
+            return null;
+        }
+
+        private static AutomationElement? FindInWindow(AutomationElement window, string automationId)
+        {
+            try
+            {
+                return window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        private static string MessageElementText(AutomationElement window)
+        {
+            AutomationElement? message = FindInWindow(window, "DialogMessage");
+            return message is null ? string.Empty : ControlTestSupport.SafeName(message);
+        }
+
+        private AutomationElement? ElementForHandle(nint hwnd)
+        {
+            if (hwnd == 0 || !Win32.IsWindow(hwnd))
+            {
+                return null;
+            }
+
+            try
+            {
+                return _automation.FromHandle(hwnd);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        private nint HwndOf(AutomationElement element)
+        {
+            try
+            {
+                AutomationElement window = ClassicDialogTests.WindowOf(element);
+                return (nint)window.Properties.NativeWindowHandle.Value;
+            }
+            catch (Exception)
+            {
+                return 0;
+            }
+        }
+
+        private nint HwndOfWindow(AutomationElement element)
+        {
+            nint hwnd = HwndOf(element);
+            if (hwnd == 0 || hwnd == _session.MainHwnd)
+            {
+                // UIA can report the owned dialog content under the main window element. The real
+                // modal HWND carries the shared "Find" caption and is the window that takes input.
+                hwnd = FindWin32DialogWindow();
+            }
+
+            return hwnd;
         }
 
         private nint FindWin32DialogWindow()
@@ -833,42 +1100,6 @@ public sealed class FindTests
             }
 
             return found;
-        }
-
-        private Window? FindDialogWindow()
-        {
-            try
-            {
-                AutomationElement desktop = _automation.GetDesktop();
-                foreach (AutomationElement window in desktop.FindAllChildren(
-                    cf => cf.ByControlType(ControlType.Window)))
-                {
-                    try
-                    {
-                        if (window.Properties.ProcessId.Value != _session.ProcessId)
-                        {
-                            continue;
-                        }
-
-                        AutomationElement? root = window.FindFirstDescendant(
-                            cf => cf.ByAutomationId("DialogRoot"));
-                        if (root is not null)
-                        {
-                            return window.AsWindow();
-                        }
-                    }
-                    catch (Exception)
-                    {
-                        // A window that disappeared during enumeration is skipped.
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                // UIA can throw while a window is created or destroyed.
-            }
-
-            return null;
         }
 
         private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);

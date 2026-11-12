@@ -1,101 +1,102 @@
 # Find UI failure modes
 
-Scope: `src/Bwc.UI/Dialogs/FindDialog.cs`, the Find and Find Next commands in
-`src/Bwc.Regedit/Commands/RegeditMenu.cs`, and the search wiring in
-`src/Bwc.Regedit/RegeditRootView.xaml.cs`. Persisted Find state lives in
+Scope: `src/Bwc.UI/Dialogs/FindDialog.cs`, `src/Bwc.UI/Dialogs/FindProgressDialog.cs`, the Find
+and Find Next commands in `src/Bwc.Regedit/Commands/RegeditMenu.cs`, the wiring in
+`src/Bwc.Regedit/Controllers/FindController.cs`, and the persisted Find state in
 `src/Bwc.Regedit/Registry/RegeditSettings.cs`.
 
-The dialog follows the oracle layout rows DLG-010 to DLG-012 and DLG-017/018. The engine contract is
-`docs/contracts/registry-engine.md` under `Find`; the inventory rows are BEH-039 to BEH-042,
-DLG-010 to DLG-012, DLG-017/018, ACC-004, ACC-010, BEH-003, OQ-10, and OQ-11.
+The dialogs follow the oracle layout rows DLG-010 to DLG-012 (Find, RT_DIALOG 106) and DLG-017/018
+(progress, RT_DIALOG 109). The engine contract is `docs/contracts/registry-engine.md` under `Find`;
+the inventory rows are BEH-039 to BEH-042, DLG-010 to DLG-012, DLG-017/018, ACC-004, ACC-010,
+BEH-003, OQ-10, and OQ-11.
 
-The dialog exposes `FindText`, `FindKeys`, `FindValues`, `FindData`, `FindWholeString`,
-`FindSubtree`, `FindStatus`, `DialogPrimary`, and `DialogSecondary` automation ids. The primary
-button is `Find Next` and never closes the dialog. The secondary button is `Cancel`, cancels the
-running search, and closes. Enter invokes Find Next; Escape cancels and closes. The dialog reads no
-hard-coded colors: the base dialog supplies the themed background and the validation brush comes
-from `SystemFillColorCriticalBrush`.
+## 1. Classic two-dialog sequence
 
-## 1. Background search and cancellation
+The Find dialog has the template 106 geometry and controls: the find-what edit, Keys, Values, Data,
+Match whole string only, Search in subtree, Find Next, and Cancel. It is built by `ClassicDialog`
+from `ClassicDialogTemplates.Find`, so the controls sit at the template rectangles in template
+order. Search in subtree is visible and checked by default, matching the oracle capture. There are
+no BWC-only options.
 
-`RegeditRootView` builds a `RegistryFindQuery`, then runs `RegistryFinder.Find` inside
-`Task.Run` with a `CancellationTokenSource` owned by the dialog request. The UI thread only
-formats text and updates controls after the awaited task completes. A search never calls the
-engine on the dispatcher thread.
+Find Next validates the text and the look-at flags, accepts, and closes the Find dialog immediately.
+The controller then opens `FindProgressDialog` (template 109, 170 x 64 DLU, Cancel is the default
+button) and starts `RegistryFinder.Find` on the thread pool. The progress dialog closes when the
+search completes. The hit is applied only after the progress dialog has closed. The Find dialog is
+not reopened. Cancel and the close box cancel the engine token, close the progress dialog, restore
+the owner, and leave the selection unchanged.
 
-Each Find Next request creates a new token source. Starting a second search cancels the first, so
-a late result from the older search cannot overwrite a newer hit or status. When the dialog closes,
-its `Closed` handler cancels the current token. The command catches `OperationCanceledException`
-and leaves the selection, the list, and `LastKey` unchanged. A cancelled request is not an error and
-does not show a dialog.
+The first Find Next with no previous query opens the Find dialog. F3 and Edit > Find Next with a
+previous query start the search directly and never show the Find dialog during the search.
 
-The Find Next button is disabled from the moment a request starts until the host calls
-`CompleteSearch`, `ShowFinished`, or `ShowSearchError`. Cancel stays enabled while a search runs so
-a scan of a large subtree can always be stopped. If the engine throws
-`RegistryOperationException` because a root cannot be enumerated, the view logs a warning and
-shows the failure in `FindStatus`; the application does not crash.
+## 2. Progress visibility and cancellation
 
-## 2. No wrap
+The progress dialog is modal to the main window. Its only button is Cancel (id 2), which is also the
+default button, so Enter, Escape, and the close box all take the cancel path. The host completes the
+dialog only after the engine task finishes; the dialog itself never closes on a timer.
 
-The search continues after the last hit and never wraps. When `RegistryFinder.Find` returns null,
-the dialog shows the oracle string `Finished searching through the registry.` and stays open. A
-second Find Next with the same query reuses the same exhausted cursor and reports the same message
-again instead of restarting at the first root. That avoids circular hit sequences when the only
-match is the current position.
+The progress dialog is held for a minimum time so the two-window sequence is not a single-frame
+flash. In the ship build the floor is 250 ms. In the E2E flavor it is 2000 ms so UI Automation can
+observe the dialog and a test can cancel it. The floor does not delay the engine: the search runs
+while the dialog is visible and both the result and the floor must finish before the dialog closes.
 
-The dialog keeps the last hit after the completed search. Pressing Find Next after the finished
-message does not silently start over. The user starts a new search by changing the text or the
-look-at flags, which resets the exhausted state and starts from the current selection.
+A cancel during the floor, including after the engine has already produced a hit, suppresses the
+hit. The controller checks the dialog's cancel state and the token before it applies anything. A late
+result from a cancelled search can never overwrite a newer hit because only one modal search can be
+in flight and the owner is disabled.
 
-## 3. Selection start
+## 3. No wrap
 
-A new search starts after the current selection, matching BEH-039. When the value list has at
-least one selected row, the cursor is `RegistryFindCursor.FromValueSelection` with the selected
-key's display path and the raw registry value name recovered from
+The search continues after the last hit and never wraps. When `RegistryFinder.Find` returns null, the
+controller records the query as exhausted and clears the last hit, then shows the classic message box
+`Finished searching through the registry.` with the caption `Find` after the progress dialog has
+closed. The selection stays where it was.
+
+A second Find Next with the same exhausted query shows the same finished message and does not start
+again from the current selection. The exhausted state is reset when the query text or look-at flags
+change.
+
+## 4. Selection start
+
+A new search starts after the current selection, matching BEH-039. When the value list has at least
+one selected row, the cursor is `RegistryFindCursor.FromValueSelection` with the selected key's
+display path and the raw registry value name recovered from
 `RegistryValueSource.RawNamesByName`. The raw name is required because the list shows `(Default)`
-for the empty name. When no value is selected, the cursor is
-`RegistryFindCursor.FromKeySelection` for the selected tree key. The virtual `Computer` node has
-no registry path, so a search started there uses no cursor and begins at the configured roots.
+for the empty name. When no value is selected, the cursor is `RegistryFindCursor.FromKeySelection`
+for the selected tree key. The virtual `Computer` node has no registry path, so a search started
+there uses no cursor and begins at the configured roots.
 
 A selection on a value whose data was already read is skipped completely, including that value's
 name and data. A selection on a key lets the search see that key's values and descendants but not
 its own name. This is the engine's documented interpretation of "after the current selection" and
 remains provisional against the oracle.
 
-## 4. Find Next with no prior search
+## 5. Find Next cases
 
 `FindNext` has three cases:
 
 1. A previous query exists and a hit was recorded: continue with
    `RegistryFindCursor.FromHit` through `RegistryFinder.FindNext` semantics.
-2. A previous query exists but no hit was recorded, because the last search ended at the
-   finished message: show the finished message without searching again.
+2. A previous query exists but no hit was recorded, because the last search ended at the finished
+   message: show the finished message without searching again.
 3. No previous query exists: open the Find dialog with the persisted text and flags. The user
-   chooses the first search explicitly. This avoids an invisible search that starts from an
-   unrelated selection.
+   chooses the first search explicitly.
 
-F3 while the Find dialog is open is treated as Find Next inside the dialog. The owner window is
-disabled by the modal, so the shell accelerator cannot fire twice.
+F3 while the Find dialog is open is handled by the dialog and is equivalent to pressing Find Next.
+The owner is disabled by the modal, so the shell accelerator cannot fire twice.
 
-## 5. Status and progress
+## 6. Finished and error messages
 
-`FindStatus` shows three search states:
+`FindController` uses `ClassicMessageBox` with the caption `Find` for the finished text and for an
+engine or no-scope failure. The finished text is exactly the oracle string
+`Finished searching through the registry.` with the information icon. A failure uses the error icon
+and the mapped resource text. Message boxes are shown after the progress dialog has closed, so the
+owner is enabled and the message is owned by the main window.
 
-- `Searching...` after Find Next starts and before the task completes.
-- `Found: <display text>` after a hit. The text is `RegistryFindHit.DisplayText`, the same
-  key/value rendering the engine uses for logs.
-- `Finished searching through the registry.` when no hit remains.
+The Find dialog itself uses a classic message box for its two validations and stays open: empty text
+and all of Keys, Values, and Data unchecked. These are the only cases where Find Next does not close
+the dialog.
 
-Validation text and an engine failure message use the same status block but replace these states
-while the dialog stays open.
-
-The status text is a plain `TextBlock` with `AutomationId="FindStatus"` so UIA and the E2E test can
-read it. The dialog does not use the separate progress dialog (DLG-017/018). The contract allows
-the progress dialog, but keeping the status in the Find window avoids a second modal owned window
-and keeps Cancel in one place. This is a declared difference from the classic two-window sequence.
-It is recorded here rather than as a silent omission.
-
-## 6. Value data row mapping
+## 7. Value data row mapping
 
 A value-name hit and a value-data hit both resolve to the key and then to one list row. The row
 display name comes from `RegistryValueDisplay.FormatName(hit.ValueName)`, so the empty registry
@@ -103,41 +104,39 @@ name maps to `(Default)` and a normal name maps to itself. After the hit navigat
 view loads the values for that key, sets the rows, and selects the matching row through the row
 automation peer's `SelectionItem` pattern. If the row is missing because the value was deleted
 between the hit and the load, the tree selection still moves to the key, the list shows the current
-values, and the status still reports the hit. The next Find Next starts from the recorded hit
-cursor; when the deleted value is no longer in the enumeration the cursor position is never
-reached, so the search reports the finished message instead of repeating the old hit.
+values, and the finished message is shown because the hit could not be presented. The recorded
+hit remains the continuation cursor, matching the stale hit rules below, so a later Find Next does
+not restart at the beginning.
 
-## 7. Stale hits after key deletion
+## 8. Stale hits after key deletion
 
 A hit is a snapshot. Between the hit and `RegistryTreeSource.FindPathAsync`, a key can be deleted,
-renamed, or become unreadable. `FindPathAsync` returns null in all three cases. The view logs the
-path, leaves the current tree selection in place, keeps the recorded hit as the continuation
-cursor, and shows the finished status. It never throws and never reports a selection that does not
-exist. The registry has no cross-key snapshot, so a search can also return a stale value name;
-the list load simply omits it as described above.
+renamed, or become unreadable. `FindPathAsync` returns null in all three cases. The controller logs
+the path, leaves the current tree selection in place, and shows the finished message. It never
+throws and never reports a selection that does not exist. The registry has no cross-key snapshot, so
+a search can also return a stale value name; the list load simply omits it and the finished message
+is shown.
 
-## 8. Duplicate hits
+## 9. Duplicate hits
 
 The engine reports each position once. A value can produce a name hit and a later data hit, and a
-key can produce a key hit and a later hit inside its values. `RegeditRootView` records the exact
-hit returned by the engine and passes `RegistryFindCursor.FromHit` on the next request. It does
-not deduplicate by key path, because two hits in the same key at different positions are both
-legitimate stops. The dialog does not compare display text to decide whether a hit is new.
+key can produce a key hit and a later hit inside its values. `FindController` records the exact hit
+returned by the engine and passes `RegistryFindCursor.FromHit` on the next request. It does not
+deduplicate by key path, because two hits in the same key at different positions are both
+legitimate stops.
 
-## 9. Modal owner and focus
+## 10. Modal owner and focus
 
-`FindDialog` derives from `ModalDialogWindow`. The owner window is disabled while the dialog is
-open, the dialog is centered over the owner, and focus starts in `FindText` with the text
-selected. The dialog is not closed by Find Next, so the E2E test can read the status and the tree
-selection behind it. Tree and list updates from a hit are applied with `SelectNode` and the row
-`SelectionItem` pattern, not with focus calls, so keyboard focus stays in the dialog.
+Both dialogs derive from `ModalDialogWindow`. The owner is disabled while either is open and restored
+on close. The Find dialog starts in `FindText` with the text selected; the progress dialog starts on
+Cancel. `RegeditRootView.ShowDialogAsync` refuses a second modal. If Edit > Find is chosen while
+another modal is open, the request is logged and ignored.
 
-`RegeditRootView.ShowDialogAsync` refuses a second modal. If Edit > Find is chosen while another
-modal is open, the request is logged and ignored. Pressing Ctrl+F or F3 while the Find dialog is
-open goes to the dialog window because the owner is disabled. Cancel restores the owner and sets
-the active window back to the main window through the base dialog.
+When the progress dialog closes, the owner is activated before the hit is applied or the finished
+message is shown. Tree and list updates from a hit use `SelectNode` and the row `SelectionItem`
+pattern, not focus calls, so the main window keeps keyboard focus after a hit.
 
-## 10. Keyboard accelerators
+## 11. Keyboard accelerators and mnemonics
 
 Ctrl+F opens Find and F3 repeats the last search. Both are handled by a routed `KeyDown` handler on
 `RegeditRootView` with `handledEventsToo: true`, so a tree or list control that already handles a
@@ -146,33 +145,48 @@ different key does not hide the accelerator. The control state is read with
 tree or list; the address bar also passes Ctrl+F and F3 to the same commands. A modal dialog is a
 separate window, so its keystrokes never reach the main view handler.
 
-The menu items Edit > Find (662) and Edit > Find Next (671) are enabled and invoke the same two
-methods as the accelerators. `FindNext` with no previous query opens the dialog instead of
-starting a search from the current selection, as described in section 4.
+The menu items Edit > Find (662) and Edit > Find Next (671) invoke the same two methods as the
+accelerators. The Find dialog passes the template mnemonic letters to `ClassicMnemonicText`:
+`Fi&nd what:`, `&Keys`, `&Values`, `&Data`, `Match &whole string only`, `Search in &subtree`, and
+`&Find Next`. Cancel has no mnemonic, as the template shows. Enter presses Find Next, Escape presses
+Cancel, and Tab follows the template order. The resource strings carry no ampersands, so
+`FindController` marks the template letter when it builds the label object; the shared resource map
+is not edited.
 
-## 11. Persisted flags, text, and last hit
+## 12. Persisted flags, text, and last hit
 
 `RegeditSettings` stores:
 
 - `FindText` and `FindFlags`: the last text and checkbox state shown in the dialog.
-- `FindQueryText` and `FindQueryFlags`: the query that produced the last hit.
+- `FindQueryText` and `FindQueryFlags`: the query that produced the last completed search.
 - `FindLastHitKey`, `FindLastHitValue`, `FindLastHitKind`, and `FindLastHitText`: the last hit
   needed to rebuild a `RegistryFindHit` after a restart.
 
 `FindFlags` is a bit mask of Keys, Values, Data, Match whole string only, and Search in subtree.
 The defaults are Keys, Values, Data, and Search in subtree enabled, which is the engine default for
-OQ-10. `CaptureSettings` copies the in-memory fields on window close; `ApplySettings` restores
-them on startup. `FindNext` after a restart therefore continues after the persisted hit when that
-key still exists. If the hit key is gone, the engine falls back to its documented cursor
-continuation rules and eventually reports the finished message. This is closer to classic BEH-003
-than a text and flags only design, but the classic parent key and value encoding are not known, so
-the shape is private to BWC.
+OQ-10. The text and flags are persisted when the Find dialog closes, including a draft that was
+cancelled without a search. `CaptureSettings` copies the in-memory fields on window close and
+`ApplySettings` restores them on startup. Find Next after a restart therefore continues after the
+persisted hit when that key still exists, or falls back to the engine cursor rules and eventually
+reports the finished message.
 
-The text and flags are also updated when the dialog closes without a search, so an edited draft is
-restored next time. Find Next does not require the dialog to have been open: the persisted query is
-enough.
+### The Applets\Regedit\FindFlags DWORD is not written
 
-## 12. Access denied and missing keys
+The oracle capture in `docs/parity/oracle/find-sequence.json` shows that Windows 11 build
+26100.8457 does not update
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit\FindFlags` when the classic Find
+dialog is used: every captured run left the DWORD at `0x00000000`. The classic dialog mask is
+recorded in the capture as `0x1` whole string, `0x2` keys, `0x4` values, `0x8` data, and `0x10`
+subtree, but classic itself did not persist it.
+
+BWC therefore does not write that DWORD. The dialog text and flags live only in BWC's own settings,
+and the in-memory F3 query state is built from those settings. This avoids claiming a registry
+side effect classic does not have and avoids guessing whether a future Windows build changes the
+classic behavior. `RegistryFindFlagsCodec` remains available to the engine, but the Find UI does
+not call it. This decision is recorded here because an earlier contract note said BWC writes the
+DWORD; that note predates the capture evidence.
+
+## 13. Access denied and missing keys
 
 The engine skips unreadable keys and values without aborting the walk. The UI does not preflight
 the roots and does not show an error for a skipped branch; it logs the engine's warning text
@@ -183,7 +197,7 @@ finished message. If the selected value was deleted, the cursor key is still val
 continues with the next value. A failure to load the values for a hit key is logged and leaves an
 empty list, never an exception to the window.
 
-## 13. E2E roots, seed, and cleanup
+## 14. E2E roots, seed, and cleanup
 
 The E2E test seeds `HKCU\Software\BWC-E2E\<runId>` with the keys `Alpha`, `Alphabet`, and `Beta`,
 the values `AlphaValue`, `DataNeedle`, `MultiNeedle`, and `Dword42`, then launches Regedit with an
@@ -196,12 +210,18 @@ behavior: with the variable unset, the default five roots are used.
 
 The test deletes the run subtree in a `finally` block, then removes the empty
 `HKCU\Software\BWC-E2E` parent when possible. Navigation uses `ControlTestSupport.NavigateToSandboxKey`,
-which expands the tree with the keyboard, so the test does not depend on the address bar. UIA
-exposes the owned Find content under the main window element and reports the main window handle for
-that element, so the test reads controls through the main UIA root. Keyboard input for Enter and
-Escape needs the real Find HWND, which the test finds by process id and the window title `Find`.
-Sending keys to the owner would reach a disabled window and do nothing.
+which expands the tree with the keyboard, so the test does not depend on the address bar.
 
-The E2E records each check through `E2EResults.Record` and asserts
-`E2EResults.FailedChecksSince`. The process is closed by the `AppSession` using block, and the
+`tests/Bwc.E2E/Find/FindTests.cs` drives the sequence with real input. It checks that Find stays
+open on open and the owner is disabled, that Find Next closes Find and opens the progress dialog,
+that F3 with a prior query shows progress without Find, that a hit selects the tree key and value
+row, that Cancel suppresses the hit and restores the owner, that the finished message is the exact
+oracle text with the caption `Find`, that a repeated exhausted Find Next does not wrap, and that
+the text and flags survive a restart. Each dialog is found by a control id that only it has
+(`FindText`, `FindProgressText`, `DialogMessage`), because Find and the progress dialog share the
+caption `Find`. Keyboard input goes to the real Find HWND, and each keyboard or mouse action checks
+that its window is foreground first. Screenshots are written under `artifacts/e2e/visual/find/`.
+
+The E2E also snapshots the real `Applets\Regedit` values before and after the run and asserts that
+the `FindFlags` DWORD is unchanged. The process is closed by the `AppSession` using block, and the
 class cleanup is expected to leave no `BwcRegedit` process and no run key behind.
