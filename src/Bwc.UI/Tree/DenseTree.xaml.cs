@@ -10,6 +10,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 using Windows.System;
 using Windows.UI.Core;
@@ -106,6 +107,7 @@ public sealed partial class DenseTree : UserControl
         Repeater.ElementClearing += OnElementClearing;
 
         KeyDown += OnKeyDown;
+        LosingFocus += OnTreeLosingFocus;
         CharacterReceived += OnCharacterReceived;
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -263,6 +265,52 @@ public sealed partial class DenseTree : UserControl
         SelectNode(node, scroll: false);
         _ = Focus(FocusState.Pointer);
         ToggleNode(node);
+    }
+
+    /// <summary>
+    /// A pointer press in the tree moves XAML focus from the tree to a ScrollViewer: first an outer one that
+    /// wraps the tree, then the tree's own. UI Automation does not expose either, so keyboard focus reads as lost
+    /// after a double-click collapse. The tree keeps focus when a ScrollViewer would take it. The rename box is
+    /// excluded because it takes focus on purpose.
+    /// </summary>
+    private void OnTreeLosingFocus(object sender, LosingFocusEventArgs args)
+    {
+        if (_renaming || args.NewFocusedElement is not ScrollViewer next)
+        {
+            return;
+        }
+
+        if (IsAncestorOf(next) || IsInsideTree(next))
+        {
+            _ = args.TrySetNewFocusedElement(this);
+        }
+    }
+
+    private bool IsAncestorOf(DependencyObject candidate)
+    {
+        for (DependencyObject? current = VisualTreeHelper.GetParent(this); current is not null;
+            current = VisualTreeHelper.GetParent(current))
+        {
+            if (ReferenceEquals(current, candidate))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsInsideTree(DependencyObject element)
+    {
+        for (DependencyObject? current = element; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (ReferenceEquals(current, this))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     internal void ChevronTapped(TreeRowElement row)

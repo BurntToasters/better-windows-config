@@ -34,7 +34,17 @@ internal sealed class EditingDriver : IDisposable
             AutomationElement? element = WaitForElement("MenuCommand_" + commandId, UiTimeout);
             if (element is null)
             {
-                throw new InvalidOperationException($"Menu command {commandId} did not appear.");
+                throw new InvalidOperationException(
+                    $"Menu command {commandId} did not appear. Visible menu commands: {DescribeMenuCommands()}. " +
+                    $"Foreground: {DescribeForeground()}.");
+            }
+
+            // A submenu opens through ExpandCollapse. Invoke on a MenuFlyoutSubItem does not expand it, so the
+            // command below it never appears (docs/failure-modes/menus.md, Invoke through automation).
+            if (IsSubmenu(element) && element.Patterns.ExpandCollapse.IsSupported)
+            {
+                element.Patterns.ExpandCollapse.Pattern.Expand();
+                continue;
             }
 
             try
@@ -52,6 +62,18 @@ internal sealed class EditingDriver : IDisposable
             {
                 element.Click();
             }
+        }
+    }
+
+    private static bool IsSubmenu(AutomationElement element)
+    {
+        try
+        {
+            return string.Equals(element.ClassName, "MenuFlyoutSubItem", StringComparison.Ordinal);
+        }
+        catch (Exception)
+        {
+            return false;
         }
     }
 
@@ -181,6 +203,62 @@ internal sealed class EditingDriver : IDisposable
     public void Dispose()
     {
         _automation.Dispose();
+    }
+
+    /// <summary>The MenuCommand_ automation ids on screen in the app's windows. Diagnostic only.</summary>
+    private string DescribeMenuCommands()
+    {
+        var ids = new List<string>();
+        try
+        {
+            AutomationElement desktop = _automation.GetDesktop();
+            foreach (AutomationElement window in desktop.FindAllChildren())
+            {
+                int processId;
+                try
+                {
+                    processId = window.Properties.ProcessId.Value;
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+
+                if (processId != _session.ProcessId)
+                {
+                    continue;
+                }
+
+                foreach (AutomationElement item in window.FindAllDescendants())
+                {
+                    try
+                    {
+                        string id = item.AutomationId ?? string.Empty;
+                        if (id.StartsWith("MenuCommand_", StringComparison.Ordinal))
+                        {
+                            string offscreen = item.IsOffscreen ? "offscreen" : "onscreen";
+                            ids.Add($"{id}({offscreen})");
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // An element that closed during the walk is skipped.
+                    }
+                }
+            }
+        }
+        catch (Exception)
+        {
+            return "unavailable";
+        }
+
+        return ids.Count == 0 ? "none" : string.Join(",", ids);
+    }
+
+    private string DescribeForeground()
+    {
+        IntPtr foreground = Win32.GetForegroundWindow();
+        return $"0x{foreground.ToInt64():X} class='{Win32.ClassNameOf(foreground)}' main={foreground == _session.MainHwnd}";
     }
 
     private AutomationElement? FindElement(string automationId)

@@ -429,8 +429,9 @@ public sealed class EditingTests
         bool classicText = message.Contains(
             "Specify a key name without a backslash",
             StringComparison.Ordinal);
-        // The error is dismissed with a real Enter, sent through the guard to the foreground window.
-        bool dismissed = dialog && driver.TypeKeys("Enter") && driver.WaitForNoDialog();
+        // The error box is the foreground window now, so the Enter goes to it directly. The guard would refuse
+        // it: it only accepts the main window or its input site, and an owned dialog is another app window.
+        bool dismissed = dialog && driver.DismissErrorBox() && driver.WaitForNoDialog();
         bool kept = ControlTestSupport.WaitUntil(
             () => KeyExists(sandbox, DefaultNewKey1),
             TimeSpan.FromSeconds(10));
@@ -611,7 +612,8 @@ public sealed class EditingTests
     private const int MaximumTextInset = 24;
 
     /// <summary>
-    /// The tree item or list item that holds the box. It contains the box's vertical center and starts at or left of it.
+    /// The tree item or list item that holds the box. It contains the box's vertical center and starts at or
+    /// left of it.
     /// </summary>
     private static System.Drawing.Rectangle RowContaining(AppSession session, System.Drawing.Rectangle box)
     {

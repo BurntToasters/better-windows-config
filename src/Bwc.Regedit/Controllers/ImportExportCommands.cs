@@ -393,6 +393,7 @@ internal sealed class ImportExportCommands
     private RegistryExportService CreateExportService(ExportFileRange range)
     {
 #if BWC_E2E
+        IRegistryExportSource? source = null;
         if (range == ExportFileRange.WholeRegistry &&
             TryGetSandboxRoot(out RegistryPath sandboxRoot))
         {
@@ -400,12 +401,106 @@ internal sealed class ImportExportCommands
             // roots are still exported through RegFileExporter.ExportWholeRegistry, but HKCU is
             // mapped to the run sandbox and the other roots are empty. The ship build uses the live
             // reader.
-            return new RegistryExportService(new SandboxWholeRegistrySource(_context.Store.Reader, sandboxRoot));
+            source = new SandboxWholeRegistrySource(_context.Store.Reader, sandboxRoot);
+        }
+
+        int pauseMs = E2EPauseMs(SlowExportVariable);
+        if (pauseMs > 0)
+        {
+            source = new PacedExportSource(source ?? new ReaderExportSource(_context.Store.Reader), pauseMs);
+        }
+
+        if (source is not null)
+        {
+            return new RegistryExportService(source);
         }
 #endif
 
         return new RegistryExportService(_context.Store.Reader);
     }
+
+#if BWC_E2E
+    /// <summary>
+    /// E2E only: the pause in milliseconds per exported key, from BWC_E2E_SLOW_EXPORT_MS. A seeded test
+    /// branch finishes in a few seconds, which is too quick for a test to read the progress window and
+    /// click Cancel. The value is clamped to 0 through 1000. The ship build never reads this variable.
+    /// </summary>
+    private const string SlowExportVariable = "BWC_E2E_SLOW_EXPORT_MS";
+
+    /// <summary>
+    /// E2E only: the pause in milliseconds per import section, from BWC_E2E_SLOW_IMPORT_MS. The same
+    /// rule as the export pause applies: a short file must stay on screen long enough to read.
+    /// </summary>
+    private const string SlowImportVariable = "BWC_E2E_SLOW_IMPORT_MS";
+
+    private static readonly int SlowImportPauseMs = E2EPauseMs(SlowImportVariable);
+
+    private static int E2EPauseMs(string variable)
+    {
+        string? configured = Environment.GetEnvironmentVariable(variable);
+        return int.TryParse(configured, NumberStyles.None, CultureInfo.InvariantCulture, out int ms)
+            ? Math.Clamp(ms, 0, 1000)
+            : 0;
+    }
+
+    /// <summary>E2E only: reads the live registry through the reader and pauses before each key.</summary>
+    private sealed class ReaderExportSource : IRegistryExportSource
+    {
+        private readonly RegistryReader _reader;
+
+        internal ReaderExportSource(RegistryReader reader)
+        {
+            _reader = reader;
+        }
+
+        public RegistryKeyInfo GetKeyInfo(RegistryPath path, CancellationToken cancellationToken = default) =>
+            _reader.GetKeyInfo(path, cancellationToken);
+
+        public IReadOnlyList<RegistryValueInfo> EnumerateValues(
+            RegistryPath path,
+            CancellationToken cancellationToken = default) =>
+            _reader.EnumerateValues(path, cancellationToken);
+
+        public IReadOnlyList<string> EnumerateSubKeyNames(
+            RegistryPath path,
+            CancellationToken cancellationToken = default) =>
+            _reader.EnumerateSubKeyNames(path, cancellationToken);
+    }
+
+    /// <summary>
+    /// E2E only: wraps another source and pauses once per key, at its value read. The pause ends early on
+    /// cancel, and the export then stops with OperationCanceledException as in the ship build.
+    /// </summary>
+    private sealed class PacedExportSource : IRegistryExportSource
+    {
+        private readonly IRegistryExportSource _inner;
+        private readonly int _pauseMs;
+
+        internal PacedExportSource(IRegistryExportSource inner, int pauseMs)
+        {
+            _inner = inner;
+            _pauseMs = pauseMs;
+        }
+
+        public RegistryKeyInfo GetKeyInfo(RegistryPath path, CancellationToken cancellationToken = default) =>
+            _inner.GetKeyInfo(path, cancellationToken);
+
+        public IReadOnlyList<RegistryValueInfo> EnumerateValues(
+            RegistryPath path,
+            CancellationToken cancellationToken = default)
+        {
+            // Every writer reads each key's values once, so the pause lands once per key in each format.
+            _ = cancellationToken.WaitHandle.WaitOne(_pauseMs);
+            cancellationToken.ThrowIfCancellationRequested();
+            return _inner.EnumerateValues(path, cancellationToken);
+        }
+
+        public IReadOnlyList<string> EnumerateSubKeyNames(
+            RegistryPath path,
+            CancellationToken cancellationToken = default) =>
+            _inner.EnumerateSubKeyNames(path, cancellationToken);
+    }
+#endif
 
 #if BWC_E2E
     private static bool TryGetSandboxRoot(out RegistryPath sandboxRoot)
@@ -601,6 +696,14 @@ internal sealed class ImportExportCommands
             {
                 _ui.Report(value);
             }
+
+#if BWC_E2E
+            // E2E only: the pause runs on the worker thread after the section is counted.
+            if (SlowImportPauseMs > 0)
+            {
+                Thread.Sleep(SlowImportPauseMs);
+            }
+#endif
         }
     }
 

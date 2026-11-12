@@ -351,6 +351,39 @@ PNG that was entirely black. The product was correct each time; the sample was e
   same rule, to see what the product showed. Setting `BWC_E2E_DUMP_JUDGED=1` also writes the last
   judged copy of each area to `artifacts/e2e/judged/`, which is the exact bitmap a check read.
 
+## 27. A window that closes before its capture
+
+A dialog that is finished by a fixture (a manifest the Hub waits for) can close while the test is still
+reaching it. The test then holds the handle of a destroyed window, `GetClientRect` fails, and the contrast
+check records "The dialog has no client area to capture." The product did its job; the test was late.
+The failures this caused in `Hub_CheckForUpdates_LocalManifest_UpToDateAvailableAndCancel` were the progress
+window's background and text contrast, while the screenshot showed the next window (Update Available).
+
+- A timed delay (2 seconds) is not enough: the progress window is found, raised, and settled (about 1 second
+  of settle wait) before its capture, and on a slow VM the delay ends first. Timing alone is not a fix.
+- The fixture holds the manifest response until the test releases it (`UpdateFixtureServer.HoldManifest` and
+  `ReleaseManifest`). The release happens after the progress window is checked and captured. The hold is
+  bounded (60 seconds), so a test that fails before the release still lets the Hub finish, and the Hub's own
+  3 minute limit still applies.
+- A held response that is never released is a test failure, not a skipped check. The progress window check
+  (`hub.update.progress.dialog`) and both contrast checks still run and are judged.
+- A window found by title can belong to another window with the same title. The progress window and the
+  message box share "Check for Updates", so the lookup for the progress window must run before the release.
+
+## 28. UIA properties that a control does not support
+
+FlaUI's `AutomationElement.Name` (and any `Properties.X.Value`) throws `PropertyNotSupportedException` when the
+control does not expose that property. A text or document peer with no name hits this, and the exception is
+not one of the COM or invalid-operation types a caller usually catches, so it aborts the whole check.
+
+- Read a property that may be unsupported through `Properties.Name.TryGetValue` or `ValueOrDefault`, never
+  through the plain property, when the control type is not known to expose it.
+- An element whose name is unsupported or empty is skipped by the text contrast check, because it has no
+  text the check can identify. The check still fails when no visible text is left at all
+  ("No visible static text control was found").
+- A skipped element is not a pass. The check that reads the pixels still decides the contrast of every
+  text rectangle that was found.
+
 ## Verification artifact
 
 A successful harness run leaves `artifacts/e2e/result-<rid>-<flavor>.json` with schema 2, the run

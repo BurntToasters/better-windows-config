@@ -21,6 +21,14 @@ If the owner handle is zero, for example because a command fired before `AttachW
 command logs a warning and returns without creating a window. A dialog that cannot activate is
 closed and completes with a cancel result so the owner is never left disabled.
 
+### Keys into an owned error box
+
+The error box for an invalid key name is an owned top level window of the app and is the foreground
+window while it is open. The E2E guard accepts only the main window or its own input site, so
+`ControlTestSupport.SendKeys` refuses to send Enter to the box and the check fails with "The app's own
+window ... had the foreground". The dismissal is sent to the foreground window directly, as the box
+is the input target, and the check still requires the message text to clear and the dialog to close.
+
 ### Escape and Enter
 
 Escape always cancels and closes with a false result. Enter invokes the primary action. Both are

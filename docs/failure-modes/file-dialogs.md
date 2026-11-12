@@ -191,7 +191,7 @@ Escape can arrive before the shell view has keyboard focus.
 
 Import and export tests create their files under
 `artifacts/e2e/import-export/<runId>/<scope>`. The export range artifacts stay under
-`artifacts/e2e/import-export/<runId>/range`, the canceled import file under `import-cancel`, and
+`artifacts/e2e/import-export/<runId>/range`, the import progress file under `import-progress`, and
 the canceled export destination under `export-cancel`. The tests delete their run key under
 `HKCU\Software\BWC-E2E` and dispose the application session. The basic import/export test removes
 only its own `basic` folder; the range artifacts remain for review. No test writes a file outside
@@ -215,3 +215,4 @@ and pattern comes from `Bwc.UI` resources, so the English text stays out of code
 | A hive file is written over an existing file in place | Hive export writes a temporary file and moves it over the destination only after `RegSaveKey` succeeds |
 | Save filters keep their old indices after the reorder | The index-to-writer map is one table, and the E2E test reads it back through the dialog |
 | The dialog cannot be shown while another modal is open | Unchanged: `FileDialogOpen` and `DialogOpen` refuse the request and log it |
+| E2E driver presses Down one time too many for a one-based filter index, so index 3 selects Win9x/NT4 | `SelectFileType` takes a one-based index (1 is the first filter) and presses Down index minus 1 times after Home; index below 1 is refused |

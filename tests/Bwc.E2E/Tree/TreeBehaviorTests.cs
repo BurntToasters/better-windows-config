@@ -7,6 +7,7 @@ using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Capturing;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
+using FlaUI.UIA3;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Bwc.E2E.Tree;
@@ -84,17 +85,22 @@ public sealed class TreeBehaviorTests
             bool expanded = WaitForRowPresent(session, "Level1") && WaitForState(session, "Tree", "Expanded");
             bool dblFocus = ControlTestSupport.IsTreeKeyboardFocused(session, "Tree");
             E2EResults.Record("tree.dblclick.expands", expanded, $"Double-click on Tree expanded it={expanded}; keyboard focus after it={dblFocus}.");
+            E2EResults.Note("tree.dblclick.diag", "after first double-click: " + DescribeFocus(session));
             SaveCapture(session, "double-click-expanded");
 
             DoubleClickRow(session, "Tree", RunChildDepth + 1);
             bool collapsedAgain = WaitForRowAbsent(session, "Level1") && WaitForState(session, "Tree", "Collapsed");
             E2EResults.Record("tree.dblclick.collapses", collapsedAgain, $"Second double-click collapsed it={collapsedAgain}.");
+            E2EResults.Note("tree.dblclick.diag", "after second double-click: " + DescribeFocus(session));
 
             // Leaves sit under the run key, which is collapsed here. Left moves to it and Add opens it.
             Key(session, "LEFT");
+            E2EResults.Note("tree.dblclick.diag", "after LEFT: " + DescribeFocus(session));
             Key(session, "ADD");
             _ = WaitForRowPresent(session, "Apple");
+            E2EResults.Note("tree.dblclick.diag", "before type-ahead: " + DescribeFocus(session));
             TypeAhead(session, "Apple");
+            E2EResults.Note("tree.dblclick.diag", "after type-ahead: " + DescribeFocus(session));
             bool appleSelected = WaitForSelected(session, "Apple");
             bool treeFocused = ControlTestSupport.IsTreeKeyboardFocused(session, "Apple");
             int rowsBefore = RowNames(session).Length;
@@ -681,6 +687,42 @@ public sealed class TreeBehaviorTests
     }
 
     private static void Key(AppSession session, string key) => ControlTestSupport.SendKeys(session, key);
+
+    /// <summary>Foreground window, UIA focused element, and selected tree row. Diagnostic only; never fails.</summary>
+    private static string DescribeFocus(AppSession session)
+    {
+        IntPtr foreground = Win32.GetForegroundWindow();
+        string foregroundText = $"foreground=0x{foreground.ToInt64():X} class='{Win32.ClassNameOf(foreground)}' " +
+            $"main={foreground == session.MainHwnd}";
+        string focusText;
+        try
+        {
+            using var automation = new UIA3Automation();
+            AutomationElement? focused = automation.FocusedElement();
+            focusText = focused is null
+                ? "focused=none"
+                : $"focused name='{SafeProperty(() => focused.Name)}' type='{SafeProperty(() => focused.ControlType.ToString())}' " +
+                    $"id='{SafeProperty(() => focused.AutomationId)}' class='{SafeProperty(() => focused.ClassName)}'";
+        }
+        catch (Exception ex)
+        {
+            focusText = "focused=unavailable (" + ex.GetType().Name + ")";
+        }
+
+        return $"{foregroundText}; {focusText}; selectedRow='{SelectedRowName(session) ?? "none"}'";
+    }
+
+    private static string SafeProperty(Func<string> read)
+    {
+        try
+        {
+            return read() ?? string.Empty;
+        }
+        catch (Exception)
+        {
+            return "?";
+        }
+    }
 
     /// <summary>Types text as characters. The tree's type-ahead buffer sees them as one prefix.</summary>
     private static void Type(AppSession session, string text)

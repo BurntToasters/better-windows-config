@@ -27,6 +27,12 @@ public sealed class ExportRangeTests
     private const int MenuFileExport = 659;
     private const string ExportValueName = "ExportString";
     private const string ExportValueData = "exported";
+    private const string ImportCaption = "Import Registry File";
+    private const string SlowExportVariable = "BWC_E2E_SLOW_EXPORT_MS";
+    private const string SlowImportVariable = "BWC_E2E_SLOW_IMPORT_MS";
+    private const string SlowPauseMilliseconds = "2";
+    private const int ImportSections = 1000;
+    private const int ExportBranchKeys = 5000;
 
     [ClassInitialize]
     public static void ClassInitialize(TestContext testContext)
@@ -105,7 +111,7 @@ public sealed class ExportRangeTests
     [TestMethod]
     [TestCategory("ImportExport")]
     [TestCategory("Mutating")]
-    public void ImportProgress_CancelKeepsCompletedWritesAndShowsStringOneThirtyTwo()
+    public void ImportProgress_ShowsClassicProgressWithoutCancel()
     {
         int checkStart = E2EResults.CheckCount;
         E2EConfig config = GuiGate.Config;
@@ -113,7 +119,7 @@ public sealed class ExportRangeTests
         RequireExecutables(config);
 
         var sandbox = new SandboxRegistry(config);
-        string tempDir = Path.Combine(config.ArtifactsDir, "import-export", config.RunId, "import-cancel");
+        string tempDir = Path.Combine(config.ArtifactsDir, "import-export", config.RunId, "import-progress");
         string visualDir = Path.Combine(config.ArtifactsDir, "visual", "importexport");
 
         try
@@ -122,13 +128,14 @@ public sealed class ExportRangeTests
             Directory.CreateDirectory(tempDir);
             Directory.CreateDirectory(visualDir);
             Seed(sandbox);
-            string importFile = WriteLargeImportFile(sandbox, tempDir, sections: 20000);
+            string importFile = WriteLargeImportFile(sandbox, tempDir, sections: ImportSections);
 
-            string dataRoot = CreateFreshDataRoot(config, "importexport-import-cancel");
+            string dataRoot = CreateFreshDataRoot(config, "importexport-import-progress");
             var environment = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
                 ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+                [SlowImportVariable] = SlowPauseMilliseconds,
             };
 
             using var session = new AppSession(config, config.RegeditExePath, environment: environment);
@@ -137,10 +144,10 @@ public sealed class ExportRangeTests
             using var automation = new UIA3Automation();
 
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
-            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "importcancel.sandbox.navigate");
-            E2EGuards.RequireImportFileInsideSandbox(importFile, sandbox, "importcancel.file-inside");
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "importprogress.sandbox.navigate");
+            E2EGuards.RequireImportFileInsideSandbox(importFile, sandbox, "importprogress.file-inside");
 
-            if (!OpenDialog(driver, dialogs, MenuFileImport, "importcancel.import", out IntPtr dialog))
+            if (!OpenDialog(driver, dialogs, MenuFileImport, "importprogress.import", out IntPtr dialog))
             {
                 FailIfNeeded(checkStart);
                 return;
@@ -151,63 +158,93 @@ public sealed class ExportRangeTests
             bool accepted = typed && dialogs.TryAccept(dialog, "Open", out acceptNotes);
             bool closed = accepted && dialogs.WaitGone(dialog, TimeSpan.FromSeconds(10));
             E2EResults.Record(
-                "importcancel.open",
+                "importprogress.open",
                 typed && accepted && closed,
                 $"{typeNotes} {acceptNotes} closed={closed}.");
 
             IntPtr progress = ImportExportWindows.WaitForProgress(automation, session.MainHwnd, TimeSpan.FromSeconds(15));
-            bool progressShown = E2EResults.Record(
-                "importcancel.progress",
-                progress != IntPtr.Zero,
-                $"progress hwnd=0x{progress.ToInt64():X}.");
-
-            bool advanced = progressShown && WaitForImportProgress(automation, progress, TimeSpan.FromSeconds(10));
+            string caption = progress == IntPtr.Zero ? string.Empty : ImportExportWindows.TitleOf(session.MainHwnd, progress);
+            bool captionOk = progress != IntPtr.Zero && string.Equals(caption, ImportCaption, StringComparison.Ordinal);
             E2EResults.Record(
-                "importcancel.progress-advanced",
-                advanced,
-                advanced ? "at least one key section finished before Cancel." : "no section finished before Cancel.");
+                "importprogress.window",
+                captionOk,
+                $"progress hwnd=0x{progress.ToInt64():X}, caption='{caption}', expected '{ImportCaption}'.");
 
-            if (progressShown)
+            if (progress != IntPtr.Zero)
+            {
+                IReadOnlyList<string>? buttons = ImportExportWindows.ButtonNames(automation, progress);
+                bool onlyTitleClose = buttons is not null && buttons.All(name => name == "Close");
+                E2EResults.Record(
+                    "importprogress.no-buttons",
+                    onlyTitleClose,
+                    $"buttons=[{string.Join(",", buttons ?? Array.Empty<string>())}]; classic DLG-019 has no Cancel " +
+                    "and no default button. The title bar Close is the only button, and the host refuses it until the import ends.");
+
+                string label = ImportExportWindows.ReadText(automation, progress, "ImportFileLabel");
+                string name = ImportExportWindows.ReadText(automation, progress, "ImportFileName");
+                E2EResults.Record(
+                    "importprogress.labels",
+                    label == "File:" && name == Path.GetFileName(importFile),
+                    $"label='{label}', file name='{name}'.");
+            }
+
+            bool mainDisabled = progress != IntPtr.Zero &&
+                ControlTestSupport.WaitUntil(() => !Win32.IsWindowEnabled(session.MainHwnd), TimeSpan.FromSeconds(5));
+            E2EResults.Record(
+                "importprogress.main-disabled",
+                mainDisabled,
+                $"main window disabled while the import runs={mainDisabled}.");
+
+            ImportExportWindows.BarState lastBar = default;
+            bool advanced = progress != IntPtr.Zero && ControlTestSupport.WaitUntil(
+                () =>
+                {
+                    lastBar = ImportExportWindows.ReadProgress(automation, progress);
+                    return lastBar.Present && lastBar.Value > 0 && lastBar.Value < lastBar.Maximum;
+                },
+                TimeSpan.FromSeconds(15));
+            E2EResults.Record(
+                "importprogress.advanced",
+                advanced,
+                $"bar value={lastBar.Value} of maximum={lastBar.Maximum} seen while the import ran.");
+
+            if (progress != IntPtr.Zero)
             {
                 string shot = ImportExportWindows.CaptureWindow(
                     progress,
                     Path.Combine(visualDir, "import-progress.png"));
-                E2EResults.Note("importcancel.screenshot", $"saved {shot}, written={File.Exists(shot)}.");
+                E2EResults.Note("importprogress.screenshot", $"saved {shot}, written={File.Exists(shot)}.");
             }
 
-            bool cancelClicked = progressShown && ImportExportWindows.ClickCancel(automation, progress);
-            bool progressClosed = cancelClicked &&
-                ControlTestSupport.WaitUntil(() => !Win32.IsWindow(progress), TimeSpan.FromSeconds(10));
-            E2EResults.Record(
-                "importcancel.cancel",
-                cancelClicked && progressClosed,
-                $"cancelClicked={cancelClicked}, progressClosed={progressClosed}.");
-
+            bool progressClosed = progress != IntPtr.Zero &&
+                ControlTestSupport.WaitUntil(() => !Win32.IsWindow(progress), TimeSpan.FromSeconds(120));
             IntPtr result = ImportExportWindows.WaitForResult(
                 session.MainHwnd,
-                text => text.Contains("Not all data was successfully written", StringComparison.Ordinal),
+                text => text.Contains("successfully added to the registry", StringComparison.Ordinal),
                 TimeSpan.FromSeconds(15));
             string resultText = result == IntPtr.Zero ? string.Empty : AppServicesSupport.DialogText(result);
             E2EResults.Record(
-                "importcancel.partial-message",
-                result != IntPtr.Zero,
-                result == IntPtr.Zero ? "no partial result message." : resultText);
+                "importprogress.completed-message",
+                progressClosed && result != IntPtr.Zero,
+                result == IntPtr.Zero
+                    ? $"progressClosed={progressClosed}; no success message (string 228)."
+                    : $"progressClosed={progressClosed}; {resultText}");
             if (result != IntPtr.Zero)
             {
                 _ = AppServicesSupport.DismissMessage(result, TimeSpan.FromSeconds(10));
             }
 
-            bool firstPresent = sandbox.Exists(@"ImportCancel\Key00001");
-            bool lastAbsent = !sandbox.Exists(@"ImportCancel\Key19999");
-            E2EResults.Record(
-                "importcancel.partial-writes",
-                firstPresent && lastAbsent,
-                $"Key00001 exists={firstPresent}, Key19999 exists={!lastAbsent}.");
-
-            bool responsive = ControlTestSupport.WaitUntil(
+            bool mainEnabled = ControlTestSupport.WaitUntil(
                 () => Win32.IsWindowEnabled(session.MainHwnd),
                 TimeSpan.FromSeconds(10));
-            E2EResults.Record("importcancel.responsive", responsive, $"main enabled={responsive}.");
+            E2EResults.Record("importprogress.main-enabled", mainEnabled, $"main enabled after the import={mainEnabled}.");
+
+            bool firstPresent = sandbox.Exists(@"ImportProgress\Key00001");
+            bool lastPresent = sandbox.Exists(@"ImportProgress\Key" + ImportSections.ToString("D5", CultureInfo.InvariantCulture));
+            E2EResults.Record(
+                "importprogress.keys",
+                firstPresent && lastPresent,
+                $"Key00001 exists={firstPresent}, Key{ImportSections:D5} exists={lastPresent}.");
 
             FailIfNeeded(checkStart);
         }
@@ -237,13 +274,14 @@ public sealed class ExportRangeTests
             sandbox.Cleanup();
             Directory.CreateDirectory(tempDir);
             Directory.CreateDirectory(visualDir);
-            SeedLargeBranch(sandbox, keyCount: 20000);
+            SeedLargeBranch(sandbox, keyCount: ExportBranchKeys);
 
             string dataRoot = CreateFreshDataRoot(config, "importexport-export-cancel");
             var environment = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
                 ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+                [SlowExportVariable] = SlowPauseMilliseconds,
             };
 
             using var session = new AppSession(config, config.RegeditExePath, environment: environment);
@@ -728,17 +766,6 @@ public sealed class ExportRangeTests
             TimeSpan.FromSeconds(4));
     }
 
-    /// <summary>
-    /// The classic Import progress window (DLG-019) has a bar and the file name only, so the wait ends
-    /// when the bar reaches its maximum.
-    /// </summary>
-    private static bool WaitForImportProgress(UIA3Automation automation, IntPtr progress, TimeSpan timeout)
-    {
-        return ControlTestSupport.WaitUntil(
-            () => ImportExportWindows.ProgressValue(automation, progress) >= 1,
-            timeout);
-    }
-
     private static bool WaitForExportProgress(UIA3Automation automation, IntPtr progress, TimeSpan timeout)
     {
         return ControlTestSupport.WaitUntil(
@@ -812,12 +839,12 @@ public sealed class ExportRangeTests
         builder.Append("Windows Registry Editor Version 5.00\r\n\r\n");
         for (var index = 1; index <= sections; index++)
         {
-            builder.Append('[').Append(rootPath).Append(@"\ImportCancel\Key")
+            builder.Append('[').Append(rootPath).Append(@"\ImportProgress\Key")
                 .Append(index.ToString("D5", CultureInfo.InvariantCulture)).Append("]\r\n");
             builder.Append("\"Value\"=\"data\"\r\n\r\n");
         }
 
-        string file = Path.Combine(folder, "cancel-import.reg");
+        string file = Path.Combine(folder, "import-progress.reg");
         byte[] body = Encoding.Unicode.GetBytes(builder.ToString());
         byte[] preamble = Encoding.Unicode.GetPreamble();
         var bytes = new byte[preamble.Length + body.Length];
@@ -835,12 +862,13 @@ public sealed class ExportRangeTests
         sandbox.SetString("Child", "ChildValue", "child");
     }
 
+    /// <summary>Seeds keyCount child keys under CancelExport through the harness, the only sandbox writer.</summary>
     private static void SeedLargeBranch(SandboxRegistry sandbox, int keyCount)
     {
         for (var index = 0; index < keyCount; index++)
         {
             sandbox.SetString(
-                @"CancelExport\Key" + index.ToString("D5", CultureInfo.InvariantCulture),
+                @"CancelExport\Key" + index.ToString("D7", CultureInfo.InvariantCulture),
                 "Value",
                 "data");
         }
