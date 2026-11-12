@@ -19,8 +19,8 @@
 - DLG: 51 rows = 26 dialog layout rows + 25 behavior rows. The layout rows list all 212 controls in the 26 dialogs; each control id was asserted to appear in its dialog row.
 - ACC: 28 rows = 24 accelerator table entries (asserted in table order against the JSON commands) + 4 keyboard behaviors.
 - MSG: 276 rows = 278 string ids minus 2 skipped (8100 and 8111, format fragments; see section 2.5).
-- VIEW: 20 rows; BEH: 49 rows; EXP: 32 rows (29 value-class rows and 3 file-format rows).
-- Total: 534 rows. Open questions: 49 (section 4). IDs are unique within each prefix, and every row starts with status open.
+- VIEW: 21 rows (VIEW-021 is a declared difference, not a classic row); BEH: 49 rows; EXP: 32 rows (29 value-class rows and 3 file-format rows).
+- Total: 535 rows. Open questions: 49 (section 4). IDs are unique within each prefix, and every row starts with status open.
 
 ## 2. Inventory tables
 
@@ -510,6 +510,7 @@ Skipped (format fragments with no user text): 8100 (" : " joiner) and 8111 (a 19
 | VIEW-018 | Status bar: absent. Metrics record statusBar.present = false and the View menu has no Status Bar item. BWC keeps the classic layout without a status bar. | regedit-metrics.json (statusBar); RT_MENU 103 (View) | U2 | open |
 | VIEW-019 | Dialog font: all 26 dialog templates declare MS Shell Dlg, 8 pt. Dialog units (DLU) are as declared in each template; the rendered face and the DLU-to-pixel conversion were not captured (OQ-28). | regedit-resources.json (dialogs.font) | U4 | open |
 | VIEW-020 | Capture environment: Arm64 processor architecture; OS build 26200 (update 9711, display version 25H2); productName reported as Windows 10 Enterprise; compat layer RunAsInvoker; regedit file version 10.0.26100.8457. Layout parity is measured on this environment only (OQ-30). | regedit-metrics.json (os, regedit) | U1 | open |
+| VIEW-021 | Declared difference: View > Theme (System, Light, Dark) is a BWC addition requested by the user. Classic regedit has no theme setting; the menu shows the Theme submenu after Font, and the choice is saved with the other view settings. The reason is the user's request, so the classic layout rows around it stay as the oracle has them. | Brief (user request); RT_STRING-free: text from Bwc.Regedit resources (MenuViewTheme and its three items) | U1 | declared-difference |
 
 ### 2.7 BEH: behavior not in the resources
 

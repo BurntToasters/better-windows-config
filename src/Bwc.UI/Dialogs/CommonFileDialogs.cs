@@ -4,6 +4,7 @@ using Windows.Win32.Foundation;
 using Windows.Win32.System.Com;
 using Windows.Win32.UI.Shell;
 using Windows.Win32.UI.Shell.Common;
+using Bwc.UI;
 
 namespace Bwc.UI.Dialogs;
 
@@ -18,7 +19,23 @@ public enum ExportFileFormat
 
     /// <summary>REGEDIT4, system ANSI code page.</summary>
     RegistrationRegedit4,
+
+    /// <summary>A binary hive file written by RegSaveKey (the Registry Hive Files filter).</summary>
+    Hive,
 }
+
+/// <summary>The reader the Import open dialog selected: a .reg script, or a binary hive file.</summary>
+public enum ImportFileFormat
+{
+    /// <summary>Registration Files (*.reg) or All Files. The file is read as a registry script.</summary>
+    Registration,
+
+    /// <summary>Registry Hive Files (*.*). The file is restored onto the selected key.</summary>
+    Hive,
+}
+
+/// <summary>The path and format approved in the Import open dialog.</summary>
+public sealed record ImportFileDialogResult(string FilePath, ImportFileFormat Format);
 
 /// <summary>How much of the registry an export covers.</summary>
 public enum ExportFileRange
@@ -59,37 +76,57 @@ public static unsafe class CommonFileDialogs
     private const uint ControlEnabled = 0x00000001;
     private const uint ControlVisible = 0x00000002;
 
-    private static readonly (string Name, string Spec)[] OpenFilters =
-    {
-        ("Registration Files (*.reg)", "*.reg"),
-    };
+    /// <summary>The Import filters in the order of oracle string 302. Index 1 is the default.</summary>
+    private static (string Name, string Spec)[] ImportFilters() =>
+    [
+        (BwcStrings.Get("FileDialogRegistrationFiles"), "*.reg"),
+        (BwcStrings.Get("FileDialogRegistryHiveFiles"), "*.*"),
+        (BwcStrings.Get("FileDialogAllFiles"), "*.*"),
+    ];
 
-    private static readonly (string Name, string Spec)[] SaveFilters =
-    {
-        ("Registration Files (*.reg)", "*.reg"),
-        ("Text Files (*.txt)", "*.txt"),
-        ("Win9x/NT4 Registration Files (*.reg)", "*.reg"),
-    };
+    /// <summary>The Export filters in the order of oracle string 305. Index 1 is the default.</summary>
+    private static (string Name, string Spec)[] ExportFilters() =>
+    [
+        (BwcStrings.Get("FileDialogRegistrationFiles"), "*.reg"),
+        (BwcStrings.Get("FileDialogRegistryHiveFilesExport"), "*."),
+        (BwcStrings.Get("FileDialogTextFiles"), "*.txt"),
+        (BwcStrings.Get("FileDialogWin9xFiles"), "*.reg"),
+        (BwcStrings.Get("FileDialogAllFiles"), "*.*"),
+    ];
+
+    /// <summary>The Load Hive filter: one entry, All Files (oracle string 180).</summary>
+    private static (string Name, string Spec)[] LoadHiveFilters() =>
+    [
+        (BwcStrings.Get("FileDialogAllFiles"), "*.*"),
+    ];
 
     /// <summary>
-    /// Shows the open dialog owned by <paramref name="ownerHwnd"/>. Returns the chosen file system
-    /// path, or null when the user cancelled. The dialog offers registry files only.
+    /// Shows the Import open dialog owned by <paramref name="ownerHwnd"/>. The filters are the classic
+    /// Registration Files, Registry Hive Files, and All Files. Returns null when the user cancelled.
     /// </summary>
-    public static string? ShowOpen(nint ownerHwnd, string? defaultFileName = null)
+    public static ImportFileDialogResult? ShowImportOpen(nint ownerHwnd)
     {
         var dialog = (IFileOpenDialog)new FileOpenDialog();
-        return ShowCore(dialog, ownerHwnd, defaultFileName, save: false, OpenFilters);
+        string? path = ShowCore(dialog, ownerHwnd, defaultFileName: null, save: false, ImportFilters(), defaultExtension: null);
+        if (path is null)
+        {
+            return null;
+        }
+
+        dialog.GetFileTypeIndex(out uint filterIndex);
+        return new ImportFileDialogResult(
+            path,
+            filterIndex == 2 ? ImportFileFormat.Hive : ImportFileFormat.Registration);
     }
 
     /// <summary>
-    /// Shows the save dialog owned by <paramref name="ownerHwnd"/>. Returns the approved file
-    /// system path, or null when the user cancelled. This overload keeps the pre-RF7 behavior for
-    /// callers that do not offer an export range.
+    /// Shows the Load Hive open dialog with the single All Files filter (oracle string 180), so a hive
+    /// file without an extension, such as NTUSER.DAT, can be chosen. Returns null when cancelled.
     /// </summary>
-    public static string? ShowSave(nint ownerHwnd, string? defaultFileName = null)
+    public static string? ShowLoadHiveOpen(nint ownerHwnd)
     {
-        var dialog = (IFileSaveDialog)new FileSaveDialog();
-        return ShowCore(dialog, ownerHwnd, defaultFileName, save: true, SaveFilters);
+        var dialog = (IFileOpenDialog)new FileOpenDialog();
+        return ShowCore(dialog, ownerHwnd, defaultFileName: null, save: false, LoadHiveFilters(), defaultExtension: null);
     }
 
     /// <summary>
@@ -106,7 +143,7 @@ public static unsafe class CommonFileDialogs
         var dialog = (IFileSaveDialog)new FileSaveDialog();
         AddExportRange(dialog, hasSelectedKey);
 
-        string? path = ShowCore(dialog, ownerHwnd, defaultFileName, save: true, SaveFilters);
+        string? path = ShowCore(dialog, ownerHwnd, defaultFileName, save: true, ExportFilters(), defaultExtension: "reg");
         if (path is null)
         {
             return null;
@@ -122,7 +159,8 @@ public static unsafe class CommonFileDialogs
         nint ownerHwnd,
         string? defaultFileName,
         bool save,
-        (string Name, string Spec)[] filters)
+        (string Name, string Spec)[] filters,
+        string? defaultExtension)
     {
         using var filterSpecs = new FilterSpecifications(filters);
         filterSpecs.Apply(dialog);
@@ -144,9 +182,9 @@ public static unsafe class CommonFileDialogs
             }
         }
 
-        if (save)
+        if (save && defaultExtension is not null)
         {
-            fixed (char* extension = "reg")
+            fixed (char* extension = defaultExtension)
             {
                 dialog.SetDefaultExtension(extension);
             }
@@ -180,14 +218,17 @@ public static unsafe class CommonFileDialogs
     private static void AddExportRange(IFileDialog dialog, bool hasSelectedKey)
     {
         var customize = (IFileDialogCustomize)dialog;
-        Check(customize.StartVisualGroup(ExportRangeGroupId, "Export range"));
+        Check(customize.StartVisualGroup(ExportRangeGroupId, BwcStrings.Get("FileDialogExportRangeGroup")));
 
         if (hasSelectedKey)
         {
             // One option group with both choices. Selected branch is the classic default.
             Check(customize.AddRadioButtonList(ExportRangeListId));
-            Check(customize.AddControlItem(ExportRangeListId, ExportRangeAllId, "&All"));
-            Check(customize.AddControlItem(ExportRangeListId, ExportRangeBranchId, "S&elected branch"));
+            Check(customize.AddControlItem(ExportRangeListId, ExportRangeAllId, BwcStrings.Get("FileDialogExportRangeAll")));
+            Check(customize.AddControlItem(
+                ExportRangeListId,
+                ExportRangeBranchId,
+                BwcStrings.Get("FileDialogExportRangeSelectedBranch")));
             Check(customize.SetControlState(ExportRangeListId, ControlEnabled | ControlVisible));
             Check(customize.SetControlItemState(
                 ExportRangeListId,
@@ -201,7 +242,7 @@ public static unsafe class CommonFileDialogs
             // branch control while All stays selected and enabled. A single option group cannot
             // disable one item and keep the other interactive in the shell.
             Check(customize.AddRadioButtonList(ExportRangeListId));
-            Check(customize.AddControlItem(ExportRangeListId, ExportRangeAllId, "&All"));
+            Check(customize.AddControlItem(ExportRangeListId, ExportRangeAllId, BwcStrings.Get("FileDialogExportRangeAll")));
             Check(customize.SetControlState(ExportRangeListId, ControlEnabled | ControlVisible));
             Check(customize.SetSelectedControlItem(ExportRangeListId, ExportRangeAllId));
 
@@ -209,7 +250,7 @@ public static unsafe class CommonFileDialogs
             Check(customize.AddControlItem(
                 ExportRangeBranchListId,
                 ExportRangeBranchOnlyItemId,
-                "S&elected branch"));
+                BwcStrings.Get("FileDialogExportRangeSelectedBranch")));
             Check(customize.SetControlState(ExportRangeBranchListId, ControlVisible));
         }
 
@@ -219,10 +260,13 @@ public static unsafe class CommonFileDialogs
     private static ExportFileFormat ReadFormat(IFileDialog dialog)
     {
         dialog.GetFileTypeIndex(out uint filterIndex);
+        // Filter order follows oracle string 305: 1 Registration, 2 Hive, 3 Text, 4 Win9x/NT4, 5 All Files.
+        // All Files writes the v5 registration format, the default writer.
         return filterIndex switch
         {
-            2 => ExportFileFormat.Text,
-            3 => ExportFileFormat.RegistrationRegedit4,
+            2 => ExportFileFormat.Hive,
+            3 => ExportFileFormat.Text,
+            4 => ExportFileFormat.RegistrationRegedit4,
             _ => ExportFileFormat.RegistrationV5,
         };
     }

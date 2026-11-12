@@ -60,8 +60,9 @@ public static class RegistrySecurityDescriptor
     }
 
     /// <summary>
-    /// Copies and validates a self-relative descriptor owned by native code, such as the pointer
-    /// aclui passes to <c>ISecurityInformation.SetSecurity</c>. The source buffer is not freed.
+    /// Copies and validates a descriptor owned by native code, such as the pointer aclui passes to
+    /// <c>ISecurityInformation.SetSecurity</c>. An absolute descriptor is converted to self-relative form
+    /// first. The source buffer is not freed.
     /// </summary>
     public static unsafe byte[] CopyFromNative(nint descriptor)
     {
@@ -78,6 +79,11 @@ public static class RegistrySecurityDescriptor
                 nameof(descriptor));
         }
 
+        if (!IsSelfRelative(native))
+        {
+            return MakeSelfRelative(native);
+        }
+
         uint declaredLength = PInvoke.GetSecurityDescriptorLength(native);
         if (declaredLength == 0 || declaredLength > int.MaxValue)
         {
@@ -88,6 +94,48 @@ public static class RegistrySecurityDescriptor
 
         byte[] buffer = new byte[(int)declaredLength];
         Marshal.Copy(descriptor, buffer, 0, buffer.Length);
+        Validate(buffer);
+        return buffer;
+    }
+
+    private const uint SelfRelativeControl = 0x8000;
+    private const int ErrorInsufficientBuffer = 122;
+
+    private static unsafe bool IsSelfRelative(PSECURITY_DESCRIPTOR native)
+    {
+        if (!PInvoke.GetSecurityDescriptorControl(native, out var control, out _))
+        {
+            throw new ArgumentException("The native security descriptor control flags cannot be read.");
+        }
+
+        return ((uint)control & SelfRelativeControl) != 0;
+    }
+
+    /// <summary>
+    /// Converts an absolute descriptor with <c>MakeSelfRelativeSD</c>. The first call reports the size
+    /// the self-relative copy needs, and the second call fills the buffer.
+    /// </summary>
+    private static unsafe byte[] MakeSelfRelative(PSECURITY_DESCRIPTOR absolute)
+    {
+        uint size = 0;
+        if (PInvoke.MakeSelfRelativeSD(absolute, default, ref size) ||
+            Marshal.GetLastPInvokeError() != ErrorInsufficientBuffer ||
+            size == 0 ||
+            size > int.MaxValue)
+        {
+            throw new ArgumentException("The absolute security descriptor cannot be converted to self-relative form.");
+        }
+
+        byte[] buffer = new byte[(int)size];
+        fixed (byte* pointer = buffer)
+        {
+            if (!PInvoke.MakeSelfRelativeSD(absolute, new PSECURITY_DESCRIPTOR(pointer), ref size))
+            {
+                throw new ArgumentException(
+                    $"The absolute security descriptor cannot be converted to self-relative form (error {Marshal.GetLastPInvokeError()}).");
+            }
+        }
+
         Validate(buffer);
         return buffer;
     }

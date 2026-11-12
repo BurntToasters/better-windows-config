@@ -104,7 +104,20 @@ public static class AboutBox
         nint icon = string.IsNullOrEmpty(executablePath)
             ? 0
             : ShellDialogNative.ExtractIconW(0, executablePath, 0);
-        int result = ShellDialogNative.ShellAboutW(owner, applicationName, text, icon);
+        int result;
+        try
+        {
+            result = ShellDialogNative.ShellAboutW(owner, applicationName, text, icon);
+        }
+        finally
+        {
+            // ExtractIconW returns a copy the caller owns, so it is released once ShellAbout has used it.
+            if (icon != 0)
+            {
+                _ = ShellDialogNative.DestroyIcon(icon);
+            }
+        }
+
         if (result == 0)
         {
             Log.Warn("Registry Editor could not show the About box.");
@@ -125,7 +138,7 @@ public static class AboutBox
         string product = assembly.GetCustomAttribute<AssemblyProductAttribute>()?.Product ?? ProductFallback;
         string copyright = assembly.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright ?? string.Empty;
         return product + "\r\n" +
-            "Version " + VersionText(assembly) + "\r\n" +
+            RegeditStrings.Get("AboutVersion").Replace("{0}", VersionText(assembly), StringComparison.Ordinal) + "\r\n" +
             copyright;
     }
 
@@ -142,7 +155,7 @@ public static class AboutBox
         Version? version = assembly.GetName().Version;
         if (version is null)
         {
-            return "unknown";
+            return RegeditStrings.Get("AboutVersionUnknown");
         }
 
         return string.Create(CultureInfo.InvariantCulture, $"{version.Major}.{version.Minor}.{version.Build}");
@@ -201,6 +214,9 @@ internal static unsafe partial class ShellDialogNative
 
     [LibraryImport("user32.dll")]
     internal static partial uint GetDpiForWindow(nint hwnd);
+
+    [LibraryImport("user32.dll")]
+    internal static partial int DestroyIcon(nint icon);
 
     [LibraryImport("shell32.dll", StringMarshalling = StringMarshalling.Utf16)]
     internal static partial int ShellAboutW(nint hwnd, string applicationName, string otherStuff, nint icon);

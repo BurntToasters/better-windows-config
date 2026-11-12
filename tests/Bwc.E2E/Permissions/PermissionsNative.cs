@@ -42,9 +42,6 @@ internal static class PermissionsNative
     [DllImport("user32.dll")]
     internal static extern IntPtr GetWindow(IntPtr hWnd, int command);
 
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    internal static extern bool SetForegroundWindow(IntPtr hWnd);
 #pragma warning restore SYSLIB1054
 
     internal static string ClassOf(IntPtr hWnd)

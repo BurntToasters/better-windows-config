@@ -87,27 +87,29 @@ but never a key outside it.
 
 ## 11. Locking out the user
 
-A DACL that removes the current user's `READ_CONTROL` or `WRITE_DAC` can make the key impossible to
-repair through the same UI. The engine does not silently add an administrator ACE or rewrite the
-owner. Tests grant full control to the current user and restore the original descriptor in a
-`finally` block. The UI test cancels the dialog and never presses OK or Apply, so a UI failure cannot
-change an ACL.
+A DACL that removes the current user's own access does not lock the owner out. A registry key's owner
+always has implicit `READ_CONTROL` and `WRITE_DAC` (no `OWNER RIGHTS` ACE is present), so the owner can
+open the key with `WRITE_DAC` alone and write a new DACL, without elevation. Classic regedit allows the
+same change. The engine does not silently add an administrator ACE or rewrite the owner. Recovery is
+described in section 26. Tests grant full control to the current user and restore the original
+descriptor in a `finally` block. The UI test cancels the dialog and never presses OK or Apply, so a UI
+failure cannot change an ACL.
 
 ## 12. Inheritance
 
 A protected DACL stops inheriting from the parent; an unprotected DACL resumes inheritance. aclui
-may present both. The engine does not recompute inherited ACEs and does not walk subkeys. Changing
-one key's DACL therefore does not update existing children, which matches `RegSetKeySecurity`.
-Callers that need recursive propagation must do it explicitly, one key at a time, with a failure
-path that reports which keys were already changed.
+may present both. A plain `SetKeySecurity` call (no propagation) changes only the named key and
+does not update existing children, which matches `RegSetKeySecurity`. Recursive propagation is a
+separate call (section 15) and is the only path that changes children.
 
 ## 13. E2E cleanup
 
 E2E tests create a disposable key under `HKCU\Software\BWC-E2E\<run-id>` and delete the run root in
 `finally`. They also remove the empty parent when possible and terminate every launched Regedit
 process. A failed restore is a test failure, not a warning, because a changed ACL can outlive the
-run. The engine tests restore the original descriptor before deleting the key, and the UI tests only
-open and cancel the dialog.
+run. The engine tests delete their run trees through the shared walk described in section 26, which
+restores the owner's full control on each key before its subkeys are listed, so a key left with no
+entries for the current user is still removed. The UI tests only open and cancel the dialog.
 
 ## 14. Native calls and allocations
 
@@ -125,9 +127,185 @@ The engine offers `RegistryWriter.SetKeySecurity(path, descriptor, information, 
 check, the sandbox link refusal, cancellation, and progress are described in
 `registry-writer.md` section I. Summary for the dialog owner:
 
-- Propagation applies the descriptor to the key and to every key below it. The first failure stops
-  the walk and throws the Win32 error for that key. Keys already changed stay changed.
+- The key receives the descriptor exactly as given. Each descendant then receives only the entries
+  it inherits from its parent: explicit entries are removed, the protected state is cleared, and
+  inherited entries carry `INHERITED_ACE`. The inherited set is computed from the parent's DACL by
+  the rules in `RegistrySecurityInheritance` (section 18), not by copying the parent's descriptor.
+- The walk lists each key's subkeys before that key's DACL changes, so a key whose new DACL denies the
+  current user enumeration is still walked. A key whose inherited entries give the current user no
+  access stays readable only to its owner (section 26). The propagation does not refuse that case.
+- Owner and group are copied to descendants only when the caller asks for them in `information`.
+  SACL propagation is refused with `ArgumentException` (section 22).
+- The first failure stops the walk and throws the Win32 error for that key. Keys already changed
+  stay changed, with no rollback.
 - The sandbox refuses a propagation whose subtree contains a link, before any key changes.
-- Cancelling stops between keys and throws `OperationCanceledException`.
-- Each descendant gets the exact descriptor, not an inheritance-computed one. This differs from
-  classic `TreeSetNamedSecurityInfo` and is recorded as a known difference (`registry-writer.md` I5).
+- Cancelling stops between keys and throws `OperationCanceledException`. Progress is reported
+  after each key, including the root.
+
+## 16. aclui flags for the Permissions dialog
+
+The dialog passes `SI_EDIT_ALL | SI_ADVANCED | SI_CONTAINER | SI_RESET_DACL_TREE` in
+`GetObjectInformation`. `SI_CONTAINER` makes the Permission Entry page offer the inheritance
+choices and makes new ACEs container-inheritable. `SI_ADVANCED` opens the Advanced page with the
+inheritance list. `SI_RESET_DACL_TREE` adds the "Replace all child object permission entries"
+check box, which the classic MSG-176 text names. Without `SI_CONTAINER`, a new ACE is not inherited
+by subkeys, which is the defect this section fixes.
+
+- `SI_RESET_SACL_TREE` (classic MSG-177, audit replace) is not offered. The engine does not
+  propagate SACLs (section 22), so the check box would have nothing to do.
+- `SI_OWNER_RECURSE` is not offered. The classic inventory has no owner-recursion text (MSG-176 to
+  MSG-179 cover only permission and audit replacement), so classic regedit does not show it.
+- Test: `PermissionsPropagationTests` opens Advanced on the sandbox key and checks the inheritance
+  list and the replace check box exist.
+
+## 17. Inherit types (`GetInheritTypes`)
+
+`GetInheritTypes` returned `E_NOTIMPL`, so the inheritance list in the permission editor had no
+entries. The list is now three entries, with ACE flags from `RegistryInheritanceModes`:
+
+- "This key only": no inheritance flags.
+- "This key and subkeys": `CONTAINER_INHERIT_ACE`.
+- "Subkeys only": `CONTAINER_INHERIT_ACE | INHERIT_ONLY_ACE`.
+
+Failure: a flag value that does not match the ACE constants gives an ACE that a subkey does not
+inherit, or that applies to the key itself when only subkeys were chosen. Test:
+`InheritModesUseTheWin32AceFlags`. The `GetInheritTypes` COM method returns `S_OK` with
+the same three entries. Test: `PermissionsPropagationTests` checks the Advanced page lists them.
+
+## 18. Propagation semantics (classic "Replace all child object permission entries")
+
+Failure: copying the parent's descriptor to every child gives each child the parent's explicit
+entries and its protection state, so a child that was never meant to change gets explicit ACEs
+and loses its own. The walk now computes each child's DACL from the parent's effective DACL.
+
+- The explicit ACEs on a child are removed and replaced by the inherited ACEs of its parent.
+- Rules, applied to each parent ACE in order: an ACE is passed down only with `CONTAINER_INHERIT_ACE`
+  (keys have no object children, so an `OBJECT_INHERIT_ACE`-only entry does not apply). The copy is
+  marked `INHERITED_ACE`. `INHERIT_ONLY_ACE` is cleared on the copy, because the child applies it.
+  `NO_PROPAGATE_INHERIT_ACE` clears the inheritance flags on the copy, so the grandchildren do not
+  receive it. The child's DACL is unprotected.
+- A child can end with no entries for the current user, when the parent grants that user access only
+  to the key itself (no `CONTAINER_INHERIT_ACE`). The propagation is not refused for that reason. The
+  owner recovers the child with `WRITE_DAC` (section 26).
+- Tests: `PropagationGivesEveryDescendantOnlyInheritedEntries`,
+  `PropagationClearsTheProtectedStateOfChildren`,
+  `PropagationRemovesTheUsersOwnAccessAndTheOwnerRecoversIt`. The cancellation and progress tests in
+  `RegistryWriterHardeningTests` use an inheritable entry for the current user.
+
+## 19. Propagation refused by the link guard
+
+Under the sandbox, a propagation whose subtree contains a symbolic link is refused before the root
+or any child is changed. Test: `SetKeySecurityPropagationRefusesLinkedSubtreeAndChangesNothing`.
+
+## 20. Propagation fails part way
+
+When a child fails (for example `WRITE_DAC` denied, or the system refuses the computed DACL), the
+walk stops, the error is thrown with the child's path, and the keys already changed keep their new
+entries. There is no rollback because a rollback could undo a change the user made after the
+dialog opened. The dialog reports the Win32 code. No automated test: a sandbox key owned by the
+test user always grants `WRITE_DAC`. The rule is reviewed in `RegistryWriter.Security.cs`.
+
+## 21. Computing inherited entries fails
+
+The inherited DACL is built in managed code, so a malformed parent or child descriptor fails with
+`ArgumentException` from `RegistrySecurityDescriptor.Validate`. The engine maps it to
+`RegistryOperationException` with the child path and `ERROR_INVALID_SECURITY_DESCR` (1338), and nothing
+is written for that child. No automated test: the parent descriptor is always one the engine read
+back from the registry, so a malformed parent cannot be produced through the public API.
+
+An earlier version used `ConvertToAutoInheritPrivateObjectSecurity`. For a parent with an inheritable
+entry it returned an empty, protected DACL with no inherited entries, so it was replaced and is not
+used.
+
+## 22. SACL and audit propagation
+
+Propagating a SACL needs `SeSecurityPrivilege`, which a normal user process does not hold, and
+audit entries are not inherited the same way. Passing `Sacl` together with a propagation is refused
+with `ArgumentException` before any change. The dialog never sends it: the root audit change goes
+through a separate non-propagating call. Test: `PropagationRefusesSaclBeforeAnyChange`.
+
+## 23. Absolute descriptors from aclui
+
+`RegistrySecurityDescriptor.CopyFromNative` assumed a self-relative descriptor. aclui can pass an
+absolute one. The copy now converts an absolute descriptor with `MakeSelfRelativeSD` before the
+length check, and a descriptor that cannot be converted is rejected with `ArgumentException`.
+Tests: `CopyFromNativeConvertsAnAbsoluteDescriptor`, `CopyFromNativeRejectsANullPointer`.
+
+## 24. Background write and reentrancy
+
+The dialog runs the write on a thread-pool thread and waits on the UI thread while it pumps window
+messages, so the window keeps painting during a long propagation. aclui can call `SetSecurity`
+again while the first call is still pumping. The second call returns `E_PENDING` and changes
+nothing. No automated test: aclui cannot be driven reentrantly. Reviewed in
+`RegistryPermissionsDialog.cs`.
+
+## 25. Classic error text
+
+The Permissions dialog maps its failures to the classic regedit texts in `Resources.resw` through
+`MessageCatalog`. Oracle ids are from `docs/parity/oracle/regedit-resources.md`; inventory ids are from
+`docs/parity/regedit-inventory.md`.
+
+- A save or propagation that fails with `ERROR_ACCESS_DENIED` shows MSG-184 (oracle 7070, "could not
+  save the security information ... does not give you access to save such information").
+- Any other save or propagation failure shows MSG-186 (oracle 7072, "could not set security in the key
+  currently selected, or some of its subkeys."). The inventory lists MSG-186 for this case, and it was
+  not in the first list of texts for this change.
+- A failed retrieval keeps MSG-181 to MSG-183 (oracle 7050 to 7052).
+- The "Replace all child object permission entries" check box is drawn by aclui, not by the Registry
+  Editor. On this machine aclui labels it "Replace all child object permission entries", so the
+  classic MSG-176 text (oracle 7015, "R&eplace Permission on Existing Subkeys") is not shown by any
+  control the Registry Editor owns. It is not added to the resources.
+- The confirmation before a propagation shows MSG-178 (oracle 7017) with the key path. Section 27.
+- Test: the E2E `Permissions_AdvancedReplaceChildEntriesGivesChildrenOnlyInheritedEntries` answers the
+  confirmation with Yes and records `permissions.propagation.replace-confirm`.
+
+## 26. Propagation removes the user's own access (owner recovery)
+
+Failure: the parent grants the current user access only to itself (for example `D:(A;;KA;;;<user>)`).
+Propagating that DACL leaves each child with no entries, so the current user can no longer enumerate
+the child's subkeys or query its values. A walk that lists a child's subkeys after changing the child
+fails on that child, so the walk lists the subkeys first.
+
+Recovery: the owner opens the child with `WRITE_DAC` alone and writes a DACL that grants the user access
+again. Verified on this machine without elevation: keys whose DACL denied the user everything were opened
+by the owner with `WRITE_DAC`, their DACL reset, and then deleted. Earlier failures came from opening a
+key with broader access (enumerate or query) than `WRITE_DAC` alone.
+
+Under the sandbox policy the engine cannot do this recovery. Its single-key `SetKeySecurity` opens the
+key through the link guard, which asks the last key for `KEY_QUERY_VALUE` and `KEY_ENUMERATE_SUB_KEYS` as
+well as `WRITE_DAC` and `READ_CONTROL`, and an emptied key denies those. The shipping policy opens the key
+with `WRITE_DAC | READ_CONTROL` and no guard, and was not run on this machine. The test performs the
+`WRITE_DAC`-only open through `RegistryLinkFixture.RestoreKeyOrRemoveLink`.
+
+Test: `PropagationRemovesTheUsersOwnAccessAndTheOwnerRecoversIt` checks that the children are left with
+no entries, that enumeration is denied to the user, and that a `WRITE_DAC` write restores enumeration.
+The children in that test are leaves. Under the sandbox policy the link guard opens every ancestor of a
+key with `KEY_READ` before it opens the key, so once the walk has emptied a child, a key below that child
+cannot be opened and the propagation stops there with access denied (`ERROR_ACCESS_DENIED`). Keys already
+changed keep their new entries (registry-writer.md I3). The shipping policy has no link guard and opens
+the key by its path directly. That path is expected to reach the key, because the access check applies to the
+key that is opened, but the shipping path is not exercised by these tests and was not verified here. The
+sandbox limit could be removed by opening each child relative to its parent's handle; that is not done.
+
+Test: `CleanupRemovesNestedKeysThatDenyTheCurrentUser` covers the cleanup of a nested key whose DACL is
+empty, below a key that grants the user access only to itself.
+
+Test cleanup: `SandboxRunCleanup.RemoveRunTree` walks a run tree depth-first. The run root's DACL is set
+through the engine. Each child is then opened with `REG_OPTION_OPEN_LINK` and `WRITE_DAC` alone
+(`RegistryLinkFixture.RestoreKeyOrRemoveLink`), given a DACL that grants the current user full control with
+`CONTAINER_INHERIT_ACE`, and removed instead if it is a link node. Its subkeys are listed only after that,
+and the walk recurses. The run root is deleted through the engine. The walk refuses any run id that is not
+a single segment under `HKCU\Software\BWC-E2E`.
+
+## 27. Replace confirmation (classic MSG-178)
+
+Failure: the propagation runs without a confirmation, so one click replaces the permissions of every
+subkey.
+
+When the "Replace all child object permission entries" check box is set, the dialog asks the classic
+MSG-178 question with the key path, with Yes and No buttons and No as the default. Answering No changes
+nothing and returns `E_ABORT` to aclui. The question is shown on the UI thread from inside
+`SetSecurity`, with a native `MessageBoxW` owned by the main window, because aclui calls back on the UI
+thread and cannot wait for a ContentDialog. The text is `MsgReplaceSubkeysConfirm`; the caption is
+`MsgCaptionRegistryEditor`. Test: the E2E permissions test records `permissions.propagation.replace-confirm`.
+Whether aclui shows its own message after `E_ABORT` is not verified on this machine.

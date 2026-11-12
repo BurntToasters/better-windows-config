@@ -22,10 +22,9 @@ internal sealed class FindController
 #endif
 
     /// <summary>
-    /// The progress line from RT_DIALOG 109. The shared resource map has no key for it, and the
-    /// resource map is outside this package.
+    /// The progress line from RT_DIALOG 109, read from the Registry Editor resources.
     /// </summary>
-    private const string SearchingRegistryText = "Searching the registry...";
+    private string SearchingRegistryText => Get("FindProgressSearching");
 
     private readonly RegeditContext _context;
     private RegistryFindQuery? _lastFindQuery;
@@ -56,12 +55,8 @@ internal sealed class FindController
             return;
         }
 
-        if (_findExhausted)
-        {
-            _context.StartCommand(ShowFinishedMessageAsync);
-            return;
-        }
-
+        // Exhausted or not, RunFindAsync decides: a selection the user moved starts a new search from
+        // that selection, as classic does, so the finished message is only for the same position.
         RegistryFindQuery query = _lastFindQuery;
         _context.StartCommand(() => RunFindAsync(ToOptions(query)));
     }
@@ -144,7 +139,6 @@ internal sealed class FindController
 
     /// <summary>
     /// Marks the template mnemonic letter. The resource strings carry no ampersands, and the shared
-    /// resource map is outside this package. A marker is used when the letter is not the first one.
     /// </summary>
     private static string Mnemonic(string text, string marker)
     {
@@ -175,11 +169,14 @@ internal sealed class FindController
         bool repeatsLastQuery = _lastFindQuery is not null && SameQuery(_lastFindQuery, query);
         RegistryFindCursor? cursor;
 
-        if (repeatsLastQuery && _lastFindHit is not null)
+        // Find Next resumes after the last hit only while the selection is still on that hit. Once the
+        // user has moved the selection, the search starts from the selection (classic behavior).
+        bool selectionMoved = repeatsLastQuery && _lastFindHit is not null && SelectionMovedSinceHit(_lastFindHit);
+        if (repeatsLastQuery && _lastFindHit is not null && !selectionMoved)
         {
             cursor = RegistryFindCursor.FromHit(_lastFindHit);
         }
-        else if (repeatsLastQuery && _findExhausted)
+        else if (repeatsLastQuery && _findExhausted && !selectionMoved)
         {
             await ShowFinishedMessageAsync();
             return;
@@ -332,6 +329,34 @@ internal sealed class FindController
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// True when the selection is no longer the position the last hit selected: another key, a value
+    /// other than the hit value, or a value selected for a key hit. The synthetic (Default) row has the
+    /// empty raw name, which is the name a default-value hit carries.
+    /// </summary>
+    private bool SelectionMovedSinceHit(RegistryFindHit hit)
+    {
+        if (!_context.TryGetSelectedKeyPath(out RegistryPath key) ||
+            !string.Equals(key.ToDisplayString(), hit.KeyPath.ToDisplayString(), StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        IReadOnlyList<DetailsRow> rows = _context.Shell.ListContent.SelectedRows;
+        if (hit.ValueName is null)
+        {
+            return rows.Count > 0;
+        }
+
+        if (rows.Count == 0)
+        {
+            return true;
+        }
+
+        _ = _context.TryGetRawValueName(rows[0], out string rawName);
+        return !string.Equals(rawName, hit.ValueName, StringComparison.Ordinal);
     }
 
     private RegistryFindCursor? CreateSelectionCursor()

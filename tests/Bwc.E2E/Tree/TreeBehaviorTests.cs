@@ -800,9 +800,7 @@ public sealed class TreeBehaviorTests
         string directory = Path.Combine(GuiGate.Config.ArtifactsDir, "visual", "tree");
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, name + ".png");
-        using var image = Capture.Element(session.Window);
-        image.ToFile(path);
-        return path;
+        return WindowCapture.SaveArtifact("tree.artifact." + name, session.MainHwnd, path);
     }
 
     private static void WriteTimings(object timings)

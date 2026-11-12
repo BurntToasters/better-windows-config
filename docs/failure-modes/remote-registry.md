@@ -161,3 +161,10 @@ handles; no other handle is shared. `scripts/check-registry-writer.js` continues
 
 The connection objects live in the Registry Editor view, not in a static cache. Closing the view
 disposes them. No credential, password, or token is stored; authentication uses the process token.
+
+## Parity package: remote write refusal
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| A write command (Load Hive, Import, Edit, New, Delete, Rename) runs with a remote node selected | Refused or disabled. Nothing reaches the writer |
+| Disconnect dialog opens with the wrong size or colors | Port of DLG-013 on `ClassicDialog`: 250 x 111 DLU, label at (7, 7), list at (7, 18) 236 x 63, OK at (138, 90), Cancel at (193, 90) |

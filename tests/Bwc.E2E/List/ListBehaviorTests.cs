@@ -662,14 +662,21 @@ public sealed class ListBehaviorTests
         string dir = Path.Combine(GuiGate.Config.ArtifactsDir, "visual", "list");
         Directory.CreateDirectory(dir);
         string path = Path.Combine(dir, name + ".png");
-        using (CaptureImage image = Capture.Element(session.Window))
+        bool written;
+        try
         {
-            image.ToFile(path);
+            _ = WindowCapture.Save(session.MainHwnd, path);
+            written = File.Exists(path) && new FileInfo(path).Length > 0;
+        }
+        catch (Exception ex)
+        {
+            written = false;
+            path += $" ({ex.GetType().Name}: {ex.Message})";
         }
 
-        bool written = File.Exists(path) && new FileInfo(path).Length > 0;
         artifact.Set("capture-" + name, path);
-        Record("list.capture." + name, written, $"saved '{path}'.");
+        // The PNG is the artifact. Writing it is not a product claim, so it is a note.
+        E2EResults.Note("list.capture." + name, $"saved '{path}', written={written}.");
     }
 
     private static void Record(string id, bool pass, string notes) => E2EResults.Record(id, pass, notes);

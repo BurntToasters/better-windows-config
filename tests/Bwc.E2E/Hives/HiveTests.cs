@@ -284,8 +284,12 @@ public sealed class HiveTests
     {
         try
         {
-            _ = SetForegroundWindow(dialog);
-            Thread.Sleep(300);
+            // Escape goes to the dialog only when the guard has made it the foreground window.
+            if (!ForegroundGuard.Ensure(dialog, "dialog.hive.foreground", TimeSpan.FromSeconds(2)))
+            {
+                return false;
+            }
+
             Keyboard.Press(VirtualKeyShort.ESCAPE);
             return ControlTestSupport.WaitUntil(() => !IsWindow(dialog), TimeSpan.FromSeconds(3));
         }
@@ -360,9 +364,6 @@ public sealed class HiveTests
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsWindow(nint window);
 
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetForegroundWindow(nint window);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetClassName(nint window, StringBuilder className, int maxCount);

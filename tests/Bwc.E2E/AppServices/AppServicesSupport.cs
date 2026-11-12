@@ -22,7 +22,6 @@ internal sealed class RegeditProcess : IDisposable
 {
     private readonly Process _process;
     private readonly UIA3Automation _automation;
-    private readonly WindowWatchdog _watchdog;
     private bool _disposed;
 
     private RegeditProcess(Process process, UIA3Automation automation, IntPtr mainHwnd)
@@ -30,11 +29,6 @@ internal sealed class RegeditProcess : IDisposable
         _process = process;
         _automation = automation;
         MainHwnd = mainHwnd;
-
-        // Same rule as AppSession: every visible window of this process, including owned dialogs,
-        // stays above other applications until Close.
-        _ = Win32.SetTopmost(mainHwnd, true);
-        _watchdog = new WindowWatchdog(unchecked((uint)process.Id));
     }
 
     public IntPtr MainHwnd { get; }
@@ -114,9 +108,6 @@ internal sealed class RegeditProcess : IDisposable
 
     public AutomationElement? Find(string automationId)
     {
-        // A menu flyout or an owned dialog is a separate top level window. Raise the process windows
-        // before every read so the element is not read or clicked while another window covers it.
-        RaiseWindows();
         try
         {
             return Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
@@ -155,30 +146,16 @@ internal sealed class RegeditProcess : IDisposable
 
             // A real click on the command. UI Automation Invoke waits for the command to return, and a
             // command that opens a modal dialog would hold the test thread until that dialog closes.
-            // Raise the flyout first, or the click would land on the topmost main window behind it.
-            RaiseWindows();
+            // The click goes to whatever window is under the point, so a flyout that is not on top is a
+            // product finding, not something the harness hides.
             var bounds = element.BoundingRectangle;
             AppServicesSupport.Click(bounds.Left + (bounds.Width / 2), bounds.Top + (bounds.Height / 2));
             Thread.Sleep(400);
         }
     }
 
-    /// <summary>Raises the visible top level windows of this process, owned dialogs included, without activating one.</summary>
-    public void RaiseWindows() => _ = Win32.RaiseProcessWindows(unchecked((uint)ProcessId));
-
-    /// <summary>Brings the main window forward with a real click on its title bar when focus is refused.</summary>
-    public void Focus()
-    {
-        RaiseWindows();
-        if (AppServicesSupport.ForceForeground(MainHwnd))
-        {
-            return;
-        }
-
-        var rect = AppServicesSupport.RectOf(MainHwnd);
-        AppServicesSupport.Click(rect.Left + ((rect.Right - rect.Left) / 2), rect.Top + 8);
-        _ = AppServicesSupport.WaitUntil(() => AppServicesSupport.IsForeground(MainHwnd), TimeSpan.FromSeconds(3));
-    }
+    /// <summary>Makes the main window the foreground window through the guard. Returns false when it is not.</summary>
+    public bool Focus() => ForegroundGuard.Ensure(MainHwnd, "gui.foreground.regedit");
 
     /// <summary>
     /// Closes the window the way a user does: the window takes the foreground, then Alt+F4 goes in as raw
@@ -192,7 +169,7 @@ internal sealed class RegeditProcess : IDisposable
             return true;
         }
 
-        bool foreground = AppServicesSupport.ForceForeground(MainHwnd);
+        bool foreground = ForegroundGuard.Ensure(MainHwnd, "gui.foreground.regedit.close");
         if (foreground)
         {
             RawKeyboard.WithHeld(RawKeyboard.Alt, () => RawKeyboard.Tap(RawKeyboard.F4));
@@ -211,13 +188,11 @@ internal sealed class RegeditProcess : IDisposable
     /// <summary>Closes the window the way a user does, so the settings are saved on close.</summary>
     public void Close()
     {
-        _watchdog.Dispose();
         if (_process.HasExited)
         {
             return;
         }
 
-        _ = Win32.SetTopmost(MainHwnd, false);
         try
         {
             _ = _process.CloseMainWindow();
@@ -244,7 +219,6 @@ internal sealed class RegeditProcess : IDisposable
         _disposed = true;
         try
         {
-            _watchdog.Dispose();
             Close();
         }
         finally
@@ -380,47 +354,72 @@ internal static class AppServicesSupport
         return dpi == 0 ? 96u : dpi;
     }
 
-    /// <summary>Activates a window. Returns true when it became the foreground window within the wait.</summary>
-    internal static bool ForceForeground(IntPtr hwnd) => Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(2));
-
     /// <summary>
-    /// Raises one window of the app above the app's other windows and above foreign windows, without
-    /// activating it. The process windows are raised first, then this window last, so it ends on top
-    /// of its owner and of any other popup.
+    /// Makes a window of the app the foreground window for input, through <see cref="ForegroundGuard"/>. A false
+    /// result is already recorded as the failed <paramref name="checkId"/> check.
     /// </summary>
-    internal static void RaiseWindow(IntPtr hwnd)
-    {
-        uint processId = Win32.ProcessIdOf(hwnd);
-        if (processId != 0)
-        {
-            _ = Win32.RaiseProcessWindows(processId);
-        }
-
-        _ = Win32.SetTopmost(hwnd, true);
-    }
+    internal static bool Activate(IntPtr hwnd, string checkId) => ForegroundGuard.Ensure(hwnd, checkId);
 
     /// <summary>
-    /// Dismisses a modal message with Enter, its default button. The message and its process windows
-    /// are raised first, and Enter is sent only after the message has the foreground, so the key
-    /// cannot reach another window. A message that does not take the foreground, or stays open after
-    /// one press, is tried again until the timeout. Returns true when the message is gone.
+    /// Dismisses a modal message with Enter, its default button. The message is checked for z order and
+    /// foreground first. Enter is sent only through the guard, so the key cannot reach another window. A
+    /// retry happens only after a foreign-foreground event, at most three attempts, and the attempt count is
+    /// recorded in a note. Returns true when the message is gone.
     /// </summary>
     internal static bool DismissMessage(IntPtr message, TimeSpan timeout)
     {
-        DateTime deadline = DateTime.UtcNow + timeout;
-        while (IsWindow(message) && DateTime.UtcNow < deadline)
+        if (!IsWindow(message))
         {
-            RaiseWindow(message);
-            if (ForceForeground(message))
-            {
-                Keyboard.Press(VirtualKeyShort.ENTER);
-            }
-
-            _ = WaitUntil(() => !IsWindow(message), TimeSpan.FromSeconds(2));
+            return true;
         }
 
-        return !IsWindow(message);
+        OwnedWindowChecks.Record(message);
+        int attempts = 0;
+        int foreignBefore = ForegroundGuard.ForeignEvents;
+        DateTime deadline = DateTime.UtcNow + timeout;
+        while (IsWindow(message) && DateTime.UtcNow < deadline && attempts < MaxInputAttempts)
+        {
+            attempts++;
+            if (!Activate(message, "dialog.message.foreground"))
+            {
+                break;
+            }
+
+            Keyboard.Press(VirtualKeyShort.ENTER);
+            if (WaitUntil(() => !IsWindow(message), TimeSpan.FromSeconds(2)))
+            {
+                break;
+            }
+
+            if (ForegroundGuard.ForeignEvents == foreignBefore)
+            {
+                break;
+            }
+
+            foreignBefore = ForegroundGuard.ForeignEvents;
+        }
+
+        bool gone = !IsWindow(message);
+        if (attempts > 1)
+        {
+            E2EResults.Note("harness.retry.dismissmessage", $"Enter on the message was sent {attempts} time(s); gone={gone}.");
+        }
+
+        if (!gone && attempts > 0)
+        {
+            E2EResults.Record(
+                "dialog.message.dismissed",
+                false,
+                $"The message 0x{message.ToInt64():X} stayed open after {attempts} Enter attempt(s).");
+        }
+
+        return gone;
     }
+
+    /// <summary>
+    /// Input attempts a helper makes after foreign-foreground events. The first failure of a product step is final.
+    /// </summary>
+    internal const int MaxInputAttempts = 3;
 
     /// <summary>A real left click at a screen point.</summary>
     internal static void Click(int x, int y)
@@ -436,7 +435,6 @@ internal static class AppServicesSupport
     /// </summary>
     internal static string DialogText(IntPtr dialog)
     {
-        RaiseWindow(dialog);
         using var automation = new UIA3Automation();
         AutomationElement window = automation.FromHandle(dialog);
         return string.Join(" | ", window.FindAllDescendants().Select(element => ControlTestSupport.SafeName(element)));
@@ -466,66 +464,104 @@ internal static class AppServicesSupport
     }
 
     /// <summary>
-    /// Clicks the dialog button whose name matches, after the dialog and its process windows are raised
-    /// and the dialog takes the foreground. Each click uses fresh bounds. A click that leaves the dialog
-    /// open is retried within a short bounded time, so a click that landed while the dialog was moving is
-    /// not the end of the test. A missing button throws, so the caller fails with the button name.
+    /// Clicks the dialog button whose name matches. The dialog is checked for foreground through the guard first,
+    /// and no click is sent when the app's own window holds the focus (that failure is already a failed check).
+    /// A click that leaves the dialog open is retried at most <see cref="MaxInputAttempts"/> times, and only after a
+    /// foreign-foreground event. The attempt count is recorded in a note. A dialog that is still open at the end
+    /// throws, so the caller fails with the button name. A missing button throws too.
     /// </summary>
     internal static void ClickButton(RegeditProcess app, IntPtr dialog, string name)
+    {
+        if (!IsWindow(dialog))
+        {
+            return;
+        }
+
+        OwnedWindowChecks.Record(dialog);
+        int attempts = 0;
+        int foreignBefore = ForegroundGuard.ForeignEvents;
+        while (IsWindow(dialog) && attempts < MaxInputAttempts)
+        {
+            attempts++;
+            System.Drawing.Rectangle? bounds = WaitForButtonBounds(app, dialog, name);
+            if (bounds is not { } rect)
+            {
+                break;
+            }
+
+            if (!Activate(dialog, "dialog.button.foreground." + OwnedWindowChecks.LabelOf(dialog)))
+            {
+                break;
+            }
+
+            Click((int)(rect.Left + (rect.Width / 2)), (int)(rect.Top + (rect.Height / 2)));
+            if (WaitUntil(() => !IsWindow(dialog), TimeSpan.FromSeconds(2)))
+            {
+                break;
+            }
+
+            if (ForegroundGuard.ForeignEvents == foreignBefore)
+            {
+                break;
+            }
+
+            foreignBefore = ForegroundGuard.ForeignEvents;
+        }
+
+        if (attempts > 1)
+        {
+            E2EResults.Note("harness.retry.clickbutton", $"'{name}' was clicked {attempts} time(s); dialog open={IsWindow(dialog)}.");
+        }
+
+        if (IsWindow(dialog))
+        {
+            throw new InvalidOperationException(
+                $"The '{name}' button did not close the dialog 0x{dialog.ToInt64():X} after {attempts} attempt(s).");
+        }
+    }
+
+    /// <summary>
+    /// The bounds of a dialog button with a size, read fresh. Returns null when the dialog closed while the button
+    /// was being looked for. Throws when the button is missing or has no size after the wait.
+    /// </summary>
+    private static System.Drawing.Rectangle? WaitForButtonBounds(RegeditProcess app, IntPtr dialog, string name)
     {
         DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
         while (true)
         {
             if (!IsWindow(dialog))
             {
-                return;
+                return null;
             }
 
-            RaiseWindow(dialog);
-            AutomationElement? button;
+            AutomationElement? button = null;
             try
             {
                 button = FindButton(app, dialog, name);
             }
             catch (Exception) when (!IsWindow(dialog))
             {
-                return;
+                return null;
             }
 
-            if (button is null)
+            if (button is not null)
             {
-                if (!IsWindow(dialog))
+                var rect = button.BoundingRectangle;
+                if (rect.Width > 0 && rect.Height > 0)
                 {
-                    return;
+                    return rect;
                 }
-
-                if (DateTime.UtcNow >= deadline)
-                {
-                    throw new InvalidOperationException($"The dialog has no '{name}' button.");
-                }
-
-                Thread.Sleep(100);
-                continue;
             }
 
-            var rect = button.BoundingRectangle;
-            if (rect.Width <= 0 || rect.Height <= 0)
+            if (DateTime.UtcNow >= deadline)
             {
-                if (DateTime.UtcNow >= deadline)
-                {
-                    throw new InvalidOperationException($"The dialog's '{name}' button has no clickable bounds.");
-                }
-
-                Thread.Sleep(100);
-                continue;
+                throw new InvalidOperationException(
+                    button is null
+                        ? $"The dialog has no '{name}' button."
+                        : $"The dialog's '{name}' button has no clickable bounds.");
             }
 
-            _ = ForceForeground(dialog);
-            Click((int)(rect.Left + (rect.Width / 2)), (int)(rect.Top + (rect.Height / 2)));
-            if (WaitUntil(() => !IsWindow(dialog), TimeSpan.FromSeconds(1)) || DateTime.UtcNow >= deadline)
-            {
-                return;
-            }
+            Thread.Sleep(100);
         }
     }
 
@@ -609,9 +645,8 @@ internal static class AppServicesSupport
     }
 
     /// <summary>
-    /// Waits for an owned window to appear and returns its handle, or zero on timeout. A window that
-    /// is found is raised above its owner and above foreign windows before it is returned, so the
-    /// caller's read or click cannot land on another window.
+    /// Waits for an owned window to appear and returns its handle, or zero on timeout. A window that is found gets
+    /// the z-order and foreground checks (<see cref="OwnedWindowChecks"/>) once, as it appeared, without any raise.
     /// </summary>
     internal static IntPtr WaitForOwnedWindow(
         IntPtr owner,
@@ -627,7 +662,7 @@ internal static class AppServicesSupport
                 found = FindOwnedWindow(owner, className, title, except);
                 if (found != IntPtr.Zero)
                 {
-                    RaiseWindow(found);
+                    OwnedWindowChecks.Record(found);
                 }
 
                 return found != IntPtr.Zero;
@@ -639,7 +674,8 @@ internal static class AppServicesSupport
     /// <summary>
     /// Waits for an owned window whose dialog text matches. Windows that do not match are skipped,
     /// including the import progress dialog, which has the same title as the result message. The
-    /// owned windows are scanned again until the matching window appears or the timeout passes.
+    /// owned windows are scanned again until the matching window appears or the timeout passes. The
+    /// window that matches gets the z-order and foreground checks once, as it appeared.
     /// </summary>
     internal static IntPtr WaitForOwnedWindowText(
         IntPtr owner,
@@ -655,7 +691,7 @@ internal static class AppServicesSupport
                 found = FindOwnedWindowText(owner, className, matches, exclude);
                 if (found != IntPtr.Zero)
                 {
-                    RaiseWindow(found);
+                    OwnedWindowChecks.Record(found);
                 }
 
                 return found != IntPtr.Zero;

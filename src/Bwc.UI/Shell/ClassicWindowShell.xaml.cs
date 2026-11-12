@@ -505,7 +505,7 @@ public sealed partial class ClassicWindowShell : UserControl
 
     /// <summary>
     /// Puts a check mark on View &gt; Address Bar while the address bar is showing. The item is a
-    /// ToggleMenuFlyoutItem; its check glyph sits in the reserved gutter, so the label does not move.
+    /// CheckMenuFlyoutItem; its check glyph sits in the reserved gutter, so the label does not move.
     /// </summary>
     private void SyncAddressBarCheck()
     {
@@ -519,7 +519,7 @@ public sealed partial class ClassicWindowShell : UserControl
     {
         foreach (var entry in items)
         {
-            if (entry is ToggleMenuFlyoutItem toggle && toggle.Tag is int id && id == commandId)
+            if (entry is CheckMenuFlyoutItem toggle && toggle.Tag is int id && id == commandId)
             {
                 toggle.IsChecked = isChecked;
             }

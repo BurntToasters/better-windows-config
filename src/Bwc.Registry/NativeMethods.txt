@@ -29,3 +29,5 @@ GetCurrentProcess
 LookupPrivilegeValue
 AdjustTokenPrivileges
 GetTokenInformation
+MakeSelfRelativeSD
+GetSecurityDescriptorControl

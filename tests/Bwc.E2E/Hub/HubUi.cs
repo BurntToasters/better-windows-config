@@ -155,21 +155,17 @@ internal static class HubUi
         }
     }
 
-    /// <summary>Brings a window to the foreground so keystrokes reach it. See <see cref="Win32.Foreground"/>.</summary>
-    public static bool Foreground(IntPtr hwnd, TimeSpan timeout) => Win32.Foreground(hwnd, timeout);
+    /// <summary>Makes a Hub window the foreground window for input, through <see cref="ForegroundGuard"/>.</summary>
+    public static bool Foreground(IntPtr hwnd, TimeSpan timeout) => ForegroundGuard.Ensure(hwnd, "gui.foreground.hub", timeout);
 
     /// <summary>
-    /// Raises a Hub dialog above the topmost Hub window and activates it. Clicks and screen copies aimed at the
-    /// dialog are sent only after this returns true, so they cannot land on the Hub or on a window that covers it.
+    /// Makes a Hub dialog the foreground window before a click or a read. Clicks aimed at the dialog are sent only
+    /// after this returns true, so they cannot land on the Hub or on a window that covers it. Failure is a recorded check.
     /// </summary>
-    public static bool RaiseDialog(IntPtr hwnd, TimeSpan timeout)
-    {
-        _ = Win32.SetTopmost(hwnd, true);
-        return Win32.ForceForeground(hwnd, timeout);
-    }
+    public static bool RaiseDialog(IntPtr hwnd, TimeSpan timeout) => ForegroundGuard.Ensure(hwnd, "dialog.hub.foreground", timeout);
 
-    /// <summary>Brings a window to the foreground, attaching to its thread when refused.</summary>
-    public static bool ForceForeground(IntPtr hwnd, TimeSpan timeout) => Win32.ForceForeground(hwnd, timeout);
+    /// <summary>Brings a Hub window to the foreground through the guard. A foreign foreground is re-asserted.</summary>
+    public static bool ForceForeground(IntPtr hwnd, TimeSpan timeout) => ForegroundGuard.Ensure(hwnd, "gui.foreground.hub", timeout);
 
     /// <summary>
     /// Names the foreground window, its process, and whether a Registry Editor process is still running. The text goes
@@ -207,7 +203,6 @@ internal static class HubUi
         do
         {
             _ = ForceForeground(hub.MainHwnd, TimeSpan.FromSeconds(2));
-            hub.RaiseWindows();
             AutomationElement? help = FindInProcess(automation, hub.ProcessId, "MenuCommand_Help", TimeSpan.FromSeconds(3));
             if (help is null)
             {
@@ -404,9 +399,9 @@ internal static class HubUi
 
     /// <summary>
     /// Saves a capture of a window's visible frame. The bounds are the DWM extended frame bounds, which
-    /// leave out the invisible resize border that GetWindowRect includes, and the pixels are read from
-    /// the screen. The caller brings the window to the foreground first. PrintWindow was not used: it
-    /// returned only part of the XAML content, so the captures were cropped. Returns the path written.
+    /// leave out the invisible resize border that GetWindowRect includes. The pixels are a verified, settled
+    /// screen copy (WindowCapture), so a window above it makes the capture not judged, and nothing is raised for the
+    /// capture. Returns the path written.
     /// </summary>
     public static string CaptureWindow(IntPtr hwnd, string path)
     {
@@ -419,13 +414,18 @@ internal static class HubUi
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-        using (Graphics graphics = Graphics.FromImage(bitmap))
+        try
         {
-            graphics.CopyFromScreen(rect.Left, rect.Top, 0, 0, new Size(width, height), CopyPixelOperation.SourceCopy);
+            using Bitmap bitmap = WindowCapture.CaptureRegion(hwnd, new Point(rect.Left, rect.Top), width, height);
+            bitmap.Save(path, ImageFormat.Png);
+        }
+        catch (WindowCapture.NotJudgedException ex)
+        {
+            // An artifact, not a check: a covered window is a note and no file is claimed.
+            E2EResults.Note("hub.capture.notjudged", $"{Path.GetFileName(path)}: {ex.Message}");
+            return string.Empty;
         }
 
-        bitmap.Save(path, ImageFormat.Png);
         return path;
     }
 

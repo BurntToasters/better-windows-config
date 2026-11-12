@@ -9,7 +9,7 @@
 ;   /D=<dir>           install folder; must be the last switch and unquoted (NSIS rule)
 ;   /RELAUNCH          start the Hub after a successful install. The updater does not pass this,
 ;                      because it starts the Hub itself after the installer exits.
-;   /PARENTPID=<n>     the updater process that launched this setup. It is excluded from the close step.
+;   /PARENTPID=<n>     the updater process that launched this setup. The setup waits for it to exit, then excludes it from the close step.
 ;   /RUNID=<id>        E2E builds only (required). Uninstall key under HKCU\Software\BWC-E2E\<id>.
 ;   /SHORTCUTS=<dir>   E2E builds only (required). Folder for the two Start menu shortcuts.
 ;
@@ -211,6 +211,11 @@ Function BwcCloseRunningApps
   BwcCloseInst_update:
   InitPluginsDir
   File "/oname=$PLUGINSDIR\${BWC_UPDATER_EXE}" "${BWC_UPDATER_SRC}"
+  ; The updater that launched this setup exits right after it starts the setup. Wait for it first, so
+  ; no file is replaced while its copy of BwcUpdate.exe is still in use. Then close the apps, excluding it.
+  StrCmp $BwcParentPid "" BwcCloseInst_noparent 0
+  !insertmacro BWC_WAIT_PARENT_BODY "install" "$PLUGINSDIR\${BWC_UPDATER_EXE}"
+  BwcCloseInst_noparent:
   StrCpy $BwcCloseArgs ""
   StrCmp $BwcParentPid "" +2 0
   StrCpy $BwcCloseArgs "--exclude-pid $BwcParentPid"

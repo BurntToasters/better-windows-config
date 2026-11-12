@@ -64,11 +64,28 @@ remedy. The harness does not copy files into the publish folder.
 
 ## 6. Window not foreground so keys go elsewhere
 
-Synthetic keyboard input goes to the foreground window, not to a chosen HWND. Before sending any
-key, `AppSession.SendKeys` checks `GetForegroundWindow`, calls `SetForegroundWindow` and FlaUI's
-`SetForeground`, and polls for up to 3 seconds. If the target window still is not foreground, it
-records a failed `gui.foreground.<exe>` check and throws. It never types into an unknown window.
-The current smoke tests do not send keys, but future tests inherit this guard.
+Synthetic keyboard input goes to the foreground window, not to a chosen HWND. Every keystroke batch
+and every click aimed at the app or one of its dialogs goes through `ForegroundGuard.Ensure`
+(`Harness/ForegroundGuard.cs`). The guard reads the foreground window first and decides from its
+owner process, never from a forced topmost flag:
+
+- The foreground is the target: nothing is sent and nothing is recorded.
+- The foreground belongs to the app under test (any window of its process, including its own popups
+  and dialogs) but is not the target: no re-assert. This is a product focus bug, so the guard records
+  a failed check and the caller does not retry. Keys are not sent to the wrong window.
+- The foreground belongs to another process (a chat app, for example): the guard records the note
+  `harness.foreign-foreground` with the foreign process name, re-asserts the target through the
+  attached-thread path in `Win32.ForceForeground`, and waits up to the timeout. If the target still
+  is not foreground, the guard records a failed check. A foreign foreground never fails a product
+  check by itself.
+- The foreground is the desktop or no window (zero handle): treated as foreign, with the name `none`.
+
+`AppSession.SendKeys` uses the guard for `gui.foreground.<exe>`. The guard also counts foreign
+foreground events, so retry helpers can tell a foreign event from a product failure (section 21).
+
+The harness never raises the app's windows above other applications. There is no topmost flag and no
+watchdog thread, so a dialog that opens behind the main window, or behind another app, stays where
+the product put it and the z-order checks (section 20) see it.
 
 ## 7. UIA stale elements after a modal
 
@@ -124,8 +141,30 @@ successful artifact from masking a crashed run.
 Failed checks try to capture the application window, falling back to the full screen. A capture
 can fail because the window closed, the desktop is locked, or the screenshot folder cannot be
 written. Screenshot errors are appended to the check notes and never replace the original
-failure message. The test still fails for the original reason. `HarnessTests` exercises the
-capture helper against a live window, checks that the PNG exists, and deletes it.
+failure message. The test still fails for the original reason.
+
+Captures come from `WindowCapture` (`Harness/WindowCapture.cs`). `PrintWindow` was tried first and
+does not paint WinUI 3 content reliably on this host (it returned false for the main window, and
+the pixel reads came back black), so it is not used. A capture is a screen copy of the window
+rectangle, and it is taken only after the area is verified:
+
+- A grid of points inside the area is sampled with `WindowFromPoint`. Every point must belong to the
+  app process, so the app's popups, flyouts and dialogs count as the app.
+- A point covered by another process records the note `harness.foreign-foreground`, re-asserts the
+  app window once with `ForegroundGuard.ReassertForCapture`, and checks again. The verification is
+  repeated after the copy, because a window can move during it.
+- If the area is still covered, the capture is not judged. It throws `WindowCapture.NotJudgedException`,
+  which derives from MSTest's `AssertInconclusiveException`. A pixel check is never run on an
+  unverified capture, and a covered area is never recorded as a pass or a failure.
+- Artifact-only captures call `WindowCapture.SaveArtifact`. A capture that is not judged is a note,
+  and the test goes on.
+
+A capture never raises, topmosts or activates a window except for that single re-assert.
+
+Writing a screenshot is not a pass or fail claim about the product. Every "screenshot written"
+check is a `Note` that names the path, and the PNG stays as an artifact under
+`artifacts/e2e/visual` or `artifacts/e2e/screenshots`. `HarnessTests` still checks the capture helper
+against a live window and deletes the PNG, as a harness self-test that is also recorded as a note.
 
 ## 14. dotnet missing
 
@@ -203,6 +242,114 @@ a stray `<run-id>.reg` file in Documents:
 Clipboard checks clear the clipboard before each copy, poll until the expected text appears, and
 compare the full hex text. A mismatch is a `UF7` known gap with the observed clipboard prefix and
 length. An unreadable clipboard is a failed check, because that is an environment problem.
+
+## 20. Dialogs that open behind their owner or another app
+
+The harness used to force every window of the app topmost on a watchdog thread, so a dialog that
+opened behind the main window or behind another app was lifted before any check saw it. That hid
+z-order and activation bugs. The watchdog, the topmost flags, and the forced activation before
+captures are gone. Each owned window that the harness waits for now gets two real checks, made
+without any harness help, when it appears (`WaitForOwnedWindow`, `WaitForOwnedWindowText`, and
+`DismissMessage` in `AppServicesSupport`):
+
+- `dialog.zorder.<title>`: the window is above its owner in the z order. The check walks
+  `GW_HWNDPREV` upward from the owner and expects the dialog in that chain.
+- `dialog.foreground.<title>`: within 1.5 seconds the dialog is the foreground window. If the
+  foreground belongs to the app but is another window, the check fails and names that window. If
+  the foreground belongs to another process, the check is not judged: the note
+  `harness.foreign-foreground` records the foreign process name, and the z-order check still decides
+  the product question.
+
+A check is never made true by a re-assert. The attached-thread path is used only for input.
+
+## 21. Retries are counted and bounded
+
+`AppServicesSupport.ClickButton` and `AppServicesSupport.DismissMessage` are the helpers that retry
+a product input. The rules are:
+
+- The first attempt that fails while the foreground belonged to the app is a failed check
+  (`gui.foreground.*` or `dialog.foreground.*`). It is not retried, because a retry would hide the
+  focus bug.
+- A retry happens only after a foreign-foreground event (`ForegroundGuard.ForeignEvents` changed
+  during the attempt). The retry count is bounded at three attempts.
+- Any helper that retries records the attempt count in a `Note` with the helper name and the target
+  button or message.
+- `ClickButton` throws when the dialog is still open after the bounded attempts, so the caller fails
+  with the button name. It no longer returns silently.
+
+## 22. Harness state and screenshots are notes
+
+A check that reads only the harness state is information, not a product claim, so it is a note:
+for example `appsvc.font.window.ready` (the harness's own foreground read), `find.keys.foreground`,
+and `icons.capture.foreground`. The product claims that used to hide in those checks are real
+checks now: the font dialog closing re-enables the main window (`appsvc.font.window.enabled`), and
+the main window regains focus after it (`appsvc.font.focus.returns`, which is a note when the foreign
+process holds the foreground). Every "screenshot written" check is a note with the path, and the PNG
+is the artifact.
+
+## 23. Inline editor geometry comes from the screen
+
+The rename box geometry used to be read from the `HelpText` the app wrote about itself. It is now
+measured from UI Automation and screen pixels:
+
+- The box bounds are `BoundingRectangle` of the UI Automation element. The box must have a
+  positive size and lie inside the window rectangle.
+- The row that holds the box is found from the UI Automation tree (the tree item or list item
+  that contains the box's vertical center). The box must start inside that row.
+- The window is captured as a verified screen copy (section 13), and the box interior is scanned for text ink. The
+  text must be visible inside the box and must not be clipped by its right edge.
+
+A rename box whose bounds or ink are missing fails the check. `HelpText` is no longer read.
+
+## 24. Edit > Find through the menu
+
+The menu command id 662 (Edit > Find) is exercised with real keyboard input in
+`Find_EditMenuFindRunsFromTheKeyboard`. Alt+E opens the Edit menu, `find.menu.item` checks that the
+`MenuCommand_662` item is in it, the F mnemonic opens Find (`find.menu.mnemonic`), and the seeded
+sandbox value is searched and its row selected (`find.menu.hit`). The check fails when the menu item
+is missing or the Find dialog does not open from the mnemonic, so a menu that loses the command or
+its mnemonic cannot pass. Only UI Automation reads are used for the checks; the keys are real input.
+
+## 25. Non-finite measurements are failed checks, never JSON
+
+A row or edge measurement that finds no edge is NaN, and a division by a zero extent is infinity.
+JSON cannot carry either, and `System.Text.Json` throws on them, which used to abort the whole icon
+test after its checks had run. `IconTests.WriteSummary` now records `icons.measure.finite` as a failed
+check that names every non-finite measurement, and it writes only the finite values.
+
+## 26. Pixels read before the paint settles
+
+A WinUI 3 window is black on its first frames, then shows its background, then its text. A screen
+copy taken as soon as a window, menu, or dialog appears reads that paint in progress. The failures
+this caused were a dialog background read as `#000000` (expected `#2B2B2B`), icon ink of zero,
+a tree or list selection color of `#000000`, a popup separator that was not found, and an artifact
+PNG that was entirely black. The product was correct each time; the sample was early.
+
+- Every capture that is judged or saved goes through `WindowCapture.CaptureArea`. It copies the
+  verified area again every 200 ms until five consecutive copies, a quiet period of about 1 second, are
+  identical and the area is not unpainted. Only then is the bitmap returned. A capture is never
+  judged from a copy that is still changing.
+- A copy is unpainted when more than 40 percent of its pixels are pure `#000000` (R, G and B all
+  zero). No BWC palette (light, dark, high contrast) uses a pure black background, so a black
+  majority means WinUI has not painted yet. Identical black frames never settle.
+- The wait is bounded at 10 seconds. When the bound passes while the last copy is still unpainted or
+  still changing, the capture is not judged: the note `harness.capture.unsettled` records the area
+  and the reason, and `NotJudgedException` is thrown, so the test is inconclusive. No pixel check is
+  ever made on a copy that has not settled. A partly painted dialog (chrome drawn, labels missing)
+  is a changing copy, so it is never judged.
+- A legitimately uniform area that is not black (for example a one pixel background sample) settles
+  as soon as five copies match. It does not wait for the bound.
+- A window that is not painted because another app holds the foreground is not judged in this
+  mode, and the harness does not raise or activate the window to change that.
+- Every copy is verified by the foreign-window rule of section 13 after it is taken. A foreign
+  window that covers the area during the wait still throws `NotJudgedException`. The settle wait
+  adds no topmost flag, watchdog, or extra activation.
+- Animated content, such as a classic menu fading in, uses the same rule. A popup is scanned only
+  after its frames have been identical for the quiet period, so the separate fade wait in the menu tests is gone.
+- A pixel check that fails after an unsettled note is still a real check. Open the PNG from the
+  same capture (`artifacts/e2e/visual` or `artifacts/e2e/screenshots`), which is taken through the
+  same rule, to see what the product showed. Setting `BWC_E2E_DUMP_JUDGED=1` also writes the last
+  judged copy of each area to `artifacts/e2e/judged/`, which is the exact bitmap a check read.
 
 ## Verification artifact
 

@@ -141,6 +141,8 @@ public sealed class ClassicDialogTests
 
         AutomationElement dialog = driver.WaitForElement(DialogRootId)!;
         IntPtr hwnd = DialogHandle(dialog);
+        // The z-order and foreground checks read the dialog as it opened, before any input activates it.
+        OwnedWindowChecks.Record(hwnd);
         bool foreground = EnsureForeground(hwnd);
 
         string caption = CaptionOf(automation, hwnd);
@@ -188,7 +190,7 @@ public sealed class ClassicDialogTests
             $"Alt+N focused the value name={altName}; Alt+V focused the value data={altValue}.");
 
         string screenshot = SaveScreenshot(dialog, Path.Combine(artifacts, "edit-string.png"));
-        E2EResults.Record("dialogs.string.screenshot", File.Exists(screenshot), $"saved '{screenshot}'.");
+        E2EResults.Note("dialogs.string.screenshot", $"saved '{screenshot}', written={File.Exists(screenshot)}.");
         DialogContrast.Check("dialogs.string.contrast", WindowOf(dialog), hwnd, DialogContrast.FaceForSystem());
 
         _ = SendAltLetter('V');
@@ -245,6 +247,7 @@ public sealed class ClassicDialogTests
 
         AutomationElement dialog = driver.WaitForElement(DialogRootId)!;
         IntPtr hwnd = DialogHandle(dialog);
+        OwnedWindowChecks.Record(hwnd);
         _ = EnsureForeground(hwnd);
 
         string caption = CaptionOf(automation, hwnd);
@@ -279,7 +282,7 @@ public sealed class ClassicDialogTests
         CheckGlyphs(driver, hwnd, "dialogs.dword.glyph-inside");
 
         string screenshot = SaveScreenshot(dialog, Path.Combine(artifacts, "edit-dword.png"));
-        E2EResults.Record("dialogs.dword.screenshot", File.Exists(screenshot), $"saved '{screenshot}'.");
+        E2EResults.Note("dialogs.dword.screenshot", $"saved '{screenshot}', written={File.Exists(screenshot)}.");
         DialogContrast.Check("dialogs.dword.contrast", WindowOf(dialog), hwnd, DialogContrast.FaceForSystem());
 
         _ = SendAltLetter('D');
@@ -295,7 +298,7 @@ public sealed class ClassicDialogTests
             $"Decimal selected={decSelected}, shown value='{decText}', expected '5000' for 0x1388.");
 
         string decimalShot = SaveScreenshot(dialog, Path.Combine(artifacts, "edit-dword-decimal.png"));
-        E2EResults.Record("dialogs.dword.screenshot-decimal", File.Exists(decimalShot), $"saved '{decimalShot}'.");
+        E2EResults.Note("dialogs.dword.screenshot-decimal", $"saved '{decimalShot}', written={File.Exists(decimalShot)}.");
 
         _ = SendAltLetter('H');
         bool backHex = ControlTestSupport.WaitUntil(
@@ -549,21 +552,16 @@ public sealed class ClassicDialogTests
         return IntPtr.Zero;
     }
 
-    /// <summary>Makes a classic dialog the foreground window before input, via <see cref="Win32.ForceForeground"/>.</summary>
-    internal static bool EnsureForeground(IntPtr hwnd) => Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(2));
+    /// <summary>Makes a classic dialog the foreground window before input, through <see cref="ForegroundGuard"/>.</summary>
+    internal static bool EnsureForeground(IntPtr hwnd) => ForegroundGuard.Ensure(hwnd, "dialog.input.foreground", TimeSpan.FromSeconds(2));
 
     /// <summary>Saves the whole dialog window, including its caption and frame, as a PNG.</summary>
     internal static string SaveScreenshot(AutomationElement dialog, string path)
     {
+        // The picture is a verified, settled screen copy of the dialog (WindowCapture). A window above it makes the
+        // capture not judged, so it never appears as the dialog.
         AutomationElement window = WindowOf(dialog);
-        // A screen copy shows whatever is above the dialog, so the dialog is raised above the topmost main window first.
-        _ = Win32.SetTopmost((IntPtr)window.Properties.NativeWindowHandle.Value, true);
-        using (var image = Capture.Element(window))
-        {
-            image.ToFile(path);
-        }
-
-        return path;
+        return WindowCapture.SaveArtifact("dialog.artifact." + Path.GetFileNameWithoutExtension(path), (IntPtr)window.Properties.NativeWindowHandle.Value, path);
     }
 
     internal static AutomationElement WindowOf(AutomationElement dialog)
@@ -737,11 +735,11 @@ public sealed class ClassicDialogTests
         Thread.Sleep(400);
         string message = driver.TextOf("DialogMessage");
         string screenshot = SaveScreenshot(dialog, Path.Combine(artifacts, "message-box.png"));
-        E2EResults.Record(
+        E2EResults.Note(
             "dialogs.messagebox.screenshot",
-            File.Exists(screenshot) && message.Length > 0,
-            $"message text='{message}', saved '{screenshot}'.");
+            $"message text='{message}', saved '{screenshot}', written={File.Exists(screenshot)}.");
         IntPtr hwnd = DialogHandle(dialog);
+        OwnedWindowChecks.Record(hwnd);
         _ = EnsureForeground(hwnd);
         DialogContrast.Check("dialogs.messagebox.contrast", WindowOf(dialog), hwnd, DialogContrast.FaceForSystem());
 

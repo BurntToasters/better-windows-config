@@ -190,3 +190,13 @@ the application is alive and the main window is enabled. The session is disposed
 block, the run subtree is removed, and the shared assembly cleanup removes the empty
 `HKCU\Software\BWC-E2E` parent when possible. A stuck `BwcRegedit` process is killed by the session
 dispose path, and the test never targets HKLM or another user hive.
+
+## Parity package: classic report layout and Computer
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| The report uses `Key:` and `Subkey:` text | Each key uses the classic labels: `Key Name:`, `Class Name:` (or `<NO CLASS>`), `Last Write Time:`, then `Value n` with `Name:`, `Type:`, `Data Size:`, `Data:` (strings 8101 to 8110, 8104 to 8109) |
+| Print is disabled at Computer | Print (All) is enabled at Computer and prints every root |
+| The labels are hard-coded | The labels come from `Resources.resw` |
+| The E2E check sends a real job to the spooler | The E2E build writes the report through the formatter to an artifact file when `BWC_E2E_PRINT_REPORT_PATH` is set, and skips the spooler. Microsoft Print to PDF is not used |
+| The golden drifts from the formatter | The golden is built in the test from the oracle labels and the seeded values |

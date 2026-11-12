@@ -1,8 +1,15 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using Bwc.Registry;
 
 namespace Bwc.Regedit.Dialogs;
+
+/// <summary>
+/// A failed write of a key's security, from the Permissions dialog. <see cref="Win32Error"/> is -1 when the
+/// failure carried no Win32 code.
+/// </summary>
+internal readonly record struct SecurityWriteFailure(int Win32Error);
 
 /// <summary>
 /// The aclui <c>ISecurityInformation</c> contract for one registry key. aclui owns the security
@@ -68,6 +75,19 @@ internal struct SI_INHERIT_TYPE
     public nint pszName;
 }
 
+/// <summary>The Win32 MSG layout, used only to pump messages while a write runs on the worker thread.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeMessage
+{
+    public nint hwnd;
+    public uint message;
+    public nuint wParam;
+    public nint lParam;
+    public uint time;
+    public int pointX;
+    public int pointY;
+}
+
 /// <summary>
 /// Writable aclui callback object for one registry key. Security descriptor buffers returned to
 /// aclui are allocated with <c>LocalAlloc</c> and are intentionally not freed here.
@@ -77,7 +97,9 @@ internal sealed unsafe partial class RegistryKeySecurityInformation : ISecurityI
 {
     // aclui.h
     private const uint SI_EDIT_ALL = 0x00000003;
+    private const uint SI_CONTAINER = 0x00000004;
     private const uint SI_ADVANCED = 0x00000010;
+    private const uint SI_RESET_DACL_TREE = 0x00004000;
     private const uint SI_ACCESS_SPECIFIC = 0x00010000;
     private const uint SI_ACCESS_GENERAL = 0x00020000;
     private const uint SI_ACCESS_CONTAINER = 0x00040000;
@@ -107,10 +129,48 @@ internal sealed unsafe partial class RegistryKeySecurityInformation : ISecurityI
     private const int E_INVALIDARG = unchecked((int)0x80070057);
     private const int E_FAIL = unchecked((int)0x80004005);
     private const int E_OUTOFMEMORY = unchecked((int)0x8007000E);
-    private const int E_NOTIMPL = unchecked((int)0x80004001);
+    private const int E_PENDING = unchecked((int)0x8000000A);
     private const int ErrorPrivilegeNotHeld = 1314;
 
     private const int DefaultAccessIndex = 1; // "Read"
+
+    // The SECURITY_INFORMATION bits the engine accepts. aclui's SI_* bits are outside this mask.
+    private const uint SecurityInformationMask =
+        (uint)(RegistrySecurityInformation.Owner
+            | RegistrySecurityInformation.Group
+            | RegistrySecurityInformation.Dacl
+            | RegistrySecurityInformation.Sacl
+            | RegistrySecurityInformation.ProtectedDacl
+            | RegistrySecurityInformation.UnprotectedDacl
+            | RegistrySecurityInformation.ProtectedSacl
+            | RegistrySecurityInformation.UnprotectedSacl);
+
+    private const uint ProtectionMask =
+        (uint)(RegistrySecurityInformation.ProtectedDacl | RegistrySecurityInformation.UnprotectedDacl);
+
+    // Resource key for the name aclui shows, and the ACE flags. The names are in Resources.resw (oracle 7090 to 7092).
+    private static readonly (string NameKey, uint Flags)[] InheritTypes =
+    {
+        ("PermissionsInheritThisKeyOnly", RegistryInheritanceModes.ThisKeyOnly),
+        ("PermissionsInheritThisKeyAndSubkeys", RegistryInheritanceModes.ThisKeyAndSubkeys),
+        ("PermissionsInheritSubkeysOnly", RegistryInheritanceModes.SubkeysOnly),
+    };
+
+    private int _writeInProgress;
+    private readonly nint _ownerHwnd;
+
+    // user32.h message values for the pump that runs while the write is on the worker thread.
+    private const uint PmRemove = 0x0001;
+    private const uint WmQuit = 0x0012;
+
+    // user32.h message box flags and results, for the replace confirmation.
+    private const uint MbYesNo = 0x00000004;
+    private const uint MbIconQuestion = 0x00000020;
+    private const uint MbDefButton2 = 0x00000100;
+    private const int IdYes = 6;
+
+    // objbase.h: the caller aborted the operation, so nothing was written.
+    private const int E_ABORT = unchecked((int)0x80004004);
 
     private static readonly (string Name, uint Mask, uint Flags)[] AccessRights =
     {
@@ -135,13 +195,15 @@ internal sealed unsafe partial class RegistryKeySecurityInformation : ISecurityI
     private readonly string _objectName;
     private nint _objectNamePtr;
     private nint _accessArray;
+    private nint _inheritArray;
     private bool _disposed;
 
     public RegistryKeySecurityInformation(
         RegistryReader reader,
         RegistryWriter writer,
         RegistryPath path,
-        string objectName)
+        string objectName,
+        nint ownerHwnd)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(writer);
@@ -152,7 +214,14 @@ internal sealed unsafe partial class RegistryKeySecurityInformation : ISecurityI
         _writer = writer;
         _path = path;
         _objectName = objectName;
+        _ownerHwnd = ownerHwnd;
     }
+
+    /// <summary>
+    /// The last write that failed in <see cref="SetSecurity"/>, or null. The dialog reads it after aclui returns,
+    /// so the classic save text can be shown for the failure.
+    /// </summary>
+    public SecurityWriteFailure? WriteFailure { get; private set; }
 
     public int GetObjectInformation(SI_OBJECT_INFO* pObjectInfo)
     {
@@ -168,7 +237,7 @@ internal sealed unsafe partial class RegistryKeySecurityInformation : ISecurityI
 
         *pObjectInfo = new SI_OBJECT_INFO
         {
-            dwFlags = SI_EDIT_ALL | SI_ADVANCED,
+            dwFlags = SI_EDIT_ALL | SI_ADVANCED | SI_CONTAINER | SI_RESET_DACL_TREE,
             hInstance = 0,
             pszServerName = 0,
             pszObjectName = _objectNamePtr,
@@ -226,12 +295,44 @@ internal sealed unsafe partial class RegistryKeySecurityInformation : ISecurityI
                 return E_INVALIDARG;
             }
 
-            byte[] descriptor = RegistrySecurityDescriptor.CopyFromNative(pSecurityDescriptor);
-            _writer.SetKeySecurity(
-                _path,
-                (RegistrySecurityInformation)securityInformation,
-                descriptor);
-            return S_OK;
+            // aclui passes its own SI_* bits in the same value. Only the SECURITY_INFORMATION bits go to the engine.
+            var information = (RegistrySecurityInformation)(securityInformation & SecurityInformationMask);
+            bool propagate = (securityInformation & SI_RESET_DACL_TREE) != 0;
+            if (information == RegistrySecurityInformation.None && !propagate)
+            {
+                return S_OK;
+            }
+
+            if (Interlocked.Exchange(ref _writeInProgress, 1) != 0)
+            {
+                return E_PENDING;
+            }
+
+            try
+            {
+                if (propagate && !ConfirmReplaceSubkeys())
+                {
+                    return E_ABORT;
+                }
+
+                byte[] descriptor = RegistrySecurityDescriptor.CopyFromNative(pSecurityDescriptor);
+                WriteFailure = null;
+                try
+                {
+                    RunOnWorker(() => WriteSecurity(information, descriptor, propagate));
+                }
+                catch (Exception ex)
+                {
+                    WriteFailure = new SecurityWriteFailure(ex is RegistryOperationException registry ? registry.Win32Error : -1);
+                    throw;
+                }
+
+                return S_OK;
+            }
+            finally
+            {
+                _ = Interlocked.Exchange(ref _writeInProgress, 0);
+            }
         }
         catch (RegistryOperationException ex)
         {
@@ -308,17 +409,102 @@ internal sealed unsafe partial class RegistryKeySecurityInformation : ISecurityI
 
     public int GetInheritTypes(SI_INHERIT_TYPE** ppInheritTypes, uint* pcInheritTypes)
     {
-        if (ppInheritTypes is not null)
+        if (ppInheritTypes is null || pcInheritTypes is null)
         {
-            *ppInheritTypes = null;
+            return E_POINTER;
         }
 
-        if (pcInheritTypes is not null)
+        if (_inheritArray == 0)
         {
-            *pcInheritTypes = 0;
+            int count = InheritTypes.Length;
+            _inheritArray = Marshal.AllocCoTaskMem(count * sizeof(SI_INHERIT_TYPE));
+            var entries = (SI_INHERIT_TYPE*)_inheritArray;
+
+            for (var index = 0; index < count; index++)
+            {
+                entries[index] = new SI_INHERIT_TYPE
+                {
+                    pguid = 0,
+                    dwFlags = InheritTypes[index].Flags,
+                    pszName = Marshal.StringToCoTaskMemUni(RegeditStrings.Get(InheritTypes[index].NameKey)),
+                };
+            }
         }
 
-        return E_NOTIMPL;
+        *ppInheritTypes = (SI_INHERIT_TYPE*)_inheritArray;
+        *pcInheritTypes = (uint)InheritTypes.Length;
+        return S_OK;
+    }
+
+    /// <summary>
+    /// Writes the security on a worker thread. The root gets the information aclui chose. When the
+    /// "Replace all child object permission entries" check box is set, the children are then computed
+    /// from the root's DACL in a second, propagating call. That call carries the DACL and the protection
+    /// state only, because the engine refuses audit entries during propagation.
+    /// </summary>
+    private void WriteSecurity(RegistrySecurityInformation information, byte[] descriptor, bool propagate)
+    {
+        if (information != RegistrySecurityInformation.None)
+        {
+            _writer.SetKeySecurity(_path, information, descriptor);
+        }
+
+        if (propagate)
+        {
+            var propagation = RegistrySecurityInformation.Dacl | (information & (RegistrySecurityInformation)ProtectionMask);
+            _writer.SetKeySecurity(_path, descriptor, propagation, propagateToSubkeys: true);
+        }
+    }
+
+    /// <summary>
+    /// Asks the classic MSG-178 question before a propagation, with No as the default. aclui calls this on the UI
+    /// thread and waits for the answer, so the question is a native message box owned by the main window.
+    /// </summary>
+    private bool ConfirmReplaceSubkeys()
+    {
+        string text = string.Format(
+            CultureInfo.CurrentCulture,
+            RegeditStrings.Get("MsgReplaceSubkeysConfirm"),
+            _objectName);
+        int answer = MessageBoxW(
+            _ownerHwnd,
+            text,
+            RegeditStrings.Get("MsgCaptionRegistryEditor"),
+            MbYesNo | MbIconQuestion | MbDefButton2);
+        return answer == IdYes;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="work"/> on a thread-pool thread. The UI thread keeps pumping window messages
+    /// while it waits, so the security editor keeps repainting during a long propagation. Exceptions from
+    /// <paramref name="work"/> are rethrown on this thread.
+    /// </summary>
+    private static void RunOnWorker(Action work)
+    {
+        Task task = Task.Run(work);
+        while (!task.IsCompleted)
+        {
+            PumpMessages();
+            Thread.Sleep(10);
+        }
+
+        task.GetAwaiter().GetResult();
+    }
+
+    private static void PumpMessages()
+    {
+        while (PeekMessageW(out NativeMessage message, 0, 0, 0, PmRemove) != 0)
+        {
+            if (message.message == WmQuit)
+            {
+                // Leave the quit request for the message loop that owns it, and stop pumping.
+                PostQuitMessage((int)message.wParam);
+                return;
+            }
+
+            _ = TranslateMessage(in message);
+            _ = DispatchMessageW(in message);
+        }
     }
 
     public int PropertySheetPageCallback(nint hwnd, uint uMsg, uint uPage)
@@ -378,7 +564,35 @@ internal sealed unsafe partial class RegistryKeySecurityInformation : ISecurityI
             Marshal.FreeCoTaskMem(_accessArray);
             _accessArray = 0;
         }
+
+        if (_inheritArray != 0)
+        {
+            var entries = (SI_INHERIT_TYPE*)_inheritArray;
+            for (var index = 0; index < InheritTypes.Length; index++)
+            {
+                Marshal.FreeCoTaskMem(entries[index].pszName);
+                entries[index].pszName = 0;
+            }
+
+            Marshal.FreeCoTaskMem(_inheritArray);
+            _inheritArray = 0;
+        }
     }
+
+    [LibraryImport("user32.dll")]
+    private static partial int PeekMessageW(out NativeMessage message, nint hWnd, uint filterMin, uint filterMax, uint remove);
+
+    [LibraryImport("user32.dll")]
+    private static partial int TranslateMessage(in NativeMessage message);
+
+    [LibraryImport("user32.dll")]
+    private static partial nint DispatchMessageW(in NativeMessage message);
+
+    [LibraryImport("user32.dll")]
+    private static partial void PostQuitMessage(int exitCode);
+
+    [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial int MessageBoxW(nint hWnd, string text, string caption, uint type);
 }
 
 /// <summary>Shows the standard aclui security editor for one registry key.</summary>
@@ -394,7 +608,8 @@ internal static unsafe partial class RegistryPermissionsDialog
         nint ownerHwnd,
         RegistryReader reader,
         RegistryStore store,
-        RegistryPath path)
+        RegistryPath path,
+        out SecurityWriteFailure? writeFailure)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(store);
@@ -411,8 +626,11 @@ internal static unsafe partial class RegistryPermissionsDialog
             reader,
             store.Writer,
             path,
-            path.ToDisplayString());
-        return EditSecurity(ownerHwnd, information);
+            path.ToDisplayString(),
+            ownerHwnd);
+        int result = EditSecurity(ownerHwnd, information);
+        writeFailure = information.WriteFailure;
+        return result;
     }
 
     [LibraryImport("kernel32.dll")]

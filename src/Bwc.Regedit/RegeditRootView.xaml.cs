@@ -70,7 +70,7 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
             _hiveRemote,
             _keyCommands,
             _valueCommands,
-            _viewCommands);
+            GoToRoot);
 
         var commands = RegeditMenu.Create(
             loader,
@@ -111,6 +111,7 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         // the last pane that had focus is used instead.
         Shell.TreeContent.GotFocus += OnTreeGotFocus;
         Shell.ListContent.GotFocus += OnListGotFocus;
+        _context.RestorePaneFocus = RestorePaneFocus;
         Shell.AddressBarSubmitted += OnAddressBarSubmitted;
         Shell.TreeContent.SetRoots(_context.TreeSource.Roots);
         Shell.TreeContent.SelectNode(_context.TreeSource.Computer);
@@ -222,6 +223,36 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
 
     public void FindNext() => _findController.FindNext();
 
+    /// <summary>
+    /// Go to HKEY_LOCAL_MACHINE (command 918, Ctrl+T and the tree menu). Under HKEY_LOCAL_MACHINE the
+    /// same command goes to HKEY_CURRENT_USER, as the menu text says.
+    /// </summary>
+    public void GoToRoot()
+    {
+        string target = ContextMenuController.GoToRootPath(_context);
+        _context.StartCommand(async () =>
+        {
+            TreeNode? node;
+            try
+            {
+                node = await _context.TreeSource.FindPathAsync(target);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Log.Warn("Registry Editor could not resolve '" + target + "': " + ex.Message);
+                node = null;
+            }
+
+            if (node is null)
+            {
+                await _context.ShowMessageAsync(_context.Messages.Get("DialogAddressBarKeyNotFound"));
+                return;
+            }
+
+            _context.ApplyNavigation(node);
+        });
+    }
+
     private void AddFavorite() => _favoritesController.AddFavorite();
 
     private void RemoveFavorite() => _favoritesController.RemoveFavorite();
@@ -314,6 +345,17 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
 
     private void OnListGotFocus(object sender, RoutedEventArgs e) => SetFocusedPane(RegeditContext.Pane.List);
 
+    private void RestorePaneFocus(RegeditContext.Pane pane)
+    {
+        if (pane == RegeditContext.Pane.List)
+        {
+            _ = Shell.ListContent.Focus(FocusState.Keyboard);
+            return;
+        }
+
+        _ = Shell.TreeContent.Focus(FocusState.Keyboard);
+    }
+
     private void SetFocusedPane(RegeditContext.Pane pane)
     {
         _context.LastFocusedPane = pane;
@@ -362,6 +404,14 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         {
             e.Handled = true;
             Find();
+            return;
+        }
+
+        // Ctrl+T is accelerator 12 (command 918), the same command as the tree menu item.
+        if (e.Key == VirtualKey.T && IsControlDown())
+        {
+            e.Handled = true;
+            GoToRoot();
             return;
         }
 

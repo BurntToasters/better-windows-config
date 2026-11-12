@@ -170,10 +170,9 @@ public sealed class ExportRangeTests
             if (progressShown)
             {
                 string shot = ImportExportWindows.CaptureWindow(
-                    automation,
                     progress,
                     Path.Combine(visualDir, "import-progress.png"));
-                E2EResults.Record("importcancel.screenshot", File.Exists(shot), shot);
+                E2EResults.Note("importcancel.screenshot", $"saved {shot}, written={File.Exists(shot)}.");
             }
 
             bool cancelClicked = progressShown && ImportExportWindows.ClickCancel(automation, progress);
@@ -285,10 +284,9 @@ public sealed class ExportRangeTests
             if (progressShown)
             {
                 string shot = ImportExportWindows.CaptureWindow(
-                    automation,
                     progress,
                     Path.Combine(visualDir, "export-progress.png"));
-                E2EResults.Record("exportcancel.screenshot", File.Exists(shot), shot);
+                E2EResults.Note("exportcancel.screenshot", $"saved {shot}, written={File.Exists(shot)}.");
             }
 
             bool cancelClicked = progressShown && ImportExportWindows.ClickCancel(automation, progress);
@@ -374,7 +372,7 @@ public sealed class ExportRangeTests
             $"Selected branch present={branchDefault.Present} enabled={branchDefault.Enabled} selected={branchDefault.Selected}.");
 
         string shot = dialogs.SaveScreenshot(dialog, Path.Combine(visualDir, "save-dialog-range-panel.png"));
-        E2EResults.Record("range.screenshot", File.Exists(shot), shot);
+        E2EResults.Note("range.screenshot", $"saved {shot}, written={File.Exists(shot)}.");
 
         bool allClicked = dialogs.ClickRadio(dialog, allRadio);
         bool allSelected = allClicked && WaitForRadio(dialogs, dialog, "All", selected: true);
@@ -450,7 +448,7 @@ public sealed class ExportRangeTests
             return;
         }
 
-        bool selected = dialogs.SelectFileType(dialog, index: 1, "Text Files", out string typeNotes);
+        bool selected = dialogs.SelectFileType(dialog, index: 3, "Text Files", out string typeNotes);
         E2EResults.Record("text.file-type", selected, typeNotes);
 
         bool typed = dialogs.TrySetFileName(dialog, exportFile, out string notes);
@@ -497,7 +495,7 @@ public sealed class ExportRangeTests
             return;
         }
 
-        bool selected = dialogs.SelectFileType(dialog, index: 2, "Win9x/NT4", out string typeNotes);
+        bool selected = dialogs.SelectFileType(dialog, index: 4, "Win9x/NT4", out string typeNotes);
         E2EResults.Record("regedit4.file-type", selected, typeNotes);
 
         bool typed = dialogs.TrySetFileName(dialog, exportFile, out string notes);
@@ -568,18 +566,19 @@ public sealed class ExportRangeTests
         string screenshot = dialogs.SaveScreenshot(
             dialog,
             Path.Combine(visualDir, "save-dialog-computer-range.png"));
-        E2EResults.Record("all.computer-screenshot", File.Exists(screenshot), screenshot);
+        E2EResults.Note("all.computer-screenshot", $"saved {screenshot}, written={File.Exists(screenshot)}.");
 
-        // Classic regedit draws Selected branch greyed on Computer. The shell still lets the item
-        // take the selection state when it is clicked, so the export code ignores the branch choice
-        // whenever no key is selected. Clicking it here proves the saved range is still the whole
-        // registry; the all.content check below reads that document.
+        // Classic regedit draws Selected branch greyed on Computer, and a disabled radio cannot be selected.
+        // A real click is sent, and the radio must still be unselected afterwards. A selected disabled radio
+        // is a product bug, recorded as a failed check. The saved range is still read by the all.content check.
         bool branchClicked = dialogs.ClickRadio(dialog, dialogs.FindRadio(dialog, "Selected branch"));
         Thread.Sleep(400);
         RadioState branchAfterClick = dialogs.ReadRadio(dialogs.FindRadio(dialog, "Selected branch"));
-        E2EResults.Note(
+        E2EResults.Record(
             "all.computer-branch",
-            $"clicked={branchClicked}, branch selected after click={branchAfterClick.Selected}; the Computer export ignores it.");
+            !branchAfterClick.Selected,
+            $"Selected branch is disabled on Computer. After a real click: clicked={branchClicked}, " +
+            $"enabled={branchAfterClick.Enabled}, selected={branchAfterClick.Selected}; classic regedit keeps it unselected.");
 
         bool typed = dialogs.TrySetFileName(dialog, exportFile, out string notes);
         string acceptNotes = "not attempted";
@@ -729,21 +728,14 @@ public sealed class ExportRangeTests
             TimeSpan.FromSeconds(4));
     }
 
+    /// <summary>
+    /// The classic Import progress window (DLG-019) has a bar and the file name only, so the wait ends
+    /// when the bar reaches its maximum.
+    /// </summary>
     private static bool WaitForImportProgress(UIA3Automation automation, IntPtr progress, TimeSpan timeout)
     {
         return ControlTestSupport.WaitUntil(
-            () =>
-            {
-                double value = ImportExportWindows.ProgressValue(automation, progress);
-                if (value >= 1)
-                {
-                    return true;
-                }
-
-                string status = ImportExportWindows.ProgressStatus(automation, progress);
-                return status.Contains("Imported ", StringComparison.Ordinal) &&
-                    !status.Contains("Imported 0 of", StringComparison.Ordinal);
-            },
+            () => ImportExportWindows.ProgressValue(automation, progress) >= 1,
             timeout);
     }
 

@@ -103,7 +103,7 @@ internal static class ImportExportWindows
                 return false;
             }
 
-            if (!Win32.ForceForeground(progressHwnd, TimeSpan.FromSeconds(2)))
+            if (!ForegroundGuard.Ensure(progressHwnd, "dialog.progress.foreground", TimeSpan.FromSeconds(2)))
             {
                 return false;
             }
@@ -126,15 +126,10 @@ internal static class ImportExportWindows
     }
 
     /// <summary>Writes a screenshot of the whole dialog window, including its frame, as a PNG.</summary>
-    internal static string CaptureWindow(UIA3Automation automation, IntPtr hwnd, string path)
+    internal static string CaptureWindow(IntPtr hwnd, string path)
     {
-        _ = Win32.SetTopmost(hwnd, true);
-        using (var image = Capture.Element(automation.FromHandle(hwnd)))
-        {
-            image.ToFile(path);
-        }
-
-        return path;
+        // The picture is a verified, settled screen copy (WindowCapture), so nothing is raised before the capture.
+        return WindowCapture.SaveArtifact("dialog.artifact." + Path.GetFileNameWithoutExtension(path), hwnd, path);
     }
 
     /// <summary>

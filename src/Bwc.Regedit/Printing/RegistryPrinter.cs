@@ -120,7 +120,7 @@ public static class RegistryPrinter
     /// thread. The UI uses <see cref="TryShowPrintDialog"/> plus <see cref="PrintToDevice"/> so the
     /// GDI work does not run on the dispatcher.
     /// </summary>
-    public static PrintResult Print(nint ownerHwnd, RegistryReader reader, RegistryPath startKey)
+    public static PrintResult Print(nint ownerHwnd, RegistryReader reader, RegistryPath startKey, PrintReportLabels labels)
     {
         if (!TryShowPrintDialog(ownerHwnd, out PrintDevice? device, out PrintResult dialogResult))
         {
@@ -129,7 +129,7 @@ public static class RegistryPrinter
 
         using (device)
         {
-            return PrintToDevice(device!, reader, startKey);
+            return PrintToDevice(device!, reader, startKey, labels);
         }
     }
 
@@ -196,13 +196,20 @@ public static class RegistryPrinter
 
     /// <summary>
     /// Formats the report without touching a printer. The selected key and each readable descendant
-    /// use registry enumeration order. Throws <see cref="RegistryOperationException"/> when the
-    /// selected key itself cannot be read. An unreadable descendant is marked and skipped.
+    /// use registry enumeration order. Each key starts with the classic Key Name, Class Name, and Last
+    /// Write Time lines, and each value has a Value n block with its name, type, data size, and data
+    /// (oracle strings 8101 to 8110). Throws <see cref="RegistryOperationException"/> when the selected
+    /// key itself cannot be read. An unreadable descendant is marked and skipped.
     /// </summary>
-    public static string FormatReport(RegistryReader reader, RegistryPath startKey, int maxChars)
+    public static string FormatReport(
+        RegistryReader reader,
+        RegistryPath startKey,
+        int maxChars,
+        PrintReportLabels labels)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(startKey);
+        ArgumentNullException.ThrowIfNull(labels);
         ArgumentOutOfRangeException.ThrowIfNegative(maxChars);
 
         if (maxChars == 0)
@@ -218,9 +225,31 @@ public static class RegistryPrinter
         while (pending.Count > 0)
         {
             (RegistryPath path, bool isStart) = pending.Pop();
-            string header = isStart
-                ? "Key: " + path.ToDisplayString() + "\n"
-                : "Subkey: " + path.ToDisplayString() + "\n";
+
+            RegistryKeyInfo info;
+            try
+            {
+                info = reader.GetKeyInfo(path);
+            }
+            catch (RegistryOperationException ex) when (!isStart)
+            {
+                if (!TryAppend(
+                        builder,
+                        "(not readable: Win32 " + ex.Win32Error.ToString(CultureInfo.InvariantCulture) + ")\n\n",
+                        maxChars,
+                        ref truncated))
+                {
+                    break;
+                }
+
+                continue;
+            }
+
+            string className = string.IsNullOrEmpty(info.ClassName) ? labels.NoClass : info.ClassName;
+            string header =
+                labels.KeyName + path.ToDisplayString() + "\n" +
+                labels.ClassName + className + "\n" +
+                labels.LastWriteTime + info.LastWriteTimeUtc.ToLocalTime().ToString("G", CultureInfo.CurrentCulture) + "\n\n";
 
             if (!TryAppend(builder, header, maxChars, ref truncated))
             {
@@ -236,7 +265,7 @@ public static class RegistryPrinter
             {
                 if (!TryAppend(
                         builder,
-                        "  (not readable: Win32 " + ex.Win32Error.ToString(CultureInfo.InvariantCulture) + ")\n",
+                        "(values not readable: Win32 " + ex.Win32Error.ToString(CultureInfo.InvariantCulture) + ")\n\n",
                         maxChars,
                         ref truncated))
                 {
@@ -246,25 +275,24 @@ public static class RegistryPrinter
                 continue;
             }
 
-            foreach (RegistryValueInfo value in values)
+            for (int index = 0; index < values.Count; index++)
             {
-                string line = "  " +
-                    Sanitize(RegistryValueDisplay.FormatName(value)) + "    " +
-                    RegistryValueDisplay.FormatType(value) + "    " +
-                    Sanitize(RegistryValueDisplay.FormatData(value, ValueDataMaxChars)) + "\n";
+                RegistryValueInfo value = values[index];
+                string name = value.Name.Length == 0 ? labels.NoName : value.Name;
+                string block =
+                    labels.ValueHeading + (index + 1).ToString(CultureInfo.InvariantCulture) + "\n" +
+                    labels.ValueName + Sanitize(name) + "\n" +
+                    labels.ValueType + RegistryValueDisplay.FormatType(value) + "\n" +
+                    labels.ValueDataSize + value.DataLength.ToString(CultureInfo.InvariantCulture) + "\n" +
+                    labels.ValueData + Sanitize(RegistryValueDisplay.FormatData(value, ValueDataMaxChars)) + "\n\n";
 
-                if (!TryAppend(builder, line, maxChars, ref truncated))
+                if (!TryAppend(builder, block, maxChars, ref truncated))
                 {
                     break;
                 }
             }
 
             if (truncated)
-            {
-                break;
-            }
-
-            if (values.Count == 0 && !TryAppend(builder, "  (no values)\n", maxChars, ref truncated))
             {
                 break;
             }
@@ -278,8 +306,8 @@ public static class RegistryPrinter
             {
                 if (!TryAppend(
                         builder,
-                        "  (subkeys not readable: Win32 " +
-                        ex.Win32Error.ToString(CultureInfo.InvariantCulture) + ")\n",
+                        "(subkeys not readable: Win32 " +
+                        ex.Win32Error.ToString(CultureInfo.InvariantCulture) + ")\n\n",
                         maxChars,
                         ref truncated))
                 {
@@ -311,11 +339,31 @@ public static class RegistryPrinter
     }
 
     /// <summary>
+    /// The classic report labels, read from the Registry Editor resources. Each one already carries its
+    /// own spacing, as the oracle strings do, so the values line up in the same columns.
+    /// </summary>
+    public sealed record PrintReportLabels(
+        string KeyName,
+        string ClassName,
+        string LastWriteTime,
+        string ValueHeading,
+        string ValueName,
+        string ValueType,
+        string ValueDataSize,
+        string ValueData,
+        string NoName,
+        string NoClass);
+
+    /// <summary>
     /// Draws a formatted report through an existing device context. Every GDI call is checked; a
     /// failure after StartDoc is aborted so a partial document is not left in the spooler.
-    /// </summary>
-    public static PrintResult PrintToDevice(PrintDevice device, RegistryReader reader, RegistryPath startKey)
+    public static PrintResult PrintToDevice(
+        PrintDevice device,
+        RegistryReader reader,
+        RegistryPath startKey,
+        PrintReportLabels labels)
     {
+        ArgumentNullException.ThrowIfNull(labels);
         ArgumentNullException.ThrowIfNull(device);
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(startKey);
@@ -323,7 +371,7 @@ public static class RegistryPrinter
         string report;
         try
         {
-            report = FormatReport(reader, startKey, DefaultMaxChars);
+            report = FormatReport(reader, startKey, DefaultMaxChars, labels);
         }
         catch (RegistryOperationException ex)
         {

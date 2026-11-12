@@ -50,9 +50,10 @@ Exit codes:
 
 ## Use by the installer
 
-The installer should call `--close-running` first, with `--exclude-pid` set to the helper's pid (the
-helper exits right after it starts the installer), then `--wait-pid <helper pid>` so the helper's copy of
-`BwcUpdate.exe` is no longer locked, and only then replace the files. A `3` from either command means the
+The installer should call `--wait-pid <helper pid> --timeout-seconds 30` first, when it was given `/PARENTPID`,
+so the helper's copy of `BwcUpdate.exe` is no longer locked (the helper exits right after it starts the
+installer). Then it calls `--close-running` with `--exclude-pid` set to the helper's pid, and only then
+replaces the files. A `3` from either command means the
 installer must not replace files that the running process holds: it should stop and report.
 
 The process name list is fixed in the updater: `BetterWindowsConfig` and the catalog tools. An installer

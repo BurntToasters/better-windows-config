@@ -114,7 +114,8 @@ internal sealed class ValueCommands
     /// <summary>Shows the read-only binary viewer for a value. The bytes are not written back.</summary>
     private async Task ShowReadOnlyViewerAsync(string displayName, RegistryPath key, RegistryValueInfo value)
     {
-        var dialog = new HexViewerDialog(Get("DialogHexTitle"), Get("DialogHexClose"));
+        // The classic Binary Data dialog has an OK button, so the viewer keeps its default OK text.
+        var dialog = new HexViewerDialog(Get("DialogHexTitle"));
         dialog.SetValue(
             displayName,
             key.ToDisplayString(),

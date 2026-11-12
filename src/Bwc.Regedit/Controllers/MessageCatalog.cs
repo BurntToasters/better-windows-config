@@ -55,20 +55,11 @@ internal sealed class MessageCatalog
     /// <summary>Data text of the default value when it is not set (oracle string 27).</summary>
     public const string ValueNotSetData = "(value not set)";
 
-    /// <summary>Prefix of the attempted path line in an address bar error.</summary>
-    public const string PathLinePrefix = "Path: ";
-
-    /// <summary>Error text used when the Windows print dialog returns no printer device.</summary>
-    public const string PrintNoDeviceMessage = "The Windows print dialog returned no printer device.";
-
     /// <summary>Base of the suggested name for a new key. An index follows it.</summary>
     public const string NewKeyNamePrefix = "New Key #";
 
     /// <summary>Base of the suggested name for a new value. An index follows it.</summary>
     public const string NewValueNamePrefix = "New Value #";
-
-    /// <summary>File base name used when the exported key has no usable name.</summary>
-    public const string FallbackExportName = "export";
 
     /// <summary>Win32 ERROR_ACCESS_DENIED.</summary>
     private const int ErrorAccessDenied = 5;
@@ -157,6 +148,16 @@ internal sealed class MessageCatalog
     /// <summary>Returns the classic message for a permissions dialog that could not show the key's security.</summary>
     public ClassicMessage ForPermissions(int win32Error) =>
         Describe(RegistryAction.Permissions, win32Error, subject: string.Empty, detail: null);
+
+    /// <summary>
+    /// Returns the classic message for a permission save or propagation that failed. Access denied shows the
+    /// save text (MSG-184). Any other failure shows the set-security text (MSG-186). <paramref name="win32Error"/>
+    /// is -1 when the failure carried no Win32 code.
+    /// </summary>
+    public ClassicMessage ForSecuritySave(int win32Error) => new(
+        Get("DialogErrorTitle"),
+        Get(win32Error == ErrorAccessDenied ? "MsgSecuritySaveDenied" : "MsgSecuritySetFailed"));
+
 
     /// <summary>Returns the classic message for a command that failed with no registry operation.</summary>
     public ClassicMessage ForCommandFailure() =>

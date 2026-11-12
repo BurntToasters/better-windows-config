@@ -31,7 +31,7 @@ public enum SingleInstanceSendResult
 }
 
 /// <summary>
-/// A per-tool, per-user, per-integrity-level single-instance gate. The first instance owns a
+/// A per-tool, per-user, per-integrity-level, per-install-folder single-instance gate. The first instance owns a
 /// mutex and serves activation messages over a named pipe; later instances only send.
 /// </summary>
 public sealed partial class SingleInstance : IDisposable
@@ -470,8 +470,27 @@ public sealed partial class SingleInstance : IDisposable
         string sid = GetUserSid();
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(sid));
         string sidHash = Convert.ToHexString(hash.AsSpan(0, 8)).ToLowerInvariant();
-        return sidHash + "." + GetIntegrityLevel();
+        return sidHash + "." + BuildScopeHash() + "." + GetIntegrityLevel();
     }
+
+    /// <summary>
+    /// Hashes the install folder and, when set, the data root. Two copies from different folders, or two
+    /// runs with different data roots, have different keys and do not forward to each other. Two launches
+    /// from the same folder and data root share a key, so the second one activates the first.
+    /// </summary>
+    private static string BuildScopeHash()
+    {
+        string installFolder = NormalizeFolder(AppContext.BaseDirectory);
+        string configuredRoot = Environment.GetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable)?.Trim() ?? string.Empty;
+        string dataRoot = configuredRoot.Length == 0 ? string.Empty : NormalizeFolder(configuredRoot);
+        string scope = "install=" + installFolder + "\nroot=" + dataRoot;
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(scope));
+        return Convert.ToHexString(hash.AsSpan(0, 8)).ToLowerInvariant();
+    }
+
+    /// <summary>The full path without a trailing separator, in upper case. Windows paths are case-insensitive.</summary>
+    private static string NormalizeFolder(string path) =>
+        Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)).ToUpperInvariant();
 
     private static string GetUserSid()
     {

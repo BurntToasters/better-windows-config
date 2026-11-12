@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Bwc.E2E.Harness;
 
@@ -6,16 +7,15 @@ namespace Bwc.E2E.Harness;
 /// Minimal Win32 window helpers used by the harness. All handles are HWNDs owned by the test
 /// process or by processes the test started.
 /// </summary>
+/// <remarks>
+/// The harness never changes z order or topmost state. Activation is requested only by
+/// <see cref="ForegroundGuard"/>, and only for input after a foreign-foreground event.
+/// </remarks>
 internal static class Win32
 {
+    internal const int GwHwndPrev = 3;
     internal const int GvOwner = 4;
     internal const int SwRestore = 9;
-
-    private const uint SwpNoSize = 0x0001;
-    private const uint SwpNoMove = 0x0002;
-    private const uint SwpNoActivate = 0x0010;
-    private static readonly IntPtr HwndTopmost = new(-1);
-    private static readonly IntPtr HwndNoTopmost = new(-2);
 
 #pragma warning disable SYSLIB1054 // LibraryImport requires unsafe/partial plumbing that this small helper does not need.
     [DllImport("user32.dll")]
@@ -63,19 +63,31 @@ internal static class Win32
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool attach);
 
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
-
     [DllImport("kernel32.dll")]
     private static extern uint GetCurrentThreadId();
 
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool EnumWindows(EnumProc callback, IntPtr lParam);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern int GetWindowTextLength(IntPtr hWnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int maxCount);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd, StringBuilder className, int maxCount);
 #pragma warning restore SYSLIB1054
 
-    private delegate bool EnumProc(IntPtr hwnd, IntPtr lParam);
+    /// <summary>The window class name, or an empty string. Read only; used in diagnostics.</summary>
+    internal static string ClassNameOf(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero)
+        {
+            return string.Empty;
+        }
+
+        var buffer = new StringBuilder(256);
+        int length = GetClassName(hwnd, buffer, buffer.Capacity);
+        return length > 0 ? buffer.ToString() : string.Empty;
+    }
 
     internal static bool HasOwner(IntPtr hwnd, IntPtr expectedOwner) =>
         GetWindow(hwnd, GvOwner) == expectedOwner;
@@ -91,79 +103,30 @@ internal static class Win32
         return processId;
     }
 
-    /// <summary>
-    /// Pins a window above the other non-topmost windows of the desktop, so another application cannot cover
-    /// it during a session. Owned windows (dialogs of the window) stay above their owner. Clearing the flag
-    /// returns the window to normal z-order. Activation is not changed.
-    /// </summary>
-    internal static bool SetTopmost(IntPtr hwnd, bool topmost) =>
-        hwnd != IntPtr.Zero && IsWindow(hwnd) &&
-        SetWindowPos(
-            hwnd,
-            topmost ? HwndTopmost : HwndNoTopmost,
-            0,
-            0,
-            0,
-            0,
-            SwpNoMove | SwpNoSize | SwpNoActivate);
-
-    /// <summary>
-    /// The top level windows of one process in z order, highest first. Hidden windows are included only
-    /// when <paramref name="visibleOnly"/> is false.
-    /// </summary>
-    internal static IntPtr[] TopLevelWindows(uint processId, bool visibleOnly)
+    /// <summary>The window title, or an empty string. Read only.</summary>
+    internal static string TitleOf(IntPtr hwnd)
     {
-        var windows = new List<IntPtr>();
-        _ = EnumWindows(
-            (hwnd, _) =>
-            {
-                if (ProcessIdOf(hwnd) == processId && (!visibleOnly || IsWindowVisible(hwnd)))
-                {
-                    windows.Add(hwnd);
-                }
-
-                return true;
-            },
-            IntPtr.Zero);
-        return windows.ToArray();
-    }
-
-    /// <summary>
-    /// Pins every visible top level window of the process above other applications, including owned
-    /// dialogs and popup windows such as WinUI flyouts. EnumWindows returns the highest window first, so
-    /// the windows are raised from the bottom up and the highest window stays on top. Activation is not
-    /// changed. Returns how many windows accepted the request.
-    /// </summary>
-    internal static int RaiseProcessWindows(uint processId)
-    {
-        IntPtr[] windows = TopLevelWindows(processId, visibleOnly: true);
-        int raised = 0;
-        for (int index = windows.Length - 1; index >= 0; index--)
+        if (hwnd == IntPtr.Zero)
         {
-            if (SetTopmost(windows[index], true))
-            {
-                raised++;
-            }
+            return string.Empty;
         }
 
-        return raised;
-    }
-
-    /// <summary>Returns every top level window of the process to the normal z order band.</summary>
-    internal static int ClearTopmost(uint processId)
-    {
-        IntPtr[] windows = TopLevelWindows(processId, visibleOnly: false);
-        int cleared = 0;
-        for (int index = windows.Length - 1; index >= 0; index--)
+        int length = GetWindowTextLength(hwnd);
+        if (length <= 0)
         {
-            if (SetTopmost(windows[index], false))
-            {
-                cleared++;
-            }
+            return string.Empty;
         }
 
-        return cleared;
+        var buffer = new StringBuilder(length + 1);
+        _ = GetWindowText(hwnd, buffer, buffer.Capacity);
+        return buffer.ToString();
     }
+
+    /// <summary>
+    /// The window directly above <paramref name="hwnd"/> in the z order, or zero at the top. Walking this chain
+    /// from an owner shows whether a window is above it.
+    /// </summary>
+    internal static IntPtr WindowAbove(IntPtr hwnd) => GetWindow(hwnd, GwHwndPrev);
 
     /// <summary>
     /// Brings the window to the foreground so keystrokes reach it. Returns false when it cannot within the timeout.
@@ -196,7 +159,7 @@ internal static class Win32
     /// <summary>
     /// Brings the window to the foreground. When Windows refuses the plain request (the foreground lock), this thread
     /// is attached to the foreground thread for the request, which lets the test take focus back from another
-    /// window. Every harness path that sends keystrokes or mouse input to a window goes through this helper.
+    /// window. Only <see cref="ForegroundGuard"/> calls this, and only after a foreign-foreground event.
     /// Returns true once the window is the foreground window within the timeout.
     /// </summary>
     internal static bool ForceForeground(IntPtr hwnd, TimeSpan timeout)

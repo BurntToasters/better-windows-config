@@ -191,6 +191,15 @@ described in [elevated-runner.md](elevated-runner.md).
   `keybd_event` and `mouse_event` helpers instead, for example `tests/Bwc.E2E/List/RawKeyboard.cs`.
 - UI Automation patterns are for reading state. Input paths are tested with real keys and clicks.
 
+## App icons
+
+Each app has a 1024x1024 PNG source in `resources/` and a generated `.ico` beside it.
+The Hub uses `bwc.ico`. The Registry Editor uses `bwc-regedit.ico`, which its exe embeds and its
+window loads. `npm run icons:normalize` rebuilds every `.ico` with ImageMagick (`magick` on PATH or
+under `C:\Program Files\ImageMagick-*`; nothing is downloaded). Each `.ico` holds 256, 128, 96, 72,
+64, 48, 40, 32, 24, 20, and 16 px images. `npm run icons:normalize -- --check` fails when an `.ico` is
+missing a size or older than its source. Run the normalize command again, then commit the `.ico`.
+
 ## npm scripts
 
 | Script | What it runs |
@@ -203,6 +212,7 @@ described in [elevated-runner.md](elevated-runner.md).
 | `npm run run:hub`, `run:regedit` | `scripts/run-app.js` (starts the app with RunAsInvoker) |
 | `npm run oracle` | `scripts/oracle.js` (regenerates the classic regedit captures) |
 | `npm run sync-version` | `scripts/sync-version.js` |
+| `npm run icons:normalize`, `-- --check` | `scripts/normalize-icons.js` (regenerates or verifies the app `.ico` files) |
 | `npm run validate` | em dash check, changelog version check, comment lint |
 
 `npm run oracle` and the oracle files are described in

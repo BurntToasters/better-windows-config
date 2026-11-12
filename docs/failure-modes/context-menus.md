@@ -150,3 +150,13 @@ The test removes only the run subtree, its scoped data root, and temporary files
 session is disposed in a finally block, which closes the process. The shared assembly cleanup
 removes the empty `HKCU\Software\BWC-E2E` parent when possible. No test writes to HKLM through the
 sandbox helpers, and no test leaves a BwcRegedit process running.
+
+## Parity package: remote menu and Go to root
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| A remote computer node opens the local key menu | It opens the classic RT_MENU 107 menu: Expand (or Collapse), Export, Disconnect |
+| A write command is enabled on a remote node | Every write command is disabled or refused for remote nodes. Remote registry is read-only |
+| Go to HKEY_LOCAL_MACHINE on a key already under HKLM | The item text is `Go to HKEY_CURRENT_USER` (string 311) and it navigates to HKCU |
+| Ctrl+T and the menu item disagree | Both use command 918 and the same target |
+| The remote Export item writes a local file for a remote node | Export is disabled for remote nodes; no remote export exists in this version |

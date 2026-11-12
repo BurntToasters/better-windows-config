@@ -97,7 +97,7 @@ export still reports through its exit code and standard error.
 ### Second launch activates the running window
 
 The first GUI launch creates `SingleInstance.Create("regedit")`, which owns the mutex
-`Local\Bwc.regedit.<sid-hash>.<integrity>` and the pipe `Bwc.regedit.<sid-hash>.<integrity>`. A second
+`Local\Bwc.regedit.<sid-hash>.<folder-hash>.<integrity>` and the pipe `Bwc.regedit.<sid-hash>.<folder-hash>.<integrity>`. A second
 launch without `/m` sends one message and exits with code 0 without creating a window. The message is
 `activate` when the command line names no file, or `import:<path>` when it names a `.reg` file. The
 running instance restores the window when it is minimized, brings it to the front, and performs the

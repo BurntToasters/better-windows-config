@@ -301,7 +301,7 @@
         the CheckStates group shows when the item is checked. The glyph is in the 33 DIP gutter, so the
         label does not move when the check changes.
     -->
-    <Style x:Key="BwcToggleMenuFlyoutItemStyle" TargetType="ToggleMenuFlyoutItem">
+    <Style x:Key="BwcToggleMenuFlyoutItemStyle" TargetType="menu:CheckMenuFlyoutItem">
         <Setter Property="UseSystemFocusVisuals" Value="False" />
         <Setter Property="Height" Value="{StaticResource BwcMenuItemHeight}" />
         <Setter Property="MinHeight" Value="0" />
@@ -314,7 +314,7 @@
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Template">
             <Setter.Value>
-                <ControlTemplate TargetType="ToggleMenuFlyoutItem">
+                <ControlTemplate TargetType="menu:CheckMenuFlyoutItem">
                     <Grid x:Name="LayoutRoot" Background="{TemplateBinding Background}">
                         <VisualStateManager.VisualStateGroups>
                             <VisualStateGroup x:Name="CommonStates">

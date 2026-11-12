@@ -274,8 +274,8 @@ Rule: these three types open read-only. The call site uses the read-only `HexVie
 formats without changing the call site. Modify Binary Data follows the same rule.
 
 Check: `RobustnessTests.Robustness_ResourceListOpensReadOnly` seeds a REG_RESOURCE_LIST value, opens it
-with Modify, checks that the read-only viewer (`HexViewerDialog`) is open and the writable editor is
-not, and closes it.
+with Modify, checks that the read-only viewer (its `HexViewerList` list) is open and the writable editor
+(`HexEditor`) is not, and closes it.
 
 ### Failure: multi-value delete stops at the first failure
 

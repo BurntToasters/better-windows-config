@@ -394,11 +394,15 @@ so every step goes through the write policy and the link guard. It does not call
   the key path and the running count. Tests: `SetKeySecurityPropagationCanBeCancelledAfterTheCurrentKey`
   and `SetKeySecurityPropagationAppliesToEveryKeyAndReportsEachOne` (progress paths).
 - I5. Inheritance. Classic "Replace all child object permission entries" recomputes inherited ACEs
-  for each child. This walk gives each descendant the exact descriptor passed in, including its
-  inheritance flags, so an inheritable entry is copied rather than recomputed. The Permissions
-  dialog must pass the descriptor it wants on every descendant. This is a known difference from
-  classic behavior, and it is recorded here until the owner decides whether to switch to
-  `TreeSetNamedSecurityInfo`.
+  for each child. This walk does the same in managed code: each descendant receives only the entries
+  its parent passes down (`RegistrySecurityInheritance`, `failure-modes/permissions.md` section 18), and
+  the parent's descriptor is not copied. The walk does not call `TreeSetNamedSecurityInfo`, so the
+  computed inherited entries may differ from classic output in edge cases. Recorded here until the
+  owner decides whether to switch to `TreeSetNamedSecurityInfo`.
+- I7. The walk lists each key's subkeys before that key's DACL changes, so a key whose new DACL denies
+  the current user enumeration is still walked. A child left with no entries for the current user is
+  recovered by its owner with `WRITE_DAC` (`failure-modes/permissions.md` section 26). The propagation
+  is not refused for that reason. No lockout guard exists.
 - I6. A non-propagating call is unchanged. The existing `SetKeySecurity(path, information,
   descriptor)` overload keeps its behavior and signature. Test: existing `RegistrySecurityTests`.
 

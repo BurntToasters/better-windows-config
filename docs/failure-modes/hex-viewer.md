@@ -123,7 +123,7 @@ strings and unknown types, is shown as its stored raw bytes.
 
 The viewer derives from `ModalDialogWindow`, so it uses the same owned, disabled-owner modal path
 as the other editors. If the window handle is not attached or another modal is already open, the
-command logs and returns without creating a window. Escape and Close both complete the dialog.
+command logs and returns without creating a window. Escape and OK both complete the dialog.
 Focus returns to the details list after the dialog closes. Focus is not sent to the list when the
 dialog could not be shown.
 

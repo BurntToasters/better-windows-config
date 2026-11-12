@@ -130,8 +130,9 @@ public static class E2EResults
     }
 
     /// <summary>
-    /// Captures the given session window, or the full screen when no session is available.
-    /// Throws when the PNG cannot be written so the caller can record a screenshot failure.
+    /// Captures a window of the session, or the full screen when no session is available. The picture is a
+    /// verified, settled screen copy (WindowCapture), so nothing is raised. Throws when the PNG cannot be written so
+    /// the caller can record a screenshot failure.
     /// </summary>
     public static string CaptureScreenshot(string id, AppSession? session = null)
     {
@@ -142,17 +143,34 @@ public static class E2EResults
         var stamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmssfffZ", CultureInfo.InvariantCulture);
         var path = Path.Combine(config.ScreenshotsDir, $"{safeId}-{stamp}.png");
 
-        using (var image = session is null ? Capture.Screen() : Capture.Element(session.Window))
+        if (session is null)
         {
+            using var image = Capture.Screen();
             image.ToFile(path);
+            if (!File.Exists(path) || new FileInfo(path).Length == 0)
+            {
+                throw new InvalidOperationException($"Screenshot was not written to '{path}'.");
+            }
+
+            return path;
         }
 
-        if (!File.Exists(path) || new FileInfo(path).Length == 0)
+        return WindowCapture.Save(CaptureTargetOf(session), path);
+    }
+
+    /// <summary>
+    /// The window a failure screenshot shows: the app's foreground window when the app holds the foreground (the
+    /// dialog that had focus), otherwise the main window.
+    /// </summary>
+    private static IntPtr CaptureTargetOf(AppSession session)
+    {
+        IntPtr foreground = Win32.GetForegroundWindow();
+        if (foreground != IntPtr.Zero && Win32.ProcessIdOf(foreground) == (uint)session.ProcessId)
         {
-            throw new InvalidOperationException($"Screenshot was not written to '{path}'.");
+            return foreground;
         }
 
-        return path;
+        return session.MainHwnd;
     }
 
     public static bool AllPassed()

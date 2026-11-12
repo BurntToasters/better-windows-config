@@ -335,3 +335,13 @@ Name matching for `Contains` uses one `FindNLSStringEx` call with `FIND_FROMSTAR
 a needle-length window at any UTF-16 offset compared under the same collation. The per-offset loop
 remains only as the fallback after a native error. Tests: the existing `RegistryFinderTests` and the
 oracle replay (`find-sequence.json`) must pass unchanged.
+
+## 18. F3 after the user moves the selection (parity package)
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| F3 resumes from the last hit after the user selected another key | When the tree or list selection no longer matches the last hit, F3 searches from the current selection, as classic does |
+| F3 shows "finished" after the user moved to a key before the exhausted point | A moved selection clears the exhausted state for that search |
+| F3 with the selection equal to the last hit | Resumes after the hit (unchanged) |
+| F3 after a value hit when the user selected a different value in the same key | Starts from the selected value, not the hit |
+| Persisted last hit after restart | Compared with the selection the same way |

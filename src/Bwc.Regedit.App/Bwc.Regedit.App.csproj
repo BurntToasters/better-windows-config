@@ -6,7 +6,13 @@
     <RootNamespace>Bwc.Regedit.App</RootNamespace>
     <AssemblyName>BwcRegedit</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\resources\bwc-regedit.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <!-- The window loads this file from the output folder. The Hub's shared props copy only bwc.ico. -->
+  <ItemGroup>
+    <Content Include="..\..\resources\bwc-regedit.ico" Link="bwc-regedit.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <!-- The E2E flavor never elevates. Ship keeps app.manifest (highestAvailable). -->
   <PropertyGroup Condition="'$(BwcFlavor)' == 'E2E'">

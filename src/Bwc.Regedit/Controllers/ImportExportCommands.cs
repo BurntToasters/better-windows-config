@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using Bwc.Core;
+using Bwc.Regedit.Dialogs;
 using Bwc.Regedit.Registry;
 using Bwc.UI.Dialogs;
 using Bwc.Registry;
@@ -19,7 +20,6 @@ internal sealed class ImportExportCommands
     private static readonly TimeSpan ProgressMinimum = TimeSpan.FromMilliseconds(700);
 
     private const int ImportProgressEverySections = 20;
-    private const int ExportProgressEveryKeys = 50;
 
     private readonly RegeditContext _context;
 
@@ -64,68 +64,113 @@ internal sealed class ImportExportCommands
 
     private async Task ImportAsync()
     {
-        string? filePath = _context.ShowFileDialog(save: false, defaultFileName: null);
-        if (string.IsNullOrEmpty(filePath))
+        if (RegeditSelectionGuards.IsRemoteSelected(_context))
+        {
+            // Remote computers are read-only in this version, so an import never targets one.
+            await _context.ShowMessageAsync(Get("DialogRemoteReadOnly"));
+            return;
+        }
+
+        ImportFileDialogResult? choice = RegeditFileDialogs.ShowImport(_context);
+        if (choice is null)
         {
             return;
         }
 
-        await ImportFileAsync(filePath);
+        if (choice.Format == ImportFileFormat.Hive)
+        {
+            await RestoreHiveAsync(choice.FilePath);
+            return;
+        }
+
+        await ImportFileAsync(choice.FilePath);
     }
 
     /// <summary>
-    /// Applies a .reg file behind the classic progress dialog, refreshes the tree and the list, and
-    /// then shows the classic result. The importer runs on the thread pool. Cancel stops between
-    /// sections, keeps the sections that already finished, and shows string 132. A skipped line does
-    /// not change the result. A refused file shows its own text, and a rejected write shows string
-    /// 132. The import keeps going after a rejected write, as classic regedit does.
+    /// File > Import with the Registry Hive Files filter: restores a binary hive onto the selected key
+    /// (RegRestoreKey). Classic requires the privilege, so a process without elevation is refused with
+    /// string 126 and nothing runs. The restore replaces every value and subkey of the key, so it asks
+    /// first with strings 55 and 56.
+    /// </summary>
+    private async Task RestoreHiveAsync(string filePath)
+    {
+        if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
+        {
+            await _context.ShowMessageAsync(
+                Get("MsgCaptionRegistryEditor"),
+                string.Format(CultureInfo.CurrentCulture, Get("MsgImportInvalidKey"), filePath));
+            return;
+        }
+
+        if (!RegeditSelectionGuards.IsElevated())
+        {
+            Log.Info($"Registry Editor refused to restore '{filePath}' because the process is not elevated.");
+            await _context.ShowMessageAsync(
+                Get("MsgCaptionRegistryEditor"),
+                string.Format(CultureInfo.CurrentCulture, Get("MsgImportPrivileges"), filePath));
+            return;
+        }
+
+        var confirm = new ConfirmDialog(
+            Get("MsgRestoreKeyCaption"),
+            string.Format(CultureInfo.CurrentCulture, Get("MsgRestoreKeyConfirm"), key.ToDisplayString()),
+            Get("DialogYes"),
+            Get("DialogNo"));
+        if (!await _context.ShowDialogAsync(confirm))
+        {
+            return;
+        }
+
+        try
+        {
+            await _context.RunRegistryWriteAsync(() => _context.Store.RestoreKey(key, filePath));
+        }
+        catch (RegistryOperationException ex)
+        {
+            LogFileOperationFailure("restore", filePath, ex);
+            await ShowFileOperationErrorAsync(RegistryAction.ImportFile, filePath, ex);
+            return;
+        }
+
+        Log.Info($"Registry Editor restored '{filePath}' onto '{key.ToDisplayString()}'.");
+        await RefreshAfterImportAsync(key.ToDisplayString());
+    }
+
+    /// <summary>
+    /// Applies a .reg file behind the classic Import progress window (DLG-019). That window has no
+    /// Cancel button and no close box, so the import always runs to the end. The importer runs on the
+    /// thread pool and reports sections to the window. A skipped line does not change the result. A
+    /// refused file shows its own text, and a rejected write shows string 132. The import keeps going
+    /// after a rejected write, as classic regedit does.
     /// </summary>
     private async Task ImportFileAsync(string filePath)
     {
         string caption = Get("MsgCaptionRegistryEditor");
         string? selectedPath = _context.Shell.TreeContent.SelectedNode?.RegistryPath;
 
-        using var cancellation = new CancellationTokenSource();
-        var progress = new ClassicProgressDialog(
-            caption,
-            string.Format(CultureInfo.CurrentCulture, "Importing {0}", Path.GetFileName(filePath)),
-            Get("DialogCancel"),
-            cancellation.Cancel);
-        progress.SetIndeterminate("Preparing the import.");
+        var progress = new ImportProgressDialog(
+            Get("MsgImportRegistryFileCaption"),
+            Get("ImportProgressFileLabel"),
+            Path.GetFileName(filePath));
 
         var progressSink = new ImportProgressSink(
-            new Progress<ImportProgress>(update => progress.SetProgress(
-                update.CompletedSections,
-                update.TotalSections,
-                string.Format(
-                    CultureInfo.CurrentCulture,
-                    "Imported {0} of {1} keys.",
-                    update.CompletedSections,
-                    update.TotalSections))));
+            new Progress<ImportProgress>(update => progress.SetProgress(update.CompletedSections, update.TotalSections)));
 
         Task<bool> dialogTask = _context.ShowDialogAsync(progress);
         Task<RegFileImportResult> importTask = _context.RunRegistryAsync(
             () => RegFileImporter.ApplyFile(
                 RegeditWritePolicy.CreateStore(),
                 filePath,
-                cancellation.Token,
-                progressSink),
-            cancellation.Token);
+                CancellationToken.None,
+                progressSink));
 
         RegFileImportResult? result = null;
         Exception? error = null;
-        bool completed = false;
-        bool cancelled = false;
 
         try
         {
             await Task.WhenAll(importTask, Task.Delay(ProgressMinimum));
             result = await importTask;
-            completed = true;
-        }
-        catch (OperationCanceledException)
-        {
-            cancelled = true;
         }
         catch (Exception ex)
         {
@@ -133,15 +178,7 @@ internal sealed class ImportExportCommands
         }
         finally
         {
-            if (completed && !progress.Cancelled)
-            {
-                progress.CompleteFromHost();
-            }
-            else
-            {
-                cancellation.Cancel();
-                CloseQuietly(progress);
-            }
+            progress.CompleteFromHost();
         }
 
         _ = await dialogTask;
@@ -159,16 +196,6 @@ internal sealed class ImportExportCommands
             return;
         }
 
-        if (!completed || cancelled)
-        {
-            Log.Warn(
-                $"Registry Editor import of '{filePath}' canceled after {progressSink.CompletedSections} " +
-                $"of {progressSink.TotalSections} key section(s). Completed writes stay applied.");
-            await RefreshAfterImportAsync(selectedPath);
-            await ShowImportCancelledAsync(filePath);
-            return;
-        }
-
         RegFileImportReport.LogOutcome(filePath, result!);
         await RefreshAfterImportAsync(selectedPath);
         await _context.ShowMessageAsync(
@@ -182,13 +209,15 @@ internal sealed class ImportExportCommands
         await _context.RefreshValuesAsync(selectDisplayName: null);
     }
 
-    private Task ShowImportCancelledAsync(string filePath) =>
-        _context.ShowMessageAsync(
-            Get("MsgCaptionRegistryEditor"),
-            string.Format(CultureInfo.CurrentCulture, Get("MsgImportPartial"), filePath));
-
     private async Task ExportAsync()
     {
+        if (RegeditSelectionGuards.IsRemoteSelected(_context))
+        {
+            // Remote export is not in this version. The menu keeps Export disabled for a remote node.
+            await _context.ShowMessageAsync(Get("DialogExportNoSelection"));
+            return;
+        }
+
         bool hasSelectedKey = _context.TryGetSelectedKeyPath(out RegistryPath selectedPath);
         bool computerSelected = _context.IsComputerSelected;
         if (!hasSelectedKey && !computerSelected)
@@ -200,21 +229,22 @@ internal sealed class ImportExportCommands
         string defaultFileName = hasSelectedKey
             ? BuildDefaultExportFileName(selectedPath)
             : BuildDefaultExportFileName("Computer");
-        ExportFileDialogResult? choice = _context.ShowExportFileDialog(defaultFileName, hasSelectedKey);
+        ExportFileDialogResult? choice = RegeditFileDialogs.ShowExport(_context, defaultFileName, hasSelectedKey);
         if (choice is null)
         {
             return;
         }
 
-        if (choice.Range == ExportFileRange.SelectedBranch && !hasSelectedKey)
+        // A hive file is one key saved with RegSaveKey, so the hive format needs a selected key, and
+        // the whole registry from Computer is only available through the .reg and text writers.
+        bool hive = choice.Format == ExportFileFormat.Hive;
+        if ((choice.Range == ExportFileRange.SelectedBranch || hive) && !hasSelectedKey)
         {
-            // The dialog disables Selected branch on Computer. A caller cannot reach this through
-            // the UI, and the whole-registry export is the only meaningful Computer export.
             await _context.ShowMessageAsync(Get("DialogExportNoSelection"));
             return;
         }
 
-        RegistryPath? startKey = choice.Range == ExportFileRange.SelectedBranch ? selectedPath : null;
+        RegistryPath? startKey = choice.Range == ExportFileRange.SelectedBranch || hive ? selectedPath : null;
         RegistryExportScope scope = choice.Range == ExportFileRange.WholeRegistry
             ? RegistryExportScope.WholeRegistry
             : RegistryExportScope.Selection;
@@ -222,10 +252,10 @@ internal sealed class ImportExportCommands
         using var cancellation = new CancellationTokenSource();
         var progress = new ClassicProgressDialog(
             Get("MsgCaptionRegistryEditor"),
-            string.Format(CultureInfo.CurrentCulture, "Exporting {0}", Path.GetFileName(choice.FilePath)),
+            string.Format(CultureInfo.CurrentCulture, Get("ExportProgressTitle"), Path.GetFileName(choice.FilePath)),
             Get("DialogCancel"),
             cancellation.Cancel);
-        progress.SetIndeterminate("Preparing the export.");
+        progress.SetIndeterminate(Get("ExportProgressPreparing"));
 
         var progressSink = new ExportProgressSink(
             new Progress<ExportProgress>(update => progress.SetIndeterminate(DescribeExport(update))));
@@ -294,7 +324,8 @@ internal sealed class ImportExportCommands
     /// <summary>
     /// Writes the export to a temporary file in the destination folder and moves it into place only
     /// after the writer finished. The temporary file is deleted on cancel or failure, so a canceled
-    /// export writes nothing and never truncates an existing destination.
+    /// export writes nothing and never truncates an existing destination. A hive export has the same
+    /// rule: RegSaveKey creates the temporary file, which is moved over the destination at the end.
     /// </summary>
     private void ExportToFile(
         ExportFileDialogResult choice,
@@ -308,6 +339,17 @@ internal sealed class ImportExportCommands
 
         try
         {
+            if (choice.Format == ExportFileFormat.Hive)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress.Report(new ExportProgress(ExportPhase.Starting, startKey!, null, 0, 0, 0));
+                _context.Store.SaveKey(startKey!, tempPath);
+                cancellationToken.ThrowIfCancellationRequested();
+                File.Move(tempPath, choice.FilePath, overwrite: true);
+                moved = true;
+                return;
+            }
+
             RegistryExportService service = CreateExportService(choice.Range);
             using (var stream = new FileStream(
                 tempPath,
@@ -449,35 +491,29 @@ internal sealed class ImportExportCommands
     }
 #endif
 
-    private static string DescribeExport(ExportProgress update) =>
+    private string DescribeExport(ExportProgress update) =>
         update.Phase switch
         {
-            ExportPhase.Starting => "Preparing the export.",
-            ExportPhase.Completed =>
-                string.Format(
-                    CultureInfo.CurrentCulture,
-                    "Exported {0} keys and {1} values.",
-                    update.KeysExported,
-                    update.ValuesExported),
+            ExportPhase.Starting => Get("ExportProgressPreparing"),
             ExportPhase.KeySkipped =>
                 string.Format(
                     CultureInfo.CurrentCulture,
-                    "Skipped an unreadable key. Exported {0} keys and {1} values.",
+                    Get("ExportProgressSkipped"),
                     update.KeysExported,
                     update.ValuesExported),
             _ =>
                 string.Format(
                     CultureInfo.CurrentCulture,
-                    "Exported {0} keys and {1} values.",
+                    Get("ExportProgressCounts"),
                     update.KeysExported,
                     update.ValuesExported),
         };
 
-    private static string BuildDefaultExportFileName(RegistryPath path) =>
+    private string BuildDefaultExportFileName(RegistryPath path) =>
         BuildDefaultExportFileName(
             path.Components.Count == 0 ? path.Root.DisplayName() : path.Components[^1]);
 
-    private static string BuildDefaultExportFileName(string source)
+    private string BuildDefaultExportFileName(string source)
     {
         char[] invalid = Path.GetInvalidFileNameChars();
         var builder = new StringBuilder(source.Length);
@@ -487,7 +523,7 @@ internal sealed class ImportExportCommands
         }
 
         string name = builder.ToString().Trim().TrimEnd('.');
-        return (name.Length == 0 ? MessageCatalog.FallbackExportName : name) + ".reg";
+        return (name.Length == 0 ? Get("ExportFallbackName") : name) + ".reg";
     }
 
     private static bool IsFileOperationFailure(Exception exception) =>
@@ -569,9 +605,9 @@ internal sealed class ImportExportCommands
     }
 
     /// <summary>
-    /// Keeps the export progress stream bounded. Starting, Completed, and every skipped key are
-    /// always reported; key progress is reported every few keys; per-value events are dropped because
-    /// the key report already carries the running value count.
+    /// Forwards the export progress stream to the window. Every event is forwarded, so the window shows
+    /// the first key at once. The engine throttles key progress (100 ms), so the sink does not count;
+    /// per-value events are dropped because the key report already carries the running value count.
     /// </summary>
     private sealed class ExportProgressSink : IProgress<ExportProgress>
     {
@@ -584,8 +620,7 @@ internal sealed class ImportExportCommands
 
         public void Report(ExportProgress value)
         {
-            if (value.Phase is ExportPhase.Starting or ExportPhase.Completed or ExportPhase.KeySkipped ||
-                (value.Phase == ExportPhase.KeyExported && value.KeysExported % ExportProgressEveryKeys == 0))
+            if (value.Phase is ExportPhase.Starting or ExportPhase.Completed or ExportPhase.KeySkipped or ExportPhase.KeyExported)
             {
                 _ui.Report(value);
             }

@@ -155,6 +155,7 @@ public sealed class ClassicValueEditorTests
 
         AutomationElement dialog = driver.WaitForElement(DialogRootId)!;
         IntPtr hwnd = ClassicDialogTests.DialogHandle(dialog);
+        OwnedWindowChecks.Record(hwnd);
         _ = ClassicDialogTests.EnsureForeground(hwnd);
 
         string caption = ClassicDialogTests.CaptionOf(automation, hwnd);
@@ -178,7 +179,7 @@ public sealed class ClassicValueEditorTests
         ClassicDialogTests.CheckValueName(driver, MultiName, "valueeditors.multi.value-name");
 
         string screenshot = ClassicDialogTests.SaveScreenshot(dialog, Path.Combine(artifacts, "edit-multi-string.png"));
-        E2EResults.Record("valueeditors.multi.screenshot", File.Exists(screenshot), $"saved '{screenshot}'.");
+        E2EResults.Note("valueeditors.multi.screenshot", $"saved '{screenshot}', written={File.Exists(screenshot)}.");
         DialogContrast.Check("valueeditors.multi.contrast", ClassicDialogTests.WindowOf(dialog), hwnd, DialogContrast.FaceForSystem());
 
         // OK with two empty lines shows the classic 117 warning. OK on the warning removes the empties and saves.
@@ -219,6 +220,7 @@ public sealed class ClassicValueEditorTests
 
         AutomationElement dialog = driver.WaitForElement(DialogRootId)!;
         IntPtr hwnd = ClassicDialogTests.DialogHandle(dialog);
+        OwnedWindowChecks.Record(hwnd);
         _ = ClassicDialogTests.EnsureForeground(hwnd);
 
         string caption = ClassicDialogTests.CaptionOf(automation, hwnd);
@@ -240,7 +242,7 @@ public sealed class ClassicValueEditorTests
         ClassicDialogTests.CheckValueName(driver, BinaryName, "valueeditors.binary.value-name");
 
         string screenshot = ClassicDialogTests.SaveScreenshot(dialog, Path.Combine(artifacts, "edit-binary.png"));
-        E2EResults.Record("valueeditors.binary.screenshot", File.Exists(screenshot), $"saved '{screenshot}'.");
+        E2EResults.Note("valueeditors.binary.screenshot", $"saved '{screenshot}', written={File.Exists(screenshot)}.");
         DialogContrast.Check("valueeditors.binary.contrast", ClassicDialogTests.WindowOf(dialog), hwnd, DialogContrast.FaceForSystem());
 
         bool hexFocused = ClassicDialogTests.FocusAutomationId(automation, HexId);

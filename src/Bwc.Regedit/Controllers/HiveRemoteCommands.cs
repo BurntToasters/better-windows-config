@@ -83,14 +83,27 @@ internal sealed class HiveRemoteCommands
         }
 
         int result;
+        SecurityWriteFailure? writeFailure;
         _context.DialogOpen = true;
         try
         {
-            result = RegistryPermissionsDialog.Show(_context.WindowHwnd, _context.Store.Reader, _context.Store, path);
+            result = RegistryPermissionsDialog.Show(
+                _context.WindowHwnd,
+                _context.Store.Reader,
+                _context.Store,
+                path,
+                out writeFailure);
         }
         finally
         {
             _context.DialogOpen = false;
+        }
+
+        if (writeFailure is { } failure)
+        {
+            Log.Warn($"Registry Editor could not save the permissions for '{path.ToDisplayString()}': Win32 {failure.Win32Error}.");
+            await _context.ShowErrorAsync(_context.Messages.ForSecuritySave(failure.Win32Error).ToErrorDialog());
+            return;
         }
 
         if (result >= 0)
@@ -114,6 +127,13 @@ internal sealed class HiveRemoteCommands
             return;
         }
 
+        if (RegeditSelectionGuards.IsRemoteSelected(_context))
+        {
+            // Remote computers are read-only in this version, so a hive never loads into one.
+            await _context.ShowMessageAsync(Get("DialogRemoteReadOnly"));
+            return;
+        }
+
         // Load Hive is enabled only at the HKEY_LOCAL_MACHINE or HKEY_USERS root. The hive loads under that root.
         if (!_context.TryGetSelectedKeyPath(out RegistryPath root) || !RegeditContext.IsLoadHiveRoot(root))
         {
@@ -121,7 +141,7 @@ internal sealed class HiveRemoteCommands
             return;
         }
 
-        string? filePath = _context.ShowFileDialog(save: false, defaultFileName: null);
+        string? filePath = RegeditFileDialogs.ShowLoadHive(_context);
         if (string.IsNullOrEmpty(filePath))
         {
             return;

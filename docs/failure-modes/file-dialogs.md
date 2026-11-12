@@ -199,3 +199,19 @@ only its own `basic` folder; the range artifacts remain for review. No test writ
 
 The E2E assembly cleanup sweeps stale run keys and the shared gate ensures one GUI test assembly
 runs at a time.
+
+## 5. Parity filters and the Load Hive dialog (parity package)
+
+Oracle strings 302 (Import) and 305 (Export) and 180 (All Files) define the filters. Each name
+and pattern comes from `Bwc.UI` resources, so the English text stays out of code.
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| Load Hive offers only `*.reg`, so `NTUSER.DAT` (no extension) cannot be chosen | Load Hive opens with the single filter `All Files` (`*.*`), string 180 |
+| Import lists the hive filter first, so a `.reg` file is not the default | Index 1 is `Registration Files (*.reg)`; index 2 is `Registry Hive Files (*.*)`; index 3 is `All Files` |
+| Export index 2 (hive) is written as text or REGEDIT4 | Index 2 routes to the hive exporter (`RegSaveKey`), index 3 to text, index 4 to REGEDIT4, index 5 (All Files) to the v5 writer |
+| Export pattern for the hive filter is `*.*`, so the list differs from classic | The hive export filter pattern is `*.` as in string 305 |
+| The export range panel is shown for the hive format on Computer | The hive format needs a key. On Computer the hive format is refused with the no-selection text |
+| A hive file is written over an existing file in place | Hive export writes a temporary file and moves it over the destination only after `RegSaveKey` succeeds |
+| Save filters keep their old indices after the reorder | The index-to-writer map is one table, and the E2E test reads it back through the dialog |
+| The dialog cannot be shown while another modal is open | Unchanged: `FileDialogOpen` and `DialogOpen` refuse the request and log it |

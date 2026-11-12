@@ -125,7 +125,7 @@ public sealed class IconTests
             bool windowReady = ControlTestSupport.WaitUntil(
                 () =>
                 {
-                    _ = ControlTestSupport.EnsureForeground(session);
+                    // Reads need no input, so the window is not activated here.
                     return Win32.IsWindow(session.MainHwnd) && Win32.IsVisible(session.MainHwnd);
                 },
                 ControlTestSupport.UiTimeout);
@@ -136,7 +136,7 @@ public sealed class IconTests
             bool rowsFound = rootsFound && ControlTestSupport.WaitUntil(
                 () =>
                 {
-                    _ = ControlTestSupport.EnsureForeground(session);
+                    // Reads need no input, so the window is not activated here.
                     computer = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "Computer");
                     hkcu = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "HKEY_CURRENT_USER");
                     parent = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "Parent");
@@ -163,22 +163,18 @@ public sealed class IconTests
                 return;
             }
 
-            // The capture is a screen copy, so it is taken only while the window is confirmed foreground.
-            bool captureForeground = ControlTestSupport.EnsureForeground(session);
-            E2EResults.Record("icons.capture.foreground", captureForeground, $"window foreground for the capture={captureForeground}.");
-            if (!captureForeground)
-            {
-                FailIfNeeded();
-                return;
-            }
+            // The capture is a verified, settled screen copy (WindowCapture). It is judged by what covers the window,
+            // not by the foreground, so the foreground state at capture time is a note only.
+            E2EResults.Note(
+                "icons.capture.foreground",
+                $"window foreground at capture time={Win32.IsForeground(session.MainHwnd)}; the capture is a verified screen copy.");
 
             Rectangle window = session.Window.BoundingRectangle;
             double scale = Math.Max(1, ControlTestSupport.WindowDpi(session)) / 96.0;
-            using var capture = Capture.Element(session.Window);
-            Bitmap bitmap = capture.Bitmap;
+            using Bitmap bitmap = WindowCapture.CaptureWindow(session.MainHwnd);
             string captureDir = Path.Combine(config.ArtifactsDir, "visual", "icons");
             Directory.CreateDirectory(captureDir);
-            capture.ToFile(Path.Combine(captureDir, $"bwc-{config.Rid}-{config.Flavor}-tree-list.png"));
+            bitmap.Save(Path.Combine(captureDir, $"bwc-{config.Rid}-{config.Flavor}-tree-list.png"), System.Drawing.Imaging.ImageFormat.Png);
 
             var measured = new Dictionary<string, double>(StringComparer.Ordinal);
 
@@ -338,12 +334,35 @@ public sealed class IconTests
 
     private static void WriteSummary(string captureDir, E2EConfig config, double scale, Dictionary<string, double> measured)
     {
+        // JSON cannot carry NaN or infinity. A non-finite measurement is a failed check that names it, and only the
+        // finite values are written. A missing edge is never written as a number.
+        var finite = new Dictionary<string, double>(StringComparer.Ordinal);
+        var nonFinite = new List<string>();
+        foreach (KeyValuePair<string, double> pair in measured)
+        {
+            if (double.IsFinite(pair.Value))
+            {
+                finite[pair.Key] = pair.Value;
+            }
+            else
+            {
+                nonFinite.Add(pair.Key);
+            }
+        }
+
+        E2EResults.Record(
+            "icons.measure.finite",
+            nonFinite.Count == 0,
+            nonFinite.Count == 0
+                ? $"All {finite.Count} row measurements are finite."
+                : $"Non-finite row measurements (no edge was found): {string.Join(", ", nonFinite)}.");
+
         var summary = new Dictionary<string, object?>
         {
             ["rid"] = config.Rid,
             ["flavor"] = config.Flavor,
             ["dpiScale"] = scale,
-            ["measuredDip"] = measured,
+            ["measuredDip"] = finite,
             ["expectedDip"] = new Dictionary<string, double>
             {
                 ["tree.indentPerLevel"] = TreeIndentDip,

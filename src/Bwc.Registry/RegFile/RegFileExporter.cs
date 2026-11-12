@@ -278,13 +278,16 @@ public static class RegFileExporter
 
     /// <summary>
     /// Passes progress to the caller. Starting, skip, and completion events always go through. Key and
-    /// value events are throttled to one report per <see cref="ThrottleInterval"/>, so a large export
-    /// does not flood the UI thread. Completion carries the final running totals.
+    /// value events are throttled to one report per <see cref="ThrottleInterval"/> for each kind, so a large
+    /// export does not flood the UI thread. The first event of each kind goes through at once. Value events
+    /// have their own interval, so a value report cannot use up the slot of the key report that follows it.
+    /// Completion carries the final running totals.
     /// </summary>
     private sealed class ProgressGate
     {
         private readonly IProgress<ExportProgress>? _progress;
-        private long _lastThrottledReport;
+        private long _lastKeyReport;
+        private long _lastValueReport;
 
         internal ProgressGate(IProgress<ExportProgress>? progress)
         {
@@ -303,13 +306,14 @@ public static class RegFileExporter
                 return;
             }
 
+            ref long last = ref report.Phase == ExportPhase.ValueExported ? ref _lastValueReport : ref _lastKeyReport;
             long now = Stopwatch.GetTimestamp();
-            if (_lastThrottledReport != 0 && Stopwatch.GetElapsedTime(_lastThrottledReport, now) < ThrottleInterval)
+            if (last != 0 && Stopwatch.GetElapsedTime(last, now) < ThrottleInterval)
             {
                 return;
             }
 
-            _lastThrottledReport = now;
+            last = now;
             _progress.Report(report);
         }
     }

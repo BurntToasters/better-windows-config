@@ -20,7 +20,6 @@ public sealed class AppSession : IDisposable
     private readonly string _exeName;
     private readonly Process _process;
     private readonly UIA3Automation _automation;
-    private readonly WindowWatchdog _watchdog;
     private bool _disposed;
     private bool _foregroundRecorded;
 
@@ -85,13 +84,8 @@ public sealed class AppSession : IDisposable
 
         ProcessId = process.Id;
 
-        // The app under test stays above other applications for the whole session, so a window the user
-        // runs cannot cover it and take the keystrokes. The watchdog also raises the app's own popups and
-        // owned dialogs, which are separate top level windows and would otherwise stay below the main
-        // window. Close stops the watchdog, which clears the flag from every window.
-        _ = Win32.SetTopmost(MainHwnd, true);
-        _watchdog = new WindowWatchdog(unchecked((uint)ProcessId));
-
+        // The window keeps its own z order. Nothing here raises it: a dialog that opens behind the main
+        // window, or behind another application, must stay visible to the z-order checks.
         E2EResults.CurrentSession = this;
     }
 
@@ -193,8 +187,9 @@ public sealed class AppSession : IDisposable
     }
 
     /// <summary>
-    /// Sends keys only to the foreground window. If the target cannot be made foreground within
-    /// three seconds a failed check is recorded and nothing is typed.
+    /// Sends keys only to the foreground window. The <see cref="ForegroundGuard"/> decides first: a foreign
+    /// foreground is re-asserted, and a failure of the main window to become foreground is a failed check
+    /// that stops the batch before any key is typed.
     /// </summary>
     public void SendKeys(params string[] keys)
     {
@@ -203,12 +198,10 @@ public sealed class AppSession : IDisposable
             return;
         }
 
-        var checkId = $"gui.foreground.{Path.GetFileNameWithoutExtension(_exePath).ToLowerInvariant()}";
+        var checkId = ForegroundCheckId;
         if (!EnsureForeground(TimeSpan.FromSeconds(3)))
         {
-            var actual = Win32.GetForegroundWindow();
-            var notes = $"Foreground HWND 0x{actual.ToInt64():X} is not target 0x{MainHwnd.ToInt64():X} for '{_exeName}'.";
-            E2EResults.Record(checkId, false, notes);
+            var notes = $"The main window 0x{MainHwnd.ToInt64():X} of '{_exeName}' is not the foreground window; no key was sent.";
             throw new InvalidOperationException(notes);
         }
 
@@ -225,21 +218,16 @@ public sealed class AppSession : IDisposable
         }
     }
 
-    /// <summary>
-    /// Raises every visible top level window of the app process, including owned dialogs and popup
-    /// windows, without changing the foreground window.
-    /// </summary>
-    internal void RaiseWindows() => _ = Win32.RaiseProcessWindows(unchecked((uint)ProcessId));
+    /// <summary>The check id for the main window's foreground state before input.</summary>
+    internal string ForegroundCheckId => $"gui.foreground.{Path.GetFileNameWithoutExtension(_exePath).ToLowerInvariant()}";
 
     public void Close()
     {
-        _watchdog.Dispose();
         if (_process.HasExited)
         {
             return;
         }
 
-        _ = Win32.SetTopmost(MainHwnd, false);
         try
         {
             _process.CloseMainWindow();
@@ -271,7 +259,6 @@ public sealed class AppSession : IDisposable
 
         try
         {
-            _watchdog.Dispose();
             Close();
         }
         finally
@@ -292,7 +279,7 @@ public sealed class AppSession : IDisposable
         var parts = key.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (parts.Length == 1)
         {
-            if (Enum.TryParse<VirtualKeyShort>(parts[0], ignoreCase: true, out var single))
+            if (TryParseKey(parts[0], out var single))
             {
                 Keyboard.Press(single);
             }
@@ -307,13 +294,39 @@ public sealed class AppSession : IDisposable
         var keys = new VirtualKeyShort[parts.Length];
         for (var i = 0; i < parts.Length; i++)
         {
-            if (!Enum.TryParse<VirtualKeyShort>(parts[i], ignoreCase: true, out keys[i]))
+            if (!TryParseKey(parts[i], out keys[i]))
             {
                 throw new ArgumentException($"Unknown key '{parts[i]}' in chord '{key}'.", nameof(key));
             }
         }
 
         Keyboard.TypeSimultaneously(keys);
+    }
+
+    /// <summary>
+    /// Maps one key name to its virtual key. Accepts the <see cref="VirtualKeyShort"/> names (<c>ESCAPE</c>, <c>F10</c>,
+    /// <c>KEY_T</c>, <c>DELETE</c>), a single letter or digit (<c>T</c>, <c>5</c>, which are the <c>KEY_</c> names),
+    /// and <c>ENTER</c>, whose enum name is <c>RETURN</c>. A name that is not a key is false, never a number.
+    /// </summary>
+    private static bool TryParseKey(string name, out VirtualKeyShort key)
+    {
+        key = default;
+        var normalized = name.Trim();
+        if (normalized.Length == 0 || char.IsDigit(normalized[0]) && normalized.Length > 1)
+        {
+            return false;
+        }
+
+        if (normalized.Length == 1 && char.IsAsciiLetterOrDigit(normalized[0]))
+        {
+            normalized = "KEY_" + char.ToUpperInvariant(normalized[0]);
+        }
+        else if (string.Equals(normalized, "ENTER", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = nameof(VirtualKeyShort.RETURN);
+        }
+
+        return Enum.TryParse(normalized, ignoreCase: true, out key) && Enum.IsDefined(key);
     }
 
     private static void Kill(Process process)
@@ -372,31 +385,10 @@ public sealed class AppSession : IDisposable
     }
 
     /// <summary>
-    /// Makes the main window the foreground window and returns true once it is, within the timeout. This is the
-    /// harness's one foreground routine: every keystroke batch and every mouse click aimed at the app is preceded by
-    /// a check through it. The window is kept topmost, activated through UI Automation, and then through the
-    /// attached-thread path in <see cref="Win32.ForceForeground"/> when Windows refuses the plain request.
+    /// Returns true once the main window is the foreground window. The decision belongs to
+    /// <see cref="ForegroundGuard.Ensure"/>: no re-assert when the app itself holds the foreground, and a
+    /// re-assert only after a foreign-foreground event. A false result is already recorded as a failed check.
     /// </summary>
-    internal bool EnsureForeground(TimeSpan? timeout = null)
-    {
-        // The app's own popups and dialogs participate in the raise, so a menu or message that is open
-        // is brought above the main window before the foreground request and the input that follows.
-        RaiseWindows();
-        if (Win32.IsForeground(MainHwnd))
-        {
-            return true;
-        }
-
-        _ = Win32.SetTopmost(MainHwnd, true);
-        try
-        {
-            Window.SetForeground();
-        }
-        catch (Exception)
-        {
-            // The attached-thread request below still runs.
-        }
-
-        return Win32.ForceForeground(MainHwnd, timeout ?? TimeSpan.FromSeconds(3));
-    }
+    internal bool EnsureForeground(TimeSpan? timeout = null) =>
+        ForegroundGuard.Ensure(MainHwnd, ForegroundCheckId, timeout);
 }

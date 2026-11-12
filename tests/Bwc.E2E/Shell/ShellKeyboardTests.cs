@@ -402,6 +402,10 @@ public sealed class ShellKeyboardTests
         _ = ControlTestSupport.EnsureForeground(session);
         Keyboard.Type(VirtualKeyShort.ESCAPE);
         bool escapeFocus = WaitUntil(() => FocusedPane(automation) == "list", UiTimeout);
+
+        // The restored column width is applied on the next layout pass, which can come after focus has moved. Reading at
+        // once returned the widened 480 px while the width was already restored: the next split began at 432 px.
+        _ = WaitUntil(() => Math.Abs(PaneWidth(session) - startWidth) <= 1, UiTimeout);
         int afterEscape = PaneWidth(session);
         checks.Record("escapeFocus", escapeFocus, $"focused pane after Escape={FocusedPane(automation)}.");
         checks.Record(
@@ -850,16 +854,9 @@ public sealed class ShellKeyboardTests
 
     // ---- pixels and captures ----------------------------------------------------------------------
 
-    private static Bitmap CaptureScreen(Rectangle area)
-    {
-        var bitmap = new Bitmap(Math.Max(1, area.Width), Math.Max(1, area.Height));
-        using (var graphics = Graphics.FromImage(bitmap))
-        {
-            graphics.CopyFromScreen(area.Left, area.Top, 0, 0, bitmap.Size);
-        }
-
-        return bitmap;
-    }
+    /// <summary>The screen pixels of an area, verified to be shown by the current session app
+    /// (see <see cref="WindowCapture"/>).</summary>
+    private static Bitmap CaptureScreen(Rectangle area) => WindowCapture.CaptureAreaOfCurrentSession(area);
 
     /// <summary>Saves the client area of the window as a PNG in artifacts/e2e/visual/shell.</summary>
     private static void CaptureWindow(AppSession session, string fileName)
@@ -874,8 +871,20 @@ public sealed class ShellKeyboardTests
 
         var origin = new POINT { X = 0, Y = 0 };
         _ = ClientToScreen(session.MainHwnd, ref origin);
-        using Bitmap shot = CaptureScreen(new Rectangle(origin.X, origin.Y, client.Right - client.Left, client.Bottom - client.Top));
-        shot.Save(Path.Combine(dir, fileName), ImageFormat.Png);
+        // An artifact, not a check: a capture that is not judged is a note, and the test goes on.
+        try
+        {
+            using Bitmap shot = WindowCapture.CaptureRegion(
+                session.MainHwnd,
+                new System.Drawing.Point(origin.X, origin.Y),
+                client.Right - client.Left,
+                client.Bottom - client.Top);
+            shot.Save(Path.Combine(dir, fileName), ImageFormat.Png);
+        }
+        catch (WindowCapture.NotJudgedException ex)
+        {
+            E2EResults.Note("shell.capture." + fileName, $"artifact not written: {ex.Message}");
+        }
     }
 
     private static int Sum(Color c) => c.R + c.G + c.B;

@@ -14,7 +14,7 @@ namespace Bwc.E2E.Theme;
 /// <summary>
 /// Read-only palette checks on the Registry Editor. Each case opens the editor, selects
 /// HKEY_CURRENT_USER\Console with the keyboard, moves focus to the list with Tab, selects one
-/// value with Down, and samples pixels from a PrintWindow capture of the main window. The tree
+/// value with Down, and samples pixels from a verified, settled screen copy of the main window (WindowCapture). The tree
 /// selection must match the Explorer visual style, the list selection must match the classic list
 /// view, the pane backgrounds must equal the window color, and only the focused selected row carries
 /// a dotted focus rectangle.
@@ -42,7 +42,6 @@ public sealed class ThemeTests
     private const int ColorHighlightText = 14;
     private const int ColorBtnFace = 15;
 
-    private const uint PwRenderFullContent = 2;
     private const int StrokeTolerance = 24;
     private const int DottedMinPercent = 30;
     private const int DottedMaxPercent = 70;
@@ -620,6 +619,11 @@ public sealed class ThemeTests
         E2EResults.Note($"theme.{caseId}.samples", path);
     }
 
+    /// <summary>
+    /// The main window as the screen shows it, verified unobscured by the app (see <see cref="WindowCapture"/>).
+    /// A covered window throws <see cref="WindowCapture.NotJudgedException"/>, so the test is inconclusive
+    /// rather than sampling another window's pixels.
+    /// </summary>
     private static Bitmap CaptureWindow(IntPtr hwnd, out Rectangle windowRect)
     {
         if (!GetWindowRect(hwnd, out NativeRect rect))
@@ -628,21 +632,7 @@ public sealed class ThemeTests
         }
 
         windowRect = Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
-        var bitmap = new Bitmap(windowRect.Width, windowRect.Height, PixelFormat.Format32bppArgb);
-        using (var graphics = Graphics.FromImage(bitmap))
-        {
-            IntPtr hdc = graphics.GetHdc();
-            try
-            {
-                _ = PrintWindow(hwnd, hdc, PwRenderFullContent);
-            }
-            finally
-            {
-                graphics.ReleaseHdc(hdc);
-            }
-        }
-
-        return bitmap;
+        return WindowCapture.CaptureWindow(hwnd);
     }
 
     private static Rectangle ToBitmap(Rectangle screen, Rectangle window) =>
@@ -909,8 +899,6 @@ public sealed class ThemeTests
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hwnd, out NativeRect rect);
 
-    [DllImport("user32.dll")]
-    private static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetDesktopWindow();

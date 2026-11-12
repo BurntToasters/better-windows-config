@@ -141,6 +141,12 @@ public sealed class HarnessTests
             action();
             E2EResults.Note(id, "ok");
         }
+        catch (WindowCapture.NotJudgedException ex)
+        {
+            // Covered by another process: nothing was judged, so this is a note and an inconclusive test, not a failure.
+            E2EResults.Note(id, $"not judged: {ex.Message}");
+            throw;
+        }
         catch (Exception ex)
         {
             E2EResults.Record(id, false, ex.Message);

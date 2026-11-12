@@ -43,6 +43,8 @@ public class ClassicDialog : ModalDialogWindow
     private ClassicFontSpec _font;
     private ClassicDialogMetrics _metrics;
     private bool _metricsReady;
+    private FrameworkElement? _initialFocus;
+    private bool _windowActive;
     private bool _cueVisible;
 
     /// <summary>Template mode: the controls are placed at the template rectangles.</summary>
@@ -83,7 +85,8 @@ public class ClassicDialog : ModalDialogWindow
         ApplyPalette();
         BwcTheme.Changed += OnPaletteChanged;
         Closed += OnDialogClosed;
-        _root.KeyDown += OnRootKeyDown;
+        // Handled events too: a focused Button marks Enter handled, and the dialog still needs Enter and Escape.
+        _root.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(OnRootKeyDown), handledEventsToo: true);
         _root.KeyUp += OnRootKeyUp;
         _root.Loaded += OnRootLoaded;
         Activated += OnActivated;
@@ -156,6 +159,59 @@ public class ClassicDialog : ModalDialogWindow
     }
 
     private void OnPaletteChanged(object? sender, EventArgs e) => ApplyPalette();
+
+    /// <summary>
+    /// Windows resets keyboard focus when the window is activated. When focus is not inside the dialog, the
+    /// control that had it after load (or the first tab stop) takes it back, so Enter and Escape reach the root.
+    /// </summary>
+    protected override void OnDialogActivated()
+    {
+        // Activation can come before the content is loaded. The XAML root does not exist yet, so the
+        // Loaded handler restores focus once it does.
+        if (_root.XamlRoot is null)
+        {
+            return;
+        }
+
+        RestoreFocusInsideDialog();
+    }
+
+    private void RestoreFocusInsideDialog()
+    {
+        if (FocusIsInsideRoot())
+        {
+            return;
+        }
+
+        if (_initialFocus is { } initial && initial.IsTabStop)
+        {
+            _ = initial.Focus(FocusState.Programmatic);
+            return;
+        }
+
+        FocusFirstTabStop();
+    }
+
+    private bool FocusIsInsideRoot()
+    {
+        if (_root.XamlRoot is null)
+        {
+            return false;
+        }
+
+        DependencyObject? node = FocusManager.GetFocusedElement(_root.XamlRoot) as DependencyObject;
+        while (node is not null)
+        {
+            if (ReferenceEquals(node, _root))
+            {
+                return true;
+            }
+
+            node = VisualTreeHelper.GetParent(node);
+        }
+
+        return false;
+    }
 
     private void OnDialogClosed(object? sender, WindowEventArgs args)
     {
@@ -251,6 +307,13 @@ public class ClassicDialog : ModalDialogWindow
     /// <summary>Enter, Escape, Tab, and Alt+letter. Other keys reach the focused control.</summary>
     private void OnRootKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        // A control that handled the key owns it, except Enter on a focused button: a button marks Enter handled
+        // without raising Click, so the dialog still answers it (the case below).
+        if (e.Handled && e.Key != VirtualKey.Enter)
+        {
+            return;
+        }
+
         switch (e.Key)
         {
             case VirtualKey.Menu:
@@ -264,6 +327,11 @@ public class ClassicDialog : ModalDialogWindow
 
             case VirtualKey.Enter:
                 if (FocusedIsMultilineEdit())
+                {
+                    return;
+                }
+
+                if (e.Handled && FocusedHosted()?.Definition.Kind != ClassicControlKind.Button)
                 {
                     return;
                 }
@@ -294,7 +362,8 @@ public class ClassicDialog : ModalDialogWindow
 
     private void OnActivated(object sender, Microsoft.UI.Xaml.WindowActivatedEventArgs args)
     {
-        if (args.WindowActivationState == WindowActivationState.Deactivated)
+        _windowActive = args.WindowActivationState != WindowActivationState.Deactivated;
+        if (!_windowActive)
         {
             SetCueVisible(false);
         }
@@ -306,6 +375,11 @@ public class ClassicDialog : ModalDialogWindow
         try
         {
             OnDialogLoaded();
+            _initialFocus = FocusManager.GetFocusedElement(_root.XamlRoot) as FrameworkElement;
+            if (_windowActive)
+            {
+                RestoreFocusInsideDialog();
+            }
         }
         catch (Exception)
         {

@@ -62,6 +62,59 @@ owner and then re-enable it early when either closes.
 Guard: `ShowAsync` is idempotent per instance. `RegeditRootView` refuses a dialog request while
 `_dialogOpen` is set.
 
+### 1.6 Owner re-enabled only after the dialog is hidden
+
+`ModalDialogWindow` re-enabled and re-activated the owner in `OnClosed`, which runs after the
+dialog window is already hidden and destroyed. For that gap the owner is still disabled, so the
+system picks another window to activate. In the Registry Editor run it was the XAML input site
+window (`InputSiteWindowClass`, empty title, size 0x0), not the main window. The foreground window
+is then not the app's input target, and every keyboard and mouse event after the dialog goes
+nowhere. The cascade looks like unrelated bugs: Alt+F does not open File, Enter does not dismiss
+the next message, double-click does not open a value, context menus and Find dialogs do not
+respond, and the tree does not take focus.
+
+Classic Win32 dialogs do not have this gap. `EndDialog` re-enables the owner before the dialog is
+hidden, so the owner is the active window when the dialog goes away.
+
+Guard: `ModalDialogWindow` restores the owner (`EnableWindow(owner, TRUE)`, then
+`SetActiveWindow(owner)`) from `AppWindow.Closing`, which runs before the dialog is hidden. That
+covers every close path: OK, Cancel, Escape, Enter, the title-bar X, Alt+F4, and a `Close()` from
+a subclass or from a progress dialog. `OnClosed` repeats the restore, and the restore is
+idempotent and exception-safe, so a close that skipped `Closing` still gives the owner back.
+E2E: after each dialog closes, the foreground window is the main window ('Registry Editor'), and
+the next keyboard command reaches it (`ImportExportTests`, `gui.foreground.*`).
+
+### 1.7 Keyboard focus not inside the dialog after activation
+
+`Activate` makes the dialog the foreground window, but the XAML focus inside it is not always on a
+control. The load-time focus (the default button, or the edit box of a value editor) can be set
+before the window is active, and activation then leaves no element focused. Enter and Escape are
+delivered to the focused element and bubble to `DialogRoot`, so with no focus inside the dialog they
+never reach `OnRootKeyDown`. The dialog then looks open and active but ignores the keyboard. The
+message box stayed open after Enter in the Registry Editor run.
+
+Guard: `ModalDialogWindow` raises `OnDialogActivated` on each activation that is not a deactivation.
+`ClassicDialog` answers it by putting focus back on the control that had it after load, or on the
+first tab stop, when no element inside the dialog has focus. Before the content is loaded the XAML
+root does not exist yet, so the activation is skipped and the Loaded handler restores focus once the
+window is active. `FocusManager.GetFocusedElement` throws for a null XAML root, so every read checks
+it first.
+E2E: after the import result message appears, Enter must close it (`dialog.message.dismissed`). The
+last run still failed this check: the restored focus is inside the dialog, but Enter never reaches
+`DialogRoot`, so the input is lost below the XAML focus, which is still open.
+
+### 1.8 Enter swallowed by a focused button
+
+A focused button marks the Enter key handled on KeyDown without raising Click, so a root `KeyDown` handler
+never sees Enter, and the dialog ignores it. The import result message stayed open for that reason.
+
+Guard: the dialog root registers its key handler with `handledEventsToo`. A handled key is ignored, except
+Enter while a button has focus, which is answered by the dialog's default or focused button. Escape keeps
+the rule that a handled key is ignored. The key-down path for a multi-line edit still lets Enter insert a
+newline.
+E2E: after the import result message appears, Enter closes it (`dialog.message.dismissed`). Not yet
+confirmed in a passing run; the import step failed at the file dialog Save click in the last runs.
+
 ## 2. DPI and geometry
 
 ### 2.1 DLU converted at system DPI instead of window DPI
@@ -481,3 +534,11 @@ reported, not claimed. Guard: rectangles are compared with RT_DIALOG 104 only.
 Edge cases with no E2E check yet: 100 % and 150 % scale (the E2E machine runs at 200 %), monitors
 with different DPI, localized labels wider than the template, and a message box wider than the
 work area. These are listed in the report, not claimed as covered.
+
+## Parity package: Import progress and Disconnect
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| Import progress is 280 x 82 DLU with a Cancel button | DLG-019: 240 x 59 DLU, `File:` at (10, 10), file name at (10, 22) 220 x 8, bar at (10, 40) 220 x 9, no Cancel |
+| Disconnect is a 470 x 360 px window | DLG-013 template, 250 x 111 DLU |
+| Disconnect text contrast is wrong | Labels and list use the palette text and face colors (`DialogContrast`) |

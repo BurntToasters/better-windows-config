@@ -120,9 +120,18 @@ the owning package records the observed behavior as a golden before implementing
   replace whose hive file contains a symbolic link key or cannot be verified as a hive; a permission
   propagation whose subtree contains a link; and any hive mount (`HKLM` or `HKU`).
 - Every policy refuses a copy into the source's own subtree, including `ShippingWritePolicy`.
-- `SetKeySecurity` with `propagateToSubkeys` applies one descriptor to the key and every key below
-  it, through the write policy for each key, and reports progress and honors cancellation between
-  keys. It is not inheritance-aware (`failure-modes/registry-writer.md` section I).
+- `SetKeySecurity` with `propagateToSubkeys` writes the descriptor to the key, then gives each key
+  below it only the entries it inherits from its parent (classic "Replace all child object permission
+  entries"): explicit entries are removed, the DACL is unprotected, and inherited entries carry
+  `INHERITED_ACE`. Owner and group are copied only when requested. SACL propagation is refused. Each key
+  goes through the write policy, progress is reported per key, and cancellation is honored between keys.
+  A propagation that removes the current user's access to a child is not refused. The owner recovers the
+  child by opening it with `WRITE_DAC` (`failure-modes/permissions.md` sections 15, 18 and 26).
+- `RegistryInheritanceModes` gives the ACE flags of the three key inherit types the Permissions dialog
+  offers: this key only (0), this key and subkeys (`CONTAINER_INHERIT_ACE`), subkeys only
+  (`CONTAINER_INHERIT_ACE | INHERIT_ONLY_ACE`).
+- `RegistrySecurityDescriptor.CopyFromNative` accepts an absolute descriptor by converting it to
+  self-relative form first (`failure-modes/permissions.md` section 23).
 - `DenyAllWritePolicy` refuses every write before native code runs. The Registry Editor uses it in
   E2E builds when `BWC_E2E_SANDBOX_ROOT` is missing or invalid, so nothing is written.
 - `scripts/check-registry-writer.js` fails the build when a file outside `RegistryWriter*.cs`
