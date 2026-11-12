@@ -179,7 +179,8 @@ public sealed partial class RegistryWriter
         // The source is checked as well, so a policy can refuse to copy from outside its sandbox.
         _policy.EnsureWriteAllowed(source, RegistryWriteOperation.CopyTree);
 
-        if (_policy.RejectsSymbolicLinks && (destination.Equals(source) || destination.IsDescendantOf(source)))
+        // Applies to every policy. RegCopyTree would recurse into the tree it is writing.
+        if (destination.Equals(source) || destination.IsDescendantOf(source))
         {
             throw new ArgumentException(
                 "A key tree cannot be copied onto itself or into one of its own subkeys.",
@@ -211,6 +212,13 @@ public sealed partial class RegistryWriter
             Operation,
             destination);
 
+        if (_policy.RejectsSymbolicLinks)
+        {
+            // RegCopyTree follows an existing destination child that has the same name as a source child, so a
+            // link already under the destination is an escape route even when the source is clean.
+            EnsureSubtreeHasNoSymbolicLinks(destinationHandle, destination.ToAbbreviatedString(), Operation, destination, depth: 0);
+        }
+
         // A null subkey copies the source key itself into the destination key.
         WIN32_ERROR error = PInvoke.RegCopyTree(sourceHandle, null!, destinationHandle);
         ThrowIfFailed(error, Operation, destination);
@@ -226,20 +234,7 @@ public sealed partial class RegistryWriter
         const string Operation = nameof(RegistryWriteOperation.SetKeySecurity);
         _policy.EnsureWriteAllowed(path, RegistryWriteOperation.SetKeySecurity);
 
-        if (information == RegistrySecurityInformation.None)
-        {
-            throw new ArgumentException(
-                "At least one security information flag is required.",
-                nameof(information));
-        }
-
-        if (!RegistrySecurityDescriptor.TryGetLength(securityDescriptor, out int declaredLength) ||
-            declaredLength != securityDescriptor.Length)
-        {
-            throw new ArgumentException(
-                "The buffer is not a valid self-relative security descriptor with an exact declared length.",
-                nameof(securityDescriptor));
-        }
+        ValidateSecurityArguments(information, securityDescriptor);
 
         uint access = WriteDacStandardRight | ReadControlStandardRight;
         if ((information & (RegistrySecurityInformation.Owner | RegistrySecurityInformation.Group)) != 0)

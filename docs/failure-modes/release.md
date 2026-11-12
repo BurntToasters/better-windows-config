@@ -1,7 +1,8 @@
 # Release tooling failure modes
 
 Scope: `scripts/sign-update-manifest.js`, `scripts/validate-updater-manifest.js`,
-`scripts/release-dry-run.js`, `scripts/release-preflight.js`, `scripts/release-session.js`,
+`scripts/assemble-bundle.js`, `scripts/release-dry-run.js`, `scripts/release-preflight.js`,
+`scripts/release-session.js`,
 `scripts/release-draft.js`, `scripts/release-verify.js`, `scripts/release-publish.js`,
 `scripts/release-selftest.js`, and `scripts/lib/**`. Written before the code, per AGENTS.md.
 
@@ -40,6 +41,9 @@ run, then exits 1. This keeps the plan visible without pretending the release is
 | S5 | File to sign is missing | Empty signature | Refuse `signature-input-missing`. Exit 3. |
 | S6 | Legacy `Ed` signing is requested | Legacy signs raw bytes, not BLAKE2b | Sign only with explicit `--legacy`; every release path refuses it later. |
 | S7 | Key file is unreadable | Silent use of another key | Refuse `key-unreadable`. Exit 3. |
+| S8 | Encrypted secret key (`EdSc` layout) is opened with a wrong password | A wrong password looks like a valid key | Refuse `wrong-password` when the BLAKE2b checksum of the decrypted key fails. Exit 1. Nothing is written. |
+| S9 | Encrypted key uses another kdf or checksum, or its scrypt parameters are out of range | Wrong or unsafe derivation | Refuse `unsupported-key-kdf` or `malformed-secret-key`. Exit 1. |
+| S10 | Password is given on the command line | It leaks into shell history and process lists | Refuse `password-argument` with exit 2. Only an environment variable name or an interactive prompt is accepted. |
 
 ## B. Manifest validator (`scripts/validate-updater-manifest.js`)
 
@@ -68,7 +72,13 @@ run, then exits 1. This keeps the plan visible without pretending the release is
 | V21 | Trusted key text carries a placeholder marker | Placeholder accepts updates | Refuse `placeholder-key`. Exit 1. |
 | V22 | One trusted key is malformed while another is valid | Fail-open key list | Refuse `malformed-key` for the whole call. Exit 1. |
 | V23 | Manifest byte or trusted comment changed after signing | Body and signed claim disagree | Refuse `signature-invalid` or `trusted-comment-invalid`. Exit 1. |
+| V23a | `--trusted-key` is not byte-identical in key id and key bytes to a key embedded in `src/Bwc.Update/Signing/TrustedKeys.cs` | A key outside the shipped list is accepted by the release tooling | Refuse `embedded-key-mismatch`. Exit 1. The check parses the embedded list, not the comments. |
 | V24 | Installer file missing for an entry inspected with `--installer` | Unverified bytes | Refuse `installer-missing`. Exit 3. |
+| V25 | Manifest trusted comment has no `channel:` or no `expires:` field, or a field is malformed | Signed claim is incomplete, so freshness and channel cannot be checked | Refuse `trusted-comment-invalid`. Exit 1. |
+| V26 | Signed `channel:` differs from the manifest `channel` | A stable manifest re-labelled as beta, or the reverse | Refuse `channel-mismatch`. Exit 1. |
+| V27 | Signed `expires:` is in the past, by the checker's clock | Replay of an old, signed manifest | Refuse `expired`. Exit 1. |
+| V28 | Trusted comment has extra fields, or an expiry that is not `yyyy-MM-ddTHH:mm:ssZ` | Two readers parse the signed claim differently | Refuse `trusted-comment-invalid`. Exit 1. The manifest format is exactly `version:<semver> channel:<stable or beta> expires:<utc>`. |
+| V29 | Manifest signed for one channel, with the manifest `channel` field set to the other | Cross-channel reuse | Refuse `channel-mismatch`. Exit 1. |
 
 ## C. Dry-run harness (`scripts/release-dry-run.js`)
 
@@ -81,7 +91,11 @@ run, then exits 1. This keeps the plan visible without pretending the release is
 | D5 | Requested channel disagrees with the version | Beta version on stable | Refuse `channel-mismatch`. Exit 2. |
 | D6 | Manifest validation fails after generation | Bad artifact recorded as pass | Write `validation-report.json` with `ok:false` and exit 1. |
 | D7 | Ephemeral secret key is left in artifacts | Test key leak | Keep the secret only in the process temp folder and delete it in `finally`. Write only the public key. |
-| D8 | Two runs with the same version | Old files mixed with new | Overwrite only the files this tool owns under `artifacts/release/<version>`. |
+| D8 | Two runs with the same version | Old files mixed with new | Overwrite only the files this tool owns under `artifacts/release/<version>/<channel>`. |
+| D9 | `--secret-key` is an encrypted key and the password is wrong or missing | Wrong key material, or a prompt that never comes | A wrong password refuses `wrong-password`, exit 1. No password source (no env var, no TTY) refuses `password-missing`, exit 2. |
+| D10 | A real key is given but its public key is not in `src/Bwc.Update/Signing/TrustedKeys.cs` | A test or foreign key signs a release bundle | Refuse `embedded-key-mismatch`. Exit 1 in `assemble-bundle`. A dry run with a test key is labelled `testKey: true` by key id and bytes, never by comment text. |
+| D11 | `assemble-bundle` output is not exactly what `BwcUpdate --check` and `--apply` read | Updater refuses a valid bundle, or accepts a bad one | The bundle is validated with the same validator the updater contract describes before the command reports PASS. Manifest trusted comment: exactly `version:<semver> channel:<stable or beta> expires:<yyyy-MM-ddTHH:mm:ssZ>`. Installer trusted comment: exactly `version:<semver> arch:<win-x64 or win-arm64>`. |
+| D12 | Manifest for one channel is written into another channel's folder | Stable and beta bundles mixed | One manifest per channel, in `artifacts/release/<version>/<channel>/`. The channel is part of the path and of the signed comment. |
 
 ## D. Preflight and session (`scripts/release-preflight.js`, `scripts/release-session.js`)
 
@@ -107,7 +121,7 @@ lives under `artifacts/release/session.json`, which is git-ignored.
 | G1 | No `--apply` | A dry run creates or publishes a release | Print the exact `gh api` commands and exit 0 or 1. No `gh` process is started. |
 | G2 | No session for `--apply` | Draft from an unrecorded tree | Refuse `missing-session`. Exit 3. |
 | G3 | Manifest has no signature | Unsigned release | Refuse `signature-missing`. Exit 1. |
-| G4 | Trusted key is the repository placeholder or marked as a dry-run test key | Placeholder or test key signs a real release | Refuse `placeholder-key` or `test-key`. Exit 1. `release-draft.js` needs `--allow-test-key` even for a dry run; verify and publish dry runs accept it with a warning, and every `--apply` path refuses it. |
+| G4 | Trusted key is the repository placeholder, or is not one of the keys embedded in `TrustedKeys.cs` (a test key) | Placeholder or test key signs a real release | Refuse `placeholder-key` or `test-key`. Exit 1. The test-key decision is made from the embedded key list (key id and bytes), never from comment text an editor can change. `release-draft.js` needs `--allow-test-key` even for a dry run; verify and publish dry runs accept it with a warning, and every `--apply` path refuses it. |
 | G5 | Installer is a `.dry-run.json` stand-in | A fake installer is published | Refuse `dry-run-artifact` in `--apply`, and in a dry-run plan print the refusal. |
 | G6 | Draft exists for the tag | Duplicate drafts | Reuse and patch the one draft. Multiple drafts refuse `duplicate-drafts`. Exit 1. |
 | G7 | Release is already published | A second draft or a re-publish | Draft refuses `already-published`. Publish is a no-op success only when tag, prerelease flag, and target commit match. |
@@ -117,6 +131,11 @@ lives under `artifacts/release/session.json`, which is git-ignored.
 | G11 | Downloaded asset size or hash differs from the manifest | Tampered upload | Verify refuses `asset-hash-mismatch` or `asset-size-mismatch`. Exit 1. |
 | G12 | Publish is attempted with no draft | Publish creates a release | Refuse `draft-missing`. Exit 1. |
 | G13 | `gh` is missing or exits non-zero under `--apply` | Silent partial release | Refuse `gh-missing` or `gh-failed`. Exit 4. |
+| G14 | `--commit` does not resolve to HEAD, or HEAD is not the session commit | Release from a commit that was not verified | Refuse `session-commit-mismatch`. Exit 1. A draft never falls back to the literal target `HEAD`. |
+| G15 | No `--repo`, no `GH_REPO`, and no `origin` remote with a GitHub URL | Release sent to a hard-coded repository | Refuse `repo-invalid`. Exit 2. The tooling never assumes an owner or name. |
+| G16 | Draft asset has the same name and size as the local file but a different SHA-256 | Size-only comparison accepts a tampered asset | Compare by the SHA-256 of the downloaded asset, never by size alone. A difference refuses `asset-conflict` unless `--replace-assets`. |
+| G17 | GitHub reports no digest for a draft asset | Digest-less comparison is unverified | The tool downloads the asset and hashes it. The result is the same comparison as G16. |
+| G18 | An asset id, name, or digest changes between verification and the publish PATCH | Race with another upload or edit | `release-publish --apply` re-reads the release immediately before the PATCH and refuses `asset-changed` when any asset id, name, or digest differs from the verified set. No PATCH is sent. Exit 1. |
 
 `release-draft.js --apply` creates or updates a draft only. `release-publish.js --apply`
 requires a fresh verification of the downloaded draft assets before the PATCH that clears

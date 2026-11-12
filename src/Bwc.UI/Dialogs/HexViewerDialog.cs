@@ -1,78 +1,41 @@
-using Bwc.UI.Hex;
-using Microsoft.UI.Xaml;
+using System.Globalization;
+using System.Text;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 
 namespace Bwc.UI.Dialogs;
 
 /// <summary>
-/// Read-only binary value viewer. The dialog owns a snapshot of the bytes passed to
-/// <see cref="SetValue"/> and never writes to the registry. Escape or Close dismisses it.
+/// Display Binary Data (RT_DIALOG 2021). A read-only view of one value snapshot: each list row holds 16
+/// bytes, an offset, and the bytes grouped by the chosen format (Byte, Word, Dword, or Qword, little endian).
+/// The dialog owns a copy of the bytes and never writes to the registry. Escape or the OK button dismisses it.
 /// </summary>
-public sealed class HexViewerDialog : ModalDialogWindow
+public sealed class HexViewerDialog : ClassicDialog
 {
-    private readonly string _title;
-    private readonly HexEditor _editor;
-    private readonly TextBlock _status;
+    private const int BytesPerRow = 16;
 
-    public HexViewerDialog(string title, string closeText = "Close")
+    private readonly ListBox _list;
+    private readonly TextBlock _valueType;
+    private byte[] _data = [];
+    private int _elementSize = 1;
+
+    /// <param name="title">The classic caption, "Binary Data".</param>
+    /// <param name="closeText">The text of the OK button.</param>
+    public HexViewerDialog(string title, string closeText = "OK")
+        : base(ClassicDialogTemplates.BinaryData(Required(title, nameof(title)), Required(closeText, nameof(closeText))))
     {
-        ArgumentException.ThrowIfNullOrEmpty(title);
-        ArgumentException.ThrowIfNullOrEmpty(closeText);
+        _list = RequireControl<ListBox>("HexViewerList");
+        _valueType = RequireControl<TextBlock>("ValueTypeText");
 
-        _title = title;
-        Title = title;
-        SetHeading(title);
-        PrimaryText = closeText;
-        SecondaryText = string.Empty;
-        ShowSecondaryButton = false;
-        SubmitsOnEnter = false;
-        SetPreferredSize(720, 480);
-
-        _editor = new HexEditor
-        {
-            Height = 260,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            IsReadOnly = true,
-            VerticalAlignment = VerticalAlignment.Stretch,
-        };
-
-        _status = new TextBlock
-        {
-            TextWrapping = TextWrapping.Wrap,
-        };
-        AutomationProperties.SetAutomationId(_status, "HexViewerStatus");
-
-        var grid = new Grid
-        {
-            RowSpacing = 6,
-        };
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        Grid.SetRow(_editor, 0);
-        grid.Children.Add(_editor);
-
-        Grid.SetRow(_status, 1);
-        grid.Children.Add(_status);
-
-        var root = new DialogRootControl
-        {
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            VerticalContentAlignment = VerticalAlignment.Stretch,
-            Content = grid,
-        };
-        AutomationProperties.SetAutomationId(root, "HexViewerDialog");
-        AutomationProperties.SetName(root, title);
-        SetBody(root);
+        RequireControl<RadioButton>("FormatByte").Checked += (_, _) => SetElementSize(1);
+        RequireControl<RadioButton>("FormatWord").Checked += (_, _) => SetElementSize(2);
+        RequireControl<RadioButton>("FormatDword").Checked += (_, _) => SetElementSize(4);
+        RequireControl<RadioButton>("FormatQword").Checked += (_, _) => SetElementSize(8);
     }
 
-    /// <summary>The editor inside the dialog. Exposed for the host and tests.</summary>
-    public HexEditor Editor => _editor;
-
     /// <summary>
-    /// Shows one value snapshot. The type name is optional; when present it appears in the status
-    /// line next to the byte count and display name.
+    /// Shows one value snapshot. The value name is the list's accessible name, and the type name fills the
+    /// Value Type field. The key path is accepted for the callers; the classic layout shows neither.
     /// </summary>
     public void SetValue(string displayName, string keyPath, byte[] data, string? typeName = null)
     {
@@ -80,19 +43,78 @@ public sealed class HexViewerDialog : ModalDialogWindow
         ArgumentNullException.ThrowIfNull(keyPath);
         ArgumentNullException.ThrowIfNull(data);
 
-        Title = _title + ": " + displayName;
-        SetHeading(_title + " - " + displayName);
-        SetMessage(keyPath);
-        _editor.SetData(data);
-
-        string type = string.IsNullOrWhiteSpace(typeName) ? string.Empty : typeName + "    ";
-        string status = data.Length + " bytes    " + type + displayName;
-        _status.Text = status;
-        AutomationProperties.SetName(_status, status);
+        _data = (byte[])data.Clone();
+        AutomationProperties.SetName(_list, displayName);
+        _valueType.Text = string.IsNullOrWhiteSpace(typeName) ? string.Empty : typeName;
+        Rebuild();
     }
 
-    protected override void OnDialogLoaded()
+    private static string Required(string value, string parameter)
     {
-        _editor.FocusEditor();
+        ArgumentException.ThrowIfNullOrEmpty(value, parameter);
+        return value;
+    }
+
+    private void SetElementSize(int size)
+    {
+        if (_elementSize == size)
+        {
+            return;
+        }
+
+        _elementSize = size;
+        Rebuild();
+    }
+
+    /// <summary>Fills the list with one row per 16 bytes in the current format.</summary>
+    private void Rebuild()
+    {
+        _list.Items.Clear();
+        for (int rowStart = 0; rowStart < _data.Length; rowStart += BytesPerRow)
+        {
+            _list.Items.Add(RowText(rowStart));
+        }
+    }
+
+    private string RowText(int rowStart)
+    {
+        int end = Math.Min(rowStart + BytesPerRow, _data.Length);
+        var text = new StringBuilder();
+        text.Append(rowStart.ToString("X4", CultureInfo.InvariantCulture)).Append("  ");
+
+        for (int at = rowStart; at < end; at += _elementSize)
+        {
+            if (at > rowStart)
+            {
+                text.Append(' ');
+            }
+
+            if (end - at >= _elementSize)
+            {
+                text.Append(ElementText(at));
+            }
+            else
+            {
+                // A value that runs past the end of the data shows its bytes one by one.
+                for (int b = at; b < end; b++)
+                {
+                    text.Append(_data[b].ToString("X2", CultureInfo.InvariantCulture));
+                }
+            }
+        }
+
+        return text.ToString();
+    }
+
+    /// <summary>The element at <paramref name="at"/> as hex, read little endian and zero padded to its width.</summary>
+    private string ElementText(int at)
+    {
+        ulong value = 0;
+        for (int b = _elementSize - 1; b >= 0; b--)
+        {
+            value = (value << 8) | _data[at + b];
+        }
+
+        return value.ToString("X" + (_elementSize * 2).ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
     }
 }

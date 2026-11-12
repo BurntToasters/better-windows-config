@@ -379,8 +379,10 @@ does through `await`.
 These are the editors migrated to the classic template in this batch: Edit Multi-String
 (RT_DIALOG 114), Edit Binary Value (RT_DIALOG 103, with the HEX control), Find (RT_DIALOG 106),
 Remove Favorites (RT_DIALOG 113), and the Load Hive style key-name prompt (RT_DIALOG 104) that
-`TextPromptDialog` now uses. The Binary Data viewer keeps its hex control until its listbox layout
-is migrated; see 9.9.
+`TextPromptDialog` now uses. The Binary Data viewer (RT_DIALOG 2021) is on the classic template: a
+read-only list of 16 bytes per row, the Byte, Word, Dword, and Qword formats, and the Value Type field.
+The 2021 template carries no value-name control, so the value name is the list's accessible name.
+Its OK button text is the caller's; the classic button is OK, so the caller must pass OK.
 
 ### 9.1 Empty strings saved without a warning
 

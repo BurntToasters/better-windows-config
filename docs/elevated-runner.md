@@ -17,10 +17,15 @@ Read this before you install it.
   projects and runs the app publish, and both come from this repo. Anything that can change files in
   this checkout (an agent, a dependency update, an edited script or test) can get code run as
   administrator the next time the task runs.
-- The runner script in `%ProgramData%\BwcElevatedRunner` can only be changed by Administrators and
-  SYSTEM, so a normal process cannot change what the task runs. That does not protect the checkout
-  the runner builds and tests.
-- Keep the task disabled unless you need an elevated run. Enable it for the run, then disable it.
+- Residual risk, in plain words: the runner protects only itself. Its copy in
+  `%ProgramData%\BwcElevatedRunner` can be changed only by Administrators and SYSTEM, and
+  `install.ps1` refuses to reuse a folder that a link or a non-administrator owns. It does not
+  protect the checkout that the runner builds and tests. Whatever is in that checkout runs as
+  administrator when the task runs.
+- The task is disabled at the end of every run, including a refused run. You must enable it again
+  for each run. A forgotten enable is not a risk; a left-on task is, so the runner turns itself off.
+- The runner uses only the machine PATH plus `System32`. It does not use the user PATH, because a
+  user-writable folder on that PATH could supply a tool to the elevated run.
 - Prefer a disposable Windows VM with a copy of the repo for this. Use the runner on your
   everyday machine only if you accept the risk above.
 - The task runs only for your user, only when you are logged on at the desktop, and only when
@@ -31,8 +36,12 @@ Read this before you install it.
 `install.ps1` (run once, elevated) does these things:
 
 - refuses to run unless the PowerShell is already elevated, and never elevates itself;
-- copies `run-elevated.ps1` to `%ProgramData%\BwcElevatedRunner\run-elevated.ps1`, with an ACL that
-  only Administrators and SYSTEM can modify (your user gets read access);
+- refuses to reuse an existing `%ProgramData%\BwcElevatedRunner` (or its files) that is a link or
+  junction, or that is owned by anything other than Administrators or SYSTEM. It stops and changes
+  nothing; run `uninstall.ps1` from an elevated shell, then install again;
+- copies `run-elevated.ps1` to `%ProgramData%\BwcElevatedRunner\run-elevated.ps1`, with the owner set
+  to Administrators and an ACL that only Administrators and SYSTEM can modify (your user gets read
+  access);
 - records this checkout and the `node` path in `%ProgramData%\BwcElevatedRunner\config.json`;
 - registers the task "BWC Elevated E2E" for the current user, interactive, with "Run with highest
   privileges". The action is a fixed command: PowerShell runs the copied runner with no arguments.
@@ -41,13 +50,17 @@ Read this before you install it.
 When the task runs, `run-elevated.ps1` does only this:
 
 1. checks that it is elevated and that it takes no arguments;
-2. reads the repo and node paths from `config.json` and checks that they are a BWC checkout;
-3. maps the node architecture to the host RID (`win-arm64` or `win-x64`);
+2. reads the repo and node paths from `config.json`, checks that the repo is a real folder (not a
+   link or junction) and a BWC checkout, and checks that the node file exists;
+3. sets the PATH to `System32` and the machine PATH only, then maps the node architecture to the
+   host RID (`win-arm64` or `win-x64`);
 4. checks the E2E publish folder `publish/<rid>-e2e` with `scripts/flavor-metadata.js`. It must
    be flavor E2E, with `asInvoker` in every exe head;
 5. runs `node scripts/test-e2e.js --rid <rid> --flavor e2e --filter "TestCategory=Elevated"` from
    that repo, and nothing else;
-6. writes its log to `%ProgramData%\BwcElevatedRunner\logs\<runId>.log` and its state to
+6. disables the scheduled task "BWC Elevated E2E", on every path including a refused run, and
+   records `taskDisabled=yes` (or `no`) in `last-run.txt`;
+7. writes its log to `%ProgramData%\BwcElevatedRunner\logs\<runId>.log` and its state to
    `%ProgramData%\BwcElevatedRunner\last-run.txt`, then exits.
 
 `run.js` (non-elevated) does this:
@@ -70,7 +83,7 @@ others run from a normal shell.
 # Once: install the task, disabled. Elevated.
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\elevated-runner\install.ps1
 
-# Before a run: enable the task. Elevated.
+# Before a run: enable the task. Elevated. The runner disables it again when it finishes.
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\elevated-runner\install.ps1 -Enable
 
 # Build the E2E publish the runner tests. Normal shell.
@@ -79,7 +92,7 @@ node scripts/dotnet-build.js --rid win-arm64 --flavor e2e
 # Run the Elevated tests and wait for the result. Normal shell. Never needs UAC.
 node scripts/elevated-runner/run.js
 
-# After the run: disable the task again. Elevated.
+# After a run that was stopped early, or to be sure: disable the task. Elevated.
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\elevated-runner\install.ps1 -Disable
 
 # Remove the task and %ProgramData%\BwcElevatedRunner. Elevated.

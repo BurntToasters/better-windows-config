@@ -204,6 +204,15 @@ public sealed class TreeBehaviorTests
             bool intoLevel2 = WaitForSelected(session, "Level2");
             E2EResults.Record("tree.arrows.right.into-expanded", intoLevel2, $"Right on an expanded Level1 moved to Level2={intoLevel2}.");
 
+            // ACC-025: Backspace selects the parent key and leaves the expansion alone.
+            Key(session, "BACK");
+            bool backspaceParent = WaitForSelected(session, "Level1") && WaitForRowPresent(session, "Level2");
+            E2EResults.Record("tree.keys.backspace.parent", backspaceParent, $"Backspace on Level2 selected its parent Level1 and kept Level2 visible={backspaceParent}.");
+
+            Key(session, "RIGHT");
+            bool backspaceReturn = WaitForSelected(session, "Level2");
+            E2EResults.Record("tree.keys.backspace.return", backspaceReturn, $"Right from Level1 returned to Level2={backspaceReturn}.");
+
             Key(session, "LEFT");
             bool toParent = WaitForSelected(session, "Level1");
             E2EResults.Record("tree.arrows.left.collapsed-to-parent", toParent, $"Left on collapsed Level2 moved to its parent={toParent}.");
@@ -634,61 +643,41 @@ public sealed class TreeBehaviorTests
         ControlTestSupport.WaitForTreeSelection(session, name);
 
     /// <summary>
-    /// Expands a row with the UI Automation ExpandCollapse pattern until the child row is present and
-    /// the state is Expanded. The row is re-read for every attempt, and an Expand that the provider
-    /// ignored while the row was still animating is sent again. Returns false after the timeout.
+    /// Expands a row with one call to the UI Automation ExpandCollapse pattern, then waits until the child
+    /// row is present and the state is Expanded. The provider must accept the first call; the test does not
+    /// resend it. Returns false when the call was refused or the state did not arrive before the timeout.
     /// </summary>
     private static bool ExpandByPattern(AppSession session, string rowName, string childName, TimeSpan timeout)
     {
-        DateTime deadline = DateTime.UtcNow + timeout;
-        do
+        _ = ControlTestSupport.EnsureForeground(session);
+        AutomationElement? row = Row(session, rowName);
+        if (row is null || !ControlTestSupport.Expand(row))
         {
-            _ = ControlTestSupport.EnsureForeground(session);
-            AutomationElement? row = Row(session, rowName);
-            if (row is not null && Row(session, childName) is null)
-            {
-                _ = ControlTestSupport.Expand(row);
-            }
-
-            if (Row(session, childName) is not null && ControlTestSupport.StateOf(Row(session, rowName)) == "Expanded")
-            {
-                return true;
-            }
-
-            Thread.Sleep(200);
+            return false;
         }
-        while (DateTime.UtcNow < deadline);
 
-        return false;
+        return ControlTestSupport.WaitUntil(
+            () => Row(session, childName) is not null && ControlTestSupport.StateOf(Row(session, rowName)) == "Expanded",
+            timeout);
     }
 
     /// <summary>
-    /// Collapses a row with the UI Automation ExpandCollapse pattern until the child row is gone and
-    /// the state is Collapsed. A Collapse sent while the expand animation was still running can be
-    /// ignored, so the row is re-read and the pattern is sent again. Returns false after the timeout.
+    /// Collapses a row with one call to the UI Automation ExpandCollapse pattern, then waits until the child
+    /// row is gone and the state is Collapsed. The provider must accept the first call; the test does not
+    /// resend it. Returns false when the call was refused or the state did not arrive before the timeout.
     /// </summary>
     private static bool CollapseByPattern(AppSession session, string rowName, string childName, TimeSpan timeout)
     {
-        DateTime deadline = DateTime.UtcNow + timeout;
-        do
+        _ = ControlTestSupport.EnsureForeground(session);
+        AutomationElement? row = Row(session, rowName);
+        if (row is null || !ControlTestSupport.Collapse(row))
         {
-            _ = ControlTestSupport.EnsureForeground(session);
-            AutomationElement? row = Row(session, rowName);
-            if (row is not null && (Row(session, childName) is not null || ControlTestSupport.StateOf(row) == "Expanded"))
-            {
-                _ = ControlTestSupport.Collapse(row);
-            }
-
-            if (Row(session, childName) is null && ControlTestSupport.StateOf(Row(session, rowName)) == "Collapsed")
-            {
-                return true;
-            }
-
-            Thread.Sleep(200);
+            return false;
         }
-        while (DateTime.UtcNow < deadline);
 
-        return false;
+        return ControlTestSupport.WaitUntil(
+            () => Row(session, childName) is null && ControlTestSupport.StateOf(Row(session, rowName)) == "Collapsed",
+            timeout);
     }
 
     private static void Key(AppSession session, string key) => ControlTestSupport.SendKeys(session, key);

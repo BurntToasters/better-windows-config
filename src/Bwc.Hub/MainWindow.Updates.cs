@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using Bwc.Core;
 using Bwc.Hub.Dialogs;
 using Bwc.Hub.Tools;
@@ -10,9 +11,9 @@ using Microsoft.UI.Xaml;
 namespace Bwc.Hub;
 
 /// <summary>
-/// Help > About, Help > Update Settings, and the update check and install. The check runs on a
-/// worker through <see cref="UpdateService"/>; the window stays responsive and a progress window
-/// with Cancel is shown for interactive checks.
+/// Help > About, Help > Update Settings, and the update check and install. The check (manifest only)
+/// runs on a worker through <see cref="UpdateService"/>. Download and Install runs the download step
+/// with a progress window, then starts the install. Each interactive step shows a window with Cancel.
 /// </summary>
 public sealed partial class MainWindow
 {
@@ -75,7 +76,7 @@ public sealed partial class MainWindow
         try
         {
             string channel = UpdateSources.Channel(_settings);
-            string? manifestUrl = UpdateSources.ManifestUrl(_settings);
+            string? manifestUrl = UpdateSources.ManifestUrl(_settings, channel);
             string currentVersion = _version.SemVer;
 
             UpdateCheckResult result = interactive && !string.IsNullOrWhiteSpace(manifestUrl)
@@ -175,9 +176,9 @@ public sealed partial class MainWindow
     }
 
     /// <summary>
-    /// Starts the helper's install and closes the Hub so the installer can replace files. Refuses
-    /// while a tool runs from the install folder, because the helper would refuse too and nothing
-    /// would visibly happen.
+    /// Refuses while a tool runs from the install folder (the installer would refuse too, after the Hub
+    /// had already closed). Otherwise downloads the installer with progress, then starts the install and
+    /// closes the Hub so the installer can replace files.
     /// </summary>
     private async Task InstallAsync(string offeredVersion)
     {
@@ -192,11 +193,25 @@ public sealed partial class MainWindow
             return;
         }
 
-        if (!UpdateService.TryFindStaged(offeredVersion, out StagedUpdate? staged) || staged is null)
+        string channel = UpdateSources.Channel(_settings);
+        string? manifestUrl = UpdateSources.ManifestUrl(_settings, channel);
+        if (string.IsNullOrWhiteSpace(manifestUrl))
+        {
+            await ShowMessageAsync(HubStrings.Get("UpdateCheckTitle"), HubStrings.Get("UpdateNotConfigured"), ClassicMessageIcon.Information);
+            return;
+        }
+
+        StagedUpdate? staged = await DownloadWithProgressAsync(manifestUrl, channel, _version.SemVer);
+        if (staged is null)
+        {
+            return;
+        }
+
+        if (!string.Equals(staged.Version, offeredVersion, StringComparison.Ordinal))
         {
             await ShowMessageAsync(
                 HubStrings.Get("UpdateCheckTitle"),
-                HubStrings.Get("UpdateNotStaged"),
+                HubStrings.Get("UpdateVersionChanged"),
                 ClassicMessageIcon.Warning);
             return;
         }
@@ -217,6 +232,83 @@ public sealed partial class MainWindow
 
         Log.Info("Hub closing so the update can install.");
         Close();
+    }
+
+    /// <summary>
+    /// Runs the download step behind a progress window with Cancel. The status line shows the percentage.
+    /// Returns the staged installer, or null when the user canceled or the download failed (the reason is shown).
+    /// </summary>
+    private async Task<StagedUpdate?> DownloadWithProgressAsync(string manifestUrl, string channel, string currentVersion)
+    {
+        using var cancel = new CancellationTokenSource();
+        var dialog = new UpdateProgressDialog(HubStrings.Get("UpdateDownloading"));
+        Task<bool> closed = dialog.ShowAsync(_hwnd);
+        StatusText.Text = HubStrings.Get("UpdateDownloading");
+
+        var progress = new Progress<DownloadProgressReport>(report =>
+        {
+            if (report.Total > 0)
+            {
+                int percent = (int)Math.Min(100, report.Received * 100 / report.Total);
+                StatusText.Text = HubStrings.Format("UpdateDownloadProgress", percent.ToString(CultureInfo.InvariantCulture));
+            }
+        });
+
+        Task<(UpdateCheckResult Result, StagedUpdate? Staged)> work = _updates.DownloadAsync(manifestUrl, channel, currentVersion, progress, cancel.Token);
+        _ = work.ContinueWith(
+            _ => DispatcherQueue.TryEnqueue(dialog.FinishFromWorker),
+            TaskScheduler.Default);
+
+        _ = await closed;
+        if (!dialog.Finished)
+        {
+            cancel.Cancel();
+        }
+
+        (UpdateCheckResult Result, StagedUpdate? Staged) outcome;
+        try
+        {
+            outcome = await work;
+        }
+        catch (OperationCanceledException)
+        {
+            outcome = (new UpdateCheckResult(UpdateOutcomeKind.Canceled, string.Empty), null);
+        }
+
+        switch (outcome.Result.Kind)
+        {
+            case UpdateOutcomeKind.Available when outcome.Staged is not null:
+                return outcome.Staged;
+
+            case UpdateOutcomeKind.Canceled:
+                StatusText.Text = HubStrings.Get("UpdateCanceled");
+                return null;
+
+            default:
+                StatusText.Text = HubStrings.Get("UpdateStatusFailed");
+                await ShowMessageAsync(
+                    HubStrings.Get("UpdateFailedTitle"),
+                    HubStrings.Format("UpdateFailedText", outcome.Result.Message),
+                    ClassicMessageIcon.Error);
+                return null;
+        }
+    }
+
+    /// <summary>
+    /// Shows why the helper did not install, when it relaunched the Hub with <c>--update-result</c>. The code is
+    /// the helper's failure name, which is a short fixed word, never free text.
+    /// </summary>
+    internal async Task ShowUpdateResultAsync(string code)
+    {
+        string text = code switch
+        {
+            "ProcessesStillRunning" => HubStrings.Get("UpdateResultRunning"),
+            "RunningElevated" => HubStrings.Get("UpdateResultElevated"),
+            _ => HubStrings.Format("UpdateResultNotInstalled", code),
+        };
+
+        StatusText.Text = HubStrings.Get("UpdateStatusFailed");
+        await ShowMessageAsync(HubStrings.Get("UpdateCheckTitle"), text, ClassicMessageIcon.Warning);
     }
 
     private async Task ShowMessageAsync(string caption, string text, ClassicMessageIcon icon)

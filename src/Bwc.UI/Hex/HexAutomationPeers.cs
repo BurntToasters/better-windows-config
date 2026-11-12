@@ -47,7 +47,7 @@ internal sealed class HexEditorAutomationPeer : FrameworkElementAutomationPeer, 
 
     protected override string GetClassNameCore() => "HexEditor";
 
-    protected override string GetNameCore() => "Hex editor";
+    protected override string GetNameCore() => BwcStrings.Get("HexEditorName");
 
     protected override string GetAutomationIdCore() => "HexEditor";
 

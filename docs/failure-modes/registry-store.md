@@ -81,19 +81,21 @@ operation is not atomic.
 
 ## 7. RenameValue target overwrite
 
-If the new name already exists, the copy overwrites the target value before the old name is
-deleted. The overwritten bytes are not saved. If the old-value delete then fails and the
-rollback succeeds, the rollback deletes the new name and the previous target value is gone. The
-store cannot restore it. Callers that need to preserve an existing target must check for it
-first and choose a different name or delete it deliberately.
+If the new name already exists, `RenameValue` refuses before any write. It throws
+`RegistryOperationException` with operation `RenameValue`, the key path, and Win32 error 183
+(`ERROR_ALREADY_EXISTS`). The UI maps that code to the classic "specified value name already
+exists" message. The existing target value is not read, written, or deleted. Tests:
+`RenameValueRefusesAnExistingTarget`, which also checks that the target keeps its data.
 
 ## 8. RenameValue with the same name
 
 Registry value names compare case-insensitively. Renaming to the identical spelling returns
-without a native call. Renaming to a different casing writes the value once and skips the delete
-step. Without that guard the delete would remove the value that was just written. The registry
-may preserve the original stored casing, so a case-only rename is not guaranteed to change the
-spelling shown by enumeration.
+without a native call. A case-only rename (`Old` to `OLD`) names the same value, so it is not an
+"already exists" case. It is done as delete then recreate: the old value is read, the old name is
+deleted, and the value is written under the new spelling. If the write fails, the store writes the
+old name back with the saved type and data, and rethrows the write error. Writing first would keep
+the stored casing, so the spelling would not change. Test: `RenameValuePreservesRawDataAndHandlesTheDefaultName`
+(case-only step).
 
 ## 9. Typed overflow
 

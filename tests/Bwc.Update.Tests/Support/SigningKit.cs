@@ -73,6 +73,13 @@ internal static class Signing
         NodeSigner.Run([.. args]);
         return new SignedFile(file, File.ReadAllText(file + ".minisig"), File.ReadAllText(file + ".sig"));
     }
+
+    /// <summary>Signs a manifest with the exact trusted comment the updater requires (version, channel, expires).</summary>
+    public static SignedFile SignManifest(string file, SigningKey key, string version, string channel, string expires)
+    {
+        NodeSigner.Run("sign-manifest", file, key.Dir, "--version", version, "--channel", channel, "--expires", expires);
+        return new SignedFile(file, File.ReadAllText(file + ".minisig"), File.ReadAllText(file + ".sig"));
+    }
 }
 
 /// <summary>Byte-level helpers that build tampered signature and key text. LF input is assumed.</summary>

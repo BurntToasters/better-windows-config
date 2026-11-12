@@ -1,19 +1,22 @@
 # Update verifier failure modes
 
-Scope: `Bwc.Update` (`BwcUpdate.exe`): the manifest and installer verification pipeline (check
-mode), the receipt handoff, and the helper mode (`--apply`) that waits for the apps to exit and
-runs the verified installer. The minisign layer is the verifier proven in
+Scope: `Bwc.Update` (`BwcUpdate.exe`): the manifest verification step (`--check`), the installer
+download and verification step (`--download`), the helper mode (`--apply`) that checks the
+verified installer and starts it, and the two process commands (`--close-running`, `--wait-pid`)
+that the installer calls. The minisign layer is the verifier proven in
 `spikes/S5-minisign/FAILURE-MODES.md`; this file covers what the update flow adds on top of it.
 
 Written before the tests and before the code, per AGENTS.md ("FIRST write all the ways it could
-fail, THEN write the code").
+fail, THEN write the code"). This revision adds sections L to R and changes rows MS14, NE4, IN15,
+HL5, HL8, HL10 to HL13, and HT7 and HT8.
 
 Terms:
 - **WA** = wrongly accept (a bad manifest, installer, or request passes).
 - **WR** = wrongly reject (a good update is refused).
 - **Test** = the MSTest method in `tests/Bwc.Update.Tests` that covers the row. `Doc` means the
-  behavior is a documented caller or operator duty, so no automated test exists.
-- Every rejection is a typed `UpdateFailure` (one enum for check and apply) with a reason.
+  behavior is a documented caller or operator duty, or is covered only by an E2E run, so no unit
+  test exists.
+- Every rejection is a typed `UpdateFailure` (one enum for check, download, and apply) with a reason.
   "Never throw" rows mean the public call returns the typed result.
 
 ## A. Manifest signature
@@ -27,13 +30,13 @@ Terms:
 | MS5 | Manifest signature truncated (a line or the base64 cut short) | WA if accepted, throw if not handled | Reject, no throw | `Manifest_SignatureTruncated_Rejected` |
 | MS6 | Manifest signature URL returns 404 | Stuck or unclear error | Reject, `ManifestSignatureDownload` with status | `Manifest_SignatureNotFound_Reported` |
 | MS7 | Untrusted comment line edited, signature kept | WR if the line is checked; WA if displayed as authenticated | Accept. The untrusted line is never returned as authenticated | `Manifest_UntrustedComment_Edit_Still_Accepted` |
-| MS8 | Trusted comment edited, signature kept | WA (the comment carries `version:`) | Reject | `Manifest_TrustedComment_Edit_Rejected` |
+| MS8 | Trusted comment edited, signature kept | WA (the comment carries `version:`, `channel:`, `expires:`) | Reject | `Manifest_TrustedComment_Edit_Rejected` |
 | MS9 | Legacy `Ed` algorithm on the manifest signature | WA: legacy signs raw bytes and is not prehashed | Reject (`allowLegacy` is false in production) | `Manifest_LegacyEd_Rejected` |
 | MS10 | Unknown algorithm bytes (not `ED` or `Ed`) | WA if treated as legacy | Reject | `Manifest_UnknownAlgorithm_Rejected` |
 | MS11 | Signature as raw minisign text, or as the base64 envelope | WR if one form is refused | Accept both | `Manifest_RawAndEnvelope_Both_Accepted` |
 | MS12 | Signature with a BOM, stray CR, extra whitespace, wrong line count | WA if trimmed silently | Reject (spike rules B11 to B17) | `Manifest_Signature_Format_Rejected` |
-| MS13 | Trusted key list is empty | WA if "no keys" means "accept" | Reject, fail closed | `Empty_Key_List_Rejected` |
-| MS14 | Shipped placeholder public key (no real key yet) | WA if the placeholder verifies anything | Every manifest is refused, `TrustedKeysInvalid` | `Placeholder_Key_Fails_Closed` |
+| MS13 | Trusted key list is empty | WA if "no keys" means "accept" | Reject, fail closed (`TrustedKeysInvalid`) | `Empty_Key_List_Rejected` |
+| MS14 | Shipped placeholder public key (no real key yet) | WA if the placeholder verifies anything | Every manifest is refused, `TrustedKeysNotConfigured` (see R1) | `Placeholder_Key_Fails_Closed` |
 | MS15 | Key rotation: the second trusted key signed | WR | Accept, return the trusted comment | `Rotation_Second_Key_Accepted` |
 | MS16 | Key rotation: a key not in the list signed | WA | Reject | `Rotation_Unlisted_Key_Rejected` |
 | MS17 | One malformed key in the list, a valid key signed | WA if the bad key is skipped | Reject the whole call (fail closed) | `Malformed_Key_Fails_Closed` |
@@ -61,7 +64,7 @@ Terms:
 | MC16 | `pubDate` not a normalized UTC ISO-8601 string (offset, no `Z`, date only) | WA on ambiguous dates | Reject | `PubDate_Format_Rejected` |
 | MC17 | `pubDate` more than 24 hours after the local clock | Wrong local clock or forged future date | Reject `ManifestDatedInFuture` | `PubDate_Far_Future_Rejected` |
 | MC18 | `pubDate` one hour after the local clock | WR from small skew | Accept | `PubDate_Small_Skew_Accepted` |
-| MC19 | `pubDate` years in the past (local clock wrong, or an old manifest) | WR if freshness is enforced | Accept. Replay is stopped by the version rule (section D), not by time | `PubDate_Old_Accepted_By_Design` |
+| MC19 | `pubDate` years in the past (local clock wrong, or an old manifest) | WR if the date alone is enforced | Accept. Staleness is stopped by `expires:` (section L) and the version rule (section D), not by `pubDate` | `PubDate_Old_Accepted_By_Design` |
 | MC20 | `notesUrl` is `http` while https is required | WA on the notes link | Reject | `Notes_Url_Http_Rejected` |
 | MC21 | Unknown property on the root or on an installer entry | WR on forward-compatible additions | Ignore | `Unknown_Fields_Ignored` |
 | MC22 | No installer entry for the running architecture | Wrong architecture installed | Reject `NoInstallerForArchitecture` | `Missing_Architecture_Rejected` |
@@ -120,11 +123,12 @@ Terms:
 | IN12 | HTTP 404 or 500 on the installer | Error page saved as installer | Reject `InstallerDownload` with the status code | `Http_Error_Rejected` |
 | IN13 | Any failure after the download started | Partial or unverified files left behind | The staging folder is removed | `Failed_Download_Leaves_No_Files` |
 | IN14 | Receipt file | Receipt for an unverified file | Written only after every check passes | `Receipt_Only_After_Verification` |
-| IN15 | Second attempt after a failure | Stale installer reused | Each attempt uses a new random folder | `Stale_Installer_Not_Reused` |
+| IN15 | Second download of the same version, channel, architecture, size, SHA-256, and signature | Repeated 330 MB download | Reuse the verified folder (section M, M2). A failed or changed attempt never reuses a folder | `Download_Reuses_Verified_Staging`, `Download_Reuse_Tampered_Installer_Redownloads` |
 | IN16 | Cancellation during the download | Partial file kept | Reject `Canceled`, partial file deleted | `Cancellation_Removes_Partial_File` |
 | IN17 | Staging root exists as a file (cannot create the folder) | Unhandled exception | Reject `Io` with the exception type | `Staging_Root_Is_File_Reported` |
 | IN18 | No connection (refused on loopback) | Unhandled exception | Reject `DownloadFailed` | `Connection_Refused_Reported` |
 | IN19 | Served body is an HTML error page with HTTP 200 | Saved as an installer | Hash mismatch, reject | `Html_Page_As_Installer_Rejected` |
+| IN20 | Cancellation while the file is being written | Unhandled `OperationCanceledException` from the write or flush | Reject `Canceled` (or `Timeout` when the limit fired), partial file deleted | `Doc`: the write and flush use the same deadline token as the reads, which `Cancellation_Removes_Partial_File` exercises; no deterministic write-path test |
 
 ## F. Helper: installer path and receipt
 
@@ -151,25 +155,25 @@ Terms:
 | HT4 | Verified installer held open | Another process writes or replaces it between check and launch | Write-open and delete-open fail while the helper holds the file (FileShare.Read only) | `Verified_Installer_Is_Locked` |
 | HT5 | Bytes the launcher starts | Different bytes than verified | The launcher sees the same hash as the verified file | `Launch_Sees_Verified_Bytes` |
 | HT6 | Receipt rewritten to match a swapped installer | Forged receipt | Refuse: the minisign signature of the swapped file fails | `Apply_Forged_Receipt_Refused` |
-| HT7 | Helper runs from the install folder, which the installer replaces | Installer cannot replace locked helper files | The helper copies its own folder to the staging area and runs the copy | `Helper_Relocates_Out_Of_Install_Dir` |
-| HT8 | Relocated copy starts and would relocate again | Loop | The copy carries `--relocated` and does not relocate | `Relocated_Copy_Does_Not_Relocate_Again` |
+| HT7 | Helper runs from the install folder, which the installer replaces | Installer cannot replace the locked `BwcUpdate.exe` | The helper does not copy itself. It starts the installer and exits at once; the installer waits for the helper pid with `--wait-pid` (section P), so the helper's file lock is gone before the installer writes. Installer duty (D1) | `Apply_Starts_Installer_And_Returns` (behavior), `Doc` (installer side) |
+| HT8 | Helper folder copied to %TEMP% (removed in this revision) | Copies the whole install folder (about 330 MB) | No copy is made. Nothing to test: the relocation code is removed | `Doc` (removed) |
 
 ## H. Helper: processes, install folder, and launch
 
 | ID | Case | Risk | Required result | Test |
 |----|------|------|-----------------|------|
-| HL1 | A waited process is still alive at the timeout | Installer runs over live files | Refuse `ProcessesStillRunning`, installer not run, Hub not relaunched | `Apply_Still_Running_Refused` |
-| HL2 | Waited processes exit before the timeout | WR | Installer runs | `Apply_Waits_Then_Installs` |
+| HL1 | A waited process is still alive at the timeout | Installer runs over live files | Refuse `ProcessesStillRunning`, installer not started, Hub relaunched with the code (N5) | `Apply_Still_Running_Refused` |
+| HL2 | Waited processes exit before the timeout | WR | Installer started | `Apply_Waits_Then_Installs` |
 | HL3 | `--wait-pid` value not a positive integer | Ambiguous wait set | Usage error, exit code 2 | `Wait_Pid_Invalid_Usage` |
 | HL4 | `--wait-pid` names a process that does not exist | Wait forever | Treated as exited | `Missing_Pid_Treated_As_Exited` |
-| HL5 | A tool executable running from the install folder (found by process name) | Overwrite of a running app | Counted as running. An unreadable image is also counted (fail closed), but that branch is not tested | `Scan_Counts_Tool_Under_Install_Dir_As_Running` |
+| HL5 | A BWC executable running from the install folder (found by process name) | Overwrite of a running app | Counted as running by the shared predicate (section O). An unreadable image is counted as running (fail closed) | `Scan_Counts_Tool_Under_Install_Dir_As_Running`, `Unreadable_Image_Counts_As_Running` |
 | HL6 | Install folder contains `"`, a control character, or a trailing backslash | Breaks the unquoted `/D=` argument | Refuse `InstallDirUnsafe` | `Install_Dir_Unsafe_Refused` |
 | HL7 | Install folder is relative or does not exist | Installs to the wrong place | Refuse `InstallDirUnsafe` | `Install_Dir_Missing_Refused` |
-| HL8 | Pass-through installer switch that is `/S`, `/D`, lowercase, has spaces or quotes, or has `=` | Overriding the silent or directory switches | Refuse `InstallerArgumentRejected`; allowed uppercase switches pass | `Installer_Arg_Validation` |
+| HL8 | Installer switch that is `/S`, `/D`, lowercase, has a space or quote, or has a value that breaks the rules in section O | Overriding the silent or directory switches, or a broken raw command line | Refuse `InstallerArgumentRejected`; allowed switches pass | `Installer_Arg_Validation` |
 | HL9 | Command line for the installer | `/D=` must be last and unquoted | Exactly `/S <switches> /D=<install dir>`, with the directory unquoted | `Installer_Command_Line_Exact` |
-| HL10 | Installer exits non-zero | Silent failure | `InstallerFailed` with the exit code; the Hub is still relaunched | `Installer_Failure_Still_Relaunches_Hub` |
-| HL11 | Installer does not exit within its timeout | Hang | `InstallerTimedOut`; the installer is not killed | `Installer_Timeout_Reported` |
-| HL12 | Hub executable missing after the installer ran | Crash | Reported as `HubMissing`, no exception | `Hub_Missing_Reported` |
+| HL10 | Installer exit code | Helper waits and reports the wrong thing | Removed: the helper does not wait for the installer (N1). The installer's own result is its duty | `Apply_Starts_Installer_And_Returns` |
+| HL11 | Installer does not exit | Hang in the helper | Removed: the helper has exited. The installer's time limit is its duty | `Doc` |
+| HL12 | Hub executable missing for a refusal relaunch | Crash | Reported as `HubMissing`, no exception, exit 6 | `Hub_Missing_Reported` |
 | HL13 | Hub relaunch | Wrong executable or folder | Path is `<install dir>\BetterWindowsConfig.exe`, working folder is the install dir | `Hub_Relaunch_Uses_Install_Dir` |
 
 ## I. Command line and entry
@@ -179,8 +183,9 @@ Terms:
 | CL1 | No arguments, or `--help` | Confusing exit | Usage text, exit code 0 | `Help_Lists_Modes` |
 | CL2 | Unknown option | Silent ignore | Usage error, exit code 2 | `Unknown_Option_Usage` |
 | CL3 | Option given twice | Last value wins silently | Usage error, exit code 2 | `Duplicate_Option_Usage` |
-| CL4 | `--check` manifest URL is `http` | WA on the production path | Refused (production always requires https) | `Check_Http_Manifest_Refused` |
-| CL5 | `--check` missing `--channel` or with an unknown channel | Default channel guessed | Usage error, exit code 2 | `Check_Channel_Usage` |
+| CL4 | `--check` or `--download` manifest URL is `http` | WA on the production path | Refused (production always requires https) | `Check_Http_Manifest_Refused` |
+| CL5 | `--check` or `--download` missing `--channel` or with an unknown channel | Default channel guessed | Usage error, exit code 2 | `Check_Channel_Usage` |
+| CL6 | `--download` takes the same options as `--check` and nothing else | Option drift between the steps | Same parser rules as `--check` | `Download_Arguments_Parse` |
 
 ## J. Keys and clock
 
@@ -196,7 +201,118 @@ Terms:
 | NE1 | Host allow list for the installer URL | `Doc`. The signature is the authority. A future allow list belongs to the hosting decision. |
 | NE2 | Key compromise and rotation policy | `Doc`. The user creates real keys and decides rotation. The placeholder key fails closed (MS14). |
 | NE3 | Attacker with the user's own account | `Doc`. Signatures stop remote tampering. Local malware under the same account is out of scope. |
-| NE4 | Freshness or expiry of a signed manifest | `Doc`. Not enforced (MC19). Replay is stopped by the version rule. |
+| NE4 | Freshness of a signed manifest | Enforced only by `expires:` (section L) and the version rule (section D). A manifest with an expiry in the past is refused. `pubDate` is not a freshness check (MC19). |
 | NE5 | Secrets in logs | `Doc`. Logs record host and path only, never query strings, keys, or signature text. |
 | NE6 | File replaced after the helper's launch | `Doc`. The lock (HT4) covers the window up to process creation. The installer owns the file after that. |
 | NE7 | Wrong-but-signed release content (a bad build signed by the real key) | `Doc`. Signing policy and release review are outside the verifier. |
+| NE8 | Installer's own elevation and file replacement | `Doc`. The helper never elevates (N10 refuses an elevated helper). The installer decides per-user or per-machine (D1). |
+
+## L. Signed manifest metadata
+
+The trusted comment of the manifest signature must be exactly
+`version:<semver> channel:<stable|beta> expires:<yyyy-MM-ddTHH:mm:ssZ>` (see
+`docs/contracts/update-manifest.md`). It binds the version, the channel, and the expiry.
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| L1 | Trusted comment without `channel:` | A manifest not bound to a channel | Reject `ManifestInvalid` | `Comment_Missing_Channel_Rejected` |
+| L2 | Trusted comment with an extra field (for example `timestamp:`), fields out of order, or extra spaces | Two spellings of one claim, or claims the verifier does not read | Reject `ManifestInvalid` (exact format) | `Comment_Format_Not_Exact_Rejected` |
+| L3 | Signed `channel:` differs from the manifest body `channel` | Body moved to another channel | Reject `ManifestInvalid` | `Comment_Channel_Mismatch_Rejected` |
+| L4 | Signed `expires:` is in the past | Replay of an old, correctly signed manifest | Reject `ManifestExpired` | `Manifest_Expired_Rejected` |
+| L5 | Signed `expires:` equals the current time | Boundary case | Reject `ManifestExpired` (expiry is exclusive: now is not before it) | `Manifest_Expires_At_Now_Rejected` |
+| L6 | `expires:` not `yyyy-MM-ddTHH:mm:ssZ` (offset, fraction, date only, impossible date such as 2026-02-30) | Ambiguous expiry | Reject `ManifestInvalid` | `Comment_Expires_Format_Rejected` |
+| L7 | Signed `expires:` one day ahead | WR | Accept | `Manifest_Expires_Future_Accepted` |
+| L8 | Signed `version:` is not SemVer | Parser confusion | Reject `ManifestInvalid` | `Comment_Version_Not_SemVer_Rejected` |
+| L9 | Signed `channel:` is neither `stable` nor `beta` | Unknown channel | Reject `ManifestInvalid` | `Comment_Unknown_Channel_Rejected` |
+| L10 | Stable manifest signed `channel:stable`, served to a beta request | Channel crossing | Reject `ChannelMismatch` (MC13) | `Channel_Mismatch_Rejected` |
+
+## M. Check, download, and staging
+
+`--check` verifies the manifest only. It reports the version and the notes URL and creates no
+staging folder. `--download` runs the same manifest checks, then reuses or downloads the installer.
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| M1 | `--check` on a valid manifest | Downloads 330 MB for nothing | Reports version and notes URL; no installer request; no staging folder | `Check_Does_Not_Download_Or_Stage` |
+| M2 | `--download` with a verified staged installer of the same version, channel, architecture, size, SHA-256, and signature | Repeated download | Reuse: no installer request, and the same folder is returned | `Download_Reuses_Verified_Staging` |
+| M3 | Reused installer changed on disk | Tampered reuse | Re-verification fails, the folder is discarded, and a fresh download is verified | `Download_Reuse_Tampered_Installer_Redownloads` |
+| M4 | Successful download prunes every other staging folder, complete or incomplete | Growth of %TEMP% | Only the returned folder remains | `Download_Prunes_Other_Staging` |
+| M5 | Staging root holds a folder whose name is not 32 lowercase hex, or a file | Deleting foreign data | Left alone | `Prune_Leaves_Foreign_Entries` |
+| M6 | Staging folder is a reparse point (junction) | Deleting through a link | Skipped: not followed and not deleted | `Prune_Skips_Reparse_Point` |
+| M7 | Download progress | Silent wait | Progress reports rise and end at the manifest size | `Download_Reports_Progress` |
+| M8 | Cancellation or kill during the download | Partial folder kept | Helper deletes its own folder on cancellation (IN16). After a kill the Hub removes folders without `receipt.json` (M9) | `Cancellation_Removes_Partial_File` |
+| M9 | Helper killed (no cleanup possible) and a folder without `receipt.json` remains | Partial installer kept | Folders without `receipt.json` are removed by the Hub's cleanup, never folders with one | `Discard_Incomplete_Removes_Folders_Without_Receipt` |
+| M10 | Time limits | The Hub kills a helper that is still working | Hub limits match the helper: check 3 minutes (two 60 s manifest reads, margin); download 32 minutes (manifest pair plus the 30 minute installer limit). The helper's own limits are unchanged | `Doc` (hub.md) |
+| M11 | `--download` with a reused folder whose receipt names another version | Wrong receipt reused | Not reused; the folder is pruned as stale | `Download_Ignores_Receipt_Of_Other_Version` |
+
+## N. Apply hand-off
+
+`--apply` checks the installer and the receipt, waits for the Hub and the tools, verifies the
+installer again, starts it, and exits. The installer is not waited for. Every refusal before the
+installer starts relaunches the Hub with a result argument (`--update-result <UpdateFailure>`).
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| N1 | Every check passes | Helper stays alive holding locks | The installer is started. The helper exits 0 with `installerStarted: true`; it does not wait for the installer and does not start the Hub (the installer does) | `Apply_Starts_Installer_And_Returns` |
+| N2 | The installer cannot be started (Win32 error) | Silent failure | Refuse `InstallerFailed` with the error type; Hub relaunched with the code | `Installer_Start_Failure_Relaunches_Hub` |
+| N3 | Refusal before the installer starts (path, receipt, architecture, downgrade, same version, install folder, switch) | The user sees nothing | Hub relaunched with `--update-result <failure>` | `Refusal_Relaunches_Hub_With_Message` |
+| N4 | The installer file cannot be opened for verification | Hub left with nothing (was exit 3 with no relaunch) | Same as N3: Hub relaunched with the code | `Open_Failure_Relaunches_Hub` |
+| N5 | Processes still running after the wait | Hub relaunch races the single-instance gate | `ProcessesStillRunning`; installer not started; Hub relaunched with the code (no second wait) | `Apply_Still_Running_Refused` |
+| N6 | A refusal while a `--wait-pid` process still runs | The relaunched Hub only activates the old one and exits | The helper waits (bounded by the wait timeout) for those pids to exit before it relaunches the Hub | `Refusal_Waits_For_Hub_Before_Relaunch` |
+| N7 | The relaunch argument | Unsafe text on the command line | Only the failure code is passed, never the detail | `Refusal_Relaunches_Hub_With_Message` (asserts the argument list is exactly the code) |
+| N8 | Hub executable missing for a refusal relaunch | Crash | `HubMissing`, no exception (HL12) | `Hub_Missing_Reported` |
+| N9 | Verified installer held open | Replacement before launch | Lock held until the start (HT4) | `Verified_Installer_Is_Locked` |
+| N10 | Helper runs elevated (high integrity or administrator token) | Medium-integrity processes can write %TEMP% staging, so an elevated run would load planted files | Refuse `RunningElevated` before any action; Hub relaunched with the code; no installer started | `Apply_Elevated_Refused` |
+| N11 | `__COMPAT_LAYER` in the helper environment | Compat layer leaks into the installer and the Hub | Removed from the helper's process environment before any child starts | `Compat_Layer_Removed_From_Children` |
+| N12 | The Hub's relaunch environment | Hub started with inherited compat flags | Covered by N11 (the helper scrubs its environment, and the Hub no longer sets the variable) | `Compat_Layer_Removed_From_Children` |
+
+## O. Shared process predicate (`RunningImageRule`)
+
+One predicate, in `src/Bwc.Update/Process/RunningImageRule.cs`, is used by the Hub's pre-check,
+the helper, and `--close-running`. The Hub compiles the same file (source link).
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| O1 | Image inside the install folder | Counted as running | Running | `Image_Inside_Install_Dir_Is_Running` |
+| O2 | Image in a sibling folder whose name starts with the install folder's name (`C:\BWC2\x.exe` for `C:\BWC`) | Prefix match counts a stranger | Not running | `Sibling_Folder_Prefix_Is_Not_Running` |
+| O3 | Image path differs from the install folder only in letter case | Missed match | Running | `Install_Dir_Compare_Ignores_Case` |
+| O4 | Install folder given with a trailing separator | Double separator, missed match | Same result as without it | `Install_Dir_Trailing_Separator_Ignored` |
+| O5 | Image cannot be read (access denied, unknown) | An install over a running app | Running (fail closed) | `Unreadable_Image_Counts_As_Running` |
+| O6 | Process has exited (its handle is signaled) | Waiting for a ghost | Not running | `Exited_Process_Is_Not_Running` |
+| O7 | Image readable and outside the install folder | Blocks an install for nothing | Not running | `Image_Outside_Install_Dir_Is_Not_Running` |
+| O8 | Hub and helper decide differently | Drift between the pre-check and the helper | One source file, linked into the Hub. | `Doc` (build link) |
+
+## P. Process commands for the installer (`--close-running`, `--wait-pid`)
+
+Documented in `docs/contracts/update-cli.md`.
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| P1 | Missing `--install-dir`, a pid that is not a positive integer, a timeout outside 1 to 3600, an unknown option, or an option given twice | Ambiguous command | Exit 2 | `CloseRunning_Usage_Errors` |
+| P2 | No BWC process runs from the folder | Nothing to close | Exit 0 | `CloseRunning_None_Running_Exits_Zero` |
+| P3 | A BWC process with a top-level window runs from the folder, and closes on WM_CLOSE | Installer over a running app | Exit 0 | `Doc` (GUI path, covered by E2E) |
+| P4 | A BWC process runs from the folder and has no window to close, or ignores the close | Installer over a running app | Exit 3; the names and pids are printed | `CloseRunning_Still_Running_Exits_Three` |
+| P5 | `--close-running` excludes its own pid and the `--exclude-pid` values | Closing the installer's own helper | Those pids are never signaled | `CloseRunning_Excludes_Own_And_Listed_Pids` |
+| P6 | `--wait-pid` names a process that is already gone | Waiting forever | Exit 0 | `WaitPid_Missing_Exits_Zero` |
+| P7 | `--wait-pid` process exits within the timeout | WR | Exit 0 | `WaitPid_Exits_In_Time` |
+| P8 | `--wait-pid` process still runs at the timeout | The installer overwrites a locked file | Exit 3 | `WaitPid_Live_Times_Out_Exits_Three` |
+
+## Q. Environment and elevation
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| Q1 | `__COMPAT_LAYER` set in the helper's environment | Leaks to children | Removed (N11) | `Compat_Layer_Removed_From_Children` |
+| Q2 | Installer switch with a `=` value that holds `"`, a space, a control character, `..`, or `=` | Broken raw command line | Refuse `InstallerArgumentRejected` | `Installer_Arg_Validation` |
+| Q3 | Installer switch `/NAME=value` with a safe value (letters, digits, `_`, `.`, `-`, `:`, `\`) | Needed for the E2E installer (`/RUNID=`, `/SHORTCUTS=`) | Accept | `Installer_Arg_Validation` |
+| Q4 | Installer switch with a lowercase name, an empty value, or a value over 256 characters | Ambiguous switch | Refuse | `Installer_Arg_Validation` |
+| Q5 | E2E flavor: the `BWC_E2E` seam applies to `--apply` as well as `--check` | E2E installer switches pass the wrong checks | `Doc`: `UpdateE2ESeam` is compiled only into the E2E flavor and runs in the E2E build (not in the unit test project) | `Doc` |
+
+## R. Keys and URLs
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| R1 | Shipped placeholder key list | Every manifest accepted or a misleading error | Refused with `TrustedKeysNotConfigured` (the Hub says updates are not configured) | `Placeholder_Key_Fails_Closed` |
+| R2 | Key list is not the placeholder and is malformed | Reported as "not configured" | Refused with `TrustedKeysInvalid`, a distinct message in the Hub | `Malformed_Key_List_Reports_TrustedKeysInvalid` |
+| R3 | Signature URL with a query string | `.minisig` appended after the query, so the signature is not found | The `.minisig` suffix goes before the query: `path.minisig?query` | `Signature_Url_Inserts_Before_Query` |
+| R4 | Signature URL with no query | Wrong suffix | `path.minisig` | `Signature_Url_Without_Query` |
+| R5 | Channel manifest URL | One URL serving both channels: one channel always fails | One manifest URL per channel (Hub). A channel mismatch is shown as its own message | `Doc` (hub.md) |

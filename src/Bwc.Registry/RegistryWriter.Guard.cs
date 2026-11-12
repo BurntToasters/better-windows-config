@@ -227,18 +227,23 @@ public sealed partial class RegistryWriter
 
     /// <summary>
     /// Refuses a hive file that the restore would load with a symbolic link key, and a file the
-    /// scanner cannot verify. Runs before the native restore, so the target key is not touched.
+    /// scanner cannot verify. Runs before the native restore, so the target key is not touched. For a
+    /// clean file the returned object keeps the file open with a sharing mode that refuses writers, so
+    /// the caller must dispose it only after the native call returns. Otherwise the file could change
+    /// between the scan and the load.
     /// </summary>
-    private static void EnsureHiveFileHasNoLinks(string fullPath, string operation, RegistryPath errorPath)
+    private static HeldHiveScan HoldVerifiedHiveFile(string fullPath, string operation, RegistryPath errorPath)
     {
-        HiveScanResult result = HiveFileLinkScanner.Scan(fullPath);
+        HeldHiveScan held = HiveFileLinkScanner.OpenAndScan(fullPath);
+        HiveScanResult result = held.Result;
 
         switch (result.Outcome)
         {
             case HiveScanOutcome.Clean:
-                return;
+                return held;
 
             case HiveScanOutcome.Linked:
+                held.Dispose();
                 throw new RegistryOperationException(
                     operation,
                     errorPath,
@@ -246,6 +251,7 @@ public sealed partial class RegistryWriter
                     $"The write policy refuses hive file '{fullPath}' because its key '{result.KeyPath}' is a symbolic link.");
 
             default:
+                held.Dispose();
                 throw new RegistryOperationException(
                     operation,
                     errorPath,

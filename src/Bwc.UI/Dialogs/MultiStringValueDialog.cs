@@ -13,12 +13,10 @@ namespace Bwc.UI.Dialogs;
 public sealed class MultiStringValueDialog : ClassicDialog
 {
     /// <summary>Oracle string 116: one empty string.</summary>
-    private const string OneEmptyStringWarning =
-        "Data of type REG_MULTI_SZ cannot contain empty strings.\r\nRegistry Editor will remove the empty string found.";
+    private static string OneEmptyStringWarning => BwcStrings.Get("MultiStringEmptyOne");
 
     /// <summary>Oracle string 117: more than one empty string.</summary>
-    private const string ManyEmptyStringsWarning =
-        "Data of type REG_MULTI_SZ cannot contain empty strings.\r\nRegistry Editor will remove all empty strings found.";
+    private static string ManyEmptyStringsWarning => BwcStrings.Get("MultiStringEmptyMany");
 
     private readonly TextBox _input;
     private bool _emptyStringsRemoved;
@@ -61,7 +59,7 @@ public sealed class MultiStringValueDialog : ClassicDialog
     {
         string text = empty == 1 ? OneEmptyStringWarning : ManyEmptyStringsWarning;
         var warning = new ClassicMessageBox(
-            "Registry Editor",
+            BwcStrings.Get("RegistryEditorTitle"),
             text,
             ClassicMessageIcon.Warning,
             ClassicMessageButtons.Ok);

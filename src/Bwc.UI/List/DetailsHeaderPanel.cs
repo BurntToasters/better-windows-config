@@ -287,7 +287,7 @@ internal sealed class HeaderGripAutomationPeer : FrameworkElementAutomationPeer
 
     protected override string GetClassNameCore() => "DetailsListHeaderDivider";
 
-    protected override string GetNameCore() => "Column divider";
+    protected override string GetNameCore() => BwcStrings.Get("DetailsHeaderDividerName");
 
     protected override bool IsControlElementCore() => true;
 

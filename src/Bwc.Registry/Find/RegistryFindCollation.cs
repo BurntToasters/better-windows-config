@@ -10,7 +10,10 @@ namespace Bwc.Registry;
 internal static partial class RegistryFindCollation
 {
     private const uint NormIgnoreCase = 0x00000001;
+    private const uint FindFromStart = 0x00400000;
     private const int CompareEqual = 2;
+    private const int NotFound = -1;
+    private const int NativeError = -2;
 
     /// <summary>The sort comparer for key and value names.</summary>
     internal static IComparer<string> Comparer { get; } =
@@ -39,6 +42,52 @@ internal static partial class RegistryFindCollation
             return false;
         }
 
+        int found = FindCore(text, needle);
+        if (found >= 0)
+        {
+            return true;
+        }
+
+        return found == NotFound ? false : ContainsByWindows(text, needle);
+    }
+
+    /// <summary>
+    /// One <c>FindNLSStringEx</c> call finds the first match from the start of the text, with the same
+    /// window-at-every-offset semantics as the per-offset loop. Returns the offset, <see cref="NotFound"/>
+    /// when the native call reports no match, or <see cref="NativeError"/> when it fails.
+    /// </summary>
+    private static unsafe int FindCore(string text, string needle)
+    {
+        fixed (char* textPointer = text)
+        fixed (char* needlePointer = needle)
+        {
+            int result = FindNLSStringEx(
+                null,
+                FindFromStart | NormIgnoreCase,
+                textPointer,
+                text.Length,
+                needlePointer,
+                needle.Length,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                IntPtr.Zero);
+
+            if (result >= 0)
+            {
+                return result;
+            }
+
+            return Marshal.GetLastPInvokeError() == 0 ? NotFound : NativeError;
+        }
+    }
+
+    /// <summary>
+    /// The fallback when the native find fails: one <c>CompareStringEx</c> call per offset, as before.
+    /// It is used only after an error, so the common path makes one native call.
+    /// </summary>
+    private static bool ContainsByWindows(string text, string needle)
+    {
         for (int index = 0; index <= text.Length - needle.Length; index += 1)
         {
             if (CompareCore(text, index, needle.Length, needle, 0, needle.Length) == 0)
@@ -87,6 +136,19 @@ internal static partial class RegistryFindCollation
             return result - CompareEqual;
         }
     }
+
+    [LibraryImport("kernel32.dll", EntryPoint = "FindNLSStringEx", SetLastError = true)]
+    private static unsafe partial int FindNLSStringEx(
+        char* localeName,
+        uint flags,
+        char* source,
+        int sourceLength,
+        char* value,
+        int valueLength,
+        IntPtr foundLength,
+        IntPtr versionInformation,
+        IntPtr reserved,
+        IntPtr sortHandle);
 
     [LibraryImport("kernel32.dll", EntryPoint = "CompareStringEx")]
     private static unsafe partial int CompareStringEx(

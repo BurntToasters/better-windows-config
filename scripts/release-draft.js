@@ -19,9 +19,13 @@ import {
 } from "./lib/cli.js";
 import {
   assetByName,
+  assetBytesMatch,
+  createTempDirectory,
   displayGh,
+  downloadAssetToFile,
   draftBody,
   ghCreateReleaseArgs,
+  ghDownloadAssetArgs,
   ghEditReleaseArgs,
   ghGetReleaseArgs,
   ghListReleasesArgs,
@@ -29,6 +33,7 @@ import {
   ghDeleteAssetArgs,
   getRelease,
   listReleases,
+  removeDirectory,
   runGhJson,
   selectRelease,
   writeGhBody,
@@ -51,7 +56,8 @@ Options:
   --session <path>         Session file. Default artifacts/release/session.json.
   --trusted-key <path>     Public release key. Repeatable.
   --repo <owner/name>      Default GH_REPO or the origin remote.
-  --commit <rev>           Default HEAD.
+  --root <dir>             Repository root. Default: the checkout this script is in.
+  --commit <rev>           Default HEAD. Any other commit is refused (session-commit-mismatch).
   --replace-assets         Delete an existing same-name asset before upload.
   --allow-detached         Allow a detached HEAD contained in the expected branch.
   --skip-preflight         Dry run only. Print the plan without preflight checks.
@@ -68,6 +74,7 @@ Exit codes: 0 plan printed or draft created, 1 refused, 2 usage, 3 missing input
 function parseOptions(argv) {
   const parsed = parseArguments(argv, {
     values: [
+      "root",
       "version",
       "channel",
       "dir",
@@ -105,6 +112,7 @@ function parseOptions(argv) {
     throw new Error("--max-age-hours must be a positive number");
   }
   return {
+    root: parsed.get("root"),
     version: parsed.get("version"),
     channel,
     dir: parsed.get("dir"),
@@ -121,6 +129,18 @@ function parseOptions(argv) {
     allowDetached: parsed.has("allow-detached"),
     json: parsed.has("json"),
   };
+}
+
+/** SHA-256 of a draft asset's bytes, from a fresh download into a temporary folder. */
+async function downloadedSha256(context, asset) {
+  const temporary = createTempDirectory("bwc-draft-compare-");
+  try {
+    const destination = path.join(temporary, "asset");
+    await downloadAssetToFile(ghDownloadAssetArgs(context.repo, asset.id), destination);
+    return await sha256FileStream(destination);
+  } finally {
+    removeDirectory(temporary);
+  }
 }
 
 function resolveCommitish(root, value) {
@@ -246,22 +266,17 @@ async function applyDraft(context, options, bodyFiles) {
       const local = localByName.get(name);
       const existing = existingByName.get(name) ?? assetByName(fresh, name);
       if (!existing) continue;
-      const remoteDigest =
-        typeof existing.digest === "string" && existing.digest.startsWith("sha256:")
-          ? existing.digest.slice("sha256:".length)
-          : null;
-      const sameBytes =
-        remoteDigest !== null
-          ? remoteDigest === local.sha256
-          : typeof existing.size === "number" && existing.size === local.size;
+      // Compared by the SHA-256 of the downloaded draft asset. Size alone never decides a match.
+      const remoteSha256 = await downloadedSha256(context, existing);
+      const sameBytes = assetBytesMatch({ remoteSha256, localSha256: local.sha256 });
       if (sameBytes) {
-        console.log(`release-draft: asset ${name} already matches; skipping`);
+        console.log(`release-draft: asset ${name} already matches (SHA-256); skipping`);
         continue;
       }
       if (!options.replaceAssets) {
         conflicts.push({
           name,
-          detail: `existing asset is ${existing.size ?? "unknown"} bytes, local is ${local.size}`,
+          detail: `existing asset SHA-256 ${remoteSha256 ?? "unknown"} differs from local ${local.sha256}`,
         });
         continue;
       }
@@ -335,7 +350,7 @@ async function run(options) {
       draftBody({
         tag: context.tag,
         version: context.version,
-        commit: context.commit ?? "HEAD",
+        commit: context.commit,
         notesBody: context.notes,
         prerelease: context.prerelease,
       }),
@@ -345,7 +360,7 @@ async function run(options) {
       draftBody({
         tag: context.tag,
         version: context.version,
-        commit: context.commit ?? "HEAD",
+        commit: context.commit,
         notesBody: context.notes,
         prerelease: context.prerelease,
       }),

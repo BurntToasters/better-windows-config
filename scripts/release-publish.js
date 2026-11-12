@@ -18,10 +18,12 @@ import {
   printRefusals,
   relativeTo,
   repoRootFrom,
+  sha256FileStream,
   writeJson,
 } from "./lib/cli.js";
 import {
   displayGh,
+  getRelease,
   ghGetReleaseArgs,
   ghListReleasesArgs,
   listReleases,
@@ -49,7 +51,8 @@ Options:
   --dir <path>             D5 artifact directory. Default artifacts/release/<version>.
   --session <path>         Session file. Default artifacts/release/session.json.
   --trusted-key <path>     Public release key. Repeatable. Required.
-  --repo <owner/name>      Default GH_REPO or the origin remote.
+  --root <dir>             Repository root. Default: the checkout this script is in.
+  --repo <owner/name>      Default GH_REPO or the origin remote. No default otherwise (repo-invalid).
   --commit <rev>           Default HEAD.
   --allow-detached         Allow a detached HEAD contained in the expected branch.
   --skip-preflight         Dry run only.
@@ -64,7 +67,7 @@ Exit codes: 0 published, no-op, or plan printed; 1 refused; 2 usage; 3 missing i
 
 function parseOptions(argv) {
   const parsed = parseArguments(argv, {
-    values: ["version", "channel", "dir", "session", { name: "trusted-key", multi: true }, "repo", "commit", "max-age-hours"],
+    values: ["root", "version", "channel", "dir", "session", { name: "trusted-key", multi: true }, "repo", "commit", "max-age-hours"],
     flags: ["apply", "dry-run", "skip-preflight", "skip-session", "allow-detached", "json", "help"],
   });
   if (parsed.has("help")) return { help: true };
@@ -92,6 +95,7 @@ function parseOptions(argv) {
     maxAgeHours: maxAgeHours === undefined ? 24 : Number(maxAgeHours),
     apply,
     skipPreflight: parsed.has("skip-preflight"),
+    root: parsed.get("root"),
     skipSession: parsed.has("skip-session"),
     allowDetached: parsed.has("allow-detached"),
     json: parsed.has("json"),
@@ -168,7 +172,27 @@ function runVerification(context, options) {
   return EXIT.OK;
 }
 
+/** Asset ids, names, sizes, and digests of a release, as one comparable string. */
+function assetSnapshot(release) {
+  const lines = (release?.assets ?? [])
+    .map((asset) => `${asset.id}|${asset.name}|${asset.size}|${asset.digest ?? ""}`)
+    .sort();
+  return { id: release?.id ?? null, text: lines.join("\n") };
+}
+
+function uniqueAssetPaths(bundle) {
+  const paths = [bundle.manifestPath, bundle.signaturePath, ...bundle.installers.map((installer) => installer.file)];
+  return [...new Set(paths.map((file) => path.resolve(file)))];
+}
+
 async function applyPublish(context, options, publishFile) {
+  // Snapshot the draft before verification. The re-check right before the PATCH must match it.
+  const beforeVerify = selectRelease(listReleases(context.repo, { cwd: context.root }), context.tag);
+  const baseline =
+    beforeVerify.ok && beforeVerify.kind === "draft"
+      ? assetSnapshot(getRelease(context.repo, beforeVerify.release.id, { cwd: context.root }))
+      : null;
+
   const verification = runVerification(context, options);
   if (verification !== EXIT.OK) return verification;
 
@@ -217,6 +241,30 @@ async function applyPublish(context, options, publishFile) {
       `${SCRIPT}: REFUSED [prerelease-mismatch]: draft prerelease=${release.prerelease}, expected ${context.prerelease}`,
     );
     return EXIT.REFUSED;
+  }
+
+  // Re-read immediately before the PATCH. The asset ids, names, sizes, and digests must equal the
+  // snapshot taken before verification, and every local asset with a digest must match it.
+  const latestRelease = getRelease(context.repo, release.id, { cwd: context.root });
+  const latest = assetSnapshot(latestRelease);
+  if (baseline === null || baseline.id !== release.id || baseline.text !== latest.text) {
+    console.error(`${SCRIPT}: REFUSED [asset-changed]: the draft's assets changed after verification; nothing was published`);
+    return EXIT.REFUSED;
+  }
+  for (const assetPath of uniqueAssetPaths(context.bundle)) {
+    const name = path.basename(assetPath);
+    const remote = (latestRelease?.assets ?? []).find((asset) => asset.name === name);
+    if (!remote) {
+      console.error(`${SCRIPT}: REFUSED [asset-changed]: ${name} is no longer on the draft; nothing was published`);
+      return EXIT.REFUSED;
+    }
+    if (typeof remote.digest === "string" && remote.digest.startsWith("sha256:")) {
+      const local = await sha256FileStream(assetPath);
+      if (remote.digest.slice("sha256:".length) !== local) {
+        console.error(`${SCRIPT}: REFUSED [asset-hash-mismatch]: ${name} digest on the draft does not match the local file`);
+        return EXIT.REFUSED;
+      }
+    }
   }
 
   const args = ["api", "--method", "PATCH", `${context.repo.api}/releases/${release.id}`, "--input", publishFile];

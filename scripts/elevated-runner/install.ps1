@@ -95,6 +95,7 @@ function Set-RunnerAcl([string]$Path, [bool]$IsDirectory) {
         $acl = New-Object System.Security.AccessControl.FileSecurity
         $inherit = [System.Security.AccessControl.InheritanceFlags]::None
     }
+    $acl.SetOwner($admins)
     $acl.SetAccessRuleProtection($true, $false)
     $propagation = [System.Security.AccessControl.PropagationFlags]::None
     $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($admins, 'FullControl', $inherit, $propagation, 'Allow')))
@@ -102,6 +103,34 @@ function Set-RunnerAcl([string]$Path, [bool]$IsDirectory) {
     $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($currentUser, 'ReadAndExecute', $inherit, $propagation, 'Allow')))
     Set-Acl -LiteralPath $Path -AclObject $acl
 }
+
+# A folder that already exists in ProgramData is trusted only if an administrator owns it and it is
+# not a link. A link could point the runner at files a normal user controls, and a foreign owner
+# could change the runner after install. Either case stops the install, and nothing is changed.
+function Assert-RunnerPathIsSafe([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        Write-Host ('Refusing: {0} is a link or junction. Nothing was changed. Run uninstall.ps1 from an elevated shell, then install again.' -f $Path)
+        exit 1
+    }
+}
+
+function Assert-RunnerOwnerIsAdministrators([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $owner = (Get-Acl -LiteralPath $Path).GetOwner([System.Security.Principal.SecurityIdentifier])
+    $admins = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-544')
+    $system = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-18')
+    if (-not ($owner.Equals($admins) -or $owner.Equals($system))) {
+        Write-Host ('Refusing: {0} is owned by {1}, not Administrators or SYSTEM. Nothing was changed. Run uninstall.ps1 from an elevated shell, then install again.' -f $Path, $owner.Value)
+        exit 1
+    }
+}
+
+foreach ($existing in @($RunnerRoot, $LogDir, $RunnerTarget, $ConfigPath)) {
+    Assert-RunnerPathIsSafe $existing
+}
+Assert-RunnerOwnerIsAdministrators $RunnerRoot
 
 New-Item -ItemType Directory -Force -Path $RunnerRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null

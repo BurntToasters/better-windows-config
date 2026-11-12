@@ -14,18 +14,24 @@ import {
   sessionPath,
   verifySessionFile,
 } from "./release-policy.js";
+import { readTrustedKeysFile } from "./trusted-keys.js";
 import { channelForVersion, tryParseSemVer } from "./semver.js";
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-export function artifactDirectory(root, version) {
-  return path.join(root, "artifacts", "release", version);
+/** One manifest per channel: artifacts/release/<version>/<channel>/. */
+export function artifactDirectory(root, version, channel) {
+  return path.join(root, "artifacts", "release", version, channel);
 }
 
 function resolveUnder(root, value) {
   return value ? path.resolve(root, value) : null;
 }
 
+/**
+ * Resolves --commit to a full SHA. Without --commit the commit is HEAD. A resolved commit that is
+ * not HEAD is returned as-is and refused by the caller, so a release never targets another tree.
+ */
 function resolveCommit(root, value) {
   if (!value) return currentCommit(root);
   if (/^[0-9a-f]{40}$/i.test(value)) return value.toLowerCase();
@@ -83,9 +89,16 @@ export async function prepareReleaseContext(options) {
     });
   }
 
+  const head = currentCommit(root);
   const commit = resolveCommit(root, options.commit);
   if (!commit) {
     errors.push({ reason: "session-commit-mismatch", detail: `--commit does not resolve to a commit`, exitCode: EXIT.REFUSED });
+  } else if (commit !== head) {
+    errors.push({
+      reason: "session-commit-mismatch",
+      detail: `--commit ${commit.slice(0, 12)} is not HEAD ${head.slice(0, 12)}`,
+      exitCode: EXIT.REFUSED,
+    });
   }
 
   let repo = null;
@@ -141,11 +154,13 @@ export async function prepareReleaseContext(options) {
   let bundle = null;
   if (options.loadBundle !== false) {
     try {
+      const embedded = readTrustedKeysFile(root);
       bundle = await loadReleaseBundle({
-        dir: resolveUnder(root, options.dir) ?? artifactDirectory(root, version),
+        dir: resolveUnder(root, options.dir) ?? artifactDirectory(root, version, channel),
         version,
         channel,
         trustedKeys,
+        embeddedKeys: embedded.ok ? embedded.embedded : undefined,
         requireArches: options.requireArches ?? ["win-x64", "win-arm64"],
         maxAgeHours: options.maxAgeHours,
       });
@@ -203,7 +218,7 @@ export async function prepareReleaseContext(options) {
     tag: tagForVersion(version),
     prerelease: isPrereleaseVersion(version),
     commit,
-    dir: resolveUnder(root, options.dir) ?? artifactDirectory(root, version),
+    dir: resolveUnder(root, options.dir) ?? artifactDirectory(root, version, channel),
     session,
     sessionFile,
     bundle,

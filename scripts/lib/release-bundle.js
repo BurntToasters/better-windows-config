@@ -4,10 +4,10 @@ import path from "node:path";
 import { EXIT, sha256FileStream } from "./cli.js";
 import {
   isPlaceholderKeyText,
-  isTestKeyText,
   loadPublicKeys,
   parsePublicKeyText,
 } from "./minisign.js";
+import { matchEmbeddedKey } from "./trusted-keys.js";
 import { validateUrl } from "./url-policy.js";
 import { KNOWN_ARCHES, validateManifestBuffer } from "./update-manifest.js";
 
@@ -38,14 +38,18 @@ export function installerFilesFromManifest(directory, manifest) {
   return { files, errors };
 }
 
-function keySummary(loadedPaths, texts) {
+/**
+ * Describes each trusted key. A key is a test key when it is not one of the embedded keys. Without
+ * the embedded list every key counts as a test key, so the caller refuses it for a release.
+ */
+function keySummary(loadedPaths, texts, embeddedTexts) {
   return texts.map((text, index) => {
     const parsed = parsePublicKeyText(text);
     return {
       path: loadedPaths[index] ?? null,
       keyId: parsed.ok ? parsed.keyIdHex : null,
       fingerprint: parsed.ok ? parsed.fingerprint : null,
-      testKey: isTestKeyText(text),
+      testKey: !Array.isArray(embeddedTexts) || !matchEmbeddedKey(text, embeddedTexts).ok,
       placeholder: isPlaceholderKeyText(text),
       ok: parsed.ok,
       detail: parsed.ok ? "" : parsed.detail,
@@ -179,7 +183,7 @@ export async function loadReleaseBundle(options) {
   }
   installers.sort((left, right) => (left.rid < right.rid ? -1 : left.rid > right.rid ? 1 : 0));
 
-  const trustedKeys = keySummary(trustedPaths, trustedTexts);
+  const trustedKeys = keySummary(trustedPaths, trustedTexts, options.embeddedKeys);
   const testKey = trustedKeys.some((key) => key.testKey);
   const placeholder = trustedKeys.some((key) => key.placeholder);
   if (placeholder) {

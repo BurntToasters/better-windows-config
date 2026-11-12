@@ -16,8 +16,6 @@ public static class RegFileWriter
     private const string ComputerPrefix = "Computer\\";
     private const string HexDigits = "0123456789abcdef";
 
-    private static readonly byte[] V5Bom = { 0xFF, 0xFE };
-
     /// <summary>Writes the document using the format recorded on it.</summary>
     public static void Write(RegFileDocument document, Stream stream)
     {
@@ -53,37 +51,33 @@ public static class RegFileWriter
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(stream);
 
+        // The whole document is built before the first byte is written, so a refused name or key
+        // leaves the stream untouched. The streaming sink writes key by key instead.
         var builder = new StringBuilder();
-        builder.Append(
-            format == RegFileFormat.V5
-                ? RegFileEncoding.V5Header
-                : RegFileEncoding.Regedit4Header);
-        builder.Append(RegFileEncoding.Crlf);
-        builder.Append(RegFileEncoding.Crlf);
+        RegFileStreamWriter.AppendHeader(builder, format);
 
         foreach (RegFileKey key in document.Keys)
         {
-            AppendKey(builder, key);
-
-            foreach (RegFileValue value in key.Values)
-            {
-                AppendValue(builder, value, format);
-            }
-
-            builder.Append(RegFileEncoding.Crlf);
+            AppendKeySection(builder, key, format);
         }
 
-        string text = builder.ToString();
+        RegFileStreamWriter.WriteText(stream, format, builder.ToString());
+    }
 
-        if (format == RegFileFormat.V5)
+    /// <summary>
+    /// Writes one key section, with its values, to a builder. The streaming sink and the document
+    /// writer both use this, so the two paths produce the same bytes.
+    /// </summary>
+    internal static void AppendKeySection(StringBuilder builder, RegFileKey key, RegFileFormat format)
+    {
+        AppendKey(builder, key);
+
+        foreach (RegFileValue value in key.Values)
         {
-            stream.Write(V5Bom);
-            stream.Write(Encoding.Unicode.GetBytes(text));
+            AppendValue(builder, value, format);
         }
-        else
-        {
-            stream.Write(RegFileEncoding.AnsiEncoding.GetBytes(text));
-        }
+
+        builder.Append(RegFileEncoding.Crlf);
     }
 
     private static void AppendKey(StringBuilder builder, RegFileKey key)
@@ -98,6 +92,13 @@ public static class RegFileWriter
         string path = key.Path.StartsWith(ComputerPrefix, StringComparison.OrdinalIgnoreCase)
             ? key.Path[ComputerPrefix.Length..]
             : key.Path;
+
+        if (path.IndexOfAny(UnwritableNameCharacters) >= 0)
+        {
+            throw new ArgumentException(
+                $"The key path '{path}' contains a NUL, line feed, or carriage return, which a .reg file cannot hold.",
+                nameof(key));
+        }
 
         builder.Append(path);
         builder.Append(']');
@@ -120,7 +121,16 @@ public static class RegFileWriter
         switch (value.Type)
         {
             case 1:
-                AppendQuoted(builder, RegistryValueCodec.DecodeString(value.Data));
+                string text = RegistryValueCodec.DecodeString(value.Data);
+                if (text.IndexOfAny(LineBreakCharacters) >= 0)
+                {
+                    // Quoted form cannot hold a line feed or carriage return, and regedit has no escape
+                    // for them. The raw bytes go out as hex(1) so the value round-trips.
+                    AppendHexData(builder, lineStart, value, format);
+                    return;
+                }
+
+                AppendQuoted(builder, text);
                 builder.Append(RegFileEncoding.Crlf);
                 return;
 
@@ -146,6 +156,13 @@ public static class RegFileWriter
             return;
         }
 
+        if (name.IndexOfAny(UnwritableNameCharacters) >= 0)
+        {
+            throw new ArgumentException(
+                "A value name contains a NUL, line feed, or carriage return, which a .reg file cannot hold.",
+                nameof(name));
+        }
+
         AppendQuoted(builder, name);
     }
 
@@ -162,15 +179,6 @@ public static class RegFileWriter
                     break;
                 case '"':
                     builder.Append("\\\"");
-                    break;
-                case '\0':
-                    builder.Append("\\0");
-                    break;
-                case '\n':
-                    builder.Append("\\n");
-                    break;
-                case '\r':
-                    builder.Append("\\r");
                     break;
                 default:
                     builder.Append(character);
@@ -241,4 +249,8 @@ public static class RegFileWriter
             firstLine = false;
         }
     }
+
+    internal static readonly char[] UnwritableNameCharacters = { '\0', '\r', '\n' };
+
+    private static readonly char[] LineBreakCharacters = { '\r', '\n' };
 }

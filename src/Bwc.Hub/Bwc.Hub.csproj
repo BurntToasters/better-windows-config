@@ -17,4 +17,12 @@
     <ProjectReference Include="..\Bwc.UI\Bwc.UI.csproj" />
   </ItemGroup>
 
+  <!-- Compiled from the updater's sources, so the Hub and BwcUpdate.exe share one running-process rule,
+       one staging cleanup, and one signature URL rule. The files depend on nothing else in Bwc.Update. -->
+  <ItemGroup>
+    <Compile Include="..\Bwc.Update\Process\RunningImageRule.cs" Link="Shared\RunningImageRule.cs" />
+    <Compile Include="..\Bwc.Update\Pipeline\StagingCleanup.cs" Link="Shared\StagingCleanup.cs" />
+    <Compile Include="..\Bwc.Update\Manifest\ManifestLocation.cs" Link="Shared\ManifestLocation.cs" />
+  </ItemGroup>
+
 </Project>

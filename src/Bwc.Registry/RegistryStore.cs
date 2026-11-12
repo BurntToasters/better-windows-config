@@ -8,6 +8,7 @@ namespace Bwc.Registry;
 public sealed class RegistryStore
 {
     private const int ErrorFileNotFound = 2;
+    private const int ErrorAlreadyExists = 183;
 
     private readonly RegistryWriter _writer;
     private readonly RegistryReader _reader;
@@ -109,8 +110,10 @@ public sealed class RegistryStore
 
     /// <summary>
     /// Copies the raw value bytes to <paramref name="newName"/> and then deletes
-    /// <paramref name="oldName"/>. If the delete fails the new value is removed and the original
-    /// error is rethrown. If the rollback also fails, the returned error names both failures.
+    /// <paramref name="oldName"/>. A <paramref name="newName"/> that already exists is refused with
+    /// ERROR_ALREADY_EXISTS before any write. A case-only change is delete then recreate. If the delete
+    /// fails the new value is removed and the original error is rethrown. If the rollback also fails, the
+    /// returned error names both failures.
     /// </summary>
     public void RenameValue(RegistryPath key, string oldName, string newName)
     {
@@ -130,14 +133,27 @@ public sealed class RegistryStore
             return;
         }
 
-        _writer.SetValue(key, newName, existing.Type, existing.Data);
-
         if (string.Equals(oldName, newName, StringComparison.OrdinalIgnoreCase))
         {
-            // Both names denote the same registry value. Deleting the old name now would delete
-            // the value that was just written.
+            // Both names denote the same registry value, so the target is the source and is not
+            // "already exists". Writing first would keep the stored spelling. The value is deleted
+            // and recreated under the new spelling instead.
+            RenameCaseOnly(key, oldName, newName, existing);
             return;
         }
+
+        if (_reader.ValueExists(key, newName))
+        {
+            // Refused before any write, so the existing target keeps its data. The UI maps 183 to
+            // the classic "value name already exists" message.
+            throw new RegistryOperationException(
+                "RenameValue",
+                key,
+                ErrorAlreadyExists,
+                $"A value named '{newName}' already exists.");
+        }
+
+        _writer.SetValue(key, newName, existing.Type, existing.Data);
 
         try
         {
@@ -164,6 +180,46 @@ public sealed class RegistryStore
                 }
 
                 throw new AggregateException(detail, deleteError, rollbackError);
+            }
+
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Changes only the casing of a value name: delete the old spelling, then write the same type and data
+    /// under the new spelling. If the write fails, the old spelling is written back and the write error is
+    /// rethrown. If that restore also fails, the error names both failures.
+    /// </summary>
+    private void RenameCaseOnly(RegistryPath key, string oldName, string newName, RegistryValueInfo existing)
+    {
+        _writer.DeleteValue(key, oldName);
+
+        try
+        {
+            _writer.SetValue(key, newName, existing.Type, existing.Data);
+        }
+        catch (Exception writeError)
+        {
+            try
+            {
+                _writer.SetValue(key, oldName, existing.Type, existing.Data);
+            }
+            catch (Exception restoreError)
+            {
+                string detail =
+                    $"The value '{oldName}' could not be restored after the rename failed. Restore failed with {restoreError.GetType().Name}: {restoreError.Message}";
+
+                if (writeError is RegistryOperationException registryError)
+                {
+                    throw new RegistryOperationException(
+                        registryError.Operation,
+                        registryError.Path,
+                        registryError.Win32Error,
+                        detail);
+                }
+
+                throw new AggregateException(detail, writeError, restoreError);
             }
 
             throw;

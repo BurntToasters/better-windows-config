@@ -360,6 +360,17 @@ public sealed partial class DenseTree : UserControl
     /// <summary>Starts the inline rename box for the selected node. F2 uses the same path.</summary>
     public void BeginRenameSelected() => BeginRename();
 
+    internal void RowRightPressed(TreeRowElement row)
+    {
+        if (row.Node is not { } node)
+        {
+            return;
+        }
+
+        SelectNode(node, scroll: false);
+        _ = Focus(FocusState.Pointer);
+    }
+
     internal void RowRightTapped(TreeRowElement row, RightTappedRoutedEventArgs e)
     {
         if (row.Node is not { } node)
@@ -719,6 +730,11 @@ public sealed partial class DenseTree : UserControl
                 ExpandOrGoToChild();
                 e.Handled = true;
                 break;
+            case VirtualKey.Back:
+                // ACC-025: Backspace selects the parent key. It does not collapse the selected key.
+                GoToParent();
+                e.Handled = true;
+                break;
             case VirtualKey.Add:
                 ExpandSelected();
                 e.Handled = true;
@@ -799,7 +815,13 @@ public sealed partial class DenseTree : UserControl
             return;
         }
 
-        if (node.Parent is { } parent)
+        GoToParent();
+    }
+
+    /// <summary>Selects the parent of the selected key. The root has no parent, so nothing changes there.</summary>
+    private void GoToParent()
+    {
+        if (SelectedNode?.Parent is { } parent)
         {
             MoveTo(_rows.IndexOfNode(parent));
         }

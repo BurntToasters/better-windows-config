@@ -129,6 +129,10 @@
   <data name="ContextExpand" xml:space="preserve">
     <value>Expand</value>
   </data>
+  <data name="ContextCollapse" xml:space="preserve">
+    <!-- Oracle 25 (MSG-010). Shown for Expand (915) while the node is expanded. -->
+    <value>Collapse</value>
+  </data>
   <data name="ContextFind" xml:space="preserve">
     <value>&amp;Find...</value>
   </data>
@@ -730,6 +734,10 @@ The key currently selected is not accessible.</value>
   <!-- Written for this product: the oracle has no generic text for a command that has no registry operation. -->
   <data name="MsgCommandFailed" xml:space="preserve">
     <value>The Registry Editor could not complete this command. Try again.</value>
+  </data>
+  <data name="MsgRegistryEditingDisabled" xml:space="preserve">
+    <!-- Oracle 40 (MSG-019). Shown when the DisableRegistryTools policy disables registry editing. -->
+    <value>Registry editing has been disabled by your administrator.</value>
   </data>
   <data name="MsgCaptionRegistryEditor" xml:space="preserve">
     <!-- Oracle 16 -->

@@ -130,10 +130,15 @@ public static class InstallDirectory
     private static Outcome<string> Refuse(string detail) => Outcome<string>.Fail(UpdateFailure.InstallDirUnsafe, detail);
 }
 
-/// <summary>Builds the silent installer command line: /S, then allowed switches, then /D= last.</summary>
+/// <summary>
+/// Builds the silent installer command line: /S, then allowed switches, then /D= last. A switch is
+/// <c>/NAME</c> or <c>/NAME=value</c>. NAME is uppercase letters, digits, or underscores, starting with a
+/// letter, and is never S or D. The value is 1 to 256 characters of letters, digits, and <c>_ . - : \</c>,
+/// with no "..", so it cannot break the raw command line.
+/// </summary>
 public static partial class InstallerArguments
 {
-    [GeneratedRegex("^/[A-Z][A-Z0-9_]{0,31}\\z", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^/(?<name>[A-Z][A-Z0-9_]{0,31})(=(?<value>[A-Za-z0-9_.:\\\\-]{1,256}))?\\z", RegexOptions.CultureInvariant)]
     private static partial Regex SwitchPattern();
 
     public static Outcome<string> Build(string installDir, IReadOnlyList<string> switches)
@@ -147,11 +152,16 @@ public static partial class InstallerArguments
 
         foreach (var switchText in switches)
         {
-            if (!SwitchPattern().IsMatch(switchText) || switchText is "/S" or "/D")
+            var match = SwitchPattern().Match(switchText);
+            var name = match.Groups["name"].Value;
+            var value = match.Groups["value"];
+            if (!match.Success
+                || name is "S" or "D"
+                || (value.Success && value.Value.Contains("..", StringComparison.Ordinal)))
             {
                 return Outcome<string>.Fail(
                     UpdateFailure.InstallerArgumentRejected,
-                    "installer switch is not allowed: use an uppercase switch with no '=' or spaces, other than /S or /D");
+                    "installer switch is not allowed: an uppercase name (never /S or /D), and an optional value of letters, digits, _ . - : or \\ with no '..'");
             }
         }
 

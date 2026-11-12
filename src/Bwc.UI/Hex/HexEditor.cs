@@ -64,7 +64,7 @@ public sealed class HexEditor : UserControl
     public HexEditor()
     {
         AutomationProperties.SetAutomationId(this, "HexEditor");
-        AutomationProperties.SetName(this, "Hex editor");
+        AutomationProperties.SetName(this, BwcStrings.Get("HexEditorName"));
 #if BWC_E2E
         // E2E-only: the debug state string is UIA help text that screen readers must not announce in ship.
         AutomationProperties.SetHelpText(this, "Length=0;SelectedOffset=-1;SelectedLength=0");

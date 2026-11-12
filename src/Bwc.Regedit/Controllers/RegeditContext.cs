@@ -20,8 +20,11 @@ namespace Bwc.Regedit.Controllers;
 /// State and services shared by the Registry Editor controllers: the registry engine, the tree and
 /// list panes, selection, the modal gates, the owner window, and the command error boundary.
 /// </summary>
-internal sealed class RegeditContext
+internal sealed partial class RegeditContext
 {
+    /// <summary>Number of registry writes running. Nested writes count, so the gate holds until the last one ends.</summary>
+    private int _writeDepth;
+
     /// <summary>The longest value name the registry accepts, in characters.</summary>
     public const int MaxValueNameLength = 16383;
 
@@ -37,6 +40,11 @@ internal sealed class RegeditContext
     /// value list for the new tree selection arrives.
     /// </summary>
     public sealed record PendingListView(IReadOnlyList<string> RowNames, double ListOffset);
+
+    /// <summary>The listing of a key that cannot be read: no rows and no names.</summary>
+    private static readonly RegistryValueListing EmptyListing = new(
+        Array.Empty<DetailsRow>(),
+        new Dictionary<string, string>(StringComparer.Ordinal));
 
     public RegeditContext(
         ClassicWindowShell shell,
@@ -146,11 +154,27 @@ internal sealed class RegeditContext
     }
 
     /// <summary>
+    /// True while a registry write runs on the thread pool. Every command dispatch checks it, and the
+    /// owner window is disabled for the same time, so no input reaches the view during the write.
+    /// </summary>
+    public bool WriteInProgress => _writeDepth > 0;
+
+    /// <summary>Raised on the UI thread when the last registry write ends. The window closes after a held close.</summary>
+    public event EventHandler? WriteFinished;
+
+    /// <summary>
     /// Runs one command and reports its failure. Callers do not await the result: the command runs
-    /// on the UI thread and its errors are shown as dialogs.
+    /// on the UI thread and its errors are shown as dialogs. A command started while a registry write
+    /// runs is ignored, so no command races the write.
     /// </summary>
     public void StartCommand(Func<Task> command)
     {
+        if (WriteInProgress)
+        {
+            Log.Info("Registry Editor ignored a command while a registry write was running.");
+            return;
+        }
+
         _ = RunCommandAsync(command);
     }
 
@@ -165,22 +189,78 @@ internal sealed class RegeditContext
         Task.Run(operation, cancellationToken);
 
     /// <summary>
-    /// Runs one registry write on the thread pool with the modal gate held. Commands that check the
-    /// gate are refused until the write finishes, so no second command starts while it runs.
+    /// Runs one registry write on the thread pool with the write gate held. The owner window is disabled
+    /// until the write finishes, and every command that checks the gate is refused.
     /// </summary>
     public async Task RunRegistryWriteAsync(Action operation)
     {
+        await RunRegistryWriteAsync(() =>
+        {
+            operation();
+            return 0;
+        });
+    }
+
+    public async Task<T> RunRegistryWriteAsync<T>(Func<T> operation)
+    {
         bool wasOpen = DialogOpen;
         DialogOpen = true;
+        BeginWrite();
         try
         {
-            await RunRegistryAsync(operation);
+            return await RunRegistryAsync(operation);
         }
         finally
         {
+            EndWrite();
             DialogOpen = wasOpen;
         }
     }
+
+    private void BeginWrite()
+    {
+        _writeDepth += 1;
+        if (_writeDepth == 1)
+        {
+            SetOwnerEnabled(false);
+        }
+    }
+
+    private void EndWrite()
+    {
+        _writeDepth -= 1;
+        if (_writeDepth != 0)
+        {
+            return;
+        }
+
+        SetOwnerEnabled(true);
+        WriteFinished?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Enables or disables the owner window. A disabled window takes no mouse or keyboard input, which
+    /// is what keeps a long write from racing a command. Failures are logged; the write gate still holds.
+    /// </summary>
+    private void SetOwnerEnabled(bool enabled)
+    {
+        if (WindowHwnd == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            _ = EnableWindow(WindowHwnd, enabled ? 1 : 0);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Registry Editor could not change the owner window enabled state: " + ex.Message);
+        }
+    }
+
+    [System.Runtime.InteropServices.LibraryImport("user32.dll")]
+    private static partial int EnableWindow(nint hWnd, int bEnable);
 
     public async Task<bool> ShowDialogAsync(ModalDialogWindow dialog)
     {
@@ -257,6 +337,26 @@ internal sealed class RegeditContext
             $"Registry Editor could not open '{path.ToDisplayString()}' for reading: Win32 {ex.Win32Error} ({ex.Message}).");
         return ShowErrorAsync(Messages.ForUnreadableKey(path.ToDisplayString(), ex.Win32Error).ToErrorDialog());
     }
+
+    /// <summary>
+    /// Shows the classic "cannot open key" error when a tree expand fails with access denied. Other
+    /// failures are logged only. The tree has already collapsed the node.
+    /// </summary>
+    public Task ShowExpandFailedAsync(TreeNode node, Exception exception)
+    {
+        if (exception is RegistryOperationException { Win32Error: AccessDeniedWin32 or PrivilegeNotHeldWin32 } ex &&
+            node.RegistryPath is { Length: > 0 } displayPath)
+        {
+            Log.Warn($"Registry Editor could not expand '{displayPath}': Win32 {ex.Win32Error} ({ex.Message}).");
+            return ShowErrorAsync(Messages.ForUnreadableKey(displayPath, ex.Win32Error).ToErrorDialog());
+        }
+
+        Log.Warn($"Registry Editor could not expand '{node.Name}': {exception.Message}");
+        return Task.CompletedTask;
+    }
+
+    private const int AccessDeniedWin32 = 5;
+    private const int PrivilegeNotHeldWin32 = 1314;
 
     /// <summary>
     /// Opens the key with the same rights as a read and returns the failure, or null when it opens.
@@ -463,13 +563,16 @@ internal sealed class RegeditContext
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 659, hasKey || IsComputerSelected);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 660, hasKey);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 679, singleRealValue);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 678, hasKey && !hasRows);
+        // Permissions and Unload Hive act on the key of the pane with focus. A value selected in the list
+        // blocks them only when the list is the target.
+        bool keyTarget = treeTarget || !hasRows;
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 678, hasKey && keyTarget);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 675, hasKey);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 680, hasKey && IsLoadHiveRoot(key));
         RegeditMenu.SetCommandEnabled(
             Shell.MenuBar,
             681,
-            hasKey && !hasRows && IsUnloadableHiveRoot(key));
+            hasKey && keyTarget && IsUnloadableHiveRoot(key));
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 657, true);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 768, RemoteConnections.Count > 0);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 912, singleRow);
@@ -524,17 +627,34 @@ internal sealed class RegeditContext
         var source = new RegistryTreeSource(Store.Reader, RemoteConnections);
         foreach (string path in expanded)
         {
-            TreeNode? node = await ResolveNodeAsync(source.Computer, path, expandAncestors: false);
-            if (node is { HasChildren: true })
+            // A key that cannot be read again stays collapsed; the rest of the tree still rebuilds.
+            try
             {
-                _ = await node.LoadChildrenAsync(CancellationToken.None);
-                node.IsExpanded = true;
+                TreeNode? node = await ResolveNodeAsync(source.Computer, path, expandAncestors: false);
+                if (node is { HasChildren: true })
+                {
+                    _ = await node.LoadChildrenAsync(CancellationToken.None);
+                    node.IsExpanded = true;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Log.Warn($"Registry Editor could not keep '{path}' expanded: {ex.Message}");
             }
         }
 
-        TreeNode? target = string.IsNullOrWhiteSpace(selectDisplayPath)
-            ? null
-            : await ResolveNodeAsync(source.Computer, selectDisplayPath, expandAncestors: true);
+        TreeNode? target = null;
+        if (!string.IsNullOrWhiteSpace(selectDisplayPath))
+        {
+            try
+            {
+                target = await ResolveNodeAsync(source.Computer, selectDisplayPath, expandAncestors: true);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Log.Warn($"Registry Editor could not select '{selectDisplayPath}': {ex.Message}");
+            }
+        }
 
         TreeSource = source;
         if (keepView)
@@ -626,7 +746,9 @@ internal sealed class RegeditContext
     private static List<string> SplitDisplayPath(string displayPath)
     {
         var names = new List<string>();
-        string rest = displayPath.Trim();
+
+        // Names are not trimmed: a key may end in spaces, and the walk must match it exactly.
+        string rest = displayPath;
         if (rest.StartsWith(@"\\", StringComparison.Ordinal))
         {
             int separator = rest.IndexOf('\\', 2);
@@ -680,19 +802,19 @@ internal sealed class RegeditContext
             return;
         }
 
-        IReadOnlyList<DetailsRow> rows;
+        RegistryValueListing listing = EmptyListing;
         RegistryOperationException? unreadable = null;
         try
         {
             unreadable = await RunRegistryAsync(() => ProbeKeyForRead(path));
-            rows = unreadable is null
-                ? await ValueSource.LoadAsync(path, CancellationToken.None)
-                : Array.Empty<DetailsRow>();
+            if (unreadable is null)
+            {
+                listing = await ValueSource.ReadAsync(path, CancellationToken.None);
+            }
         }
         catch (Exception ex)
         {
             Log.Warn($"Registry values for '{path.ToDisplayString()}' could not be refreshed: {ex.Message}");
-            rows = Array.Empty<DetailsRow>();
         }
 
         if (generation != ValueGeneration)
@@ -700,6 +822,8 @@ internal sealed class RegeditContext
             return;
         }
 
+        IReadOnlyList<DetailsRow> rows = listing.Rows;
+        ValueSource.Apply(listing);
         Shell.ListContent.SetRows(rows);
         UpdateCommandStates();
 
@@ -722,7 +846,7 @@ internal sealed class RegeditContext
         var tokenSource = new CancellationTokenSource();
         ValueLoad = tokenSource;
         int generation = ++ValueGeneration;
-        IReadOnlyList<DetailsRow> rows;
+        RegistryValueListing listing = EmptyListing;
         RegistryPath? unreadablePath = null;
         RegistryOperationException? unreadable = null;
 
@@ -731,30 +855,27 @@ internal sealed class RegeditContext
             if (node.RegistryPath is not { Length: > 0 } displayPath)
             {
                 // Computer is virtual and has no registry values.
-                rows = Array.Empty<DetailsRow>();
             }
             else if (TryResolveRemoteNode(node, out RemoteRegistryConnection? remote, out RegistryPath? remotePath))
             {
                 // Remote machine and root nodes have no values below the root itself. A remote
                 // reader only accepts HKEY_LOCAL_MACHINE and HKEY_USERS paths.
-                rows = remotePath.IsRoot
-                    ? Array.Empty<DetailsRow>()
-                    : await new RegistryValueSource(remote.CreateReader())
-                        .LoadAsync(remotePath, tokenSource.Token);
+                if (!remotePath.IsRoot)
+                {
+                    listing = await new RegistryValueSource(remote.CreateReader())
+                        .ReadAsync(remotePath, tokenSource.Token);
+                }
             }
-            else if (!RegistryPath.TryParse(displayPath, out RegistryPath? parsed) || parsed is null)
-            {
-                rows = Array.Empty<DetailsRow>();
-            }
-            else
+            else if (RegistryPath.TryParse(displayPath, out RegistryPath? parsed) && parsed is not null)
             {
                 // A key that cannot be opened shows the classic error and an empty list. The probe
                 // runs first because the value source reports a failed read as an empty list.
                 unreadable = await RunRegistryAsync(() => ProbeKeyForRead(parsed), tokenSource.Token);
                 unreadablePath = parsed;
-                rows = unreadable is null
-                    ? await ValueSource.LoadAsync(parsed, tokenSource.Token)
-                    : Array.Empty<DetailsRow>();
+                if (unreadable is null)
+                {
+                    listing = await ValueSource.ReadAsync(parsed, tokenSource.Token);
+                }
             }
         }
         catch (OperationCanceledException)
@@ -764,7 +885,6 @@ internal sealed class RegeditContext
         catch (Exception ex)
         {
             Log.Warn($"Registry values for '{node.Name}' could not be loaded: {ex.Message}");
-            rows = Array.Empty<DetailsRow>();
         }
         finally
         {
@@ -787,7 +907,8 @@ internal sealed class RegeditContext
             {
                 PendingListView? pending = PendingList;
                 PendingList = null;
-                Shell.ListContent.SetRows(rows);
+                ValueSource.Apply(listing);
+                Shell.ListContent.SetRows(listing.Rows);
                 if (unreadablePath is not null && unreadable is not null)
                 {
                     _ = ShowUnreadableKeyAsync(unreadablePath, unreadable);
@@ -796,12 +917,12 @@ internal sealed class RegeditContext
 
                 if (pending is not null)
                 {
-                    SelectListRows(rows, pending.RowNames);
+                    SelectListRows(listing.Rows, pending.RowNames);
                     RestoreScrollOffset(Shell.ListContent, pending.ListOffset);
                 }
                 else if (!string.IsNullOrEmpty(selectDisplayName))
                 {
-                    SelectListRow(rows, selectDisplayName);
+                    SelectListRow(listing.Rows, selectDisplayName);
                 }
             }
         });

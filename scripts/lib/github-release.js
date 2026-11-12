@@ -16,12 +16,32 @@ export function resolveRepo(root, explicit) {
       if (match) raw = `${match[1]}/${match[2]}`;
     }
   }
-  if (!raw) raw = "BurntToasters/better-windows-config";
+  if (!raw) {
+    // No default repository: a release must name its target, so it cannot reach the wrong one.
+    const failure = new Error(
+      "no GitHub repository: pass --repo owner/name, set GH_REPO, or add a GitHub origin remote",
+    );
+    failure.reason = "repo-invalid";
+    failure.exitCode = 2;
+    throw failure;
+  }
   const match = raw.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
   if (!match) {
-    throw new Error(`--repo must be owner/name; received ${raw}`);
+    const failure = new Error(`--repo must be owner/name; received ${raw}`);
+    failure.reason = "repo-invalid";
+    failure.exitCode = 2;
+    throw failure;
   }
   return { owner: match[1], name: match[2], slug: `${match[1]}/${match[2]}`, api: `/repos/${match[1]}/${match[2]}` };
+}
+
+/**
+ * True only when a draft asset's SHA-256 is known and equals the local file's. Size is never used:
+ * two files of the same size can differ. A missing remote hash is a mismatch, and the caller
+ * downloads the asset and hashes it before deciding.
+ */
+export function assetBytesMatch({ remoteSha256, localSha256 }) {
+  return typeof remoteSha256 === "string" && remoteSha256.length === 64 && remoteSha256 === localSha256;
 }
 
 export function tagForVersion(version) {

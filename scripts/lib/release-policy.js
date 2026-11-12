@@ -3,12 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { EXIT, isPathInside } from "./cli.js";
-import {
-  isPlaceholderKeyText,
-  isTestKeyText,
-  loadKeyMaterial,
-  parsePublicKeyText,
-} from "./minisign.js";
+import { isPlaceholderKeyText, loadKeyMaterial } from "./minisign.js";
+import { matchEmbeddedKey, readTrustedKeysFile } from "./trusted-keys.js";
 import { channelForVersion, tryParseSemVer } from "./semver.js";
 import { parsePackageVersion, readDirectoryBuildPropsVersion } from "../sync-version-helpers.js";
 import { validateManifestBuffer } from "./update-manifest.js";
@@ -271,19 +267,11 @@ export function checkCleanTree(root) {
 }
 
 export function readTrustedKeysSource(root) {
-  const file = path.join(root, "src", "Bwc.Update", "Signing", "TrustedKeys.cs");
-  if (!fs.existsSync(file)) {
-    return { ok: false, reason: "missing-trusted-key-source", detail: file };
+  const source = readTrustedKeysFile(root);
+  if (!source.ok) {
+    return { ok: false, reason: source.reason, detail: source.detail ?? source.file, file: source.file };
   }
-  const text = fs.readFileSync(file, "utf8");
-  const placeholderMatch = text.match(/IsPlaceholder\s*=\s*(true|false)/);
-  return {
-    ok: true,
-    file,
-    isPlaceholder: placeholderMatch ? placeholderMatch[1] === "true" : true,
-    hasPlaceholderText: /PLACEHOLDER-NOT-A-KEY|replace with the release public key/i.test(text),
-    text,
-  };
+  return { ok: true, file: source.file, isPlaceholder: source.isPlaceholder, embedded: source.embedded };
 }
 
 export function checkTrustedKey(root, trustedKeyValue, { requireKey = false } = {}) {
@@ -293,14 +281,14 @@ export function checkTrustedKey(root, trustedKeyValue, { requireKey = false } = 
 
   if (!source.ok) {
     errors.push({ reason: source.reason, detail: source.detail, exitCode: EXIT.REFUSED });
-  } else if (source.isPlaceholder || source.hasPlaceholderText) {
+  } else if (source.isPlaceholder || source.embedded.some((text) => isPlaceholderKeyText(text))) {
     errors.push({
       reason: "placeholder-key",
       detail: "src/Bwc.Update/Signing/TrustedKeys.cs still carries the placeholder release key",
       exitCode: EXIT.REFUSED,
     });
   } else {
-    checks.push({ name: "trusted-key-source", pass: true });
+    checks.push({ name: "trusted-key-source", pass: true, detail: `${source.embedded.length} embedded key(s)` });
   }
 
   let key = null;
@@ -310,19 +298,20 @@ export function checkTrustedKey(root, trustedKeyValue, { requireKey = false } = 
       errors.push({ reason: loaded.reason, detail: loaded.detail, exitCode: EXIT.MISSING });
     } else if (isPlaceholderKeyText(loaded.text)) {
       errors.push({ reason: "placeholder-key", detail: "the trusted public key is a placeholder", exitCode: EXIT.REFUSED });
-    } else {
-      const parsed = parsePublicKeyText(loaded.text);
-      if (!parsed.ok) {
-        errors.push({ reason: parsed.reason, detail: parsed.detail, exitCode: EXIT.REFUSED });
+    } else if (source.ok) {
+      // A key is trusted only when its id and bytes equal an embedded key. Comments are ignored.
+      const matched = matchEmbeddedKey(loaded.text, source.embedded);
+      if (!matched.ok) {
+        errors.push({ reason: matched.reason, detail: matched.detail, exitCode: EXIT.REFUSED });
       } else {
         key = {
           text: loaded.text,
           path: loaded.path,
-          keyId: parsed.keyIdHex,
-          fingerprint: parsed.fingerprint,
-          testKey: isTestKeyText(loaded.text),
+          keyId: matched.keyIdHex,
+          fingerprint: matched.fingerprint,
+          testKey: false,
         };
-        checks.push({ name: "trusted-key", pass: true, detail: parsed.keyIdHex });
+        checks.push({ name: "trusted-key", pass: true, detail: matched.keyIdHex });
       }
     }
   } else if (requireKey) {

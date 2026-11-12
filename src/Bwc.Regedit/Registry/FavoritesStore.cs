@@ -157,7 +157,8 @@ public sealed class FavoritesStore
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(path);
 
-        string displayName = name.Trim();
+        // The name is kept as given. Classic regedit does not trim it, so a trailing space is part of it.
+        string displayName = name;
         if (displayName.Length == 0)
         {
             throw new ArgumentException("Enter a favorite name.", nameof(name));

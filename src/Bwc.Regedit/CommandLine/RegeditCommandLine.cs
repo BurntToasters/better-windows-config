@@ -48,8 +48,8 @@ public static class RegeditCommandLine
                 continue;
             }
 
-            // A single .reg path opens the window and asks to import it, as classic regedit does.
-            if (IsRegFileArgument(argument))
+            // A single positional path opens the window and asks to import it, as classic regedit does.
+            if (IsPositionalPath(argument))
             {
                 if (startupRegFile is not null)
                 {
@@ -118,6 +118,15 @@ public static class RegeditCommandLine
     {
         try
         {
+            // Policy level 2 refuses a silent import. The message goes to standard error, like the other refusals.
+            if (operation == Operation.SilentImport &&
+                RegeditPolicy.BlocksSilentImport(RegeditPolicy.ReadDisableRegistryTools()))
+            {
+                Log.Warn("Registry Editor silent import was refused by the DisableRegistryTools policy.");
+                WriteStandardError("BwcRegedit: " + RegeditStrings.Get("MsgRegistryEditingDisabled"));
+                return 1;
+            }
+
             RegistryStore store = RegeditWritePolicy.CreateStore();
 
             if (operation == Operation.SilentImport)
@@ -129,16 +138,23 @@ public static class RegeditCommandLine
             RegFileFormat format = operation == Operation.ExportV5
                 ? RegFileFormat.V5
                 : RegFileFormat.Regedit4;
-            RegFileDocument document = key is null
-                ? RegFileExporter.Export(
-                    store.Reader,
-                    RegistryPath.Parse("HKEY_CURRENT_USER"),
-                    format,
-                    CancellationToken.None)
-                : RegFileExporter.Export(store.Reader, key, format, CancellationToken.None);
 
             using var buffer = new MemoryStream();
+            if (key is null)
+            {
+                // No key means the whole registry, as classic regedit does: every root under Computer.
+                CreateExportService(store).WriteRegFile(
+                    startKey: null,
+                    buffer,
+                    format,
+                    RegistryExportScope.WholeRegistry,
+                    CancellationToken.None);
+                File.WriteAllBytes(file, buffer.ToArray());
+                Log.Info($"Registry Editor export succeeded: {file}, the whole registry, {format} format.");
+                return 0;
+            }
 
+            RegFileDocument document = RegFileExporter.Export(store.Reader, key, format, CancellationToken.None);
             if (format == RegFileFormat.V5)
             {
                 RegFileWriter.WriteV5(document, buffer);
@@ -161,6 +177,25 @@ public static class RegeditCommandLine
             WriteStandardError("BwcRegedit: " + message);
             return 1;
         }
+    }
+
+    /// <summary>
+    /// The export service for a command line export. The ship build reads the live registry. The E2E build
+    /// maps HKEY_CURRENT_USER to the run sandbox, as the window's export does.
+    /// </summary>
+    private static RegistryExportService CreateExportService(RegistryStore store)
+    {
+#if BWC_E2E
+        string? configured = Environment.GetEnvironmentVariable("BWC_E2E_SANDBOX_ROOT");
+        if (!string.IsNullOrWhiteSpace(configured) &&
+            RegistryPath.TryParse(configured.Trim(), out RegistryPath? sandboxRoot) &&
+            sandboxRoot is not null)
+        {
+            return new RegistryExportService(new SandboxExportSource(store.Reader, sandboxRoot));
+        }
+#endif
+
+        return new RegistryExportService(store.Reader);
     }
 
     /// <summary>
@@ -203,17 +238,18 @@ public static class RegeditCommandLine
         }
     }
 
-    /// <summary>True when the argument is a positional path ending in .reg (case insensitive).</summary>
-    public static bool IsRegFileArgument(string argument) =>
-        !string.IsNullOrWhiteSpace(argument)
-        && !LooksLikeSwitch(argument)
-        && argument.EndsWith(".reg", StringComparison.OrdinalIgnoreCase);
+    /// <summary>
+    /// True when the argument is a positional path. Classic regedit offers to import any file it is
+    /// given, so the extension does not matter; the import reads the file as a registry file.
+    /// </summary>
+    public static bool IsPositionalPath(string argument) =>
+        !string.IsNullOrWhiteSpace(argument) && !LooksLikeSwitch(argument);
 
-    /// <summary>The .reg path given on the command line for a window launch, or null.</summary>
+    /// <summary>The file given on the command line for a window launch, or null.</summary>
     public static string? StartupRegFile(IReadOnlyList<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
-        return arguments.FirstOrDefault(IsRegFileArgument);
+        return arguments.FirstOrDefault(IsPositionalPath);
     }
 
     /// <summary>True when /m is present. Such a launch never joins the single-instance gate.</summary>

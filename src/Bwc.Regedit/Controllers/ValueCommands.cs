@@ -107,16 +107,31 @@ internal sealed class ValueCommands
             return;
         }
 
+        await ShowReadOnlyViewerAsync(rows[0].Name, key, value);
+        _ = _context.Shell.ListContent.Focus(FocusState.Programmatic);
+    }
+
+    /// <summary>Shows the read-only binary viewer for a value. The bytes are not written back.</summary>
+    private async Task ShowReadOnlyViewerAsync(string displayName, RegistryPath key, RegistryValueInfo value)
+    {
         var dialog = new HexViewerDialog(Get("DialogHexTitle"), Get("DialogHexClose"));
         dialog.SetValue(
-            rows[0].Name,
+            displayName,
             key.ToDisplayString(),
             value.Data,
             RegistryValueTypeExtensions.ToDisplayName(value.Type));
 
         _ = await _context.ShowDialogAsync(dialog);
-        _ = _context.Shell.ListContent.Focus(FocusState.Programmatic);
     }
+
+    /// <summary>
+    /// The resource list types hold hardware resource data. Modify and Modify Binary Data open them
+    /// read-only.
+    /// </summary>
+    private static bool IsReadOnlyResourceType(uint type) =>
+        type is (uint)RegistryValueType.ResourceList
+            or (uint)RegistryValueType.FullResourceDescriptor
+            or (uint)RegistryValueType.ResourceRequirementsList;
 
     /// <summary>
     /// Opens the hex editor for a value whose type has no typed editor, or for Modify Binary Data. The
@@ -157,6 +172,14 @@ internal sealed class ValueCommands
         if (value is null)
         {
             await ShowValueReadErrorAsync(rawName, forEdit: true);
+            return;
+        }
+
+        if (IsReadOnlyResourceType(value.Type))
+        {
+            // Hardware resource data is shown read-only, so a typed edit cannot change device resources.
+            await ShowReadOnlyViewerAsync(activatedRow.Name, key, value);
+            _ = _context.Shell.ListContent.Focus(FocusState.Programmatic);
             return;
         }
 
@@ -286,6 +309,12 @@ internal sealed class ValueCommands
             case RegistryValueType.ExpandString:
                 saved = await EditStringValueAsync(key, rawName, value, expandable: true);
                 break;
+            case RegistryValueType.Dword when !RegistryValueCodec.IsValidDword(value.Data):
+            case RegistryValueType.Qword when !RegistryValueCodec.IsValidQword(value.Data):
+                // A number with the wrong data length has no typed editor. Classic regedit opens the
+                // binary editor, which keeps the bytes and the type.
+                await EditValueHexAsync(row);
+                return;
             case RegistryValueType.Dword:
                 saved = await EditDwordValueAsync(key, rawName, value);
                 break;
@@ -581,17 +610,30 @@ internal sealed class ValueCommands
             return;
         }
 
-        try
+        // Every value is attempted. A failure does not stop the rest, and the first failure is shown once,
+        // after the work, with the classic text. The list is refreshed in every case.
+        RegistryOperationException? first = null;
+        string? firstName = null;
+        await _context.RunRegistryWriteAsync(() =>
         {
             foreach (string rawName in rawNames)
             {
-                _context.Store.DeleteValue(key, rawName);
+                try
+                {
+                    _context.Store.DeleteValue(key, rawName);
+                }
+                catch (RegistryOperationException ex)
+                {
+                    Log.Warn($"Registry Editor could not delete value '{ValueLabel(rawName)}': Win32 {ex.Win32Error} ({ex.Message}).");
+                    first ??= ex;
+                    firstName ??= ValueLabel(rawName);
+                }
             }
-        }
-        catch (RegistryOperationException ex)
+        });
+
+        if (first is not null)
         {
-            await _context.ShowRegistryErrorAsync(ex, RegistryAction.DeleteValues, ValueLabel(rawNames[0]));
-            return;
+            await _context.ShowRegistryErrorAsync(first, RegistryAction.DeleteValues, firstName);
         }
 
         await _context.RefreshValuesAsync(selectDisplayName: null);

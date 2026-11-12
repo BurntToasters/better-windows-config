@@ -250,6 +250,153 @@ Known gap for `view.refresh` in `ShellTests` (RF1).
 
 Rule: View > Refresh is enabled and runs the same refresh as F5.
 
+## Typed editors and read-only types
+
+### Failure: a DWORD or QWORD with the wrong data length does nothing
+
+A REG_DWORD whose data is not four bytes, or a REG_QWORD whose data is not eight, has no typed
+editor. Modify, Enter, and double-click did nothing, because the typed editor was skipped and the
+hex editor was not opened.
+
+Rule: a number value with the wrong length opens the binary editor (`HexEditorDialog`) with its
+bytes and its type, as classic regedit does. Accepting it writes the bytes back with the same type.
+
+Check: `RobustnessTests.Robustness_InvalidLengthDwordOpensBinaryEditor` seeds a REG_DWORD with two
+bytes, opens it with Modify, checks that the hex editor (`HexEditor`) is open, and cancels it.
+
+### Failure: resource list types open the writable hex editor
+
+REG_RESOURCE_LIST, REG_FULL_RESOURCE_DESCRIPTOR, and REG_RESOURCE_REQUIREMENTS_LIST are hardware
+resource data. Modify opened the writable hex editor, so a typed edit could corrupt the device data.
+
+Rule: these three types open read-only. The call site uses the read-only `HexViewerDialog`
+(caption `Binary Data`) for now. A later change replaces the viewer's content with the classic
+formats without changing the call site. Modify Binary Data follows the same rule.
+
+Check: `RobustnessTests.Robustness_ResourceListOpensReadOnly` seeds a REG_RESOURCE_LIST value, opens it
+with Modify, checks that the read-only viewer (`HexViewerDialog`) is open and the writable editor is
+not, and closes it.
+
+### Failure: multi-value delete stops at the first failure
+
+The delete loop threw on the first value it could not delete. The values after it stayed, the list
+was not refreshed, and the work ran on the UI thread.
+
+Rule: the delete continues past a failing value and runs on the thread pool with the write gate
+held. Every value that can be deleted is deleted. The failures are logged, and one classic error
+message (the first failure) is shown after the work. The list is refreshed in every case.
+
+Check: no automated check. A failing value delete needs a value removed behind the app, and the E2E
+harness has no value delete helper (`SandboxRegistry` deletes whole keys only). The rule is covered by
+reading the code path; it is not covered by a run.
+
+## Context menus
+
+### Failure: the value context menu Delete deletes the key
+
+The value context menu used the focused-pane delete. When the list did not hold focus (the menu was
+opened by a right click that did not move focus), the pane was the tree, and the menu deleted the
+selected key recursively.
+
+Rule: the value context menu Delete is bound to the value delete directly. It deletes values only,
+for the rows selected in the list, and never the key.
+
+Check: `RobustnessTests.Robustness_ValueMenuDeleteRemovesOnlyTheValue` right clicks a value in the list
+with the tree focused, chooses Delete from the value menu, and checks that the dialog asks about a
+value (not a key), that the value is removed, and that the key and its other value remain.
+
+### Failure: the tree context menu label and layout differ from the classic menu
+
+RT_MENU 104 has separators after Find, after Rename, and after Permissions, and none after New. The
+menu also disabled Export on Computer, which the main menu allows, and it kept the label Expand on
+an expanded key.
+
+Rule: the tree context menu has the classic separators and no separator after New. Export is
+enabled on Computer, as the main menu does. The Expand item (915) shows Collapse (RT_STRING 25) when
+the node is expanded, and choosing it collapses the node.
+
+Check: `RobustnessTests.Robustness_ExpandedKeyMenuShowsCollapse` expands a key, opens its tree context
+menu, and checks that item 915 is labeled `Collapse`. The separator placement and the Export item on
+Computer have no automated check; they are covered by the oracle rows CTX-001 and CTX-014 only.
+
+## Tree expansion errors
+
+### Failure: expanding a key without access shows nothing
+
+The tree source turned an enumeration failure into an empty child list, so the expand had no error
+to report. The key opened with no children and no message, and the `ExpandFailed` event had no
+subscriber.
+
+Rule: expanding a key that cannot be enumerated with access denied collapses the node and shows the
+classic `Cannot open key` message (`MsgOpenKeyFailed` under `MsgCaptionOpenKeyError`), with the system
+text as the details line. Other enumeration failures keep the empty list and are logged. The expander
+stays on the key, so the next expand retries.
+
+Check: `RobustnessTests.Robustness_ExpandOfDeniedKeyShowsClassicError` expands `HKEY_LOCAL_MACHINE` and then
+`SECURITY`, which a standard user cannot enumerate, and checks the classic text (`... cannot be opened.`,
+caption `Error Opening Key`) before it dismisses the message. The check writes nothing.
+
+## Busy gate for registry writes
+
+### Failure: a command starts while a long write runs
+
+A recursive Delete Key runs on the thread pool. New Key, New Value, inline Rename, F5, and address
+bar navigation did not check whether a write was running. Their registry calls raced the delete,
+and a refresh read a half-deleted tree.
+
+Rule: one gate is checked by every command dispatch. While a registry write runs, the command is
+ignored and logged, and the owner window is disabled, so no input reaches it. When the write ends the
+window is enabled again and the view is refreshed by the write's own command. Closing the window
+during a write waits for the write to finish, then closes. The write is not cancelled, because a
+recursive delete has no safe cancellation point.
+
+Check: `RobustnessTests.Robustness_BusyGateDisablesWindowDuringRecursiveDelete` seeds a key with 4000
+subkeys, deletes it, and checks that the owner window is disabled while the delete runs. It then
+posts a close request during the delete and checks that the window closes only after the delete
+finished. The test sends no keystrokes during the delete: with the owner disabled, keys would go to
+whatever window has focus, so the command-level gate is not exercised by input in E2E.
+
+### Failure: two connects to the same name leak a connection
+
+Connect Network Registry passed the duplicate check before the connect, and the connect ran outside
+the gate. Two connects to the same name both passed, and the second connection was kept without a
+tree node for it.
+
+Rule: Connect runs under the write gate. After the connect succeeds, the duplicate check runs again.
+A connection that is a duplicate is disposed and the duplicate message is shown.
+
+Check: no automated check. A second connect needs a reachable remote computer, which the E2E
+environment does not have.
+
+## Tree context menu targets
+
+### Failure: Permissions and Unload Hive use the list selection
+
+Both commands were disabled or refused when the list had selected rows, even when the tree was the
+focused pane. The tree context menu Permissions item acted on the list state, not on the tree node.
+
+Rule: a command takes its target from the pane it was invoked from. The tree context menu passes the
+tree node. The main menu uses the focused pane: when the tree has focus, the selected key is the
+target whatever the list selection is. When the list has focus with a value selected, Permissions
+and Unload Hive are disabled.
+
+Check: no automated check. The security editor is a system dialog that the E2E driver does not open.
+
+## Keys with names the path type cannot hold
+
+### Failure: keys named `.` or `..` are hidden and names lose trailing spaces
+
+`RegistryPath` rejects `.` and `..` as components, so the child list dropped those keys. The tree
+and the restore path also trimmed the names, so a key named `Name ` with a trailing space was
+searched as `Name` and could not be restored or refreshed.
+
+Rule: the tree lists every child key, including `.` and `..`, with its display path built from the
+parent. Those nodes have no children and no values, because `RegistryPath` cannot name them, so they
+show without a value list. Display paths are not trimmed. Trailing spaces stay in the names.
+
+Known gap: opening, renaming, or deleting a key named `.` or `..` needs `RegistryPath` to accept
+those components. That type lives in `src/Bwc.Registry`, which this change does not own.
+
 ## Testing
 
 The whole behavior is tested through the real application: the checks drive menus, keys, and dialogs

@@ -12,6 +12,13 @@ export const MAX_INSTALLER_BYTES = 1024 * 1024 * 1024;
 export const MAX_FUTURE_SKEW_HOURS = 24;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const PUBDATE_PATTERN = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{3})?Z$/;
+// The signed expiry has whole seconds only, so every reader parses it the same way.
+const EXPIRES_PATTERN = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/;
+
+/** The exact manifest trusted comment. Signing and validation both build it from the manifest fields. */
+export function manifestTrustedComment({ version, channel, expires }) {
+  return `version:${version} channel:${channel} expires:${expires}`;
+}
 
 export function buildManifest({ version, channel, pubDate, notesUrl, installers }) {
   const manifest = {
@@ -232,10 +239,29 @@ export async function validateManifestBuffer(bytes, options = {}) {
           result.add("trusted-comment-invalid", comment.detail);
         } else {
           const signedVersion = comment.fields.get("version");
+          const signedChannel = comment.fields.get("channel");
+          const signedExpires = comment.fields.get("expires");
           if (!signedVersion) {
             result.add("trusted-comment-invalid", "manifest trusted comment has no version field");
           } else if (versionText && signedVersion !== versionText) {
             result.add("version-mismatch", "signed trusted comment version does not match the manifest version");
+          }
+          if (!signedChannel) {
+            result.add("trusted-comment-invalid", "manifest trusted comment has no channel field");
+          } else if (channelText && signedChannel !== channelText) {
+            result.add("channel-mismatch", `signed channel ${signedChannel} does not match the manifest channel ${channelText}`);
+          }
+          if (!signedExpires || !EXPIRES_PATTERN.test(signedExpires) || Number.isNaN(Date.parse(signedExpires))) {
+            result.add("trusted-comment-invalid", "manifest trusted comment has no valid expires field (yyyy-MM-ddTHH:mm:ssZ)");
+          } else if (now.getTime() > Date.parse(signedExpires)) {
+            result.add("expired", `the signed expiry ${signedExpires} has passed`);
+          }
+          const canonical = `version:${versionText} channel:${channelText} expires:${signedExpires}`;
+          if (versionText && channelText && signedExpires && verified.trustedComment !== canonical) {
+            result.add(
+              "trusted-comment-invalid",
+              "manifest trusted comment must be exactly version, channel, and expires in that order",
+            );
           }
         }
       }

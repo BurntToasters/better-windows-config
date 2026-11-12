@@ -12,6 +12,13 @@ public sealed partial class RegistryWriter
     private const int ErrorFileExists = 183;
     private const int ErrorPrivilegeNotHeld = 1314;
 
+    /// <summary>
+    /// Serializes every hive operation in the process. The backup and restore privileges are process-wide,
+    /// so one operation must not disable them while another still needs them. The lock also covers the file
+    /// check and the native call of each operation (failure modes D4 and A12).
+    /// </summary>
+    private static readonly object HiveOperationLock = new();
+
     public void LoadHive(RegistryPath path, string filePath)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -21,12 +28,15 @@ public sealed partial class RegistryWriter
         ValidateHiveMountTarget(path);
         _policy.EnsureWriteAllowed(path, RegistryWriteOperation.LoadHive);
 
-        string fullPath = ResolveExistingHiveFile(filePath, Operation, path, nameof(filePath));
-        using PrivilegeScope privilegeScope = EnableHivePrivileges(Operation, path);
+        lock (HiveOperationLock)
+        {
+            string fullPath = ResolveExistingHiveFile(filePath, Operation, path, nameof(filePath));
+            using PrivilegeScope privilegeScope = EnableHivePrivileges(Operation, path);
 
-        using SafeRegistryKeyHandle root = SafeRegistryKeyHandle.FromPredefined(path.Root);
-        WIN32_ERROR error = PInvoke.RegLoadKey(root, path.Components[0], fullPath);
-        ThrowIfFailed(error, Operation, path);
+            using SafeRegistryKeyHandle root = SafeRegistryKeyHandle.FromPredefined(path.Root);
+            WIN32_ERROR error = PInvoke.RegLoadKey(root, path.Components[0], fullPath);
+            ThrowIfFailed(error, Operation, path);
+        }
     }
 
     public void UnloadHive(RegistryPath path)
@@ -37,11 +47,14 @@ public sealed partial class RegistryWriter
         ValidateHiveMountTarget(path);
         _policy.EnsureWriteAllowed(path, RegistryWriteOperation.UnloadHive);
 
-        using PrivilegeScope privilegeScope = EnableHivePrivileges(Operation, path);
+        lock (HiveOperationLock)
+        {
+            using PrivilegeScope privilegeScope = EnableHivePrivileges(Operation, path);
 
-        using SafeRegistryKeyHandle root = SafeRegistryKeyHandle.FromPredefined(path.Root);
-        WIN32_ERROR error = PInvoke.RegUnLoadKey(root, path.Components[0]);
-        ThrowIfFailed(error, Operation, path);
+            using SafeRegistryKeyHandle root = SafeRegistryKeyHandle.FromPredefined(path.Root);
+            WIN32_ERROR error = PInvoke.RegUnLoadKey(root, path.Components[0]);
+            ThrowIfFailed(error, Operation, path);
+        }
     }
 
     public void SaveKey(RegistryPath path, string filePath)
@@ -53,23 +66,26 @@ public sealed partial class RegistryWriter
         RejectRoot(path, "A predefined registry root cannot be saved to a hive file.");
         _policy.EnsureWriteAllowed(path, RegistryWriteOperation.SaveKey);
 
-        if (_policy.RejectsSymbolicLinks)
+        lock (HiveOperationLock)
         {
-            // Check the key before the file is created or any privilege is taken.
-            EnsureKeyIsReachable(path, Operation);
+            if (_policy.RejectsSymbolicLinks)
+            {
+                // Check the key before the file is created or any privilege is taken.
+                EnsureKeyIsReachable(path, Operation);
+            }
+
+            string fullPath = ResolveSaveDestination(filePath, Operation, path, nameof(filePath));
+            using PrivilegeScope privilegeScope = EnableHivePrivileges(Operation, path);
+
+            using SafeRegistryKeyHandle handle = OpenKey(
+                path,
+                REG_SAM_FLAGS.KEY_READ,
+                Operation,
+                path);
+
+            WIN32_ERROR error = PInvoke.RegSaveKey(handle, fullPath, null);
+            ThrowIfFailed(error, Operation, path);
         }
-
-        string fullPath = ResolveSaveDestination(filePath, Operation, path, nameof(filePath));
-        using PrivilegeScope privilegeScope = EnableHivePrivileges(Operation, path);
-
-        using SafeRegistryKeyHandle handle = OpenKey(
-            path,
-            REG_SAM_FLAGS.KEY_READ,
-            Operation,
-            path);
-
-        WIN32_ERROR error = PInvoke.RegSaveKey(handle, fullPath, null);
-        ThrowIfFailed(error, Operation, path);
     }
 
     public void ReplaceKey(RegistryPath path, string newFileName, string backupFileName)
@@ -82,40 +98,45 @@ public sealed partial class RegistryWriter
         RejectRoot(path, "A predefined registry root cannot be replaced from a hive file.");
         _policy.EnsureWriteAllowed(path, RegistryWriteOperation.ReplaceKey);
 
-        if (_policy.RejectsSymbolicLinks)
+        lock (HiveOperationLock)
         {
-            EnsureKeyIsReachable(path, Operation);
+            if (_policy.RejectsSymbolicLinks)
+            {
+                EnsureKeyIsReachable(path, Operation);
+            }
+
+            string newFullPath = ResolveExistingHiveFile(
+                newFileName,
+                Operation,
+                path,
+                nameof(newFileName));
+
+            // The replacement file is scanned, not held: the native call takes the file over, so a sharing
+            // lock would stop it. The residual window is recorded in registry-writer.md (D3).
+            if (_policy.RejectsSymbolicLinks)
+            {
+                // Refuse before the backup file is created, so a refused replace leaves no files behind.
+                HoldVerifiedHiveFile(newFullPath, Operation, path).Dispose();
+            }
+
+            string backupFullPath = ResolveBackupDestination(
+                backupFileName,
+                newFullPath,
+                Operation,
+                path,
+                nameof(backupFileName));
+
+            using PrivilegeScope privilegeScope = EnableHivePrivileges(Operation, path);
+
+            using SafeRegistryKeyHandle handle = OpenKey(
+                path,
+                REG_SAM_FLAGS.KEY_READ,
+                Operation,
+                path);
+
+            WIN32_ERROR error = PInvoke.RegReplaceKey(handle, null, newFullPath, backupFullPath);
+            ThrowIfFailed(error, Operation, path);
         }
-
-        string newFullPath = ResolveExistingHiveFile(
-            newFileName,
-            Operation,
-            path,
-            nameof(newFileName));
-
-        if (_policy.RejectsSymbolicLinks)
-        {
-            // Refuse before the backup file is created, so a refused replace leaves no files behind.
-            EnsureHiveFileHasNoLinks(newFullPath, Operation, path);
-        }
-
-        string backupFullPath = ResolveBackupDestination(
-            backupFileName,
-            newFullPath,
-            Operation,
-            path,
-            nameof(backupFileName));
-
-        using PrivilegeScope privilegeScope = EnableHivePrivileges(Operation, path);
-
-        using SafeRegistryKeyHandle handle = OpenKey(
-            path,
-            REG_SAM_FLAGS.KEY_READ,
-            Operation,
-            path);
-
-        WIN32_ERROR error = PInvoke.RegReplaceKey(handle, null, newFullPath, backupFullPath);
-        ThrowIfFailed(error, Operation, path);
     }
 
     public void RestoreKey(RegistryPath path, string filePath)
@@ -127,29 +148,33 @@ public sealed partial class RegistryWriter
         RejectRoot(path, "A predefined registry root cannot be restored from a hive file.");
         _policy.EnsureWriteAllowed(path, RegistryWriteOperation.RestoreKey);
 
-        if (_policy.RejectsSymbolicLinks)
+        lock (HiveOperationLock)
         {
-            EnsureKeyIsReachable(path, Operation);
+            if (_policy.RejectsSymbolicLinks)
+            {
+                EnsureKeyIsReachable(path, Operation);
+            }
+
+            string fullPath = ResolveExistingHiveFile(filePath, Operation, path, nameof(filePath));
+
+            // Refuse before the native restore, so a refused restore leaves the target untouched. A clean
+            // file stays open with FileShare.Read until the native call returns, so the bytes checked are
+            // the bytes loaded (failure mode D3).
+            using HeldHiveScan? verified = _policy.RejectsSymbolicLinks
+                ? HoldVerifiedHiveFile(fullPath, Operation, path)
+                : null;
+
+            using PrivilegeScope privilegeScope = EnableHivePrivileges(Operation, path);
+
+            using SafeRegistryKeyHandle handle = OpenKey(
+                path,
+                REG_SAM_FLAGS.KEY_READ,
+                Operation,
+                path);
+
+            WIN32_ERROR error = PInvoke.RegRestoreKey(handle, fullPath, default);
+            ThrowIfFailed(error, Operation, path);
         }
-
-        string fullPath = ResolveExistingHiveFile(filePath, Operation, path, nameof(filePath));
-
-        if (_policy.RejectsSymbolicLinks)
-        {
-            // Refuse before the native restore, so a refused restore leaves the target untouched.
-            EnsureHiveFileHasNoLinks(fullPath, Operation, path);
-        }
-
-        using PrivilegeScope privilegeScope = EnableHivePrivileges(Operation, path);
-
-        using SafeRegistryKeyHandle handle = OpenKey(
-            path,
-            REG_SAM_FLAGS.KEY_READ,
-            Operation,
-            path);
-
-        WIN32_ERROR error = PInvoke.RegRestoreKey(handle, fullPath, default);
-        ThrowIfFailed(error, Operation, path);
     }
 
     private static void ValidateHiveMountTarget(RegistryPath path)

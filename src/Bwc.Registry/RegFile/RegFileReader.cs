@@ -594,9 +594,6 @@ public static class RegFileReader
                     {
                         '\\' => '\\',
                         '"' => '"',
-                        'n' => '\n',
-                        'r' => '\r',
-                        '0' => '\0',
                         _ => throw Error(
                             escapeStart,
                             $"The escape sequence '\\{escape}' is not recognized."),

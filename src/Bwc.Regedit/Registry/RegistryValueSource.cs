@@ -6,9 +6,18 @@ using Bwc.UI.List;
 namespace Bwc.Regedit.Registry;
 
 /// <summary>
-/// Loads the details rows for one key. Enumeration and formatting run on the thread pool; the
-/// caller applies the result on the UI thread. Registry failures produce an empty list, never an
-/// exception to the window.
+/// The rows of one key and the display-name to raw-name map that goes with them. Built on the thread
+/// pool and never stored there: the caller applies it on the UI thread, and only when it is still the
+/// current load.
+/// </summary>
+public sealed record RegistryValueListing(
+    IReadOnlyList<DetailsRow> Rows,
+    IReadOnlyDictionary<string, string> RawNamesByName);
+
+/// <summary>
+/// Loads the details rows for one key. Enumeration and formatting run on the thread pool and return a
+/// <see cref="RegistryValueListing"/>; the caller applies it on the UI thread with <see cref="Apply"/>.
+/// Registry failures produce an empty list, never an exception to the window.
 /// </summary>
 public sealed class RegistryValueSource
 {
@@ -27,23 +36,33 @@ public sealed class RegistryValueSource
         _reader = reader ?? new RegistryReader();
     }
 
-    /// <summary>The last read failure text, or null after a successful load.</summary>
-    public string? LastError { get; private set; }
-
-    /// <summary>Display name to raw registry name. Kept for a future rename editor.</summary>
+    /// <summary>
+    /// Display name to raw registry name for the rows last applied with <see cref="Apply"/>. Read and
+    /// written on the UI thread only.
+    /// </summary>
     public IReadOnlyDictionary<string, string> RawNamesByName { get; private set; } = NoRawNames;
 
-    public Task<IReadOnlyList<DetailsRow>> LoadAsync(RegistryPath path, CancellationToken cancellationToken)
+    /// <summary>Reads the rows of a key on the thread pool. The result is not stored in this source.</summary>
+    public Task<RegistryValueListing> ReadAsync(RegistryPath path, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(path);
-        return Task.Run(() => Load(path, cancellationToken), cancellationToken);
+        return Task.Run(() => Read(path, cancellationToken), cancellationToken);
     }
 
-    private IReadOnlyList<DetailsRow> Load(RegistryPath path, CancellationToken cancellationToken)
+    /// <summary>
+    /// Makes a listing the current one for name lookups. Call on the UI thread, and only for the load
+    /// that is still current.
+    /// </summary>
+    public void Apply(RegistryValueListing listing)
+    {
+        ArgumentNullException.ThrowIfNull(listing);
+        RawNamesByName = listing.RawNamesByName;
+    }
+
+    private RegistryValueListing Read(RegistryPath path, CancellationToken cancellationToken)
     {
         try
         {
-            LastError = null;
             IReadOnlyList<RegistryValueInfo> values = _reader.EnumerateValues(path, cancellationToken);
 
             // The default value sorts first, then the remaining names in the approximate
@@ -81,16 +100,13 @@ public sealed class RegistryValueSource
                 rawNames[displayName] = value.Name;
             }
 
-            RawNamesByName = rawNames;
-            return rows;
+            return new RegistryValueListing(rows, rawNames);
         }
         catch (RegistryOperationException ex)
         {
-            LastError = ex.Message;
-            RawNamesByName = NoRawNames;
             Log.Warn(
                 $"Registry values for '{path.ToDisplayString()}' could not be read: Win32 {ex.Win32Error} ({ex.Message}).");
-            return NoRows;
+            return new RegistryValueListing(NoRows, NoRawNames);
         }
     }
 }

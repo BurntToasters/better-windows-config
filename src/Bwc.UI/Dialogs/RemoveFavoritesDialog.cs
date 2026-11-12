@@ -9,8 +9,6 @@ namespace Bwc.UI.Dialogs;
 /// </summary>
 public sealed class RemoveFavoritesDialog : ClassicDialog
 {
-    private const string DefaultEmptySelectionMessage = "Select at least one favorite to remove.";
-
     private readonly ListBox _list;
     private readonly string _emptySelectionMessage;
 
@@ -28,7 +26,7 @@ public sealed class RemoveFavoritesDialog : ClassicDialog
         ArgumentNullException.ThrowIfNull(names);
 
         _emptySelectionMessage = string.IsNullOrWhiteSpace(emptySelectionMessage)
-            ? DefaultEmptySelectionMessage
+            ? BwcStrings.Get("RemoveFavoritesEmptySelection")
             : emptySelectionMessage;
 
         _list = RequireControl<ListBox>("FavoritesList");

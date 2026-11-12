@@ -267,6 +267,13 @@
         <Setter Property="VerticalAlignment" Value="Top" />
     </Style>
 
+    <Style x:Key="BwcClassicListBoxItemStyle" TargetType="ListBoxItem">
+        <Setter Property="Padding" Value="0,0,2,0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+    </Style>
+
     <Style x:Key="BwcClassicComboBoxStyle" TargetType="ComboBox">
         <Setter Property="Background" Value="{ThemeResource ControlFillColorDefaultBrush}" />
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />

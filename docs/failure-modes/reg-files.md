@@ -62,20 +62,37 @@ encoding. An empty file has no header and is rejected.
 
 ## 5. String escaping
 
-Quoted value names and `REG_SZ` data escape a backslash as `\\`, a quote as `\"`, a NUL as
-`\0`, a line feed as `\n`, and a carriage return as `\r`. The goldens show `\\` for
+Quoted value names and `REG_SZ` data escape a backslash as `\\` and a quote as `\"`. Those are the
+only two escapes regedit writes, and the reader accepts only those two. The goldens show `\\` for
 `C:\Path\To\File`, `\"` for `He said "hi" and left`, and a quoted name containing both a quote
-and a backslash. Characters that are not one of those five are written literally, including
-tabs and other control characters.
+and a backslash. Characters other than those two are written literally, including tabs and other
+control characters.
 
-The reader understands the same five escapes. Any other escape, a bare newline inside the
-quotes, or a missing closing quote is malformed and raises a parse exception. Escaping applies
-to value names as well as data.
+The escapes `\0`, `\n`, and `\r` are not regedit syntax, so they are not written and not read. The
+reader treats them as unknown escapes and raises a parse exception, as it does for any other escape.
+Escaping applies to value names as well as data.
+
+Data that cannot be written in quoted form is written as `hex(1):` instead, with its raw bytes:
+
+- A `REG_SZ` whose text, up to the first NUL, contains a line feed or a carriage return. No golden
+  shows this case, so the `hex(1):` form is the safe round-trip choice, not an observed classic
+  rule. Recorded as unverified against classic regedit.
+- A `REG_SZ` with an embedded NUL keeps the classic truncation: the text stops at the first NUL. The
+  golden `EmbeddedNul` exports as `"abc"`, so this is classic behavior and is not changed.
+- A value name containing a NUL, a line feed, or a carriage return has no quoted form and no `hex`
+  form. The exporter refuses it with `ExportValueName` (Win32 123) and the writer refuses to write
+  it. The NUL rule is the existing one in `export.md` section 7.
 
 Key paths are not escaped. They are written between `[` and `]` exactly as the document stores
 them, except that one leading `Computer\` prefix in any casing is removed so the output uses the
-registry-style form. A key name containing `]` cannot be represented unambiguously in this
-format.
+registry-style form.
+
+A key name containing `]` cannot round-trip. The reader takes the last `]` on the header line as the
+closer, as classic does, and then refuses a path segment that still contains `]`. The oracle case
+`header-extra-close-bracket` pins that refusal, and `[...\C12]]` is byte-for-byte what a key named
+`C12]` exports to. The two cannot be told apart, so the oracle wins: the exporter writes such a key
+as classic does, and BWC and classic both refuse to import it. This is a known limit, recorded in
+`export.md` section 7, and it is not fixed in the reader.
 
 ## 6. Embedded NUL and lossy strings
 

@@ -40,11 +40,12 @@ $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Env
 These are not implemented by D4 to D7.
 
 1. Create the real minisign release key. Keep the secret key off the repository and off the
-   release VM image history. The keygen in `scripts/sign-update-manifest.js` writes an
-   unencrypted test key and marks it `BWC TEST KEY` (`DRY-RUN TEST KEY` with `--test-key`);
-   never use it for a release.
-2. Put the real public key in `src/Bwc.Update/Signing/TrustedKeys.cs` and set
-   `IsPlaceholder = false`. Rotation lists the old and new key during the overlap.
+   release VM image history, and encrypt it with a password you keep in a password manager
+   (`minisign -G`). The keygen in `scripts/sign-update-manifest.js` writes test keys only; never use
+   one for a release. Check the encrypted-key path once with a key that minisign made (see 2a).
+2. Put the real public key in `src/Bwc.Update/Signing/TrustedKeys.cs`, in the `Embedded` list, and
+   set `IsPlaceholder = false`. The release tooling trusts exactly the keys in that list, matched by
+   key id and key bytes. Rotation lists the old and new key during the overlap.
 3. Choose the https hosting origin and path for the manifest, signature, notes page, and
    installers. The dry run defaults to `https://example.invalid/bwc/<version>`. Replace it
    with `--download-base-url`.
@@ -72,7 +73,8 @@ commit is contained in the expected branch.
 
 ## 1. Test key and signatures (D4)
 
-Create an unencrypted test key:
+Create an unencrypted test key (or an encrypted one with `--password-env <NAME>`; `--test-kdf`
+lowers the scrypt cost for tests only):
 
 ```powershell
 node scripts/sign-update-manifest.js keygen --out artifacts/release/test-key --test-key
@@ -102,13 +104,13 @@ Validate a manifest, its signature, and optional installer bytes:
 
 ```powershell
 node scripts/validate-updater-manifest.js `
-  --manifest artifacts/release/0.1.0-beta.1/manifest.json `
-  --signature artifacts/release/0.1.0-beta.1/manifest.json.minisig `
-  --trusted-key artifacts/release/0.1.0-beta.1/ephemeral/minisign.pub `
+  --manifest artifacts/release/0.1.0-beta.1/beta/manifest.json `
+  --signature artifacts/release/0.1.0-beta.1/beta/manifest.json.minisig `
+  --trusted-key artifacts/release/0.1.0-beta.1/beta/ephemeral/minisign.pub `
   --version 0.1.0-beta.1 --channel beta `
   --require-arch win-x64 --require-arch win-arm64 `
-  --installer win-x64=artifacts/release/0.1.0-beta.1/BetterWindowsConfig-0.1.0-beta.1-win-x64-setup.dry-run.json `
-  --installer win-arm64=artifacts/release/0.1.0-beta.1/BetterWindowsConfig-0.1.0-beta.1-win-arm64-setup.dry-run.json
+  --installer win-x64=artifacts/release/0.1.0-beta.1/beta/BetterWindowsConfig-0.1.0-beta.1-win-x64-setup.dry-run.json `
+  --installer win-arm64=artifacts/release/0.1.0-beta.1/beta/BetterWindowsConfig-0.1.0-beta.1-win-arm64-setup.dry-run.json
 ```
 
 Add `--current-version <installed>` to refuse `same-version` and `downgrade`. Add
@@ -142,20 +144,62 @@ Options:
 | `--current-version <semver>` | Also check the generated version is newer. |
 | `--max-age-hours <n>` | Freshness limit used by the validation report. Default 24. |
 
-Output is `artifacts/release/<version>/`:
+Output is `artifacts/release/<version>/<channel>/` (one manifest per channel). The version
+folder also holds `publish-<rid>.json`:
 
 | File | Contents |
 |------|----------|
 | `manifest.json` | Schema 1 manifest for the chosen version and channel. |
-| `manifest.json.minisig` | Raw minisign signature of the manifest bytes. |
+| `manifest.json.minisig` | Raw minisign signature. Its trusted comment is `version:<semver> channel:<channel> expires:<utc>`. |
 | `manifest.json.sig` | Base64 envelope of the same signature. |
 | `BetterWindowsConfig-<version>-<rid>-setup.exe` | Real setup EXE, when a matching installer record exists. |
 | `BetterWindowsConfig-<version>-<rid>-setup.dry-run.json` | Stand-in when NSIS has not produced a setup EXE. |
-| `<installer>.minisig`, `<installer>.sig` | Installer signature, raw and base64. |
-| `ephemeral/minisign.pub` | Public key for this run. The secret key is never written. |
+| `<installer>.minisig`, `<installer>.sig` | Installer signature, raw and base64. Its trusted comment is `version:<semver> arch:<win-x64 or win-arm64>`. |
+| `assembly.json` | Key id, fingerprint, expiry, arches, and whether the key was a test key. No secret material. |
+| `ephemeral/minisign.pub` | Public key of an ephemeral test key (dry run only). The secret key is never written. |
 | `publish-<rid>.json` | Every file in `publish/<rid>` with its size and SHA-256, plus a tree hash. |
 | `release-plan.json` | Version, channel, RIDs, build commands, and artifact sources. |
 | `validation-report.json` | D4 validator result, key fingerprint, sizes, hashes, and errors. |
+
+The signed comments are exact. The manifest comment is
+`version:<semver> channel:<stable|beta> expires:<yyyy-MM-ddTHH:mm:ssZ>`. A manifest without a
+channel, with another channel, or past its `expires` is refused (`trusted-comment-invalid`,
+`channel-mismatch`, `expired`). The expiry defaults to 168 hours after the publish time and is set
+with `--expires-hours`.
+
+## 2a. Assemble a bundle with a real key (`scripts/assemble-bundle.js`)
+
+`release-dry-run.js` calls the same assembler. Use it directly to sign a release bundle with the
+user's key:
+
+```powershell
+node scripts/assemble-bundle.js --version 0.1.0-beta.1 `
+  --installer-win-x64 artifacts/installer/BetterWindowsConfig-0.1.0-beta.1-win-x64-setup.exe `
+  --installer-win-arm64 artifacts/installer/BetterWindowsConfig-0.1.0-beta.1-win-arm64-setup.exe `
+  --secret-key C:\release-keys\bwc-release `
+  --password-env BWC_RELEASE_KEY_PASSWORD
+```
+
+- The signing key's public half must be one of the `Embedded` keys in
+  `src/Bwc.Update/Signing/TrustedKeys.cs`, matched by key id and key bytes. A key that is not
+  embedded is refused (`embedded-key-mismatch`). Only `--dry-run` allows another key, and then
+  the output is labelled `testKey: true`.
+- A password is never a command-line argument. `--password-env <NAME>` reads it from that
+  environment variable. Without it, an encrypted key asks on a terminal, and in a script it
+  refuses (`password-missing`, exit 2). `--password <value>` is refused everywhere
+  (`password-argument`).
+- The assembler validates its own output with the validator before it reports PASS. A
+  wrong password refuses `wrong-password` and writes nothing.
+
+**Key formats.** A key made by `sign-update-manifest.js keygen --test-key` is a test key: it is
+unencrypted by default, or encrypted with `--password-env`. The encrypted format follows the
+minisign layout (`Ed`, kdf `Sc` with scrypt, checksum `B2`, XSalsa20 keystream). The tool checks it
+against keys it creates. It has not been checked against a key that the minisign program created,
+so the first real release key must be tested with the user's own minisign before it signs anything.
+The scrypt cost is the libsodium sensitive setting (about 1 GiB of memory, a few seconds per use).
+
+The key id and the public key bytes are the only things that decide whether a key is trusted. The
+comment line of a key file is never used for that decision.
 
 The harness never opens a socket and never publishes. A non-dry run invokes
 `scripts/dotnet-build.js` for a missing publish; that build uses the local SDK and NuGet
@@ -167,7 +211,7 @@ Preflight alone:
 
 ```powershell
 node scripts/release-preflight.js --version 0.1.0-beta.1 --channel beta `
-  --trusted-key artifacts/release/0.1.0-beta.1/ephemeral/minisign.pub
+  --trusted-key artifacts/release/0.1.0-beta.1/beta/ephemeral/minisign.pub
 ```
 
 Add `--artifact-dir artifacts/release/0.1.0-beta.1` to validate the manifest, signature,
@@ -178,7 +222,7 @@ Create the session after preflight passes:
 
 ```powershell
 node scripts/release-session.js create --version 0.1.0-beta.1 --channel beta `
-  --trusted-key artifacts/release/0.1.0-beta.1/ephemeral/minisign.pub `
+  --trusted-key artifacts/release/0.1.0-beta.1/beta/ephemeral/minisign.pub `
   --artifact-dir artifacts/release/0.1.0-beta.1
 ```
 
@@ -194,14 +238,16 @@ branch, package version, changelog heading, trusted key fingerprint, start time,
 age (default 24 hours). It is a local proof, not a signature. The session file is
 git-ignored, so creating it does not dirty the worktree.
 
-Create the session with the same key you will use for `--apply`. A session recorded with
-the D5 dry-run test key will refuse `session-mismatch` when draft or publish uses the real
-release key. The D5 test key is for offline plans only.
+Create the session with the same key you will use for `--apply`. Preflight now requires the
+trusted key to be one of the embedded keys in `TrustedKeys.cs`, so a dry-run test key is refused
+(`embedded-key-mismatch`) by preflight, session creation, draft, verify, and publish. A test key
+therefore can not produce a session or a draft. Test keys are for the offline bundle checks in
+sections 1 and 2 only.
 
-`release-verify.js` and `release-publish.js` dry runs accept a test key and label it with a
-warning, because they still create nothing. Their `--apply` paths refuse it. `release-draft.js`
-requires `--allow-test-key` even for its dry-run plan, so a draft command cannot be copied
-from a test-key plan by accident.
+`--commit <rev>` on draft, verify, and publish must resolve to HEAD. Any other commit is refused
+(`session-commit-mismatch`). A draft never targets the literal name `HEAD`. The GitHub repository
+must be named with `--repo`, `GH_REPO`, or an origin remote; the tooling never assumes one
+(`repo-invalid`). `--root <dir>` selects another checkout on the same commands.
 
 ## 4. Draft (D7)
 
@@ -210,7 +256,7 @@ The default is a dry run. It prints the exact commands and starts no `gh` proces
 ```powershell
 node scripts/release-draft.js --version 0.1.0-beta.1 --channel beta `
   --dir artifacts/release/0.1.0-beta.1 `
-  --trusted-key artifacts/release/0.1.0-beta.1/ephemeral/minisign.pub
+  --trusted-key artifacts/release/0.1.0-beta.1/beta/ephemeral/minisign.pub
 ```
 
 A dry run accepts a test key only with `--allow-test-key`, and accepts a `.dry-run.json`
@@ -243,7 +289,7 @@ Dry run:
 ```powershell
 node scripts/release-verify.js --version 0.1.0-beta.1 --channel beta `
   --dir artifacts/release/0.1.0-beta.1 `
-  --trusted-key artifacts/release/0.1.0-beta.1/ephemeral/minisign.pub
+  --trusted-key artifacts/release/0.1.0-beta.1/beta/ephemeral/minisign.pub
 ```
 
 Apply, against the draft:
@@ -272,7 +318,7 @@ Dry run:
 ```powershell
 node scripts/release-publish.js --version 0.1.0-beta.1 --channel beta `
   --dir artifacts/release/0.1.0-beta.1 `
-  --trusted-key artifacts/release/0.1.0-beta.1/ephemeral/minisign.pub
+  --trusted-key artifacts/release/0.1.0-beta.1/beta/ephemeral/minisign.pub
 ```
 
 Apply:

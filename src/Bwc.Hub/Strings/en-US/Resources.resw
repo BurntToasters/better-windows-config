@@ -190,8 +190,32 @@ Download and Install checks the update again, closes the Hub, and replaces the i
   <data name="UpdateInstallBlocked" xml:space="preserve">
     <value>Close these running tools before you install the update: {0}.</value>
   </data>
-  <data name="UpdateNotStaged" xml:space="preserve">
-    <value>The update is no longer staged. Check for updates again.</value>
+  <data name="UpdateVersionChanged" xml:space="preserve">
+    <value>The update server now offers a different version. Check for updates again.</value>
+  </data>
+  <data name="UpdateDownloading" xml:space="preserve">
+    <value>Downloading the update...</value>
+  </data>
+  <data name="UpdateDownloadProgress" xml:space="preserve">
+    <value>Downloading the update: {0}%</value>
+  </data>
+  <data name="UpdateTrustedKeysInvalid" xml:space="preserve">
+    <value>Updates cannot be checked: the update key list in this build is invalid. Your installed tools have not been changed.</value>
+  </data>
+  <data name="UpdateChannelMismatch" xml:space="preserve">
+    <value>The update server returned a release for a different channel than the one selected. Check the update channel in Update Settings.</value>
+  </data>
+  <data name="UpdateManifestExpired" xml:space="preserve">
+    <value>The update server returned a release list that has expired. Try again later.</value>
+  </data>
+  <data name="UpdateResultRunning" xml:space="preserve">
+    <value>The update was not installed because Better Windows Config apps were still running. Close them and check for updates again.</value>
+  </data>
+  <data name="UpdateResultElevated" xml:space="preserve">
+    <value>The update was not installed because its helper was started with administrator rights. Check for updates from Better Windows Config without administrator rights.</value>
+  </data>
+  <data name="UpdateResultNotInstalled" xml:space="preserve">
+    <value>The update was not installed (reason: {0}). Your installed tools have not been changed.</value>
   </data>
   <data name="UpdateInstallStartFailed" xml:space="preserve">
     <value>The update could not be started: {0}</value>

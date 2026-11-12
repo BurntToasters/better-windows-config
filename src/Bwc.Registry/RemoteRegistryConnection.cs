@@ -7,7 +7,8 @@ namespace Bwc.Registry;
 
 /// <summary>
 /// Owns the read-only HKEY_LOCAL_MACHINE and HKEY_USERS handles for one remote computer.
-/// Readers created from this connection borrow those handles and never close them.
+/// Readers created from this connection take a pin on those handles for each open and release it
+/// afterwards, so a Dispose cannot close a handle that an in-flight read still uses.
 /// </summary>
 public sealed class RemoteRegistryConnection : IDisposable
 {
@@ -130,8 +131,17 @@ public sealed class RemoteRegistryConnection : IDisposable
                 nameof(root)),
         };
 
-        return SafeRegistryKeyHandle.FromBorrowed(handle.DangerousGetHandle());
+        // The caller receives its own reference. Dispose of this connection closes only the connection's
+        // reference, so a load that is still using the root keeps the key open until it releases the pin.
+        return SafeRegistryKeyHandle.Pin(handle);
     }
+
+    /// <summary>Wraps two existing root handles in a connection. The connection takes ownership of both.</summary>
+    internal static RemoteRegistryConnection CreateForTesting(
+        string computerName,
+        SafeRegistryKeyHandle localMachine,
+        SafeRegistryKeyHandle users) =>
+        new(computerName, localMachine, users);
 
     public RegistryReader CreateReader()
     {

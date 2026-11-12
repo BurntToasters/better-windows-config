@@ -94,15 +94,31 @@ internal sealed class Scenario : IAsyncDisposable
     }
 
     /// <summary>
-    /// Writes the manifest, signs it, and maps the manifest and signature routes. Pass
-    /// <paramref name="commentVersion"/> to sign a comment that disagrees with the body.
+    /// The expiry the signed manifest carries by default: one day from now, in the form the trusted
+    /// comment requires (yyyy-MM-ddTHH:mm:ssZ).
     /// </summary>
-    public void Publish(string? commentVersion = null, SigningKey? signer = null, bool publishSignature = true)
+    public static string DefaultExpires(TimeSpan? ahead = null) =>
+        DateTimeOffset.UtcNow.Add(ahead ?? TimeSpan.FromDays(1)).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Writes the manifest, signs it, and maps the manifest and signature routes. The comment is the
+    /// required form (version, channel, expires). Pass <paramref name="commentVersion"/>,
+    /// <paramref name="commentChannel"/>, or <paramref name="expires"/> to sign a comment that disagrees
+    /// with the body or has another expiry, and <paramref name="rawComment"/> to sign any text at all.
+    /// </summary>
+    public void Publish(
+        string? commentVersion = null,
+        SigningKey? signer = null,
+        bool publishSignature = true,
+        string? commentChannel = null,
+        string? expires = null,
+        string? rawComment = null)
     {
         ManifestBytes = Encoding.UTF8.GetBytes(Manifest.ToJsonString());
         var file = Dir.Write("manifest-" + Guid.NewGuid().ToString("N") + ".json", ManifestBytes);
-        var comment = $"timestamp:1794102823\tversion:{commentVersion ?? Version}";
-        var signed = Signing.Sign(file, signer ?? Key, comment);
+        var signed = rawComment is not null
+            ? Signing.Sign(file, signer ?? Key, rawComment)
+            : Signing.SignManifest(file, signer ?? Key, commentVersion ?? Version, commentChannel ?? Channel, expires ?? DefaultExpires());
         Server.Map(ManifestPath, new Route(Body: ManifestBytes));
         if (publishSignature)
         {

@@ -131,7 +131,30 @@ public sealed class RegistryReader
         int bufferLength = maxSubKeyNameLength >= (uint)int.MaxValue
             ? int.MaxValue
             : (int)maxSubKeyNameLength + 1;
-        char[] buffer = new char[Math.Max(1, bufferLength)];
+        return CollectSubKeyNames(
+            path,
+            bufferLength,
+            (uint index, char[] buffer, ref uint length) =>
+                (int)PInvoke.RegEnumKeyEx(handle, index, buffer, ref length, Span<char>.Empty),
+            cancellationToken);
+    }
+
+    /// <summary>Reads one subkey name by index into a buffer. Returns a Win32 error code, or 0 on success.</summary>
+    internal delegate int SubKeyNameReader(uint index, char[] buffer, ref uint length);
+
+    /// <summary>
+    /// Collects every subkey name in index order through <paramref name="readName"/>. A name that does
+    /// not fit makes the reader return <c>ERROR_MORE_DATA</c>; the buffer then grows and the same index is
+    /// read again. At most 16 attempts are made for one index, the same bound the value readers use, so a
+    /// registry that keeps reporting a larger name fails with <c>ERROR_MORE_DATA</c> instead of looping.
+    /// </summary>
+    internal static IReadOnlyList<string> CollectSubKeyNames(
+        RegistryPath path,
+        int initialCapacity,
+        SubKeyNameReader readName,
+        CancellationToken cancellationToken = default)
+    {
+        char[] buffer = new char[Math.Max(1, initialCapacity)];
         var names = new List<string>();
         uint index = 0;
 
@@ -139,36 +162,42 @@ public sealed class RegistryReader
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            uint nameLength = (uint)buffer.Length;
-            WIN32_ERROR error = PInvoke.RegEnumKeyEx(
-                handle,
-                index,
-                buffer,
-                ref nameLength,
-                Span<char>.Empty);
-
-            if (error == WIN32_ERROR.ERROR_SUCCESS)
+            int attempt = 0;
+            while (true)
             {
-                names.Add(new string(buffer, 0, (int)nameLength));
-                index += 1;
-                continue;
-            }
+                uint nameLength = (uint)buffer.Length;
+                int error = readName(index, buffer, ref nameLength);
 
-            if (error == WIN32_ERROR.ERROR_MORE_DATA)
-            {
-                Array.Resize(ref buffer, GrowBuffer(nameLength, buffer.Length));
-                continue;
-            }
+                if (error == 0)
+                {
+                    names.Add(new string(buffer, 0, (int)nameLength));
+                    index += 1;
+                    break;
+                }
 
-            if (error == WIN32_ERROR.ERROR_NO_MORE_ITEMS)
-            {
-                break;
-            }
+                if (error == (int)WIN32_ERROR.ERROR_NO_MORE_ITEMS)
+                {
+                    return names;
+                }
 
-            throw new RegistryOperationException(EnumKeyOperation, path, (int)error);
+                if (error != ErrorMoreData)
+                {
+                    throw new RegistryOperationException(EnumKeyOperation, path, error);
+                }
+
+                attempt += 1;
+                if (attempt >= MaxEnumerationAttempts)
+                {
+                    throw new RegistryOperationException(
+                        EnumKeyOperation,
+                        path,
+                        ErrorMoreData,
+                        "The subkey name kept growing between reads.");
+                }
+
+                buffer = new char[GrowBuffer(nameLength, buffer.Length)];
+            }
         }
-
-        return names;
     }
 
     public IReadOnlyList<RegistryValueInfo> EnumerateValues(
@@ -244,12 +273,7 @@ public sealed class RegistryReader
         ArgumentNullException.ThrowIfNull(path);
         cancellationToken.ThrowIfCancellationRequested();
 
-        SafeRegistryKeyHandle? rootOverride = _remote?.GetRoot(path.Root);
-        WIN32_ERROR error = NativeRegistry.TryOpenKey(
-            path,
-            REG_SAM_FLAGS.KEY_READ,
-            rootOverride,
-            out SafeRegistryKeyHandle? handle);
+        WIN32_ERROR error = TryOpen(path, REG_SAM_FLAGS.KEY_READ, out SafeRegistryKeyHandle? handle);
 
         try
         {
@@ -286,11 +310,7 @@ public sealed class RegistryReader
                 nameof(information));
         }
 
-        WIN32_ERROR error = NativeRegistry.TryOpenKey(
-            path,
-            (REG_SAM_FLAGS)ReadControlStandardRight,
-            _remote?.GetRoot(path.Root),
-            out SafeRegistryKeyHandle? handle);
+        WIN32_ERROR error = TryOpen(path, (REG_SAM_FLAGS)ReadControlStandardRight, out SafeRegistryKeyHandle? handle);
 
         if (error != WIN32_ERROR.ERROR_SUCCESS)
         {
@@ -392,11 +412,7 @@ public sealed class RegistryReader
         ArgumentNullException.ThrowIfNull(valueName);
         cancellationToken.ThrowIfCancellationRequested();
 
-        WIN32_ERROR openError = NativeRegistry.TryOpenKey(
-            path,
-            REG_SAM_FLAGS.KEY_READ,
-            _remote?.GetRoot(path.Root),
-            out SafeRegistryKeyHandle? handle);
+        WIN32_ERROR openError = TryOpen(path, REG_SAM_FLAGS.KEY_READ, out SafeRegistryKeyHandle? handle);
 
         if (openError != WIN32_ERROR.ERROR_SUCCESS)
         {
@@ -635,13 +651,7 @@ public sealed class RegistryReader
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        SafeRegistryKeyHandle? rootOverride = _remote?.GetRoot(path.Root);
-
-        WIN32_ERROR error = NativeRegistry.TryOpenKey(
-            path,
-            REG_SAM_FLAGS.KEY_READ,
-            rootOverride,
-            out SafeRegistryKeyHandle? handle);
+        WIN32_ERROR error = TryOpen(path, REG_SAM_FLAGS.KEY_READ, out SafeRegistryKeyHandle? handle);
 
         if (error != WIN32_ERROR.ERROR_SUCCESS)
         {
@@ -650,6 +660,17 @@ public sealed class RegistryReader
         }
 
         return handle!;
+    }
+
+    /// <summary>
+    /// Opens <paramref name="path"/> under the connection's root, if any. The root is pinned for the
+    /// duration of the open and released afterwards. A key returned from a predefined root keeps its own
+    /// pin, so the caller's handle stays valid after this method returns.
+    /// </summary>
+    private WIN32_ERROR TryOpen(RegistryPath path, REG_SAM_FLAGS access, out SafeRegistryKeyHandle? handle)
+    {
+        using SafeRegistryKeyHandle? pin = _remote?.GetRoot(path.Root);
+        return NativeRegistry.TryOpenKey(path, access, pin, out handle);
     }
 
     private static void QueryMetadata(

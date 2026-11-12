@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 /**
  * Offline release dry run. Publishes both RIDs only when asked, computes sizes and SHA-256,
- * makes a manifest with an ephemeral minisign test key, validates it, and writes a repeatable
- * artifact under artifacts/release/<version>/.
+ * assembles one channel bundle with scripts/assemble-bundle.js, validates it, and writes a
+ * repeatable artifact under artifacts/release/<version>/<channel>/.
+ *
+ * With no --secret-key, an ephemeral test key signs the bundle. The secret exists only in this
+ * process and is never written. With --secret-key, a real or test key signs it, and the key must
+ * be one of the keys embedded in src/Bwc.Update/Signing/TrustedKeys.cs.
  *
  * No network, no gh, no gpg, no NSIS, no UAC. The dry-run installer stand-in is never a release
  * asset: release-draft.js --apply refuses a .dry-run.json installer.
  */
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 import {
   EXIT,
@@ -21,11 +25,12 @@ import {
   sha256FileStream,
   writeJson,
 } from "./lib/cli.js";
-import { envelope, generateKeyPair, signFile } from "./lib/minisign.js";
+import { generateKeyPair, loadKeyMaterial, secretKeyNeedsPassword } from "./lib/minisign.js";
 import { publishInventory } from "./lib/publish-inventory.js";
 import { channelForVersion, tryParseSemVer } from "./lib/semver.js";
-import { buildManifest, serializeManifest, validateManifestBuffer } from "./lib/update-manifest.js";
 import { validateUrl } from "./lib/url-policy.js";
+import { passwordArgumentGiven, resolvePassword } from "./lib/secret-input.js";
+import { assembleBundle, normalizePubDate } from "./assemble-bundle.js";
 import { parsePackageVersion } from "./sync-version-helpers.js";
 
 const SCRIPT = "scripts/release-dry-run.js";
@@ -34,12 +39,13 @@ const RIDS = ["win-x64", "win-arm64"];
 const DEFAULT_OUT = path.join("artifacts", "release");
 const INSTALLER_DIR = path.join(REPO_ROOT, "artifacts", "installer");
 const DEFAULT_BASE_URL = "https://example.invalid/bwc";
-const PUBDATE_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+const DEFAULT_EXPIRES_HOURS = 168;
 
 function printHelp() {
   console.log(`Usage:
   node ${SCRIPT} [--rid win-x64|win-arm64|all] [--version <semver>] [--channel <stable|beta>]
-                 [--dry-run] [--no-build] [--pub-date <utc>] [--download-base-url <url>]
+                 [--dry-run] [--no-build] [--pub-date <utc>] [--expires-hours <n>] [--download-base-url <url>]
+                 [--secret-key <dir|file>] [--password-env <NAME>]
                  [--installer-win-x64 <path>] [--installer-win-arm64 <path>]
                  [--current-version <semver>] [--max-age-hours <n>] [--json]
 
@@ -51,36 +57,31 @@ Options:
                                publish or setup EXE already exists.
   --no-build                   Do not build, but do not label the run a dry run.
   --pub-date <utc>             Default now, or SOURCE_DATE_EPOCH. Normalized UTC ending in Z.
+  --expires-hours <n>          Signed expiry after the publish time. Default ${DEFAULT_EXPIRES_HOURS}.
   --download-base-url <url>    Default ${DEFAULT_BASE_URL}. Must be https.
+  --secret-key <dir|file>      Sign with this minisign key instead of the ephemeral test key. The key
+                               must be embedded in TrustedKeys.cs.
+  --password-env <NAME>        Environment variable with the password of an encrypted --secret-key.
+                               A password is never a command-line argument.
   --installer-<rid> <path>     Use an explicit installer file for one RID.
   --current-version <semver>   Also check that the generated version is newer.
   --max-age-hours <n>          Manifest freshness limit for the validation report. Default 24.
   --json                       Print one JSON line summary.
   --help                       Show this help.
 
-Output: artifacts/release/<version>/ with manifest.json, manifest.json.minisig,
-manifest.json.sig, installer signatures, publish hashes, release-plan.json,
-validation-report.json, and ephemeral/minisign.pub.
+Output: artifacts/release/<version>/<channel>/ with manifest.json, manifest.json.minisig,
+manifest.json.sig, installer copies with signatures, publish hashes, assembly.json,
+release-plan.json, and validation-report.json. Also artifacts/release/<version>/publish-<rid>.json.
 
 Exit codes: 0 pass, 1 validation refused, 2 usage, 3 input missing, 4 build failed.`);
 }
 
-function normalizePubDate(value) {
-  if (!value) {
-    const epoch = process.env.SOURCE_DATE_EPOCH;
-    if (epoch !== undefined && /^\d+$/.test(epoch)) {
-      return new Date(Number(epoch) * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
-    }
-    return new Date(Math.floor(Date.now() / 1000) * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+function parseRids(value) {
+  if (!value || value === "all") return RIDS;
+  if (!RIDS.includes(value)) {
+    throw new Error(`--rid must be win-x64, win-arm64, or all; received ${value}`);
   }
-  if (!PUBDATE_PATTERN.test(value)) {
-    throw new Error("--pub-date must be a UTC ISO-8601 timestamp ending in Z");
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error("--pub-date is not a real timestamp");
-  }
-  return value;
+  return [value];
 }
 
 function normalizeBaseUrl(value) {
@@ -93,14 +94,6 @@ function normalizeBaseUrl(value) {
     throw new Error("--download-base-url may not carry a query or fragment");
   }
   return url.replace(/\/+$/, "");
-}
-
-function parseRids(value) {
-  if (!value || value === "all") return RIDS;
-  if (!RIDS.includes(value)) {
-    throw new Error(`--rid must be win-x64, win-arm64, or all; received ${value}`);
-  }
-  return [value];
 }
 
 function numericOption(value, name, fallback) {
@@ -224,13 +217,25 @@ function chooseInstaller({ rid, version, channel, artifactDir, explicitPath, pub
   };
 }
 
-function signedComment({ version, rid, fileName, pubDate }) {
-  const timestamp = Math.floor(pubDate.getTime() / 1000);
-  return `timestamp:${timestamp} file:${fileName} version:${version} arch:${rid}`;
-}
-
-function artifactUrl(baseUrl, version, fileName) {
-  return `${baseUrl}/${encodeURIComponent(version)}/${encodeURIComponent(fileName)}`;
+/** Resolves the signing key: an ephemeral test key, or a key file the caller named. */
+async function signingKey(options) {
+  if (!options.secretKey) {
+    const pair = generateKeyPair({ comment: "untrusted comment: BWC RELEASE DRY-RUN TEST KEY" });
+    return { text: pair.secretKeyText, password: undefined, ephemeral: true, pair };
+  }
+  const loaded = loadKeyMaterial(options.secretKey, { kind: "secret" });
+  if (!loaded.ok) {
+    return { error: { reason: loaded.reason, detail: loaded.detail, exitCode: EXIT.MISSING } };
+  }
+  let password;
+  if (secretKeyNeedsPassword(loaded.text)) {
+    const resolved = await resolvePassword({ envName: options.passwordEnv });
+    if (!resolved.ok) {
+      return { error: { reason: resolved.reason, detail: resolved.detail, exitCode: EXIT.USAGE } };
+    }
+    password = resolved.password;
+  }
+  return { text: loaded.text, password, ephemeral: false };
 }
 
 async function run(options) {
@@ -257,249 +262,210 @@ async function run(options) {
     return EXIT.USAGE;
   }
 
-  const pubDate = options.pubDate;
-  const artifactDir = path.join(options.out, options.version);
-  const ephemeralDir = path.join(artifactDir, "ephemeral");
-  const generated = [
-    path.join(artifactDir, "manifest.json"),
-    path.join(artifactDir, "manifest.json.minisig"),
-    path.join(artifactDir, "manifest.json.sig"),
-    path.join(artifactDir, "release-plan.json"),
-    path.join(artifactDir, "validation-report.json"),
-  ];
+  const key = await signingKey(options);
+  if (key.error) {
+    console.error(`${SCRIPT}: REFUSED [${key.error.reason}]: ${key.error.detail}`);
+    return key.error.exitCode;
+  }
+
+  const artifactRoot = path.join(options.out, options.version);
+  const artifactDir = path.join(artifactRoot, channel);
+  fs.rmSync(artifactDir, { recursive: true, force: true });
   for (const rid of RIDS) {
-    generated.push(
-      path.join(artifactDir, `BetterWindowsConfig-${options.version}-${rid}-setup.dry-run.json`),
-      path.join(artifactDir, `BetterWindowsConfig-${options.version}-${rid}-setup.dry-run.json.minisig`),
-      path.join(artifactDir, `BetterWindowsConfig-${options.version}-${rid}-setup.dry-run.json.sig`),
-      path.join(artifactDir, `publish-${rid}.json`),
-    );
+    fs.rmSync(path.join(artifactRoot, `publish-${rid}.json`), { force: true });
   }
   fs.mkdirSync(artifactDir, { recursive: true });
-  for (const file of generated) {
-    fs.rmSync(file, { force: true });
+  // Only the public half of an ephemeral key is written, so the bundle can be validated afterwards.
+  let ephemeralPublicPath = null;
+  if (key.ephemeral) {
+    ephemeralPublicPath = path.join(artifactDir, "ephemeral", "minisign.pub");
+    fs.mkdirSync(path.dirname(ephemeralPublicPath), { recursive: true });
+    fs.writeFileSync(ephemeralPublicPath, key.pair.publicKeyText, "utf8");
   }
-  fs.rmSync(ephemeralDir, { recursive: true, force: true });
-
-  const pair = generateKeyPair({ comment: "untrusted comment: BWC RELEASE DRY-RUN TEST KEY" });
-  const publicKeyPath = path.join(ephemeralDir, "minisign.pub");
-  fs.mkdirSync(ephemeralDir, { recursive: true });
-  fs.writeFileSync(publicKeyPath, pair.publicKeyText, "utf8");
 
   const buildCommands = options.rids.map((rid) => `node scripts/dotnet-build.js --rid ${rid}`);
   const publishReports = {};
-  const installers = {};
+  const installerFiles = {};
+  const installerSources = {};
 
   for (const rid of options.rids) {
-      const built = ensurePublish(rid, options.dryRun, options.noBuild);
-      if (!built.ok) {
-        console.error(`${SCRIPT}: FAIL [build-failed]: ${built.detail}`);
-        return EXIT.EXTERNAL;
-      }
-      if (!built.built && built.detail) {
-        console.log(`release-dry-run: ${rid}: ${built.detail}`);
-      }
+    const built = ensurePublish(rid, options.dryRun, options.noBuild);
+    if (!built.ok) {
+      console.error(`${SCRIPT}: FAIL [build-failed]: ${built.detail}`);
+      return EXIT.EXTERNAL;
+    }
+    if (!built.built && built.detail) {
+      console.log(`release-dry-run: ${rid}: ${built.detail}`);
+    }
 
-      const inventory = await publishInventory(built.publishDir);
-      const inventoryFile = path.join(artifactDir, `publish-${rid}.json`);
-      writeJson(inventoryFile, {
+    const inventory = await publishInventory(built.publishDir);
+    const inventoryFile = path.join(artifactRoot, `publish-${rid}.json`);
+    writeJson(inventoryFile, {
+      schema: 1,
+      tool: SCRIPT,
+      rid,
+      present: inventory.present,
+      directory: relativeTo(REPO_ROOT, inventory.directory),
+      files: inventory.files,
+      bytes: inventory.bytes,
+      treeSha256: inventory.treeSha256,
+      detail: inventory.detail ?? null,
+    });
+    publishReports[rid] = {
+      present: inventory.present,
+      files: inventory.files.length,
+      bytes: inventory.bytes,
+      treeSha256: inventory.treeSha256,
+      report: relativeTo(REPO_ROOT, inventoryFile),
+    };
+
+    const chosen = chooseInstaller({
+      rid,
+      version: options.version,
+      channel,
+      artifactDir,
+      explicitPath: options.explicitInstallers[rid],
+      publish: inventory,
+    });
+    if (!chosen.ok) {
+      console.error(`${SCRIPT}: REFUSED [${chosen.reason}]: ${chosen.detail}`);
+      return EXIT.MISSING;
+    }
+    installerFiles[rid] = chosen.path;
+    installerSources[rid] = chosen;
+  }
+
+  const assembled = await assembleBundle({
+    root: REPO_ROOT,
+    version: options.version,
+    channel,
+    secretKey: key.text,
+    password: key.password,
+    passwordEnv: options.passwordEnv,
+    dryRun: key.ephemeral,
+    pubDate: options.pubDate,
+    expiresHours: options.expiresHours,
+    baseUrl: options.baseUrl,
+    out: artifactRoot,
+    installers: installerFiles,
+  });
+
+  const installers = {};
+  for (const rid of options.rids) {
+    const entry = assembled.installers?.[rid];
+    installers[rid] = {
+      file: entry?.file ?? installerFiles[rid],
+      size: entry?.size ?? fs.statSync(installerFiles[rid]).size,
+      sha256: entry?.sha256 ?? (await sha256FileStream(installerFiles[rid])),
+      source: installerSources[rid].source,
+      dryRun: installerSources[rid].dryRun,
+      url: entry?.url ?? null,
+    };
+  }
+
+  const validationErrors = assembled.errors ?? [];
+  const validationChecks = assembled.checks ?? [];
+  const report = {
+    schema: 1,
+    tool: SCRIPT,
+    ok: assembled.ok,
+    version: options.version,
+    channel,
+    pubDate: options.pubDate,
+    expires: assembled.expires ?? null,
+    artifactDir: relativeTo(REPO_ROOT, artifactDir),
+    dryRun: options.dryRun,
+    network: "none",
+    key: {
+      keyId: assembled.keyIdHex ?? null,
+      fingerprint: assembled.fingerprint ?? null,
+      testKey: Boolean(assembled.testKey),
+      source: key.ephemeral ? "ephemeral" : "file",
+      publicKey: ephemeralPublicPath ? relativeTo(REPO_ROOT, ephemeralPublicPath) : null,
+    },
+    manifest: assembled.manifestPath ? relativeTo(REPO_ROOT, assembled.manifestPath) : null,
+    manifestSignature: assembled.signaturePath ? relativeTo(REPO_ROOT, assembled.signaturePath) : null,
+    installers: Object.fromEntries(
+      Object.entries(installers).map(([rid, installer]) => [
+        rid,
+        {
+          file: relativeTo(REPO_ROOT, installer.file),
+          size: installer.size,
+          sha256: installer.sha256,
+          source: installer.source,
+          dryRun: installer.dryRun,
+        },
+      ]),
+    ),
+    publish: publishReports,
+    errors: validationErrors,
+    checks: validationChecks,
+  };
+  writeJson(path.join(artifactDir, "validation-report.json"), report);
+
+  writeJson(path.join(artifactDir, "release-plan.json"), {
+    schema: 1,
+    tool: SCRIPT,
+    version: options.version,
+    channel,
+    pubDate: options.pubDate,
+    rids: options.rids,
+    dryRun: options.dryRun,
+    network: "none",
+    published: false,
+    artifactDir: relativeTo(REPO_ROOT, artifactDir),
+    buildCommands,
+    installers: Object.fromEntries(
+      Object.entries(installers).map(([rid, installer]) => [
+        rid,
+        { file: relativeTo(REPO_ROOT, installer.file), source: installer.source, dryRun: installer.dryRun },
+      ]),
+    ),
+    signer: key.ephemeral ? "ephemeral test key, never written to disk" : "key named by --secret-key",
+    next:
+      "Validate the artifact with scripts/validate-updater-manifest.js, then run the draft and " +
+      "publish scripts in their default dry-run mode.",
+  });
+
+  if (!assembled.ok) {
+    printRefusals("release-dry-run", validationErrors);
+    console.error(`release-dry-run: FAIL: validation report ${relativeTo(REPO_ROOT, path.join(artifactDir, "validation-report.json"))}`);
+    return assembled.errors?.some((error) => error.exitCode === EXIT.MISSING) ? EXIT.MISSING : EXIT.REFUSED;
+  }
+
+  if (options.json) {
+    console.log(
+      JSON.stringify({
         schema: 1,
         tool: SCRIPT,
-        rid,
-        present: inventory.present,
-        directory: relativeTo(REPO_ROOT, inventory.directory),
-        files: inventory.files,
-        bytes: inventory.bytes,
-        treeSha256: inventory.treeSha256,
-        detail: inventory.detail ?? null,
-      });
-      publishReports[rid] = {
-        present: inventory.present,
-        files: inventory.files.length,
-        bytes: inventory.bytes,
-        treeSha256: inventory.treeSha256,
-        report: relativeTo(REPO_ROOT, inventoryFile),
-      };
-
-      const chosen = chooseInstaller({
-        rid,
-        version: options.version,
-        channel,
-        artifactDir,
-        explicitPath: options.explicitInstallers[rid],
-        publish: inventory,
-      });
-      if (!chosen.ok) {
-        console.error(`${SCRIPT}: REFUSED [${chosen.reason}]: ${chosen.detail}`);
-        return EXIT.MISSING;
-      }
-
-      const fileName = path.basename(chosen.path);
-      const trustedComment = signedComment({ version: options.version, rid, fileName, pubDate: new Date(pubDate) });
-      const signatureText = await signFile(chosen.path, pair.secretKeyText, trustedComment);
-      const signaturePath = `${chosen.path}.minisig`;
-      const envelopePath = `${chosen.path}.sig`;
-      fs.writeFileSync(signaturePath, signatureText, "utf8");
-      fs.writeFileSync(envelopePath, envelope(signatureText), "utf8");
-
-      const size = fs.statSync(chosen.path).size;
-      const sha256 = await sha256FileStream(chosen.path);
-      installers[rid] = {
-        file: chosen.path,
-        fileName,
-        size,
-        sha256,
-        signature: envelope(signatureText),
-        signatureFile: signaturePath,
-        envelopeFile: envelopePath,
-        source: chosen.source,
-        dryRun: chosen.dryRun,
-        url: artifactUrl(options.baseUrl, options.version, fileName),
-      };
-      console.log(
-        `release-dry-run: ${rid}: ${chosen.source} ${fileName} (${size} bytes, sha256 ${sha256.slice(0, 12)}...)`,
-      );
+        ok: true,
+        artifactDir: relativeTo(REPO_ROOT, artifactDir),
+        manifest: relativeTo(REPO_ROOT, assembled.manifestPath),
+        signature: relativeTo(REPO_ROOT, assembled.signaturePath),
+        keyId: assembled.keyIdHex,
+        rids: options.rids,
+      }),
+    );
+  } else {
+    console.log("release-dry-run: PASS");
+    console.log(`  artifact: ${relativeTo(REPO_ROOT, artifactDir)}`);
+    console.log(`  manifest: ${relativeTo(REPO_ROOT, assembled.manifestPath)}`);
+    console.log(`  signature: ${relativeTo(REPO_ROOT, assembled.signaturePath)}`);
+    console.log(`  validation: ${relativeTo(REPO_ROOT, path.join(artifactDir, "validation-report.json"))}`);
+    console.log(`  channel: ${channel}, version: ${options.version}, pubDate: ${options.pubDate}, expires: ${assembled.expires}`);
+    for (const rid of options.rids) {
+      const installer = installers[rid];
+      console.log(`  ${rid}: ${path.basename(installer.file)} (${installer.size} bytes, ${installer.source})`);
     }
-
-    const manifest = buildManifest({
-      version: options.version,
-      channel,
-      pubDate,
-      notesUrl: `${options.baseUrl}/${encodeURIComponent(options.version)}/notes`,
-      installers: Object.fromEntries(
-        Object.entries(installers).map(([rid, installer]) => [
-          rid,
-          {
-            url: installer.url,
-            size: installer.size,
-            sha256: installer.sha256,
-            signature: installer.signature,
-          },
-        ]),
-      ),
-    });
-    const manifestBytes = serializeManifest(manifest);
-    const manifestPath = path.join(artifactDir, "manifest.json");
-    fs.writeFileSync(manifestPath, manifestBytes);
-    const manifestSignatureText = await signFile(manifestPath, pair.secretKeyText, `version:${options.version}`);
-    const manifestSignaturePath = `${manifestPath}.minisig`;
-    fs.writeFileSync(manifestSignaturePath, manifestSignatureText, "utf8");
-    fs.writeFileSync(`${manifestPath}.sig`, envelope(manifestSignatureText), "utf8");
-
-    const validation = await validateManifestBuffer(manifestBytes, {
-      signature: manifestSignatureText,
-      trustedKeys: [pair.publicKeyText],
-      channel,
-      version: options.version,
-      requireArches: options.rids,
-      currentVersion: options.currentVersion,
-      maxAgeHours: options.maxAgeHours,
-      installers: Object.fromEntries(Object.entries(installers).map(([rid, installer]) => [rid, installer.file])),
-    });
-
-    const report = {
-      schema: 1,
-      tool: SCRIPT,
-      ok: validation.ok,
-      version: options.version,
-      channel,
-      pubDate,
-      artifactDir: relativeTo(REPO_ROOT, artifactDir),
-      dryRun: options.dryRun,
-      network: "none",
-      key: {
-        keyId: pair.keyIdHex,
-        fingerprint: pair.fingerprint,
-        publicKey: relativeTo(REPO_ROOT, publicKeyPath),
-        testKey: true,
-      },
-      manifest: relativeTo(REPO_ROOT, manifestPath),
-      manifestSignature: relativeTo(REPO_ROOT, manifestSignaturePath),
-      installers: Object.fromEntries(
-        Object.entries(installers).map(([rid, installer]) => [
-          rid,
-          {
-            file: relativeTo(REPO_ROOT, installer.file),
-            size: installer.size,
-            sha256: installer.sha256,
-            source: installer.source,
-            dryRun: installer.dryRun,
-            signature: relativeTo(REPO_ROOT, installer.signatureFile),
-          },
-        ]),
-      ),
-      publish: publishReports,
-      errors: validation.errors,
-      checks: validation.checks,
-    };
-    writeJson(path.join(artifactDir, "validation-report.json"), report);
-
-    writeJson(path.join(artifactDir, "release-plan.json"), {
-      schema: 1,
-      tool: SCRIPT,
-      version: options.version,
-      channel,
-      pubDate,
-      rids: options.rids,
-      dryRun: options.dryRun,
-      network: "none",
-      published: false,
-      artifactDir: relativeTo(REPO_ROOT, artifactDir),
-      buildCommands,
-      installers: Object.fromEntries(
-        Object.entries(installers).map(([rid, installer]) => [
-          rid,
-          {
-            file: relativeTo(REPO_ROOT, installer.file),
-            source: installer.source,
-            dryRun: installer.dryRun,
-          },
-        ]),
-      ),
-      signer: "ephemeral test key, secret deleted after the run",
-      next:
-        "Validate the artifact with scripts/validate-updater-manifest.js, then run the draft and " +
-        "publish scripts in their default dry-run mode.",
-    });
-
-    if (!validation.ok) {
-      printRefusals("release-dry-run", validation.errors);
-      console.error(`release-dry-run: FAIL: validation report ${relativeTo(REPO_ROOT, path.join(artifactDir, "validation-report.json"))}`);
-      return EXIT.REFUSED;
-    }
-
-    if (options.json) {
-      console.log(
-        JSON.stringify({
-          schema: 1,
-          tool: SCRIPT,
-          ok: true,
-          artifactDir: relativeTo(REPO_ROOT, artifactDir),
-          manifest: relativeTo(REPO_ROOT, manifestPath),
-          signature: relativeTo(REPO_ROOT, manifestSignaturePath),
-          keyId: pair.keyIdHex,
-          rids: options.rids,
-        }),
-      );
-    } else {
-      console.log("release-dry-run: PASS");
-      console.log(`  artifact: ${relativeTo(REPO_ROOT, artifactDir)}`);
-      console.log(`  manifest: ${relativeTo(REPO_ROOT, manifestPath)}`);
-      console.log(`  signature: ${relativeTo(REPO_ROOT, manifestSignaturePath)}`);
-      console.log(`  public key: ${relativeTo(REPO_ROOT, publicKeyPath)}`);
-      console.log(`  validation: ${relativeTo(REPO_ROOT, path.join(artifactDir, "validation-report.json"))}`);
-      console.log(`  channel: ${channel}, version: ${options.version}, pubDate: ${pubDate}`);
-      for (const rid of options.rids) {
-        const installer = installers[rid];
-        console.log(
-          `  ${rid}: ${path.basename(installer.file)} (${installer.size} bytes, ${installer.source})`,
-        );
-      }
-    }
-    return EXIT.OK;
+  }
+  return EXIT.OK;
 }
 
 function main(argv = process.argv.slice(2)) {
+  if (passwordArgumentGiven(argv)) {
+    console.error(`${SCRIPT}: REFUSED [password-argument]: passwords are never command-line arguments; use --password-env <NAME>`);
+    return EXIT.USAGE;
+  }
   let options;
   try {
     const parsed = parseArguments(argv, {
@@ -508,12 +474,15 @@ function main(argv = process.argv.slice(2)) {
         "version",
         "channel",
         "pub-date",
+        "expires-hours",
         "download-base-url",
         "installer-win-x64",
         "installer-win-arm64",
         "current-version",
         "max-age-hours",
         "out",
+        "secret-key",
+        "password-env",
       ],
       flags: ["dry-run", "no-build", "json", "help"],
     });
@@ -538,16 +507,24 @@ function main(argv = process.argv.slice(2)) {
     if (channel !== undefined && channel !== "stable" && channel !== "beta") {
       throw new Error("--channel must be stable or beta");
     }
+    const expiresText = parsed.get("expires-hours");
+    const expiresHours = expiresText === undefined ? DEFAULT_EXPIRES_HOURS : Number(expiresText);
+    if (!Number.isInteger(expiresHours) || expiresHours < 1) {
+      throw new Error("--expires-hours must be a positive whole number");
+    }
     options = {
       rids: parseRids(parsed.get("rid")),
       version,
       channel,
       pubDate: normalizePubDate(parsed.get("pub-date")),
+      expiresHours,
       baseUrl: normalizeBaseUrl(parsed.get("download-base-url") ?? DEFAULT_BASE_URL),
       explicitInstallers: {
         "win-x64": parsed.get("installer-win-x64"),
         "win-arm64": parsed.get("installer-win-arm64"),
       },
+      secretKey: parsed.get("secret-key"),
+      passwordEnv: parsed.get("password-env"),
       currentVersion: parsed.get("current-version"),
       maxAgeHours: numericOption(parsed.get("max-age-hours"), "max-age-hours", 24),
       out: path.resolve(REPO_ROOT, parsed.get("out") ?? DEFAULT_OUT),

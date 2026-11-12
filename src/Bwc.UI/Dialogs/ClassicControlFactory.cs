@@ -133,9 +133,13 @@ internal static class ClassicControlFactory
                 break;
 
             case ClassicControlKind.ListBox:
+                // A classic list is painted in COLOR_WINDOW, and its rows are one text line high, not a Fluent item.
                 element = new ListBox
                 {
                     Style = StyleOf(styles, "BwcClassicListBoxStyle"),
+                    Background = BwcBrushes.Window,
+                    Foreground = BwcBrushes.WindowText,
+                    ItemContainerStyle = StyleOf(styles, "BwcClassicListBoxItemStyle"),
                     FontFamily = new FontFamily(font.Face),
                     FontSize = font.DipSize,
                     IsTabStop = definition.TabStop,

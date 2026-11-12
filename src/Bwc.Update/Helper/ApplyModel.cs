@@ -16,10 +16,11 @@ public sealed record ApplyRequest(
     IReadOnlyList<string> InstallerSwitches);
 
 /// <summary>
-/// The apply result. Failure is None only when the installer exited 0. HubLaunched says whether
-/// the Hub was started again.
+/// The apply result. Failure is None only when the installer was started. InstallerStarted says the
+/// installer is running and the helper is done (the installer relaunches the Hub). HubLaunched says the
+/// helper started the Hub again with the failure code, which only happens for a refusal.
 /// </summary>
-public sealed record ApplyOutcome(UpdateFailure Failure, string Detail, int? InstallerExitCode, bool HubLaunched);
+public sealed record ApplyOutcome(UpdateFailure Failure, string Detail, bool InstallerStarted, bool HubLaunched);
 
 /// <summary>
 /// Process operations the helper needs. The Windows implementation is
@@ -28,15 +29,19 @@ public sealed record ApplyOutcome(UpdateFailure Failure, string Detail, int? Ins
 public interface IUpdateProcessHost
 {
     /// <summary>
-    /// Returns the pids still running, plus tool processes running from <paramref name="installDir"/>.
+    /// Returns the pids still running, plus BWC processes running from <paramref name="installDir"/>.
+    /// A live process whose image cannot be read counts as running.
     /// </summary>
     IReadOnlyList<int> LiveProcesses(IReadOnlyList<int> pids, string installDir);
 
+    /// <summary>True when this process runs elevated or at high integrity.</summary>
+    bool IsElevated();
+
     /// <summary>
-    /// Starts the installer with a raw command line (never re-quoted) and waits for it. Returns the
-    /// exit code, or null when <paramref name="timeout"/> passes first. The installer is not stopped.
+    /// Starts the installer with a raw command line (never re-quoted) and returns without waiting for it.
+    /// Returns false when it did not start. The installer is never killed by the helper.
     /// </summary>
-    Task<int?> RunInstallerAsync(string installerPath, string arguments, TimeSpan timeout, CancellationToken ct);
+    bool StartInstaller(string installerPath, string arguments);
 
     /// <summary>Starts an executable without waiting. Returns false when the file does not exist.</summary>
     bool StartDetached(string exePath, IReadOnlyList<string> arguments, string workingDirectory);

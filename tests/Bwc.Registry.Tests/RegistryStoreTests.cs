@@ -221,9 +221,6 @@ public sealed class RegistryStoreTests
             store.SetString(runRoot, "Old", "value");
             store.SetValue(runRoot, "Odd", RegistryValueType.Dword, new byte[] { 0x01, 0x02, 0x03 });
             store.SetString(runRoot, string.Empty, "default text");
-            store.SetString(runRoot, "Source", "after");
-            store.SetString(runRoot, "Target", "before");
-
             store.RenameValue(runRoot, "Old", "New");
 
             Assert.IsNull(store.GetValue(runRoot, "Old"));
@@ -256,11 +253,6 @@ public sealed class RegistryStoreTests
                 RegistryValueType.String,
                 Encoding.Unicode.GetBytes("default text\0"));
 
-            store.RenameValue(runRoot, "Source", "Target");
-
-            Assert.IsNull(store.GetValue(runRoot, "Source"));
-            AssertValue(store.GetValue(runRoot, "Target"), "Target", RegistryValueType.String, Encoding.Unicode.GetBytes("after\0"));
-
             store.RenameValue(runRoot, "New", "New");
             store.RenameValue(runRoot, "New", "NEW");
 
@@ -275,6 +267,33 @@ public sealed class RegistryStoreTests
             Assert.AreEqual("RenameValue", missingError.Operation);
             Assert.AreEqual(runRoot, missingError.Path);
             Assert.IsNull(store.GetValue(runRoot, "Nope"));
+        }
+        finally
+        {
+            DeleteRunRoot(runId);
+        }
+    }
+
+    [TestMethod]
+    public void RenameValueRefusesAnExistingTarget()
+    {
+        string runId = NewRunId();
+        RegistryPath runRoot = RunRoot(runId);
+
+        try
+        {
+            var store = new RegistryStore(new SandboxWritePolicy(runRoot));
+            store.CreateKey(runRoot);
+            store.SetString(runRoot, "Source", "after");
+            store.SetString(runRoot, "Target", "before");
+
+            RegistryOperationException error = Assert.ThrowsExactly<RegistryOperationException>(
+                () => store.RenameValue(runRoot, "Source", "Target"));
+
+            Assert.AreEqual(183, error.Win32Error, "ERROR_ALREADY_EXISTS maps to the classic message.");
+            Assert.AreEqual("RenameValue", error.Operation);
+            AssertValue(store.GetValue(runRoot, "Source"), "Source", RegistryValueType.String, Encoding.Unicode.GetBytes("after\0"));
+            AssertValue(store.GetValue(runRoot, "Target"), "Target", RegistryValueType.String, Encoding.Unicode.GetBytes("before\0"));
         }
         finally
         {

@@ -24,6 +24,7 @@ import {
 } from "./lib/github-release.js";
 import { loadReleaseBundle } from "./lib/release-bundle.js";
 import { prepareReleaseContext } from "./lib/release-context.js";
+import { readTrustedKeysFile } from "./lib/trusted-keys.js";
 import { git } from "./lib/release-policy.js";
 
 const SCRIPT = "scripts/release-verify.js";
@@ -203,11 +204,13 @@ async function applyVerify(context, options) {
       return EXIT.REFUSED;
     }
 
+    const embedded = readTrustedKeysFile(context.root);
     const downloaded = await loadReleaseBundle({
       dir: temporary,
       version: context.version,
       channel: context.channel,
       trustedKeys: context.trustedKeys,
+      embeddedKeys: embedded.ok ? embedded.embedded : undefined,
       requireArches: ["win-x64", "win-arm64"],
     });
     if (!downloaded.ok) {

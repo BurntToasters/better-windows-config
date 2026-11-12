@@ -75,6 +75,7 @@ public sealed class DetailsRowContextRequestedEventArgs : EventArgs
 public sealed partial class DetailsList : UserControl
 {
     private const double MinColumnWidth = 40;
+    private const double MaxColumnWidth = 4096;
     private const int BackgroundSortThreshold = 10_000;
     private const int AutoSizeSampleRows = 200;
 
@@ -970,7 +971,56 @@ public sealed partial class DetailsList : UserControl
             return;
         }
 
-        ResetRows(sorted);
+        ApplySortedRows(sorted);
+    }
+
+    /// <summary>
+    /// Puts the background-sorted rows in place without changing what the user or the caller sees. The
+    /// selection, focus, anchor, and an open rename are kept by row name, so a caller that selected a row
+    /// (new value, rename, F5, find) still has it selected when the sort ends.
+    /// </summary>
+    private void ApplySortedRows(List<DetailsRow> sorted)
+    {
+        bool InRange(int index) => index >= 0 && index < _rows.Count;
+
+        List<string> selectedNames = _selected.Where(InRange).Select(index => _rows[index].Name).ToList();
+        string? focusName = InRange(_focus) ? _rows[_focus].Name : null;
+        string? anchorName = InRange(_anchor) ? _rows[_anchor].Name : null;
+        string? renameName = _renaming && InRange(_renameIndex) ? _rows[_renameIndex].Name : null;
+
+        var indexByName = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var i = 0; i < sorted.Count; i++)
+        {
+            _ = indexByName.TryAdd(sorted[i].Name, i);
+        }
+
+        _rows = sorted;
+        _selected.Clear();
+        foreach (string name in selectedNames)
+        {
+            if (indexByName.TryGetValue(name, out int index))
+            {
+                _ = _selected.Add(index);
+            }
+        }
+
+        _focus = focusName is not null && indexByName.TryGetValue(focusName, out int focus) ? focus : -1;
+        _anchor = anchorName is not null && indexByName.TryGetValue(anchorName, out int anchor) ? anchor : -1;
+        _typeAhead.Clear();
+        Repeater.ItemsSource = null;
+        Repeater.ItemsSource = _rows;
+
+        if (renameName is not null && indexByName.TryGetValue(renameName, out int renameIndex))
+        {
+            _renameIndex = renameIndex;
+            PositionRenameBox();
+        }
+        else if (_renaming)
+        {
+            EndRenameCore();
+        }
+
+        RaiseSelectionChanged();
     }
 
     /// <summary>
@@ -1002,7 +1052,14 @@ public sealed partial class DetailsList : UserControl
             return;
         }
 
-        double clamped = Math.Max(MinColumnWidth, Math.Round(width));
+        // Widths come from settings and from drags. A value that is not a number is ignored, and the rest
+        // are kept inside the classic range, so a corrupt setting cannot make a column unreadable or huge.
+        if (!double.IsFinite(width))
+        {
+            return;
+        }
+
+        double clamped = Math.Clamp(Math.Round(width), MinColumnWidth, MaxColumnWidth);
         if (Math.Abs(_columns[index].Width - clamped) < 0.01)
         {
             return;

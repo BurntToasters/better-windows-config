@@ -95,8 +95,8 @@ public abstract class ClassicNumberDialog : ClassicDialog
     private async Task ShowInputErrorAsync()
     {
         string message = _base == NumberBase.Hexadecimal
-            ? $"Enter a hexadecimal number from 0 to {MaxText(NumberBase.Hexadecimal)}."
-            : $"Enter a decimal number from 0 to {MaxText(NumberBase.Decimal)}.";
+            ? string.Format(BwcStrings.Get("NumberErrorHexadecimal"), MaxText(NumberBase.Hexadecimal))
+            : string.Format(BwcStrings.Get("NumberErrorDecimal"), MaxText(NumberBase.Decimal));
 
         // The error is owned by this dialog, so this dialog stays disabled until the error closes.
         ModalDialogWindow error = ErrorDialog.ForMessage(Title, message);
