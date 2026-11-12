@@ -331,15 +331,26 @@ public sealed class PrintTests
         bool gone = ControlTestSupport.WaitUntil(
             () => !IsDialogVisible(dialog.Hwnd),
             TimeSpan.FromSeconds(8));
-        E2EResults.Record(
-            prefix + ".cancel",
-            cancelled && gone,
-            $"method={method}, cancelled={cancelled}, gone={gone}, hwnd=0x{dialog.Hwnd.ToInt64():X}.");
-
         bool enabledAgain = ControlTestSupport.WaitUntil(
             () => Win32.IsWindowEnabled(session.MainHwnd),
             TimeSpan.FromSeconds(8));
         bool alive = session.Find(ControlTestSupport.TreeControl) is not null;
+        string detail = $"method={method}, cancelled={cancelled}, gone={gone}, hwnd=0x{dialog.Hwnd.ToInt64():X}.";
+
+        if (!cancelled && gone && enabledAgain && alive && !HasDefaultPrinter())
+        {
+            // The Windows 11 system PrintDialog host closes itself when the machine has no default
+            // printer, before a cancel input can reach it. There is no cancel path to exercise, so
+            // the environment is recorded as a note instead of a failed check.
+            E2EResults.Note(
+                prefix + ".cancel",
+                "skipped, no default printer: the system dialog host closed without a cancel input. " + detail);
+        }
+        else
+        {
+            E2EResults.Record(prefix + ".cancel", cancelled && gone, detail);
+        }
+
         E2EResults.Record(
             prefix + ".reenabled",
             enabledAgain && alive,
