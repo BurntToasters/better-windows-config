@@ -217,9 +217,15 @@ public sealed class ImportResultTests
         AppServicesSupport.ClickButton(app, confirm, "Yes");
         _ = AppServicesSupport.WaitUntil(() => !AppServicesSupport.IsWindow(confirm), DialogTimeout);
 
-        // The result dialog is a different window from the confirmation. Excluding the confirmation
-        // handle keeps a confirmation that failed to close from being read as the result text.
-        IntPtr result = AppServicesSupport.WaitForOwnedWindow(app.MainHwnd, null, Caption, DialogTimeout, confirm);
+        // The progress dialog is owned by the main window and is also titled Registry Editor. It
+        // closes before the result message appears, so the result is the first owned window after
+        // the confirmation whose text is a result string rather than the progress text.
+        IntPtr result = ImportExportWindows.WaitForResult(
+            app.MainHwnd,
+            text => text.Contains("Cannot import", StringComparison.Ordinal) ||
+                text.Contains(SuccessText, StringComparison.Ordinal),
+            DialogTimeout,
+            confirm);
         if (result == IntPtr.Zero)
         {
             app.Close();
