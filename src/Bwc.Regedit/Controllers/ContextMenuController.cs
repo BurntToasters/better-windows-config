@@ -72,22 +72,21 @@ internal sealed class ContextMenuController
         bool hasKey = _context.TryGetSelectedKeyPath(out RegistryPath key);
         bool mutableKey = hasKey && !key.IsRoot;
 
+        // Expand (915) becomes Collapse (RT_STRING 25) while the node is expanded, and then collapses it.
         var items = new List<ClassicCommandItem>
         {
-            MenuCommand(
-                915,
-                "ContextExpand",
-                node.HasChildren && !node.IsExpanded,
-                _context.Shell.TreeContent.ExpandSelected),
+            node.IsExpanded
+                ? MenuCommand(915, "ContextCollapse", node.HasChildren, _context.Shell.TreeContent.CollapseSelected)
+                : MenuCommand(915, "ContextExpand", node.HasChildren, _context.Shell.TreeContent.ExpandSelected),
             MenuCommand(516, "MenuEditNew", hasKey, children: BuildNewSubmenu(hasKey)),
-            ClassicCommandItem.Separator,
             MenuCommand(662, "ContextFind", isEnabled: true, invoke: _editCommands.Find),
             ClassicCommandItem.Separator,
             MenuCommand(913, "ContextDelete", mutableKey, _keys.DeleteKey),
             MenuCommand(914, "ContextRename", mutableKey, BeginTreeRenameFromMenu),
             ClassicCommandItem.Separator,
-            MenuCommand(659, "ContextExport", hasKey, _importExport.Export),
-            MenuCommand(678, "ContextPermissions", hasKey, _hiveRemote.Permissions),
+            // Export at Computer is the whole-registry export, as on the main menu.
+            MenuCommand(659, "ContextExport", hasKey || _context.IsComputerSelected, _importExport.Export),
+            MenuCommand(678, "ContextPermissions", hasKey, () => _hiveRemote.PermissionsForNode(node)),
             ClassicCommandItem.Separator,
             MenuCommand(675, "ContextCopyKeyName", hasKey, _keys.CopySelectedKeyName),
             MenuCommand(918, "ContextGoToHklm", isEnabled: true, invoke: _view.GoToLocalMachine),
@@ -111,7 +110,9 @@ internal sealed class ContextMenuController
             MenuCommand(912, "ContextModify", single, _values.ModifySelectedValue),
             MenuCommand(917, "ContextModifyBinary", single && realValues == 1, _values.ModifyBinaryData),
             ClassicCommandItem.Separator,
-            MenuCommand(913, "ContextDelete", realValues > 0, _editCommands.DeleteSelection),
+            // The value menu deletes values only. It does not go through the focused pane, which can be the
+            // tree when the list did not take focus, and would delete the key.
+            MenuCommand(913, "ContextDelete", realValues > 0, _values.DeleteValues),
             MenuCommand(914, "ContextRename", canRename, BeginListRenameFromMenu),
         };
 

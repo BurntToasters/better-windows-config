@@ -1,33 +1,41 @@
 using System.Globalization;
+using System.Text;
 using Bwc.E2E.Controls;
+using Bwc.E2E.Dialogs;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
+using FlaUI.UIA3;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Win32;
 
 namespace Bwc.E2E.Hex;
 
 /// <summary>
-/// Seeds a 300 byte binary value and a string value, then drives View > Display Binary Data through
-/// the real menu, modal dialog, hex grid, selection, and clipboard path.
+/// Drives View > Display Binary Data on a seeded 300 byte REG_BINARY value and a REG_SZ value through the
+/// real menu and modal dialog. The classic RT_DIALOG 2021 viewer is checked for its caption, Value Type, the
+/// read-only list rows in each of the Byte, Word, Dword, and Qword formats (switched with Alt+letter), OK and
+/// Escape closing it without changing the value, and the contrast of the client pixels. Each view is saved
+/// as a PNG under artifacts/e2e/visual/dialogs.
 /// </summary>
 [TestClass]
 public sealed class HexViewerTests
 {
-    /// <summary>Classic Edit Binary Value and Display Binary Data show eight bytes per row (hex-editor.md).</summary>
-    private const int BytesPerRow = 8;
-
     private const int MenuView = 514;
     private const int MenuViewDisplayBinaryData = 679;
     private const string PatternValueName = "Pattern300";
     private const string StringValueName = "HexString";
     private const string StringText = "HelloHex";
-    private const string CopyBehavior =
-        "Ctrl+C after Ctrl+A copies all 300 selected bytes as space separated hex text, in the same format as the hex column.";
+    private const int BytesPerRow = 16;
+    private const string ListId = "HexViewerList";
+    private const string TypeTextId = "ValueTypeText";
+    private const string DialogRootId = "DialogRoot";
+    private const string PrimaryId = "DialogPrimary";
+    private const string Caption = "Binary Data";
+    private static readonly TimeSpan UiTimeout = TimeSpan.FromSeconds(15);
 
     private static int _checkStart;
 
@@ -41,7 +49,7 @@ public sealed class HexViewerTests
     [TestMethod]
     [TestCategory("Hex")]
     [TestCategory("E2EOnly")]
-    public void HexViewer_ShowsRawBytesSelectsAndReturnsFocus()
+    public void HexViewer_ClassicBinaryDataFollowsTheFormats()
     {
         _checkStart = E2EResults.CheckCount;
         E2EConfig config = GuiGate.Config;
@@ -76,6 +84,7 @@ public sealed class HexViewerTests
 
             using var session = new AppSession(config, config.RegeditExePath, environment: environment);
             using var driver = new EditingDriver(session);
+            using var automation = new UIA3Automation();
 
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
             bool seededRows = ControlTestSupport.WaitUntil(
@@ -89,8 +98,8 @@ public sealed class HexViewerTests
                 navigated && seededRows,
                 $"navigated={navigated}, seededRows={seededRows}, rows=[{string.Join(",", ControlTestSupport.ListRowNames(session))}].");
 
-            CheckBinaryValue(session, driver, pattern, sandbox);
-            CheckStringValue(session, driver, sandbox);
+            CheckBinaryValue(session, driver, automation, pattern, sandbox);
+            CheckStringValue(session, driver, automation, sandbox);
 
             FailIfNeeded();
         }
@@ -104,126 +113,84 @@ public sealed class HexViewerTests
     private static void CheckBinaryValue(
         AppSession session,
         EditingDriver driver,
+        UIA3Automation automation,
         byte[] pattern,
         SandboxRegistry sandbox)
     {
         bool selected = SelectRow(session, PatternValueName);
-        E2EResults.Record(
-            "hex.binary.select",
-            selected,
-            $"binary row selected={selected}.");
+        E2EResults.Record("hex.binary.select", selected, $"binary row selected={selected}.");
 
         driver.OpenMenu(MenuView, MenuViewDisplayBinaryData);
         bool dialog = driver.WaitForDialog();
-        bool viewer = driver.WaitForElement("HexViewerDialog") is not null;
-        bool editor = driver.WaitForElement("HexEditor") is not null;
-        E2EResults.Record(
-            "hex.binary.dialog",
-            dialog && viewer && editor,
-            $"DialogRoot={dialog}, HexViewerDialog={viewer}, HexEditor={editor}.");
-
-        string heading = driver.TextOf("DialogHeading");
-        E2EResults.Record(
-            "hex.binary.heading",
-            heading.Contains(PatternValueName, StringComparison.Ordinal),
-            $"heading='{heading}'.");
-
-        string status = driver.TextOf("HexViewerStatus");
-        bool statusOk = status.Contains("300", StringComparison.Ordinal) &&
-            status.Contains("REG_BINARY", StringComparison.Ordinal) &&
-            status.Contains(PatternValueName, StringComparison.Ordinal);
-        E2EResults.Record(
-            "hex.binary.status",
-            statusOk,
-            $"status='{status}'.");
-
-        AutomationElement? firstRow = driver.WaitForElement("HexRow_0");
-        string rowText = ControlTestSupport.SafeName(firstRow);
-        string expectedHex = string.Join(
-            " ",
-            pattern.Take(BytesPerRow).Select(value => value.ToString("X2", CultureInfo.InvariantCulture)));
-        bool rowOk = rowText.StartsWith("0000  ", StringComparison.Ordinal) &&
-            rowText.Contains(expectedHex, StringComparison.Ordinal) &&
-            rowText.Contains(new string('.', BytesPerRow), StringComparison.Ordinal);
-        E2EResults.Record(
-            "hex.binary.row0",
-            rowOk,
-            $"row0='{rowText}', expectedHex='{expectedHex}'.");
-
-        AutomationElement? editorElement = driver.WaitForElement("HexEditor");
-        bool focused = false;
-        try
+        AutomationElement? root = driver.WaitForElement(DialogRootId, UiTimeout);
+        E2EResults.Record("hex.binary.dialog", dialog && root is not null, $"DialogRoot present={root is not null}.");
+        if (root is null)
         {
-            firstRow?.Focus();
-            focused = ControlTestSupport.WaitUntil(
-                () => HasKeyboardFocus(editorElement),
-                TimeSpan.FromSeconds(5));
-        }
-        catch (Exception)
-        {
-            focused = false;
+            return;
         }
 
-        bool selectAll = false;
-        if (focused)
-        {
-            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
-            selectAll = ControlTestSupport.WaitUntil(
-                () => HelpTextOf(editorElement).Contains("SelectedLength=300", StringComparison.Ordinal),
-                TimeSpan.FromSeconds(5));
+        IntPtr hwnd = ClassicDialogTests.DialogHandle(root);
+        _ = ClassicDialogTests.EnsureForeground(hwnd);
 
-            // The clipboard is cleared first, so only this copy can put text on it.
-            _ = ClipboardProbe.Clear();
-            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_C);
-            string expectedClipboard = HexText(pattern);
-            ClipboardProbe.Reading copied = ClipboardProbe.WaitForText(expectedClipboard, TimeSpan.FromSeconds(3));
-            if (selectAll)
-            {
-                ClipboardProbe.RecordCopy("hex.binary.clipboard", copied, expectedClipboard, CopyBehavior);
-            }
-            else
-            {
-                E2EResults.Note("hex.binary.clipboard", "not compared: select all did not reach 300 bytes (see hex.binary.selectall).");
-            }
-        }
-        else
-        {
-            E2EResults.Note("hex.binary.clipboard", "not attempted: the hex editor did not take UIA keyboard focus (see hex.binary.selectall).");
-        }
+        string caption = ClassicDialogTests.CaptionOf(automation, hwnd);
+        E2EResults.Record("hex.binary.caption", caption == Caption, $"window caption='{caption}'.");
 
-        E2EResults.Record(
-            "hex.binary.selectall",
-            selectAll,
-            $"editorFocused={focused}, help='{HelpTextOf(editorElement)}'.");
+        string type = driver.TextOf(TypeTextId);
+        E2EResults.Record("hex.binary.type", type == "REG_BINARY", $"Value Type='{type}'.");
 
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        AutomationElement? list = root.FindFirstDescendant(cf => cf.ByAutomationId(ListId));
+        CheckRows(list, "hex.binary.byte", ExpectedRows(pattern, 1), selected: true);
+
+        // The format radios switch the view. Alt+letter is the mnemonic, as in the classic dialog.
+        SwitchFormat(driver, "FormatWord", 'W', 2, "hex.binary.word", list, pattern);
+        SwitchFormat(driver, "FormatDword", 'D', 4, "hex.binary.dword", list, pattern);
+        SwitchFormat(driver, "FormatQword", 'Q', 8, "hex.binary.qword", list, pattern);
+
+        // Byte is the last step back, so the data view returns to the first format.
+        SwitchFormat(driver, "FormatByte", 'B', 1, "hex.binary.byte-again", list, pattern);
+
+        DialogContrast.Check("hex.binary.contrast", ClassicDialogTests.WindowOf(root), hwnd, DialogContrast.FaceForSystem());
+        Save(root, "hex-viewer-byte.png", "hex.binary.shot");
+
+        AutomationElement? ok = root.FindFirstDescendant(cf => cf.ByAutomationId(PrimaryId));
+        bool clicked = ok is not null && TryClick(ok);
         bool closed = driver.WaitForNoDialog();
-        bool focusReturned = ControlTestSupport.WaitUntil(
-            () => HasKeyboardFocus(session.Find(ControlTestSupport.ListControl)),
-            TimeSpan.FromSeconds(5));
-        bool stillExists = sandbox.ReadBinary(string.Empty, PatternValueName) is not null;
+        bool unchanged = sandbox.ReadBinary(string.Empty, PatternValueName)?.SequenceEqual(pattern) == true;
         E2EResults.Record(
-            "hex.binary.close",
-            closed && focusReturned && stillExists,
-            $"closed={closed}, focusReturnedToList={focusReturned}, valueUnchanged={stillExists}.");
+            "hex.binary.ok",
+            clicked && closed && unchanged,
+            $"OK clicked={clicked}, closed={closed}, value unchanged={unchanged}.");
     }
 
-    private static void CheckStringValue(AppSession session, EditingDriver driver, SandboxRegistry sandbox)
+    private static void SwitchFormat(
+        EditingDriver driver,
+        string radioId,
+        char mnemonic,
+        int elementSize,
+        string checkId,
+        AutomationElement? list,
+        byte[] pattern)
+    {
+        ClassicDialogTests.SendAltLetter(mnemonic);
+        bool chosen = ControlTestSupport.WaitUntil(
+            () => ControlTestSupport.IsSelected(driver.WaitForElement(radioId, TimeSpan.FromMilliseconds(300))),
+            TimeSpan.FromSeconds(3));
+        CheckRows(list, checkId, ExpectedRows(pattern, elementSize), chosen);
+    }
+
+    private static void CheckStringValue(
+        AppSession session,
+        EditingDriver driver,
+        UIA3Automation automation,
+        SandboxRegistry sandbox)
     {
         bool selected = SelectRow(session, StringValueName);
-        E2EResults.Record(
-            "hex.string.select",
-            selected,
-            $"string row selected={selected}.");
+        E2EResults.Record("hex.string.select", selected, $"string row selected={selected}.");
 
         driver.OpenMenu(MenuView);
         AutomationElement? command = driver.WaitForElement("MenuCommand_" + MenuViewDisplayBinaryData);
         bool enabled = command is not null && SafeIsEnabled(command);
-        E2EResults.Record(
-            "hex.string.enabled",
-            selected && enabled,
-            $"selected={selected}, DisplayBinaryData enabled={enabled}.");
-
+        E2EResults.Record("hex.string.enabled", selected && enabled, $"selected={selected}, DisplayBinaryData enabled={enabled}.");
         if (!enabled)
         {
             return;
@@ -231,29 +198,93 @@ public sealed class HexViewerTests
 
         driver.Invoke("MenuCommand_" + MenuViewDisplayBinaryData);
         bool dialog = driver.WaitForDialog();
-        string status = driver.TextOf("HexViewerStatus");
-        AutomationElement? firstRow = driver.WaitForElement("HexRow_0");
-        string rowText = ControlTestSupport.SafeName(firstRow);
-        byte[] stringBytes = System.Text.Encoding.Unicode.GetBytes(StringText);
-        string expectedHex = string.Join(
-            " ",
-            stringBytes.Take(BytesPerRow).Select(value => value.ToString("X2", CultureInfo.InvariantCulture)));
-        bool rowOk = rowText.Contains(expectedHex, StringComparison.Ordinal);
-        int expectedLength = stringBytes.Length + 2;
-        bool statusOk = status.Contains(expectedLength.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal) &&
-            status.Contains("REG_SZ", StringComparison.Ordinal);
-        E2EResults.Record(
-            "hex.string.viewer",
-            dialog && rowOk && statusOk,
-            $"dialog={dialog}, status='{status}', row0='{rowText}', expectedHex='{expectedHex}'.");
+        AutomationElement? root = driver.WaitForElement(DialogRootId, UiTimeout);
+        if (root is null)
+        {
+            E2EResults.Record("hex.string.viewer", false, $"dialog={dialog}, DialogRoot present=False.");
+            return;
+        }
+
+        IntPtr hwnd = ClassicDialogTests.DialogHandle(root);
+        _ = ClassicDialogTests.EnsureForeground(hwnd);
+        string type = driver.TextOf(TypeTextId);
+
+        // REG_SZ is shown as its UTF-16 bytes with the terminating null, so the view has 18 bytes.
+        byte[] stringBytes = Encoding.Unicode.GetBytes(StringText + "\0");
+        AutomationElement? list = root.FindFirstDescendant(cf => cf.ByAutomationId(ListId));
+        CheckRows(list, "hex.string.viewer", ExpectedRows(stringBytes, 1), selected: true);
+        E2EResults.Record("hex.string.type", type == "REG_SZ", $"Value Type='{type}'.");
 
         Keyboard.Press(VirtualKeyShort.ESCAPE);
         bool closed = driver.WaitForNoDialog();
         bool valueUnchanged = sandbox.ReadString(string.Empty, StringValueName) == StringText;
+        E2EResults.Record("hex.string.close", closed && valueUnchanged, $"Escape closed={closed}, valueUnchanged={valueUnchanged}.");
+    }
+
+    /// <summary>
+    /// Compares the list rows with the expected rows exactly. The list must hold one row per 16 bytes, so a
+    /// truncated or extra row fails the check.
+    /// </summary>
+    private static void CheckRows(AutomationElement? list, string checkId, string[] expected, bool selected)
+    {
+        IReadOnlyList<string> rows = list is null
+            ? Array.Empty<string>()
+            : list.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem)).Select(item => item.Name).ToArray();
+        bool ok = selected && rows.Count == expected.Length && rows.Zip(expected).All(pair => pair.First == pair.Second);
         E2EResults.Record(
-            "hex.string.close",
-            closed && valueUnchanged,
-            $"closed={closed}, valueUnchanged={valueUnchanged}.");
+            checkId,
+            ok,
+            $"selected={selected}; rows={rows.Count} expected={expected.Length}; first=[{string.Join(" | ", rows.Take(2))}]; " +
+            $"last=[{string.Join(" | ", rows.TakeLast(1))}]; expectedFirst=[{string.Join(" | ", expected.Take(2))}]; expectedLast=[{expected.LastOrDefault()}].");
+    }
+
+    /// <summary>
+    /// The rows the classic viewer must show: an offset in hex, then the values of each element (little endian,
+    /// zero padded to its width). A value cut off at the end of the data shows its bytes one by one.
+    /// </summary>
+    private static string[] ExpectedRows(byte[] data, int elementSize)
+    {
+        var rows = new List<string>();
+        for (int rowStart = 0; rowStart < data.Length; rowStart += BytesPerRow)
+        {
+            int end = Math.Min(rowStart + BytesPerRow, data.Length);
+            var row = new StringBuilder();
+            row.Append(rowStart.ToString("X4", CultureInfo.InvariantCulture)).Append("  ");
+            for (int at = rowStart; at < end; at += elementSize)
+            {
+                if (at > rowStart)
+                {
+                    row.Append(' ');
+                }
+
+                if (end - at >= elementSize)
+                {
+                    for (int b = elementSize - 1; b >= 0; b--)
+                    {
+                        row.Append(data[at + b].ToString("X2", CultureInfo.InvariantCulture));
+                    }
+                }
+                else
+                {
+                    for (int b = at; b < end; b++)
+                    {
+                        row.Append(data[b].ToString("X2", CultureInfo.InvariantCulture));
+                    }
+                }
+            }
+
+            rows.Add(row.ToString());
+        }
+
+        return rows.ToArray();
+    }
+
+    private static void Save(AutomationElement root, string fileName, string checkId)
+    {
+        string artifacts = Path.Combine(GuiGate.Config.RepoRoot, "artifacts", "e2e", "visual", "dialogs");
+        Directory.CreateDirectory(artifacts);
+        string path = ClassicDialogTests.SaveScreenshot(root, Path.Combine(artifacts, fileName));
+        E2EResults.Record(checkId, File.Exists(path), $"saved '{path}'.");
     }
 
     private static bool SelectRow(AppSession session, string name)
@@ -304,6 +335,19 @@ public sealed class HexViewerTests
         return true;
     }
 
+    private static bool TryClick(AutomationElement element)
+    {
+        try
+        {
+            element.Click();
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     private static bool SafeIsEnabled(AutomationElement? element)
     {
         if (element is null)
@@ -318,40 +362,6 @@ public sealed class HexViewerTests
         catch (Exception)
         {
             return false;
-        }
-    }
-
-    private static bool HasKeyboardFocus(AutomationElement? element)
-    {
-        if (element is null)
-        {
-            return false;
-        }
-
-        try
-        {
-            return element.Properties.HasKeyboardFocus.Value;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
-
-    private static string HelpTextOf(AutomationElement? element)
-    {
-        if (element is null)
-        {
-            return string.Empty;
-        }
-
-        try
-        {
-            return element.Properties.HelpText.Value ?? string.Empty;
-        }
-        catch (Exception)
-        {
-            return string.Empty;
         }
     }
 
@@ -396,7 +406,4 @@ public sealed class HexViewerTests
             failures.Count,
             $"Hex checks failed:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
     }
-
-    private static string HexText(byte[] bytes) =>
-        string.Join(" ", bytes.Select(value => value.ToString("X2", CultureInfo.InvariantCulture)));
 }

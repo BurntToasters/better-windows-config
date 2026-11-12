@@ -91,11 +91,26 @@ try {
     exit 2
 }
 
+# Turns the scheduled task off. The user enables it again before the next run (install.ps1 -Enable).
+# Called on every exit path, so a finished or refused run never leaves the task armed.
+function Disable-RunnerTask {
+    try {
+        Disable-ScheduledTask -TaskName 'BWC Elevated E2E' -ErrorAction Stop | Out-Null
+        Add-LogLine '# task disabled after this run'
+        return 'yes'
+    } catch {
+        Add-LogLine ('# could not disable the task: ' + $_.Exception.Message)
+        return 'no'
+    }
+}
+
 function Stop-Refused([string]$Message) {
     Add-LogLine ('# refused: ' + $Message)
+    $disabled = Disable-RunnerTask
     Write-RunRecord ([ordered]@{
         runId = $runId; status = 'refused'; startedUtc = $startedUtc; finishedUtc = (Get-Date).ToUniversalTime().ToString('o');
-        exitCode = 2; rid = $rid; repo = $repo; log = $script:LogPath; resultArtifact = ''; message = $Message
+        exitCode = 2; rid = $rid; repo = $repo; log = $script:LogPath; resultArtifact = ''; message = $Message;
+        taskDisabled = $disabled
     })
     exit 2
 }
@@ -115,6 +130,13 @@ $script:NodePath = [string]$config.node
 if ([string]::IsNullOrWhiteSpace($repo) -or -not [System.IO.Path]::IsPathRooted($repo)) {
     Stop-Refused 'config.json has no absolute repo path.'
 }
+if (-not (Test-Path -LiteralPath $repo -PathType Container)) {
+    Stop-Refused ('The recorded repo folder is missing: ' + $repo)
+}
+$repoItem = Get-Item -LiteralPath $repo -Force
+if ($repoItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+    Stop-Refused ('The recorded repo is a link or junction, which this runner does not follow: ' + $repo)
+}
 if (-not (Test-Path -LiteralPath (Join-Path $repo 'scripts\test-e2e.js') -PathType Leaf) -or
     -not (Test-Path -LiteralPath (Join-Path $repo 'BetterWindowsConfig.slnx') -PathType Leaf)) {
     Stop-Refused ('The recorded repo is not a BWC checkout: ' + $repo)
@@ -125,8 +147,9 @@ if ([string]::IsNullOrWhiteSpace($script:NodePath) -or
 }
 
 Set-Location -LiteralPath $repo
-# Machine and user PATH, so dotnet resolves even if it was added after logon.
-$env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
+# Only the machine PATH plus System32. The user PATH is not used: it can name folders that a normal
+# account can write, and an elevated run must not load a tool from one of them.
+$env:Path = (Join-Path $env:SystemRoot 'System32') + ';' + [Environment]::GetEnvironmentVariable('Path', 'Machine')
 $env:MSBUILDDISABLENODEREUSE = '1'
 $env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER = '1'
 
@@ -149,11 +172,12 @@ switch ($testCode) {
     default { $status = 'fail'; $message = ('Elevated E2E tests failed (exit ' + $testCode + ').') }
 }
 
+$disabled = Disable-RunnerTask
 Write-RunRecord ([ordered]@{
     runId = $runId; status = $status; startedUtc = $startedUtc; finishedUtc = (Get-Date).ToUniversalTime().ToString('o');
     exitCode = $testCode; rid = $rid; repo = $repo; log = $script:LogPath;
     resultArtifact = $(if (Test-Path -LiteralPath $resultArtifact -PathType Leaf) { $resultArtifact } else { '' });
-    message = $message
+    message = $message; taskDisabled = $disabled
 })
 
 switch ($status) {

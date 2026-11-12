@@ -28,8 +28,19 @@ internal sealed class HiveRemoteCommands
 
     public void DisconnectNetworkRegistry() => _context.StartCommand(DisconnectNetworkRegistryAsync);
 
-    /// <summary>Opens the standard aclui security editor for the selected registry key.</summary>
-    public void Permissions() => _context.StartCommand(PermissionsAsync);
+    /// <summary>
+    /// Opens the standard aclui security editor for the selected registry key. The target is the pane
+    /// with focus: a value selected in the list is refused, and the tree's selected key is used otherwise.
+    /// </summary>
+    public void Permissions()
+    {
+        bool listTarget = _context.FocusedPane() == RegeditContext.Pane.List;
+        _context.StartCommand(() => PermissionsAsync(_context.Shell.TreeContent.SelectedNode, listTarget));
+    }
+
+    /// <summary>Opens the security editor for the key of a tree node. The tree context menu uses this.</summary>
+    public void PermissionsForNode(TreeNode node) =>
+        _context.StartCommand(() => PermissionsAsync(node, targetIsList: false));
 
     /// <summary>Closes every remote connection. Runs once, when the view unloads.</summary>
     public void DisposeRemoteConnections()
@@ -48,7 +59,7 @@ internal sealed class HiveRemoteCommands
         _context.RemoteConnections.Clear();
     }
 
-    private async Task PermissionsAsync()
+    private async Task PermissionsAsync(TreeNode? node, bool targetIsList)
     {
         if (_context.DialogOpen || _context.FileDialogOpen || _context.WindowHwnd == 0)
         {
@@ -57,15 +68,16 @@ internal sealed class HiveRemoteCommands
             return;
         }
 
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath path))
+        // Security belongs to the key. A value selected in the list has no security of its own, so the
+        // list target is refused while a value is selected. The tree target never depends on the list.
+        if (targetIsList && _context.Shell.ListContent.SelectedRows.Count > 0)
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
         }
 
-        if (_context.Shell.ListContent.SelectedRows.Count > 0)
+        if (!TryGetNodeKeyPath(node, out RegistryPath path))
         {
-            // The command is disabled for value selections. Keep the keyboard path consistent.
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
         }
@@ -175,8 +187,11 @@ internal sealed class HiveRemoteCommands
             return;
         }
 
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath path) ||
-            _context.Shell.ListContent.SelectedRows.Count > 0 ||
+        // The target is the key of the focused pane. A value selected in the list is refused only when
+        // the list has focus, so the tree's selected hive is unloaded with a value still selected.
+        bool listTarget = _context.FocusedPane() == RegeditContext.Pane.List;
+        if ((listTarget && _context.Shell.ListContent.SelectedRows.Count > 0) ||
+            !TryGetNodeKeyPath(_context.Shell.TreeContent.SelectedNode, out RegistryPath path) ||
             !RegeditContext.IsUnloadableHiveRoot(path))
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
@@ -233,7 +248,9 @@ internal sealed class HiveRemoteCommands
         RemoteRegistryConnection connection;
         try
         {
-            connection = await _context.RunRegistryAsync(() => RemoteRegistryConnection.Connect(computerName));
+            // The connect runs under the write gate, so a second Connect cannot pass the duplicate check
+            // while this one is still connecting.
+            connection = await _context.RunRegistryWriteAsync(() => RemoteRegistryConnection.Connect(computerName));
         }
         catch (RemoteRegistryException ex)
         {
@@ -245,6 +262,17 @@ internal sealed class HiveRemoteCommands
         {
             Log.Warn($"Registry Editor could not connect to '{computerName}': {ex.Message}");
             await _context.ShowErrorAsync(_context.Messages.ForConnect(RemoteRegistryFailureReason.ConnectFailed, 0, computerName).ToErrorDialog());
+            return;
+        }
+
+        // Checked again after the connect: a connection with the same name that was added meanwhile would
+        // leave a second tree node and a leaked connection. The rejected one is disposed.
+        if (_context.RemoteConnections.Any(existing =>
+                string.Equals(existing.ComputerName, connection.ComputerName, StringComparison.OrdinalIgnoreCase)))
+        {
+            connection.Dispose();
+            Log.Warn($"Registry Editor dropped a second connection to '{connection.ComputerName}'.");
+            await _context.ShowMessageAsync(Get("DialogConnectTitle"), Get("DialogConnectDuplicate"));
             return;
         }
 
@@ -370,6 +398,21 @@ internal sealed class HiveRemoteCommands
     {
         _context.TreeSource = new RegistryTreeSource(_context.Store.Reader, _context.RemoteConnections);
         _context.Shell.TreeContent.SetRoots(_context.TreeSource.Roots);
+    }
+
+    /// <summary>The local registry path of a tree node. False for Computer, a remote node, or an invalid path.</summary>
+    private static bool TryGetNodeKeyPath(TreeNode? node, out RegistryPath path)
+    {
+        if (node?.RegistryPath is { Length: > 0 } displayPath &&
+            RegistryPath.TryParse(displayPath, out RegistryPath? parsed) &&
+            parsed is not null)
+        {
+            path = parsed;
+            return true;
+        }
+
+        path = null!;
+        return false;
     }
 
     private static TreeNode? FindChild(TreeNode parent, string name)

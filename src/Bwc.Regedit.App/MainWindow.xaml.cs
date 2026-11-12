@@ -2,6 +2,7 @@ using Bwc.Core;
 using Bwc.Regedit;
 using Bwc.Regedit.Controllers;
 using Bwc.Regedit.Registry;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using System.Runtime.InteropServices;
@@ -16,11 +17,16 @@ public sealed partial class MainWindow : Window
     private const int DefaultHeightDip = 700;
     private const string ToolId = "regedit";
 
+    /// <summary>How long a setting must stay unchanged before it is saved.</summary>
+    private const int SettingsSaveDelayMs = 500;
+
     private readonly SettingsStore<RegeditSettings> _settingsStore;
     private readonly string? _startupRegFile;
 
     private bool _initialSizeApplied;
     private bool _placementApplied;
+    private bool _closeWhenWritesEnd;
+    private DispatcherQueueTimer? _settingsTimer;
 
     /// <summary>The last rectangle seen while the window was not maximized or minimized. Saved at close.</summary>
     private WindowBounds? _normalBounds;
@@ -50,6 +56,7 @@ public sealed partial class MainWindow : Window
         RootView.ApplySettings(settings);
         RootView.ExitRequested += OnExitRequested;
         RootView.SettingsChanged += OnSettingsChanged;
+        RootView.WriteFinished += OnWriteFinished;
         RootView.Loaded += OnRootViewLoaded;
         AppWindow.Closing += OnAppWindowClosing;
         AppWindow.Changed += OnAppWindowChanged;
@@ -125,13 +132,56 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args) => SaveSettings();
+    private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (RootView.IsWriteInProgress)
+        {
+            // A registry write cannot be cancelled. The close waits for it, and runs when it ends.
+            args.Cancel = true;
+            _closeWhenWritesEnd = true;
+            return;
+        }
 
-    private void OnSettingsChanged(object? sender, EventArgs e) => SaveSettings();
+        _settingsTimer?.Stop();
+        SaveSettings();
+    }
+
+    private void OnWriteFinished(object? sender, EventArgs e)
+    {
+        if (!_closeWhenWritesEnd)
+        {
+            return;
+        }
+
+        _closeWhenWritesEnd = false;
+        Close();
+    }
+
+    private void OnSettingsChanged(object? sender, EventArgs e) => ScheduleSettingsSave();
 
     /// <summary>
-    /// Writes the view state and the window placement. Runs at close and whenever a setting changes, so a
-    /// font or theme choice is kept even when the window does not get its closing event.
+    /// Saves the settings a short time after the last change, so a burst of font or theme changes writes
+    /// the file once and not on the UI thread for every step. Closing the window saves at once.
+    /// </summary>
+    private void ScheduleSettingsSave()
+    {
+        _settingsTimer ??= CreateSettingsTimer();
+        _settingsTimer.Stop();
+        _settingsTimer.Start();
+    }
+
+    private DispatcherQueueTimer CreateSettingsTimer()
+    {
+        DispatcherQueueTimer timer = DispatcherQueue.CreateTimer();
+        timer.Interval = TimeSpan.FromMilliseconds(SettingsSaveDelayMs);
+        timer.IsRepeating = false;
+        timer.Tick += (_, _) => SaveSettings();
+        return timer;
+    }
+
+    /// <summary>
+    /// Writes the view state and the window placement. Runs at close and after a setting change settles,
+    /// so a font or theme choice is kept even when the window does not get its closing event.
     /// </summary>
     private void SaveSettings()
     {
@@ -158,6 +208,7 @@ public sealed partial class MainWindow : Window
     {
         RootView.ExitRequested -= OnExitRequested;
         RootView.SettingsChanged -= OnSettingsChanged;
+        RootView.WriteFinished -= OnWriteFinished;
         RootView.Loaded -= OnRootViewLoaded;
         AppWindow.Closing -= OnAppWindowClosing;
         AppWindow.Changed -= OnAppWindowChanged;

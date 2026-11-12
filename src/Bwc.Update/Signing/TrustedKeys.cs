@@ -16,4 +16,18 @@ public static class TrustedKeys
     private const string PlaceholderKey = "untrusted comment: PLACEHOLDER replace with the release public key\nPLACEHOLDER-NOT-A-KEY";
 
     public static readonly IReadOnlyList<string> Embedded = [PlaceholderKey];
+
+    /// <summary>True only for the shipped placeholder list, which means no release key is configured yet.</summary>
+    public static bool IsPlaceholderList(IReadOnlyList<string> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        return IsPlaceholder && keys.Count == 1 && keys[0] == PlaceholderKey;
+    }
+
+    /// <summary>
+    /// The failure for a key list that does not validate. The placeholder is "not configured" (the Hub
+    /// says so); any other invalid list is <see cref="UpdateFailure.TrustedKeysInvalid"/>.
+    /// </summary>
+    internal static UpdateFailure FailureFor(IReadOnlyList<string> keys) =>
+        IsPlaceholderList(keys) ? UpdateFailure.TrustedKeysNotConfigured : UpdateFailure.TrustedKeysInvalid;
 }

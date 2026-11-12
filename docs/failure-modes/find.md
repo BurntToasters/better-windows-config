@@ -316,3 +316,22 @@ value order. That covers the NLS ordering, `(Default)` first, text digit runs, a
 The replay test writes `artifacts/find-parity/result.json` with each run name, the captured
 FindFlags DWORD, expected hit count, actual hit count, pass flag, and the hit pairs. The file is
 diagnostic and does not replace the assertions.
+
+## 17. Cursor key whose parent cannot be enumerated (F3)
+
+`FindNext` resumes from the cursor key's path. The continuation rebuilds the siblings after the
+cursor at each level by listing that level's parent. When the cursor's parent cannot be listed
+(access denied, or the parent was removed), no sibling list exists for that level, so the cursor
+key's own presence cannot be read from the listing. Intended behavior: the finder probes the cursor
+key itself with `KeyExists`. If the key still exists, it is pushed back on the continuation and its
+subtree is searched, so F3 does not skip the cursor key's subtree. If the probe fails with an error
+other than "not found", the key is treated as present, so the search does not skip it. No automated
+test: the sandbox cannot make a parent unreadable without the writer's own guard failing on it, because
+the guard needs query and enumerate rights on the parent to restore its descriptor. The probe is
+checked by review of `RegistryFinder.cs`.
+
+Name matching for `Contains` uses one `FindNLSStringEx` call with `FIND_FROMSTART` and
+`NORM_IGNORECASE` per search, not one `CompareStringEx` call per offset. The intent is the same match:
+a needle-length window at any UTF-16 offset compared under the same collation. The per-offset loop
+remains only as the fallback after a native error. Tests: the existing `RegistryFinderTests` and the
+oracle replay (`find-sequence.json`) must pass unchanged.

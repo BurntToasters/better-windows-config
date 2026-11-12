@@ -92,8 +92,14 @@ internal sealed class UpdateDownloader : IDisposable
     /// <summary>
     /// Streams an installer to a new file. The file must not exist yet. It is written with no
     /// sharing, so no other process can open it while it is written. The caller deletes the file on failure.
+    /// <paramref name="progress"/> gets the bytes written so far after each chunk.
     /// </summary>
-    public async Task<Outcome<long>> DownloadToFileAsync(Uri url, long expectedSize, string path, CancellationToken ct)
+    public async Task<Outcome<long>> DownloadToFileAsync(
+        Uri url,
+        long expectedSize,
+        string path,
+        CancellationToken ct,
+        IProgress<DownloadProgress>? progress = null)
     {
         using var deadline = new Deadline(ct, _options.InstallerDownloadTimeout, _options.StallTimeout);
         var opened = await OpenAsync(url, DownloadStage.Installer, deadline);
@@ -154,12 +160,18 @@ internal sealed class UpdateDownloader : IDisposable
 
                     try
                     {
-                        await file.WriteAsync(chunk.AsMemory(0, read.Value), ct);
+                        await file.WriteAsync(chunk.AsMemory(0, read.Value), deadline.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return deadline.Classify<long>();
                     }
                     catch (IOException ex)
                     {
                         return Outcome<long>.Fail(UpdateFailure.Io, $"cannot write the installer: {ex.GetType().Name}");
                     }
+
+                    progress?.Report(new DownloadProgress(total, expectedSize));
                 }
 
                 if (total != expectedSize)
@@ -171,7 +183,11 @@ internal sealed class UpdateDownloader : IDisposable
 
                 try
                 {
-                    await file.FlushAsync(ct);
+                    await file.FlushAsync(deadline.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return deadline.Classify<long>();
                 }
                 catch (IOException ex)
                 {

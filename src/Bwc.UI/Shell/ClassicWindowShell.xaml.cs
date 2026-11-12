@@ -4,6 +4,7 @@ using Bwc.UI.Theme;
 using Bwc.UI.Tree;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
@@ -47,6 +48,12 @@ public sealed partial class ClassicWindowShell : UserControl
     private double _splitterDragStartWidth;
     private string _currentPath = "Computer";
 
+    // The pane that held the focus last, and the tree width when keyboard split mode began. Enter and
+    // Escape return the focus to that pane, and Escape puts back the width.
+    private Pane _lastPane = Pane.Tree;
+    private Pane _paneBeforeSplit = Pane.Tree;
+    private double _widthBeforeSplit = DenseMetrics.TreePaneWidth;
+
     // Menu items whose visibility is already watched for a popup width. Each item is watched once.
     private readonly HashSet<FrameworkElement> _observedEntries = [];
 
@@ -61,6 +68,11 @@ public sealed partial class ClassicWindowShell : UserControl
     public ClassicWindowShell()
     {
         InitializeComponent();
+        AutomationProperties.SetName(this, BwcStrings.Get("ShellRootName"));
+        AutomationProperties.SetName(AddressBox, BwcStrings.Get("ShellAddressBarName"));
+        AutomationProperties.SetName(TreePaneBorder, BwcStrings.Get("ShellTreePaneName"));
+        AutomationProperties.SetName(ListPaneBorder, BwcStrings.Get("ShellListPaneName"));
+        AutomationProperties.SetName(SplitterThumb, BwcStrings.Get("ShellSplitterName"));
         _currentPath = AddressBox.Text;
         ApplyAddressBarPalette();
         ApplyMetrics();
@@ -211,13 +223,16 @@ public sealed partial class ClassicWindowShell : UserControl
     public void BeginSplitKeyboardMode()
     {
         _keyboardSplitMode = true;
+        _paneBeforeSplit = _lastPane;
+        _widthBeforeSplit = _treePaneWidth;
 
-        // The splitter is not a tab stop, so keyboard focus is requested programmatically.
+        // The splitter keeps IsTabStop=True: WinUI refuses explicit focus on a Thumb that is not a tab stop. Tab and
+        // F6 skip it, because OnShellNavigationKeyDown owns that cycle, so the request below is what focuses it.
         _ = SplitterThumb.Focus(FocusState.Programmatic);
 
-        // A View menu click closes the flyout after the Click handler. Focus again after that
-        // close so the flyout cannot take focus back from the splitter.
-        _ = DispatcherQueue.TryEnqueue(() =>
+        // A View menu click closes the flyout after the Click handler, and the flyout returns focus to the
+        // menu bar when it closes. Low priority runs after that close, so the splitter keeps the focus.
+        _ = DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
             if (_keyboardSplitMode)
             {
@@ -306,6 +321,19 @@ public sealed partial class ClassicWindowShell : UserControl
 
         bool tree = IsWithin(focused, TreePaneBorder);
         bool list = IsWithin(focused, ListPaneBorder);
+        if (tree)
+        {
+            _lastPane = Pane.Tree;
+        }
+        else if (list)
+        {
+            _lastPane = Pane.List;
+        }
+        else if (IsWithin(focused, AddressBox))
+        {
+            _lastPane = Pane.Address;
+        }
+
         BwcTheme.SetPaneState(BwcPane.Tree, tree, tree && TreeControl.SelectedNode is not null);
         BwcTheme.SetPaneState(BwcPane.List, list, list && ListControl.SelectedRows.Count == 1);
     }
@@ -651,7 +679,16 @@ public sealed partial class ClassicWindowShell : UserControl
                 _ = ListControl.Focus(FocusState.Keyboard);
                 break;
             default:
-                _ = AddressBox.Focus(FocusState.Keyboard);
+                // A hidden address bar cannot take focus, so the focus goes to the tree.
+                if (IsAddressBarVisible)
+                {
+                    _ = AddressBox.Focus(FocusState.Keyboard);
+                }
+                else
+                {
+                    _ = TreeControl.Focus(FocusState.Keyboard);
+                }
+
                 break;
         }
     }
@@ -695,12 +732,29 @@ public sealed partial class ClassicWindowShell : UserControl
                 e.Handled = true;
                 break;
             case VirtualKey.Enter:
-            case VirtualKey.Escape:
-                _keyboardSplitMode = false;
-                _ = Focus(FocusState.Programmatic);
                 e.Handled = true;
+                EndSplitKeyboardMode(restoreWidth: false);
+                break;
+            case VirtualKey.Escape:
+                e.Handled = true;
+                EndSplitKeyboardMode(restoreWidth: true);
                 break;
         }
+    }
+
+    /// <summary>
+    /// Leaves keyboard split mode and returns the focus to the pane that had it before the split. Escape
+    /// also puts back the tree width from before the split began; Enter keeps the width.
+    /// </summary>
+    private void EndSplitKeyboardMode(bool restoreWidth)
+    {
+        _keyboardSplitMode = false;
+        if (restoreWidth)
+        {
+            SetTreeWidth(_widthBeforeSplit);
+        }
+
+        FocusPane(_paneBeforeSplit);
     }
 
     private void OnSplitterLostFocus(object sender, RoutedEventArgs e)

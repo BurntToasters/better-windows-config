@@ -293,13 +293,8 @@ public sealed class MenuTests
             return;
         }
 
-        // Open and close the File menu once with the keyboard. The first keyboard menu use
-        // initializes the router state; the Alt tap below then has a settled idle bar to toggle.
-        SendRaw("ALT+KEY_F");
-        Thread.Sleep(300);
-        SendRaw("ESCAPE");
-        Thread.Sleep(300);
-
+        // The first Alt tap after launch must show the underlines. No File menu is opened first, so a
+        // product that needs priming fails this check.
         Rectangle label = file.BoundingRectangle;
         using Bitmap before = CaptureScreen(label);
 

@@ -105,8 +105,19 @@ any link is found, so no link key reaches the destination. Test:
 ### A11. CopyTree with a destination equal to or inside the source
 
 Copying a tree into itself can recurse until the tree is huge. Intended behavior: the guard refuses
-it with `ArgumentException` before native code. This check applies only to the sandbox guard, which
-leaves shipping behavior unchanged. Test: `CopyIntoOwnSubtreeIsRefused`.
+it with `ArgumentException` before native code. The check applies to every policy, shipping
+included, because the native call would recurse into the tree it is writing. Tests:
+`CopyIntoOwnSubtreeIsRefused` (sandbox) and `ShippingPolicyRefusesCopyIntoOwnSubtreeBeforeAnyNativeCall`.
+
+### A11a. CopyTree whose destination subtree contains a link
+
+`RegCopyTree` opens a destination child that has the same name as a source child with an ordinary,
+following open. A link key already under the destination is therefore an escape route even when the
+source tree is clean. Intended behavior: under the sandbox guard the destination subtree is walked
+with the same no-follow check as the source, before native code runs, and the copy is refused with
+access denied when any destination key is a link. The destination itself is opened through the
+guard, so a link at the destination path is refused as before. Test:
+`CopyTreeWithLinkInDestinationIsRefusedBeforeAnyCopy`.
 
 ### A12. RestoreKey or ReplaceKey with a hive file that contains a link
 
@@ -124,10 +135,14 @@ content.
 ### A13. RestoreKey or ReplaceKey with a file the scanner cannot verify
 
 Example: a file that is not a `regf` hive, a truncated file, a cell whose size does not fit its
-`hbin`, or a subkey list that loops. Intended behavior: the guard refuses the restore with
+`hbin`, a bin chain whose sizes do not add up to the declared bin data, or a subkey list that loops.
+Intended behavior: the guard refuses the restore with
 `ERROR_BAD_FORMAT` (11) and a detail that says the sandbox cannot verify the file. The guard fails
 closed: anything it cannot read is treated as possibly containing a link. Test:
-`RestoreOfUnverifiableFileIsRefused`.
+`RestoreOfUnverifiableFileIsRefused`. A file that the scanner verifies is held open for the rest of
+the operation for `RestoreKey`: the scanner opens it with `FileShare.Read` and the handle stays open
+until the native restore returns (see D3). `ReplaceKey` scans the new file and does not hold it,
+because the native replace takes the file over. Test: `ScanHoldsTheHiveFileAgainstWritersUntilReleased`.
 
 ### A14. Hive mount and unmount in the sandbox
 
@@ -165,9 +180,12 @@ open therefore see the same view, whatever the bitness of the process. Keys unde
 
 ### A19. Remote handles
 
-The writer never connects to a remote computer. `RegistryPath` cannot name one, and
-`RemoteRegistryConnection` is read-only. A future remote write must call the policy with
-`RegistryWriteOperation.Remote`.
+The writer never connects to a remote computer, and no remote write exists. The unused
+`RegistryWriteOperation.Remote` value and the unused `RegLoadAppKey` import were removed. The UI
+parses remote display paths (`\\COMPUTER\HKEY_LOCAL_MACHINE\...`) into ordinary `RegistryPath`
+values with local roots, so the engine cannot tell a remote node from a local one. An explicit
+engine guard needs a computer identity on `RegistryPath`, which is an API change and is open. Until
+then the UI must not send remote-tree nodes to a `RegistryWriter`. Remote tests: none for writes.
 
 ### A20. Raw handles and direct native calls
 
@@ -216,6 +234,16 @@ The hive scanner follows only subkey lists from the root key. It does not read v
 binary value that happens to contain `nk` bytes does not count as a key node. An unreachable key
 node is not loaded by a restore, and the scanner does not look at it.
 
+### B6. Hives with several pages per bin
+
+A hive bin (`hbin`) is a multiple of 4 KiB and may span several pages. A cell can sit in the second
+or later page of a bin, where the page header is not an `hbin` signature. Intended behavior: the
+scanner walks the bin chain from offset zero, checks each `hbin` header and size, and maps each cell
+offset to the bin that contains it. A valid large hive is scanned and accepted when it has no link.
+A chain that breaks (a bin size that is not a multiple of 4 KiB, a bin that runs past the bin data,
+or a missing `hbin` header) is unverifiable and refused. Tests: `ScanAcceptsAHiveWhoseBinSpansSeveralPages`,
+`ScanFindsALinkInASecondPageOfABin`, `ScanRefusesABinChainThatDoesNotAddUp`.
+
 ## C. Native behavior the design depends on
 
 These statements are the design's assumptions. Each one has a test in the suite that fails if the
@@ -254,8 +282,20 @@ assumption is wrong. Items marked as measured were checked on this Windows build
   A later native call on that path then acts on the new empty key, so a delete reports success where
   regedit would report not found. This is the one write the probe can make, and it happens only in
   the race.
-- D3. The hive file can change between the scan and the native restore. The scanner reads the file,
-  and the native call reads it again by path.
+- D3. Restore: closed. The hive file could change between the scan and the native restore when the
+  scanner closed its handle. `RestoreKey` now keeps the file open with `FileShare.Read` from the scan
+  until the native call returns, so a writer cannot open it for write, delete it, or rename it in that
+  window. Replace: open. `RegReplaceKey` takes over the new file, so a sharing lock on it would stop
+  the native call. `ReplaceKey` therefore scans the file and does not hold it, and a writer can still
+  change the file between the scan and the replace.
+- D4. Concurrent hive operations and the process privilege. `PrivilegeScope` enables
+  `SeBackupPrivilege` and `SeRestorePrivilege` on the process token, which is process-wide. Two
+  hive operations on different threads could restore a privilege state that the other still needs.
+  Intended behavior: every hive operation in `RegistryWriter` runs under one lock, so the privilege
+  is enabled and disabled by one operation at a time. The lock also serializes the scan and the
+  native call of one operation with the next. No automated test forces the interleaving; the rule is
+  checked by review of `RegistryWriter.Hives.cs`.
+- D5. Permission propagation is not atomic. See section I.
 
 ## E. Static guard (`scripts/check-registry-writer.js`)
 
@@ -329,6 +369,38 @@ violations and nothing from the clean file or the writer file. The self-test is 
   Mount behavior needs a manual elevated run, which is outside the acceptance run.
 - F4. Each test removes its run root in `finally`. The parent `HKCU\Software\BWC-E2E` may remain
   empty, and the acceptance check looks for child keys.
+
+## I. Permission propagation (`SetKeySecurity` with `propagateToSubkeys`)
+
+The Permissions dialog can replace the descriptor of a key and of every key below it. The
+propagating overload walks the tree itself and applies the same self-relative descriptor to each key,
+so every step goes through the write policy and the link guard. It does not call
+`TreeSetNamedSecurityInfo`, which would compute inherited entries per child; see I5.
+
+- I1. Sandbox refusal before any change. Under the sandbox guard the subtree is scanned for links
+  before the first key is changed, and the call is refused with access denied when any key below
+  the target is a link. A refused propagation changes nothing. Test:
+  `SetKeySecurityPropagationRefusesLinkedSubtreeAndChangesNothing`.
+- I2. Policy per key. Each key is checked with `EnsureWriteAllowed` for `SetKeySecurity`. A
+  sandbox policy therefore refuses a propagation that would reach a key outside the sandbox root.
+  Test: `SetKeySecurityPropagationStaysInsideTheSandbox`.
+- I3. Partial propagation. A failure on one key stops the walk and throws the Win32 error for that
+  key. Keys already changed keep the new descriptor, as classic `TreeSetNamedSecurityInfo` can leave
+  them. The writer does not roll back, because a rollback could undo a later user change. No automated
+  test: a key whose WRITE_DAC is denied cannot be set up in the sandbox, because the owner of a sandbox
+  key keeps WRITE_DAC. The rule is checked by review of `RegistryWriter.Security.cs`.
+- I4. Cancellation. The token is checked before each key. A cancelled propagation keeps the keys it
+  already changed and throws `OperationCanceledException`. Progress is reported after each key with
+  the key path and the running count. Tests: `SetKeySecurityPropagationCanBeCancelledAfterTheCurrentKey`
+  and `SetKeySecurityPropagationAppliesToEveryKeyAndReportsEachOne` (progress paths).
+- I5. Inheritance. Classic "Replace all child object permission entries" recomputes inherited ACEs
+  for each child. This walk gives each descendant the exact descriptor passed in, including its
+  inheritance flags, so an inheritable entry is copied rather than recomputed. The Permissions
+  dialog must pass the descriptor it wants on every descendant. This is a known difference from
+  classic behavior, and it is recorded here until the owner decides whether to switch to
+  `TreeSetNamedSecurityInfo`.
+- I6. A non-propagating call is unchanged. The existing `SetKeySecurity(path, information,
+  descriptor)` overload keeps its behavior and signature. Test: existing `RegistrySecurityTests`.
 
 ## G. Retained failure modes
 

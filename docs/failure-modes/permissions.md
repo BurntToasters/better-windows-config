@@ -117,3 +117,17 @@ Write path: policy check, `RegOpenKeyEx` with `WRITE_DAC | WRITE_OWNER | READ_CO
 KEY_WOW64_64KEY`, `RegSetKeySecurity`, then `RegCloseKey`. The only security descriptor allocation is
 the `LocalAlloc` buffer returned to aclui; aclui frees it with `LocalFree`. No other native
 allocation is made by the engine.
+
+## 15. Propagation to subkeys (engine API)
+
+The engine offers `RegistryWriter.SetKeySecurity(path, descriptor, information, propagateToSubkeys,
+...)` for the "Replace all child object permission entries" check box. The walk, the per-key policy
+check, the sandbox link refusal, cancellation, and progress are described in
+`registry-writer.md` section I. Summary for the dialog owner:
+
+- Propagation applies the descriptor to the key and to every key below it. The first failure stops
+  the walk and throws the Win32 error for that key. Keys already changed stay changed.
+- The sandbox refuses a propagation whose subtree contains a link, before any key changes.
+- Cancelling stops between keys and throws `OperationCanceledException`.
+- Each descendant gets the exact descriptor, not an inheritance-computed one. This differs from
+  classic `TreeSetNamedSecurityInfo` and is recorded as a known difference (`registry-writer.md` I5).

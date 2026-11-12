@@ -31,6 +31,8 @@ public sealed class ShellKeyboardTests
     private const string AddressBarId = "AddressBar";
     private const string SplitterId = "Splitter";
     private const string TreePaneId = "TreePane";
+    private const int MenuViewCommand = 514;
+    private const int MenuViewSplitCommand = 670;
     private const string ListPaneId = "ListPane";
     private const string MenuBarItemClass = "Microsoft.UI.Xaml.Controls.MenuBarItem";
     private const string SummaryFileName = "measurements.json";
@@ -368,6 +370,65 @@ public sealed class ShellKeyboardTests
 
     [TestMethod]
     [TestCategory("Shell")]
+    public void Shell_ViewSplitReturnsFocusAndEscapeRestoresWidth()
+    {
+        var checks = new Checks("shell.split");
+        using var session = OpenBwc(checks, "shell-split");
+        using var automation = new UIA3Automation();
+
+        // The list has focus before View > Split. Split mode must give focus back to the list afterwards.
+        bool onList = EnsurePane(session, automation, "list", "TAB", 6);
+        checks.Record("startsOnList", onList, $"focused pane before View > Split={FocusedPane(automation)}.");
+
+        int startWidth = PaneWidth(session);
+        SplitFromView(session);
+        bool splitterFocused = WaitUntil(() => FocusedPane(automation) == "splitter", UiTimeout);
+        checks.Record(
+            "splitterFocused",
+            splitterFocused,
+            $"focused pane after View > Split={FocusedPane(automation)} (Tab skips the splitter; View > Split requests its focus).");
+
+        for (int i = 0; i < 3; i++)
+        {
+            _ = ControlTestSupport.EnsureForeground(session);
+            Keyboard.Type(VirtualKeyShort.RIGHT);
+            Thread.Sleep(KeySettle);
+        }
+
+        int widened = PaneWidth(session);
+        checks.Record("arrowWidens", widened > startWidth, $"tree width {startWidth} px -> {widened} px after three Right presses.");
+
+        // Escape leaves split mode, puts the width back from before the split, and returns focus to the list.
+        _ = ControlTestSupport.EnsureForeground(session);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
+        bool escapeFocus = WaitUntil(() => FocusedPane(automation) == "list", UiTimeout);
+        int afterEscape = PaneWidth(session);
+        checks.Record("escapeFocus", escapeFocus, $"focused pane after Escape={FocusedPane(automation)}.");
+        checks.Record(
+            "escapeWidth",
+            Math.Abs(afterEscape - startWidth) <= 1,
+            $"tree width after Escape={afterEscape} px, before the split={startWidth} px.");
+
+        // Enter keeps the new width and also returns focus to the list.
+        SplitFromView(session);
+        _ = WaitUntil(() => FocusedPane(automation) == "splitter", UiTimeout);
+        _ = ControlTestSupport.EnsureForeground(session);
+        Keyboard.Type(VirtualKeyShort.RIGHT);
+        Thread.Sleep(KeySettle);
+        int beforeEnter = PaneWidth(session);
+        Keyboard.Type(VirtualKeyShort.ENTER);
+        bool enterFocus = WaitUntil(() => FocusedPane(automation) == "list", UiTimeout);
+        int afterEnter = PaneWidth(session);
+        checks.Record("enterFocus", enterFocus, $"focused pane after Enter={FocusedPane(automation)}.");
+        checks.Record(
+            "enterKeepsWidth",
+            Math.Abs(afterEnter - beforeEnter) <= 1 && Math.Abs(afterEnter - startWidth) > 1,
+            $"tree width after Enter={afterEnter} px (before Enter {beforeEnter} px, before the split {startWidth} px).");
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Shell")]
     public void Shell_WindowEdgeAndSplitterAreNotDark()
     {
         var checks = new Checks("shell.edge");
@@ -409,6 +470,16 @@ public sealed class ShellKeyboardTests
     }
 
     // ---- sessions and focus -------------------------------------------------------------------------
+
+    /// <summary>The tree pane width in pixels, or -1 when the pane is not found.</summary>
+    private static int PaneWidth(AppSession session) => WaitForId(session, TreePaneId)?.BoundingRectangle.Width ?? -1;
+
+    /// <summary>Runs View > Split (command 670) from the menu bar with the real menu path.</summary>
+    private static void SplitFromView(AppSession session)
+    {
+        using var driver = new Bwc.E2E.Editing.EditingDriver(session);
+        driver.OpenMenu(MenuViewCommand, MenuViewSplitCommand);
+    }
 
     private static AppSession OpenBwc(Checks checks, string scope)
     {

@@ -24,6 +24,7 @@ internal sealed class LoopbackServer : IAsyncDisposable
 {
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
     private readonly ConcurrentDictionary<string, Route> _routes = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, int> _hits = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _stop = new();
     private readonly Task _accepting;
 
@@ -38,6 +39,9 @@ internal sealed class LoopbackServer : IAsyncDisposable
     public Uri Url(string path) => new($"http://127.0.0.1:{Port}{path}");
 
     public void Map(string path, Route route) => _routes[path] = route;
+
+    /// <summary>How many requests reached <paramref name="path"/> (answered or not).</summary>
+    public int Hits(string path) => _hits.TryGetValue(path, out var count) ? count : 0;
 
     private async Task AcceptLoopAsync()
     {
@@ -65,6 +69,7 @@ internal sealed class LoopbackServer : IAsyncDisposable
             {
                 var stream = client.GetStream();
                 var path = await ReadRequestTargetAsync(stream);
+                _hits.AddOrUpdate(path, 1, (_, count) => count + 1);
                 var route = _routes.TryGetValue(path, out var found)
                     ? found
                     : new Route(404, Encoding.ASCII.GetBytes("not found"));

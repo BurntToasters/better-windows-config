@@ -2,6 +2,7 @@ using Bwc.Core;
 using Bwc.Regedit.CommandLine;
 using Bwc.Regedit.Controllers;
 using Bwc.Regedit.Dialogs;
+using Bwc.Regedit.Registry;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
@@ -31,7 +32,18 @@ public partial class App : Application
         // Logging and crash reporting start before anything else in the window path can fail.
         Log.Initialize("regedit");
         CrashHandler.Install("regedit", showDialog: true);
+        UnhandledException += OnUnhandledException;
         Log.Info("Registry Editor " + AboutBox.VersionText(System.Reflection.Assembly.GetEntryAssembly() ?? typeof(App).Assembly) + " starting.");
+
+        // An administrator can disable registry editing. The window is not created then.
+        int policy = RegeditPolicy.ReadDisableRegistryTools();
+        if (RegeditPolicy.DisablesRegistryEditing(policy))
+        {
+            Log.Warn($"Registry Editor is disabled by the DisableRegistryTools policy ({policy}).");
+            RegeditPolicy.ShowRegistryEditingDisabled();
+            Environment.Exit(1);
+            return;
+        }
 
         string? regFile = RegeditCommandLine.StartupRegFile(arguments);
         if (!RegeditCommandLine.AllowsMultipleInstances(arguments) && !TakeOrForwardSingleInstance(regFile))
@@ -81,6 +93,16 @@ public partial class App : Application
         }
 
         window.HandleActivation(RegeditActivation.TryDecode(message, out string? regFile) ? regFile : null);
+    }
+
+    /// <summary>
+    /// Reports an exception thrown by a window handler. CrashHandler logs it and shows the classic error
+    /// box. The exception is marked handled, so the window stays usable; out-of-memory is not handled.
+    /// </summary>
+    private static void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+    {
+        CrashHandler.Report(e.Exception, "Registry Editor.UnhandledException");
+        e.Handled = e.Exception is not OutOfMemoryException;
     }
 
     /// <summary>

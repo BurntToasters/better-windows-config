@@ -35,7 +35,9 @@ internal static class NativeRegistry
 
         if (path.IsRoot)
         {
-            handle = SafeRegistryKeyHandle.FromBorrowed(rootOverride.DangerousGetHandle());
+            // The caller's pin on the root may be released after this call, so the returned handle takes
+            // its own reference.
+            handle = SafeRegistryKeyHandle.Pin(rootOverride);
             return WIN32_ERROR.ERROR_SUCCESS;
         }
 

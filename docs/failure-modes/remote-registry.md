@@ -42,9 +42,15 @@ a UAC prompt for this check.
 ## 4. Connection handles
 
 `RegConnectRegistryW` returns one handle per root. `RemoteRegistryConnection` owns the
-`HKEY_LOCAL_MACHINE` and `HKEY_USERS` handles and closes both in `Dispose`. A reader that uses the
-connection borrows the root handles and never closes them itself. The connection must outlive every
-reader created from it; the UI disposes readers before the connection.
+`HKEY_LOCAL_MACHINE` and `HKEY_USERS` handles. A reader does not own them. Each operation that
+needs a root takes a pin: `GetRoot` calls `DangerousAddRef` on the root handle and returns a wrapper
+that calls `DangerousRelease` when it is disposed. The reader disposes the pin after the open, and a
+key handle opened from a predefined root takes its own pin, so the root stays valid while that key
+is in use. `Dispose` of the connection drops its own reference. The native `RegCloseKey` runs when
+the last pin is released, so a `Disconnect` while a load is in flight cannot close a handle that the
+load still uses. A load that starts after `Dispose` gets `ObjectDisposedException` from `GetRoot`.
+Test: `RootPinKeepsTheHandleUsableAfterTheConnectionIsDisposed` (no network, no writes; it wraps two
+read-only HKCU handles with `CreateForTesting`).
 
 A disposed connection cannot create a reader. Every member that reaches a borrowed handle throws
 `ObjectDisposedException` after disposal. Dispose is idempotent and never throws.
@@ -150,7 +156,8 @@ must run only on an isolated network. The test never writes to a remote computer
 
 `RegistryReader` and `RemoteRegistryConnection` call `RegConnectRegistryW`, `RegOpenKeyEx`, and the
 read-only query APIs. No mutating API is added outside `RegistryWriter`, and `RegistryWriter` has no
-remote routing. `scripts/check-registry-writer.js` continues to enforce that boundary.
+remote routing. Root pins use `DangerousAddRef` and `DangerousRelease` on the connection's own
+handles; no other handle is shared. `scripts/check-registry-writer.js` continues to enforce that boundary.
 
 The connection objects live in the Registry Editor view, not in a static cache. Closing the view
 disposes them. No credential, password, or token is stored; authentication uses the process token.

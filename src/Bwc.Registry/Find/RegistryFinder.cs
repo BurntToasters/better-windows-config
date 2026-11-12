@@ -178,6 +178,13 @@ public sealed class RegistryFinder
 
                     continuationLevels.Add(laterSiblings);
                 }
+                else if (atCursorLevel)
+                {
+                    // The parent cannot be listed, so the listing cannot tell whether the cursor key is
+                    // still there. Probe the key itself. A key that cannot be probed is treated as present,
+                    // so its subtree is not skipped.
+                    cursorKeyExists = ProbeKeyExists(cursor.KeyPath);
+                }
 
                 current = parent;
                 atCursorLevel = false;
@@ -220,6 +227,18 @@ public sealed class RegistryFinder
             {
                 sortedNames = new List<string>();
                 return false;
+            }
+        }
+
+        private bool ProbeKeyExists(RegistryPath path)
+        {
+            try
+            {
+                return _reader.KeyExists(path, _cancellationToken);
+            }
+            catch (RegistryOperationException)
+            {
+                return true;
             }
         }
 

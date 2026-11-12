@@ -42,6 +42,11 @@ public sealed class TreeRowElement : Panel
     private double _overlayRowHeight = -1;
     private ExpandCollapseState _expandState = ExpandCollapseState.LeafNode;
 
+    // The peer UI Automation holds for this row. Expand and collapse notifications go to this instance
+    // directly, instead of a FromElement lookup, which misses while the framework has not yet handed the
+    // peer back to the element (the first ExpandCollapse call on a row was dropped that way).
+    private TreeRowAutomationPeer? _peer;
+
     public TreeRowElement()
     {
         Background = DenseTheme.Transparent;
@@ -100,6 +105,7 @@ public sealed class TreeRowElement : Panel
         Tapped += OnRowTapped;
         DoubleTapped += OnRowDoubleTapped;
         RightTapped += OnRowRightTapped;
+        PointerPressed += OnRowPointerPressed;
         Loaded += (_, _) =>
         {
             ApplyIcon();
@@ -269,7 +275,7 @@ public sealed class TreeRowElement : Panel
         return finalSize;
     }
 
-    protected override AutomationPeer OnCreateAutomationPeer() => new TreeRowAutomationPeer(this);
+    protected override AutomationPeer OnCreateAutomationPeer() => _peer ??= new TreeRowAutomationPeer(this);
 
     private bool MetricsStale() =>
         DenseMetrics.FontSize != _fontSize || DenseMetrics.TreeRowHeight != _rowHeight;
@@ -353,7 +359,7 @@ public sealed class TreeRowElement : Panel
 
     private void NotifyPeer(Action<TreeRowAutomationPeer> action)
     {
-        if (FrameworkElementAutomationPeer.FromElement(this) is TreeRowAutomationPeer peer)
+        if (_peer is { } peer)
         {
             action(peer);
         }
@@ -392,6 +398,20 @@ public sealed class TreeRowElement : Panel
     /// must not reach the row, or the row would toggle a second time.
     /// </summary>
     private static void OnChevronDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => e.Handled = true;
+
+    /// <summary>
+    /// A right button press selects the row and takes the focus before the menu opens. The flyout is shown on
+    /// the release (RightTapped); a focus change after it opens dismisses it, so the focus must already be here.
+    /// </summary>
+    private void OnRowPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.Handled || !e.GetCurrentPoint(this).Properties.IsRightButtonPressed)
+        {
+            return;
+        }
+
+        Owner?.RowRightPressed(this);
+    }
 
     private void OnRowRightTapped(object sender, RightTappedRoutedEventArgs e)
     {
@@ -488,6 +508,7 @@ internal sealed class TreeRowAutomationPeer :
     {
         if (_row.Node is { HasChildren: true } node)
         {
+            // The owner sets IsExpanded and raises the change through the row, which notifies this peer.
             _row.Owner?.ExpandFromAutomation(node);
         }
     }

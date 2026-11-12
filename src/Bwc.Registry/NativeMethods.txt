@@ -21,7 +21,6 @@ RegSetKeySecurity
 RegGetKeySecurity
 GetSecurityDescriptorLength
 IsValidSecurityDescriptor
-RegLoadAppKey
 RegFlushKey
 RegNotifyChangeKeyValue
 RegConnectRegistry

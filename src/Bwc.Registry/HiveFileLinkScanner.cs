@@ -5,9 +5,10 @@ namespace Bwc.Registry;
 
 /// <summary>
 /// Walks the key tree of a regf hive file without loading it and reports whether any reachable key
-/// node has the KEY_SYM_LINK flag. The walk follows subkey lists from the root key only. Every cell
-/// is checked against its hive bin before it is read. Any structure that cannot be validated is
-/// reported as unverifiable, so the caller fails closed.
+/// node has the KEY_SYM_LINK flag. The scanner first walks the hive bin chain from offset zero, so
+/// every bin is a validated range; a bin may span several 4 KiB pages. The walk then follows subkey
+/// lists from the root key only, and every cell is mapped to its bin before it is read. Any structure
+/// that cannot be validated is reported as unverifiable, so the caller fails closed.
 /// </summary>
 internal static class HiveFileLinkScanner
 {
@@ -20,20 +21,44 @@ internal static class HiveFileLinkScanner
     private const ushort KeySymbolicLinkFlag = 0x0010;
     private const ushort KeyCompressedNameFlag = 0x0020;
 
-    /// <summary>Scans <paramref name="fullPath"/>. Never throws for a malformed file.</summary>
+    /// <summary>Scans <paramref name="fullPath"/> and releases the file. Never throws for a malformed file.</summary>
     internal static HiveScanResult Scan(string fullPath)
     {
+        using HeldHiveScan held = OpenAndScan(fullPath);
+        return held.Result;
+    }
+
+    /// <summary>
+    /// Scans <paramref name="fullPath"/> and keeps the file open with <see cref="FileShare.Read"/> until
+    /// the returned object is disposed. A writer that opens the file for write, deletes it, or renames it
+    /// is refused for that whole window, so the scanned bytes are the bytes a native call then loads.
+    /// Never throws for a malformed file; an unverifiable file is returned with no file held.
+    /// </summary>
+    internal static HeldHiveScan OpenAndScan(string fullPath)
+    {
+        FileStream? stream = null;
+
         try
         {
-            using var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            return new Walker(stream).Run();
+            stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            HiveScanResult result = new Walker(stream).Run();
+
+            var held = new HeldHiveScan(stream, result);
+            stream = null;
+            return held;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException
             or ArgumentException or NotSupportedException)
         {
-            return HiveScanResult.Unverifiable(ex.Message);
+            return new HeldHiveScan(null, HiveScanResult.Unverifiable(ex.Message));
+        }
+        finally
+        {
+            stream?.Dispose();
         }
     }
+
+    private readonly record struct BinRange(long Start, long Size);
 
     private sealed class Walker
     {
@@ -41,6 +66,7 @@ internal static class HiveFileLinkScanner
         private readonly long _length;
         private readonly uint _binsSize;
         private readonly uint _rootOffset;
+        private readonly List<BinRange> _bins = new();
         private readonly HashSet<uint> _visited = new();
         private string _linkedKeyPath = string.Empty;
 
@@ -67,6 +93,7 @@ internal static class HiveFileLinkScanner
             }
 
             _rootOffset = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0x24));
+            WalkBinChain();
         }
 
         public HiveScanResult Run()
@@ -74,6 +101,44 @@ internal static class HiveFileLinkScanner
             return VisitKey(_rootOffset, string.Empty, depth: 0)
                 ? HiveScanResult.Linked(_linkedKeyPath)
                 : HiveScanResult.Clean;
+        }
+
+        /// <summary>
+        /// Reads every bin header from offset zero. Each bin must start with an "hbin" header whose offset
+        /// field matches its position, and each bin size must be a positive multiple of 4 KiB. The bins must
+        /// end exactly at the declared bin data size. Anything else is unverifiable.
+        /// </summary>
+        private void WalkBinChain()
+        {
+            long offset = 0;
+
+            while (offset < _binsSize)
+            {
+                byte[] header = ReadBytes(BaseBlockSize + offset, BinHeaderSize);
+                if (!HasSignature(header, 0, "hbin"))
+                {
+                    throw new InvalidDataException("the hive bin chain has no hbin header where a bin should start");
+                }
+
+                if (BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(4)) != offset)
+                {
+                    throw new InvalidDataException("an hbin header records the wrong offset");
+                }
+
+                long size = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8));
+                if (size < BinAlignment || size % BinAlignment != 0 || offset + size > _binsSize)
+                {
+                    throw new InvalidDataException("an hbin size is invalid");
+                }
+
+                _bins.Add(new BinRange(offset, size));
+                offset += size;
+            }
+
+            if (offset != _binsSize)
+            {
+                throw new InvalidDataException("the hive bin chain does not end at the declared bin data size");
+            }
         }
 
         /// <returns>True when a link node was found; its path is in <see cref="_linkedKeyPath"/>.</returns>
@@ -172,6 +237,10 @@ internal static class HiveFileLinkScanner
             return false;
         }
 
+        /// <summary>
+        /// Maps a cell offset to the validated bin that contains it, then checks the cell's size field.
+        /// Returns the data offset and data length of the cell.
+        /// </summary>
         private (long DataOffset, int DataLength) ResolveCell(uint relativeOffset)
         {
             if (relativeOffset >= _binsSize || relativeOffset % MinimumCellSize != 0)
@@ -179,20 +248,8 @@ internal static class HiveFileLinkScanner
                 throw new InvalidDataException("a cell offset is outside the hive bins or is misaligned");
             }
 
-            long binStart = relativeOffset & ~(long)(BinAlignment - 1);
-            byte[] bin = ReadBytes(BaseBlockSize + binStart, BinHeaderSize);
-            if (!HasSignature(bin, 0, "hbin"))
-            {
-                throw new InvalidDataException("a cell points into a block without an hbin header");
-            }
-
-            uint binSize = BinaryPrimitives.ReadUInt32LittleEndian(bin.AsSpan(8));
-            if (binSize < BinAlignment || binSize % BinAlignment != 0 || binStart + binSize > _binsSize)
-            {
-                throw new InvalidDataException("an hbin size is invalid");
-            }
-
-            if (relativeOffset < binStart + BinHeaderSize)
+            BinRange bin = FindBin(relativeOffset);
+            if (relativeOffset < bin.Start + BinHeaderSize)
             {
                 throw new InvalidDataException("a cell starts inside an hbin header");
             }
@@ -206,12 +263,43 @@ internal static class HiveFileLinkScanner
 
             long allocated = -(long)cellSize;
             if (allocated < MinimumCellSize || allocated % MinimumCellSize != 0
-                || relativeOffset + allocated > binStart + binSize)
+                || relativeOffset + allocated > bin.Start + bin.Size)
             {
                 throw new InvalidDataException("a cell size is invalid");
             }
 
             return (BaseBlockSize + relativeOffset + 4, (int)(allocated - 4));
+        }
+
+        /// <summary>
+        /// Returns the bin whose range contains <paramref name="relativeOffset"/>. The bins cover all of
+        /// the bin data, so a miss means the offset is outside the hive.
+        /// </summary>
+        private BinRange FindBin(uint relativeOffset)
+        {
+            int low = 0;
+            int high = _bins.Count - 1;
+
+            while (low <= high)
+            {
+                int middle = low + ((high - low) / 2);
+                BinRange candidate = _bins[middle];
+
+                if (relativeOffset < candidate.Start)
+                {
+                    high = middle - 1;
+                }
+                else if (relativeOffset >= candidate.Start + candidate.Size)
+                {
+                    low = middle + 1;
+                }
+                else
+                {
+                    return candidate;
+                }
+            }
+
+            throw new InvalidDataException("a cell offset is outside every hive bin");
         }
 
         private byte[] ReadBytes(long offset, int count)
@@ -239,6 +327,29 @@ internal static class HiveFileLinkScanner
                 signature,
                 StringComparison.Ordinal);
         }
+    }
+}
+
+/// <summary>
+/// A scanned hive file that stays open, with the scan result. Dispose releases the file. When the scan
+/// was unverifiable, no file is held and dispose does nothing.
+/// </summary>
+internal sealed class HeldHiveScan : IDisposable
+{
+    private FileStream? _stream;
+
+    internal HeldHiveScan(FileStream? stream, HiveScanResult result)
+    {
+        _stream = stream;
+        Result = result;
+    }
+
+    internal HiveScanResult Result { get; }
+
+    public void Dispose()
+    {
+        FileStream? stream = Interlocked.Exchange(ref _stream, null);
+        stream?.Dispose();
     }
 }
 

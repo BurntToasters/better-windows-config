@@ -21,9 +21,6 @@ public sealed record UpdateOptions
 
     public TimeSpan InstallerDownloadTimeout { get; init; } = TimeSpan.FromMinutes(30);
 
-    /// <summary>How long the helper waits for the installer. The installer is never killed.</summary>
-    public TimeSpan InstallerRunTimeout { get; init; } = TimeSpan.FromMinutes(30);
-
     public long MaxManifestBytes { get; init; } = 256 * 1024;
 
     public long MaxSignatureBytes { get; init; } = 8 * 1024;

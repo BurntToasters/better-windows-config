@@ -78,16 +78,22 @@ public sealed class RegistryExportService
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        RegFileDocument document = ExportRegFile(startKey, format, scope, cancellationToken, progress);
+        // Each key section goes to the stream as soon as it is read, so the document is never held in
+        // memory. The header is written with the first section; a start key that cannot be read
+        // leaves the stream empty.
+        RegistryPath? start = scope == RegistryExportScope.WholeRegistry ? null : RequireStartKey(startKey);
+        var writer = new RegFileStreamWriter(stream, format);
 
-        if (format == RegFileFormat.V5)
+        if (start is null)
         {
-            RegFileWriter.WriteV5(document, stream);
+            RegFileExporter.ExportWholeRegistryKeys(_source, cancellationToken, progress, writer.WriteKey);
         }
         else
         {
-            RegFileWriter.WriteRegedit4(document, stream);
+            RegFileExporter.ExportSubtree(_source, start, cancellationToken, progress, writer.WriteKey);
         }
+
+        writer.Finish();
     }
 
     public void ExportTextFile(

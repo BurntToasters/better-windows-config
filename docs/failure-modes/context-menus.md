@@ -7,6 +7,13 @@ RT_MENU 108, the text edit menu, is out of scope and is not attached to any cont
 
 ## Right-click selection
 
+### The first right click opens the menu
+
+The tree takes the pointer focus on the right button press, not on the release. A focus change after
+the flyout is shown dismisses it, so a first right click on a tree row whose pane did not have focus
+closed its own menu. The list already focused on press. The E2E driver makes one right click and
+fails when no menu opens; it does not retry.
+
 ### Selection happens before the popup
 
 A right-click on a tree row selects that node first, then raises the context request. A right-click

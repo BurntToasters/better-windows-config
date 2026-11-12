@@ -14,7 +14,6 @@ public enum RegistryWriteOperation
     ReplaceKey,
     RestoreKey,
     SetKeySecurity,
-    Remote,
 }
 
 public interface IRegistryWritePolicy

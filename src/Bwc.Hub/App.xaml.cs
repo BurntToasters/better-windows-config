@@ -39,9 +39,36 @@ public partial class App : Application
         }
 
         _instance.MessageReceived += OnMessageReceived;
-        _window = new MainWindow();
+        var window = new MainWindow();
+        _window = window;
         _window.Closed += OnWindowClosed;
         _window.Activate();
+
+        // The update helper relaunches the Hub with --update-result <code> when it did not install.
+        if (ReadUpdateResult(Environment.GetCommandLineArgs()) is { } updateResult)
+        {
+            window.DispatcherQueue.TryEnqueue(() =>
+            {
+                _ = window.ShowUpdateResultAsync(updateResult);
+            });
+        }
+    }
+
+    private const string UpdateResultArgument = "--update-result";
+
+    /// <summary>The failure code after --update-result, or null. Only a short run of letters and digits is accepted.</summary>
+    private static string? ReadUpdateResult(string[] args)
+    {
+        for (int i = 0; i + 1 < args.Length; i++)
+        {
+            if (string.Equals(args[i], UpdateResultArgument, StringComparison.Ordinal))
+            {
+                string code = args[i + 1];
+                return code.Length is > 0 and <= 64 && code.All(char.IsAsciiLetterOrDigit) ? code : null;
+            }
+        }
+
+        return null;
     }
 
     private void Shutdown()

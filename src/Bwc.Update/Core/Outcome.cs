@@ -6,6 +6,7 @@ public enum UpdateFailure
     None,
     InvalidOptions,
     TrustedKeysInvalid,
+    TrustedKeysNotConfigured,
     UrlRejected,
     DownloadFailed,
     Timeout,
@@ -20,6 +21,7 @@ public enum UpdateFailure
     ChannelMismatch,
     PrereleaseOnStable,
     ManifestDatedInFuture,
+    ManifestExpired,
     SameVersion,
     Downgrade,
     NoInstallerForArchitecture,
@@ -37,8 +39,8 @@ public enum UpdateFailure
     InstallDirUnsafe,
     InstallerArgumentRejected,
     InstallerFailed,
-    InstallerTimedOut,
     HubMissing,
+    RunningElevated,
 }
 
 /// <summary>A typed result. When Ok is false, Failure says why and Detail is safe to log.</summary>

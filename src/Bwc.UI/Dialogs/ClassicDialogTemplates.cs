@@ -179,6 +179,34 @@ public static class ClassicDialogTemplates
             FontPointSize = 8,
         };
 
+    /// <summary>
+    /// Display Binary Data (RT_DIALOG 2021, the template with Value Type): the value's bytes in a read-only
+    /// list, the Byte, Word, Dword, and Qword formats, and the value type. 440 x 161 DLU. The caller's
+    /// caption and OK text are used as given.
+    /// </summary>
+    public static ClassicDialogDefinition BinaryData(string caption, string okText) =>
+        new(
+            caption,
+            "RT_DIALOG 2021 (en-US regedit.exe.mui)",
+            440,
+            161,
+            [
+                Label("DataLabel", "D&ata:", 4, 6, 20, 8),
+                ListBox("HexViewerList", 2022, 4, 15, 433, 71, multiSelect: false),
+                Group("FormatGroup", "Format", 4, 92, 212, 35),
+                Radio("FormatByte", 2023, "&Byte", 24, 105, 30, 10, tabStop: false, isChecked: true),
+                Radio("FormatWord", 2024, "&Word", 64, 105, 35, 10, tabStop: false, isChecked: false),
+                Radio("FormatDword", 2025, "&Dword", 109, 105, 39, 10, tabStop: false, isChecked: false),
+                Radio("FormatQword", 2027, "&Qword", 158, 105, 39, 10, tabStop: false, isChecked: false),
+                Button("DialogPrimary", 1, okText, 161, 137, 40, 14, isDefault: true),
+                Label("ValueTypeLabel", "Value Type:", 255, 105, 44, 8),
+                Label("ValueTypeText", string.Empty, 303, 105, 58, 8),
+            ])
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
     private static ClassicControlDefinition MultiLineEdit(string automationId, int id, int x, int y, int cx, int cy) =>
         Edit(automationId, id, x, y, cx, cy, multiline: true);
 

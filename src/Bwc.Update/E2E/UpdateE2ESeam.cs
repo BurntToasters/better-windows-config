@@ -4,7 +4,7 @@ using System.Text;
 namespace Bwc.Update;
 
 /// <summary>
-/// E2E-only overrides for the check command. Compiled only into the E2E flavor, so a ship build
+/// E2E-only overrides for the check, download, and apply commands. Compiled only into the E2E flavor, so a ship build
 /// has no environment switch that changes trust or transport. A variable that does not decode
 /// leaves the default options in place, so the placeholder key still refuses every manifest.
 /// </summary>

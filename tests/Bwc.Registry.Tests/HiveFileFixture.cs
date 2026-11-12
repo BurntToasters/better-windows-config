@@ -63,6 +63,64 @@ internal static class HiveFileFixture
         return bytes;
     }
 
+    /// <summary>
+    /// Builds a hive whose single hive bin spans two 4 KiB pages. The root key and its list live in
+    /// the first page; the child key lives in the second page, which has no "hbin" header of its own.
+    /// This file is valid. A scanner that reads only the header at the start of a cell's own page
+    /// refuses it.
+    /// </summary>
+    internal static byte[] BuildMultiPageHive(bool includeLinkChild)
+    {
+        const int TwoPageBin = BinSize * 2;
+        const int SecondPageListOffset = BinSize;
+        const int SecondPageChildOffset = BinSize + 0x20;
+
+        byte[] bytes = new byte[BaseBlockSize + TwoPageBin];
+
+        WriteAscii(bytes, 0, "regf");
+        WriteUInt32(bytes, 0x24, RootCellOffset);
+        WriteUInt32(bytes, 0x28, TwoPageBin);
+
+        WriteAscii(bytes, BaseBlockSize, "hbin");
+        WriteUInt32(bytes, BaseBlockSize + 4, 0);
+        WriteUInt32(bytes, BaseBlockSize + 8, TwoPageBin);
+
+        WriteNamedKey(bytes, RootCellOffset, RootCellSize, "Root", KeyCompressedNameFlag, 1, SecondPageListOffset);
+
+        WriteCellHeader(bytes, SecondPageListOffset, ListCellSize);
+        int list = BaseBlockSize + SecondPageListOffset + 4;
+        WriteAscii(bytes, list, "lf");
+        WriteUInt16(bytes, list + 2, 1);
+        WriteUInt32(bytes, list + 4, SecondPageChildOffset);
+        WriteUInt32(bytes, list + 8, 0);
+
+        uint childFlags = KeyCompressedNameFlag | (includeLinkChild ? KeySymbolicLinkFlag : 0);
+        WriteNamedKey(bytes, SecondPageChildOffset, ChildCellSize, "Child", childFlags, subkeyCount: 0, NoOffset);
+
+        return bytes;
+    }
+
+    /// <summary>
+    /// Builds a hive whose header declares two pages of bin data, but only the first page is an
+    /// "hbin". The second page has no header, so the bin chain does not add up to the declared size
+    /// and the file is unverifiable even though the root key is readable.
+    /// </summary>
+    internal static byte[] BuildBrokenBinChainHive()
+    {
+        byte[] bytes = new byte[BaseBlockSize + (BinSize * 2)];
+
+        WriteAscii(bytes, 0, "regf");
+        WriteUInt32(bytes, 0x24, RootCellOffset);
+        WriteUInt32(bytes, 0x28, BinSize * 2);
+
+        WriteAscii(bytes, BaseBlockSize, "hbin");
+        WriteUInt32(bytes, BaseBlockSize + 4, 0);
+        WriteUInt32(bytes, BaseBlockSize + 8, BinSize);
+
+        WriteNamedKey(bytes, RootCellOffset, RootCellSize, "Root", KeyCompressedNameFlag, 0, NoOffset);
+        return bytes;
+    }
+
     private static void WriteNamedKey(
         byte[] bytes,
         int cellOffset,

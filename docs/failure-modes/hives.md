@@ -76,6 +76,10 @@ Hive APIs require these privileges:
 | ReplaceKey | SeRestorePrivilege, SeBackupPrivilege |
 | RestoreKey | SeRestorePrivilege, SeBackupPrivilege |
 
+The privilege is process-wide, so every hive operation in `RegistryWriter` takes one lock for its
+whole run, from the file checks to the native call. Two hive operations never overlap, and one
+operation never disables a privilege that another is using (see `registry-writer.md` D4).
+
 If `AdjustTokenPrivileges` reports `ERROR_NOT_ALL_ASSIGNED` (1300) or a lookup fails, the writer
 throws `ERROR_PRIVILEGE_NOT_HELD` (1314) without calling a hive API. A non-elevated process
 therefore cannot mount a hive by accident. The UI does not request elevation and never shows a UAC
@@ -97,6 +101,11 @@ overwrites an existing file.
 `RegReplaceKey` writes the current hive contents to the backup file before installing the new
 file. The backup file is created by the system, not by this code, and is never deleted here.
 `RegRestoreKey` replaces the key contents from the file and does not create a backup.
+
+When the sandbox guard checks a hive file before `RegRestoreKey`, the scanner keeps that file open
+with `FileShare.Read` until the native call returns, so a writer cannot change the file between the
+link check and the load. `RegReplaceKey` checks its replacement file without holding it, because the
+native call takes the file over; see `registry-writer.md` A12 and D3.
 
 ## 7. Load and unload errors
 

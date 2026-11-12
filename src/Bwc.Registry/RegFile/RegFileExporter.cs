@@ -1,22 +1,30 @@
+using System.Diagnostics;
+
 namespace Bwc.Registry;
 
 /// <summary>
-/// Builds a <see cref="RegFileDocument"/> from a live registry tree. Keys and values are read in
-/// registry enumeration order, never in the UI's sorted order. The complete document is built in
-/// memory; the caller owns writing it.
+/// Builds a <see cref="RegFileDocument"/> from a live registry tree, or streams the same key sections
+/// to a writer as they are read. Keys and values are read in registry enumeration order, never in the
+/// UI's sorted order. The document overloads collect every key in memory; the caller owns writing it.
+/// <see cref="RegistryExportService.WriteRegFile"/> uses the streaming path, so its memory use does not
+/// grow with the size of the export.
 /// </summary>
 public static class RegFileExporter
 {
     private const int ErrorAccessDenied = 5;
+    private const int ErrorFileNotFound = 2;
+    private const int ErrorKeyDeleted = 1018;
     private const int ErrorInvalidName = 123;
     private const string ExportValueNameOperation = "ExportValueName";
+    private const string ExportKeyNameOperation = "ExportKeyName";
     private const string ComputerPrefix = "Computer\\";
+    private static readonly TimeSpan ThrottleInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
     /// Exports <paramref name="startKey"/> and every readable descendant. An unreadable
     /// descendant is skipped with its subtree; an unreadable start key throws
-    /// <see cref="RegistryOperationException"/>. A value whose name contains an embedded NUL also
-    /// throws, with operation <c>ExportValueName</c>, and no document is returned.
+    /// <see cref="RegistryOperationException"/>. A value or key name that cannot be written to a
+    /// .reg file also throws, and no document is returned.
     /// </summary>
     public static RegFileDocument Export(
         RegistryReader reader,
@@ -44,14 +52,9 @@ public static class RegFileExporter
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(startKey);
         ValidateFormat(format);
-        cancellationToken.ThrowIfCancellationRequested();
 
         var keys = new List<RegFileKey>();
-        var state = new ExportState();
-        progress?.Report(Starting(startKey, state));
-        Walk(source, startKey, isStart: true, cancellationToken, progress, state, keys);
-        progress?.Report(Completed(startKey, state));
-
+        ExportSubtree(source, startKey, cancellationToken, progress, keys.Add);
         return new RegFileDocument(format, keys);
     }
 
@@ -81,20 +84,9 @@ public static class RegFileExporter
     {
         ArgumentNullException.ThrowIfNull(source);
         ValidateFormat(format);
-        cancellationToken.ThrowIfCancellationRequested();
 
         var keys = new List<RegFileKey>();
-        var state = new ExportState();
-        IReadOnlyList<RegistryPath> roots = RegistryExportRoots.Classic;
-        progress?.Report(Starting(roots[0], state));
-
-        foreach (RegistryPath root in roots)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            Walk(source, root, isStart: false, cancellationToken, progress, state, keys);
-        }
-
-        progress?.Report(Completed(roots[^1], state));
+        ExportWholeRegistryKeys(source, cancellationToken, progress, keys.Add);
         return new RegFileDocument(format, keys);
     }
 
@@ -112,14 +104,58 @@ public static class RegFileExporter
         return Export(reader, RegistryPath.Parse(displayPath), format, cancellationToken, progress);
     }
 
+    /// <summary>
+    /// Passes each key section of a subtree export to <paramref name="emit"/> in document order. A
+    /// section is passed only after all of its values are read, so an exception from the walk never
+    /// leaves a half-read section behind.
+    /// </summary>
+    internal static void ExportSubtree(
+        IRegistryExportSource source,
+        RegistryPath startKey,
+        CancellationToken cancellationToken,
+        IProgress<ExportProgress>? progress,
+        Action<RegFileKey> emit)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var state = new ExportState();
+        var gate = new ProgressGate(progress);
+        gate.Always(Starting(startKey, state));
+        Walk(source, startKey, isStart: true, cancellationToken, gate, state, emit);
+        gate.Always(Completed(startKey, state));
+    }
+
+    /// <summary>Passes each key section of every classic root to <paramref name="emit"/>, in tree order.</summary>
+    internal static void ExportWholeRegistryKeys(
+        IRegistryExportSource source,
+        CancellationToken cancellationToken,
+        IProgress<ExportProgress>? progress,
+        Action<RegFileKey> emit)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var state = new ExportState();
+        var gate = new ProgressGate(progress);
+        IReadOnlyList<RegistryPath> roots = RegistryExportRoots.Classic;
+        gate.Always(Starting(roots[0], state));
+
+        foreach (RegistryPath root in roots)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Walk(source, root, isStart: false, cancellationToken, gate, state, emit);
+        }
+
+        gate.Always(Completed(roots[^1], state));
+    }
+
     private static void Walk(
         IRegistryExportSource source,
         RegistryPath path,
         bool isStart,
         CancellationToken cancellationToken,
-        IProgress<ExportProgress>? progress,
+        ProgressGate gate,
         ExportState state,
-        List<RegFileKey> keys)
+        Action<RegFileKey> emit)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -132,10 +168,11 @@ public static class RegFileExporter
             cancellationToken.ThrowIfCancellationRequested();
             subKeyNames = source.EnumerateSubKeyNames(path, cancellationToken);
         }
-        catch (RegistryOperationException ex) when (!isStart && ex.Win32Error == ErrorAccessDenied)
+        catch (RegistryOperationException ex) when (!isStart && IsSkippableKeyError(ex.Win32Error))
         {
+            // Access denied, or a key that was deleted or never existed by the time it was read.
             state.KeysSkipped += 1;
-            progress?.Report(new ExportProgress(
+            gate.Always(new ExportProgress(
                 ExportPhase.KeySkipped,
                 path,
                 null,
@@ -151,20 +188,21 @@ public static class RegFileExporter
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // A .reg name cannot hold a NUL. Writing it would produce a name that is not the
-            // registry's, and classic regedit stops the export at such a value without an error.
-            if (value.Name.Contains('\0'))
+            // A .reg name cannot hold a NUL, a line feed, or a carriage return. Writing one would
+            // produce a name that is not the registry's, and classic regedit stops the export at
+            // such a value without an error. The exporter refuses instead.
+            if (value.Name.IndexOfAny(RegFileWriter.UnwritableNameCharacters) >= 0)
             {
                 throw new RegistryOperationException(
                     ExportValueNameOperation,
                     path,
                     ErrorInvalidName,
-                    "A value name contains an embedded NUL and cannot be written to a .reg file.");
+                    "A value name contains a NUL, line feed, or carriage return and cannot be written to a .reg file.");
             }
 
             fileValues.Add(new RegFileValue(value.Name, value.Type, value.Data));
             state.ValuesExported += 1;
-            progress?.Report(new ExportProgress(
+            gate.Throttled(new ExportProgress(
                 ExportPhase.ValueExported,
                 path,
                 value.Name,
@@ -173,9 +211,9 @@ public static class RegFileExporter
                 state.KeysSkipped));
         }
 
-        keys.Add(new RegFileKey(ToRegPath(path), fileValues));
+        emit(new RegFileKey(ToRegPath(path), fileValues));
         state.KeysExported += 1;
-        progress?.Report(new ExportProgress(
+        gate.Throttled(new ExportProgress(
             ExportPhase.KeyExported,
             path,
             null,
@@ -186,9 +224,23 @@ public static class RegFileExporter
         foreach (string subKeyName in subKeyNames)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Walk(source, path.Append(subKeyName), isStart: false, cancellationToken, progress, state, keys);
+
+            if (subKeyName.IndexOfAny(RegFileWriter.UnwritableNameCharacters) >= 0)
+            {
+                // Refused before the child is read, so no section for it is emitted.
+                throw new RegistryOperationException(
+                    ExportKeyNameOperation,
+                    path,
+                    ErrorInvalidName,
+                    "A key name contains a NUL, line feed, or carriage return and cannot be written to a .reg file.");
+            }
+
+            Walk(source, path.Append(subKeyName), isStart: false, cancellationToken, gate, state, emit);
         }
     }
+
+    private static bool IsSkippableKeyError(int win32Error) =>
+        win32Error is ErrorAccessDenied or ErrorFileNotFound or ErrorKeyDeleted;
 
     private static ExportProgress Starting(RegistryPath path, ExportState state) =>
         new(ExportPhase.Starting, path, null, state.KeysExported, state.ValuesExported, state.KeysSkipped);
@@ -222,5 +274,43 @@ public static class RegFileExporter
         public int ValuesExported { get; set; }
 
         public int KeysSkipped { get; set; }
+    }
+
+    /// <summary>
+    /// Passes progress to the caller. Starting, skip, and completion events always go through. Key and
+    /// value events are throttled to one report per <see cref="ThrottleInterval"/>, so a large export
+    /// does not flood the UI thread. Completion carries the final running totals.
+    /// </summary>
+    private sealed class ProgressGate
+    {
+        private readonly IProgress<ExportProgress>? _progress;
+        private long _lastThrottledReport;
+
+        internal ProgressGate(IProgress<ExportProgress>? progress)
+        {
+            _progress = progress;
+        }
+
+        internal void Always(ExportProgress report)
+        {
+            _progress?.Report(report);
+        }
+
+        internal void Throttled(ExportProgress report)
+        {
+            if (_progress is null)
+            {
+                return;
+            }
+
+            long now = Stopwatch.GetTimestamp();
+            if (_lastThrottledReport != 0 && Stopwatch.GetElapsedTime(_lastThrottledReport, now) < ThrottleInterval)
+            {
+                return;
+            }
+
+            _lastThrottledReport = now;
+            _progress.Report(report);
+        }
     }
 }

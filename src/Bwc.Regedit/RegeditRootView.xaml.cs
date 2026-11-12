@@ -102,6 +102,8 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         Shell.TreeContent.ContextRequested += OnTreeContextRequested;
         Shell.TreeContent.DeleteRequested += OnTreeDeleteRequested;
         Shell.TreeContent.CopyKeyNameRequested += OnCopyKeyNameRequested;
+        Shell.TreeContent.ExpandFailed += OnTreeExpandFailed;
+        _context.WriteFinished += OnWriteFinished;
         Shell.ListContent.ContextRequested += OnListContextRequested;
         Shell.ListContent.DeleteRequested += OnListDeleteRequested;
 
@@ -125,6 +127,12 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
 
     /// <summary>Raised when View > Font or View > Theme changes a setting, so the window saves at once.</summary>
     public event EventHandler? SettingsChanged;
+
+    /// <summary>Raised on the UI thread when the last registry write ends. The window closes after a held close.</summary>
+    public event EventHandler? WriteFinished;
+
+    /// <summary>True while a registry write runs. The window holds a close request until it ends.</summary>
+    public bool IsWriteInProgress => _context.WriteInProgress;
 
     /// <summary>The in-memory view state. Updated by selection changes, not written to disk.</summary>
     public RegeditSettings Settings => _context.Settings;
@@ -313,6 +321,11 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
     }
 
     private void OnCopyKeyNameRequested(object? sender, EventArgs e) => _keyCommands.CopySelectedKeyName();
+
+    private void OnTreeExpandFailed(object? sender, TreeNodeErrorEventArgs e) =>
+        _ = _context.ShowExpandFailedAsync(e.Node, e.Exception);
+
+    private void OnWriteFinished(object? sender, EventArgs e) => WriteFinished?.Invoke(this, EventArgs.Empty);
 
     private void OnTreeContextRequested(object? sender, TreeNodeContextRequestedEventArgs e) =>
         _contextMenus.ShowTreeContextMenu(e);

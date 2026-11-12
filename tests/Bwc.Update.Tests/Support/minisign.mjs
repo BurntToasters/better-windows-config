@@ -4,9 +4,14 @@
 //   node minisign.mjs keygen <dir>
 //   node minisign.mjs sign <file> <keydir> [--trusted-comment <text>] [--legacy]
 //
+//   node minisign.mjs sign-manifest <file> <keydir> --version <semver> --channel stable|beta --expires <yyyy-MM-ddTHH:mm:ssZ>
+//
 // sign writes two files next to <file>:
 //   <file>.minisig  raw minisign signature text (4 lines, LF endings, trailing newline)
 //   <file>.sig      base64 of that text: the envelope Tauri writes and puts in latest.json "signature"
+//
+// sign-manifest signs a manifest and writes the trusted comment the updater requires, exactly:
+//   version:<semver> channel:<stable|beta> expires:<yyyy-MM-ddTHH:mm:ssZ>
 //
 // Signing is prehashed ("ED"): Ed25519 over BLAKE2b-512(file), streamed in 1 MB chunks.
 // --legacy writes an "Ed" packet over the raw file bytes instead (only for tests of rejection).
@@ -112,12 +117,34 @@ export function envelope(signatureText) {
   return Buffer.from(signatureText, "utf8").toString("base64");
 }
 
+// The manifest trusted comment. The updater accepts exactly this form (docs/contracts/update-manifest.md).
+const MANIFEST_COMMENT_PATTERN =
+  /^version:(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)? channel:(stable|beta) expires:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
+export function manifestTrustedComment({ version, channel, expires }) {
+  const comment = `version:${version} channel:${channel} expires:${expires}`;
+  if (!MANIFEST_COMMENT_PATTERN.test(comment)) {
+    throw new Error(`manifest trusted comment is not in the required form: ${comment}`);
+  }
+  return comment;
+}
+
 function usage() {
   return [
     "usage:",
     "  node minisign.mjs keygen <dir>",
     "  node minisign.mjs sign <file> <keydir> [--trusted-comment <text>] [--legacy]",
+    "  node minisign.mjs sign-manifest <file> <keydir> --version <semver> --channel stable|beta --expires <yyyy-MM-ddTHH:mm:ssZ>",
   ].join("\n");
+}
+
+async function writeSignature(file, keyDir, trustedComment, legacy) {
+  const secretKeyText = fs.readFileSync(path.join(keyDir, "minisign.key"), "utf8");
+  const signatureText = await signFile(file, secretKeyText, trustedComment, { legacy });
+  fs.writeFileSync(`${file}.minisig`, signatureText);
+  fs.writeFileSync(`${file}.sig`, envelope(signatureText));
+  console.log(`${file}.minisig`);
+  console.log(`${file}.sig`);
 }
 
 async function main(argv) {
@@ -152,12 +179,23 @@ async function main(argv) {
         throw new Error(`unknown option ${options[i]}`);
       }
     }
-    const secretKeyText = fs.readFileSync(path.join(keyDir, "minisign.key"), "utf8");
-    const signatureText = await signFile(file, secretKeyText, trustedComment, { legacy });
-    fs.writeFileSync(`${file}.minisig`, signatureText);
-    fs.writeFileSync(`${file}.sig`, envelope(signatureText));
-    console.log(`${file}.minisig`);
-    console.log(`${file}.sig`);
+    await writeSignature(file, keyDir, trustedComment, legacy);
+    return;
+  }
+
+  if (command === "sign-manifest" && rest.length >= 2) {
+    const [file, keyDir, ...options] = rest;
+    const fields = {};
+    for (let i = 0; i < options.length; i += 2) {
+      const flag = options[i];
+      if (!["--version", "--channel", "--expires"].includes(flag)) throw new Error(`unknown option ${flag}`);
+      if (options[i + 1] === undefined) throw new Error(`${flag} needs a value`);
+      fields[flag.slice(2)] = options[i + 1];
+    }
+    for (const name of ["version", "channel", "expires"]) {
+      if (fields[name] === undefined) throw new Error(`--${name} is required`);
+    }
+    await writeSignature(file, keyDir, manifestTrustedComment(fields), false);
     return;
   }
 

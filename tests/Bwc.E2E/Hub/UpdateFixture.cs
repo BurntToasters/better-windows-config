@@ -87,7 +87,10 @@ internal sealed class UpdateFixture : IDisposable
             manifestPath,
             JsonSerializer.Serialize(manifest),
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        RunNode(_signer, "sign", manifestPath, _keyDir, "--trusted-comment", "timestamp:1794102823 version:" + version);
+
+        // The trusted comment binds version, channel, and expiry, in exactly this form.
+        string expires = DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+        RunNode(_signer, "sign-manifest", manifestPath, _keyDir, "--version", version, "--channel", "stable", "--expires", expires);
         return (File.ReadAllBytes(manifestPath), File.ReadAllBytes(manifestPath + ".minisig"));
     }
 

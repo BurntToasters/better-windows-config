@@ -89,39 +89,28 @@ internal sealed class ContextMenuDriver : IDisposable
     }
 
     /// <summary>
-    /// Right clicks a target that is re-read for every attempt and returns the menu that opens. A
-    /// stale row element after a rename or a click that only restores focus is retried, because the
-    /// failure looks like a missing menu even though the row is on screen. Each attempt waits a
-    /// short time for a menu, so a real failure still ends within the caller's timeout.
+    /// Right clicks a target once and returns the menu that opens. A classic menu opens on the first
+    /// right click, so there is no retry: a click that does not open the menu returns null and the
+    /// caller fails. The target is read once, right before the click.
     /// </summary>
     internal MenuSnapshot? RightClickForMenu(
         Func<AutomationElement?> target,
         IReadOnlyList<string> expectedNames,
         TimeSpan? timeout = null)
     {
-        DateTime deadline = DateTime.UtcNow + (timeout ?? UiTimeout);
-        for (int attempt = 1; attempt <= 3 && DateTime.UtcNow < deadline; attempt++)
+        AutomationElement? element = target();
+        if (element is null || !RightClick(element))
         {
-            AutomationElement? element = target();
-            if (element is not null && RightClick(element))
-            {
-                MenuSnapshot? snapshot = WaitForMenu(expectedNames, TimeSpan.FromSeconds(4));
-                if (snapshot is not null)
-                {
-                    return snapshot;
-                }
-            }
-
-            _ = WaitForNoMenu(TimeSpan.FromSeconds(1));
-            Thread.Sleep(150);
+            E2EResults.Note("context-menu.first-click", "The right click was not sent: the target was not found.");
+            return null;
         }
 
-        return null;
+        return RecordFirstClick(WaitForMenu(expectedNames, timeout ?? UiTimeout));
     }
 
     /// <summary>
-    /// Right clicks a screen point and returns the menu that opens. A click that only restores focus
-    /// is retried, with the same bounded per-attempt menu wait as the element overload.
+    /// Right clicks a screen point once and returns the menu that opens. There is no retry, as in the
+    /// element overload.
     /// </summary>
     internal MenuSnapshot? RightClickForMenu(
         int x,
@@ -129,23 +118,24 @@ internal sealed class ContextMenuDriver : IDisposable
         IReadOnlyList<string> expectedNames,
         TimeSpan? timeout = null)
     {
-        DateTime deadline = DateTime.UtcNow + (timeout ?? UiTimeout);
-        for (int attempt = 1; attempt <= 3 && DateTime.UtcNow < deadline; attempt++)
+        if (!RightClick(x, y))
         {
-            if (RightClick(x, y))
-            {
-                MenuSnapshot? snapshot = WaitForMenu(expectedNames, TimeSpan.FromSeconds(4));
-                if (snapshot is not null)
-                {
-                    return snapshot;
-                }
-            }
-
-            _ = WaitForNoMenu(TimeSpan.FromSeconds(1));
-            Thread.Sleep(150);
+            E2EResults.Note("context-menu.first-click", "The right click was not sent.");
+            return null;
         }
 
-        return null;
+        return RecordFirstClick(WaitForMenu(expectedNames, timeout ?? UiTimeout));
+    }
+
+    /// <summary>Records whether the single right click opened the menu, so a failure is visible in the run notes.</summary>
+    private static MenuSnapshot? RecordFirstClick(MenuSnapshot? snapshot)
+    {
+        E2EResults.Note(
+            "context-menu.first-click",
+            snapshot is null
+                ? "One right click did not open the menu (no retry was made)."
+                : "One right click opened the menu.");
+        return snapshot;
     }
 
     /// <summary>

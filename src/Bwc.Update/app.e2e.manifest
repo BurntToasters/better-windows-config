@@ -2,7 +2,7 @@
 <!--
   E2E flavor only (-p:BwcFlavor=E2E). Selected in Bwc.Update.csproj instead of app.manifest.
   asInvoker keeps the E2E build from raising a UAC prompt. scripts/flavor-metadata.js requires this
-  level in every E2E publish. The ship manifest (app.manifest) keeps requireAdministrator.
+  level in every E2E publish. The ship manifest (app.manifest) is asInvoker as well.
 -->
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity version="1.0.0.0" name="BwcUpdate.app" />

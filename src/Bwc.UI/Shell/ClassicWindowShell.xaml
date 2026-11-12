@@ -7,7 +7,6 @@
     xmlns:shell="using:Bwc.UI.Shell"
     xmlns:tree="using:Bwc.UI.Tree"
     AutomationProperties.AutomationId="ClassicWindowShell"
-    AutomationProperties.Name="Classic window shell"
     Background="{StaticResource BwcFaceBrush}"
     IsTabStop="True"
     UseSystemFocusVisuals="False">
@@ -28,7 +27,6 @@
             x:Name="AddressBox"
             Grid.Row="1"
             AutomationProperties.AutomationId="AddressBar"
-            AutomationProperties.Name="Address bar"
             IsSpellCheckEnabled="False"
             IsTextPredictionEnabled="False"
             KeyDown="OnAddressBarKeyDown"
@@ -45,7 +43,6 @@
             <Border
                 x:Name="TreePaneBorder"
                 AutomationProperties.AutomationId="TreePane"
-                AutomationProperties.Name="Tree pane"
                 Background="{StaticResource BwcWindowBrush}">
                 <Grid x:Name="TreeBody" AutomationProperties.AutomationId="TreeBody">
                     <tree:DenseTree x:Name="TreeControl" />
@@ -57,7 +54,6 @@
                 Grid.Column="1"
                 Width="4"
                 AutomationProperties.AutomationId="Splitter"
-                AutomationProperties.Name="Splitter"
                 DragCompleted="OnSplitterDragCompleted"
                 DragDelta="OnSplitterDragDelta"
                 DragStarted="OnSplitterDragStarted"
@@ -79,7 +75,6 @@
                 x:Name="ListPaneBorder"
                 Grid.Column="2"
                 AutomationProperties.AutomationId="ListPane"
-                AutomationProperties.Name="List pane"
                 Background="{StaticResource BwcWindowBrush}">
                 <list:DetailsList x:Name="ListControl" />
             </Border>

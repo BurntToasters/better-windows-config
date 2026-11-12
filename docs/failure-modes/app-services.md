@@ -22,10 +22,61 @@ operation with a bad switch returns exit code 2 and writes the usage text to sta
 ### Positional .reg path selects the GUI import path
 
 A single positional argument that ends in `.reg` (case insensitive) is not a console operation. The
-GUI path starts, and the window asks to import it (see the import section). Any other positional
-argument, a `.reg` path combined with `/s`, `/e`, or `/a`, a switch without its file, or a
-second positional argument returns the usage error with exit code 2. A `.reg` path that does not
-exist is reported by the import confirmation path, not by a usage error.
+GUI path starts, and the window asks to import it (see the import section). A `.reg` path combined
+with `/s`, `/e`, or `/a`, a switch without its file, or a second positional argument returns the
+usage error with exit code 2. A `.reg` path that does not exist is reported by the import
+confirmation path, not by a usage error.
+
+### Positional path that is not a .reg file
+
+Any positional argument is an import file, not only a path ending in `.reg`. Classic regedit offers
+to import any file it is given, so a file with another extension opens the same confirmation as a
+`.reg` file. The usage error (exit 2) is kept for a second positional path, a switch without its
+file, and `/s`, `/e`, or `/a` combined with a positional path. A GUI launch writes nothing to
+standard error, so a usage error there was invisible to the user.
+
+Check: no automated check. The E2E launcher does not pass a file argument to the window; the command line
+checks cover the exit codes of the console path.
+
+### Whole-registry export on the command line
+
+`/e file` and `/a file` without a key export every root classic regedit shows under Computer, in
+tree order, through `RegistryExportScope.WholeRegistry`. The earlier build exported HKEY_CURRENT_USER
+only. With a key, the export covers that key and its descendants, as before. A root or subkey that
+cannot be read is skipped with its subtree, and the other roots are written.
+
+Check: `RobustnessTests.Robustness_WholeRegistryExportWritesEveryRoot` runs `/e` with no key on the
+e2e flavor, where HKCU maps to the run sandbox and the other roots are empty, and checks that the file
+has `[HKEY_LOCAL_MACHINE` and `[HKEY_CURRENT_USER` headers.
+
+### DisableRegistryTools policy
+
+Classic regedit honors `HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System\DisableRegistryTools`
+and the same value under HKLM. The larger of the two values counts. A value of 1 or 2 means registry
+editing is disabled: the window is not opened. The application shows the classic message (RT_STRING
+40, `Registry editing has been disabled by your administrator.`) in a message box with the caption
+`Registry Editor`, and exits with code 1. A value of 2 also refuses a silent import with `/s`: the
+message goes to standard error and the exit code is 1, and no key is written. `/e` and `/a` are not
+affected by the policy. The application only reads the policy and never writes it.
+
+For E2E only, the `BWC_E2E_DISABLE_REGISTRY_TOOLS` environment variable (1 or 2) replaces the policy
+value. The variable is read only in E2E builds, so the ship build never honors it. Tests never set
+the real policy values.
+
+Check: `RobustnessTests.Robustness_PolicyOverrideShowsRegistryEditingDisabled` launches the window with the
+override set to 1 and checks the message box text, that no window is created, and the exit code 1.
+`RobustnessTests.Robustness_PolicyLevelTwoRefusesSilentImport` runs `/s` with the override set to 2 and
+checks the refusal text, exit code 1, and that nothing is written.
+
+### Unhandled exception in a window handler
+
+An exception thrown by a synchronous XAML handler reaches `Application.UnhandledException`. The
+handler reports it through `CrashHandler.Report`, which logs it and shows the classic error box that
+names the log file. The exception is marked handled, so the window stays usable. Out-of-memory
+exceptions are not handled and end the process as before.
+
+Check: no automated check. A forced XAML handler exception needs a test-only hook in the window,
+which this change does not add. The log entry is the evidence.
 
 ### Log initialization failure
 
@@ -209,6 +260,43 @@ exist.`) and does not ask for confirmation.
 
 The import writes only the keys the file names. The file itself is not modified. The E2E tests use
 a file inside the run's artifact folder whose keys sit under the sandbox run root.
+
+## Window close and settings save
+
+### Settings save on each font or theme change
+
+Every View > Font or View > Theme change wrote `settings.json` with a flush on the UI thread. A burst
+of changes, such as a theme change followed by a font step, wrote the file once per change.
+
+Rule: a change schedules one save 500 ms later on the UI thread. A later change in that window
+restarts the delay, so a burst writes once. Closing the window writes at once, so the last change is
+never lost.
+
+Check: no automated check; the close save is the evidence in the settings file after a run.
+
+### Close during a registry write
+
+A recursive delete can run for seconds. Closing the window while it ran tore the window and its
+remote connections down under the write.
+
+Rule: a close request during a registry write is held. The window is not closed, the settings are not
+saved yet, and the close runs when the write ends. The write is not cancelled.
+
+Check: `RobustnessTests.Robustness_BusyGateDisablesWindowDuringRecursiveDelete` posts a close request during a
+recursive delete and checks that the window closes after the delete finished.
+
+## Favorites name
+
+### Failure: a favorite name loses its trailing space
+
+`FavoritesStore.Add` trimmed the name before the duplicate check and the write. Classic regedit keeps
+the name as typed, so `Name ` and `Name` were one favorite, and the stored name was not the one typed.
+
+Rule: `Add` writes the name as given. The name must not be empty and must be at most the value name
+limit, with no NUL character. The duplicate check is case-insensitive on the name as given.
+
+Check: no automated check. The favorites key is the classic applet store, which the E2E sandbox does not
+redirect, so the test does not write it.
 
 ## Load Hive and Unload Hive
 

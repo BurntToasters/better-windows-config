@@ -186,3 +186,14 @@ seeds it, and deletes the whole root in a `finally` block. Cleanup uses
 root does not hide the original failure behind a cleanup exception. The parent
 `HKCU\Software\BWC-E2E` may remain empty; acceptance checks for child keys. A crash that skips
 `finally` leaves a key whose name contains the run id, which is easy to identify and remove.
+
+## 17. Subkey name buffer that never fits
+
+`EnumerateSubKeyNames` grows its name buffer on `ERROR_MORE_DATA` and retries the same index. A
+registry that keeps reporting a larger name than the buffer would loop forever. Intended behavior:
+the retry count is capped at 16 attempts per index, the same bound the value readers use. When the
+cap is reached the reader throws `RegistryOperationException` with `ERROR_MORE_DATA` and the
+operation `EnumKey`. A name that fits within the cap is returned as before. The loop is
+`RegistryReader.CollectSubKeyNames`, which takes the native read as a delegate, so the test can
+report "more data" without a real key. Tests: `EnumerateSubKeyNamesGivesUpAfterTheRetryCap` and
+`EnumerateSubKeyNamesGrowsTheBufferAndReturnsTheName`.

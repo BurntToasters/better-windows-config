@@ -17,6 +17,8 @@ const nativeWritePatterns = [
   "Reg(?:SetValue|CreateKey|CreateKeyTransacted|DeleteKey|DeleteKeyTransacted|DeleteKeyValue|DeleteValue|DeleteTree|RenameKey|CopyTree|LoadKey|LoadAppKey|UnLoadKey|SaveKey|ReplaceKey|RestoreKey|SetKeySecurity|SetKeyValue|OverridePredefKey)(?:A|W|Ex|ExA|ExW)?",
   "(?:Nt|Zw)(?:SetValueKey|CreateKey|CreateKeyTransacted|DeleteKey|DeleteKeyTransacted|DeleteValueKey|RenameKey|LoadKey2|LoadKeyEx|LoadKey|UnloadKey2|UnloadKeyEx|UnloadKey|SaveKeyEx|SaveKey|SaveMergedKeys|ReplaceKey|RestoreKey|SetInformationKey)",
   "SH(?:SetValue|DeleteKey|DeleteValue|DeleteEmptyKey|CopyKey|RegSetUSValue|RegWriteUSValue|RegDeleteUSValue|RegCreateUSKey|RegOpenUSKey|RegDeleteEmptyUSKey)(?:A|W)?",
+  // Security descriptor writes change who can read or write a key, so they count as writes too.
+  "(?:TreeSetNamedSecurityInfo|SetNamedSecurityInfo|SetSecurityInfo)(?:A|W|Ex|ExA|ExW)?",
 ];
 
 const nativeWriteIdentifier = new RegExp(`\\b(${nativeWritePatterns.join("|")})\\b`, "g");
@@ -474,6 +476,13 @@ function runSelfTest() {
         "}",
       ],
       "src/Fixture/NativeMethods.txt": ["RegDeleteValueW", "RegSetKeySecurity"],
+      "src/Fixture/SecurityInfo.cs": [
+        "internal static class SecurityInfo",
+        "{",
+        "    internal static void Set() { SetSecurityInfo(); SetNamedSecurityInfoW(); }",
+        "    internal static void Tree() => TreeSetNamedSecurityInfoW();",
+        "}",
+      ],
       "src/Fixture/ManagedWrite.cs": [
         "using Microsoft.Win32;",
         "internal static class ManagedWrite",
@@ -536,6 +545,9 @@ function runSelfTest() {
       "src/Fixture/EntryPointLiteral.cs:4: native-write-name: RegDeleteKeyExA",
       "src/Fixture/NativeMethods.txt:1: native-write-name: RegDeleteValueW",
       "src/Fixture/NativeMethods.txt:2: native-write-name: RegSetKeySecurity",
+      "src/Fixture/SecurityInfo.cs:3: native-write-name: SetSecurityInfo",
+      "src/Fixture/SecurityInfo.cs:3: native-write-name: SetNamedSecurityInfoW",
+      "src/Fixture/SecurityInfo.cs:4: native-write-name: TreeSetNamedSecurityInfoW",
       "src/Fixture/ManagedWrite.cs:4: managed-write",
       "src/Fixture/ManagedWrite.cs:5: managed-write",
       "src/Fixture/ProcessLaunch.cs:4: reg-process-launch: reg.exe",

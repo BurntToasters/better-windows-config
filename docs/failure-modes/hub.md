@@ -78,8 +78,9 @@ with the cancelled error and that text appears in `HubStatus`. E2E runs set `__C
 `RunAsInvoker` so the same code path is tested without a prompt.
 
 The update helper (`BwcUpdate.exe`) is started with `UseShellExecute = false` and
-`CreateNoWindow = true`. Its manifest is `asInvoker`, so it never raises a prompt. E2E runs set
-`__COMPAT_LAYER` to `RunAsInvoker` on the helper as well.
+`CreateNoWindow = true`. Its manifest is `asInvoker`, so it never raises a prompt. The Hub does not set
+`__COMPAT_LAYER` on the helper, and the helper removes it from its own environment before it starts the
+installer or the Hub, so the compatibility layer does not leak into them.
 
 ## About dialog
 
@@ -110,50 +111,66 @@ after the first pass, so the client area matches the content at the current DPI.
 
 ## Update check
 
-Help > Check for Updates runs `BwcUpdate.exe --check --manifest-url <url> --signature-url <url>.minisig
---channel <stable|beta> --current-version <version>` on a worker task. The UI thread never waits for
-it. The progress dialog has one Cancel button. Cancel kills the helper's process tree and reports
-nothing, so no result dialog follows a cancel. The check never blocks the window.
+Help > Check for Updates runs `BwcUpdate.exe --check --manifest-url <url> --signature-url <url>
+--channel <stable|beta> --current-version <version>` on a worker task. The check verifies the signed
+manifest only, so it downloads no installer and stages nothing. The UI thread never waits for it. The
+progress dialog has one Cancel button. Cancel kills the helper's process tree and reports nothing, so no
+result dialog follows a cancel. The check never blocks the window. The Hub kills a check that runs longer
+than 3 minutes (two manifest reads of at most 60 seconds each, with a margin).
+
+Each channel has its own manifest URL in the build (`UpdateSources.BuildStableManifestUrl` and
+`BuildBetaManifestUrl`). A URL set in Hub settings applies to the channel that is selected.
 
 Outcomes, in the order the Hub checks them:
 
-1. No manifest URL is configured (none in the build, none in settings, no E2E override). The Hub
-   shows the "not configured" message and starts no process.
+1. No manifest URL is configured for the selected channel (none in the build, none in settings, no E2E
+   override). The Hub shows the "not configured" message and starts no process.
 2. The helper is not in the Hub folder. The Hub shows the expected path and starts no process.
 3. The helper cannot be started. The Win32 message is shown and logged.
 4. The helper does not finish within 3 minutes. Its process tree is killed and the Hub shows a
    timeout message.
-5. The helper prints no JSON line, or the line is not the expected shape. The Hub shows the exit
-   code and that no result was returned.
-6. `TrustedKeysInvalid` (the release key is still the placeholder). The Hub shows the same
+5. The helper prints no JSON line with an `ok` field, or the line is not the expected shape. The Hub
+   shows the exit code and that no result was returned.
+6. `TrustedKeysNotConfigured` (the release key is still the placeholder). The Hub shows the same
    deliberate "not configured" message as case 1, not an error, because the build has no release key
    yet.
-7. `SameVersion`, `Downgrade`, or `PrereleaseOnStable`: nothing newer is offered for this channel.
+7. `TrustedKeysInvalid` (a key list that is set but malformed). The Hub shows a distinct message that
+   the update key list is invalid. It is not "not configured".
+8. `ChannelMismatch`: the server's manifest is for the other channel. The Hub shows a message to check
+   the update channel in Update Settings.
+9. `ManifestExpired`: the signed manifest has passed its expiry. The Hub shows that and suggests trying again later.
+10. `SameVersion`, `Downgrade`, or `PrereleaseOnStable`: nothing newer is offered for this channel.
    The Hub shows "up to date".
-8. `ok: true`: an update is staged and verified by the helper. The Hub shows the version, the
+11. `ok: true`: an update is offered by the verified manifest. The Hub shows the version, the
    release notes link from the manifest (only the https URL the helper validated), and the buttons
    "Download and Install" and "Later".
-9. Any other failure (URL rejected, download failed, signature invalid, and so on): the Hub shows
-   the failure name and the helper's detail text.
-
-The staged folder is found by the `receipt.json` version match under `%TEMP%\BWC-Update`. The Hub
-never runs an installer itself.
+12. Any other failure (URL rejected, signature invalid, and so on): the Hub shows the failure name and
+   the helper's detail text.
 
 ## Update install
 
-Download and Install starts `BwcUpdate.exe --apply <installer.exe> --receipt <receipt.json>
---current-version <version> --install-dir <Hub folder> --wait-pid <Hub pid>`. Before starting it,
-the Hub checks whether any tool process runs from the Hub folder. If one does, the Hub shows a
-message that names it and stops. The helper would otherwise refuse with `ProcessesStillRunning`
-after the Hub has already closed, and the user would see nothing happen.
+Download and Install first refuses while a tool process runs from the Hub folder (the Hub shows a message
+that names it and stops; the installer would refuse too, after the Hub had closed).
 
-When the helper starts, the Hub closes its window and exits so the installer can replace files. If
-the helper cannot be started, the Hub stays open and shows the error. The Hub does not wait for the
-helper and does not elevate. The helper's own exit codes (refused, installer failed, Hub not
-started) are logged by the helper and are not shown in the Hub, which has already exited.
+Then the download step runs: `BwcUpdate.exe --download` with the same arguments as the check. It
+re-verifies the manifest, reuses a verified staged installer for the same version and SHA-256 when one
+exists, or downloads and verifies the installer. A progress window with Cancel is shown, and the status
+line shows the percentage from the helper's progress lines. The download is killed after 32 minutes
+(the manifest pair plus the helper's 30 minute installer limit, with a margin). A cancel or a timeout
+kills the helper, and the Hub then removes any staging folder without a receipt. A failure shows the
+helper's failure name and detail.
 
-If the staged folder is gone (the temp folder was cleaned after the check), the Hub shows "The
-update is no longer staged. Check for updates again." and starts nothing.
+When the download finishes, the Hub checks that the staged version is still the offered version
+(otherwise "The update server now offers a different version. Check for updates again."). It then
+starts `BwcUpdate.exe --apply <installer.exe> --receipt <receipt.json> --current-version <version>
+--install-dir <Hub folder> --wait-pid <Hub pid>`, closes its window, and exits, so the installer can
+replace files. The Hub does not wait for the helper and does not elevate. The installer starts the Hub
+again when it finishes.
+
+If the helper refuses before the installer starts (the path, receipt, downgrade, processes still running,
+an elevated helper, and so on), it starts the Hub again with `--update-result <failure>`. The Hub then
+shows the reason: "apps still running" and "elevated" have their own messages, and every other code
+reads "The update was not installed (reason: <code>)". The argument carries the failure name only.
 
 ## Update settings
 
@@ -248,8 +265,9 @@ and never reads them.
   the same URL with `.minisig` appended. The value must be an http or https URL on loopback.
 - `BWC_E2E_UPDATE_TRUSTED_KEY` (BwcUpdate, E2E builds only): base64 of a minisign public key text.
   When set, the check trusts only this key instead of the placeholder list.
-- `BWC_E2E_UPDATE_ALLOW_HTTP` (BwcUpdate, E2E builds only): when `1`, the check accepts http URLs.
-  Only the check honors it; the apply command still requires https.
+- `BWC_E2E_UPDATE_ALLOW_HTTP` (BwcUpdate, E2E builds only): when `1`, the check and the download accept
+  http URLs. The apply command honors it too, so the E2E installer's `/RUNID=` and `/SHORTCUTS=` switches
+  can be passed; the ship build never reads it.
 
 The E2E test generates the key pair, the signed manifests, and the signed installer files in a
 temporary folder at run time, serves them from a loopback listener in the test process, and

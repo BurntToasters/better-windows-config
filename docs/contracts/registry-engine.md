@@ -15,10 +15,14 @@ the owning package records the observed behavior as a golden before implementing
 - All engine calls are synchronous and may run on any thread. The UI calls them on the thread
   pool and marshals results back with `DispatcherQueue`. The engine never blocks waiting on the
   UI.
-- Every operation that loops over keys or values (enumerate, find, export, import, delete
-  tree, copy tree) takes a `CancellationToken` and checks it at least once per key. Cancellation
-  throws `OperationCanceledException` and leaves no partial write in progress: an import stops
-  between two complete `.reg` entries, never inside one.
+- Every operation that loops over keys or values (enumerate, find, export, import, and the
+  permission propagation walk) takes a `CancellationToken` and checks it at least once per key.
+  Cancellation throws `OperationCanceledException` and leaves no partial write in progress: an
+  import stops between two complete `.reg` entries, never inside one.
+- `DeleteKey(recursive: true)` and `CopyTree` are each one native call (`RegDeleteTree`,
+  `RegCopyTree`) and take no `CancellationToken`: a started native call cannot be interrupted. The
+  sandbox link walk that runs before them is bounded by the 512-level depth limit. A cancelled
+  delete or copy is therefore not offered, and the UI must not show a cancel control for them.
 - Key handles are wrapped in `SafeRegistryHandle`-style owners. A handle is never shared between
   two concurrent operations; each operation opens what it needs.
 - Results are snapshots. The engine does not watch for changes; the view refreshes on F5, as in
@@ -41,9 +45,10 @@ the owning package records the observed behavior as a golden before implementing
   regedit reaches them, no further. Value names with an embedded NUL are read with their own data
   (see Values), but reads and deletes by name cannot address them, so `RegistryWriter` refuses
   such names.
-- Limits come from the platform: key name component 255 characters, value name 16,383
-  characters, nesting depth 512. The engine does not pre-validate them; it passes the request
-  to Windows and reports the Win32 error, so error paths match regedit.
+- Limits: a key name component is at most 255 characters, a value name at most 16,383, and nesting
+  depth 512. `RegistryPath` and `RegistryWriter` validate the first two before any native call and
+  throw `ArgumentException`, so the request never reaches Windows. Nesting depth is a platform limit;
+  the sandbox link walk refuses deeper trees rather than recursing without bound.
 - The default value has the name `""`. The UI shows it as `(Default)` from the oracle string
   table.
 - Duplicate-name checks use `StringComparer.OrdinalIgnoreCase`, which matches the registry's
@@ -111,8 +116,13 @@ the owning package records the observed behavior as a golden before implementing
   before calling native code for anything else, including relative opens that would escape the
   root.
 - The E2E sandbox also refuses: renaming the sandbox root; a copy whose source is outside the
-  sandbox; a copy into the source's own subtree; a restore or replace whose hive file contains a
-  symbolic link key or cannot be verified as a hive; and any hive mount (`HKLM` or `HKU`).
+  sandbox; a copy whose source or destination subtree contains a symbolic link key; a restore or
+  replace whose hive file contains a symbolic link key or cannot be verified as a hive; a permission
+  propagation whose subtree contains a link; and any hive mount (`HKLM` or `HKU`).
+- Every policy refuses a copy into the source's own subtree, including `ShippingWritePolicy`.
+- `SetKeySecurity` with `propagateToSubkeys` applies one descriptor to the key and every key below
+  it, through the write policy for each key, and reports progress and honors cancellation between
+  keys. It is not inheritance-aware (`failure-modes/registry-writer.md` section I).
 - `DenyAllWritePolicy` refuses every write before native code runs. The Registry Editor uses it in
   E2E builds when `BWC_E2E_SANDBOX_ROOT` is missing or invalid, so nothing is written.
 - `scripts/check-registry-writer.js` fails the build when a file outside `RegistryWriter*.cs`
@@ -120,7 +130,11 @@ the owning package records the observed behavior as a golden before implementing
   registry writes appear outside the checker's allowlist, or when `reg.exe` or `regedit.exe` is
   launched to write.
 - Rename of a key uses `RegRenameKey`. Rename of a value is copy then delete, as in regedit
-  (there is no native value rename); if the delete fails the copy is removed.
+  (there is no native value rename); if the delete fails the copy is removed. A rename to a name
+  that already exists is refused with Win32 error 183 before any write. A case-only rename is delete
+  then recreate, so the stored spelling changes.
+- Hive operations run one at a time under one lock in `RegistryWriter`, because the hive privileges
+  are process-wide.
 
 ## Find (package B7 and R9)
 

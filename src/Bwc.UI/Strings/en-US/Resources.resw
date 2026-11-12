@@ -44,4 +44,46 @@
   <data name="BwcProductName" xml:space="preserve">
     <value>Better Windows Config</value>
   </data>
+  <data name="ShellRootName" xml:space="preserve">
+    <value>Classic window shell</value>
+  </data>
+  <data name="ShellAddressBarName" xml:space="preserve">
+    <value>Address bar</value>
+  </data>
+  <data name="ShellTreePaneName" xml:space="preserve">
+    <value>Tree pane</value>
+  </data>
+  <data name="ShellListPaneName" xml:space="preserve">
+    <value>List pane</value>
+  </data>
+  <data name="ShellSplitterName" xml:space="preserve">
+    <value>Splitter</value>
+  </data>
+  <data name="HexEditorName" xml:space="preserve">
+    <value>Hex editor</value>
+  </data>
+  <data name="DetailsHeaderDividerName" xml:space="preserve">
+    <value>Column divider</value>
+  </data>
+  <data name="NumberErrorHexadecimal" xml:space="preserve">
+    <value>Enter a hexadecimal number from 0 to {0}.</value>
+  </data>
+  <data name="NumberErrorDecimal" xml:space="preserve">
+    <value>Enter a decimal number from 0 to {0}.</value>
+  </data>
+  <data name="MultiStringEmptyOne" xml:space="preserve">
+    <value>Data of type REG_MULTI_SZ cannot contain empty strings.&#13;&#10;Registry Editor will remove the empty string found.</value>
+  </data>
+  <data name="MultiStringEmptyMany" xml:space="preserve">
+    <value>Data of type REG_MULTI_SZ cannot contain empty strings.&#13;&#10;Registry Editor will remove all empty strings found.</value>
+  </data>
+  <data name="RegistryEditorTitle" xml:space="preserve">
+    <value>Registry Editor</value>
+  </data>
+  <data name="RemoveFavoritesEmptySelection" xml:space="preserve">
+    <value>Select at least one favorite to remove.</value>
+  </data>
+  <data name="HexViewerCaption" xml:space="preserve">
+    <value>Binary Data</value>
+  </data>
 </root>
