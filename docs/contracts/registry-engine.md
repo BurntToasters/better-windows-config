@@ -199,6 +199,32 @@ the owning package records the observed behavior as a golden before implementing
   registry.  Some keys are open by the system or other processes, or you have insufficient
   privileges to perform this operation.` (two spaces after `registry.`).
 
+## Export formats (package E5)
+
+- `RegFileFormat.V5` is the default for every export entry point. `RegFileFormat.Regedit4`
+  selects the `REGEDIT4` header and the ANSI encoding rules in the previous section.
+- `RegFileExporter.Export` keeps its existing argument order. Every export method accepts a
+  `CancellationToken` and an optional `IProgress<ExportProgress>` as the last two parameters.
+  Existing callers compile unchanged.
+- A `Computer` selection exports every root classic regedit shows, in this order:
+  `HKEY_CLASSES_ROOT`, `HKEY_CURRENT_USER`, `HKEY_LOCAL_MACHINE`, `HKEY_USERS`,
+  `HKEY_CURRENT_CONFIG`. A selected predefined root exports that root's subtree only.
+  `RegFileExporter.ExportWholeRegistry` and `RegistryExportService` expose the whole-registry
+  form. An inaccessible root is skipped, and the remaining roots are exported.
+- Text export (`RegistryTextExporter`, *Text Files*) is a streaming readable format. There is no
+  oracle golden, so `docs/failure-modes/export.md` fixes the stable layout: UTF-16LE with BOM,
+  CRLF, `Key Name` / `Class Name` / `Last Write Time` blocks, and indented value entries. It is
+  display-only and lossy for the cases listed there.
+- Hive export (`RegistryHiveExporter.Save`, `RegistryExportService.ExportHiveFile`) saves one
+  subtree through `RegistryWriter.SaveKey`. It uses the same write policy and
+  `SeBackupPrivilege` / `SeRestorePrivilege` path as the hive tests. A predefined root is
+  refused, an existing destination is refused, and cancellation is observed before the native
+  save starts.
+- A `.reg` value name with an embedded NUL still throws `RegistryOperationException`
+  (`ExportValueName`, error 123). REG_SZ data after the first NUL is still dropped, and REGEDIT4
+  still converts unrepresentable characters to `?`. Hive export is the only lossless whole-tree
+  format. `docs/failure-modes/export.md` lists every case classic `.reg` cannot represent.
+
 ## Command line (package R13)
 
 - `/s` silent import, `/e file [key]` and `/a file [key]` export, `/m` multiple instances. The
