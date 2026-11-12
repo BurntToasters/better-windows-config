@@ -44,25 +44,29 @@ internal sealed class ViewCommands
     }
 
     /// <summary>
-    /// Renames the item of the pane that has focus. The tree renames the selected key. The list renames
-    /// the single selected value, or the selected key when the list has no selection.
+    /// Renames the item of the pane that has focus with the same inline editor as F2. The tree renames
+    /// the selected key. The list renames the single selected value, or the selected key when the list
+    /// has no selection.
     /// </summary>
     public void RenameSelection()
     {
         IReadOnlyList<DetailsRow> rows = _context.Shell.ListContent.SelectedRows;
-        if (_context.FocusedPane() == RegeditContext.Pane.List && rows.Count > 1)
+        if (_context.FocusedPane() == RegeditContext.Pane.List)
         {
-            _context.StartCommand(() => _context.ShowMessageAsync(Get("DialogNoSelection")));
-            return;
+            if (rows.Count > 1)
+            {
+                _context.StartCommand(() => _context.ShowMessageAsync(Get("DialogNoSelection")));
+                return;
+            }
+
+            if (rows.Count == 1)
+            {
+                _context.Shell.ListContent.BeginRenameSelected();
+                return;
+            }
         }
 
-        if (_context.FocusedPane() == RegeditContext.Pane.List && rows.Count == 1)
-        {
-            _values.RenameValueInteractive(rows[0]);
-            return;
-        }
-
-        _keys.RenameKeyInteractive();
+        _context.Shell.TreeContent.BeginRenameSelected();
     }
 
     public void HandleTreeSelectionChanged(TreeNode node)

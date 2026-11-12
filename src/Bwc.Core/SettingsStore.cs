@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
@@ -12,6 +11,14 @@ namespace Bwc.Core;
 public sealed class SettingsStore<T>
     where T : class, new()
 {
+    /// <summary>
+    /// Gets the largest settings file in bytes that <see cref="Load"/> will read. A larger file is
+    /// treated as corrupt: it is moved beside the original and a fresh instance is returned. The
+    /// length is checked before the read buffer is allocated, so a hostile file cannot force an
+    /// unbounded allocation.
+    /// </summary>
+    public const long MaxFileBytes = 1L * 1024 * 1024;
+
     private readonly JsonTypeInfo<T> _jsonTypeInfo;
 
     public SettingsStore(string filePath, JsonTypeInfo<T> jsonTypeInfo)
@@ -34,11 +41,16 @@ public sealed class SettingsStore<T>
                 return new T();
             }
 
-            string json = File.ReadAllText(Path);
+            byte[]? json = ReadCappedFile();
+            if (json is null)
+            {
+                return RecoverFromCorruptFile();
+            }
+
             T? value;
             try
             {
-                value = JsonSerializer.Deserialize(json, _jsonTypeInfo);
+                value = JsonSerializer.Deserialize(new ReadOnlySpan<byte>(json), _jsonTypeInfo);
             }
             catch (JsonException)
             {
@@ -90,6 +102,29 @@ public sealed class SettingsStore<T>
         }
     }
 
+    private byte[]? ReadCappedFile()
+    {
+        using var stream = new FileStream(
+            Path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read);
+        long length = stream.Length;
+        if (length > MaxFileBytes)
+        {
+            return null;
+        }
+
+        if (length == 0)
+        {
+            return Array.Empty<byte>();
+        }
+
+        byte[] bytes = new byte[(int)length];
+        stream.ReadExactly(bytes);
+        return bytes;
+    }
+
     private T RecoverFromCorruptFile()
     {
         string stamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ", CultureInfo.InvariantCulture);
@@ -116,7 +151,7 @@ public sealed class SettingsStore<T>
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Trace.WriteLine("Could not delete temporary settings file '" + path + "': " + ex.Message);
+            SafeTrace.WriteLine("Could not delete temporary settings file '" + path + "': " + ex.Message);
         }
     }
 }

@@ -75,6 +75,37 @@ menu keeps its order and the command ids stay findable by the existing `SetComma
 Check: `BasicsTests` opens Edit with no value selected and checks that neither Modify item is
 present, then selects a value, opens Edit again, and checks both items are present and enabled.
 
+## New Key and New Value
+
+### Failure: New asks for the name in a dialog before the object exists
+
+Classic regedit creates the object first with a counter name and then renames it inline. A prompt is
+a different control, shows the wrong order of operations, and can leave nothing behind when it is
+cancelled.
+
+Rule: New Key creates the child under the selected key with the first unused name from `New Key #N`,
+refresh selects it, and the tree inline editor opens with the whole default name selected. Escape
+cancels the rename and keeps the default name. New Value does the same in the list with
+`New Value #N`: it writes the classic default data, refreshes and selects the row, and opens the
+list inline editor. No value data dialog opens from New. Enter commits the typed name through the
+same path as F2.
+
+The classic default data is: REG_SZ and REG_EXPAND_SZ an empty string, REG_BINARY zero bytes,
+REG_DWORD and REG_QWORD zero, and REG_MULTI_SZ one empty string, encoded as the double NUL
+terminator. The counter uses the first unused number, so a previous default named `New Key #1` or
+`New Value #1` moves the next New command to `#2`.
+
+Failure to avoid: starting the inline editor in the menu click handler. The closing menu restores
+focus and would commit or cancel the editor at once, so the editor starts on the next low priority
+dispatcher turn, after the refresh selection and after the menu closes.
+
+Check: `EditingTests` checks `editing.newkey.inline`, `editing.newkey.escape`,
+`editing.newkey.duplicate`, `editing.newkey.commit`, `editing.newvalue.inline`,
+`editing.newvalue.escape`, `editing.newvalue.duplicate`, and the per-type
+`editing.newvalue.*` checks. Typing after the editor opens without clearing proves the default name
+was selected. The captures `new-key-inline.png` and `new-value-inline.png` are written under
+`artifacts/e2e/visual/editing`.
+
 ## Copy Key Name
 
 ### Failure: the Edit menu item is a stub
@@ -141,6 +172,25 @@ and checks that the key is gone.
 
 Rule: Rename follows the same pane rule. Tree focus renames the key, list focus renames the single
 selected renameable value.
+
+### Failure: Rename opens a prompt dialog instead of the inline editor
+
+Rule: Edit > Rename, the tree and value context menus, and F2 all use the existing inline editor for
+the focused pane. Tree focus shows `TreeRenameBox`; list focus shows `ListRenameBox`. The current
+name is shown and selected. Enter commits through the same validation as the context menu, Escape
+cancels, and a click elsewhere applies the tree rename as before.
+
+### Failure: an inline rename commits an empty or invalid name
+
+Rule: a key rename to an empty name, a name with a backslash, a name that is too long, or an existing
+sibling name shows the classic `Error Renaming Key` text (oracle strings 66 to 70) and writes
+nothing. A value rename to an empty name, a name over 16383 characters, or an existing value name
+shows the classic `Error Renaming Value` text (strings 73 to 75) and writes nothing. The default
+value row is never renameable. The object keeps its last valid name.
+
+Check: `EditingTests` checks `editing.renamevalue.menu`, `editing.renamekey.menu`, and
+`editing.renamekey.invalid`. `MessageTests` checks the duplicate key text through
+`messages.renamekey.exists.*` and the refused run-key rename through `messages.renamekey.*`.
 
 ## Multi-value delete text
 

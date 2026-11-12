@@ -4,6 +4,7 @@ using Bwc.Regedit.Registry;
 using Bwc.Registry;
 using Bwc.UI.Dialogs;
 using Bwc.UI.List;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
 namespace Bwc.Regedit.Controllers;
@@ -33,8 +34,6 @@ internal sealed class ValueCommands
     public void NewValue(NewValueKind kind) => _context.StartCommand(() => NewValueAsync(kind));
 
     public void DeleteValues() => _context.StartCommand(DeleteValuesAsync);
-
-    public void RenameValueInteractive(DetailsRow row) => _context.StartCommand(() => RenameValueInteractiveAsync(row));
 
     /// <summary>Opens the editor for an Entered or double-clicked value. It is the same dispatch as Modify.</summary>
     public void ActivateValue(DetailsRow row) => _context.StartCommand(() => ModifyValueAsync(row));
@@ -474,6 +473,10 @@ internal sealed class ValueCommands
     private static string ValueLabel(string rawName) =>
         rawName.Length == 0 ? MessageCatalog.DefaultValueLabel : RegistryValueDisplay.FormatName(rawName);
 
+    /// <summary>
+    /// Creates the value with the first unused classic name, its classic default data, and opens the
+    /// same inline editor as F2 with the default name selected. Escape leaves the default name.
+    /// </summary>
     private async Task NewValueAsync(NewValueKind kind)
     {
         if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
@@ -482,149 +485,63 @@ internal sealed class ValueCommands
             return;
         }
 
-        string suggested = NextUniqueValueName(key);
-        var nameDialog = new TextPromptDialog(
-            Get("DialogNewValueTitle"),
-            Get("DialogValueNameLabel"),
-            suggested,
-            value => ValidateNewValueName(key, value));
-
-        if (!await _context.ShowDialogAsync(nameDialog))
+        string valueName = NextUniqueValueName(key);
+        try
         {
+            WriteDefaultValue(key, valueName, kind);
+        }
+        catch (RegistryOperationException ex)
+        {
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.CreateValue, ValueLabel(valueName));
             return;
         }
 
-        string valueName = nameDialog.Value;
-        bool saved = kind switch
-        {
-            NewValueKind.String => await WriteStringValueAsync(key, valueName, expandable: false),
-            NewValueKind.ExpandableString => await WriteStringValueAsync(key, valueName, expandable: true),
-            NewValueKind.Binary => await WriteBinaryValueAsync(key, valueName),
-            NewValueKind.Dword => await WriteDwordValueAsync(key, valueName),
-            NewValueKind.Qword => await WriteQwordValueAsync(key, valueName),
-            NewValueKind.MultiString => await WriteMultiStringValueAsync(key, valueName),
-            _ => false,
-        };
+        await _context.RefreshValuesAsync(RegistryValueDisplay.FormatName(valueName));
+        BeginListRenameSoon();
+    }
 
-        if (saved)
+    /// <summary>
+    /// The classic default data of a new value: empty strings for the text types, zero-length binary,
+    /// zero for the numbers, and the empty multi-string list (the double NUL terminator).
+    /// </summary>
+    private void WriteDefaultValue(RegistryPath key, string valueName, NewValueKind kind)
+    {
+        switch (kind)
         {
-            await _context.RefreshValuesAsync(RegistryValueDisplay.FormatName(valueName));
+            case NewValueKind.String:
+                _context.Store.SetString(key, valueName, string.Empty);
+                break;
+            case NewValueKind.ExpandableString:
+                _context.Store.SetExpandString(key, valueName, string.Empty);
+                break;
+            case NewValueKind.Binary:
+                _context.Store.SetBinary(key, valueName, ReadOnlySpan<byte>.Empty);
+                break;
+            case NewValueKind.Dword:
+                _context.Store.SetDword(key, valueName, 0);
+                break;
+            case NewValueKind.Qword:
+                _context.Store.SetQword(key, valueName, 0);
+                break;
+            case NewValueKind.MultiString:
+                _context.Store.SetMultiString(key, valueName, Array.Empty<string>());
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind));
         }
     }
 
-    private async Task<bool> WriteStringValueAsync(RegistryPath key, string valueName, bool expandable)
+    /// <summary>
+    /// Starts the inline editor on the next dispatcher turn, after the row selection that the refresh
+    /// queued. A menu flyout that closes later would otherwise take the rename box focus away.
+    /// </summary>
+    private void BeginListRenameSoon()
     {
-        var dialog = new StringValueDialog(
-            Get(expandable ? "DialogValueExpandableTitle" : "DialogValueStringTitle"),
-            multiline: expandable,
-            valueName: RegistryValueDisplay.FormatName(valueName));
-
-        if (!await _context.ShowDialogAsync(dialog))
+        if (!_context.Shell.DispatcherQueue.TryEnqueue(
+                DispatcherQueuePriority.Low,
+                _context.Shell.ListContent.BeginRenameSelected))
         {
-            return false;
-        }
-
-        try
-        {
-            if (expandable)
-            {
-                _context.Store.SetExpandString(key, valueName, dialog.Value);
-            }
-            else
-            {
-                _context.Store.SetString(key, valueName, dialog.Value);
-            }
-
-            return true;
-        }
-        catch (RegistryOperationException ex)
-        {
-            await _context.ShowRegistryErrorAsync(ex, RegistryAction.CreateValue, ValueLabel(valueName));
-            return false;
-        }
-    }
-
-    private async Task<bool> WriteDwordValueAsync(RegistryPath key, string valueName)
-    {
-        var dialog = new DwordValueDialog(
-            Get("DialogValueDwordTitle"),
-            valueName: RegistryValueDisplay.FormatName(valueName));
-        if (!await _context.ShowDialogAsync(dialog))
-        {
-            return false;
-        }
-
-        try
-        {
-            _context.Store.SetDword(key, valueName, dialog.Value);
-            return true;
-        }
-        catch (RegistryOperationException ex)
-        {
-            await _context.ShowRegistryErrorAsync(ex, RegistryAction.CreateValue, ValueLabel(valueName));
-            return false;
-        }
-    }
-
-    private async Task<bool> WriteQwordValueAsync(RegistryPath key, string valueName)
-    {
-        var dialog = new QwordValueDialog(
-            Get("DialogValueQwordTitle"),
-            valueName: RegistryValueDisplay.FormatName(valueName));
-        if (!await _context.ShowDialogAsync(dialog))
-        {
-            return false;
-        }
-
-        try
-        {
-            _context.Store.SetQword(key, valueName, dialog.Value);
-            return true;
-        }
-        catch (RegistryOperationException ex)
-        {
-            await _context.ShowRegistryErrorAsync(ex, RegistryAction.CreateValue, ValueLabel(valueName));
-            return false;
-        }
-    }
-
-    private async Task<bool> WriteBinaryValueAsync(RegistryPath key, string valueName)
-    {
-        var dialog = new BinaryValueDialog(Get("DialogValueBinaryTitle"));
-        if (!await _context.ShowDialogAsync(dialog))
-        {
-            return false;
-        }
-
-        try
-        {
-            _context.Store.SetBinary(key, valueName, dialog.Value);
-            return true;
-        }
-        catch (RegistryOperationException ex)
-        {
-            await _context.ShowRegistryErrorAsync(ex, RegistryAction.CreateValue, ValueLabel(valueName));
-            return false;
-        }
-    }
-
-    private async Task<bool> WriteMultiStringValueAsync(RegistryPath key, string valueName)
-    {
-        var dialog = new MultiStringValueDialog(Get("DialogValueMultiStringTitle"));
-        if (!await _context.ShowDialogAsync(dialog))
-        {
-            return false;
-        }
-
-        try
-        {
-            _context.Store.SetMultiString(key, valueName, dialog.Value);
-            return true;
-        }
-        catch (RegistryOperationException ex)
-        {
-            await _context.ShowRegistryErrorAsync(ex, RegistryAction.CreateValue, ValueLabel(valueName));
-            return false;
+            _context.Shell.ListContent.BeginRenameSelected();
         }
     }
 
@@ -680,34 +597,6 @@ internal sealed class ValueCommands
         await _context.RefreshValuesAsync(selectDisplayName: null);
     }
 
-    private async Task RenameValueInteractiveAsync(DetailsRow row)
-    {
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
-        {
-            await _context.ShowMessageAsync(Get("DialogNoSelection"));
-            return;
-        }
-
-        if (!_context.TryGetRawValueName(row, out string oldName) || oldName.Length == 0)
-        {
-            await _context.ShowMessageAsync(Get("DialogDefaultValueLocked"));
-            return;
-        }
-
-        var dialog = new TextPromptDialog(
-            Get("DialogRenameValueTitle"),
-            Get("DialogValueNameLabel"),
-            oldName,
-            value => ValidateRenameValue(key, oldName, value));
-
-        if (!await _context.ShowDialogAsync(dialog))
-        {
-            return;
-        }
-
-        await RenameValueCoreAsync(key, oldName, dialog.Value);
-    }
-
     private async Task RenameValueCoreAsync(RegistryPath key, string oldName, string newName)
     {
         if (string.Equals(oldName, newName, StringComparison.Ordinal))
@@ -733,25 +622,6 @@ internal sealed class ValueCommands
         }
 
         await _context.RefreshValuesAsync(newName);
-    }
-
-    /// <summary>The text for a new value name that cannot be used, or null when it can.</summary>
-    private string? ValidateNewValueName(RegistryPath key, string name)
-    {
-        string? invalid = ValidateValueName(name);
-        if (invalid is not null)
-        {
-            return invalid;
-        }
-
-        try
-        {
-            return _context.Store.Reader.ValueExists(key, name) ? Get("DialogNameExists") : null;
-        }
-        catch (RegistryOperationException ex)
-        {
-            return ValidationFailure(ex, RegistryAction.ReadValue, ValueLabel(name));
-        }
     }
 
     /// <summary>

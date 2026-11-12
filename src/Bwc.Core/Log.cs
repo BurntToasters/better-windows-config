@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 
@@ -30,8 +29,9 @@ public sealed class LogOptions
 
 /// <summary>
 /// Process-wide, thread-safe file logger. Every public member is non-throwing by design; a
-/// logger failure falls back to <see cref="Trace"/>. Each entry is written through a short-lived
-/// append handle so callers can read <see cref="CurrentFile"/> as soon as the call returns.
+/// logger failure falls back to the internal safe trace helper. Each entry is written through a
+/// short-lived append handle so callers can read <see cref="CurrentFile"/> as soon as the call
+/// returns.
 /// </summary>
 public static class Log
 {
@@ -63,9 +63,7 @@ public static class Log
                 throw new ArgumentOutOfRangeException(nameof(options), "RetainDays must be zero or greater.");
             }
 
-            string directory = string.IsNullOrWhiteSpace(settings.Directory)
-                ? AppPaths.LogDirectory(toolId)
-                : settings.Directory;
+            string directory = ResolveDirectory(toolId, settings.Directory);
 
             lock (Gate)
             {
@@ -85,13 +83,39 @@ public static class Log
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("Log.Initialize failed: " + ex);
+            SafeTrace.WriteLine("Log.Initialize failed: " + ex);
             lock (Gate)
             {
                 _toolId = null;
+                Directory = null;
                 CurrentFile = null;
             }
         }
+    }
+
+    private static string ResolveDirectory(string toolId, string? configured)
+    {
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return AppPaths.LogDirectory(toolId);
+        }
+
+        try
+        {
+            if (Path.IsPathFullyQualified(configured))
+            {
+                return Path.GetFullPath(configured);
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            SafeTrace.WriteLine("Log directory '" + configured + "' is invalid: " + ex.Message);
+            return AppPaths.LogDirectory(toolId);
+        }
+
+        SafeTrace.WriteLine(
+            "Log directory '" + configured + "' is not absolute; using the per-tool directory instead.");
+        return AppPaths.LogDirectory(toolId);
     }
 
     public static void Info(string message)
@@ -126,7 +150,7 @@ public static class Log
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("Log.Shutdown failed: " + ex);
+            SafeTrace.WriteLine("Log.Shutdown failed: " + ex);
         }
     }
 
@@ -143,7 +167,7 @@ public static class Log
             {
                 if (_toolId is null || Directory is null || CurrentFile is null)
                 {
-                    Trace.WriteLine(FormatEntry("unknown", level, message, ex));
+                    SafeTrace.WriteLine(FormatEntry("unknown", level, message, ex));
                     return;
                 }
 
@@ -178,14 +202,14 @@ public static class Log
         }
         catch (Exception writeError)
         {
-            Trace.WriteLine("Log write failed: " + writeError);
+            SafeTrace.WriteLine("Log write failed: " + writeError);
             try
             {
-                Trace.WriteLine(FormatEntry("unknown", level, message, ex));
+                SafeTrace.WriteLine(FormatEntry("unknown", level, message, ex));
             }
             catch (Exception traceError)
             {
-                Trace.WriteLine("Log trace fallback failed: " + traceError.Message);
+                SafeTrace.WriteLine("Log trace fallback failed: " + traceError.Message);
             }
         }
     }
@@ -297,13 +321,13 @@ public static class Log
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    Trace.WriteLine("Log retention could not delete '" + path + "': " + ex.Message);
+                    SafeTrace.WriteLine("Log retention could not delete '" + path + "': " + ex.Message);
                 }
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Trace.WriteLine("Log retention scan failed for '" + directory + "': " + ex.Message);
+            SafeTrace.WriteLine("Log retention scan failed for '" + directory + "': " + ex.Message);
         }
     }
 }

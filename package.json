@@ -22,6 +22,15 @@
     "test:all": "node scripts/test-all.js",
     "oracle": "node scripts/oracle.js",
     "gate": "node scripts/test-all.js",
-    "validate": "node scripts/validate-no-em-dash.js && node scripts/validate-changelog-version.js && node scripts/lint-comments.mjs"
+    "validate": "node scripts/validate-no-em-dash.js && node scripts/validate-changelog-version.js && node scripts/lint-comments.mjs",
+    "release:dry-run": "node scripts/release-dry-run.js",
+    "release:sign": "node scripts/sign-update-manifest.js",
+    "release:validate": "node scripts/validate-updater-manifest.js",
+    "release:preflight": "node scripts/release-preflight.js",
+    "release:session": "node scripts/release-session.js",
+    "release:draft": "node scripts/release-draft.js",
+    "release:verify": "node scripts/release-verify.js",
+    "release:publish": "node scripts/release-publish.js",
+    "release:selftest": "node scripts/release-selftest.js"
   }
 }

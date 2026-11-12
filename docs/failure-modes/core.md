@@ -32,13 +32,21 @@ machine-wide override of `BWC_DATA_ROOT` deliberately opts out of that separatio
 
 ## Log
 
+### Relative or invalid directory override
+
+`LogOptions.Directory` is a diagnostic and test seam. When it is null or blank, the per-tool
+directory under `AppPaths.BaseDirectory` is used. A relative override is rejected because it would
+write against the process working directory, which can be outside the data root. An override that
+is not a valid absolute path falls back the same way. A failed `Initialize` clears `Directory` and
+`CurrentFile` so a later crash report says the log path is unavailable instead of naming a path the
+logger never opened.
+
 ### Initialization failure
 
 `Initialize` never throws. If the directory cannot be created, the path is an existing file, or
-the daily file cannot be opened for append, the logger records the failure with
-`Trace.WriteLine`, leaves itself without a destination file, and every later write goes to
-`Trace.WriteLine`. This keeps a logger failure from turning a diagnostic path into a second
-crash.
+the daily file cannot be opened for append, the logger records the failure with the internal safe
+trace helper, leaves itself without a destination file, and every later write goes to that helper.
+This keeps a logger failure from turning a diagnostic path into a second crash.
 
 ### Entry larger than the file limit
 
@@ -54,7 +62,7 @@ Retention runs at initialization and when the UTC day changes. It enumerates onl
 `log-*.txt` directly in the log directory and deletes those whose last write time is older than
 `RetainDays`. Non-matching files such as `notes.txt`, settings, and crash reports are left alone.
 The daily file currently being written has a fresh timestamp and is therefore not deleted. A
-deletion failure is logged to `Trace` and does not stop logging.
+deletion failure goes to the safe trace helper and does not stop logging.
 
 ### Concurrent writes and date changes
 
@@ -71,14 +79,22 @@ earlier day's file, which is acceptable because files are append-only.
 `Shutdown` stops the logger under the lock. It never throws. Tests and tools can call
 `Initialize` again afterwards. `CurrentFile` and `Directory` keep pointing at the last path so
 diagnostics can report where the log went even after shutdown. No file handle is held between
-entries, so shutdown does not need to drain a buffer.
+entries, so shutdown does not need to drain a buffer. A write after shutdown falls through to the
+safe trace helper instead of touching the filesystem.
 
 ### Disk and handle failures
 
 A full disk, a revoked handle, a deleted directory, or an antivirus lock can make a write fail.
-Every public method catches the failure, writes to `Trace`, and returns. Logging never propagates
-an exception to the caller. Exceptions passed to `Exception` are expanded with their type,
-message, and stack trace on following lines.
+Every public method catches the failure, writes to the safe trace helper, and returns. Logging
+never propagates an exception to the caller. Exceptions passed to `Exception` are expanded with
+their type, message, and stack trace on following lines.
+
+### Trace listener failure
+
+`Trace.WriteLine` is not guaranteed to be quiet: a registered `TraceListener` can throw. Every
+trace call in this assembly goes through `SafeTrace`, which catches listener failures. A broken
+listener therefore cannot escape `Log`, `CrashHandler`, or `SingleInstance`, including while a
+process is shutting down.
 
 ## CrashHandler
 
@@ -87,13 +103,14 @@ message, and stack trace on following lines.
 `Report` is guarded by an atomic flag. A dialog that pumps messages can dispatch a second
 unhandled exception on the same thread; that nested report sees the flag and returns instead of
 recursing. All work is wrapped, so a failing logger or a failing `MessageBoxW` cannot throw out
-of the crash path.
+of the crash path. Trace fallback calls use `SafeTrace`, so even a throwing trace listener cannot
+escape during shutdown.
 
 ### Logging was never initialized
 
-If `Log.Initialize` failed or did not run, `Log.Exception` falls back to `Trace.WriteLine`. The
-report still reaches a debugger or trace listener. The dialog text reports that the log path is
-unavailable instead of failing.
+If `Log.Initialize` failed, did not run, or already shut down, `Log.Exception` falls back to the
+safe trace helper. The report still reaches a debugger or trace listener. The dialog text reports
+that the log path is unavailable instead of failing.
 
 ### Dialog in a non-interactive session
 
@@ -132,12 +149,22 @@ corruption. The original file is moved, never deleted, to
 exists, a numeric suffix is added so the older corrupt copy is preserved. The original bytes are
 unchanged by the move. `Load` then returns a fresh `T`.
 
+### Oversized file
+
+`Load` checks the file length before allocating the read buffer. The documented cap is
+`SettingsStore<T>.MaxFileBytes`, 1 MiB. A file larger than the cap is treated as corruption: it
+is moved aside to `<file>.bad-<stamp>`, the original bytes and length are preserved, and a fresh
+`T` is returned. The oversized content is never read into memory. The length check and the read
+happen through one `FileStream` opened with `FileShare.Read`, so a writer cannot grow the file
+between the check and the read.
+
 ### IO errors during load
 
-Errors other than malformed JSON, such as a sharing violation, access denial, or a failed move,
-are wrapped in an `IOException` that names the settings path and keeps the original exception as
-the inner exception. They are not silently converted into defaults, because doing so could hide
-a permissions problem and later overwrite a file the user cannot read.
+Errors other than malformed JSON or an oversized file, such as a sharing violation, access
+denial, or a failed move, are wrapped in an `IOException` that names the settings path and keeps
+the original exception as the inner exception. They are not silently converted into defaults,
+because doing so could hide a permissions problem and later overwrite a file the user cannot
+read.
 
 ### Atomic save
 
@@ -185,12 +212,40 @@ larger message is disconnected without the server reading the announced bytes in
 client rejects messages whose UTF-8 encoding exceeds 64 KiB before connecting. Zero-length
 messages are legal and raise an empty string.
 
-### Connection failures and timeouts
+### Connection failures, timeouts, and named result
 
-A second instance connects with a five-second timeout. A missing server, a rejected ACL, a
-broken pipe, or a timeout makes `SendMessage` return false after a `Trace` line. The Hub retries
-`activate` three times with 200 ms gaps. A server that is between accept iterations has a small
-window where a client waits inside `Connect`; the timeout and retries cover it.
+`TrySendMessage` connects with a three-second timeout and returns a named
+`SingleInstanceSendResult`: `Sent`, `ServerUnavailable`, `TimedOut`, `AccessDenied`, `Disposed`, or
+`Failed`. A missing or non-accepting server ends as `TimedOut`, a rejected ACL as `AccessDenied`,
+and a broken pipe as `ServerUnavailable`. Every failure therefore has a name, throws no
+exception, and has no retry loop of its own. `SendMessage` remains as a compatibility wrapper
+that returns true only for `Sent`. The Hub retries `activate` three times with 200 ms gaps. A
+server that is between accept iterations has a small window where a client waits inside
+`Connect`; the timeout and retries cover it.
+
+### Current-user-only client
+
+The client always uses the local machine name `.` and the bare pipe name. It never tries the
+global pipe namespace, a remote server name, or an impersonation token, so it can only reach the
+per-user pipe that the server created with `PipeOptions.CurrentUserOnly`. The constructed name
+contains no path separators, and the server and client both use the same identity suffix.
+
+### Accept loop backoff
+
+A pipe name can be taken while the mutex says this process is first, for example when a stale
+process still holds the pipe or another component uses the same name. Creating the server then
+fails repeatedly. The accept loop applies exponential backoff from 50 ms to 1000 ms and stops
+retrying when disposal cancels it. The loop therefore cannot spin at 100 percent CPU while the
+name is unavailable. A client that connects and then disconnects without a complete message is
+treated as an abnormal client: the server disposes that connection and waits 25 ms before
+listening again, so a fast connect-disconnect stream cannot drive an unbounded tight loop.
+
+### Server read timeout
+
+After accepting a connection the server allows 1.5 seconds for the complete four-byte length and
+payload. A client that connects and stalls is disconnected when the timeout expires. The next
+client is accepted normally. The timeout uses a cancellable `WaitAsync` over the asynchronous
+read, and the connection is disposed on every path, so an abandoned read cannot hold the pipe.
 
 ### Same-user ACL
 
@@ -203,10 +258,11 @@ over one pipe.
 ### Dispose while accepting
 
 `Dispose` cancels the accept loop, disposes the active server to break a pending
-`WaitForConnectionAsync`, briefly waits for the loop, and then closes the mutex. It is idempotent.
-If the loop does not finish within the brief wait, the process can still exit because the loop
-runs on a background task. A message handler that throws is caught and traced; it cannot kill the
-accept loop.
+`WaitForConnectionAsync` or read, briefly waits for the loop, and then closes the mutex. It is
+idempotent and every cleanup step is wrapped, so disposal cannot throw. If the loop does not
+finish within the brief wait, the process can still exit because the loop runs on a background
+task. A message handler that throws is caught and traced; it cannot kill the accept loop. A
+retry delay is cancellable, so disposal does not wait for a full backoff interval.
 
 ### Stale state after a crash
 
@@ -220,7 +276,8 @@ proceeds.
 ### Logger failure
 
 `Log.Initialize("hub")` runs before any window exists. A failed log directory does not prevent
-startup; messages go to `Trace`. The crash handler is installed immediately after logging.
+startup; messages go to the safe trace helper. The crash handler is installed immediately after
+logging.
 
 ### Second instance
 
@@ -255,7 +312,10 @@ The existing launcher rows, automation ids, and merged resource dictionaries are
 ## Verification
 
 `tests/Bwc.Core.Tests` covers path validation, log writing, rolling, retention, failed
-initialization, settings round trips, corrupt file preservation, temporary file cleanup, single
-instance behavior, message size rejection, disposal and recreation, and crash report logging. The
-tests use a per-run temporary folder and unique tool ids, and they clean up files, pipes, and
-mutexes. Release builds with `-p:Platform=ARM64` must have zero warnings.
+initialization, relative log directory fallback, throwing trace listeners, settings round trips,
+corrupt file preservation, oversized file rejection without a large allocation, temporary file
+cleanup, single instance behavior, message size rejection, named send results, disposal and
+recreation, pipe-name conflict backoff with a CPU-time bound, server read timeout, abnormal
+client disconnects, and crash report logging after shutdown. The tests use a per-run temporary
+folder and unique tool ids, and they clean up files, pipes, and mutexes. Release builds with
+`-p:Platform=ARM64` must have zero warnings.

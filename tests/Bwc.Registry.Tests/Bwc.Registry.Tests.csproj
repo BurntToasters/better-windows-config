@@ -18,6 +18,12 @@
     <None Include="..\..\docs\parity\oracle\import-behavior.json"
           Link="oracle\import-behavior.json"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\docs\parity\oracle\find-sequence.json"
+          Link="oracle\find-sequence.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\docs\parity\oracle\sort-order.json"
+          Link="oracle\sort-order.json"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

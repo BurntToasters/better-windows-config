@@ -1,8 +1,8 @@
 namespace Bwc.Registry;
 
 /// <summary>
-/// One Find request. Matching is case-insensitive with the current culture. At least one of
-/// Keys, Values, or Data must be enabled, and the search text cannot be empty.
+/// One Find request. Matching uses the classic Windows NLS collation (case-insensitive). At
+/// least one of Keys, Values, or Data must be enabled, and the search text cannot be empty.
 /// </summary>
 public sealed class RegistryFindQuery
 {
@@ -53,7 +53,62 @@ public sealed class RegistryFindQuery
         Roots = roots is null ? DefaultRoots : CopyRoots(roots);
     }
 
+    /// <summary>
+    /// Builds a query from the classic Find option bits. This is the overload the persisted
+    /// <c>FindFlags</c> DWORD feeds through <see cref="RegistryFindFlagsCodec"/>.
+    /// </summary>
+    public RegistryFindQuery(
+        string searchText,
+        RegistryFindFlags flags,
+        IReadOnlyList<RegistryPath>? roots = null)
+        : this(
+            searchText,
+            (flags & RegistryFindFlags.Keys) != 0,
+            (flags & RegistryFindFlags.Values) != 0,
+            (flags & RegistryFindFlags.Data) != 0,
+            (flags & RegistryFindFlags.MatchWholeString) != 0,
+            (flags & RegistryFindFlags.SearchInSubtree) != 0,
+            roots)
+    {
+    }
+
     public string SearchText { get; }
+
+    /// <summary>The classic Find option bits for this query.</summary>
+    public RegistryFindFlags Flags
+    {
+        get
+        {
+            RegistryFindFlags flags = RegistryFindFlags.None;
+
+            if (LookAtKeys)
+            {
+                flags |= RegistryFindFlags.Keys;
+            }
+
+            if (LookAtValues)
+            {
+                flags |= RegistryFindFlags.Values;
+            }
+
+            if (LookAtData)
+            {
+                flags |= RegistryFindFlags.Data;
+            }
+
+            if (MatchWholeStringOnly)
+            {
+                flags |= RegistryFindFlags.MatchWholeString;
+            }
+
+            if (SearchInSubtree)
+            {
+                flags |= RegistryFindFlags.SearchInSubtree;
+            }
+
+            return flags;
+        }
+    }
 
     public bool LookAtKeys { get; }
 

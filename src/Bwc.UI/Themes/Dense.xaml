@@ -518,6 +518,56 @@
     </Style>
 
     <!--
+        Inline rename box in the tree and the value list. The template is the plain classic edit:
+        an opaque window background, one pixel shadow border, no Fluent clear button, and no
+        focus-state background change, so the row label can never show through the box.
+    -->
+    <Style x:Key="BwcInlineRenameTextBoxStyle" TargetType="TextBox">
+        <Setter Property="Background" Value="{StaticResource BwcWindowBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource BwcWindowTextBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BwcShadowBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="0,0" />
+        <Setter Property="FontSize" Value="{StaticResource BwcFontSize}" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="TextAlignment" Value="Left" />
+        <Setter Property="IsSpellCheckEnabled" Value="False" />
+        <Setter Property="IsTextPredictionEnabled" Value="False" />
+        <Setter Property="UseSystemFocusVisuals" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Grid>
+                        <Border
+                            x:Name="BorderElement"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Control.IsTemplateFocusTarget="True"
+                            CornerRadius="{TemplateBinding CornerRadius}" />
+                        <ScrollViewer
+                            x:Name="ContentElement"
+                            Margin="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}"
+                            AutomationProperties.AccessibilityView="Raw"
+                            Foreground="{TemplateBinding Foreground}"
+                            HorizontalScrollBarVisibility="Hidden"
+                            HorizontalScrollMode="Auto"
+                            IsTabStop="False"
+                            VerticalScrollBarVisibility="Hidden"
+                            VerticalScrollMode="Auto"
+                            ZoomMode="Disabled" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
         Address bar only. This is keyed so a normal TextBox in another view keeps its
         Fluent height and padding. The corner radius is 0, so the field is a flat rectangle as in the
         classic edit. The border and background brushes are set in ClassicWindowShell.

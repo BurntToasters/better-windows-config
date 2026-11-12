@@ -45,16 +45,10 @@
                         AutomationProperties.AutomationId="TreeRenameBox"
                         AutomationProperties.Name="Rename key"
                         AcceptsReturn="False"
-                        BorderThickness="1"
                         FontFamily="Segoe UI"
                         FontSize="12"
-                        IsSpellCheckEnabled="False"
-                        IsTextPredictionEnabled="False"
-                        MinHeight="0"
-                        MinWidth="0"
-                        Padding="0"
+                        Style="{StaticResource BwcInlineRenameTextBoxStyle}"
                         TextWrapping="NoWrap"
-                        VerticalContentAlignment="Center"
                         Visibility="Collapsed" />
                 </Canvas>
             </Grid>

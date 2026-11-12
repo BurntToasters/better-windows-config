@@ -130,14 +130,29 @@ the owning package records the observed behavior as a golden before implementing
   the remaining root keys in their tree order. It does not wrap; at the end it reports
   regedit's "Finished searching through the registry." message.
 - At each key the check order is: key name (if *Keys* is checked), then each value in display
-  order, checking value name (if *Values*) then value data (if *Data*).
-- Matching is case-insensitive substring, or whole-string equality with *Match whole string
-  only*.
-- Which data types *Data* searches, and how `REG_MULTI_SZ` and binary data are matched, is
-  *verify against oracle*: drive classic regedit's Find over the seeded tree in E2E and commit
-  the hit sequence as a golden before implementing.
+  order, checking value name (if *Values*) then value data (if *Data*). A value produces at most
+  one hit per step: the name wins when both name and data match.
+- Matching and ordering use the Windows NLS collation classic uses: `CompareStringEx` with
+  `NORM_IGNORECASE` at the user default locale. Substring matching compares a needle-length
+  window at every UTF-16 offset. `CurrentCultureIgnoreCase` and ordinal ignore case do not
+  reproduce the oracle order. `docs/parity/oracle/sort-order.json` is the ordering golden.
+- *Data* searches only `REG_SZ`, `REG_EXPAND_SZ`, and `REG_MULTI_SZ`, using the text the Data
+  column shows. `REG_MULTI_SZ` is the items joined with single spaces; individual items are not
+  separate candidates. DWORD, QWORD, binary, link, none, and unknown types are not searched.
+  Whole-string matching compares that same displayed text, so a multi-string whose item is `ab`
+  does not match the whole string `ab`. The oracle `find-sequence.json` is the golden.
+- A cursor whose key or value disappeared resumes at the nearest later position in NLS order
+  instead of reporting finished. A missing key resumes at the first later sibling subtree; a
+  missing value resumes at the first value that sorts after it. If no later position exists,
+  the search is finished. The search never wraps.
+- *Search in subtree* unchecked is not "starting key only": the oracle's no-subtree run still
+  reached the seeded descendants. The engine's configured `Roots` define the scope and the flag
+  does not narrow the walk. The cross-root scope difference is not captured and stays OQ-10.
 - F3 repeats the last search from the current hit. The search runs on a background thread
-  with the regedit progress dialog and Cancel button.
+  with the regedit progress dialog and Cancel button. `RegistryFindFlagsCodec` uses the classic
+  dialog mask (`0x1` whole, `0x2` keys, `0x4` values, `0x8` data, `0x10` subtree). Windows 11
+  build 26100.8457 does not update the persisted `FindFlags` DWORD; BWC writes it. F3 state is a
+  query built from that DWORD.
 
 ## `.reg` files (packages B5, B6)
 

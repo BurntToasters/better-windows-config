@@ -182,19 +182,61 @@ public sealed class ContextMenuTests
         bool submenu = newMenu && menus.OpenSubmenu(516) && menus.WaitForItem(663) is not null;
         E2EGuards.RequireSandboxSelection(session, sandbox, "contextmenu.sandbox.newkey");
         bool newInvoked = submenu && menus.Invoke(663);
-        bool dialog = newInvoked && driver.WaitForDialog();
-        bool input = dialog && driver.WaitForElement("DialogTextInput") is not null;
-        // The classic prompt has no heading. Its window title is the New Key caption.
-        AutomationElement? promptRoot = dialog ? driver.WaitForElement("DialogRoot") : null;
-        string heading = promptRoot is null ? string.Empty : ControlTestSupport.SafeName(ClassicDialogTests.WindowOf(promptRoot));
-        bool cancelled = input && driver.Invoke("DialogSecondary") && driver.WaitForNoDialog();
-        bool keyAbsent = !sandbox.Exists(NewKeyName);
+        bool renameBox = newInvoked && ControlTestSupport.WaitUntil(
+            () => session.Find("TreeRenameBox") is not null,
+            TimeSpan.FromSeconds(10));
+        AutomationElement? renameElement = renameBox ? session.Find("TreeRenameBox") : null;
+        string defaultName = renameElement is null ? string.Empty : session.TextOf(renameElement);
+        bool classicName = string.Equals(defaultName, "New Key #1", StringComparison.Ordinal);
+        bool typed = renameBox && driver.TypeKeys(NewKeyName);
+        bool committed = typed && driver.TypeKeys("Enter");
+        bool keyExists = ControlTestSupport.WaitUntil(
+            () => sandbox.Exists(NewKeyName),
+            TimeSpan.FromSeconds(10));
+        bool selected = keyExists && ControlTestSupport.WaitUntil(
+            () => ControlTestSupport.IsSelected(FindTreeRow(session, NewKeyName)),
+            TimeSpan.FromSeconds(10));
         E2EResults.Record(
             "contextmenu.tree.newkey",
-            submenu && newInvoked && dialog && heading.StartsWith("New Key", StringComparison.Ordinal) &&
-                cancelled && keyAbsent,
-            $"submenu={submenu}, invoked={newInvoked}, dialog={dialog}, title='{heading}', cancelled={cancelled}, keyAbsent={keyAbsent}.");
+            submenu && newInvoked && renameBox && classicName && typed && committed && keyExists && selected,
+            $"submenu={submenu}, invoked={newInvoked}, renameBox={renameBox}, default='{defaultName}', typed={typed}, committed={committed}, exists={keyExists}, selected={selected}.");
+
+        bool runSelected = SelectTreeRow(session, config.RunId);
+        bool valuesBack = ControlTestSupport.WaitUntil(
+            () => ControlTestSupport.ListRowNames(session).Contains(StringValueName, StringComparer.OrdinalIgnoreCase),
+            TimeSpan.FromSeconds(10));
+        E2EResults.Note(
+            "contextmenu.tree.newkey.reselect",
+            $"run key selected={runSelected}, value rows back={valuesBack}.");
+
+        MenuSnapshot? renameSnapshot = menus.RightClickForMenu(
+            () => FindTreeRow(session, config.RunId),
+            TreeMenuNames);
+        bool renameMenu = renameSnapshot is not null;
+        bool renameInvoked = renameMenu && menus.Invoke(914);
+        bool treeRenameBox = renameInvoked && ControlTestSupport.WaitUntil(
+            () => session.Find("TreeRenameBox") is not null,
+            TimeSpan.FromSeconds(5));
+        bool renameEscaped = treeRenameBox && SendKeys(session, "ESCAPE");
+        bool renameClosed = renameEscaped && ControlTestSupport.WaitUntil(
+            () => session.Find("TreeRenameBox") is null,
+            TimeSpan.FromSeconds(5));
+        E2EResults.Record(
+            "contextmenu.tree.rename",
+            renameInvoked && treeRenameBox && renameClosed,
+            $"menu={renameMenu}, invoked={renameInvoked}, renameBox={treeRenameBox}, escaped={renameEscaped}, closed={renameClosed}.");
     }
+
+    /// <summary>Selects a tree row by name and retries until the row reports as selected.</summary>
+    private static bool SelectTreeRow(AppSession session, string rowName) =>
+        ControlTestSupport.WaitUntil(
+            () =>
+            {
+                AutomationElement? row = FindTreeRow(session, rowName);
+                ControlTestSupport.Select(row);
+                return ControlTestSupport.IsSelected(FindTreeRow(session, rowName));
+            },
+            TimeSpan.FromSeconds(10));
 
     private static void CheckValueMenu(
         AppSession session,

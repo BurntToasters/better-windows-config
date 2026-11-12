@@ -3,7 +3,6 @@ using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
-using FlaUI.Core.Input;
 using FlaUI.UIA3;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Win32;
@@ -37,7 +36,8 @@ public sealed class MessageTests
     private const string TextRenameValueExists =
         "The Registry Editor cannot rename AlphaString. The specified value name already exists. Type another name and try again.";
     private const string TextRenameKeyFailed = "The Registry Editor cannot rename {0}. Error while renaming key.";
-    private const string TextNewKeyExists = "A registry object with this name already exists.";
+    private const string TextRenameKeyExists =
+        "The Registry Editor cannot rename Child. The specified key name already exists. Type another name and try again.";
 
     /// <summary>The text of every message box the checks saw. Scanned for developer text at the end.</summary>
     private static readonly List<string> SeenMessages = new();
@@ -76,6 +76,7 @@ public sealed class MessageTests
         {
             sandbox.Cleanup();
             EditingTests.SeedSandbox(sandbox);
+            sandbox.CreateKey("ChildSibling");
 
             string dataRoot = CreateFreshDataRoot(config, "messages");
             var environment = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -103,7 +104,7 @@ public sealed class MessageTests
                 seeded,
                 $"list rows=[{string.Join(",", ControlTestSupport.ListRowNames(session))}].");
 
-            CheckNewKeyWhereNameExists(session, driver, automation, sandbox);
+            CheckRenameKeyToExistingName(session, driver, automation, sandbox, config);
             CheckDeleteSeveralValues(session, driver, automation, sandbox);
             CheckRenameToExistingValue(session, driver, automation, sandbox);
             CheckDeleteKeyConfirmation(session, driver, automation, sandbox, config);
@@ -213,51 +214,58 @@ public sealed class MessageTests
     }
 
     /// <summary>
-    /// New Key under the run key, where a key named Child already exists: the prompt shows the
-    /// duplicate text and does not create a key. Escape cancels.
+    /// Rename a key to the name of an existing sibling through the inline editor: caption 64 and text
+    /// 68, and the key is not changed. Rename is inline now, so the error follows an Enter in the tree
+    /// rename box, not a prompt.
     /// </summary>
-    private static void CheckNewKeyWhereNameExists(
+    private static void CheckRenameKeyToExistingName(
         AppSession session,
         EditingDriver driver,
         UIA3Automation automation,
-        SandboxRegistry sandbox)
+        SandboxRegistry sandbox,
+        E2EConfig config)
     {
-        E2EGuards.RequireSandboxSelection(session, sandbox, "messages.newkey.sandbox");
-        driver.OpenMenu(MenuEdit, MenuEditNew, MenuEditNewKey);
-        bool prompt = driver.WaitForDialog() && driver.WaitForElement("DialogTextInput") is not null;
-        bool typed = prompt && driver.SetText("DialogTextInput", "Child");
-        // The duplicate check runs when the prompt is submitted. The error is its own modal window over the
-        // prompt, so its text is DialogErrorText. Enter dismisses it, and the prompt stays open with the text.
-        bool submitted = typed && driver.Invoke("DialogPrimary");
+        bool selected = ControlTestSupport.NavigateToSandboxKey(session, config, "Child");
+        E2EGuards.RequireSandboxNavigation(session, sandbox, selected, "messages.renamekey.exists.navigate");
+        E2EGuards.RequireSandboxSelection(session, sandbox, "messages.renamekey.exists.sandbox");
 
-        string validation = string.Empty;
-        bool shown = submitted && ControlTestSupport.WaitUntil(
-            () =>
-            {
-                validation = driver.TextOf("DialogErrorText");
-                return string.Equals(validation, TextNewKeyExists, StringComparison.Ordinal);
-            },
+        driver.OpenMenu(MenuEdit, MenuEditRename);
+        bool editorOpen = ControlTestSupport.WaitUntil(
+            () => session.Find("TreeRenameBox") is not null,
             TimeSpan.FromSeconds(5));
-        if (validation.Length > 0)
-        {
-            SeenMessages.Add(validation);
-        }
+        bool typed = editorOpen && driver.TypeKeys("ChildSibling");
+        bool committed = typed && driver.TypeKeys("Enter");
 
-        if (shown)
-        {
-            Keyboard.Type(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
-            _ = ControlTestSupport.WaitUntil(() => driver.TextOf("DialogErrorText").Length == 0, TimeSpan.FromSeconds(5));
-        }
+        AutomationElement? root = committed ? WaitForInProcess(session, automation, "DialogRoot") : null;
+        string caption = root is null ? string.Empty : CaptionOf(root);
+        string text = driver.TextOf("DialogErrorText");
+        SeenMessages.Add(text);
+        E2EResults.Record(
+            "messages.renamekey.exists.caption",
+            string.Equals(caption, CaptionRenameKeyError, StringComparison.Ordinal),
+            $"selected={selected}, dialog={root is not null}, caption='{caption}'.");
+        E2EResults.Record(
+            "messages.renamekey.exists.text",
+            string.Equals(text, TextRenameKeyExists, StringComparison.Ordinal),
+            $"text='{text}'.");
 
-        bool cancelled = shown && driver.Invoke("DialogSecondary");
-        bool closed = cancelled && driver.WaitForNoDialog();
-        bool childKept = ControlTestSupport.WaitUntil(
-            () => sandbox.ReadString("Child", "Marker") == "child",
+        bool ok = root is not null && driver.Invoke("DialogPrimary");
+        bool closed = ok && driver.WaitForNoDialog();
+        bool kept = ControlTestSupport.WaitUntil(
+            () => sandbox.ReadString("Child", "Marker") == "child" && sandbox.Exists("ChildSibling"),
             TimeSpan.FromSeconds(5));
         E2EResults.Record(
-            "messages.newkey.exists",
-            prompt && typed && shown && closed && childKept,
-            $"prompt={prompt}, validation='{validation}', shown={shown}, closed={closed}, Child kept={childKept}.");
+            "messages.renamekey.exists.kept",
+            ok && closed && kept,
+            $"ok={ok}, closed={closed}, Child kept={kept}.");
+
+        bool back = ControlTestSupport.NavigateToSandboxKey(session, config);
+        bool rowsBack = ControlTestSupport.WaitUntil(
+            () => ControlTestSupport.ListRowNames(session).Contains("AlphaString", StringComparer.OrdinalIgnoreCase),
+            TimeSpan.FromSeconds(10));
+        E2EResults.Note(
+            "messages.renamekey.exists.back",
+            $"run key selected={back}, value rows back={rowsBack}.");
     }
 
     /// <summary>Delete on a key: the confirmation text, caption, and buttons, with the default on Yes. Then No.</summary>
@@ -329,9 +337,11 @@ public sealed class MessageTests
         string runId = SandboxRunId(sandbox);
 
         driver.OpenMenu(MenuEdit, MenuEditRename);
-        bool prompt = driver.WaitForDialog() && driver.WaitForElement("DialogTextInput") is not null;
-        bool typed = prompt && driver.SetText("DialogTextInput", runId + "Renamed");
-        bool submitted = typed && driver.Invoke("DialogPrimary");
+        bool editorOpen = ControlTestSupport.WaitUntil(
+            () => session.Find("TreeRenameBox") is not null,
+            TimeSpan.FromSeconds(5));
+        bool typed = editorOpen && driver.TypeKeys(runId + "Renamed");
+        bool submitted = typed && driver.TypeKeys("Enter");
 
         AutomationElement? root = submitted ? WaitForInProcess(session, automation, "DialogRoot") : null;
         string caption = root is null ? string.Empty : CaptionOf(root);
@@ -341,7 +351,7 @@ public sealed class MessageTests
         E2EResults.Record(
             "messages.renamekey.caption",
             string.Equals(caption, CaptionRenameKeyError, StringComparison.Ordinal),
-            $"prompt={prompt}, submitted={submitted}, dialog={root is not null}, caption='{caption}'.");
+            $"renameBox={editorOpen}, submitted={submitted}, dialog={root is not null}, caption='{caption}'.");
         E2EResults.Record(
             "messages.renamekey.text",
             string.Equals(text, expectedText, StringComparison.Ordinal),

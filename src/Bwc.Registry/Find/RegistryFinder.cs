@@ -1,13 +1,11 @@
-using System.Globalization;
-using System.Text;
-
 namespace Bwc.Registry;
 
 /// <summary>
 /// Classic regedit Find over the real registry. The walk is depth-first pre-order with an
-/// explicit stack, checks the key name, then each value name and its data in display order, and
-/// continues across the configured roots without wrapping. Reads use <see cref="RegistryReader"/>
-/// only and may run on any thread.
+/// explicit stack, uses the Windows NLS collation for matching and ordering, checks the key
+/// name, then each value name and its data, and continues across the configured roots without
+/// wrapping. A cursor whose key or value disappeared resumes at the nearest later position.
+/// Reads use <see cref="RegistryReader"/> only and may run on any thread.
 /// </summary>
 public sealed class RegistryFinder
 {
@@ -47,11 +45,6 @@ public sealed class RegistryFinder
 
     private sealed class Walk
     {
-        private const StringComparison MatchComparison = StringComparison.CurrentCultureIgnoreCase;
-
-        private static readonly StringComparer SortComparer =
-            StringComparer.CurrentCultureIgnoreCase;
-
         private readonly RegistryFindQuery _query;
         private readonly RegistryFindCursor? _cursor;
         private readonly RegistryReader _reader;
@@ -79,29 +72,25 @@ public sealed class RegistryFinder
                 return WalkStack(CreateRootStack());
             }
 
-            if (_query.SearchInSubtree)
+            if (TryCreateContinuationStack(
+                _cursor,
+                out Stack<Frame> continuation,
+                out bool cursorKeyExists))
             {
-                if (TryCreateContinuationStack(_cursor, out Stack<Frame> continuation))
+                if (!cursorKeyExists)
                 {
-                    return WalkStack(continuation);
+                    // The cursor key is gone. Its position in pre-order has passed, so
+                    // every frame in the continuation is after the cursor.
+                    _pastCursor = true;
                 }
 
-                // The cursor key's continuation could not be built. Scan from the first root
-                // so an unreadable ancestor cannot abort the search. A cursor that is never
-                // reached returns null instead of wrapping.
-                return WalkStack(CreateRootStack());
+                return WalkStack(continuation);
             }
 
-            // OQ-10 is provisional: with Search in subtree unchecked, only the starting key is
-            // in scope. Predefined roots have no values, so a cursor is normally required.
-            if (!IsInsideAnyRoot(_cursor.KeyPath))
-            {
-                return null;
-            }
-
-            var singleKey = new Stack<Frame>();
-            singleKey.Push(new Frame(_cursor.KeyPath));
-            return WalkStack(singleKey);
+            // The cursor key is outside every root or its continuation cannot be placed.
+            // Scan from the first root. A cursor that is never reached returns null instead
+            // of wrapping.
+            return WalkStack(CreateRootStack());
         }
 
         private Stack<Frame> CreateRootStack()
@@ -118,9 +107,11 @@ public sealed class RegistryFinder
 
         private bool TryCreateContinuationStack(
             RegistryFindCursor cursor,
-            out Stack<Frame> stack)
+            out Stack<Frame> stack,
+            out bool cursorKeyExists)
         {
             stack = new Stack<Frame>();
+            cursorKeyExists = false;
 
             int rootIndex = FindRootIndex(cursor.KeyPath);
             if (rootIndex < 0)
@@ -128,58 +119,68 @@ public sealed class RegistryFinder
                 return false;
             }
 
+            cursorKeyExists = cursor.KeyPath.Equals(_query.Roots[rootIndex]);
+
             // Each level holds the siblings that follow the cursor branch at that level. Level
             // zero is the cursor key's own next siblings; the last level is the next siblings of
             // the search root's child. Ancestors themselves were already considered before the
-            // cursor and are not pushed again.
+            // cursor and are not pushed again. A level whose parent is unreadable contributes no
+            // later siblings; the climb continues at the parent's parent.
             var continuationLevels = new List<List<RegistryPath>>();
             RegistryPath root = _query.Roots[rootIndex];
             RegistryPath current = cursor.KeyPath;
+            bool atCursorLevel = true;
 
             while (!current.Equals(root))
             {
                 RegistryPath parent = current.Parent!;
-                IReadOnlyList<string> childNames;
+                string leaf = current.Components[^1];
 
                 _cancellationToken.ThrowIfCancellationRequested();
 
-                try
+                if (TryGetSortedChildNames(parent, out List<string> sortedNames))
                 {
-                    childNames = _reader.EnumerateSubKeyNames(parent, _cancellationToken);
-                }
-                catch (RegistryOperationException)
-                {
-                    return false;
-                }
+                    int index = sortedNames.FindIndex(
+                        name => string.Equals(name, leaf, StringComparison.OrdinalIgnoreCase));
+                    int laterStart;
 
-                List<string> sortedNames = childNames
-                    .OrderBy(name => name, SortComparer)
-                    .ToList();
-                string leaf = current.Components[^1];
-                int index = sortedNames.FindIndex(
-                    name => string.Equals(name, leaf, StringComparison.OrdinalIgnoreCase));
-
-                if (index < 0)
-                {
-                    // The cursor key was deleted, renamed, or otherwise cannot be placed in
-                    // pre-order. The caller falls back to a root walk and will stop at null if
-                    // the cursor is never reached.
-                    return false;
-                }
-
-                var laterSiblings = new List<RegistryPath>(sortedNames.Count - index - 1);
-
-                for (int siblingIndex = index + 1; siblingIndex < sortedNames.Count; siblingIndex += 1)
-                {
-                    RegistryPath? sibling = TryAppend(parent, sortedNames[siblingIndex]);
-                    if (sibling is not null)
+                    if (index >= 0)
                     {
-                        laterSiblings.Add(sibling);
+                        if (atCursorLevel)
+                        {
+                            cursorKeyExists = true;
+                        }
+
+                        laterStart = index + 1;
                     }
+                    else
+                    {
+                        // The key was deleted or renamed. Insert its old leaf name at the
+                        // nearest NLS position and continue with the siblings after it.
+                        laterStart = LowerBound(sortedNames, leaf);
+
+                        if (atCursorLevel)
+                        {
+                            cursorKeyExists = false;
+                        }
+                    }
+
+                    var laterSiblings = new List<RegistryPath>(sortedNames.Count - laterStart);
+
+                    for (int siblingIndex = laterStart; siblingIndex < sortedNames.Count; siblingIndex += 1)
+                    {
+                        RegistryPath? sibling = TryAppend(parent, sortedNames[siblingIndex]);
+                        if (sibling is not null)
+                        {
+                            laterSiblings.Add(sibling);
+                        }
+                    }
+
+                    continuationLevels.Add(laterSiblings);
                 }
 
-                continuationLevels.Add(laterSiblings);
                 current = parent;
+                atCursorLevel = false;
             }
 
             for (int index = _query.Roots.Count - 1; index > rootIndex; index -= 1)
@@ -197,8 +198,51 @@ public sealed class RegistryFinder
                 }
             }
 
-            stack.Push(new Frame(cursor.KeyPath));
+            if (cursorKeyExists)
+            {
+                stack.Push(new Frame(cursor.KeyPath));
+            }
+
             return true;
+        }
+
+        private bool TryGetSortedChildNames(RegistryPath parent, out List<string> sortedNames)
+        {
+            try
+            {
+                sortedNames = _reader
+                    .EnumerateSubKeyNames(parent, _cancellationToken)
+                    .OrderBy(name => name, RegistryFindCollation.Comparer)
+                    .ToList();
+                return true;
+            }
+            catch (RegistryOperationException)
+            {
+                sortedNames = new List<string>();
+                return false;
+            }
+        }
+
+        private static int LowerBound(IReadOnlyList<string> sortedNames, string name)
+        {
+            int low = 0;
+            int high = sortedNames.Count;
+
+            while (low < high)
+            {
+                int middle = low + ((high - low) / 2);
+
+                if (RegistryFindCollation.Compare(sortedNames[middle], name) <= 0)
+                {
+                    low = middle + 1;
+                }
+                else
+                {
+                    high = middle;
+                }
+            }
+
+            return low;
         }
 
         private RegistryFindHit? WalkStack(Stack<Frame> stack)
@@ -256,7 +300,7 @@ public sealed class RegistryFinder
 
         private RegistryFindHit? CheckKeyName(RegistryPath path)
         {
-            if (IsCursorPosition(path, null, RegistryFindCursorPhase.AfterKeyName))
+            if (IsCursorKeyPosition(path))
             {
                 _pastCursor = true;
                 return null;
@@ -276,14 +320,17 @@ public sealed class RegistryFinder
 
         private RegistryFindHit? CheckValues(RegistryPath path)
         {
-            bool cursorNeedsValues = !_pastCursor
+            bool cursorValueInThisKey = !_pastCursor
                 && _cursor is not null
                 && _cursor.ValueName is not null
                 && _cursor.KeyPath.Equals(path);
 
-            if (!_query.LookAtValues && !_query.LookAtData && !cursorNeedsValues)
+            if (!cursorValueInThisKey)
             {
-                return null;
+                if (!_pastCursor || (!_query.LookAtValues && !_query.LookAtData))
+                {
+                    return null;
+                }
             }
 
             _cancellationToken.ThrowIfCancellationRequested();
@@ -297,21 +344,93 @@ public sealed class RegistryFinder
             catch (RegistryOperationException)
             {
                 // An unreadable key does not abort the search. Its name may already have been a
-                // hit; its values and children are simply unavailable.
-                return null;
-            }
-
-            foreach (RegistryValueInfo value in values
-                .OrderBy(item => item.Name.Length == 0 ? 0 : 1)
-                .ThenBy(item => item.Name, SortComparer))
-            {
-                _cancellationToken.ThrowIfCancellationRequested();
-
-                if (IsCursorPosition(path, value.Name, RegistryFindCursorPhase.AfterValueName))
+                // hit; its values and children are simply unavailable. If the cursor value lives
+                // here, the nearest reachable position is the key's children.
+                if (cursorValueInThisKey)
                 {
                     _pastCursor = true;
                 }
-                else if (_pastCursor && _query.LookAtValues && Matches(value.Name))
+
+                return null;
+            }
+
+            List<RegistryValueInfo> sortedValues = values
+                .OrderBy(item => item.Name.Length == 0 ? 0 : 1)
+                .ThenBy(item => item.Name, RegistryFindCollation.Comparer)
+                .ToList();
+            int startIndex = 0;
+            int cursorIndex = -1;
+
+            if (cursorValueInThisKey)
+            {
+                string cursorValueName = _cursor!.ValueName!;
+                cursorIndex = sortedValues.FindIndex(
+                    item => string.Equals(
+                        item.Name,
+                        cursorValueName,
+                        StringComparison.OrdinalIgnoreCase));
+
+                if (cursorIndex >= 0)
+                {
+                    if (_cursor.Phase == RegistryFindCursorPhase.AfterValueData)
+                    {
+                        startIndex = cursorIndex + 1;
+                        _pastCursor = true;
+                    }
+                    else
+                    {
+                        // AfterValueName: this value's name was the last position considered.
+                        // Its data is still checked below.
+                        startIndex = cursorIndex;
+                    }
+                }
+                else
+                {
+                    // The cursor value disappeared or was renamed. Resume at the first value
+                    // that sorts after its old name.
+                    startIndex = sortedValues.FindIndex(
+                        item => RegistryFindCollation.Compare(item.Name, cursorValueName) > 0);
+
+                    if (startIndex < 0)
+                    {
+                        startIndex = sortedValues.Count;
+                    }
+
+                    _pastCursor = true;
+                }
+            }
+
+            for (int index = startIndex; index < sortedValues.Count; index += 1)
+            {
+                _cancellationToken.ThrowIfCancellationRequested();
+                RegistryValueInfo value = sortedValues[index];
+
+                if (cursorValueInThisKey
+                    && index == cursorIndex
+                    && _cursor!.Phase == RegistryFindCursorPhase.AfterValueName)
+                {
+                    _pastCursor = true;
+
+                    if (_query.LookAtData && TryMatchData(value, out string dataText))
+                    {
+                        return new RegistryFindHit(
+                            path,
+                            value.Name,
+                            RegistryFindHitKind.ValueData,
+                            dataText);
+                    }
+
+                    continue;
+                }
+
+                if (!_pastCursor)
+                {
+                    continue;
+                }
+
+                // Classic reports a value at most once per step. The name wins when both the
+                // name and the data match.
+                if (_query.LookAtValues && Matches(value.Name))
                 {
                     return new RegistryFindHit(
                         path,
@@ -320,18 +439,7 @@ public sealed class RegistryFinder
                         value.Name);
                 }
 
-                if (IsCursorPosition(path, value.Name, RegistryFindCursorPhase.AfterValueData))
-                {
-                    _pastCursor = true;
-                    continue;
-                }
-
-                if (!_pastCursor || !_query.LookAtData)
-                {
-                    continue;
-                }
-
-                if (TryMatchData(value, out string matchedText))
+                if (_query.LookAtData && TryMatchData(value, out string matchedText))
                 {
                     return new RegistryFindHit(
                         path,
@@ -341,44 +449,30 @@ public sealed class RegistryFinder
                 }
             }
 
+            if (cursorValueInThisKey && !_pastCursor)
+            {
+                // The cursor value sorted after every value that still exists.
+                _pastCursor = true;
+            }
+
             return null;
         }
 
-        private bool IsCursorPosition(
-            RegistryPath path,
-            string? valueName,
-            RegistryFindCursorPhase phase)
-        {
-            if (_pastCursor
-                || _cursor is null
-                || _cursor.Phase != phase
-                || !_cursor.KeyPath.Equals(path))
-            {
-                return false;
-            }
-
-            if (valueName is null)
-            {
-                return _cursor.ValueName is null;
-            }
-
-            return _cursor.ValueName is not null
-                && string.Equals(_cursor.ValueName, valueName, StringComparison.OrdinalIgnoreCase);
-        }
+        private bool IsCursorKeyPosition(RegistryPath path) =>
+            !_pastCursor
+            && _cursor is not null
+            && _cursor.Phase == RegistryFindCursorPhase.AfterKeyName
+            && _cursor.ValueName is null
+            && _cursor.KeyPath.Equals(path);
 
         private IReadOnlyList<string> EnumerateChildren(RegistryPath path)
         {
-            if (!_query.SearchInSubtree)
-            {
-                return Array.Empty<string>();
-            }
-
             _cancellationToken.ThrowIfCancellationRequested();
 
             try
             {
                 IReadOnlyList<string> names = _reader.EnumerateSubKeyNames(path, _cancellationToken);
-                return names.OrderBy(name => name, SortComparer).ToArray();
+                return names.OrderBy(name => name, RegistryFindCollation.Comparer).ToArray();
             }
             catch (RegistryOperationException)
             {
@@ -396,101 +490,39 @@ public sealed class RegistryFinder
                 return false;
             }
 
+            string candidate;
+
             switch (value.Type)
             {
                 case (uint)RegistryValueType.String:
                 case (uint)RegistryValueType.ExpandString:
-                    return TryMatchText(RegistryValueCodec.DecodeString(value.Data), out matchedText);
+                    candidate = RegistryValueCodec.DecodeString(value.Data);
+                    break;
 
                 case (uint)RegistryValueType.MultiString:
-                    return TryMatchMultiString(value.Data, out matchedText);
-
-                case (uint)RegistryValueType.Dword:
-                    if (!RegistryValueCodec.IsValidDword(value.Data))
-                    {
-                        return TryMatchText(FormatHex(value.Data), out matchedText);
-                    }
-
-                    return TryMatchNumber(
-                        RegistryValueCodec.DecodeDword(value.Data),
-                        out matchedText);
-
-                case (uint)RegistryValueType.Qword:
-                    if (!RegistryValueCodec.IsValidQword(value.Data))
-                    {
-                        return TryMatchText(FormatHex(value.Data), out matchedText);
-                    }
-
-                    return TryMatchNumber(
-                        RegistryValueCodec.DecodeQword(value.Data),
-                        out matchedText);
-
-                case (uint)RegistryValueType.Link:
-                    // Provisional: the display layer treats a link as text, but the find
-                    // contract has no oracle capture for it. Search the raw bytes as hex.
-                    return TryMatchText(FormatHex(value.Data), out matchedText);
+                    // The Data column joins the items with spaces. The oracle's whole-string
+                    // run proves that individual items are not separate candidates.
+                    candidate = RegistryValueDisplay.FormatData(value, int.MaxValue);
+                    break;
 
                 default:
-                    return TryMatchText(
-                        RegistryValueDisplay.FormatData(value, int.MaxValue),
-                        out matchedText);
+                    // The oracle's Data hits never include DWORD, QWORD, binary, link, none,
+                    // or unknown types. Classic searches only the three string types.
+                    return false;
             }
-        }
 
-        private bool TryMatchMultiString(byte[] data, out string matchedText)
-        {
-            matchedText = string.Empty;
-            MultiStringDecodeResult decoded = RegistryValueCodec.DecodeMultiString(data);
-            var strings = decoded.Strings;
-
-            foreach (string item in strings)
+            if (candidate.Length == 0 || !Matches(candidate))
             {
-                if (TryMatchText(item, out matchedText))
-                {
-                    return true;
-                }
+                return false;
             }
 
-            if (strings.Count > 1)
-            {
-                string joined = string.Join(' ', strings);
-                if (TryMatchText(joined, out matchedText))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private bool TryMatchNumber(ulong number, out string matchedText)
-        {
-            string decimalText = number.ToString(CultureInfo.InvariantCulture);
-
-            if (TryMatchText(decimalText, out matchedText))
-            {
-                return true;
-            }
-
-            string hexText = "0x" + number.ToString("X", CultureInfo.InvariantCulture);
-            return TryMatchText(hexText, out matchedText);
-        }
-
-        private bool TryMatchText(string text, out string matchedText)
-        {
-            if (Matches(text))
-            {
-                matchedText = text;
-                return true;
-            }
-
-            matchedText = string.Empty;
-            return false;
+            matchedText = candidate;
+            return true;
         }
 
         private bool Matches(string text) => _query.MatchWholeStringOnly
-            ? string.Equals(text, _query.SearchText, MatchComparison)
-            : text.Contains(_query.SearchText, MatchComparison);
+            ? RegistryFindCollation.Equals(text, _query.SearchText)
+            : RegistryFindCollation.Contains(text, _query.SearchText);
 
         private int FindRootIndex(RegistryPath path)
         {
@@ -507,8 +539,6 @@ public sealed class RegistryFinder
             return -1;
         }
 
-        private bool IsInsideAnyRoot(RegistryPath path) => FindRootIndex(path) >= 0;
-
         private static RegistryPath? TryAppend(RegistryPath parent, string component)
         {
             try
@@ -521,23 +551,6 @@ public sealed class RegistryFinder
                 // instead of aborting the whole search.
                 return null;
             }
-        }
-
-        private static string FormatHex(byte[] data)
-        {
-            var builder = new StringBuilder(data.Length * 3);
-
-            for (int index = 0; index < data.Length; index += 1)
-            {
-                if (index > 0)
-                {
-                    builder.Append(' ');
-                }
-
-                builder.Append(data[index].ToString("X2", CultureInfo.InvariantCulture));
-            }
-
-            return builder.ToString();
         }
 
         private sealed class Frame

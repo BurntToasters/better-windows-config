@@ -23,6 +23,15 @@
   "startKey": "HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Find",
   "searchInSubtree": true,
   "matchCase": "not offered by classic Find; the search is case-insensitive",
+  "findFlagsWrittenByClassic": false,
+  "findFlagsDialogMask": {
+    "wholeString": "0x00000001",
+    "keys": "0x00000002",
+    "values": "0x00000004",
+    "data": "0x00000008",
+    "searchInSubtree": "0x00000010"
+  },
+  "findFlagsNote": "Every captured run left FindFlags at 0x00000000. Classic saved LastKey and View on exit but did not update the Find options. findFlagsDialogMask records the dialog control table (ids 1151, 1152, 1153, 1154, 1161); BWC must write that layout itself.",
   "note": "Registry value names are case-insensitive, so the seeded AB and ab in the Find key are one value; the later write (AB) holds the data AB. A hit reports the key by its tree path and the value name as shown in the list. The sequence stops when the selection leaves the Find tree.",
   "seed": [
     {
@@ -139,6 +148,7 @@
         "searchInSubtree": true
       },
       "name": "keys-values-data",
+      "findFlags": 0,
       "hits": [
         {
           "key": "Find",
@@ -193,7 +203,25 @@
           "value": ""
         }
       ],
-      "endedBy": "left-find-tree"
+      "endedBy": "left-find-tree",
+      "findFlagsLayout": {
+        "wholeString": {
+          "candidateBits": []
+        },
+        "keys": {
+          "candidateBits": []
+        },
+        "values": {
+          "candidateBits": []
+        },
+        "data": {
+          "candidateBits": []
+        },
+        "searchInSubtree": {
+          "candidateBits": []
+        },
+        "unmappedBits": []
+      }
     },
     {
       "flags": {
@@ -204,6 +232,7 @@
         "searchInSubtree": true
       },
       "name": "keys-values-data-whole",
+      "findFlags": 0,
       "hits": [
         {
           "key": "Find",
@@ -226,7 +255,25 @@
           "value": ""
         }
       ],
-      "endedBy": "no-change"
+      "endedBy": "no-change",
+      "findFlagsLayout": {
+        "wholeString": {
+          "candidateBits": []
+        },
+        "keys": {
+          "candidateBits": []
+        },
+        "values": {
+          "candidateBits": []
+        },
+        "data": {
+          "candidateBits": []
+        },
+        "searchInSubtree": {
+          "candidateBits": []
+        },
+        "unmappedBits": []
+      }
     },
     {
       "flags": {
@@ -237,6 +284,7 @@
         "searchInSubtree": true
       },
       "name": "keys-only",
+      "findFlags": 0,
       "hits": [
         {
           "key": "Find\\ab",
@@ -259,7 +307,25 @@
           "value": ""
         }
       ],
-      "endedBy": "left-find-tree"
+      "endedBy": "left-find-tree",
+      "findFlagsLayout": {
+        "wholeString": {
+          "candidateBits": []
+        },
+        "keys": {
+          "candidateBits": []
+        },
+        "values": {
+          "candidateBits": []
+        },
+        "data": {
+          "candidateBits": []
+        },
+        "searchInSubtree": {
+          "candidateBits": []
+        },
+        "unmappedBits": []
+      }
     },
     {
       "flags": {
@@ -270,6 +336,7 @@
         "searchInSubtree": true
       },
       "name": "values-only",
+      "findFlags": 0,
       "hits": [
         {
           "key": "Find",
@@ -288,7 +355,25 @@
           "value": "ab"
         }
       ],
-      "endedBy": "left-find-tree"
+      "endedBy": "left-find-tree",
+      "findFlagsLayout": {
+        "wholeString": {
+          "candidateBits": []
+        },
+        "keys": {
+          "candidateBits": []
+        },
+        "values": {
+          "candidateBits": []
+        },
+        "data": {
+          "candidateBits": []
+        },
+        "searchInSubtree": {
+          "candidateBits": []
+        },
+        "unmappedBits": []
+      }
     },
     {
       "flags": {
@@ -299,6 +384,7 @@
         "searchInSubtree": true
       },
       "name": "data-only",
+      "findFlags": 0,
       "hits": [
         {
           "key": "Find",
@@ -329,7 +415,25 @@
           "value": "ab"
         }
       ],
-      "endedBy": "left-find-tree"
+      "endedBy": "left-find-tree",
+      "findFlagsLayout": {
+        "wholeString": {
+          "candidateBits": []
+        },
+        "keys": {
+          "candidateBits": []
+        },
+        "values": {
+          "candidateBits": []
+        },
+        "data": {
+          "candidateBits": []
+        },
+        "searchInSubtree": {
+          "candidateBits": []
+        },
+        "unmappedBits": []
+      }
     },
     {
       "flags": {
@@ -340,6 +444,7 @@
         "searchInSubtree": true
       },
       "name": "values-data-whole",
+      "findFlags": 0,
       "hits": [
         {
           "key": "Find",
@@ -354,7 +459,109 @@
           "value": "ab"
         }
       ],
-      "endedBy": "no-change"
+      "endedBy": "no-change",
+      "findFlagsLayout": {
+        "wholeString": {
+          "candidateBits": []
+        },
+        "keys": {
+          "candidateBits": []
+        },
+        "values": {
+          "candidateBits": []
+        },
+        "data": {
+          "candidateBits": []
+        },
+        "searchInSubtree": {
+          "candidateBits": []
+        },
+        "unmappedBits": []
+      }
+    },
+    {
+      "flags": {
+        "keys": true,
+        "values": true,
+        "data": true,
+        "wholeString": false,
+        "searchInSubtree": false
+      },
+      "name": "keys-values-data-no-subtree",
+      "findFlags": 0,
+      "hits": [
+        {
+          "key": "Find",
+          "value": "ab"
+        },
+        {
+          "key": "Find",
+          "value": "ex"
+        },
+        {
+          "key": "Find",
+          "value": "Mixed Ab"
+        },
+        {
+          "key": "Find",
+          "value": "ms"
+        },
+        {
+          "key": "Find",
+          "value": "Name"
+        },
+        {
+          "key": "Find",
+          "value": "xAbx"
+        },
+        {
+          "key": "Find\\ab",
+          "value": ""
+        },
+        {
+          "key": "Find\\ABC",
+          "value": ""
+        },
+        {
+          "key": "Find\\ABC",
+          "value": "k"
+        },
+        {
+          "key": "Find\\Cab",
+          "value": ""
+        },
+        {
+          "key": "Find\\Plain",
+          "value": "ab"
+        },
+        {
+          "key": "Find\\Zed\\Inner\\ab",
+          "value": ""
+        },
+        {
+          "key": "Find\\Zed\\Inner\\abracadabra",
+          "value": ""
+        }
+      ],
+      "endedBy": "left-find-tree",
+      "findFlagsLayout": {
+        "wholeString": {
+          "candidateBits": []
+        },
+        "keys": {
+          "candidateBits": []
+        },
+        "values": {
+          "candidateBits": []
+        },
+        "data": {
+          "candidateBits": []
+        },
+        "searchInSubtree": {
+          "candidateBits": []
+        },
+        "unmappedBits": []
+      }
     }
   ]
 }

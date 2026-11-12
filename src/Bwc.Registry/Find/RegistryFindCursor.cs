@@ -11,7 +11,8 @@ public enum RegistryFindCursorPhase
 /// <summary>
 /// A position to resume after. A fresh Find with no cursor starts at the first search root.
 /// <see cref="FromKeySelection"/> and <see cref="FromValueSelection"/> map the tree selection to
-/// the contract's "start after the current selection" rule.
+/// the contract's "start after the current selection" rule. If the key or value named here no
+/// longer exists, the finder resumes at the nearest later position in the classic NLS order.
 /// </summary>
 public sealed class RegistryFindCursor
 {
@@ -79,8 +80,11 @@ public sealed class RegistryFindCursor
         {
             RegistryFindHitKind.KeyName =>
                 new RegistryFindCursor(hit.KeyPath, RegistryFindCursorPhase.AfterKeyName),
+
+            // Classic reports a matching value once even when both its name and its data
+            // contain the needle. Find Next therefore resumes after the whole value.
             RegistryFindHitKind.ValueName =>
-                new RegistryFindCursor(hit.KeyPath, RegistryFindCursorPhase.AfterValueName, hit.ValueName!),
+                new RegistryFindCursor(hit.KeyPath, RegistryFindCursorPhase.AfterValueData, hit.ValueName!),
             RegistryFindHitKind.ValueData =>
                 new RegistryFindCursor(hit.KeyPath, RegistryFindCursorPhase.AfterValueData, hit.ValueName!),
             _ => throw new ArgumentOutOfRangeException(nameof(hit)),

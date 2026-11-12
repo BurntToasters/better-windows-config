@@ -12,10 +12,11 @@ BEH-039 to BEH-042, DLG-010, DLG-011, OQ-10, and OQ-11.
 The walk is depth-first pre-order. At one key the order is:
 
 1. The key name, when *Keys* is enabled.
-2. Each value in display order: the default value first, then the other values sorted with
-   `StringComparer.CurrentCultureIgnoreCase`. For each value, the value name when *Values* is
-   enabled, then the value data when *Data* is enabled.
-3. Each subkey in the same culture-aware order, recursively, using an explicit stack.
+2. Each value in display order: the default value first, then the other values sorted with the
+   classic NLS collation (`CompareStringEx` with `NORM_IGNORECASE`). For each value, the value
+   name when *Values* is enabled, then the value data when *Data* is enabled. A value produces at
+   most one hit per search step: the name wins when both the name and the data match.
+3. Each subkey in the same NLS order, recursively, using an explicit stack.
 
 The walk is iterative. Registry depth can reach 512, and a recursive implementation would put
 more than 512 frames on the call stack for a deep tree. The explicit stack also makes
@@ -46,6 +47,11 @@ The walk skips every position up to and including the cursor position. A cursor 
 therefore resumes with that key's values and then its children. A cursor at a value name resumes
 with that value's data. A cursor at value data resumes with the next value.
 
+Classic Find reports a matching value once, even when both its name and its data contain the
+search text. `RegistryFindCursor.FromHit` therefore resumes after value data for both value-name
+and value-data hits. `AfterValueName` remains available to a caller that deliberately wants the
+same value's data checked next, but Find Next does not use it.
+
 Two conveniences cover the common UI cases:
 
 - `RegistryFindCursor.FromKeySelection(key)` uses `AfterKeyName`, matching the contract phrase
@@ -60,12 +66,26 @@ not recorded that sequence, so a later golden can change the cursor mapping deli
 
 When a cursor is supplied, the finder starts directly at the cursor key instead of rescanning
 the registry from the first root. It builds the continuation from the cursor key's later
-siblings and its ancestors' later siblings. If that continuation cannot be built, for example
-because an ancestor's child list is unreadable, the finder falls back to a normal walk from the
-first root. If the cursor position is never reached, `Find` returns `null`. It does not restart
-from the beginning and it does not guess a nearby position.
+siblings and its ancestors' later siblings.
+
+The registry can change between two Find Next presses. Classic regedit does not report
+"finished" merely because the previous hit disappeared. The finder also continues from the
+nearest position:
+
+- If the cursor key no longer exists, the finder inserts its leaf name into the parent's sorted
+  child list, using the same NLS order. It resumes with the first later sibling's subtree, then
+  that parent's later siblings, and so on up to the search root. If the parent also disappeared,
+  the climb repeats at the grandparent. Key-name, value-name, and value-data checks all run at
+  the resumed position because the cursor itself is gone.
+- If the cursor value no longer exists, the finder inserts its name into the key's sorted value
+  list and resumes with the first value that sorts after it. Values before that position were
+  already considered.
+- If the cursor key exists but its value list cannot be read, the finder resumes with that key's
+  children. No value in the key can be reported, so that is the nearest reachable position.
+- If no later sibling or later root exists, the search is finished and `Find` returns `null`.
 
 A cursor whose key is not inside any configured search root is never reached and returns `null`.
+The search never wraps and never restarts at the first root after a deletion.
 
 ## 4. Default value name
 
@@ -74,35 +94,36 @@ the empty string for a hit on the default value. `(Default)` is a UI display str
 registry name. Searching value names for `Default` therefore does not match the default value.
 The default value can still produce a data hit.
 
-## 5. Data matching (OQ-11, provisional)
+## 5. Data matching (oracle `find-sequence.json`)
 
-The Data check uses the following pragmatic mapping. Classic regedit's exact set is OQ-11 and
-has not been captured in a golden sequence.
+Classic Find searches data only for the string types. The oracle capture seeds the needle `ab`
+into a DWORD (`0x000000AB`), a binary value (`61 62`, the ASCII bytes for `ab`), a multi-string,
+an expandable string, and ordinary strings. The DWORD and the binary value never appear as Data
+hits in any captured run. A `REG_LINK`, `REG_NONE`, unknown type, QWORD, or other non-string
+type is therefore not searched either. This settles OQ-11.
 
-- `REG_SZ` and `REG_EXPAND_SZ`: the decoded display text, stopping at the first UTF-16 NUL.
-- `REG_MULTI_SZ`: each decoded string is a candidate. The joined display text (single spaces
-  between items) is also a candidate, so a search phrase can span item boundaries. A hit
-  reports the individual string that matched when one did, otherwise the joined text.
-- `REG_DWORD` and `REG_QWORD`: both the invariant decimal text and the `0x` hexadecimal text
-  are candidates. A valid four-byte DWORD or eight-byte QWORD searches decimal first, then hex.
-  An invalid length falls back to the hex byte display.
-- `REG_BINARY`, `REG_NONE`, unknown types, and every other type not listed above: the hex byte
-  display from `RegistryValueDisplay.FormatData`, for example `AE 01`. Arbitrary bytes are
-  never decoded as text.
+The candidate text is the one the Data column shows:
+
+- `REG_SZ` and `REG_EXPAND_SZ`: `RegistryValueCodec.DecodeString`, which stops at the first
+  UTF-16 NUL.
+- `REG_MULTI_SZ`: the decoded items joined with single spaces, the same text as
+  `RegistryValueDisplay.FormatData`. The items are not searched individually. In the oracle's
+  whole-string run, the multi-string `zz`, `ab` does not match the whole string `ab`, while the
+  joined text contains `ab` for substring runs. That is exactly the captured sequence.
 - Zero-length data is not searched. The display placeholders `(value not set)` and
-  `(zero-length binary value)` are UI text, not value data, and must not produce a Data hit.
-- `REG_LINK` is treated as an opaque type and searched as hex. This is provisional. The display
-  layer treats a link as text, so a later oracle capture may align find with display.
+  `(zero-length binary value)` are UI text, not stored data, and never produce a hit.
 
-A Data hit reports one `MatchedText`, the specific candidate that matched. A single value
-produces at most one Data hit per search step even when several of its strings or several of
-its decimal and hex forms contain the search text.
+A value produces at most one hit per search step. If both its name and its data match, the
+ValueName hit is reported first, and the next Find Next moves past the whole value. Only stored
+data is searched; display placeholders are not. A hit reports one `MatchedText`, the candidate
+text that contained or equaled the needle.
 
 ## 6. Duplicate hits
 
-Positions are distinct. One value can produce a value-name hit and then, on the next step, a
-data hit. Those are two legitimate find stops. A key can produce a key-name hit and later a hit
-inside the same key's values. Repeating an identical position is not allowed.
+A value is one stop even when both its name and its data match. The value-name hit is reported,
+and the next step moves past the whole value; the same value does not produce a second data hit.
+A key can produce a key-name hit and later a hit inside the same key's values, because those are
+different positions. Repeating an identical position is not allowed.
 
 If the same key is reachable through overlapping configured roots, it is walked once per root.
 Callers that supply custom roots should avoid overlapping roots when duplicate reporting would
@@ -110,15 +131,26 @@ be confusing.
 
 ## 7. Matching and culture
 
-Matching uses `StringComparison.CurrentCultureIgnoreCase`. Substring search uses
-`string.Contains` with that comparison; whole-string search uses `string.Equals` with it. This
-is linguistic, not ordinal and not invariant. The value and key sort uses
-`StringComparer.CurrentCultureIgnoreCase`, which matches the display-order approximation in the
-contract.
+Matching and ordering both use the Windows NLS collation that classic regedit calls:
+`CompareStringEx` with `NORM_IGNORECASE` and the user default locale. The managed current-culture
+comparer is not used. It disagrees with the captured classic order on real names, for example
+`_x` against `(x)`, `#h` against the other symbols, `a-b` against `a01`, and `x_y` against
+`x.y`.
 
-Regedit uses `CompareStringEx` with `NORM_IGNORECASE` (`lstrcmpiW`) for display order. The .NET
-current-culture comparer is close but not guaranteed to be byte-for-byte identical for every
-locale. Digit runs such as `Key2` against `Key10` remain unverified against the oracle.
+- Whole-string matching is `CompareStringEx(...) == CSTR_EQUAL` over the full text.
+- Substring matching compares a needle-length window at every UTF-16 offset, exactly as
+  `lstrcmpi`-style classic code does. A window crossing a separator or an embedded NUL is still
+  compared; the API receives explicit lengths.
+- Ordering sorts key and value names with the same call. `docs/parity/oracle/sort-order.json`
+  records the classic order for 27 names, including the `(Default)` value first, digit runs as
+  text (`1`, `10`, `2`), and the punctuation order above. The test suite replays that list.
+- If the native call fails, which only happens for an invalid locale or flag, the code falls
+  back to ordinal ignore case so a walk or sort still terminates. That fallback is not the
+  semantic model and is not exercised on Windows.
+
+The oracle's `matchCase` note says classic Find offers no match-case option and searches case
+insensitively, so `NORM_IGNORECASE` is the only comparison flag. `NORM_IGNORECASE |
+SORT_STRINGSORT` does not reproduce the recorded order.
 
 The empty search string is rejected with `ArgumentException`. Whitespace is allowed and is
 matched literally. At least one of *Keys*, *Values*, or *Data* must be enabled.
@@ -166,24 +198,27 @@ The finder visits every key under every configured root. On a real machine that 
 which is why the UI runs it on a background thread and why the engine exposes custom roots.
 Tests scope the roots to one small sandbox key.
 
-Data matching for a large binary or opaque value materializes the full hex display text, so
-memory use grows with the value size. The engine has no value-size cap, matching the reader.
-Cancellation is the only bound the engine offers; the UI progress dialog is the user-facing
-one.
+Data matching for a large string or multi-string value materializes its decoded display text,
+so memory use grows with the value size. Values of other types are not searched and are not
+decoded for Find. The engine has no value-size cap, matching the reader. Cancellation is the
+only bound the engine offers; the UI progress dialog is the user-facing one.
 
 ## 11. Search in subtree (OQ-10)
 
-OQ-10 records that the default state of the *Search in subtree* checkbox, its interaction with
-the search start key, and whether it takes effect are unknown. This engine defaults
-`SearchInSubtree` to `true`.
+OQ-10 records that the default state of the *Search in subtree* checkbox and its exact scope
+are not fully known. This engine defaults `SearchInSubtree` to `true`.
 
-When it is `false`, only the starting key is searched. With a cursor, that is the cursor's key:
-its values are checked after the cursor phase, and no child keys are visited. Without a cursor,
-each configured root is checked without descending. Predefined roots have no values, so a
-subtree-disabled search with only predefined roots normally returns `null`.
+The oracle now has a `keys-values-data-no-subtree` run. The capture cleared control 1161 with
+`BM_SETCHECK` and confirmed `BM_GETCHECK == 0` before Find Next. Classic still reported all 13
+hits from the seeded subtree, including values in child keys. The unchecked box therefore does
+not mean "starting key only". The engine follows that evidence: `SearchInSubtree` does not
+narrow the walk. Both values use the same continuation stack and the configured `Roots` define
+the scope.
 
-This interpretation is provisional. The Win32 dialog dump does not say whether the unchecked
-box means "selected key only" or something else, and no oracle run has captured it.
+What the checkbox changes beyond the seeded tree is not captured. A run that starts in one key
+and lets classic leave that subtree would be needed to pin down the cross-root stop. Until then,
+the cross-subtree scope stays provisional and the flag remains a UI and persistence value, not a
+reason to skip child keys.
 
 ## 12. Custom roots and scope
 
@@ -200,7 +235,9 @@ lists and null entries are rejected.
 Finder tests run in the E2E flavor against the real registry. Each test creates one unique
 `HKCU\Software\BWC-E2E\find-<guid>` key with the 64-bit view, seeds a small tree through
 `RegistryStore` and `SandboxWritePolicy`, and deletes the run root in a `finally` block with
-`DeleteSubKeyTree(..., throwOnMissingSubKey: false)`.
+`DeleteSubKeyTree(..., throwOnMissingSubKey: false)`. The oracle replay test seeds a deeper
+`...\find-<guid>\Find` root from `find-sequence.json`. The run identifier is a GUID; its hex
+digits never become part of a searched name because the custom root is the `Find` key.
 
 The finder tests pass only their run root as `Roots`, so they do not scan the rest of the
 registry and do not depend on unrelated machine state. Deleting the run root also removes any
@@ -219,5 +256,63 @@ Two races are not tested against the real registry:
   skip path is implemented with `RegistryOperationException`, but creating and restoring such a
   descriptor reliably needs privileges the E2E suite does not assume.
 
-A cursor whose key was deleted is tested: the finder returns `null` instead of throwing or
-wrapping.
+A cursor whose key was deleted and a cursor whose value was deleted are both tested: the finder
+continues at the nearest later position instead of throwing, wrapping, or reporting finished.
+A deleted cursor with no later position returns `null`.
+
+## 15. Classic FindFlags codec
+
+The classic Find dialog uses one in-memory mask for its five controls. The mask table in
+`C:\Windows\regedit.exe` 10.0.26100.8457 stores these control id and bit pairs:
+
+| Control | Mask | Meaning |
+| --- | --- | --- |
+| 1151 | `0x0001` | Match whole string only |
+| 1152 | `0x0002` | Keys |
+| 1153 | `0x0004` | Values |
+| 1154 | `0x0008` | Data |
+| 1161 | `0x0010` | Search in subtree |
+
+The runtime capture shows that this build **does not persist the mask**. Seven option sets were
+run, including one with Search in subtree cleared and confirmed by `BM_GETCHECK`. Every run
+left `HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit\FindFlags` at
+`0x00000000`. Classic saved `LastKey` and `View` on exit (the final `LastKey` was the last hit
+outside the seed tree) but did not update `FindFlags`. Its loader reads the DWORD at startup and
+its saver writes the same startup value back; the dialog only updates the in-memory mask.
+
+BWC must add the write itself. `RegistryFindFlagsCodec` uses the confirmed mask so a value BWC
+writes is readable by classic's loader and by any future build that restores the write. Higher
+bits, including the high-word match-case flag used by some reimplementations, are ignored because
+classic Find has no match-case control (oracle `matchCase` note). The default used when the value
+is missing or is not a DWORD is `Keys | Values | Data | SearchInSubtree` (`0x001E`); the subtree
+default remains OQ-10. The caller reads and writes the DWORD through `RegistryReader` and
+`RegistryWriter`; the codec itself performs no registry I/O, so it cannot bypass the write
+policy. `RegistryFindFlagsCodec.CreateQuery` and `FromQuery` convert between the DWORD and
+`RegistryFindQuery`, which is the state F3 needs.
+
+The legacy `RegeditFindFlags` enum in `Bwc.Regedit` uses the wrong layout (`Keys=0x1`). RF6 must
+replace its use with this codec when it writes the classic applet key. Until then, the enum is a
+private BWC settings encoding and no classic DWORD is produced from it.
+
+## 16. Oracle replay and artifact
+
+`RegistryFinderTests.OracleSequenceReplaysForEveryCapturedRun` reads
+`docs/parity/oracle/find-sequence.json`, seeds the same tree under a fresh sandbox root, and
+replays all seven runs. The comparison is the recorded `(key, value)` pair per hit, in order.
+Because the test roots the search at the seeded `Find` key, a run ends when the walk is
+exhausted rather than when classic leaves the tree. The recorded hits are still the full prefix
+that the oracle saw. The no-subtree run records the same 13 hits, which is why the engine no
+longer treats the unchecked box as starting-key-only.
+
+`FindFlagsCodecMatchesCapturedOracleBits` checks the captured DWORDs, the per-run layout, and
+the `findFlagsDialogMask` control table. In this build all captured DWORDs are zero and every
+layout has empty candidate bits, so the runtime part confirms the absence of a classic write.
+The mask part then checks the codec against the dialog's confirmed bit assignment.
+`FindFlagsRoundTripUsesClassicBits` covers encode and decode.
+
+`OracleSortOrderMatchesTheCapturedClassicOrder` seeds the names from
+`docs/parity/oracle/sort-order.json`, searches a common data value, and asserts the reported
+value order. That covers the NLS ordering, `(Default)` first, text digit runs, and punctuation.
+The replay test writes `artifacts/find-parity/result.json` with each run name, the captured
+FindFlags DWORD, expected hit count, actual hit count, pass flag, and the hit pairs. The file is
+diagnostic and does not replace the assertions.
