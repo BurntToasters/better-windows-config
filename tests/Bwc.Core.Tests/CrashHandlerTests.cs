@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Bwc.Core.Tests;
@@ -33,5 +34,27 @@ public sealed class CrashHandlerTests
             "the log should contain the exception type.");
         Assert.IsTrue(text.Contains("boom", StringComparison.Ordinal),
             "the log should contain the exception message.");
+    }
+
+    [TestMethod]
+    public void ReportAfterLogShutdownDoesNotThrowWhenTraceListenerThrows()
+    {
+        using var temp = new TempDirectory();
+        var listener = new ThrowingTraceListener();
+        try
+        {
+            Log.Initialize("crash-throwing", new LogOptions { Directory = temp.Path });
+            CrashHandler.Install("crash-throwing", showDialog: false);
+            Log.Shutdown();
+
+            Trace.Listeners.Add(listener);
+            CrashHandler.Report(new InvalidOperationException("late boom"), "after-shutdown");
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
+            CrashHandler.Uninstall();
+            Log.Shutdown();
+        }
     }
 }

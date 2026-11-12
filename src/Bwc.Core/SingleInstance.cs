@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
@@ -9,6 +8,28 @@ using System.Text;
 
 namespace Bwc.Core;
 
+/// <summary>Describes how a message send ended. Only <see cref="Sent"/> means delivery.</summary>
+public enum SingleInstanceSendResult
+{
+    /// <summary>The server accepted and read the complete message.</summary>
+    Sent,
+
+    /// <summary>No server is listening, the pipe is busy, or the pipe broke.</summary>
+    ServerUnavailable,
+
+    /// <summary>The connect or write did not finish before the timeout.</summary>
+    TimedOut,
+
+    /// <summary>The pipe ACL rejected this process.</summary>
+    AccessDenied,
+
+    /// <summary>This instance object has already been disposed.</summary>
+    Disposed,
+
+    /// <summary>The pipe could not be opened for another reason.</summary>
+    Failed,
+}
+
 /// <summary>
 /// A per-tool, per-user, per-integrity-level single-instance gate. The first instance owns a
 /// mutex and serves activation messages over a named pipe; later instances only send.
@@ -16,7 +37,12 @@ namespace Bwc.Core;
 public sealed partial class SingleInstance : IDisposable
 {
     private const int MaxMessageBytes = 64 * 1024;
-    private const int ConnectTimeoutMilliseconds = 5000;
+    private const int ConnectTimeoutMilliseconds = 3000;
+    private const int ServerReadTimeoutMilliseconds = 1500;
+    private const int AcceptRetryInitialDelayMilliseconds = 50;
+    private const int AcceptRetryMaximumDelayMilliseconds = 1000;
+    private const int AbnormalClientDelayMilliseconds = 25;
+    private const string LocalServerName = ".";
     private const uint TokenQueryAccess = 0x0008;
     private const int TokenIntegrityLevelClass = 25;
 
@@ -42,6 +68,7 @@ public sealed partial class SingleInstance : IDisposable
         if (ownsMutex)
         {
             _acceptTask = Task.Run(() => AcceptLoopAsync(_cancellation.Token));
+            ObserveFaults(_acceptTask);
         }
     }
 
@@ -83,7 +110,12 @@ public sealed partial class SingleInstance : IDisposable
         }
     }
 
-    public bool SendMessage(string message)
+    /// <summary>
+    /// Sends one message to the first instance and reports a named result. The client only
+    /// targets the local machine with the bare per-user pipe name. It never tries the global
+    /// pipe namespace, a remote server, or an impersonation token.
+    /// </summary>
+    public SingleInstanceSendResult TrySendMessage(string message)
     {
         ArgumentNullException.ThrowIfNull(message);
         if (message.Length > MaxMessageBytes)
@@ -103,7 +135,7 @@ public sealed partial class SingleInstance : IDisposable
 
         if (Volatile.Read(ref _disposed) != 0)
         {
-            return false;
+            return SingleInstanceSendResult.Disposed;
         }
 
         byte[] packet = new byte[4 + payload.Length];
@@ -113,21 +145,49 @@ public sealed partial class SingleInstance : IDisposable
         try
         {
             using var client = new NamedPipeClientStream(
-                ".",
+                LocalServerName,
                 _pipeName,
                 PipeDirection.Out,
                 PipeOptions.Asynchronous);
             client.Connect(ConnectTimeoutMilliseconds);
             client.Write(packet, 0, packet.Length);
             client.Flush();
-            return true;
+            return SingleInstanceSendResult.Sent;
         }
-        catch (Exception ex) when (ex is IOException or TimeoutException or UnauthorizedAccessException
-            or ObjectDisposedException or InvalidOperationException or System.Security.SecurityException)
+        catch (TimeoutException ex)
         {
-            Trace.WriteLine("SingleInstance could not send a message: " + ex.Message);
-            return false;
+            SafeTrace.WriteLine("SingleInstance send timed out: " + ex.Message);
+            return SingleInstanceSendResult.TimedOut;
         }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            SafeTrace.WriteLine("SingleInstance send was denied: " + ex.Message);
+            return SingleInstanceSendResult.AccessDenied;
+        }
+        catch (ObjectDisposedException ex)
+        {
+            SafeTrace.WriteLine("SingleInstance send used a disposed pipe: " + ex.Message);
+            return SingleInstanceSendResult.Disposed;
+        }
+        catch (IOException ex)
+        {
+            SafeTrace.WriteLine("SingleInstance server is unavailable: " + ex.Message);
+            return SingleInstanceSendResult.ServerUnavailable;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or NotSupportedException)
+        {
+            SafeTrace.WriteLine("SingleInstance could not send a message: " + ex.Message);
+            return SingleInstanceSendResult.Failed;
+        }
+    }
+
+    /// <summary>
+    /// Sends one message and returns true only when the first instance received it. Prefer
+    /// <see cref="TrySendMessage"/> when the caller needs to distinguish failure reasons.
+    /// </summary>
+    public bool SendMessage(string message)
+    {
+        return TrySendMessage(message) == SingleInstanceSendResult.Sent;
     }
 
     public void Dispose()
@@ -143,7 +203,7 @@ public sealed partial class SingleInstance : IDisposable
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("SingleInstance cancellation failed: " + ex.Message);
+            SafeTrace.WriteLine("SingleInstance cancellation failed: " + ex.Message);
         }
 
         NamedPipeServerStream? active;
@@ -161,7 +221,7 @@ public sealed partial class SingleInstance : IDisposable
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("SingleInstance server dispose failed: " + ex.Message);
+                SafeTrace.WriteLine("SingleInstance server dispose failed: " + ex.Message);
             }
         }
 
@@ -173,7 +233,7 @@ public sealed partial class SingleInstance : IDisposable
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("SingleInstance accept loop did not stop cleanly: " + ex.Message);
+                SafeTrace.WriteLine("SingleInstance accept loop did not stop cleanly: " + ex.Message);
             }
         }
 
@@ -187,7 +247,7 @@ public sealed partial class SingleInstance : IDisposable
                 }
                 catch (ApplicationException ex)
                 {
-                    Trace.WriteLine("SingleInstance mutex release skipped: " + ex.Message);
+                    SafeTrace.WriteLine("SingleInstance mutex release skipped: " + ex.Message);
                 }
             }
 
@@ -195,7 +255,7 @@ public sealed partial class SingleInstance : IDisposable
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("SingleInstance mutex dispose failed: " + ex.Message);
+            SafeTrace.WriteLine("SingleInstance mutex dispose failed: " + ex.Message);
         }
 
         try
@@ -204,15 +264,18 @@ public sealed partial class SingleInstance : IDisposable
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("SingleInstance cancellation dispose failed: " + ex.Message);
+            SafeTrace.WriteLine("SingleInstance cancellation dispose failed: " + ex.Message);
         }
     }
 
     private async Task AcceptLoopAsync(CancellationToken token)
     {
+        int retryDelay = AcceptRetryInitialDelayMilliseconds;
         while (!token.IsCancellationRequested)
         {
             NamedPipeServerStream? server = null;
+            bool connectionAccepted = false;
+            bool messageCompleted = false;
             try
             {
                 server = new NamedPipeServerStream(
@@ -228,17 +291,30 @@ public sealed partial class SingleInstance : IDisposable
                 }
 
                 await server.WaitForConnectionAsync(token).ConfigureAwait(false);
-                string? message = await ReadMessageAsync(server, token).ConfigureAwait(false);
-                server.Disconnect();
+                connectionAccepted = true;
+                retryDelay = AcceptRetryInitialDelayMilliseconds;
+
+                Task<string?> readTask = ReadMessageAsync(server, token);
+                ObserveFaults(readTask);
+                string? message = await readTask
+                    .WaitAsync(TimeSpan.FromMilliseconds(ServerReadTimeoutMilliseconds), token)
+                    .ConfigureAwait(false);
 
                 if (message is not null)
                 {
                     RaiseMessage(message);
+                    messageCompleted = true;
                 }
             }
             catch (OperationCanceledException)
             {
                 break;
+            }
+            catch (TimeoutException)
+            {
+                SafeTrace.WriteLine(
+                    "SingleInstance disconnected a client that did not send a complete message within " +
+                    ServerReadTimeoutMilliseconds.ToString(CultureInfo.InvariantCulture) + " ms.");
             }
             catch (ObjectDisposedException) when (token.IsCancellationRequested)
             {
@@ -246,7 +322,7 @@ public sealed partial class SingleInstance : IDisposable
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("SingleInstance pipe server error: " + ex.Message);
+                SafeTrace.WriteLine("SingleInstance pipe server error: " + ex.Message);
             }
             finally
             {
@@ -258,8 +334,73 @@ public sealed partial class SingleInstance : IDisposable
                     }
                 }
 
-                server?.Dispose();
+                if (server is not null)
+                {
+                    try
+                    {
+                        server.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        SafeTrace.WriteLine("SingleInstance server cleanup failed: " + ex.Message);
+                    }
+                }
             }
+
+            if (token.IsCancellationRequested)
+            {
+                break;
+            }
+
+            if (connectionAccepted && messageCompleted)
+            {
+                continue;
+            }
+
+            if (connectionAccepted)
+            {
+                // A client connected but did not deliver a complete message. Do not let a fast
+                // connect and disconnect stream drive an unbounded tight loop.
+                if (!await DelayAsync(AbnormalClientDelayMilliseconds, token).ConfigureAwait(false))
+                {
+                    break;
+                }
+
+                continue;
+            }
+
+            // Creating the server failed, most often because another process owns the pipe name.
+            // Back off so the loop cannot saturate a core while the name is unavailable.
+            if (!await DelayAsync(retryDelay, token).ConfigureAwait(false))
+            {
+                break;
+            }
+
+            retryDelay = Math.Min(retryDelay * 2, AcceptRetryMaximumDelayMilliseconds);
+        }
+    }
+
+    private static void ObserveFaults(Task task)
+    {
+        // A timed-out read is abandoned after the server is disposed. Observe its eventual
+        // fault so TaskScheduler.UnobservedTaskException cannot turn cleanup into a report.
+        _ = task.ContinueWith(
+            static completed => _ = completed.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private static async Task<bool> DelayAsync(int milliseconds, CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(milliseconds, token).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
         }
     }
 
@@ -319,7 +460,7 @@ public sealed partial class SingleInstance : IDisposable
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("SingleInstance message handler failed: " + ex);
+                SafeTrace.WriteLine("SingleInstance message handler failed: " + ex);
             }
         });
     }
@@ -341,7 +482,7 @@ public sealed partial class SingleInstance : IDisposable
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("SingleInstance could not read the user SID: " + ex.Message);
+            SafeTrace.WriteLine("SingleInstance could not read the user SID: " + ex.Message);
             return Environment.UserName;
         }
     }
@@ -395,7 +536,7 @@ public sealed partial class SingleInstance : IDisposable
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("SingleInstance could not read the integrity level: " + ex.Message);
+            SafeTrace.WriteLine("SingleInstance could not read the integrity level: " + ex.Message);
             return "unknown";
         }
         finally

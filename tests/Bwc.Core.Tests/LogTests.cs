@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -127,6 +128,67 @@ public sealed class LogTests
         }
         finally
         {
+            Log.Shutdown();
+        }
+    }
+
+    [TestMethod]
+    public void RelativeLogDirectoryFallsBackToThePerToolDataRoot()
+    {
+        using var temp = new TempDirectory();
+        string? previousRoot = Environment.GetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable);
+        string relative = "bwc-relative-log-" + Guid.NewGuid().ToString("N");
+        string relativeFull = Path.GetFullPath(relative);
+        try
+        {
+            Environment.SetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable, temp.Path);
+            Log.Initialize("log-relative", new LogOptions { Directory = relative });
+
+            Assert.IsNotNull(Log.Directory, "a fallback directory should be selected.");
+            Assert.IsTrue(
+                string.Equals(
+                    Path.GetFullPath(AppPaths.LogDirectory("log-relative")),
+                    Path.GetFullPath(Log.Directory!),
+                    StringComparison.OrdinalIgnoreCase),
+                "the fallback directory should be the per-tool directory under the data root.");
+            Assert.IsTrue(
+                Path.GetFullPath(Log.Directory!).StartsWith(
+                    Path.GetFullPath(temp.Path),
+                    StringComparison.OrdinalIgnoreCase),
+                "a relative override must not write against the working directory.");
+
+            Log.Info("relative fallback");
+        }
+        finally
+        {
+            Log.Shutdown();
+            Environment.SetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable, previousRoot);
+            if (Directory.Exists(relativeFull))
+            {
+                Directory.Delete(relativeFull, recursive: true);
+            }
+        }
+    }
+
+    [TestMethod]
+    public void FailedInitializeAndLateWriteDoNotThrowWhenTraceListenerThrows()
+    {
+        using var temp = new TempDirectory();
+        string blockingFile = Path.Combine(temp.Path, "not-a-directory");
+        File.WriteAllText(blockingFile, "x");
+        var listener = new ThrowingTraceListener();
+        Trace.Listeners.Add(listener);
+        try
+        {
+            Log.Initialize("log-throwing", new LogOptions { Directory = blockingFile });
+            Log.Info("this must be swallowed");
+            Log.Warn("this must also be swallowed");
+
+            Assert.IsNull(Log.CurrentFile, "the failed initialize should leave no current file.");
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
             Log.Shutdown();
         }
     }

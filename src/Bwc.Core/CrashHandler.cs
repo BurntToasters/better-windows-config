@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Bwc.Core;
@@ -38,7 +37,7 @@ public static partial class CrashHandler
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("CrashHandler.Install failed: " + ex);
+            SafeTrace.WriteLine("CrashHandler.Install failed: " + ex);
         }
     }
 
@@ -60,7 +59,7 @@ public static partial class CrashHandler
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("CrashHandler.Uninstall failed: " + ex);
+            SafeTrace.WriteLine("CrashHandler.Uninstall failed: " + ex);
         }
     }
 
@@ -70,14 +69,14 @@ public static partial class CrashHandler
         {
             if (ex is null)
             {
-                Trace.WriteLine("CrashHandler.Report received a null exception.");
+                SafeTrace.WriteLine("CrashHandler.Report received a null exception.");
                 return;
             }
 
             string safeContext = string.IsNullOrWhiteSpace(context) ? "Unhandled exception" : context;
             if (Interlocked.Exchange(ref _reporting, 1) != 0)
             {
-                Trace.WriteLine("CrashHandler.Report skipped a recursive report.");
+                SafeTrace.WriteLine("CrashHandler.Report skipped a recursive report.");
                 return;
             }
 
@@ -104,7 +103,7 @@ public static partial class CrashHandler
         }
         catch (Exception reportError)
         {
-            Trace.WriteLine("CrashHandler.Report failed: " + reportError);
+            SafeTrace.WriteLine("CrashHandler.Report failed: " + reportError);
         }
     }
 

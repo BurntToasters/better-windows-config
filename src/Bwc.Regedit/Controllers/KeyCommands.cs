@@ -3,6 +3,7 @@ using Bwc.Core;
 using Bwc.Registry;
 using Bwc.UI.Dialogs;
 using Bwc.UI.Tree;
+using Microsoft.UI.Dispatching;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace Bwc.Regedit.Controllers;
@@ -25,8 +26,6 @@ internal sealed class KeyCommands
     public void NewKey() => _context.StartCommand(NewKeyAsync);
 
     public void DeleteKey() => _context.StartCommand(DeleteKeyAsync);
-
-    public void RenameKeyInteractive() => _context.StartCommand(RenameKeyInteractiveAsync);
 
     /// <summary>Applies an inline rename that the tree committed for one of its nodes.</summary>
     public void RenameFromTree(TreeNode node, string newName)
@@ -73,6 +72,10 @@ internal sealed class KeyCommands
         }
     }
 
+    /// <summary>
+    /// Creates the child key under the selected key with the first unused classic name and opens the
+    /// same inline editor as F2. Escape leaves the default name in place.
+    /// </summary>
     private async Task NewKeyAsync()
     {
         if (!_context.TryGetSelectedKeyPath(out RegistryPath parent))
@@ -81,19 +84,8 @@ internal sealed class KeyCommands
             return;
         }
 
-        string suggested = NextUniqueKeyName(parent);
-        var dialog = new TextPromptDialog(
-            Get("DialogNewKeyTitle"),
-            Get("DialogKeyNameLabel"),
-            suggested,
-            value => ValidateNewKeyName(parent, value));
-
-        if (!await _context.ShowDialogAsync(dialog))
-        {
-            return;
-        }
-
-        RegistryPath created = parent.Append(dialog.Value);
+        string name = NextUniqueKeyName(parent);
+        RegistryPath created = parent.Append(name);
         try
         {
             _context.Store.CreateKey(created);
@@ -105,6 +97,21 @@ internal sealed class KeyCommands
         }
 
         await _context.RefreshTreeAsync(created.ToDisplayString());
+        BeginTreeRenameSoon();
+    }
+
+    /// <summary>
+    /// Starts the inline editor on the next dispatcher turn. A command invoked from a menu flyout can
+    /// otherwise lose the rename box to the focus restoration the closing flyout performs.
+    /// </summary>
+    private void BeginTreeRenameSoon()
+    {
+        if (!_context.Shell.DispatcherQueue.TryEnqueue(
+                DispatcherQueuePriority.Low,
+                _context.Shell.TreeContent.BeginRenameSelected))
+        {
+            _context.Shell.TreeContent.BeginRenameSelected();
+        }
     }
 
     private async Task DeleteKeyAsync()
@@ -158,35 +165,6 @@ internal sealed class KeyCommands
         await _context.RefreshTreeAsync(parentPath);
     }
 
-    private async Task RenameKeyInteractiveAsync()
-    {
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath path))
-        {
-            await _context.ShowMessageAsync(Get("DialogNoSelection"));
-            return;
-        }
-
-        if (path.IsRoot)
-        {
-            await _context.ShowMessageAsync(Get("DialogRootKeyLocked"));
-            return;
-        }
-
-        string currentName = path.Components[^1];
-        var dialog = new TextPromptDialog(
-            Get("DialogRenameKeyTitle"),
-            Get("DialogKeyNameLabel"),
-            currentName,
-            value => ValidateRenameKey(path, value));
-
-        if (!await _context.ShowDialogAsync(dialog))
-        {
-            return;
-        }
-
-        await RenameKeyCoreAsync(path, dialog.Value);
-    }
-
     private async Task RenameKeyCoreAsync(RegistryPath path, string newName)
     {
         if (string.Equals(path.Components[^1], newName, StringComparison.Ordinal))
@@ -213,28 +191,6 @@ internal sealed class KeyCommands
         }
 
         await _context.RefreshTreeAsync(target.ToDisplayString());
-    }
-
-    private string? ValidateNewKeyName(RegistryPath parent, string name)
-    {
-        RegistryPath child;
-        try
-        {
-            child = parent.Append(name);
-        }
-        catch (ArgumentException)
-        {
-            return Get("DialogInvalidKeyName");
-        }
-
-        try
-        {
-            return _context.Store.Reader.KeyExists(child) ? Get("DialogNameExists") : null;
-        }
-        catch (RegistryOperationException ex)
-        {
-            return ValidationFailure(ex, RegistryAction.OpenKey, RegeditContext.DefaultSubject(parent));
-        }
     }
 
     /// <summary>

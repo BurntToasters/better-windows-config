@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.Win32;
@@ -7,8 +8,9 @@ namespace Bwc.Oracle.Capture;
 // `find`: seeds keys and values of every data type with the needle "ab" in names and data (case variants,
 // whole-string matches, substrings), drives classic Find for each option set, then repeats Find Next (F3) and
 // records every hit as (key path, value name). The dialog is filled by WM_SETTEXT and BM_SETCHECK, and the
-// search is started with BM_CLICK on Find Next. Cancel is the only way the dialog is closed. Find state is
-// restored with the applet snapshot after the capture.
+// search is started with BM_CLICK on Find Next. Cancel is the only way the dialog is closed. Each run also
+// records the FindFlags DWORD observed after the app closes, and the file derives the bit for each option
+// from the runs where it was on and off. Find state is restored with the applet snapshot after the capture.
 internal static class FindCapture
 {
     private const string Needle = "ab";
@@ -29,16 +31,43 @@ internal static class FindCapture
 
     private static readonly TimeSpan DialogTimeout = TimeSpan.FromSeconds(25);
 
-    private sealed record Options(string Name, bool Keys, bool Values, bool Data, bool Whole);
+    private sealed record Options(
+        string Name,
+        bool Keys,
+        bool Values,
+        bool Data,
+        bool Whole,
+        bool Subtree);
 
     private static readonly Options[] Configs =
     {
-        new("keys-values-data", Keys: true, Values: true, Data: true, Whole: false),
-        new("keys-values-data-whole", Keys: true, Values: true, Data: true, Whole: true),
-        new("keys-only", Keys: true, Values: false, Data: false, Whole: false),
-        new("values-only", Keys: false, Values: true, Data: false, Whole: false),
-        new("data-only", Keys: false, Values: false, Data: true, Whole: false),
-        new("values-data-whole", Keys: false, Values: true, Data: true, Whole: true),
+        new("keys-values-data", Keys: true, Values: true, Data: true, Whole: false, Subtree: true),
+        new("keys-values-data-whole", Keys: true, Values: true, Data: true, Whole: true, Subtree: true),
+        new("keys-only", Keys: true, Values: false, Data: false, Whole: false, Subtree: true),
+        new("values-only", Keys: false, Values: true, Data: false, Whole: false, Subtree: true),
+        new("data-only", Keys: false, Values: false, Data: true, Whole: false, Subtree: true),
+        new("values-data-whole", Keys: false, Values: true, Data: true, Whole: true, Subtree: true),
+        new("keys-values-data-no-subtree", Keys: true, Values: true, Data: true, Whole: false, Subtree: false),
+    };
+
+    private static readonly string[] LayoutOptionNames =
+    {
+        "wholeString",
+        "keys",
+        "values",
+        "data",
+        "searchInSubtree",
+    };
+
+    // The control-to-bit table in the classic Find dialog procedure. This build does not update
+    // the persisted DWORD, so the table is recorded as the layout oracle for the bits BWC writes.
+    private static readonly (string Option, uint Mask)[] DialogMask =
+    {
+        ("wholeString", 0x00000001),
+        ("keys", 0x00000002),
+        ("values", 0x00000004),
+        ("data", 0x00000008),
+        ("searchInSubtree", 0x00000010),
     };
 
     internal static void Run(RepoPaths paths, bool allowDpi)
@@ -48,13 +77,23 @@ internal static class FindCapture
         Seed(seedRecords);
 
         var runs = new JsonArray();
+        var observations = new List<Observation>();
         uint windowDpi = systemDpi;
         foreach (Options options in Configs)
         {
-            (JsonObject run, uint dpi) = RunOne(options);
-            runs.Add(run);
-            windowDpi = dpi;
+            Observation observation = RunOne(options);
+            observations.Add(observation);
+            runs.Add(observation.Run);
+            windowDpi = observation.Dpi;
         }
+
+        FindFlagsLayout layout = DeriveFindFlagsLayout(observations);
+        foreach (Observation observation in observations)
+        {
+            AddFindFlagsLayout(observation.Run, layout, observation.FindFlags);
+        }
+
+        bool findFlagsWritten = observations.Any(observation => observation.FindFlags != 0);
 
         Report.WriteJson(paths.FindSequenceJson, new JsonObject
         {
@@ -67,13 +106,18 @@ internal static class FindCapture
             ["startKey"] = @"HKEY_CURRENT_USER\Software\BWC-Oracle\Find",
             ["searchInSubtree"] = true,
             ["matchCase"] = "not offered by classic Find; the search is case-insensitive",
+            ["findFlagsWrittenByClassic"] = findFlagsWritten,
+            ["findFlagsDialogMask"] = CreateDialogMaskJson(),
+            ["findFlagsNote"] = findFlagsWritten
+                ? "findFlagsLayout maps the bits observed across the captured option sets."
+                : "Every captured run left FindFlags at 0x00000000. Classic saved LastKey and View on exit but did not update the Find options. findFlagsDialogMask records the dialog control table (ids 1151, 1152, 1153, 1154, 1161); BWC must write that layout itself.",
             ["note"] = "Registry value names are case-insensitive, so the seeded AB and ab in the Find key are one value; the later write (AB) holds the data AB. A hit reports the key by its tree path and the value name as shown in the list. The sequence stops when the selection leaves the Find tree.",
             ["seed"] = seedRecords,
             ["runs"] = runs,
         });
     }
 
-    private static (JsonObject Run, uint Dpi) RunOne(Options options)
+    private static Observation RunOne(Options options)
     {
         RegistryGuard.SetAppletValue(string.Empty, "LastKey", RegType.Sz, SeedSpec.Sz(StartKey));
         using RegeditWindow w = RegeditWindow.Start();
@@ -126,20 +170,199 @@ internal static class FindCapture
         }
 
         w.CloseGracefully();
-        return (new JsonObject
-        {
-            ["flags"] = new JsonObject
+        uint findFlags = ReadFindFlags();
+        Console.WriteLine($"find: {options.Name} wrote FindFlags=0x{findFlags:X8}");
+        return new Observation(
+            options,
+            new JsonObject
             {
-                ["keys"] = options.Keys,
-                ["values"] = options.Values,
-                ["data"] = options.Data,
-                ["wholeString"] = options.Whole,
-                ["searchInSubtree"] = true,
+                ["flags"] = new JsonObject
+                {
+                    ["keys"] = options.Keys,
+                    ["values"] = options.Values,
+                    ["data"] = options.Data,
+                    ["wholeString"] = options.Whole,
+                    ["searchInSubtree"] = options.Subtree,
+                },
+                ["name"] = options.Name,
+                ["findFlags"] = findFlags,
+                ["hits"] = hits,
+                ["endedBy"] = endedBy,
             },
-            ["name"] = options.Name,
-            ["hits"] = hits,
-            ["endedBy"] = endedBy,
-        }, dpi);
+            findFlags,
+            dpi);
+    }
+
+    // Reads the DWORD classic would write when the Find dialog's Find Next button closes it.
+    private static uint ReadFindFlags()
+    {
+        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(
+            RegistryGuard.AppletSubPath,
+            writable: false);
+
+        if (key is null)
+        {
+            throw new InvalidOperationException(
+                "The Regedit applet key is missing after the Find capture.");
+        }
+
+        RegistryNative.RawValue? raw = RegistryNative.QueryRaw(key.Handle, "FindFlags");
+        if (raw is null)
+        {
+            throw new InvalidOperationException(
+                "Classic regedit did not write the FindFlags value during the Find capture.");
+        }
+
+        if (raw.Value.Type != RegType.Dword || raw.Value.Data.Length != sizeof(uint))
+        {
+            throw new InvalidOperationException(
+                $"The FindFlags value has type {raw.Value.Type} and {raw.Value.Data.Length} bytes, not a DWORD.");
+        }
+
+        return BinaryPrimitives.ReadUInt32LittleEndian(raw.Value.Data);
+    }
+
+    // Derives each option's bit by intersecting the DWORDs of runs where the option was on and
+    // excluding every bit that appeared in a run where it was off. A bit that cannot be mapped
+    // is reported as a candidate or as an unmapped bit instead of being guessed.
+    private static FindFlagsLayout DeriveFindFlagsLayout(IReadOnlyList<Observation> observations)
+    {
+        var layout = new FindFlagsLayout();
+        uint mappedMask = 0;
+
+        foreach (string option in LayoutOptionNames)
+        {
+            uint trueBits = uint.MaxValue;
+            uint falseBits = 0;
+            bool anyTrue = false;
+
+            foreach (Observation observation in observations)
+            {
+                if (GetOptionState(observation.Options, option))
+                {
+                    anyTrue = true;
+                    trueBits &= observation.FindFlags;
+                }
+                else
+                {
+                    falseBits |= observation.FindFlags;
+                }
+            }
+
+            uint candidates = anyTrue ? (trueBits & ~falseBits) : 0;
+            layout.CandidateMasks[option] = candidates;
+
+            if (IsSingleBit(candidates, out uint bit))
+            {
+                layout.MappedBits[option] = bit;
+                mappedMask |= bit;
+            }
+        }
+
+        uint observedMask = 0;
+        foreach (Observation observation in observations)
+        {
+            observedMask |= observation.FindFlags;
+        }
+
+        layout.UnmappedMask = observedMask & ~mappedMask;
+        return layout;
+    }
+
+    private static void AddFindFlagsLayout(JsonObject run, FindFlagsLayout layout, uint findFlags)
+    {
+        var runLayout = new JsonObject();
+
+        foreach (string option in LayoutOptionNames)
+        {
+            var entry = new JsonObject();
+
+            if (layout.MappedBits.TryGetValue(option, out uint bit))
+            {
+                entry["bit"] = FormatBit(bit);
+                entry["set"] = (findFlags & bit) != 0;
+            }
+            else
+            {
+                var candidates = new JsonArray();
+                uint candidateMask = layout.CandidateMasks[option];
+
+                for (int index = 0; index < 32; index += 1)
+                {
+                    uint candidate = 1u << index;
+                    if ((candidateMask & candidate) != 0)
+                    {
+                        candidates.Add(FormatBit(candidate));
+                    }
+                }
+
+                entry["candidateBits"] = candidates;
+            }
+
+            runLayout[option] = entry;
+        }
+
+        var unmappedBits = new JsonArray();
+        uint runUnmapped = findFlags & layout.UnmappedMask;
+
+        for (int index = 0; index < 32; index += 1)
+        {
+            uint bit = 1u << index;
+            if ((runUnmapped & bit) != 0)
+            {
+                unmappedBits.Add(FormatBit(bit));
+            }
+        }
+
+        runLayout["unmappedBits"] = unmappedBits;
+        run["findFlagsLayout"] = runLayout;
+    }
+
+    private static bool GetOptionState(Options options, string option) => option switch
+    {
+        "wholeString" => options.Whole,
+        "keys" => options.Keys,
+        "values" => options.Values,
+        "data" => options.Data,
+        "searchInSubtree" => options.Subtree,
+        _ => throw new ArgumentOutOfRangeException(nameof(option)),
+    };
+
+    private static bool IsSingleBit(uint value, out uint bit)
+    {
+        if (value != 0 && (value & (value - 1)) == 0)
+        {
+            bit = value;
+            return true;
+        }
+
+        bit = 0;
+        return false;
+    }
+
+    private static JsonObject CreateDialogMaskJson()
+    {
+        var mask = new JsonObject();
+
+        foreach ((string option, uint bit) in DialogMask)
+        {
+            mask[option] = FormatBit(bit);
+        }
+
+        return mask;
+    }
+
+    private static string FormatBit(uint bit) => $"0x{bit:X8}";
+
+    private sealed record Observation(Options Options, JsonObject Run, uint FindFlags, uint Dpi);
+
+    private sealed class FindFlagsLayout
+    {
+        internal Dictionary<string, uint> MappedBits { get; } = new(StringComparer.Ordinal);
+
+        internal Dictionary<string, uint> CandidateMasks { get; } = new(StringComparer.Ordinal);
+
+        internal uint UnmappedMask { get; set; }
     }
 
     private static void Fill(RegeditWindow w, IntPtr dlg, Options options)
@@ -150,7 +373,7 @@ internal static class FindCapture
         SetCheck(w, dlg, KeysId, options.Keys);
         SetCheck(w, dlg, ValuesId, options.Values);
         SetCheck(w, dlg, DataId, options.Data);
-        SetCheck(w, dlg, SubtreeId, true);
+        SetCheck(w, dlg, SubtreeId, options.Subtree);
     }
 
     private static void SetCheck(RegeditWindow w, IntPtr dlg, int id, bool value)

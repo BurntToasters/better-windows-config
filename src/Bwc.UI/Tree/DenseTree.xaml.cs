@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Bwc.UI.Theme;
 using Microsoft.UI.Dispatching;
@@ -83,6 +84,8 @@ public sealed partial class DenseTree : UserControl
     private const int MaxTypeAheadLength = 32;
     private const double MinimumLabelVisibleDip = 40;
     private const double LeftRevealMarginDip = 8;
+    private const double RenameChrome = 2;
+    private const double MinimumRenameWidth = 40;
 
     private readonly FlatNodeList _rows = new();
     private readonly List<TreeNode> _roots = new();
@@ -905,7 +908,10 @@ public sealed partial class DenseTree : UserControl
         RenameBox.Visibility = Visibility.Visible;
         PositionRenameBox();
         RenameBox.Focus(FocusState.Programmatic);
-        RenameBox.SelectAll();
+        // Select the whole name with the caret at the start, so a long name shows its beginning
+        // instead of scrolling to its tail. Typing still replaces the selection.
+        RenameBox.SelectionStart = 0;
+        RenameBox.SelectionLength = RenameBox.Text.Length;
     }
 
     private void PositionRenameBox()
@@ -922,15 +928,43 @@ public sealed partial class DenseTree : UserControl
         }
 
         double rowHeight = DenseMetrics.TreeRowHeight;
-        double left = 18 + Math.Max(0, _renameNode.Depth) * DenseMetrics.TreeIndent;
-        double available = Scroller.ViewportWidth - left - 8;
-        double width = Math.Clamp(available, 120, 400);
+        double labelLeft = TreeRowElement.LabelStartFor(_renameNode);
+        double viewport = Scroller.ViewportWidth > 0 ? Scroller.ViewportWidth : ActualWidth;
+        double left = Math.Max(0, labelLeft);
+        double visible = Math.Max(0, viewport - left - 1);
+        double labelWidth = MeasureTextWidth(_renameNode.Name);
+        double width = Math.Min(
+            Math.Max(MinimumRenameWidth, labelWidth + RenameChrome),
+            Math.Max(MinimumRenameWidth, visible));
+
         Canvas.SetLeft(RenameBox, left);
         Canvas.SetTop(RenameBox, index * rowHeight);
         RenameBox.Width = width;
         RenameBox.Height = rowHeight + 2;
         RenameBox.FontSize = DenseMetrics.FontSize;
         RenameBox.FontFamily = DenseMetrics.FontFamily;
+#if BWC_E2E
+        // E2E-only geometry trace: the rename box and the label it replaces, all in content DIPs.
+        AutomationProperties.SetHelpText(
+            RenameBox,
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"LabelLeft={labelLeft:0.##};LabelWidth={labelWidth:0.##};VisibleWidth={visible:0.##};BoxLeft={left:0.##};BoxWidth={width:0.##};BoxHeight={RenameBox.Height:0.##}"));
+#endif
+    }
+
+    /// <summary>The width of the node label at the current font, in DIPs.</summary>
+    private static double MeasureTextWidth(string text)
+    {
+        var probe = new TextBlock
+        {
+            Text = text,
+            FontFamily = DenseMetrics.FontFamily,
+            FontSize = DenseMetrics.FontSize,
+            TextWrapping = TextWrapping.NoWrap,
+        };
+        probe.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        return probe.DesiredSize.Width;
     }
 
     private void OnRenameKeyDown(object sender, KeyRoutedEventArgs e)
