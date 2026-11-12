@@ -243,9 +243,14 @@ public sealed class ImportExportTests
             $"rootValue={rootValue}, childValue={childValue}.");
 
         // The result message (RT_STRING 228) is modal. It is read and dismissed here, before the tree and list checks.
-        IntPtr result = AppServicesSupport.WaitForOwnedWindow(session.MainHwnd, null, "Registry Editor", TimeSpan.FromSeconds(10));
+        IntPtr result = AppServicesSupport.WaitForOwnedWindow(
+            session.MainHwnd, null, "Registry Editor", TimeSpan.FromSeconds(10), dialog);
         bool resultText = result != IntPtr.Zero
-            && AppServicesSupport.DialogText(result).Contains("successfully added to the registry", StringComparison.Ordinal);
+            && AppServicesSupport.WaitForDialogText(
+                result,
+                text => text.Contains("successfully added to the registry", StringComparison.Ordinal),
+                TimeSpan.FromSeconds(10))
+                .Contains("successfully added to the registry", StringComparison.Ordinal);
         E2EResults.Record(
             "importexport.import.result",
             resultText,

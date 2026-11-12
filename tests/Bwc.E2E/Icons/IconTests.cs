@@ -119,9 +119,24 @@ public sealed class IconTests
             AutomationElement? alpha = null;
             AutomationElement? binary = null;
             AutomationElement? dword = null;
-            bool rowsFound = ControlTestSupport.WaitUntil(
+            // The window must be visible and foreground before the rows are read. Each pass brings it
+            // forward, then retries the tree and list lookups within the bounded timeout, so a window
+            // that is still painting or a UIA tree that is rebuilt after the expand is read again.
+            bool windowReady = ControlTestSupport.WaitUntil(
                 () =>
                 {
+                    _ = ControlTestSupport.EnsureForeground(session);
+                    return Win32.IsWindow(session.MainHwnd) && Win32.IsVisible(session.MainHwnd);
+                },
+                ControlTestSupport.UiTimeout);
+            bool rootsFound = ControlTestSupport.WaitUntil(
+                () => session.Find(ControlTestSupport.TreeControl) is not null &&
+                    session.Find(ControlTestSupport.ListControl) is not null,
+                ControlTestSupport.UiTimeout);
+            bool rowsFound = rootsFound && ControlTestSupport.WaitUntil(
+                () =>
+                {
+                    _ = ControlTestSupport.EnsureForeground(session);
                     computer = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "Computer");
                     hkcu = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "HKEY_CURRENT_USER");
                     parent = ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "Parent");
@@ -133,8 +148,16 @@ public sealed class IconTests
                         alpha is not null && binary is not null && dword is not null;
                 },
                 ControlTestSupport.UiTimeout);
-            E2EResults.Record("icons.rows.found", rowsFound, $"all tree and list rows found={rowsFound}.");
-            if (!rowsFound)
+            string rowDiagnostic = rowsFound
+                ? string.Empty
+                : $" treeRows=[{string.Join(",", ControlTestSupport.Rows(session, ControlTestSupport.TreeControl, ControlType.TreeItem).Select(ControlTestSupport.SafeName))}]" +
+                  $", listRows=[{string.Join(",", ControlTestSupport.ListRowNames(session))}]";
+            E2EResults.Record(
+                "icons.rows.found",
+                windowReady && rowsFound,
+                $"all tree and list rows found={rowsFound}; window visible={Win32.IsVisible(session.MainHwnd)}, " +
+                $"window ready={windowReady}, roots found={rootsFound}.{rowDiagnostic}");
+            if (!(windowReady && rowsFound))
             {
                 FailIfNeeded();
                 return;

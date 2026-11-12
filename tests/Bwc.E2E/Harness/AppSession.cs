@@ -20,6 +20,7 @@ public sealed class AppSession : IDisposable
     private readonly string _exeName;
     private readonly Process _process;
     private readonly UIA3Automation _automation;
+    private readonly WindowWatchdog _watchdog;
     private bool _disposed;
     private bool _foregroundRecorded;
 
@@ -82,12 +83,15 @@ public sealed class AppSession : IDisposable
             throw;
         }
 
-        // The app under test stays above other applications for the whole session, so a window the user
-        // runs cannot cover it and take the keystrokes. Owned dialogs of this window stay above it.
-        // Close clears the flag before the window is closed.
-        _ = Win32.SetTopmost(MainHwnd, true);
-
         ProcessId = process.Id;
+
+        // The app under test stays above other applications for the whole session, so a window the user
+        // runs cannot cover it and take the keystrokes. The watchdog also raises the app's own popups and
+        // owned dialogs, which are separate top level windows and would otherwise stay below the main
+        // window. Close stops the watchdog, which clears the flag from every window.
+        _ = Win32.SetTopmost(MainHwnd, true);
+        _watchdog = new WindowWatchdog(unchecked((uint)ProcessId));
+
         E2EResults.CurrentSession = this;
     }
 
@@ -221,8 +225,15 @@ public sealed class AppSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// Raises every visible top level window of the app process, including owned dialogs and popup
+    /// windows, without changing the foreground window.
+    /// </summary>
+    internal void RaiseWindows() => _ = Win32.RaiseProcessWindows(unchecked((uint)ProcessId));
+
     public void Close()
     {
+        _watchdog.Dispose();
         if (_process.HasExited)
         {
             return;
@@ -260,6 +271,7 @@ public sealed class AppSession : IDisposable
 
         try
         {
+            _watchdog.Dispose();
             Close();
         }
         finally
@@ -343,7 +355,7 @@ public sealed class AppSession : IDisposable
             }
 
             var hwnd = _process.MainWindowHandle;
-            if (hwnd != IntPtr.Zero && Win32.IsWindow(hwnd))
+            if (hwnd != IntPtr.Zero && Win32.IsWindow(hwnd) && Win32.IsVisible(hwnd))
             {
                 return hwnd;
             }
@@ -367,6 +379,9 @@ public sealed class AppSession : IDisposable
     /// </summary>
     internal bool EnsureForeground(TimeSpan? timeout = null)
     {
+        // The app's own popups and dialogs participate in the raise, so a menu or message that is open
+        // is brought above the main window before the foreground request and the input that follows.
+        RaiseWindows();
         if (Win32.IsForeground(MainHwnd))
         {
             return true;

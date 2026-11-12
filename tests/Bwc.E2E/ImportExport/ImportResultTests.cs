@@ -217,14 +217,19 @@ public sealed class ImportResultTests
         AppServicesSupport.ClickButton(app, confirm, "Yes");
         _ = AppServicesSupport.WaitUntil(() => !AppServicesSupport.IsWindow(confirm), DialogTimeout);
 
-        IntPtr result = AppServicesSupport.WaitForOwnedWindow(app.MainHwnd, null, Caption, DialogTimeout);
+        // The result dialog is a different window from the confirmation. Excluding the confirmation
+        // handle keeps a confirmation that failed to close from being read as the result text.
+        IntPtr result = AppServicesSupport.WaitForOwnedWindow(app.MainHwnd, null, Caption, DialogTimeout, confirm);
         if (result == IntPtr.Zero)
         {
             app.Close();
             return new Outcome(true, false, string.Empty);
         }
 
-        string text = AppServicesSupport.DialogText(result);
+        string text = AppServicesSupport.WaitForDialogText(
+            result,
+            value => value.Any(char.IsLetterOrDigit),
+            DialogTimeout);
         _ = AppServicesSupport.DismissMessage(result, DialogTimeout);
         app.Close();
         return new Outcome(true, true, text);

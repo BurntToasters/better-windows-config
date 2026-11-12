@@ -134,15 +134,16 @@ public sealed class ContextMenuTests
         SandboxRegistry sandbox,
         E2EConfig config)
     {
-        AutomationElement? row = FindTreeRow(session, config.RunId);
-        bool clicked = menus.RightClick(row);
-        MenuSnapshot? snapshot = menus.WaitForMenu(TreeMenuNames);
+        MenuSnapshot? snapshot = menus.RightClickForMenu(
+            () => FindTreeRow(session, config.RunId),
+            TreeMenuNames);
+        bool opened = snapshot is not null;
         string actual = NamesOf(snapshot);
 
         E2EResults.Record(
             "contextmenu.tree.open",
-            clicked && snapshot is not null,
-            $"rightClick={clicked}, names=[{actual}].");
+            opened,
+            $"menu opened={opened}, names=[{actual}].");
         E2EResults.Record(
             "contextmenu.tree.order",
             snapshot is not null && NamesEqual(snapshot.Names, TreeMenuNames),
@@ -162,8 +163,10 @@ public sealed class ContextMenuTests
             copyInvoked && copied,
             $"invoked={copyInvoked}, expected='{expectedKeyPath}', copied={copied}.");
 
-        row = FindTreeRow(session, config.RunId);
-        bool expandMenu = menus.RightClick(row) && menus.WaitForMenu(TreeMenuNames) is not null;
+        MenuSnapshot? expandSnapshot = menus.RightClickForMenu(
+            () => FindTreeRow(session, config.RunId),
+            TreeMenuNames);
+        bool expandMenu = expandSnapshot is not null;
         bool expandInvoked = expandMenu && menus.Invoke(915);
         bool childVisible = expandInvoked &&
             ControlTestSupport.WaitForTreeRow(session, ChildKeyName, TimeSpan.FromSeconds(10));
@@ -172,8 +175,10 @@ public sealed class ContextMenuTests
             expandInvoked && childVisible,
             $"menu={expandMenu}, invoked={expandInvoked}, childVisible={childVisible}.");
 
-        row = FindTreeRow(session, config.RunId);
-        bool newMenu = menus.RightClick(row) && menus.WaitForMenu(TreeMenuNames) is not null;
+        MenuSnapshot? newSnapshot = menus.RightClickForMenu(
+            () => FindTreeRow(session, config.RunId),
+            TreeMenuNames);
+        bool newMenu = newSnapshot is not null;
         bool submenu = newMenu && menus.OpenSubmenu(516) && menus.WaitForItem(663) is not null;
         E2EGuards.RequireSandboxSelection(session, sandbox, "contextmenu.sandbox.newkey");
         bool newInvoked = submenu && menus.Invoke(663);
@@ -197,15 +202,16 @@ public sealed class ContextMenuTests
         ContextMenuDriver menus,
         SandboxRegistry sandbox)
     {
-        AutomationElement? row = FindListRow(session, BinaryValueName);
-        bool clicked = menus.RightClick(row);
-        MenuSnapshot? snapshot = menus.WaitForMenu(ValueMenuNames);
+        MenuSnapshot? snapshot = menus.RightClickForMenu(
+            () => FindListRow(session, BinaryValueName),
+            ValueMenuNames);
+        bool opened = snapshot is not null;
         string actual = NamesOf(snapshot);
 
         E2EResults.Record(
             "contextmenu.value.open",
-            clicked && snapshot is not null,
-            $"rightClick={clicked}, names=[{actual}].");
+            opened,
+            $"menu opened={opened}, names=[{actual}].");
         E2EResults.Record(
             "contextmenu.value.order",
             snapshot is not null && NamesEqual(snapshot.Names, ValueMenuNames),
@@ -244,8 +250,10 @@ public sealed class ContextMenuTests
             binaryInvoked && hexDialog && hexEditor && cancelled && unchanged,
             $"invoked={binaryInvoked}, hexDialog={hexDialog}, hexEditor={hexEditor}, cancelled={cancelled}, unchanged={unchanged}.");
 
-        row = FindListRow(session, BinaryValueName);
-        bool renameMenu = menus.RightClick(row) && menus.WaitForMenu(ValueMenuNames) is not null;
+        MenuSnapshot? renameSnapshot = menus.RightClickForMenu(
+            () => FindListRow(session, BinaryValueName),
+            ValueMenuNames);
+        bool renameMenu = renameSnapshot is not null;
         E2EGuards.RequireSandboxSelection(session, sandbox, "contextmenu.sandbox.rename");
         bool renameInvoked = renameMenu && menus.Invoke(914);
         bool renameBox = renameInvoked && ControlTestSupport.WaitUntil(
@@ -260,8 +268,10 @@ public sealed class ContextMenuTests
             renameInvoked && renameBox && renameClosed,
             $"menu={renameMenu}, invoked={renameInvoked}, renameBox={renameBox}, escaped={escaped}, closed={renameClosed}.");
 
-        row = FindListRow(session, BinaryValueName);
-        bool deleteMenu = menus.RightClick(row) && menus.WaitForMenu(ValueMenuNames) is not null;
+        MenuSnapshot? deleteSnapshot = menus.RightClickForMenu(
+            () => FindListRow(session, BinaryValueName),
+            ValueMenuNames);
+        bool deleteMenu = deleteSnapshot is not null;
         E2EGuards.RequireSandboxSelection(session, sandbox, "contextmenu.sandbox.delete");
         bool deleteInvoked = deleteMenu && menus.Invoke(913);
         bool deleteDialog = deleteInvoked && driver.WaitForDialog();
@@ -287,14 +297,14 @@ public sealed class ContextMenuTests
         System.Drawing.Rectangle bounds = list.BoundingRectangle;
         int x = bounds.Left + 120;
         int y = Math.Min(bounds.Bottom - 40, bounds.Top + 220);
-        bool clicked = menus.RightClick(x, y);
-        MenuSnapshot? snapshot = menus.WaitForMenu(BackgroundMenuNames);
+        MenuSnapshot? snapshot = menus.RightClickForMenu(x, y, BackgroundMenuNames);
+        bool opened = snapshot is not null;
         string actual = NamesOf(snapshot);
 
         E2EResults.Record(
             "contextmenu.background.open",
-            clicked && snapshot is not null,
-            $"rightClick=({x},{y}), clicked={clicked}, names=[{actual}].");
+            opened,
+            $"rightClick=({x},{y}), menu opened={opened}, names=[{actual}].");
 
         bool onlyNew = snapshot is not null &&
             NamesEqual(snapshot.Names, BackgroundMenuNames) &&
@@ -307,7 +317,7 @@ public sealed class ContextMenuTests
             onlyNew,
             $"expected=[New], actual=[{actual}].");
 
-        bool submenu = clicked && menus.OpenSubmenu(516);
+        bool submenu = opened && menus.OpenSubmenu(516);
         var present = new List<int>();
         var missing = new List<int>();
         if (submenu)
