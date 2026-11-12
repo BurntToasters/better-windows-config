@@ -826,13 +826,18 @@ public sealed class AppServicesTests
 
             if (answerYes)
             {
-                IntPtr result = AppServicesSupport.WaitForOwnedWindow(app.MainHwnd, null, Caption, DialogTimeout, confirm);
+                // The import progress dialog is owned by the main window and has the same title as
+                // the result message. Scan owned windows until one carries the success text, and
+                // rescan after the progress dialog closes.
+                IntPtr result = AppServicesSupport.WaitForOwnedWindowText(
+                    app.MainHwnd,
+                    className: null,
+                    text => text.Contains("successfully added", StringComparison.Ordinal),
+                    DialogTimeout,
+                    confirm);
                 string resultText = result == IntPtr.Zero
                     ? string.Empty
-                    : AppServicesSupport.WaitForDialogText(
-                        result,
-                        text => text.Contains("successfully added", StringComparison.Ordinal),
-                        DialogTimeout);
+                    : AppServicesSupport.DialogText(result);
                 E2EResults.Record(
                     checkPrefix + ".result.shown",
                     resultText.Contains("successfully added", StringComparison.Ordinal),
