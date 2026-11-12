@@ -636,6 +636,71 @@ internal static class AppServicesSupport
         return found;
     }
 
+    /// <summary>
+    /// Waits for an owned window whose dialog text matches. Windows that do not match are skipped,
+    /// including the import progress dialog, which has the same title as the result message. The
+    /// owned windows are scanned again until the matching window appears or the timeout passes.
+    /// </summary>
+    internal static IntPtr WaitForOwnedWindowText(
+        IntPtr owner,
+        string? className,
+        Func<string, bool> matches,
+        TimeSpan timeout,
+        params IntPtr[] exclude)
+    {
+        IntPtr found = IntPtr.Zero;
+        _ = WaitUntil(
+            () =>
+            {
+                found = FindOwnedWindowText(owner, className, matches, exclude);
+                if (found != IntPtr.Zero)
+                {
+                    RaiseWindow(found);
+                }
+
+                return found != IntPtr.Zero;
+            },
+            timeout);
+        return found;
+    }
+
+    /// <summary>
+    /// Finds the first owned window whose dialog text matches. The caller's excluded handles are
+    /// skipped so a confirmation or a progress dialog that is still closing cannot answer.
+    /// </summary>
+    internal static IntPtr FindOwnedWindowText(
+        IntPtr owner,
+        string? className,
+        Func<string, bool> matches,
+        params IntPtr[] exclude)
+    {
+        IntPtr found = IntPtr.Zero;
+        _ = EnumWindows(
+            (hwnd, _) =>
+            {
+                if (exclude.Contains(hwnd) || GetWindow(hwnd, GwOwner) != owner || !Win32.IsVisible(hwnd))
+                {
+                    return true;
+                }
+
+                if (className is not null && ClassOf(hwnd) != className)
+                {
+                    return true;
+                }
+
+                string text = DialogText(hwnd);
+                if (!matches(text))
+                {
+                    return true;
+                }
+
+                found = hwnd;
+                return false;
+            },
+            IntPtr.Zero);
+        return found;
+    }
+
     /// <summary>Every top-level window owned by <paramref name="owner"/>, with its class and title.</summary>
     internal static IReadOnlyList<(IntPtr Hwnd, string Class, string Title)> OwnedWindows(IntPtr owner)
     {
