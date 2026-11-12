@@ -32,6 +32,10 @@ node scripts/launch-unelevated.js publish\win-arm64-e2e\BwcRegedit.exe
 `--quick` runs the static checks, both app builds, and the test projects. Publish the app first with
 `node scripts/dotnet-build.js --rid win-arm64 --flavor e2e` if the `publish` folder is missing.
 
+App icons are generated from `resources/*.png` with ImageMagick. Run `npm run icons:normalize` after
+changing a source, and `npm run icons:normalize -- --check` to verify the `.ico` files. See
+[docs/build-setup.md](docs/build-setup.md#app-icons).
+
 ## Documentation
 
 - [`handoff.md`](handoff.md): current state, work status, known issues, and rules for contributors.

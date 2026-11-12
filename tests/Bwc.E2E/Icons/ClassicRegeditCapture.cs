@@ -1,7 +1,7 @@
 using Bwc.E2E.Controls;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Capturing;
+
 using FlaUI.Core.Definitions;
 
 namespace Bwc.E2E.Icons;
@@ -94,7 +94,6 @@ internal static class ClassicRegeditCapture
             throw new InvalidOperationException("Classic regedit showed no Computer row.");
         }
 
-        RequireForeground(session);
         SaveWindow(session, initialPath);
 
         AutomationElement hkcu = FindTreeItem(session, HkcuRow)
@@ -112,7 +111,6 @@ internal static class ClassicRegeditCapture
                 $"HKEY_CURRENT_USER did not expand (state {ControlTestSupport.StateOf(FindTreeItem(session, HkcuRow))}).");
         }
 
-        RequireForeground(session);
         SaveWindow(session, expandedPath);
 
         session.Close();
@@ -143,20 +141,7 @@ internal static class ClassicRegeditCapture
 
     private static void SaveWindow(AppSession session, string path)
     {
-        using var capture = Capture.Element(session.Window);
-        capture.ToFile(path);
-    }
-
-    /// <summary>
-    /// Brings the classic window to the foreground without clicking into it, because a click lands on
-    /// a tree or list row. Throws when it cannot, so a capture never shows another window.
-    /// </summary>
-    private static void RequireForeground(AppSession session)
-    {
-        if (!session.EnsureForeground(TimeSpan.FromSeconds(3)))
-        {
-            throw new InvalidOperationException("The classic window did not come to the foreground, so a capture would show another window.");
-        }
+        _ = WindowCapture.SaveArtifact("classic.artifact." + Path.GetFileNameWithoutExtension(path), session.MainHwnd, path);
     }
 
     private static AutomationElement? FindTreeItem(AppSession session, string name)

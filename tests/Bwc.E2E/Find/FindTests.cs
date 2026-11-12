@@ -121,10 +121,7 @@ public sealed class FindTests
                 string findShot = SaveScreenshot(
                     driver.FindWindowElement,
                     Path.Combine(visualDir, "find-dialog.png"));
-                Record(
-                    "find.visual.dialog",
-                    findShot.Length > 0,
-                    $"Find screenshot='{findShot}'.");
+                E2EResults.Note("find.visual.dialog", $"Find screenshot='{findShot}'.");
 
                 // Alt+K reaches the Keys checkbox through its template mnemonic, then again restores it.
                 bool mnemonicToggle = driver.SendAltMnemonic('K') &&
@@ -160,8 +157,10 @@ public sealed class FindTests
                     driver.TypeFindText("Alpha");
                 Record("find.keys.prepare", preparedKeys, $"FindText='{driver.TextOf("FindText")}'.");
 
+                // The guard makes Find the foreground window before the click, and records a failed check itself
+                // when it cannot. This line is harness state, so it is a note.
                 bool foreground = driver.EnsureFindForeground();
-                Record("find.keys.foreground", foreground, $"Find foreground={foreground}.");
+                E2EResults.Note("find.keys.foreground", $"Find foreground={foreground} before Find Next.");
 
                 bool nextClicked = foreground && driver.Click("DialogPrimary");
                 bool findClosed = nextClicked && driver.WaitForFindClosed();
@@ -182,10 +181,7 @@ public sealed class FindTests
                     "find.progress.opens",
                     progressOpened && progressText && driver.ControlPresent("DialogSecondary"),
                     $"progress opened={progressOpened}, text='{driver.ProgressText()}'.");
-                Record(
-                    "find.visual.progress",
-                    progressShot.Length > 0,
-                    $"progress screenshot='{progressShot}'.");
+                E2EResults.Note("find.visual.progress", $"progress screenshot='{progressShot}'.");
 
                 bool progressClosed = driver.WaitForProgressClosed(TimeSpan.FromSeconds(10));
                 bool alphaSelected = ControlTestSupport.WaitForTreeSelection(
@@ -328,10 +324,7 @@ public sealed class FindTests
                         driver.MessageWindowElement,
                         Path.Combine(visualDir, "find-finished.png"))
                     : string.Empty;
-                Record(
-                    "find.visual.finished",
-                    finishedShot.Length > 0,
-                    $"finished screenshot='{finishedShot}'.");
+                E2EResults.Note("find.visual.finished", $"finished screenshot='{finishedShot}'.");
 
                 bool dismissed = missMessage && driver.DismissMessage();
                 Record("find.miss.dismiss", dismissed, $"message dismissed={dismissed}.");
@@ -409,6 +402,102 @@ public sealed class FindTests
                 "find.findFlags.notWrittenAfterRestart",
                 beforeFindFlags.Equals(afterRestart),
                 $"FindFlags before={beforeFindFlags}, after={afterRestart}.");
+        }
+        finally
+        {
+            ControlTestSupport.CleanupRegistry(config);
+        }
+
+        FailIfNeeded();
+    }
+
+    /// <summary>
+    /// Edit &gt; Find (menu command 662) is opened with real keyboard input only: Alt+E opens the Edit menu, the F
+    /// mnemonic invokes Find, and the seeded value is found through the Find dialog. The menu item must exist with
+    /// command id 662 before the mnemonic is sent, so a menu that lost the command cannot pass.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Find")]
+    [TestCategory("E2EOnly")]
+    public void Find_EditMenuFindRunsFromTheKeyboard()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        try
+        {
+            config.EnsureExecutablesExist();
+        }
+        catch (Exception ex)
+        {
+            E2EResults.Record("find.menu.publish", false, ex.Message);
+            Assert.Fail(ex.Message);
+            return;
+        }
+
+        var sandbox = SeedSandbox(config);
+        string dataRoot = CreateFreshDataRoot(config, "findmenu");
+        var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+            ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+        };
+
+        try
+        {
+            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
+            using var driver = new FindDialogDriver(session);
+            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+            Record("find.menu.navigate", navigated, $"navigated to run root={navigated}.");
+            if (!navigated)
+            {
+                FailIfNeeded();
+                return;
+            }
+
+            // Alt+E with real keys opens the Edit menu. The Find command must be in it with id 662.
+            bool editOpened = SendAccelerator(session, "ALT+KEY_E");
+            bool findItem = editOpened && ControlTestSupport.WaitUntil(
+                () => session.Find("MenuCommand_662") is not null,
+                TimeSpan.FromSeconds(5));
+            Record(
+                "find.menu.item",
+                findItem,
+                $"Alt+E sent={editOpened}; Edit menu item with command id 662 (Find) present={findItem}.");
+
+            // The F mnemonic invokes Find, which opens the Find dialog from the menu, not from Ctrl+F.
+            bool mnemonicSent = findItem && SendAccelerator(session, "KEY_F");
+            bool findOpened = mnemonicSent && driver.WaitForFindOpen();
+            Record(
+                "find.menu.mnemonic",
+                findOpened,
+                $"F mnemonic sent={mnemonicSent}; Find dialog opened from the Edit menu={findOpened}.");
+            if (!findOpened)
+            {
+                FailIfNeeded();
+                return;
+            }
+
+            bool prepared = driver.SetChecked("FindKeys", false) &&
+                driver.SetChecked("FindValues", true) &&
+                driver.SetChecked("FindData", false) &&
+                driver.TypeFindText(ValueHitName);
+            bool clicked = prepared && driver.Click("DialogPrimary");
+            bool findClosed = clicked && driver.WaitForFindClosed();
+            bool progressClosed = findClosed && driver.WaitForProgressClosed(TimeSpan.FromSeconds(15));
+            bool rowSelected = progressClosed && ControlTestSupport.WaitUntil(
+                () => ControlTestSupport.IsSelected(
+                    ControlTestSupport.FindRowByName(
+                        session,
+                        ControlTestSupport.ListControl,
+                        ControlType.DataItem,
+                        ValueHitName)),
+                TimeSpan.FromSeconds(30));
+            Record(
+                "find.menu.hit",
+                prepared && clicked && findClosed && progressClosed && rowSelected,
+                $"prepared={prepared}, clicked={clicked}, Find closed={findClosed}, progress closed={progressClosed}, " +
+                $"row '{ValueHitName}' selected={rowSelected}.");
         }
         finally
         {
@@ -513,9 +602,10 @@ public sealed class FindTests
 
     private static string SaveScreenshot(AutomationElement? window, string path)
     {
+        // A screenshot is an artifact, not a pass or fail claim, so a failure is a note.
         if (window is null)
         {
-            E2EResults.Record("find.screenshot", false, $"No window to capture for '{path}'.");
+            E2EResults.Note("find.screenshot", $"No window to capture for '{path}'.");
             return string.Empty;
         }
 
@@ -525,7 +615,7 @@ public sealed class FindTests
         }
         catch (Exception ex)
         {
-            E2EResults.Record("find.screenshot", false, $"'{path}' failed: {ex.Message}");
+            E2EResults.Note("find.screenshot", $"'{path}' failed: {ex.Message}");
             return string.Empty;
         }
     }
@@ -616,6 +706,12 @@ public sealed class FindTests
                 _findHwnd = HwndOf(found);
             }
 
+            if (_findHwnd != 0)
+            {
+                // The z-order and foreground checks read the Find dialog as it opened, before any input.
+                OwnedWindowChecks.Record(_findHwnd);
+            }
+
             return WaitForElement("FindText", UiTimeout) is not null && _findHwnd != 0;
         }
 
@@ -636,6 +732,12 @@ public sealed class FindTests
             if (_progressHwnd == 0)
             {
                 _progressHwnd = HwndOf(found);
+            }
+
+            if (_progressHwnd != 0)
+            {
+                // The Find progress window is checked for z order and foreground as it appeared.
+                OwnedWindowChecks.Record(_progressHwnd);
             }
 
             return WaitForElement("FindProgressText", UiTimeout) is not null;
@@ -666,6 +768,11 @@ public sealed class FindTests
             if (_messageHwnd == 0)
             {
                 _messageHwnd = HwndOf(found);
+            }
+
+            if (_messageHwnd != 0)
+            {
+                OwnedWindowChecks.Record(_messageHwnd);
             }
 
             return _messageHwnd != 0;
@@ -704,7 +811,7 @@ public sealed class FindTests
             }
 
             AutomationElement? button = FindInWindow(message, "DialogPrimary");
-            if (button is null || !EnsureWindowForeground(_messageHwnd))
+            if (button is null || !ForegroundGuard.Ensure(_messageHwnd, "dialog.find.message.foreground", TimeSpan.FromSeconds(3)))
             {
                 return false;
             }
@@ -847,7 +954,7 @@ public sealed class FindTests
             }
 
             nint hwnd = HwndOfWindow(element);
-            if (!EnsureWindowForeground(hwnd))
+            if (!ForegroundGuard.Ensure(hwnd, "dialog.find.foreground", TimeSpan.FromSeconds(3)))
             {
                 return false;
             }
@@ -900,23 +1007,15 @@ public sealed class FindTests
             return true;
         }
 
-        internal bool EnsureFindForeground() => EnsureWindowForeground(_findHwnd);
+        internal bool EnsureFindForeground() =>
+            ForegroundGuard.Ensure(_findHwnd, "dialog.find.foreground", TimeSpan.FromSeconds(3));
 
-        internal bool EnsureProgressForeground() => EnsureWindowForeground(_progressHwnd);
+        internal bool EnsureProgressForeground() =>
+            ForegroundGuard.Ensure(_progressHwnd, "dialog.progress.foreground", TimeSpan.FromSeconds(3));
 
         public void Dispose()
         {
             _automation.Dispose();
-        }
-
-        private static bool EnsureWindowForeground(nint hwnd)
-        {
-            if (hwnd == 0 || !Win32.IsWindow(hwnd))
-            {
-                return false;
-            }
-
-            return Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(3)) && Win32.IsForeground(hwnd);
         }
 
         private AutomationElement? WaitForElement(string automationId, TimeSpan timeout)

@@ -324,7 +324,7 @@ Error code: {1} (0x{1:X8})
     <value>Select a key or value first.</value>
   </data>
   <data name="DialogExportNoSelection" xml:space="preserve">
-    <value>Select a key to export. Exporting the whole registry from Computer is not supported.</value>
+    <value>Select a key to export.</value>
   </data>
   <data name="DialogAddressBarInvalidPath" xml:space="preserve">
     <value>Enter Computer, a predefined root such as HKCU, or a full key path such as HKCU\Software.</value>
@@ -731,6 +731,31 @@ The key currently selected is marked for deletion.</value>
     <value>Registry Editor could not retrieve the security information.
 The key currently selected is not accessible.</value>
   </data>
+  <data name="MsgSecuritySaveDenied" xml:space="preserve">
+    <!-- Oracle 7070 (MSG-184) -->
+    <value>Registry Editor could not save the security information.
+The key currently selected does not give you access to save such information.</value>
+  </data>
+  <data name="MsgSecuritySetFailed" xml:space="preserve">
+    <!-- Oracle 7072 (MSG-186). The oracle text ends with a space. -->
+    <value>Registry Editor could not set security in the key currently selected, or some of its subkeys. </value>
+  </data>
+  <data name="MsgReplaceSubkeysConfirm" xml:space="preserve">
+    <!-- Oracle 7017 (MSG-178). {0} is the key path. -->
+    <value>Do you want to replace the permission on all existing subkeys within {0}?</value>
+  </data>
+  <data name="PermissionsInheritThisKeyOnly" xml:space="preserve">
+    <!-- Oracle 7090 (MSG-191) -->
+    <value>This key only</value>
+  </data>
+  <data name="PermissionsInheritThisKeyAndSubkeys" xml:space="preserve">
+    <!-- Oracle 7091 (MSG-192) -->
+    <value>This key and subkeys</value>
+  </data>
+  <data name="PermissionsInheritSubkeysOnly" xml:space="preserve">
+    <!-- Oracle 7092 (MSG-193) -->
+    <value>Subkeys only</value>
+  </data>
   <!-- Written for this product: the oracle has no generic text for a command that has no registry operation. -->
   <data name="MsgCommandFailed" xml:space="preserve">
     <value>The Registry Editor could not complete this command. Try again.</value>
@@ -765,6 +790,120 @@ The key currently selected is not accessible.</value>
   </data>
   <data name="MenuViewThemeDark" xml:space="preserve">
     <value>&amp;Dark</value>
+  </data>
+  <!-- Oracle 311. The Ctrl+T and menu 918 text when the selection is under HKEY_LOCAL_MACHINE. -->
+  <data name="ContextGoToHkcu" xml:space="preserve">
+    <value>Go &amp;to HKEY_CURRENT_USER</value>
+  </data>
+  <!-- Oracle 300. Caption of the Import progress dialog (DLG-019). -->
+  <data name="MsgImportRegistryFileCaption" xml:space="preserve">
+    <value>Import Registry File</value>
+  </data>
+  <!-- Oracle DLG-019 static text, the label of the file name line. -->
+  <data name="ImportProgressFileLabel" xml:space="preserve">
+    <value>File:</value>
+  </data>
+  <!-- Written for this product: the export progress status before the first key. -->
+  <data name="ExportProgressPreparing" xml:space="preserve">
+    <value>Preparing the export.</value>
+  </data>
+  <!-- Written for this product: the export progress caption, with the file name. -->
+  <data name="ExportProgressTitle" xml:space="preserve">
+    <value>Exporting {0}</value>
+  </data>
+  <!-- Written for this product: the export progress status after a key. -->
+  <data name="ExportProgressCounts" xml:space="preserve">
+    <value>Exported {0} keys and {1} values.</value>
+  </data>
+  <!-- Written for this product: the export progress status after a skipped key. -->
+  <data name="ExportProgressSkipped" xml:space="preserve">
+    <value>Skipped an unreadable key. Exported {0} keys and {1} values.</value>
+  </data>
+  <!-- Oracle DLG-017 and DLG-018 static text (ordinal 0x66 icon beside it). -->
+  <data name="FindProgressSearching" xml:space="preserve">
+    <value>Searching the registry...</value>
+  </data>
+  <!-- Written for this product: the attempted path line in an address bar error. -->
+  <data name="AddressBarPathLine" xml:space="preserve">
+    <value>Path: </value>
+  </data>
+  <!-- Written for this product: the error when the print dialog returns no printer. -->
+  <data name="PrintNoDevice" xml:space="preserve">
+    <value>The Windows print dialog returned no printer device.</value>
+  </data>
+  <!-- Oracle 23 (New Key #%u). The index follows the prefix. -->
+  <data name="NewKeyNamePrefix" xml:space="preserve">
+    <value>New Key #</value>
+  </data>
+  <!-- Oracle 24 (New Value #%u). The index follows the prefix. -->
+  <data name="NewValueNamePrefix" xml:space="preserve">
+    <value>New Value #</value>
+  </data>
+  <!-- Written for this product: the file base name when the exported key has no usable name. -->
+  <data name="ExportFallbackName" xml:space="preserve">
+    <value>export</value>
+  </data>
+  <!-- Oracle 55. The {0} placeholder is the key the hive file is restored onto. -->
+  <data name="MsgRestoreKeyConfirm" xml:space="preserve">
+    <value>The key will be restored on top of key: {0}.
+All value entries and subkeys of this key will be deleted.
+Do you want to continue the operation?</value>
+  </data>
+  <!-- Oracle 56. Caption of the restore confirmation. -->
+  <data name="MsgRestoreKeyCaption" xml:space="preserve">
+    <value>Confirm Restore Key</value>
+  </data>
+  <!-- Written for this product: remote nodes refuse every write command. -->
+  <data name="DialogRemoteReadOnly" xml:space="preserve">
+    <value>Remote computers are read-only in this version. Select a key on this computer to change it.</value>
+  </data>
+  <!-- Written for this product: the About box version line. -->
+  <data name="AboutVersion" xml:space="preserve">
+    <value>Version {0}</value>
+  </data>
+  <!-- Written for this product: the About box version when no version is set. -->
+  <data name="AboutVersionUnknown" xml:space="preserve">
+    <value>unknown</value>
+  </data>
+  <!-- Oracle 8101. -->
+  <data name="PrintKeyName" xml:space="preserve">
+    <value>Key Name:          </value>
+  </data>
+  <!-- Oracle 8102. -->
+  <data name="PrintClassName" xml:space="preserve">
+    <value>Class Name:        </value>
+  </data>
+  <!-- Oracle 8103. -->
+  <data name="PrintLastWriteTime" xml:space="preserve">
+    <value>Last Write Time:   </value>
+  </data>
+  <!-- Oracle 8104. The value index follows. -->
+  <data name="PrintValueHeading" xml:space="preserve">
+    <value>Value </value>
+  </data>
+  <!-- Oracle 8105. -->
+  <data name="PrintValueName" xml:space="preserve">
+    <value>  Name:            </value>
+  </data>
+  <!-- Oracle 8106. -->
+  <data name="PrintValueType" xml:space="preserve">
+    <value>  Type:            </value>
+  </data>
+  <!-- Oracle 8107. -->
+  <data name="PrintValueDataSize" xml:space="preserve">
+    <value>  Data Size:       </value>
+  </data>
+  <!-- Oracle 8108. -->
+  <data name="PrintValueData" xml:space="preserve">
+    <value>  Data:            </value>
+  </data>
+  <!-- Oracle 8109. -->
+  <data name="PrintNoName" xml:space="preserve">
+    <value>&lt;NO NAME&gt;</value>
+  </data>
+  <!-- Oracle 8110. -->
+  <data name="PrintNoClass" xml:space="preserve">
+    <value>&lt;NO CLASS&gt;</value>
   </data>
 </root>
 

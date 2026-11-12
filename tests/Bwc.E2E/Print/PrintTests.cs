@@ -650,10 +650,10 @@ public sealed class PrintTests
 
     /// <summary>
     /// Confirms a dialog is the foreground window before any keystroke or mouse input is sent to it. The shared
-    /// routine is <see cref="Win32.ForceForeground"/>, which also attaches to the foreground thread when Windows
-    /// refuses the plain request.
+    /// routine is <see cref="ForegroundGuard"/>, which re-asserts only after a foreign-foreground event and records
+    /// a failed check when the dialog still is not foreground.
     /// </summary>
-    private static bool EnsureForeground(nint hwnd) => Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(2));
+    private static bool EnsureForeground(nint hwnd) => ForegroundGuard.Ensure(hwnd, "dialog.print.foreground", TimeSpan.FromSeconds(2));
 
     private static bool HasDefaultPrinter()
     {
@@ -766,6 +766,170 @@ public sealed class PrintTests
         {
             // The application exit path may still hold a settings file for a moment.
         }
+    }
+
+    /// <summary>
+    /// Ctrl+T (command 918) goes to HKEY_LOCAL_MACHINE from a key under HKCU, and to HKEY_CURRENT_USER
+    /// from a key under HKLM. The menu text changes to match. Runs against the seeded sandbox key.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Parity")]
+    [TestCategory("Mutating")]
+    public void Parity_CtrlT_TogglesBetweenLocalMachineAndCurrentUser()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+        config.EnsureExecutablesExist();
+
+        var sandbox = new SandboxRegistry(config);
+        string? dataRoot = null;
+
+        try
+        {
+            sandbox.Cleanup();
+            Seed(sandbox);
+            dataRoot = CreateFreshDataRoot(config, "parity-ctrlt");
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+            };
+
+            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
+            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "parity.ctrlt.navigate");
+
+            ControlTestSupport.SendKeys(session, "CONTROL+T");
+            bool toLocalMachine = ControlTestSupport.WaitForTreeSelection(session, "HKEY_LOCAL_MACHINE");
+            E2EResults.Record(
+                "parity.ctrlt.to-hklm",
+                toLocalMachine,
+                $"Ctrl+T under HKCU reached HKEY_LOCAL_MACHINE: {toLocalMachine}.");
+
+            ControlTestSupport.SendKeys(session, "CONTROL+T");
+            bool toCurrentUser = ControlTestSupport.WaitForTreeSelection(session, "HKEY_CURRENT_USER");
+            E2EResults.Record(
+                "parity.ctrlt.to-hkcu",
+                toCurrentUser,
+                $"Ctrl+T under HKLM reached HKEY_CURRENT_USER: {toCurrentUser}.");
+
+            FailIfNeeded();
+        }
+        finally
+        {
+            ControlTestSupport.CleanupRegistry(config);
+            DeleteDataRoot(dataRoot);
+        }
+    }
+
+    /// <summary>
+    /// The print report written through BWC_E2E_PRINT_REPORT_PATH (the E2E-only seam that formats the
+    /// report without the spooler) uses the classic labels, oracle strings 8101 to 8110. The copy is kept
+    /// at artifacts/e2e/parity/print-report.txt.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Parity")]
+    [TestCategory("Mutating")]
+    public void Parity_PrintReport_UsesClassicLabels()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+        config.EnsureExecutablesExist();
+
+        var sandbox = new SandboxRegistry(config);
+        string? dataRoot = null;
+        string artifactDir = Path.Combine(config.ArtifactsDir, "parity");
+        string reportPath = Path.Combine(artifactDir, "print-report.txt");
+
+        try
+        {
+            sandbox.Cleanup();
+            Seed(sandbox);
+            dataRoot = CreateFreshDataRoot(config, "parity-print");
+            Directory.CreateDirectory(artifactDir);
+            if (File.Exists(reportPath))
+            {
+                File.Delete(reportPath);
+            }
+
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+                ["BWC_E2E_PRINT_REPORT_PATH"] = reportPath,
+            };
+
+            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
+            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "parity.print.navigate");
+
+            ControlTestSupport.SendKeys(session, "CONTROL+KEY_P");
+            bool written = ControlTestSupport.WaitUntil(() => File.Exists(reportPath), TimeSpan.FromSeconds(15));
+            E2EResults.Record("parity.print.written", written, $"report file written: {written}.");
+
+            if (written)
+            {
+                CheckReport(File.ReadAllText(reportPath), sandbox);
+            }
+
+            FailIfNeeded();
+        }
+        finally
+        {
+            ControlTestSupport.CleanupRegistry(config);
+            DeleteDataRoot(dataRoot);
+        }
+    }
+
+    private static void CheckReport(string report, SandboxRegistry sandbox)
+    {
+        const string labelKeyName = "Key Name:          ";
+        const string labelClassName = "Class Name:        ";
+        const string labelLastWrite = "Last Write Time:   ";
+        const string labelValueHeading = "Value ";
+        const string labelValueName = "  Name:            ";
+        const string labelValueType = "  Type:            ";
+        const string labelValueDataSize = "  Data Size:       ";
+        const string labelValueData = "  Data:            ";
+
+        string keyTail = sandbox.RunRootDisplayPath[(sandbox.RunRootDisplayPath.IndexOf('\\') + 1)..];
+        string[] lines = report.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+
+        bool oldLabels = report.StartsWith("Key: ", StringComparison.Ordinal) ||
+            report.Contains("\nKey: ", StringComparison.Ordinal) ||
+            report.Contains("Subkey: ", StringComparison.Ordinal);
+        E2EResults.Record("parity.print.no-bwc-labels", !oldLabels, "No Key: or Subkey: labels in the report.");
+
+        bool keyBlock = lines.Any(line => line.StartsWith(labelKeyName, StringComparison.Ordinal) && line.Contains(keyTail, StringComparison.OrdinalIgnoreCase));
+        E2EResults.Record("parity.print.key-name", keyBlock, $"Key Name line for the sandbox key (8101): {keyBlock}.");
+
+        bool classLine = lines.Any(line => line == labelClassName + "<NO CLASS>");
+        E2EResults.Record("parity.print.class-name", classLine, "Class Name line with <NO CLASS> (8102, 8110).");
+
+        bool writeLine = lines.Any(line => line.StartsWith(labelLastWrite, StringComparison.Ordinal));
+        E2EResults.Record("parity.print.last-write", writeLine, "Last Write Time line (8103).");
+
+        bool valueBlocks = lines.Any(line => line == labelValueHeading + "1") && lines.Any(line => line == labelValueHeading + "2");
+        E2EResults.Record("parity.print.value-blocks", valueBlocks, "Value 1 and Value 2 blocks (8104).");
+
+        bool stringBlock = lines.Any(line => line == labelValueName + SeedValueName) &&
+            lines.Any(line => line == labelValueType + "REG_SZ") &&
+            lines.Any(line => line == labelValueData + "printed");
+        E2EResults.Record("parity.print.string-value", stringBlock, "PrintValue: Name, Type REG_SZ, Data (8105 to 8108).");
+
+        bool dwordBlock = lines.Any(line => line == labelValueName + SeedDwordName) &&
+            lines.Any(line => line == labelValueType + "REG_DWORD") &&
+            lines.Any(line => line == labelValueData + "0x00000007 (7)");
+        E2EResults.Record("parity.print.dword-value", dwordBlock, "PrintDword: Name, Type REG_DWORD, Data 0x00000007 (7).");
+
+        bool sizeLines = lines.Count(line => line.StartsWith(labelValueDataSize, StringComparison.Ordinal)) >= 2;
+        E2EResults.Record("parity.print.data-size", sizeLines, "Data Size line for each value (8107).");
+
+        bool childBlock = lines.Any(line => line.StartsWith(labelKeyName, StringComparison.Ordinal) && line.EndsWith(ChildKeyName, StringComparison.OrdinalIgnoreCase)) &&
+            lines.Any(line => line == labelValueName + ChildValueName);
+        E2EResults.Record("parity.print.child-key", childBlock, "PrintChild has its own Key Name block and ChildValue.");
     }
 
     private static void FailIfNeeded()

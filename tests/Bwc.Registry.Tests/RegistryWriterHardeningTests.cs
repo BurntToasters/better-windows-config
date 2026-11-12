@@ -162,20 +162,30 @@ public sealed class RegistryWriterHardeningTests
             RegistryWriter writer = WriterFor(sandbox);
             var progress = new RecordingSecurityProgress();
 
+            // A container-inheritable entry on the root is what the children inherit.
+            var inheritable = new RawSecurityDescriptor($"D:(A;CI;KA;;;{CurrentUserSid()})");
+            byte[] inheritableBinary = new byte[inheritable.BinaryLength];
+            inheritable.GetBinaryForm(inheritableBinary, 0);
+
             writer.SetKeySecurity(
                 Hkcu(tree),
-                EveryoneDescriptor(),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.UnprotectedDacl,
+                inheritableBinary);
+            writer.SetKeySecurity(
+                Hkcu(tree),
+                inheritableBinary,
                 RegistrySecurityInformation.Dacl,
                 propagateToSubkeys: true,
                 progress: progress);
 
-            string expected = Sddl(Reader.GetKeySecurity(Hkcu(tree), RegistrySecurityInformation.Dacl));
-            foreach (string key in new[] { tree, tree + @"\A", tree + @"\A\B", tree + @"\C" })
+            foreach (string key in new[] { tree + @"\A", tree + @"\A\B", tree + @"\C" })
             {
-                Assert.AreEqual(
-                    expected,
-                    Sddl(Reader.GetKeySecurity(Hkcu(key), RegistrySecurityInformation.Dacl)),
-                    key);
+                RawSecurityDescriptor child = new(Reader.GetKeySecurity(Hkcu(key), RegistrySecurityInformation.Dacl), 0);
+                RawAcl dacl = child.DiscretionaryAcl ?? throw new InvalidOperationException("The child has no DACL.");
+                Assert.AreEqual(1, dacl.Count, key);
+                Assert.IsTrue(
+                    ((CommonAce)dacl[0]).AceFlags.HasFlag(AceFlags.Inherited),
+                    key + " must hold only the inherited entry.");
             }
 
             CollectionAssert.AreEquivalent(
@@ -218,10 +228,12 @@ public sealed class RegistryWriterHardeningTests
             using var cancellation = new CancellationTokenSource();
             var progress = new RecordingSecurityProgress(() => cancellation.Cancel());
 
+            // The root grants the current user full control through an inheritable entry, so every child keeps
+            // an entry for the current user and the walk can be cancelled between keys.
             Assert.ThrowsExactly<OperationCanceledException>(
                 () => writer.SetKeySecurity(
                     Hkcu(tree),
-                    EveryoneDescriptor(),
+                    InheritableUserDescriptor(),
                     RegistrySecurityInformation.Dacl,
                     propagateToSubkeys: true,
                     progress: progress,
@@ -287,6 +299,20 @@ public sealed class RegistryWriterHardeningTests
 
     private static byte[] Utf16(string text) => Encoding.Unicode.GetBytes(text);
 
+    private static string CurrentUserSid()
+    {
+        using System.Security.Principal.WindowsIdentity identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        return identity.User?.Value ?? throw new InvalidOperationException("The current Windows identity has no user SID.");
+    }
+
+    private static byte[] InheritableUserDescriptor()
+    {
+        var descriptor = new RawSecurityDescriptor($"D:(A;CI;KA;;;{CurrentUserSid()})");
+        byte[] binary = new byte[descriptor.BinaryLength];
+        descriptor.GetBinaryForm(binary, 0);
+        return binary;
+    }
+
     private static byte[] EveryoneDescriptor()
     {
         var descriptor = new RawSecurityDescriptor("D:(A;;KA;;;WD)");
@@ -295,22 +321,12 @@ public sealed class RegistryWriterHardeningTests
         return binary;
     }
 
-    private static void CleanupRun(string runId)
-    {
-        string relative = $@"{SandboxBase}\{runId}";
-
-        RegistryLinkFixture.DeleteLinkNodes(relative);
-
-        var store = new RegistryStore(new SandboxWritePolicy(Hkcu(SandboxBase)));
-        try
-        {
-            store.DeleteKey(Hkcu(relative), recursive: true);
-        }
-        catch (RegistryOperationException error) when (error.Win32Error == ErrorFileNotFound)
-        {
-            // The tree was never created.
-        }
-    }
+    /// <summary>
+    /// Removes the run tree through the shared walk. The walk restores the owner's full control on each key,
+    /// removes link nodes without following them, and deletes through the engine.
+    /// See docs/failure-modes/permissions.md section 26.
+    /// </summary>
+    private static void CleanupRun(string runId) => SandboxRunCleanup.RemoveRunTree(runId);
 
     private sealed class RecordingSecurityProgress : IProgress<KeySecurityProgress>
     {

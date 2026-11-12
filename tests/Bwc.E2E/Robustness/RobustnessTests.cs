@@ -250,14 +250,16 @@ public sealed class RobustnessTests
             _ = SelectListRow(session, "Resources");
             E2EGuards.RequireListRowSelected(session, "Resources", "robust.resource.row");
             driver.OpenMenu(MenuEdit, MenuEditModify);
-            // The viewer is the only dialog with the HexViewerDialog id. The writable editor has none.
-            bool viewer = driver.WaitForElement("HexViewerDialog") is not null;
+            // The viewer is the classic Binary Data dialog, identified by its read-only list (HexViewerList). The
+            // writable editor has the HexEditor control and no list, so it must be absent for the value to be read-only.
+            bool viewer = driver.WaitForElement("HexViewerList") is not null;
+            bool writable = driver.WaitForElement("HexEditor", TimeSpan.FromSeconds(1)) is not null;
             Keyboard.Press(VirtualKeyShort.ESCAPE);
             bool closed = viewer && driver.WaitForNoDialog();
             E2EResults.Record(
                 "robust.resource.readonly",
-                rows && viewer && closed,
-                $"rows={rows}, read-only viewer={viewer}, closed={closed}.");
+                rows && viewer && !writable && closed,
+                $"rows={rows}, read-only viewer={viewer}, writable editor={writable}, closed={closed}.");
 
             FailIfNeeded();
         }

@@ -81,6 +81,26 @@ row two below the original selection, leaving the original selected.
 E2E: `right-click keeps multi-selection` (right-click a selected row, count stays 2),
 `right-click on unselected row selects only it`, and `empty-area click clears selection`.
 
+### 3a. Mouse presses that never reach the row or the grip (baseline E2E)
+
+Baseline failures seen in one full run, before any change to the list:
+
+- A Ctrl+click is treated as a plain click when Control is not down for the press. `list.multi.ctrl-click`
+  counted 2 after row 1, then Ctrl+click on rows 2 and 3. The result {2, 3} means the first Ctrl+click
+  acted as a plain click, or the row 2 press was lost. `list.right-click.keeps-multi-selection` counted 2
+  with the same set, so the right click kept the rows that were selected. Cause not yet confirmed: the
+  press reads Control with `IsKeyDown` (the key state of the UI thread), and the harness holds Control
+  with raw input before a UIA click. Unconfirmed: whether the Control key-down reached the foreground window.
+- An empty-area press leaves the selection alone when the click before it selected nothing. The check
+  `list.empty-area.clears-selection` read 0 selected before the click, so the setup click never selected row 0.
+- The divider press never reaches the grip. `list.divider.trace` read `Presses=0;Moves=0;Releases=0` after a
+  +60 DIP drag, so `OnDividerPressed` never ran. The UI Automation hit test still reported the `Column
+  divider` separator at the drag point. A probe with a clean foreground (WindowFromPoint and the foreground
+  window both the Registry Editor) read `Presses=0` after a press on the grip, so the grip never got
+  `PointerPressed`, although UIA places it there. Cause not yet found. A second probe run had Windows Terminal
+  in the foreground at the grip point, so that run cannot be used. Foreign windows from other test runs must
+  be ruled out before a mouse check is judged.
+
 ## 4. Type-ahead
 
 Classic list views use incremental search: typed characters form a prefix buffer that resets after

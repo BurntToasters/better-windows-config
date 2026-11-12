@@ -141,14 +141,40 @@ public sealed class AppServicesTests
             bool closed = AppServicesSupport.WaitUntil(() => !AppServicesSupport.IsWindow(dialog), DialogTimeout);
             E2EResults.Record("appsvc.font.dialog.closed", closed, $"Font dialog closed after OK={closed}.");
 
-            // The common dialog hands the window back. Wait until the window is enabled and foreground, then the
-            // rows are read again through UI Automation from the handle, so no element from before the dialog is used.
+            // The common dialog hands the window back. The product must re-enable the main window and return the
+            // focus to it by itself. Nothing here activates the window, so a lost focus shows up in the checks below.
             bool enabledAfterDialog = AppServicesSupport.WaitUntil(() => AppServicesSupport.IsEnabled(app.MainHwnd), DialogTimeout);
-            bool foregroundAfterDialog = enabledAfterDialog && AppServicesSupport.ForceForeground(app.MainHwnd);
             E2EResults.Record(
+                "appsvc.font.window.enabled",
+                enabledAfterDialog,
+                $"main window enabled={enabledAfterDialog} after the font dialog closed.");
+
+            ForegroundState focusState = ForegroundGuard.Observe(app.MainHwnd, out string focusText);
+            DateTime focusDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+            while (focusState != ForegroundState.Target && DateTime.UtcNow < focusDeadline)
+            {
+                Thread.Sleep(100);
+                focusState = ForegroundGuard.Observe(app.MainHwnd, out focusText);
+            }
+
+            switch (focusState)
+            {
+                case ForegroundState.Target:
+                    E2EResults.Record("appsvc.font.focus.returns", true, "The main window regained the focus without help.");
+                    break;
+                case ForegroundState.AppOther:
+                    E2EResults.Record("appsvc.font.focus.returns", false, $"The focus stayed in the app but not on the main window: {focusText}.");
+                    break;
+                default:
+                    E2EResults.Note(
+                        ForegroundGuard.ForeignNoteId,
+                        $"appsvc.font.focus.returns not judged: {focusText} belongs to another process.");
+                    break;
+            }
+
+            E2EResults.Note(
                 "appsvc.font.window.ready",
-                enabledAfterDialog && foregroundAfterDialog,
-                $"main window enabled={enabledAfterDialog}, foreground={foregroundAfterDialog} after the font dialog closed.");
+                $"enabled={enabledAfterDialog}, focus={focusState} ({focusText}) after the font dialog closed.");
 
             bool changed = AppServicesSupport.WaitUntil(
                 () => Math.Abs(WaitForRowHeight(app) - expectedAfter) <= tolerance,
@@ -319,8 +345,19 @@ public sealed class AppServicesTests
 
             // The Name width is the distance from the Name title to the Type title. A title's own bounds are clipped
             // at the list pane edge when the column is wider than the pane, but the Type title keeps its layout position.
+            // The titles get their bounds on the first layout pass, which can come after the elements exist. A read
+            // before that gives zero bounds for both titles, so wait until both have a width before measuring.
             AutomationElement? header = app.WaitFor("HeaderName", UiTimeout);
             AutomationElement? typeHeader = app.Find("HeaderType");
+            AppServicesSupport.WaitUntil(
+                () =>
+                {
+                    header = app.Find("HeaderName");
+                    typeHeader = app.Find("HeaderType");
+                    return header is not null && typeHeader is not null
+                        && header.BoundingRectangle.Width > 0 && typeHeader.BoundingRectangle.Width > 0;
+                },
+                UiTimeout);
             double nameWidth = header is not null && typeHeader is not null
                 ? typeHeader.BoundingRectangle.Left - header.BoundingRectangle.Left
                 : 0;
@@ -506,10 +543,15 @@ public sealed class AppServicesTests
             text.Contains("Copyright", StringComparison.Ordinal),
             "About text carries the copyright line.");
 
-        AppServicesSupport.ForceForeground(dialog);
-        Keyboard.Press(VirtualKeyShort.ENTER);
-        bool closed = AppServicesSupport.WaitUntil(() => !AppServicesSupport.IsWindow(dialog), DialogTimeout);
-        E2EResults.Record("appsvc.about.closed", closed, "The About box closed on Enter.");
+        // Enter goes to the About box only when the guard has made it the foreground window.
+        bool aboutFocused = AppServicesSupport.Activate(dialog, "appsvc.about.foreground");
+        if (aboutFocused)
+        {
+            Keyboard.Press(VirtualKeyShort.ENTER);
+        }
+
+        bool closed = aboutFocused && AppServicesSupport.WaitUntil(() => !AppServicesSupport.IsWindow(dialog), DialogTimeout);
+        E2EResults.Record("appsvc.about.closed", closed, $"The About box closed on Enter (focused={aboutFocused}).");
         app.Close();
 
         FailIfNeeded(checkStart);
@@ -757,10 +799,10 @@ public sealed class AppServicesTests
     {
         app.Focus();
         var rect = app.Window.BoundingRectangle;
-        using CaptureImage image = Capture.Element(app.Window);
+        using System.Drawing.Bitmap image = WindowCapture.CaptureWindow(app.MainHwnd);
         int x = (int)(rect.Width * 0.75);
         int y = (int)(rect.Height - 40);
-        System.Drawing.Color color = image.Bitmap.GetPixel(Math.Clamp(x, 0, image.Bitmap.Width - 1), Math.Clamp(y, 0, image.Bitmap.Height - 1));
+        System.Drawing.Color color = image.GetPixel(Math.Clamp(x, 0, image.Width - 1), Math.Clamp(y, 0, image.Height - 1));
         return (color.R, color.G, color.B);
     }
 

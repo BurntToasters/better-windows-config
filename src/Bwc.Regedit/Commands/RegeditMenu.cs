@@ -461,7 +461,7 @@ public static class RegeditMenu
         // The three theme items are radio items in one group, so exactly one shows a bullet.
         bool radio = IsThemeRadio(command.Id);
         MenuFlyoutItem item = command.Id == AddressBarCommandId
-            ? new ToggleMenuFlyoutItem()
+            ? new CheckMenuFlyoutItem()
             : radio
                 ? new RadioMenuFlyoutItem { GroupName = ThemeRadioGroupName }
                 : new MenuFlyoutItem();
@@ -488,7 +488,7 @@ public static class RegeditMenu
             MenuItemActions.Register(item, invoke);
         }
 
-        ApplyStyle(item, item is ToggleMenuFlyoutItem ? ToggleMenuFlyoutItemStyleKey : MenuFlyoutItemStyleKey);
+        ApplyStyle(item, item is CheckMenuFlyoutItem ? ToggleMenuFlyoutItemStyleKey : MenuFlyoutItemStyleKey);
         return item;
     }
 

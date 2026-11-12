@@ -62,12 +62,30 @@ when the drag started, and the drag must end. The thumb's `CancelDrag` raises `D
 handler the tree stays at the dragged width. A check holds the mouse on the splitter, moves it,
 presses Escape, releases the mouse, and expects the tree width from before the drag.
 
+### Mouse drag of the splitter (measured)
+
+A probe that presses the thumb, moves 60 DIP, and holds the button reads the tree at 552 px (432 px before),
+with DragStarted 1, DragDelta 12. The drag path works. The `shell.splitterDrag.dragMoves` failure
+(432 px during the drag) did not reproduce in the probe; the cause is not confirmed.
+
+The cursor check reads a different cursor handle on most samples over the thumb. The SizeWE handle
+(0x10011) appeared on only one of six samples, so the cursor is set and then replaced. `SplitterSurface`
+sets `ProtectedCursor`, but another element's cursor wins on most moves. Open.
+
 ### Keyboard split steps after an Escape
 
 After a cancelled drag the keyboard split mode state must be clear. A stale `_keyboardSplitMode`
 makes the next Left or Right move the split when focus is elsewhere. The drag start clears the
 flag already; a check repeats the Escape cancel and then sends Left to the tree, expecting no width
 change.
+
+### The width is read before the restore is laid out
+
+Escape puts the tree width back from before the split, but the column change is applied on the next
+layout pass. A check that reads the width as soon as focus returns sees the widened width. The baseline
+run read 480 px for `shell.split.escapeWidth` (restored width 432 px), while the next split began at 432
+px and one Right press gave 448 px, so the restore had happened. The check waits for the width to settle
+before it reads. The restore itself is unchanged and the check still compares with the same 432 px.
 
 ## Address bar
 
@@ -119,7 +137,23 @@ Toggling the address bar must collapse its row to zero height and let the tree a
 space. A hidden row that keeps its height leaves a blank band under the menu bar. A check toggles
 the bar off and on and reads the tree top against the menu bar bottom.
 
+### Toggle item has no Invoke, and a mouse click does nothing
+
+Measured on the baseline build: `ToggleMenuFlyoutItem` (View > Address Bar) exposes the UIA Toggle
+pattern but not Invoke. A UIA click on it leaves the View popup open and the bar at 38 px, so
+`shell.addressbar.hiddenAfterToggle` and `shell.reflow.hiddenGapClosed` fail on the first toggle. The Toggle
+pattern does flip the bar and close the popup. A normal `MenuFlyoutItem` (View > Split) closes on a click.
+
+The item is now a `CheckMenuFlyoutItem`, a plain `MenuFlyoutItem` subclass with a gutter check glyph. It
+exposes Invoke, and Invoke runs the command: the bar goes absent and the popup closes. The E2E helpers try
+Invoke before a click. Rebuilt-app run: `shell.addressbar.hiddenAfterToggle`, `visibleAfterToggle`,
+`shell.reflow.hiddenGapClosed`, `shell.reflow.shownAgain`, and `shell.hiddenTab.skipsHidden` all pass.
+
+Still open: a mouse click at the item's centre did not close the popup even on the new class, while the
+same click on View > Split does. The Invoke route is verified; the mouse route is not explained.
+
 ### Check mark out of step
+
 
 The View > Address Bar check mark follows `IsAddressBarVisible`. The menu check test in
 `tests/Bwc.E2E/Menus/MenuTests.cs` covers it.
@@ -131,3 +165,10 @@ The View > Address Bar check mark follows `IsAddressBarVisible`. The menu check 
 The window client area is painted with the face brush. A pane or a splitter that uses a dark or
 unset brush shows as a dark strip at the edge of the client area. A capture sampled at the right
 and bottom client edges must match the face color. The check is in `ShellKeyboardTests.cs`.
+
+## Parity package: About icon and font
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| The icon from ExtractIconW leaks after ShellAboutW | DestroyIcon releases it after the call |
+| View > Font applies only the size | The chosen face and weight are applied (LOGFONT). Blocked on DenseMetrics (outside this package), see the report |

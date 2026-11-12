@@ -86,4 +86,40 @@
   <data name="HexViewerCaption" xml:space="preserve">
     <value>Binary Data</value>
   </data>
+  <!-- Oracle 302 and 305. Name of the *.reg filter. -->
+  <data name="FileDialogRegistrationFiles" xml:space="preserve">
+    <value>Registration Files (*.reg)</value>
+  </data>
+  <!-- Oracle 302. Hive filter for Import. -->
+  <data name="FileDialogRegistryHiveFiles" xml:space="preserve">
+    <value>Registry Hive Files (*.*)</value>
+  </data>
+  <!-- Oracle 305. Hive filter for Export. The pattern is *. as in the oracle. -->
+  <data name="FileDialogRegistryHiveFilesExport" xml:space="preserve">
+    <value>Registry Hive Files (*.*)</value>
+  </data>
+  <!-- Oracle 305. Text filter for Export. -->
+  <data name="FileDialogTextFiles" xml:space="preserve">
+    <value>Text Files (*.txt)</value>
+  </data>
+  <!-- Oracle 305. REGEDIT4 filter for Export. -->
+  <data name="FileDialogWin9xFiles" xml:space="preserve">
+    <value>Win9x/NT4 Registration Files (*.reg)</value>
+  </data>
+  <!-- Oracle 180. Load Hive, and the last filter of Import and Export. -->
+  <data name="FileDialogAllFiles" xml:space="preserve">
+    <value>All Files</value>
+  </data>
+  <!-- Written for this product: the classic Export range group label (DLG-001). -->
+  <data name="FileDialogExportRangeGroup" xml:space="preserve">
+    <value>Export range</value>
+  </data>
+  <!-- Oracle DLG-001 control 1280. -->
+  <data name="FileDialogExportRangeAll" xml:space="preserve">
+    <value>&amp;All</value>
+  </data>
+  <!-- Oracle DLG-001 control 1281. -->
+  <data name="FileDialogExportRangeSelectedBranch" xml:space="preserve">
+    <value>S&amp;elected branch</value>
+  </data>
 </root>

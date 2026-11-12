@@ -262,6 +262,9 @@ internal sealed partial class RegeditContext
     [System.Runtime.InteropServices.LibraryImport("user32.dll")]
     private static partial int EnableWindow(nint hWnd, int bEnable);
 
+    /// <summary>Puts keyboard focus back in a pane after a dialog closes. The root view sets it.</summary>
+    public Action<Pane>? RestorePaneFocus { get; set; }
+
     public async Task<bool> ShowDialogAsync(ModalDialogWindow dialog)
     {
         if (DialogOpen)
@@ -276,6 +279,7 @@ internal sealed partial class RegeditContext
             return false;
         }
 
+        Pane focusBefore = FocusedPane();
         DialogOpen = true;
         try
         {
@@ -289,6 +293,23 @@ internal sealed partial class RegeditContext
         finally
         {
             DialogOpen = false;
+            RestoreFocusAfterDialog(focusBefore);
+        }
+    }
+
+    /// <summary>
+    /// The owner is active again when the dialog has closed. The pane that had focus before the dialog gets
+    /// keyboard focus back, so the next key goes to the tree or list rather than to nothing.
+    /// </summary>
+    private void RestoreFocusAfterDialog(Pane pane)
+    {
+        try
+        {
+            RestorePaneFocus?.Invoke(pane);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Registry Editor could not restore focus after a dialog: " + ex.Message);
         }
     }
 
@@ -384,7 +405,7 @@ internal sealed partial class RegeditContext
         var lines = new List<string>();
         if (!string.IsNullOrWhiteSpace(attempted))
         {
-            lines.Add(MessageCatalog.PathLinePrefix + attempted);
+            lines.Add(Messages.Get("AddressBarPathLine") + attempted);
             lines.Add(string.Empty);
         }
 
@@ -397,75 +418,6 @@ internal sealed partial class RegeditContext
     public bool IsComputerSelected =>
         Shell.TreeContent.SelectedNode is { Parent: null } node &&
         string.Equals(node.Name, "Computer", StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// Shows the Export save dialog with the range panel and the export filters. Returns null when
-    /// cancelled or when another modal is open.
-    /// </summary>
-    public ExportFileDialogResult? ShowExportFileDialog(string? defaultFileName, bool hasSelectedKey)
-    {
-        if (DialogOpen || FileDialogOpen)
-        {
-            Log.Warn("Registry Editor ignored a file dialog request because another modal is already open.");
-            return null;
-        }
-
-        if (WindowHwnd == 0)
-        {
-            Log.Warn("Registry Editor ignored a file dialog request because the window handle is not attached.");
-            return null;
-        }
-
-        FileDialogOpen = true;
-        try
-        {
-            return CommonFileDialogs.ShowExportSave(WindowHwnd, defaultFileName, hasSelectedKey);
-        }
-        catch (Exception ex)
-        {
-            Log.Warn("Registry Editor could not show a file dialog: " + ex.Message);
-            _ = ShowErrorAsync(Messages.ForCommandFailure().ToErrorDialog());
-            return null;
-        }
-        finally
-        {
-            FileDialogOpen = false;
-        }
-    }
-
-    /// <summary>Shows the open or save dialog. Returns null when cancelled or when another modal is open.</summary>
-    public string? ShowFileDialog(bool save, string? defaultFileName)
-    {
-        if (DialogOpen || FileDialogOpen)
-        {
-            Log.Warn("Registry Editor ignored a file dialog request because another modal is already open.");
-            return null;
-        }
-
-        if (WindowHwnd == 0)
-        {
-            Log.Warn("Registry Editor ignored a file dialog request because the window handle is not attached.");
-            return null;
-        }
-
-        FileDialogOpen = true;
-        try
-        {
-            return save
-                ? CommonFileDialogs.ShowSave(WindowHwnd, defaultFileName)
-                : CommonFileDialogs.ShowOpen(WindowHwnd, defaultFileName);
-        }
-        catch (Exception ex)
-        {
-            Log.Warn("Registry Editor could not show a file dialog: " + ex.Message);
-            _ = ShowErrorAsync(Messages.ForCommandFailure().ToErrorDialog());
-            return null;
-        }
-        finally
-        {
-            FileDialogOpen = false;
-        }
-    }
 
     public bool TryGetSelectedKeyPath(out RegistryPath path)
     {

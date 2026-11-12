@@ -1133,7 +1133,8 @@ public sealed class ShellTests
 
     /// <summary>
     /// Finds the bottom of the list header row by scanning a screen strip for the first full-width
-    /// divider row. The header row has no automation peer, so UIA cannot report its rectangle.
+    /// divider row. The header row has no automation peer, so UIA cannot report its rectangle. The strip is a
+    /// settled, verified screen copy (see <see cref="WindowCapture"/>), so a header that is still painting is not measured.
     /// </summary>
     private static int MeasureHeaderRowHeight(Rectangle listPane)
     {
@@ -1144,166 +1145,128 @@ public sealed class ShellTests
             return -1;
         }
 
-        var screenDc = Native.GetDC(IntPtr.Zero);
-        if (screenDc == IntPtr.Zero)
+        using Bitmap strip = WindowCapture.CaptureAreaOfCurrentSession(
+            new Rectangle(listPane.Left, listPane.Top, width, StripHeight));
+        var pixels = BgraPixels(strip);
+
+        var headerColor = DominantColor(0);
+        var bodyColor = DominantColor(StripHeight - 1);
+
+        static int Distance((int Red, int Green, int Blue) left, (int Red, int Green, int Blue) right) =>
+            Math.Max(
+                Math.Abs(left.Red - right.Red),
+                Math.Max(Math.Abs(left.Green - right.Green), Math.Abs(left.Blue - right.Blue)));
+
+        if (Distance(headerColor, bodyColor) > 8)
         {
+            // The header and body use different layer colors. The header ends at the first
+            // row where the body color becomes dominant for at least three rows in a row.
+            var run = 0;
+            for (var y = 10; y < StripHeight; y++)
+            {
+                var color = DominantColor(y);
+                if (Distance(color, bodyColor) <= 3 && Distance(color, headerColor) > 8)
+                {
+                    run++;
+                    if (run >= 3)
+                    {
+                        return y - 2;
+                    }
+                }
+                else
+                {
+                    run = 0;
+                }
+            }
+
             return -1;
         }
 
-        var memoryDc = IntPtr.Zero;
-        var bitmap = IntPtr.Zero;
-        var previous = IntPtr.Zero;
+        var threshold = (int)(width * 0.9);
+        var dividerStart = -1;
+        var dividerEnd = -1;
+        for (var y = 4; y < StripHeight; y++)
+        {
+            var different = 0;
+            for (var x = 0; x < width; x++)
+            {
+                var index = ((y * width) + x) * 4;
+                var distance = Math.Max(
+                    Math.Abs(pixels[index] - headerColor.Blue),
+                    Math.Max(
+                        Math.Abs(pixels[index + 1] - headerColor.Green),
+                        Math.Abs(pixels[index + 2] - headerColor.Red)));
+                if (distance > 8)
+                {
+                    different++;
+                }
+            }
+
+            var isDivider = different >= threshold;
+            if (isDivider && dividerStart < 0)
+            {
+                dividerStart = y;
+            }
+
+            if (isDivider)
+            {
+                dividerEnd = y;
+            }
+            else if (dividerStart >= 0)
+            {
+                break;
+            }
+        }
+
+        return dividerStart < 0 ? -1 : dividerEnd + 1;
+
+        (int Red, int Green, int Blue) DominantColor(int y)
+        {
+            var counts = new Dictionary<int, int>();
+            for (var x = 0; x < width; x++)
+            {
+                var index = ((y * width) + x) * 4;
+                var key = (pixels[index + 2] << 16) | (pixels[index + 1] << 8) | pixels[index];
+                counts[key] = counts.TryGetValue(key, out var count) ? count + 1 : 1;
+            }
+
+            var best = 0;
+            var bestCount = -1;
+            foreach (var pair in counts)
+            {
+                if (pair.Value > bestCount)
+                {
+                    best = pair.Key;
+                    bestCount = pair.Value;
+                }
+            }
+
+            return ((best >> 16) & 0xFF, (best >> 8) & 0xFF, best & 0xFF);
+        }
+    }
+
+    /// <summary>The pixels of a 32 bit bitmap as BGRA bytes, one row after the other with no padding.</summary>
+    private static byte[] BgraPixels(Bitmap bitmap)
+    {
+        int rowBytes = bitmap.Width * 4;
+        var pixels = new byte[rowBytes * bitmap.Height];
+        System.Drawing.Imaging.BitmapData data = bitmap.LockBits(
+            new Rectangle(0, 0, bitmap.Width, bitmap.Height),
+            System.Drawing.Imaging.ImageLockMode.ReadOnly,
+            System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         try
         {
-            memoryDc = Native.CreateCompatibleDC(screenDc);
-            bitmap = Native.CreateCompatibleBitmap(screenDc, width, StripHeight);
-            if (memoryDc == IntPtr.Zero || bitmap == IntPtr.Zero)
+            for (var y = 0; y < bitmap.Height; y++)
             {
-                return -1;
-            }
-
-            previous = Native.SelectObject(memoryDc, bitmap);
-            if (!Native.BitBlt(memoryDc, 0, 0, width, StripHeight, screenDc, listPane.Left, listPane.Top, 0x00CC0020))
-            {
-                return -1;
-            }
-
-            _ = Native.SelectObject(memoryDc, previous);
-            previous = IntPtr.Zero;
-
-            var info = new BitmapInfo
-            {
-                Header = new BitmapInfoHeader
-                {
-                    Size = Marshal.SizeOf<BitmapInfoHeader>(),
-                    Width = width,
-                    Height = -StripHeight,
-                    Planes = 1,
-                    BitCount = 32,
-                    Compression = 0,
-                },
-            };
-
-            var pixels = new byte[width * StripHeight * 4];
-            if (Native.GetDIBits(memoryDc, bitmap, 0, (uint)StripHeight, pixels, ref info, 0) == 0)
-            {
-                return -1;
-            }
-
-            var headerColor = DominantColor(0);
-            var bodyColor = DominantColor(StripHeight - 1);
-
-            static int Distance((int Red, int Green, int Blue) left, (int Red, int Green, int Blue) right) =>
-                Math.Max(
-                    Math.Abs(left.Red - right.Red),
-                    Math.Max(Math.Abs(left.Green - right.Green), Math.Abs(left.Blue - right.Blue)));
-
-            if (Distance(headerColor, bodyColor) > 8)
-            {
-                // The header and body use different layer colors. The header ends at the first
-                // row where the body color becomes dominant for at least three rows in a row.
-                var run = 0;
-                for (var y = 10; y < StripHeight; y++)
-                {
-                    var color = DominantColor(y);
-                    if (Distance(color, bodyColor) <= 3 && Distance(color, headerColor) > 8)
-                    {
-                        run++;
-                        if (run >= 3)
-                        {
-                            return y - 2;
-                        }
-                    }
-                    else
-                    {
-                        run = 0;
-                    }
-                }
-
-                return -1;
-            }
-
-            var threshold = (int)(width * 0.9);
-            var dividerStart = -1;
-            var dividerEnd = -1;
-            for (var y = 4; y < StripHeight; y++)
-            {
-                var different = 0;
-                for (var x = 0; x < width; x++)
-                {
-                    var index = ((y * width) + x) * 4;
-                    var distance = Math.Max(
-                        Math.Abs(pixels[index] - headerColor.Blue),
-                        Math.Max(
-                            Math.Abs(pixels[index + 1] - headerColor.Green),
-                            Math.Abs(pixels[index + 2] - headerColor.Red)));
-                    if (distance > 8)
-                    {
-                        different++;
-                    }
-                }
-
-                var isDivider = different >= threshold;
-                if (isDivider && dividerStart < 0)
-                {
-                    dividerStart = y;
-                }
-
-                if (isDivider)
-                {
-                    dividerEnd = y;
-                }
-                else if (dividerStart >= 0)
-                {
-                    break;
-                }
-            }
-
-            return dividerStart < 0 ? -1 : dividerEnd + 1;
-
-            (int Red, int Green, int Blue) DominantColor(int y)
-            {
-                var counts = new Dictionary<int, int>();
-                for (var x = 0; x < width; x++)
-                {
-                    var index = ((y * width) + x) * 4;
-                    var key = (pixels[index + 2] << 16) | (pixels[index + 1] << 8) | pixels[index];
-                    counts[key] = counts.TryGetValue(key, out var count) ? count + 1 : 1;
-                }
-
-                var best = 0;
-                var bestCount = -1;
-                foreach (var pair in counts)
-                {
-                    if (pair.Value > bestCount)
-                    {
-                        best = pair.Key;
-                        bestCount = pair.Value;
-                    }
-                }
-
-                return ((best >> 16) & 0xFF, (best >> 8) & 0xFF, best & 0xFF);
+                Marshal.Copy(IntPtr.Add(data.Scan0, y * data.Stride), pixels, y * rowBytes, rowBytes);
             }
         }
         finally
         {
-            if (previous != IntPtr.Zero && memoryDc != IntPtr.Zero)
-            {
-                _ = Native.SelectObject(memoryDc, previous);
-            }
-
-            if (bitmap != IntPtr.Zero)
-            {
-                _ = Native.DeleteObject(bitmap);
-            }
-
-            if (memoryDc != IntPtr.Zero)
-            {
-                _ = Native.DeleteDC(memoryDc);
-            }
-
-            _ = Native.ReleaseDC(IntPtr.Zero, screenDc);
+            bitmap.UnlockBits(data);
         }
+
+        return pixels;
     }
 
     private sealed class Checks
@@ -1345,29 +1308,6 @@ public sealed class ShellTests
         }
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct BitmapInfoHeader
-    {
-        public int Size;
-        public int Width;
-        public int Height;
-        public short Planes;
-        public short BitCount;
-        public int Compression;
-        public int SizeImage;
-        public int XPelsPerMeter;
-        public int YPelsPerMeter;
-        public int ClrUsed;
-        public int ClrImportant;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct BitmapInfo
-    {
-        public BitmapInfoHeader Header;
-        public int Colors;
-    }
-
 #pragma warning disable SYSLIB1054 // The small user32 and gdi32 surface does not justify LibraryImport plumbing.
     private static class Native
     {
@@ -1380,52 +1320,6 @@ public sealed class ShellTests
 
         [DllImport("user32.dll")]
         internal static extern uint GetDpiForWindow(IntPtr hwnd);
-
-        [DllImport("user32.dll")]
-        internal static extern IntPtr GetDC(IntPtr hwnd);
-
-        [DllImport("user32.dll")]
-        internal static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
-
-        [DllImport("gdi32.dll")]
-        internal static extern IntPtr CreateCompatibleDC(IntPtr hdc);
-
-        [DllImport("gdi32.dll")]
-        internal static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int width, int height);
-
-        [DllImport("gdi32.dll")]
-        internal static extern IntPtr SelectObject(IntPtr hdc, IntPtr obj);
-
-        [DllImport("gdi32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static extern bool BitBlt(
-            IntPtr hdc,
-            int x,
-            int y,
-            int width,
-            int height,
-            IntPtr source,
-            int sourceX,
-            int sourceY,
-            uint rasterOperation);
-
-        [DllImport("gdi32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static extern bool DeleteObject(IntPtr obj);
-
-        [DllImport("gdi32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static extern bool DeleteDC(IntPtr hdc);
-
-        [DllImport("gdi32.dll")]
-        internal static extern int GetDIBits(
-            IntPtr hdc,
-            IntPtr bitmap,
-            uint start,
-            uint lines,
-            byte[] bits,
-            ref BitmapInfo info,
-            uint usage);
     }
 #pragma warning restore SYSLIB1054
 }

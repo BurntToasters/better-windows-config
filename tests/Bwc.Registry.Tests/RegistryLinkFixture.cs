@@ -19,6 +19,9 @@ internal static partial class RegistryLinkFixture
     private const uint KeyQueryValue = 0x0001;
     private const uint KeyAllAccess = 0x000F003F;
     private const uint KeyWow64_64Key = 0x0100;
+    private const uint WriteDac = 0x00040000;
+    private const uint DaclSecurityInformation = 0x00000004;
+    private const uint UnprotectedDaclSecurityInformation = 0x20000000;
     private const uint RegOptionNonVolatile = 0x00000000;
     private const uint RegOptionCreateLink = 0x00000002;
     private const uint RegOptionOpenLink = 0x00000008;
@@ -58,6 +61,9 @@ internal static partial class RegistryLinkFixture
     [LibraryImport("ntdll.dll", EntryPoint = "NtDeleteKey")]
     private static partial int NtDeleteKey(nint keyHandle);
 
+    [LibraryImport("advapi32.dll", EntryPoint = "RegSetKeySecurity")]
+    private static partial int RegSetKeySecurity(nint hKey, uint securityInformation, byte[] securityDescriptor);
+
     [LibraryImport("advapi32.dll")]
     private static partial int RegCloseKey(nint hKey);
 
@@ -95,6 +101,59 @@ internal static partial class RegistryLinkFixture
         {
             RegCloseKey(parent);
         }
+    }
+
+    /// <summary>
+    /// Gives the child <paramref name="name"/> of <paramref name="parentPath"/> the DACL in
+    /// <paramref name="descriptor"/>, unprotected, and returns false. When the child is a link node, the link is
+    /// removed and the method returns true. The child is opened with REG_OPTION_OPEN_LINK and WRITE_DAC only, so a
+    /// link is never followed and its target keeps its DACL. The open needs only WRITE_DAC, which the owner holds
+    /// implicitly, so the child may already deny the current user everything. The cleanup walk calls this before it
+    /// lists a key's subkeys.
+    /// </summary>
+    internal static bool RestoreKeyOrRemoveLink(string parentPath, string name, byte[] descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+
+        nint parent = OpenKey(parentPath, KeyQueryValue | KeyWow64_64Key);
+        try
+        {
+            int status = RegCreateKeyEx(
+                parent,
+                name,
+                0,
+                null,
+                RegOptionOpenLink,
+                WriteDac | KeyWow64_64Key,
+                nint.Zero,
+                out nint node,
+                out _);
+            Check(status, "open node with WRITE_DAC " + name);
+
+            try
+            {
+                Check(
+                    RegSetKeySecurity(node, DaclSecurityInformation | UnprotectedDaclSecurityInformation, descriptor),
+                    "set DACL on " + name);
+            }
+            finally
+            {
+                RegCloseKey(node);
+            }
+        }
+        finally
+        {
+            RegCloseKey(parent);
+        }
+
+        // The DACL now grants the current user access to the node, so the link check can read it.
+        if (IsLink(parentPath, name))
+        {
+            RemoveLinkNode(parentPath, name);
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -176,7 +235,8 @@ internal static partial class RegistryLinkFixture
         }
     }
 
-    private static void RemoveLinkNode(string parentPath, string name)
+    /// <summary>Removes one link node, opened with REG_OPTION_OPEN_LINK so the link is not followed.</summary>
+    internal static void RemoveLinkNode(string parentPath, string name)
     {
         nint parent = OpenKey(parentPath, KeyAllAccess);
         try

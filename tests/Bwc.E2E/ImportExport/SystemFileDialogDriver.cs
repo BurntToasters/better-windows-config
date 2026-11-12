@@ -36,6 +36,12 @@ internal sealed class SystemFileDialogDriver : IDisposable
         _ = ControlTestSupport.WaitUntil(
             () => (found = FindDialog()) != IntPtr.Zero,
             timeout);
+        if (found != IntPtr.Zero)
+        {
+            // The dialog is checked as it appeared, before any input activates it.
+            OwnedWindowChecks.Record(found);
+        }
+
         return found;
     }
 
@@ -331,11 +337,7 @@ internal sealed class SystemFileDialogDriver : IDisposable
         return matches;
     }
 
-    internal string SaveScreenshot(IntPtr dialog, string path)
-    {
-        AutomationElement window = _automation.FromHandle(dialog);
-        return ClassicDialogTests.SaveScreenshot(window, path);
-    }
+    internal string SaveScreenshot(IntPtr dialog, string path) => WindowCapture.SaveArtifact("dialog.artifact." + Path.GetFileNameWithoutExtension(path), dialog, path);
 
     public void Dispose() => _automation.Dispose();
 
@@ -369,7 +371,7 @@ internal sealed class SystemFileDialogDriver : IDisposable
         }
     }
 
-    private static bool EnsureForeground(IntPtr hwnd) => Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(2));
+    private static bool EnsureForeground(IntPtr hwnd) => ForegroundGuard.Ensure(hwnd, "dialog.file.foreground", TimeSpan.FromSeconds(2));
 
     private IntPtr FindDialog()
     {

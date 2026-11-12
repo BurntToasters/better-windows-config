@@ -17,6 +17,7 @@
     "installer:arm64": "node scripts/build-installer.js --rid win-arm64",
     "run:hub": "node scripts/run-app.js hub",
     "run:regedit": "node scripts/run-app.js regedit",
+    "icons:normalize": "node scripts/normalize-icons.js",
     "sync-version": "node scripts/sync-version.js",
     "test:e2e": "node scripts/test-e2e.js",
     "test:all": "node scripts/test-all.js",

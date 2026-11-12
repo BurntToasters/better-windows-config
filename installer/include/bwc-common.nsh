@@ -156,6 +156,34 @@ FunctionEnd
 !macroend
 
 ; ---------------------------------------------------------------------------
+; Wait for the updater that launched this setup (/PARENTPID). The updater starts the installer and exits
+; at once, so its copy of BwcUpdate.exe is not held for long. The wait runs before the close step, so
+; no file is replaced while the parent still runs. $BwcParentPid holds the pid. EXE is the helper's path.
+;
+; Exit 0 continues. Exit 3 means the parent still runs: interactive runs offer Retry or Cancel, silent
+; runs abort with exit code 2. Any other exit aborts. Nothing is changed before this step succeeds.
+; ---------------------------------------------------------------------------
+
+!macro BWC_WAIT_PARENT_BODY ID EXE
+  BwcWait_${ID}_run:
+  nsExec::ExecToLog '"${EXE}" --wait-pid $BwcParentPid --timeout-seconds 30'
+  Pop $0
+  StrCmp $0 "0" BwcWait_${ID}_done 0
+  StrCmp $0 "3" BwcWait_${ID}_busy 0
+  DetailPrint "The wait for the updater failed (exit $0). Nothing was changed."
+  Abort "Stopped: the wait for the updater failed (exit $0). Nothing was changed."
+  BwcWait_${ID}_busy:
+  DetailPrint "The updater (pid $BwcParentPid) is still running."
+  IfSilent BwcWait_${ID}_silent 0
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "The Better Windows Config updater is still running. Click Retry to wait again, or Cancel to stop without changing anything." IDRETRY BwcWait_${ID}_run
+  Abort "Stopped: the updater is still running. Nothing was changed."
+  BwcWait_${ID}_silent:
+  SetErrorLevel 2
+  Abort "Stopped: the updater is still running. Nothing was changed."
+  BwcWait_${ID}_done:
+!macroend
+
+; ---------------------------------------------------------------------------
 ; Write System.AppUserModel.ID to a shortcut. Non-fatal: a warning is logged and the install
 ; continues. The running apps still set their own AUMID at startup.
 ; ---------------------------------------------------------------------------

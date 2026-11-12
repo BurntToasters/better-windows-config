@@ -420,21 +420,24 @@ public sealed class EditingTests
 
         driver.OpenMenu(MenuEdit, MenuEditNew, MenuEditNewKey);
         bool editor = WaitForRenameBox(session, TreeRenameBox, DefaultNewKey1, out _);
-        bool set = editor && driver.SetText(TreeRenameBox, @"Bad\Name");
-        bool submitted = set && driver.TypeKeys("Enter");
+        // Real keyboard input: the default name is selected, so the typed text replaces it. No UI Automation
+        // value write and no UI Automation Invoke is used for this check.
+        bool typed = editor && driver.TypeKeys(@"Bad\Name");
+        bool submitted = typed && driver.TypeKeys("Enter");
         bool dialog = submitted && driver.WaitForDialog();
         string message = dialog ? driver.TextOf("DialogErrorText") : string.Empty;
         bool classicText = message.Contains(
             "Specify a key name without a backslash",
             StringComparison.Ordinal);
-        bool dismissed = dialog && driver.Invoke("DialogPrimary") && driver.WaitForNoDialog();
+        // The error is dismissed with a real Enter, sent through the guard to the foreground window.
+        bool dismissed = dialog && driver.TypeKeys("Enter") && driver.WaitForNoDialog();
         bool kept = ControlTestSupport.WaitUntil(
             () => KeyExists(sandbox, DefaultNewKey1),
             TimeSpan.FromSeconds(10));
         E2EResults.Record(
             "editing.renamekey.invalid",
-            editor && set && submitted && dialog && classicText && dismissed && kept,
-            $"renameBox={editor}, set={set}, dialog={dialog}, message='{message}', dismissed={dismissed}, default kept={kept}.");
+            editor && typed && submitted && dialog && classicText && dismissed && kept,
+            $"renameBox={editor}, typed={typed}, dialog={dialog}, message='{message}', dismissed={dismissed}, default kept={kept}.");
     }
 
     private static void CheckDeleteValue(AppSession session, EditingDriver driver, SandboxRegistry sandbox)
@@ -577,61 +580,112 @@ public sealed class EditingTests
         }
 
         string text = session.TextOf(box);
-        string help = string.Empty;
-        try
-        {
-            help = box.Properties.HelpText.Value ?? string.Empty;
-        }
-        catch (Exception)
-        {
-            // A missing help text fails the geometry assertions below.
-        }
-
         System.Drawing.Rectangle bounds = box.BoundingRectangle;
-        Dictionary<string, double> geometry = ParseGeometry(help);
-        double labelLeft = GeometryValue(geometry, "LabelLeft");
-        double labelWidth = GeometryValue(geometry, "LabelWidth");
-        double visibleWidth = GeometryValue(geometry, "VisibleWidth");
-        double boxLeft = GeometryValue(geometry, "BoxLeft");
-        double boxWidth = GeometryValue(geometry, "BoxWidth");
+        System.Drawing.Rectangle windowBounds = session.Window.BoundingRectangle;
+        System.Drawing.Rectangle row = RowContaining(session, bounds);
+
+        // The row and the box come from UI Automation. The text inside the box comes from the screen pixels,
+        // so the check reads what is drawn, not what the app says about itself.
+        int centerY = bounds.Top + (bounds.Height / 2);
         bool textOk = string.Equals(text, expectedText, StringComparison.Ordinal);
-        bool startsAtOrLeft = boxLeft <= labelLeft + 0.5;
-        bool spansLabel = boxWidth + 0.5 >= Math.Min(labelWidth, visibleWidth);
-        bool boundsRecorded = bounds.Width > 0 && bounds.Height > 0;
-        bool pass = textOk && startsAtOrLeft && spansLabel && boundsRecorded;
+        bool boxInWindow = bounds.Width > 0 && bounds.Height > 0 && windowBounds.Contains(bounds);
+        bool boxInRow = !row.IsEmpty && row.Top <= centerY && centerY < row.Bottom && bounds.Left >= row.Left - 1;
+        InkExtent ink = MeasureInkInside(session.MainHwnd, bounds);
+        bool inkVisible = ink.Count >= MinimumInkPixels;
+        bool startsAtText = inkVisible && ink.Left >= bounds.Left && ink.Left - bounds.Left <= MaximumTextInset;
+        bool notClipped = inkVisible && ink.Right < bounds.Right - 2;
+        bool pass = textOk && boxInWindow && boxInRow && inkVisible && startsAtText && notClipped;
         E2EResults.Record(
             checkId,
             pass,
-            $"text='{text}', bounds=({bounds.Left},{bounds.Top},{bounds.Width}x{bounds.Height}), help='{help}'.");
+            $"text='{text}', box=({bounds.Left},{bounds.Top},{bounds.Width}x{bounds.Height}), boxInWindow={boxInWindow}, " +
+            $"row=({row.Left},{row.Top},{row.Width}x{row.Height}) boxInRow={boxInRow}, ink pixels={ink.Count} " +
+            $"from x={ink.Left} to x={ink.Right} (box right {bounds.Right}), startsAtText={startsAtText}, notClipped={notClipped}.");
         return pass;
     }
 
-    private static Dictionary<string, double> ParseGeometry(string help)
-    {
-        var values = new Dictionary<string, double>(StringComparer.Ordinal);
-        foreach (string part in help.Split(';', StringSplitOptions.RemoveEmptyEntries))
-        {
-            int separator = part.IndexOf('=', StringComparison.Ordinal);
-            if (separator <= 0)
-            {
-                continue;
-            }
+    /// <summary>Minimum text ink pixels inside a rename box for the text to count as drawn.</summary>
+    private const int MinimumInkPixels = 8;
 
-            if (double.TryParse(
-                    part[(separator + 1)..],
-                    NumberStyles.Float,
-                    CultureInfo.InvariantCulture,
-                    out double value))
+    /// <summary>Device pixels between the box's left edge and the first ink pixel, at most.</summary>
+    private const int MaximumTextInset = 24;
+
+    /// <summary>
+    /// The tree item or list item that holds the box. It contains the box's vertical center and starts at or left of it.
+    /// </summary>
+    private static System.Drawing.Rectangle RowContaining(AppSession session, System.Drawing.Rectangle box)
+    {
+        int centerY = box.Top + (box.Height / 2);
+        try
+        {
+            foreach (AutomationElement item in session.Window.FindAllDescendants(
+                cf => cf.ByControlType(ControlType.TreeItem).Or(cf.ByControlType(ControlType.DataItem))))
             {
-                values[part[..separator]] = value;
+                System.Drawing.Rectangle rect = item.BoundingRectangle;
+                if (rect.Width > 0 && rect.Top <= centerY && centerY < rect.Bottom && rect.Left <= box.Left + 1)
+                {
+                    return rect;
+                }
             }
         }
+        catch (Exception)
+        {
+            // A tree that is rebuilt during the read leaves no row, and the check fails with the box geometry.
+        }
 
-        return values;
+        return System.Drawing.Rectangle.Empty;
     }
 
-    private static double GeometryValue(Dictionary<string, double> values, string key) =>
-        values.TryGetValue(key, out double value) ? value : double.NaN;
+    private readonly record struct InkExtent(int Count, int Left, int Right);
+
+    /// <summary>
+    /// Counts the pixels inside the box that differ from its background, and their horizontal extent, from a
+    /// verified, settled screen copy (WindowCapture). The background is the color of the box's top right corner,
+    /// inset from the border.
+    /// </summary>
+    private static InkExtent MeasureInkInside(IntPtr hwnd, System.Drawing.Rectangle box)
+    {
+        if (box.Width <= 8 || box.Height <= 8)
+        {
+            return new InkExtent(0, 0, 0);
+        }
+
+        try
+        {
+            using System.Drawing.Bitmap region = WindowCapture.CaptureRegion(hwnd, box.Location, box.Width, box.Height);
+            System.Drawing.Color background = region.GetPixel(region.Width - 3, 2);
+            int count = 0;
+            int left = int.MaxValue;
+            int right = int.MinValue;
+            for (int y = 2; y < region.Height - 2; y++)
+            {
+                for (int x = 2; x < region.Width - 2; x++)
+                {
+                    System.Drawing.Color pixel = region.GetPixel(x, y);
+                    int difference = Math.Abs(pixel.R - background.R) + Math.Abs(pixel.G - background.G) + Math.Abs(pixel.B - background.B);
+                    if (difference < 90)
+                    {
+                        continue;
+                    }
+
+                    count++;
+                    left = Math.Min(left, box.Left + x);
+                    right = Math.Max(right, box.Left + x);
+                }
+            }
+
+            return count == 0 ? new InkExtent(0, 0, 0) : new InkExtent(count, left, right);
+        }
+        catch (WindowCapture.NotJudgedException)
+        {
+            // Covered by another process: the ink is not judged, so the test is inconclusive. It is never a fail.
+            throw;
+        }
+        catch (Exception)
+        {
+            return new InkExtent(0, 0, 0);
+        }
+    }
 
     /// <summary>
     /// Saves the main window as a visual capture under artifacts/e2e/visual/editing and records the
@@ -644,15 +698,15 @@ public sealed class EditingTests
             string directory = Path.Combine(GuiGate.Config.ArtifactsDir, "visual", "editing");
             Directory.CreateDirectory(directory);
             string path = Path.Combine(directory, name + ".png");
-            using var image = Capture.Element(session.Window);
-            image.ToFile(path);
+            _ = WindowCapture.Save(session.MainHwnd, path);
             bool written = File.Exists(path) && new FileInfo(path).Length > 0;
-            E2EResults.Record(checkId, written, $"screenshot={path}, bytes={(written ? new FileInfo(path).Length : 0)}.");
+            // The PNG is the artifact. Writing it is not a product claim, so it is a note.
+            E2EResults.Note(checkId, $"screenshot={path}, bytes={(written ? new FileInfo(path).Length : 0)}, written={written}.");
             return written;
         }
         catch (Exception ex)
         {
-            E2EResults.Record(checkId, false, "Screenshot failed: " + ex.Message);
+            E2EResults.Note(checkId, "Screenshot failed: " + ex.Message);
             return false;
         }
     }

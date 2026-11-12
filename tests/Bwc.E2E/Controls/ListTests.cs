@@ -138,7 +138,6 @@ public sealed class ListTests
                         throw new InvalidOperationException($"HeaderName has no clickable bounds (width={bounds.Width}, height={bounds.Height}).");
                     }
 
-                    session.RaiseWindows();
                     Mouse.Click(new System.Drawing.Point(
                         (int)(bounds.Left + (bounds.Width / 2)),
                         (int)(bounds.Top + (bounds.Height / 2))));

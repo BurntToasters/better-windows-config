@@ -261,3 +261,16 @@ In an E2E build with `BWC_E2E_SANDBOX_ROOT` set, "All" still calls
 `HKEY_CURRENT_USER` subtree mapped to the run sandbox and the other roots empty. This keeps a GUI
 test from reading the developer's whole registry into a test artifact and keeps the export bounded.
 The production build uses the live reader and exports the real registry.
+
+## Parity package: hive import, progress, and text
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| Import with the hive filter when the process is not elevated | Refused with string 126, `Cannot import {0}: Insufficient privileges.`, and no restore runs. Registry Editor never self-elevates |
+| Import with the hive filter on a remote node or on Computer | Refused with the same invalid-key text (string 125) or the read-only text; nothing is written |
+| Import with the hive filter on a key that is not the one the user selected | The restore runs on the selected key only, after the classic confirmation (strings 55 and 56) |
+| Restore confirmation is declined | No restore; the key is unchanged |
+| Import progress shows a Cancel button | Classic DLG-019 has no Cancel button and no close box, so the import cannot be cancelled from the progress window |
+| Import progress caption is the product name | Caption is string 300, `Import Registry File`, and the label is `File:` |
+| Status texts are hard-coded in code | All status and caption text comes from `Resources.resw` |
+| Export progress and import progress texts are inline | Moved to `Resources.resw` with the same wording |

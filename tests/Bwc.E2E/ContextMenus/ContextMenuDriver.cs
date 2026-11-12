@@ -30,7 +30,6 @@ internal sealed class ContextMenuDriver : IDisposable
 
     internal bool RightClick(AutomationElement? element)
     {
-        RaiseWindows();
         if (element is null)
         {
             E2EResults.Note("contextmenu.rightclick", "The target element was not available, so no right click was sent.");
@@ -71,7 +70,6 @@ internal sealed class ContextMenuDriver : IDisposable
 
     internal bool RightClick(int x, int y)
     {
-        RaiseWindows();
         if (!ControlTestSupport.EnsureForeground(_session))
         {
             return false;
@@ -183,13 +181,11 @@ internal sealed class ContextMenuDriver : IDisposable
             return false;
         }
 
-        RaiseWindows();
         try
         {
             if (entry.Element.Patterns.Invoke.IsSupported)
             {
                 entry.Element.Patterns.Invoke.Pattern.Invoke();
-                RaiseWindows();
                 return true;
             }
         }
@@ -201,7 +197,6 @@ internal sealed class ContextMenuDriver : IDisposable
         try
         {
             bool clicked = ClickElement(entry.Element);
-            RaiseWindows();
             return clicked;
         }
         catch (Exception)
@@ -222,13 +217,11 @@ internal sealed class ContextMenuDriver : IDisposable
             return false;
         }
 
-        RaiseWindows();
         try
         {
             if (entry.Element.Patterns.ExpandCollapse.IsSupported)
             {
                 entry.Element.Patterns.ExpandCollapse.Pattern.Expand();
-                RaiseWindows();
                 return true;
             }
         }
@@ -240,7 +233,6 @@ internal sealed class ContextMenuDriver : IDisposable
         try
         {
             bool clicked = ClickElement(entry.Element);
-            RaiseWindows();
             return clicked;
         }
         catch (Exception)
@@ -258,9 +250,8 @@ internal sealed class ContextMenuDriver : IDisposable
 
     private MenuSnapshot? Snapshot()
     {
-        // A WinUI flyout is a separate top level window. Raise every window of the app before the
-        // snapshot, so the menu is above the main window and can be read and clicked.
-        RaiseWindows();
+        // A WinUI flyout is a separate top level window. Its items are read through UI Automation from the
+        // process windows, without raising anything.
         var entries = new List<MenuEntry>();
 
         try
@@ -355,7 +346,6 @@ internal sealed class ContextMenuDriver : IDisposable
         }
     }
 
-    private void RaiseWindows() => _session.RaiseWindows();
 
     /// <summary>
     /// Clicks the center of an element with the OS mouse path. The bounds are read at the moment of

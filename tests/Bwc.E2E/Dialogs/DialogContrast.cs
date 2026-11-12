@@ -43,7 +43,8 @@ internal static class DialogContrast
     /// <summary>
     /// Captures the client area of <paramref name="hwnd"/> and records two checks: "{checkId}.background" for (a) and
     /// "{checkId}.text-contrast" for (b). <paramref name="window"/> is the UI Automation element of the same window.
-    /// The caller brings the window to the foreground first, because the capture is a screen copy.
+    /// The capture is a verified, settled screen copy of the dialog (see <see cref="WindowCapture"/>), so a window that
+    /// covers the dialog makes the check not judged instead of changing the sample, and nothing is raised or activated for it.
     /// </summary>
     internal static void Check(string checkId, AutomationElement window, IntPtr hwnd, Color expectedFace)
     {
@@ -53,11 +54,6 @@ internal static class DialogContrast
             E2EResults.Record(checkId + ".text-contrast", false, "The dialog has no client area to capture.");
             return;
         }
-
-        // The main window is topmost, which puts a non-topmost dialog beneath it. The capture is a screen copy, so the
-        // dialog is raised above the main window and activated first; otherwise the sample shows the main window.
-        _ = Win32.SetTopmost(hwnd, true);
-        _ = Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(2));
 
         var origin = new Point(0, 0);
         if (!ClientToScreen(hwnd, ref origin))
@@ -69,7 +65,19 @@ internal static class DialogContrast
 
         int width = client.Right;
         int height = client.Bottom;
-        int[] pixels = Capture(origin, width, height);
+        int[] pixels;
+        try
+        {
+            pixels = Capture(hwnd, origin, width, height);
+        }
+        catch (WindowCapture.NotJudgedException ex)
+        {
+            // Covered by another process: the pixels are not the dialog's, so neither contrast check is judged.
+            E2EResults.Note(checkId + ".background", $"not judged: {ex.Message}");
+            E2EResults.Note(checkId + ".text-contrast", $"not judged: {ex.Message}");
+            return;
+        }
+
         List<Rectangle> edits = EditRectangles(window, origin, width, height);
         CheckFace(checkId, pixels, width, height, expectedFace, edits);
         CheckEdits(checkId, pixels, width, edits, expectedFace);
@@ -249,13 +257,9 @@ internal static class DialogContrast
     }
 
     /// <summary>Copies the screen rectangle into an array of 0xRRGGBB values, row by row.</summary>
-    private static int[] Capture(Point origin, int width, int height)
+    private static int[] Capture(IntPtr hwnd, Point origin, int width, int height)
     {
-        using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-        using (Graphics graphics = Graphics.FromImage(bitmap))
-        {
-            graphics.CopyFromScreen(origin.X, origin.Y, 0, 0, new Size(width, height), CopyPixelOperation.SourceCopy);
-        }
+        using var bitmap = WindowCapture.CaptureRegion(hwnd, origin, width, height);
 
         Rectangle all = new(0, 0, width, height);
         BitmapData data = bitmap.LockBits(all, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);

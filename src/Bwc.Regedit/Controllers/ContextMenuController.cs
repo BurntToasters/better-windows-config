@@ -1,5 +1,6 @@
 using Bwc.Core;
 using Bwc.Regedit.Commands;
+using Bwc.Regedit.Dialogs;
 using Bwc.Registry;
 using Bwc.UI.List;
 using Bwc.UI.Menu;
@@ -19,7 +20,7 @@ internal sealed class ContextMenuController
     private readonly HiveRemoteCommands _hiveRemote;
     private readonly KeyCommands _keys;
     private readonly ValueCommands _values;
-    private readonly ViewCommands _view;
+    private readonly Action _goToRoot;
     private MenuFlyout? _contextFlyout;
 
     public ContextMenuController(
@@ -29,7 +30,7 @@ internal sealed class ContextMenuController
         HiveRemoteCommands hiveRemote,
         KeyCommands keys,
         ValueCommands values,
-        ViewCommands view)
+        Action goToRoot)
     {
         _context = context;
         _editCommands = editCommands;
@@ -37,10 +38,20 @@ internal sealed class ContextMenuController
         _hiveRemote = hiveRemote;
         _keys = keys;
         _values = values;
-        _view = view;
+        _goToRoot = goToRoot;
     }
 
     private string Get(string key) => _context.Messages.Get(key);
+
+    /// <summary>
+    /// The root that Go to HKEY_LOCAL_MACHINE (command 918, Ctrl+T) navigates to. Under HKEY_LOCAL_MACHINE
+    /// the same command goes to HKEY_CURRENT_USER, and the menu text changes to match.
+    /// </summary>
+    public static string GoToRootPath(RegeditContext context) =>
+        IsUnderLocalMachine(context) ? "Computer\\HKEY_CURRENT_USER" : "Computer\\HKEY_LOCAL_MACHINE";
+
+    private static bool IsUnderLocalMachine(RegeditContext context) =>
+        context.TryGetSelectedKeyPath(out RegistryPath key) && key.Root == RegistryRoot.LocalMachine;
 
     public void ShowTreeContextMenu(TreeNodeContextRequestedEventArgs e)
     {
@@ -50,7 +61,11 @@ internal sealed class ContextMenuController
             return;
         }
 
-        ShowContextFlyout(CreateTreeContextMenu(e.Node), e.Element, e.Point);
+        // A remote computer has the classic RT_MENU 107 menu. It is read-only, so none of its items writes.
+        MenuFlyout flyout = IsRemoteNode(e.Node)
+            ? CreateRemoteTreeContextMenu(e.Node)
+            : CreateTreeContextMenu(e.Node);
+        ShowContextFlyout(flyout, e.Element, e.Point);
     }
 
     public void ShowListContextMenu(DetailsRowContextRequestedEventArgs e)
@@ -67,10 +82,14 @@ internal sealed class ContextMenuController
         ShowContextFlyout(flyout, e.Element, e.Point);
     }
 
+    private static bool IsRemoteNode(TreeNode node) =>
+        node.RegistryPath is { Length: > 0 } displayPath && displayPath.StartsWith(@"\\", StringComparison.Ordinal);
+
     private MenuFlyout CreateTreeContextMenu(TreeNode node)
     {
         bool hasKey = _context.TryGetSelectedKeyPath(out RegistryPath key);
         bool mutableKey = hasKey && !key.IsRoot;
+        string goToResource = IsUnderLocalMachine(_context) ? "ContextGoToHkcu" : "ContextGoToHklm";
 
         // Expand (915) becomes Collapse (RT_STRING 25) while the node is expanded, and then collapses it.
         var items = new List<ClassicCommandItem>
@@ -89,7 +108,28 @@ internal sealed class ContextMenuController
             MenuCommand(678, "ContextPermissions", hasKey, () => _hiveRemote.PermissionsForNode(node)),
             ClassicCommandItem.Separator,
             MenuCommand(675, "ContextCopyKeyName", hasKey, _keys.CopySelectedKeyName),
-            MenuCommand(918, "ContextGoToHklm", isEnabled: true, invoke: _view.GoToLocalMachine),
+            MenuCommand(918, goToResource, isEnabled: true, invoke: _goToRoot),
+        };
+
+        return CreateContextFlyout(items);
+    }
+
+    /// <summary>
+    /// The classic RT_MENU 107 menu for a remote computer: Expand (or Collapse), Export, and Disconnect.
+    /// Export is disabled because there is no remote export in this version. Disconnect opens the
+    /// Disconnect Network Registry list.
+    /// </summary>
+    private MenuFlyout CreateRemoteTreeContextMenu(TreeNode node)
+    {
+        var items = new List<ClassicCommandItem>
+        {
+            node.IsExpanded
+                ? MenuCommand(915, "ContextCollapse", node.HasChildren, _context.Shell.TreeContent.CollapseSelected)
+                : MenuCommand(915, "ContextExpand", node.HasChildren, _context.Shell.TreeContent.ExpandSelected),
+            ClassicCommandItem.Separator,
+            MenuCommand(659, "ContextExport", isEnabled: false),
+            ClassicCommandItem.Separator,
+            MenuCommand(768, "ContextDisconnect", _context.RemoteConnections.Count > 0, _hiveRemote.DisconnectNetworkRegistry),
         };
 
         return CreateContextFlyout(items);
@@ -98,13 +138,16 @@ internal sealed class ContextMenuController
     private MenuFlyout CreateValueContextMenu(DetailsRow row)
     {
         IReadOnlyList<DetailsRow> rows = _context.Shell.ListContent.SelectedRows;
-        bool single = rows.Count == 1;
+
+        // Values under a remote computer are read-only, so every value command is disabled there.
+        bool writable = !RegeditSelectionGuards.IsRemoteSelected(_context);
+        bool single = writable && rows.Count == 1;
         bool canRename = single && row.Renameable;
 
         // Modify is enabled for every single value. Binary and unknown types open the hex editor from it.
         // Modify Binary Data and Delete need a value behind the row, so the synthetic (Default) row
         // does not enable them.
-        int realValues = _context.SelectedRealValueCount();
+        int realValues = writable ? _context.SelectedRealValueCount() : 0;
         var items = new List<ClassicCommandItem>
         {
             MenuCommand(912, "ContextModify", single, _values.ModifySelectedValue),
@@ -121,7 +164,7 @@ internal sealed class ContextMenuController
 
     private MenuFlyout CreateBackgroundContextMenu()
     {
-        bool hasKey = _context.TryGetSelectedKeyPath(out _);
+        bool hasKey = _context.TryGetSelectedKeyPath(out _) && !RegeditSelectionGuards.IsRemoteSelected(_context);
         var items = new List<ClassicCommandItem>
         {
             MenuCommand(516, "MenuEditNew", hasKey, children: BuildNewSubmenu(hasKey)),

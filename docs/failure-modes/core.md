@@ -190,8 +190,10 @@ trimming and Native AOT cannot remove members that the serializer needs at runti
 
 ### Identity key construction
 
-The instance key contains the tool id, a short hash of the current user's SID, and the process
-integrity level. If the SID cannot be read, the user name is hashed instead so creation still
+The instance key contains the tool id, a short hash of the current user's SID, a short hash of the
+install folder (the full path of the application base directory, case-insensitive) and of `BWC_DATA_ROOT`
+when it is set, and the process integrity level. Copies installed in different folders, or runs with
+different data roots, never forward to each other. If the SID cannot be read, the user name is hashed instead so creation still
 succeeds. If the integrity level query fails, the token `unknown` is used. A failure to query the
 integrity level never makes `Create` throw, and it cannot make two different integrity levels
 share a pipe by accident beyond the explicit `unknown` fallback.

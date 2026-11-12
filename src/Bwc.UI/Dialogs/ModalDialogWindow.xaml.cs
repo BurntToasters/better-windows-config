@@ -19,6 +19,7 @@ public partial class ModalDialogWindow : Window
     private TaskCompletionSource<bool>? _completion;
     private nint _ownerHwnd;
     private bool _ownerDisabled;
+    private AppWindow? _appWindow;
     private bool _accepted;
     private double _preferredWidthDip = 420;
     private double _preferredHeightDip = 220;
@@ -40,7 +41,8 @@ public partial class ModalDialogWindow : Window
         }
 
         InitializeComponent();
-        DialogRoot.KeyDown += OnRootKeyDown;
+        // Handled events too: a focused Button marks Enter handled, and the dialog still needs Enter and Escape.
+        DialogRoot.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(OnRootKeyDown), handledEventsToo: true);
         ((FrameworkElement)Content).Loaded += OnContentLoaded;
     }
 
@@ -106,6 +108,9 @@ public partial class ModalDialogWindow : Window
             ApplySizeAndPosition(ownerHwnd);
 
             Closed += OnClosed;
+            Activated += OnWindowActivated;
+            _appWindow = AppWindow;
+            _appWindow.Closing += OnClosing;
             _ = Win32Dialog.EnableWindow(ownerHwnd, 0);
             _ownerDisabled = true;
             Activate();
@@ -183,6 +188,25 @@ public partial class ModalDialogWindow : Window
         }
     }
 
+    /// <summary>
+    /// Closes the dialog and gives the owner back first. <c>Window.Close</c> does not raise
+    /// <see cref="AppWindow.Closing"/>, so every programmatic close needs the restore here. The owner is
+    /// enabled and activated while the dialog still exists. This hides the base method for subclasses.
+    /// </summary>
+    public new void Close()
+    {
+        RestoreOwner();
+        base.Close();
+    }
+
+    /// <summary>
+    /// Runs each time the dialog becomes the active window. Windows resets keyboard focus on activation, so
+    /// subclasses put focus back inside the dialog here; otherwise Enter and Escape never reach it.
+    /// </summary>
+    protected virtual void OnDialogActivated()
+    {
+    }
+
     /// <summary>Subclasses set their result here and return false to keep the dialog open.</summary>
     protected virtual bool TryAccept() => true;
 
@@ -250,6 +274,12 @@ public partial class ModalDialogWindow : Window
 
     private void OnRootKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        // A control that handled the key owns it, except Enter on a focused button (see ClassicDialog).
+        if (e.Handled && !(e.Key == VirtualKey.Enter && FocusManager.GetFocusedElement(DialogRoot.XamlRoot) is Button))
+        {
+            return;
+        }
+
         if (e.Key == VirtualKey.Escape)
         {
             e.Handled = true;
@@ -264,13 +294,44 @@ public partial class ModalDialogWindow : Window
         }
     }
 
+    /// <summary>
+    /// Runs before the dialog is hidden, on every close path: OK, Cancel, Escape, Enter, the title-bar X,
+    /// Alt+F4, and <see cref="Window.Close"/>. The owner is enabled and activated while the dialog still
+    /// exists, so the system does not pick another window (such as the XAML input site) to activate.
+    /// </summary>
+    private void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        RestoreOwner();
+    }
+
+    private void OnWindowActivated(object sender, Microsoft.UI.Xaml.WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState == WindowActivationState.Deactivated || _completion is null || _completion.Task.IsCompleted)
+        {
+            return;
+        }
+
+        OnDialogActivated();
+    }
+
     private void OnClosed(object sender, WindowEventArgs args)
     {
         Closed -= OnClosed;
+        Activated -= OnWindowActivated;
+        if (_appWindow is not null)
+        {
+            _appWindow.Closing -= OnClosing;
+            _appWindow = null;
+        }
+
         RestoreOwner();
         _completion?.TrySetResult(_accepted);
     }
 
+    /// <summary>
+    /// Re-enables the owner and makes it the active window. Idempotent: it does nothing once the owner
+    /// is restored. A failed Win32 call leaves nothing else to undo, so it does not throw into the close path.
+    /// </summary>
     private void RestoreOwner()
     {
         if (!_ownerDisabled)
@@ -279,8 +340,15 @@ public partial class ModalDialogWindow : Window
         }
 
         _ownerDisabled = false;
-        _ = Win32Dialog.EnableWindow(_ownerHwnd, 1);
-        _ = Win32Dialog.SetActiveWindow(_ownerHwnd);
+        try
+        {
+            _ = Win32Dialog.EnableWindow(_ownerHwnd, 1);
+            _ = Win32Dialog.SetActiveWindow(_ownerHwnd);
+        }
+        catch (Exception)
+        {
+            // The owner handle may already be gone. The dialog is closing either way.
+        }
     }
 }
 

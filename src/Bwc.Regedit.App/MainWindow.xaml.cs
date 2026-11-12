@@ -43,7 +43,7 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
 
         Title = RegeditStrings.Get("RegeditTitle");
-        AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "bwc.ico"));
+        AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "bwc-regedit.ico"));
 
         // Placement is applied before the window is shown. Without a saved placement the DIP default is
         // scaled once the XamlRoot knows the monitor scale.
