@@ -30,24 +30,48 @@ internal sealed class ContextMenuDriver : IDisposable
 
     internal bool RightClick(AutomationElement? element)
     {
-        if (element is null || !ControlTestSupport.EnsureForeground(_session))
+        RaiseWindows();
+        if (element is null)
         {
+            E2EResults.Note("contextmenu.rightclick", "The target element was not available, so no right click was sent.");
+            return false;
+        }
+
+        if (!ControlTestSupport.EnsureForeground(_session))
+        {
+            E2EResults.Note("contextmenu.rightclick", "The window did not take the foreground, so no right click was sent.");
             return false;
         }
 
         try
         {
-            element.RightClick();
+            // Click the center of the row with the OS mouse path instead of asking UI Automation for a
+            // clickable point. A stale or partially scrolled element can have bounds but no clickable
+            // point, and the center works as long as the bounds are real.
+            System.Drawing.Rectangle bounds = element.BoundingRectangle;
+            if (bounds.Width > 0 && bounds.Height > 0)
+            {
+                Mouse.RightClick(new System.Drawing.Point(
+                    (int)(bounds.Left + (bounds.Width / 2)),
+                    (int)(bounds.Top + (bounds.Height / 2))));
+            }
+            else
+            {
+                element.RightClick();
+            }
+
             return true;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            E2EResults.Note("contextmenu.rightclick", $"The right click failed: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
 
     internal bool RightClick(int x, int y)
     {
+        RaiseWindows();
         if (!ControlTestSupport.EnsureForeground(_session))
         {
             return false;
@@ -62,6 +86,66 @@ internal sealed class ContextMenuDriver : IDisposable
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Right clicks a target that is re-read for every attempt and returns the menu that opens. A
+    /// stale row element after a rename or a click that only restores focus is retried, because the
+    /// failure looks like a missing menu even though the row is on screen. Each attempt waits a
+    /// short time for a menu, so a real failure still ends within the caller's timeout.
+    /// </summary>
+    internal MenuSnapshot? RightClickForMenu(
+        Func<AutomationElement?> target,
+        IReadOnlyList<string> expectedNames,
+        TimeSpan? timeout = null)
+    {
+        DateTime deadline = DateTime.UtcNow + (timeout ?? UiTimeout);
+        for (int attempt = 1; attempt <= 3 && DateTime.UtcNow < deadline; attempt++)
+        {
+            AutomationElement? element = target();
+            if (element is not null && RightClick(element))
+            {
+                MenuSnapshot? snapshot = WaitForMenu(expectedNames, TimeSpan.FromSeconds(4));
+                if (snapshot is not null)
+                {
+                    return snapshot;
+                }
+            }
+
+            _ = WaitForNoMenu(TimeSpan.FromSeconds(1));
+            Thread.Sleep(150);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Right clicks a screen point and returns the menu that opens. A click that only restores focus
+    /// is retried, with the same bounded per-attempt menu wait as the element overload.
+    /// </summary>
+    internal MenuSnapshot? RightClickForMenu(
+        int x,
+        int y,
+        IReadOnlyList<string> expectedNames,
+        TimeSpan? timeout = null)
+    {
+        DateTime deadline = DateTime.UtcNow + (timeout ?? UiTimeout);
+        for (int attempt = 1; attempt <= 3 && DateTime.UtcNow < deadline; attempt++)
+        {
+            if (RightClick(x, y))
+            {
+                MenuSnapshot? snapshot = WaitForMenu(expectedNames, TimeSpan.FromSeconds(4));
+                if (snapshot is not null)
+                {
+                    return snapshot;
+                }
+            }
+
+            _ = WaitForNoMenu(TimeSpan.FromSeconds(1));
+            Thread.Sleep(150);
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -109,11 +193,13 @@ internal sealed class ContextMenuDriver : IDisposable
             return false;
         }
 
+        RaiseWindows();
         try
         {
             if (entry.Element.Patterns.Invoke.IsSupported)
             {
                 entry.Element.Patterns.Invoke.Pattern.Invoke();
+                RaiseWindows();
                 return true;
             }
         }
@@ -124,8 +210,9 @@ internal sealed class ContextMenuDriver : IDisposable
 
         try
         {
-            entry.Element.Click();
-            return true;
+            bool clicked = ClickElement(entry.Element);
+            RaiseWindows();
+            return clicked;
         }
         catch (Exception)
         {
@@ -145,11 +232,13 @@ internal sealed class ContextMenuDriver : IDisposable
             return false;
         }
 
+        RaiseWindows();
         try
         {
             if (entry.Element.Patterns.ExpandCollapse.IsSupported)
             {
                 entry.Element.Patterns.ExpandCollapse.Pattern.Expand();
+                RaiseWindows();
                 return true;
             }
         }
@@ -160,8 +249,9 @@ internal sealed class ContextMenuDriver : IDisposable
 
         try
         {
-            entry.Element.Click();
-            return true;
+            bool clicked = ClickElement(entry.Element);
+            RaiseWindows();
+            return clicked;
         }
         catch (Exception)
         {
@@ -178,6 +268,9 @@ internal sealed class ContextMenuDriver : IDisposable
 
     private MenuSnapshot? Snapshot()
     {
+        // A WinUI flyout is a separate top level window. Raise every window of the app before the
+        // snapshot, so the menu is above the main window and can be read and clicked.
+        RaiseWindows();
         var entries = new List<MenuEntry>();
 
         try
@@ -270,6 +363,28 @@ internal sealed class ContextMenuDriver : IDisposable
                 // A stale element is skipped; the next snapshot pass re-reads the tree.
             }
         }
+    }
+
+    private void RaiseWindows() => _session.RaiseWindows();
+
+    /// <summary>
+    /// Clicks the center of an element with the OS mouse path. The bounds are read at the moment of
+    /// the click, so a menu item that moved while the flyout opened still gets a real click. Falls
+    /// back to the UI Automation click only when the element reports no bounds.
+    /// </summary>
+    private static bool ClickElement(AutomationElement element)
+    {
+        System.Drawing.Rectangle bounds = element.BoundingRectangle;
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            element.Click();
+            return true;
+        }
+
+        Mouse.Click(new System.Drawing.Point(
+            (int)(bounds.Left + (bounds.Width / 2)),
+            (int)(bounds.Top + (bounds.Height / 2))));
+        return true;
     }
 
     private static bool NamesEqual(IReadOnlyList<string> actual, IReadOnlyList<string> expected)

@@ -129,7 +129,19 @@ public sealed class ListTests
                         throw new InvalidOperationException("The Registry Editor window did not come to the foreground, so the header was not clicked.");
                     }
 
-                    header.Click();
+                    // Click the header bounds with the OS mouse path. UI Automation reports no clickable
+                    // point for a header whose cell is partly clipped, but its visible rectangle is real.
+                    AutomationElement? current = session.Find("HeaderName");
+                    System.Drawing.Rectangle bounds = (current ?? header).BoundingRectangle;
+                    if (bounds.Width <= 0 || bounds.Height <= 0)
+                    {
+                        throw new InvalidOperationException($"HeaderName has no clickable bounds (width={bounds.Width}, height={bounds.Height}).");
+                    }
+
+                    session.RaiseWindows();
+                    Mouse.Click(new System.Drawing.Point(
+                        (int)(bounds.Left + (bounds.Width / 2)),
+                        (int)(bounds.Top + (bounds.Height / 2))));
                     Thread.Sleep(300);
                 }
                 catch (Exception ex)

@@ -22,6 +22,7 @@ internal sealed class RegeditProcess : IDisposable
 {
     private readonly Process _process;
     private readonly UIA3Automation _automation;
+    private readonly WindowWatchdog _watchdog;
     private bool _disposed;
 
     private RegeditProcess(Process process, UIA3Automation automation, IntPtr mainHwnd)
@@ -30,8 +31,10 @@ internal sealed class RegeditProcess : IDisposable
         _automation = automation;
         MainHwnd = mainHwnd;
 
-        // Same rule as AppSession: the window stays above other applications until Close.
+        // Same rule as AppSession: every visible window of this process, including owned dialogs,
+        // stays above other applications until Close.
         _ = Win32.SetTopmost(mainHwnd, true);
+        _watchdog = new WindowWatchdog(unchecked((uint)process.Id));
     }
 
     public IntPtr MainHwnd { get; }
@@ -111,6 +114,9 @@ internal sealed class RegeditProcess : IDisposable
 
     public AutomationElement? Find(string automationId)
     {
+        // A menu flyout or an owned dialog is a separate top level window. Raise the process windows
+        // before every read so the element is not read or clicked while another window covers it.
+        RaiseWindows();
         try
         {
             return Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
@@ -149,15 +155,21 @@ internal sealed class RegeditProcess : IDisposable
 
             // A real click on the command. UI Automation Invoke waits for the command to return, and a
             // command that opens a modal dialog would hold the test thread until that dialog closes.
+            // Raise the flyout first, or the click would land on the topmost main window behind it.
+            RaiseWindows();
             var bounds = element.BoundingRectangle;
             AppServicesSupport.Click(bounds.Left + (bounds.Width / 2), bounds.Top + (bounds.Height / 2));
             Thread.Sleep(400);
         }
     }
 
+    /// <summary>Raises the visible top level windows of this process, owned dialogs included, without activating one.</summary>
+    public void RaiseWindows() => _ = Win32.RaiseProcessWindows(unchecked((uint)ProcessId));
+
     /// <summary>Brings the main window forward with a real click on its title bar when focus is refused.</summary>
     public void Focus()
     {
+        RaiseWindows();
         if (AppServicesSupport.ForceForeground(MainHwnd))
         {
             return;
@@ -199,6 +211,7 @@ internal sealed class RegeditProcess : IDisposable
     /// <summary>Closes the window the way a user does, so the settings are saved on close.</summary>
     public void Close()
     {
+        _watchdog.Dispose();
         if (_process.HasExited)
         {
             return;
@@ -231,6 +244,7 @@ internal sealed class RegeditProcess : IDisposable
         _disposed = true;
         try
         {
+            _watchdog.Dispose();
             Close();
         }
         finally
@@ -253,7 +267,7 @@ internal sealed class RegeditProcess : IDisposable
             }
 
             IntPtr hwnd = process.MainWindowHandle;
-            if (hwnd != IntPtr.Zero && AppServicesSupport.IsWindow(hwnd))
+            if (hwnd != IntPtr.Zero && AppServicesSupport.IsWindow(hwnd) && Win32.IsVisible(hwnd))
             {
                 return hwnd;
             }
@@ -370,16 +384,33 @@ internal static class AppServicesSupport
     internal static bool ForceForeground(IntPtr hwnd) => Win32.ForceForeground(hwnd, TimeSpan.FromSeconds(2));
 
     /// <summary>
-    /// Dismisses a modal message with Enter, its default button. Enter is sent only after the message
-    /// has the foreground, so the key cannot reach another window. A message that does not take the
-    /// foreground, or stays open after one press, is tried again until the timeout. Returns true when
-    /// the message is gone.
+    /// Raises one window of the app above the app's other windows and above foreign windows, without
+    /// activating it. The process windows are raised first, then this window last, so it ends on top
+    /// of its owner and of any other popup.
+    /// </summary>
+    internal static void RaiseWindow(IntPtr hwnd)
+    {
+        uint processId = Win32.ProcessIdOf(hwnd);
+        if (processId != 0)
+        {
+            _ = Win32.RaiseProcessWindows(processId);
+        }
+
+        _ = Win32.SetTopmost(hwnd, true);
+    }
+
+    /// <summary>
+    /// Dismisses a modal message with Enter, its default button. The message and its process windows
+    /// are raised first, and Enter is sent only after the message has the foreground, so the key
+    /// cannot reach another window. A message that does not take the foreground, or stays open after
+    /// one press, is tried again until the timeout. Returns true when the message is gone.
     /// </summary>
     internal static bool DismissMessage(IntPtr message, TimeSpan timeout)
     {
         DateTime deadline = DateTime.UtcNow + timeout;
         while (IsWindow(message) && DateTime.UtcNow < deadline)
         {
+            RaiseWindow(message);
             if (ForceForeground(message))
             {
                 Keyboard.Press(VirtualKeyShort.ENTER);
@@ -399,31 +430,109 @@ internal static class AppServicesSupport
         mouse_event(MouseEventLeftUp, 0, 0, 0, UIntPtr.Zero);
     }
 
-    /// <summary>The UI Automation names under a dialog, joined into one text. Message dialogs expose it this way.</summary>
+    /// <summary>
+    /// The UI Automation names under a dialog, joined into one text. Message dialogs expose it this way.
+    /// The dialog is raised first, so the read cannot be answered by the window that covers it.
+    /// </summary>
     internal static string DialogText(IntPtr dialog)
     {
+        RaiseWindow(dialog);
         using var automation = new UIA3Automation();
         AutomationElement window = automation.FromHandle(dialog);
         return string.Join(" | ", window.FindAllDescendants().Select(element => ControlTestSupport.SafeName(element)));
     }
 
     /// <summary>
-    /// Clicks the dialog button whose name matches, after the dialog takes the foreground. A missing button
-    /// throws, so the caller fails with the button name in the message.
+    /// Reads the dialog text until <paramref name="matches"/> accepts it, within the timeout. The
+    /// dialog is raised before each read, and a dialog that is still building its content is read
+    /// again instead of being reported as empty. The last text is returned when the timeout passes.
+    /// </summary>
+    internal static string WaitForDialogText(IntPtr dialog, Func<string, bool> matches, TimeSpan timeout)
+    {
+        string text = string.Empty;
+        _ = WaitUntil(
+            () =>
+            {
+                if (!IsWindow(dialog))
+                {
+                    return false;
+                }
+
+                text = DialogText(dialog);
+                return matches(text);
+            },
+            timeout);
+        return text;
+    }
+
+    /// <summary>
+    /// Clicks the dialog button whose name matches, after the dialog and its process windows are raised
+    /// and the dialog takes the foreground. Each click uses fresh bounds. A click that leaves the dialog
+    /// open is retried within a short bounded time, so a click that landed while the dialog was moving is
+    /// not the end of the test. A missing button throws, so the caller fails with the button name.
     /// </summary>
     internal static void ClickButton(RegeditProcess app, IntPtr dialog, string name)
     {
-        var buttons = app.WindowOf(dialog).FindAllDescendants(cf => cf.ByControlType(ControlType.Button));
-        AutomationElement? button = buttons.FirstOrDefault(b => string.Equals((b.Name ?? string.Empty).Replace("&", string.Empty), name, StringComparison.Ordinal));
-        if (button is null)
+        DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+        while (true)
         {
-            throw new InvalidOperationException($"The dialog has no '{name}' button.");
-        }
+            if (!IsWindow(dialog))
+            {
+                return;
+            }
 
-        var rect = button.BoundingRectangle;
-        ForceForeground(dialog);
-        Click((int)(rect.Left + (rect.Width / 2)), (int)(rect.Top + (rect.Height / 2)));
+            RaiseWindow(dialog);
+            AutomationElement? button;
+            try
+            {
+                button = FindButton(app, dialog, name);
+            }
+            catch (Exception) when (!IsWindow(dialog))
+            {
+                return;
+            }
+
+            if (button is null)
+            {
+                if (!IsWindow(dialog))
+                {
+                    return;
+                }
+
+                if (DateTime.UtcNow >= deadline)
+                {
+                    throw new InvalidOperationException($"The dialog has no '{name}' button.");
+                }
+
+                Thread.Sleep(100);
+                continue;
+            }
+
+            var rect = button.BoundingRectangle;
+            if (rect.Width <= 0 || rect.Height <= 0)
+            {
+                if (DateTime.UtcNow >= deadline)
+                {
+                    throw new InvalidOperationException($"The dialog's '{name}' button has no clickable bounds.");
+                }
+
+                Thread.Sleep(100);
+                continue;
+            }
+
+            _ = ForceForeground(dialog);
+            Click((int)(rect.Left + (rect.Width / 2)), (int)(rect.Top + (rect.Height / 2)));
+            if (WaitUntil(() => !IsWindow(dialog), TimeSpan.FromSeconds(1)) || DateTime.UtcNow >= deadline)
+            {
+                return;
+            }
+        }
     }
+
+    private static AutomationElement? FindButton(RegeditProcess app, IntPtr dialog, string name) =>
+        app.WindowOf(dialog)
+            .FindAllDescendants(cf => cf.ByControlType(ControlType.Button))
+            .FirstOrDefault(b => string.Equals((b.Name ?? string.Empty).Replace("&", string.Empty), name, StringComparison.Ordinal));
 
     /// <summary>
     /// A real left button drag from one screen point to another. The moves are absolute mouse_event moves on the
@@ -467,16 +576,17 @@ internal static class AppServicesSupport
     }
 
     /// <summary>
-    /// Finds a top-level window owned by <paramref name="owner"/>. The class and title are optional
-    /// filters; a title filter is an exact match.
+    /// Finds a visible top-level window owned by <paramref name="owner"/>. The class and title are
+    /// optional filters; a title filter is an exact match. <paramref name="except"/> skips one handle,
+    /// so a caller that waits for the next dialog cannot be answered by the one it is closing.
     /// </summary>
-    internal static IntPtr FindOwnedWindow(IntPtr owner, string? className, string? title)
+    internal static IntPtr FindOwnedWindow(IntPtr owner, string? className, string? title, IntPtr except = default)
     {
         IntPtr found = IntPtr.Zero;
         _ = EnumWindows(
             (hwnd, _) =>
             {
-                if (GetWindow(hwnd, GwOwner) != owner)
+                if (hwnd == except || GetWindow(hwnd, GwOwner) != owner || !Win32.IsVisible(hwnd))
                 {
                     return true;
                 }
@@ -498,11 +608,31 @@ internal static class AppServicesSupport
         return found;
     }
 
-    /// <summary>Waits for an owned window to appear and returns its handle, or zero on timeout.</summary>
-    internal static IntPtr WaitForOwnedWindow(IntPtr owner, string? className, string? title, TimeSpan timeout)
+    /// <summary>
+    /// Waits for an owned window to appear and returns its handle, or zero on timeout. A window that
+    /// is found is raised above its owner and above foreign windows before it is returned, so the
+    /// caller's read or click cannot land on another window.
+    /// </summary>
+    internal static IntPtr WaitForOwnedWindow(
+        IntPtr owner,
+        string? className,
+        string? title,
+        TimeSpan timeout,
+        IntPtr except = default)
     {
         IntPtr found = IntPtr.Zero;
-        _ = WaitUntil(() => (found = FindOwnedWindow(owner, className, title)) != IntPtr.Zero, timeout);
+        _ = WaitUntil(
+            () =>
+            {
+                found = FindOwnedWindow(owner, className, title, except);
+                if (found != IntPtr.Zero)
+                {
+                    RaiseWindow(found);
+                }
+
+                return found != IntPtr.Zero;
+            },
+            timeout);
         return found;
     }
 

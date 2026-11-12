@@ -196,14 +196,33 @@ internal static class HubUi
 
     /// <summary>
     /// Opens the Help menu by clicking its menu bar item. The mouse path does not depend on the
-    /// keyboard state of the menu router, which a previous Alt+H and Escape can leave behind.
+    /// keyboard state of the menu router, which a previous Alt+H and Escape can leave behind. The
+    /// window is forced to the foreground before each attempt, because a click that only activates
+    /// an inactive window is consumed and leaves the menu closed. The click is retried until the
+    /// Check for Updates item is present, so a menu that opened and closed is opened again.
     /// </summary>
     public static void OpenHelpMenuByMouse(AppSession hub, UIA3Automation automation)
     {
-        _ = Foreground(hub.MainHwnd, TimeSpan.FromSeconds(3));
-        AutomationElement? help = FindInProcess(automation, hub.ProcessId, "MenuCommand_Help", TimeSpan.FromSeconds(5));
-        help?.Click();
-        Thread.Sleep(400);
+        DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        do
+        {
+            _ = ForceForeground(hub.MainHwnd, TimeSpan.FromSeconds(2));
+            hub.RaiseWindows();
+            AutomationElement? help = FindInProcess(automation, hub.ProcessId, "MenuCommand_Help", TimeSpan.FromSeconds(3));
+            if (help is null)
+            {
+                continue;
+            }
+
+            WaitForSettledBounds(help, TimeSpan.FromSeconds(1));
+            help.Click();
+            Thread.Sleep(250);
+            if (FindInProcess(automation, hub.ProcessId, "MenuItem_CheckForUpdates", TimeSpan.FromSeconds(2)) is not null)
+            {
+                return;
+            }
+        }
+        while (DateTime.UtcNow < deadline);
     }
 
     /// <summary>

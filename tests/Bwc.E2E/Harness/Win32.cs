@@ -50,6 +50,10 @@ internal static class Win32
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool BringWindowToTop(IntPtr hWnd);
 
     [DllImport("user32.dll")]
@@ -65,10 +69,18 @@ internal static class Win32
 
     [DllImport("kernel32.dll")]
     private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumWindows(EnumProc callback, IntPtr lParam);
 #pragma warning restore SYSLIB1054
+
+    private delegate bool EnumProc(IntPtr hwnd, IntPtr lParam);
 
     internal static bool HasOwner(IntPtr hwnd, IntPtr expectedOwner) =>
         GetWindow(hwnd, GvOwner) == expectedOwner;
+
+    internal static bool IsVisible(IntPtr hwnd) => hwnd != IntPtr.Zero && IsWindowVisible(hwnd);
 
     internal static bool IsForeground(IntPtr hwnd) => GetForegroundWindow() == hwnd;
 
@@ -94,6 +106,64 @@ internal static class Win32
             0,
             0,
             SwpNoMove | SwpNoSize | SwpNoActivate);
+
+    /// <summary>
+    /// The top level windows of one process in z order, highest first. Hidden windows are included only
+    /// when <paramref name="visibleOnly"/> is false.
+    /// </summary>
+    internal static IntPtr[] TopLevelWindows(uint processId, bool visibleOnly)
+    {
+        var windows = new List<IntPtr>();
+        _ = EnumWindows(
+            (hwnd, _) =>
+            {
+                if (ProcessIdOf(hwnd) == processId && (!visibleOnly || IsWindowVisible(hwnd)))
+                {
+                    windows.Add(hwnd);
+                }
+
+                return true;
+            },
+            IntPtr.Zero);
+        return windows.ToArray();
+    }
+
+    /// <summary>
+    /// Pins every visible top level window of the process above other applications, including owned
+    /// dialogs and popup windows such as WinUI flyouts. EnumWindows returns the highest window first, so
+    /// the windows are raised from the bottom up and the highest window stays on top. Activation is not
+    /// changed. Returns how many windows accepted the request.
+    /// </summary>
+    internal static int RaiseProcessWindows(uint processId)
+    {
+        IntPtr[] windows = TopLevelWindows(processId, visibleOnly: true);
+        int raised = 0;
+        for (int index = windows.Length - 1; index >= 0; index--)
+        {
+            if (SetTopmost(windows[index], true))
+            {
+                raised++;
+            }
+        }
+
+        return raised;
+    }
+
+    /// <summary>Returns every top level window of the process to the normal z order band.</summary>
+    internal static int ClearTopmost(uint processId)
+    {
+        IntPtr[] windows = TopLevelWindows(processId, visibleOnly: false);
+        int cleared = 0;
+        for (int index = windows.Length - 1; index >= 0; index--)
+        {
+            if (SetTopmost(windows[index], false))
+            {
+                cleared++;
+            }
+        }
+
+        return cleared;
+    }
 
     /// <summary>
     /// Brings the window to the foreground so keystrokes reach it. Returns false when it cannot within the timeout.

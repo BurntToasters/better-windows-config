@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Harness;
+using Bwc.E2E.List;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
@@ -292,9 +293,21 @@ public sealed class MenuTests
             return;
         }
 
+        // Open and close the File menu once with the keyboard. The first keyboard menu use
+        // initializes the router state; the Alt tap below then has a settled idle bar to toggle.
+        SendRaw("ALT+KEY_F");
+        Thread.Sleep(300);
+        SendRaw("ESCAPE");
+        Thread.Sleep(300);
+
         Rectangle label = file.BoundingRectangle;
         using Bitmap before = CaptureScreen(label);
-        SendRaw("ALT");
+
+        // keybd_event carries the Alt scan code, so the app receives the WM_SYSKEYDOWN/WM_SYSKEYUP
+        // pair its menu router needs. FlaUI's synthetic tap can be taken as the system menu request
+        // and never reach the router, which leaves the underlines off.
+        _ = ControlTestSupport.EnsureForeground(session);
+        RawKeyboard.Tap(RawKeyboard.Alt);
         Thread.Sleep(400);
         using Bitmap after = CaptureScreen(label);
         int run = LongestNewDarkRun(before, after);

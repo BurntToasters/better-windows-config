@@ -813,7 +813,10 @@ public sealed class AppServicesTests
                 Assert.Fail("regedit file.reg did not ask for confirmation.");
             }
 
-            string confirmText = string.Join(" | ", app.WindowOf(confirm).FindAllDescendants().Select(element => ControlTestSupport.SafeName(element)));
+            string confirmText = AppServicesSupport.WaitForDialogText(
+                confirm,
+                text => text.Contains("Adding information", StringComparison.Ordinal) && text.Contains(file, StringComparison.Ordinal),
+                DialogTimeout);
             bool textOk = confirmText.Contains("Adding information", StringComparison.Ordinal) && confirmText.Contains(file, StringComparison.Ordinal);
             E2EResults.Record(checkPrefix + ".confirm.text", textOk, "The confirmation carries the RT_STRING 304 text and the file path.");
 
@@ -823,10 +826,13 @@ public sealed class AppServicesTests
 
             if (answerYes)
             {
-                IntPtr result = AppServicesSupport.WaitForOwnedWindow(app.MainHwnd, null, Caption, DialogTimeout);
+                IntPtr result = AppServicesSupport.WaitForOwnedWindow(app.MainHwnd, null, Caption, DialogTimeout, confirm);
                 string resultText = result == IntPtr.Zero
                     ? string.Empty
-                    : string.Join(" | ", app.WindowOf(result).FindAllDescendants().Select(element => ControlTestSupport.SafeName(element)));
+                    : AppServicesSupport.WaitForDialogText(
+                        result,
+                        text => text.Contains("successfully added", StringComparison.Ordinal),
+                        DialogTimeout);
                 E2EResults.Record(
                     checkPrefix + ".result.shown",
                     resultText.Contains("successfully added", StringComparison.Ordinal),
