@@ -245,7 +245,10 @@ public sealed class ShellTests
         var fileCommands = new (string Id, string Name, bool Enabled)[]
         {
             ("import", "Import...", true),
-            ("export", "Export...", false),
+            // Classic regedit enables Export on Computer because the save dialog offers
+            // Export range = All. The same command stays enabled for a selected key; the
+            // ImportExport suite covers both states (all.computer-range and range.export.menu).
+            ("export", "Export...", true),
             ("unloadHive", "Unload Hive...", false),
             ("connectNetworkRegistry", "Connect Network Registry...", true),
             ("disconnectNetworkRegistry", "Disconnect Network Registry...", false),
