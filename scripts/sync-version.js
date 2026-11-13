@@ -19,8 +19,14 @@ function printHelp() {
   console.log(`Usage:
   node ${SCRIPT} [--root <dir>] [--check]
 
-Reads <root>/package.json and writes the version to
-<root>/Directory.Build.props and <root>/CHANGELOG.md.
+Reads <root>/package.json and writes the version to:
+  Directory.Build.props  Version and the four-part FileVersion.
+  CHANGELOG.md           Download links (tag and file names), the beta
+                         callout, and a "## Changes in \\\`vX.Y.Z:\\\`" section
+                         with a placeholder when the version has none.
+
+CHANGELOG.md is the GitHub release body in BCLS form. Replace the
+placeholder before release; validate-changelog-version.js refuses it.
 
 Options:
   --root <dir>  Repository root to update. Defaults to the parent of scripts/.
@@ -156,7 +162,7 @@ function main(argv = process.argv) {
         file: "CHANGELOG.md",
         path: changelogFile,
         next: nextChangelog,
-        detail: `section [${parsed.version}]`,
+        detail: `v${parsed.version} (download links, beta callout, section)`,
         verify: (text) => {
           if (syncChangelogForVersion(text, parsed.version) !== text) {
             throw new Error("CHANGELOG.md write verification failed");
