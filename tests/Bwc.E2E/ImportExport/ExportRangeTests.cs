@@ -4,6 +4,7 @@ using Bwc.E2E.AppServices;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
+using Bwc.E2E.List;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
@@ -31,6 +32,9 @@ public sealed class ExportRangeTests
     private const string SlowExportVariable = "BWC_E2E_SLOW_EXPORT_MS";
     private const string SlowImportVariable = "BWC_E2E_SLOW_IMPORT_MS";
     private const string SlowPauseMilliseconds = "2";
+
+    // 1000 sections at 10 ms each keeps the import open for about 10 s, so the bar can be read several times.
+    private const string SlowImportPauseMilliseconds = "10";
     private const int ImportSections = 1000;
     private const int ExportBranchKeys = 5000;
 
@@ -135,7 +139,7 @@ public sealed class ExportRangeTests
             {
                 [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
                 ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
-                [SlowImportVariable] = SlowPauseMilliseconds,
+                [SlowImportVariable] = SlowImportPauseMilliseconds,
             };
 
             using var session = new AppSession(config, config.RegeditExePath, environment: environment);
@@ -172,13 +176,37 @@ public sealed class ExportRangeTests
 
             if (progress != IntPtr.Zero)
             {
+                // The caption Close box is a declared difference (known gap UF7), so it is not in the body count.
                 IReadOnlyList<string>? buttons = ImportExportWindows.ButtonNames(automation, progress);
-                bool onlyTitleClose = buttons is not null && buttons.All(name => name == "Close");
+                string buttonList = string.Join(",", buttons ?? Array.Empty<string>());
+                bool noTitleClose = buttons is not null && !buttons.Contains("Close", StringComparer.Ordinal);
+                bool noBodyButtons = buttons is not null && buttons.All(button => button == "Close");
                 E2EResults.Record(
                     "importprogress.no-buttons",
-                    onlyTitleClose,
-                    $"buttons=[{string.Join(",", buttons ?? Array.Empty<string>())}]; classic DLG-019 has no Cancel " +
-                    "and no default button. The title bar Close is the only button, and the host refuses it until the import ends.");
+                    noBodyButtons,
+                    $"buttons=[{buttonList}]; classic DLG-019 has no Cancel and no default button. Only the caption " +
+                    "Close is listed, and it is checked by importprogress.no-close-button.");
+
+                long style = ImportExportWindows.StyleOf(progress);
+                bool noSystemMenu = (style & ImportExportWindows.WsSysMenu) == 0;
+                bool hasCaption = (style & ImportExportWindows.WsCaption) == ImportExportWindows.WsCaption;
+                E2EResults.RecordOrKnownGap(
+                    "importprogress.no-close-button",
+                    noTitleClose,
+                    "UF7",
+                    "classic DLG-019 (style 0x90C001C4) has no Close box in the caption, and the caption Close is absent " +
+                    "from the UI Automation tree.",
+                    $"UI Automation buttons of the window=[{buttonList}]. Cause: WinUI windowing restores WS_SYSMENU " +
+                    "during WM_STYLECHANGING, after the outermost subclass has cleared it, so a WinUI window cannot " +
+                    "drop the system menu. Close and Alt+F4 are refused until the import ends.");
+                E2EResults.RecordOrKnownGap(
+                    "importprogress.style",
+                    noSystemMenu && hasCaption,
+                    "UF7",
+                    "GWL_STYLE 0x90C001C4: WS_CAPTION present, WS_SYSMENU absent.",
+                    $"GWL_STYLE=0x{style:X8}; WS_SYSMENU present={!noSystemMenu}, WS_CAPTION present={hasCaption}. " +
+                    "Cause: WinUI windowing restores WS_SYSMENU during WM_STYLECHANGING, after the outermost subclass " +
+                    "has cleared it; WM_STYLECHANGED then stores the bit. See docs/failure-modes/import-export.md 14.");
 
                 string label = ImportExportWindows.ReadText(automation, progress, "ImportFileLabel");
                 string name = ImportExportWindows.ReadText(automation, progress, "ImportFileName");
@@ -195,18 +223,37 @@ public sealed class ExportRangeTests
                 mainDisabled,
                 $"main window disabled while the import runs={mainDisabled}.");
 
+            // A single partial value (1 of 1000) is not progress. The bar must be read at least twice while the
+            // window is open, and the readings must rise. The E2E pause keeps the import running for about 10 s.
             ImportExportWindows.BarState lastBar = default;
-            bool advanced = progress != IntPtr.Zero && ControlTestSupport.WaitUntil(
-                () =>
-                {
-                    lastBar = ImportExportWindows.ReadProgress(automation, progress);
-                    return lastBar.Present && lastBar.Value > 0 && lastBar.Value < lastBar.Maximum;
-                },
-                TimeSpan.FromSeconds(15));
+            var readings = new List<double>();
+            if (progress != IntPtr.Zero)
+            {
+                _ = ControlTestSupport.WaitUntil(
+                    () =>
+                    {
+                        if (!Win32.IsWindow(progress))
+                        {
+                            return true;
+                        }
+
+                        lastBar = ImportExportWindows.ReadProgress(automation, progress);
+                        if (lastBar.Present && lastBar.Value > 0 && lastBar.Value < lastBar.Maximum)
+                        {
+                            readings.Add(lastBar.Value);
+                        }
+
+                        return StrictlyAdvanced(readings);
+                    },
+                    TimeSpan.FromSeconds(30));
+            }
+
+            bool advanced = progress != IntPtr.Zero && StrictlyAdvanced(readings);
             E2EResults.Record(
                 "importprogress.advanced",
                 advanced,
-                $"bar value={lastBar.Value} of maximum={lastBar.Maximum} seen while the import ran.");
+                $"bar readings while the window was open=[{string.Join(",", readings)}]; " +
+                $"last value={lastBar.Value} of maximum={lastBar.Maximum}.");
 
             if (progress != IntPtr.Zero)
             {
@@ -214,6 +261,28 @@ public sealed class ExportRangeTests
                     progress,
                     Path.Combine(visualDir, "import-progress.png"));
                 E2EResults.Note("importprogress.screenshot", $"saved {shot}, written={File.Exists(shot)}.");
+            }
+
+            // Alt+F4 is real keyboard input to the progress window. The import is still running, so the window must
+            // refuse the close and the owner must stay disabled.
+            if (progress != IntPtr.Zero && Win32.IsWindow(progress))
+            {
+                bool foreground = ForegroundGuard.Ensure(
+                    progress,
+                    "importprogress.altf4.foreground",
+                    TimeSpan.FromSeconds(2));
+                if (foreground)
+                {
+                    RawKeyboard.WithHeld(RawKeyboard.Alt, () => RawKeyboard.Tap(RawKeyboard.F4));
+                }
+
+                Thread.Sleep(800);
+                bool kept = Win32.IsWindow(progress);
+                bool stillDisabled = !Win32.IsWindowEnabled(session.MainHwnd);
+                E2EResults.Record(
+                    "importprogress.altf4",
+                    foreground && kept && stillDisabled,
+                    $"foreground={foreground}, window open after Alt+F4={kept}, main still disabled={stillDisabled}.");
             }
 
             bool progressClosed = progress != IntPtr.Zero &&
@@ -830,6 +899,28 @@ public sealed class ExportRangeTests
         return bytes[0] == 0xFF && bytes[1] == 0xFE
             ? Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2)
             : Encoding.ASCII.GetString(bytes);
+    }
+
+    /// <summary>
+    /// True when the bar was read at least twice while the window was open, the readings never fell, and the last
+    /// reading is above the first. One partial value, such as 1 of 1000, is not enough.
+    /// </summary>
+    private static bool StrictlyAdvanced(IReadOnlyList<double> readings)
+    {
+        if (readings.Count < 2 || readings[^1] <= readings[0])
+        {
+            return false;
+        }
+
+        for (int index = 1; index < readings.Count; index++)
+        {
+            if (readings[index] < readings[index - 1])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string WriteLargeImportFile(SandboxRegistry sandbox, string folder, int sections)

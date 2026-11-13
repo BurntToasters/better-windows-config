@@ -221,15 +221,23 @@ public sealed class HexViewerTests
         E2EResults.Record("hex.string.close", closed && valueUnchanged, $"Escape closed={closed}, valueUnchanged={valueUnchanged}.");
     }
 
+    private static IReadOnlyList<string> RealizedRowNames(AutomationElement? list) =>
+        list is null
+            ? Array.Empty<string>()
+            : list.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem)).Select(item => item.Name).ToArray();
+
     /// <summary>
     /// Compares the list rows with the expected rows exactly. The list must hold one row per 16 bytes, so a
     /// truncated or extra row fails the check.
     /// </summary>
     private static void CheckRows(AutomationElement? list, string checkId, string[] expected, bool selected)
     {
-        IReadOnlyList<string> rows = list is null
-            ? Array.Empty<string>()
-            : list.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem)).Select(item => item.Name).ToArray();
+        // The rows are realized lazily, so UI Automation can show only the first row right after the dialog
+        // opens. The check waits for the realized rows to match, then compares them exactly.
+        IReadOnlyList<string> rows = RealizedRowNames(list);
+        _ = ControlTestSupport.WaitUntil(
+            () => (rows = RealizedRowNames(list)).Count == expected.Length,
+            TimeSpan.FromSeconds(5));
         bool ok = selected && rows.Count == expected.Length && rows.Zip(expected).All(pair => pair.First == pair.Second);
         E2EResults.Record(
             checkId,

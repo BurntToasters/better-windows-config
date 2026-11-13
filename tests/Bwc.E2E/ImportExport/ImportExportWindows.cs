@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Bwc.E2E.AppServices;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Harness;
@@ -17,6 +18,18 @@ namespace Bwc.E2E.ImportExport;
 internal static class ImportExportWindows
 {
     private const string Caption = "Registry Editor";
+
+    /// <summary>winuser.h style bits: WS_CAPTION (title bar) and WS_SYSMENU (system menu and Close box).</summary>
+    internal const long WsCaption = 0x00C00000;
+    internal const long WsSysMenu = 0x00080000;
+    private const int GwlStyle = -16;
+
+    /// <summary>The window style (GWL_STYLE) of an owned window.</summary>
+    internal static long StyleOf(IntPtr hwnd) => GetWindowLongPtr(hwnd, GwlStyle).ToInt64();
+
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    private static extern IntPtr GetWindowLongPtr(IntPtr hwnd, int index);
 
     /// <summary>Waits for the owned progress dialog and returns its HWND, or zero on timeout.</summary>
     internal static IntPtr WaitForProgress(UIA3Automation automation, IntPtr mainHwnd, TimeSpan timeout)

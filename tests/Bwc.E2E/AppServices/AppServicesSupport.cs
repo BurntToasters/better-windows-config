@@ -280,6 +280,10 @@ internal static class AppServicesSupport
     private const int SmYVirtualScreen = 77;
     private const int SmCxVirtualScreen = 78;
     private const int SmCyVirtualScreen = 79;
+    private const uint GaRoot = 2;
+    private static readonly TimeSpan ForegroundWait = TimeSpan.FromMilliseconds(1500);
+    private static readonly TimeSpan ButtonReadyWait = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan ButtonStablePause = TimeSpan.FromMilliseconds(150);
 
     /// <summary>A directory under the run's data root that holds no settings from an earlier test.</summary>
     internal static string FreshDataRoot(E2EConfig config, string scope)
@@ -464,11 +468,13 @@ internal static class AppServicesSupport
     }
 
     /// <summary>
-    /// Clicks the dialog button whose name matches. The dialog is checked for foreground through the guard first,
-    /// and no click is sent when the app's own window holds the focus (that failure is already a failed check).
-    /// A click that leaves the dialog open is retried at most <see cref="MaxInputAttempts"/> times, and only after a
-    /// foreign-foreground event. The attempt count is recorded in a note. A dialog that is still open at the end
-    /// throws, so the caller fails with the button name. A missing button throws too.
+    /// Clicks the dialog button whose name matches, with a real mouse press. A press is sent only when the button is
+    /// ready: the dialog is the foreground window, the button is enabled and on screen with the same bounds on two
+    /// reads, the window at the press point is the dialog, and UI Automation reports the button at that point. A
+    /// button that is not ready is waited for, and a press is never sent to a point that is not the button. A press
+    /// that leaves the dialog open is repeated at most <see cref="MaxInputAttempts"/> times, and only when a
+    /// foreign-foreground event happened during it. Any other press that leaves the dialog open fails, and a note
+    /// records the state at that press. A dialog that is still open at the end throws, so the caller fails.
     /// </summary>
     internal static void ClickButton(RegeditProcess app, IntPtr dialog, string name)
     {
@@ -479,33 +485,35 @@ internal static class AppServicesSupport
 
         OwnedWindowChecks.Record(dialog);
         int attempts = 0;
-        int foreignBefore = ForegroundGuard.ForeignEvents;
+        string lastState = string.Empty;
         while (IsWindow(dialog) && attempts < MaxInputAttempts)
         {
             attempts++;
-            System.Drawing.Rectangle? bounds = WaitForButtonBounds(app, dialog, name);
-            if (bounds is not { } rect)
-            {
-                break;
-            }
-
+            WaitForForeground(dialog);
             if (!Activate(dialog, "dialog.button.foreground." + OwnedWindowChecks.LabelOf(dialog)))
             {
                 break;
             }
 
-            Click((int)(rect.Left + (rect.Width / 2)), (int)(rect.Top + (rect.Height / 2)));
+            System.Drawing.Point? press = WaitForPressPoint(app, dialog, name);
+            if (press is not { } point)
+            {
+                break;
+            }
+
+            // Counted from the press, so a foreign event during the wait above does not make this press a retry.
+            int foreignAtPress = ForegroundGuard.ForeignEvents;
+            Click(point.X, point.Y);
             if (WaitUntil(() => !IsWindow(dialog), TimeSpan.FromSeconds(2)))
             {
                 break;
             }
 
-            if (ForegroundGuard.ForeignEvents == foreignBefore)
+            lastState = DescribePress(dialog, name, point);
+            if (ForegroundGuard.ForeignEvents == foreignAtPress)
             {
                 break;
             }
-
-            foreignBefore = ForegroundGuard.ForeignEvents;
         }
 
         if (attempts > 1)
@@ -515,18 +523,35 @@ internal static class AppServicesSupport
 
         if (IsWindow(dialog))
         {
+            if (lastState.Length > 0)
+            {
+                E2EResults.Note("harness.click.notclosed", $"'{name}' press left the dialog open. {lastState}");
+            }
+
             throw new InvalidOperationException(
                 $"The '{name}' button did not close the dialog 0x{dialog.ToInt64():X} after {attempts} attempt(s).");
         }
     }
 
     /// <summary>
-    /// The bounds of a dialog button with a size, read fresh. Returns null when the dialog closed while the button
-    /// was being looked for. Throws when the button is missing or has no size after the wait.
+    /// Waits, up to <see cref="ForegroundWait"/>, for the dialog to be the foreground window. Only polls: the
+    /// activation itself is made by the caller through the guard, which re-asserts a foreign foreground.
     /// </summary>
-    private static System.Drawing.Rectangle? WaitForButtonBounds(RegeditProcess app, IntPtr dialog, string name)
+    private static void WaitForForeground(IntPtr dialog)
     {
-        DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+        _ = WaitUntil(
+            () => !IsWindow(dialog) || ForegroundGuard.Observe(dialog, out _) == ForegroundState.Target,
+            ForegroundWait);
+    }
+
+    /// <summary>
+    /// The screen point of a dialog button that is ready to press, read fresh. Returns null when the dialog closed
+    /// while the button was being looked for. Throws when the button is not ready before <see cref="ButtonReadyWait"/>,
+    /// with the state that stopped it, so the failure names the cause and no press was sent.
+    /// </summary>
+    private static System.Drawing.Point? WaitForPressPoint(RegeditProcess app, IntPtr dialog, string name)
+    {
+        DateTime deadline = DateTime.UtcNow + ButtonReadyWait;
         while (true)
         {
             if (!IsWindow(dialog))
@@ -534,35 +559,135 @@ internal static class AppServicesSupport
                 return null;
             }
 
-            AutomationElement? button = null;
+            System.Drawing.Point? point;
+            string state;
             try
             {
-                button = FindButton(app, dialog, name);
+                point = ReadyPressPoint(app, dialog, name, out state);
             }
             catch (Exception) when (!IsWindow(dialog))
             {
                 return null;
             }
 
-            if (button is not null)
+            if (point is not null)
             {
-                var rect = button.BoundingRectangle;
-                if (rect.Width > 0 && rect.Height > 0)
-                {
-                    return rect;
-                }
+                return point;
             }
 
             if (DateTime.UtcNow >= deadline)
             {
                 throw new InvalidOperationException(
-                    button is null
-                        ? $"The dialog has no '{name}' button."
-                        : $"The dialog's '{name}' button has no clickable bounds.");
+                    $"The '{name}' button of dialog 0x{dialog.ToInt64():X} was not ready to press: {state}. No press was sent.");
             }
 
             Thread.Sleep(100);
         }
+    }
+
+    /// <summary>
+    /// The center of the named button when it is ready now, or null with the reason in <paramref name="state"/>.
+    /// </summary>
+    private static System.Drawing.Point? ReadyPressPoint(RegeditProcess app, IntPtr dialog, string name, out string state)
+    {
+        AutomationElement? button = FindButton(app, dialog, name);
+        if (button is null)
+        {
+            state = $"the dialog has no '{name}' button";
+            return null;
+        }
+
+        if (!button.IsEnabled)
+        {
+            state = $"the '{name}' button is disabled";
+            return null;
+        }
+
+        if (button.IsOffscreen)
+        {
+            state = $"the '{name}' button is off screen";
+            return null;
+        }
+
+        System.Drawing.Rectangle first = button.BoundingRectangle;
+        if (first.Width <= 0 || first.Height <= 0)
+        {
+            state = $"the '{name}' button has no bounds";
+            return null;
+        }
+
+        Thread.Sleep(ButtonStablePause);
+        System.Drawing.Rectangle second = button.BoundingRectangle;
+        if (second != first)
+        {
+            state = $"the '{name}' button is still moving: {first} then {second}";
+            return null;
+        }
+
+        var center = new System.Drawing.Point(first.Left + (first.Width / 2), first.Top + (first.Height / 2));
+        AutomationElement? atPoint;
+        try
+        {
+            using var automation = new UIA3Automation();
+            atPoint = automation.FromPoint(center);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            state = $"UI Automation has no element at {center}: {ex.Message}";
+            return null;
+        }
+
+        if (!IsButtonOrChildNamed(atPoint, name))
+        {
+            state = $"UI Automation reports '{DescribeElement(atPoint)}' at {center}, not the '{name}' button";
+            return null;
+        }
+
+        IntPtr root = RootWindowAt(center);
+        if (root != dialog)
+        {
+            state = $"the window at {center} is 0x{root.ToInt64():X} ('{TitleOf(root)}'), not the dialog";
+            return null;
+        }
+
+        state = string.Empty;
+        return center;
+    }
+
+    /// <summary>True when the element is the named button, or a child of it within three levels.</summary>
+    private static bool IsButtonOrChildNamed(AutomationElement? element, string name)
+    {
+        for (int depth = 0; element is not null && depth < 3; depth++)
+        {
+            if (element.ControlType == ControlType.Button &&
+                string.Equals((element.Name ?? string.Empty).Replace("&", string.Empty), name, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            element = element.Parent;
+        }
+
+        return false;
+    }
+
+    private static string DescribeElement(AutomationElement? element) =>
+        element is null ? "nothing" : $"{element.ControlType} '{element.Name}'";
+
+    /// <summary>The top-level window that owns the window at a screen point, or zero.</summary>
+    private static IntPtr RootWindowAt(System.Drawing.Point point)
+    {
+        IntPtr hit = WindowFromPoint(new POINT { X = point.X, Y = point.Y });
+        return hit == IntPtr.Zero ? IntPtr.Zero : GetAncestor(hit, GaRoot);
+    }
+
+    /// <summary>The state after a press that left the dialog open: foreground and the window at the point.</summary>
+    private static string DescribePress(IntPtr dialog, string name, System.Drawing.Point point)
+    {
+        _ = ForegroundGuard.Observe(dialog, out string foreground);
+        IntPtr root = RootWindowAt(point);
+        return $"Pressed '{name}' at {point}. Foreground: {foreground}. Window at the point: 0x{root.ToInt64():X} " +
+            $"('{TitleOf(root)}'), dialog 0x{dialog.ToInt64():X}.";
     }
 
     private static AutomationElement? FindButton(RegeditProcess app, IntPtr dialog, string name) =>
@@ -809,6 +934,13 @@ internal static class AppServicesSupport
         public int Bottom;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
     private delegate bool EnumProc(IntPtr hwnd, IntPtr lParam);
 
 #pragma warning disable SYSLIB1054 // Small set of user32 calls. LibraryImport plumbing is not needed here.
@@ -831,6 +963,12 @@ internal static class AppServicesSupport
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetWindow(IntPtr hwnd, int relationship);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(POINT point);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetDlgItem(IntPtr dialog, int controlId);

@@ -214,6 +214,52 @@ reported in the status, not in the value. Test: `CopyPasteHexText`.
 Delete and Backspace follow the rules in "Delete and Backspace" above, with the offset column
 kept at its width. Test: `BackspaceDeleteKeys`.
 
+## Double-click on a selected value row
+
+The double-click path is `DetailsRowElement.OnDoubleTapped`, then `DetailsList.RowDoubleTapped`,
+then `ValueCommands.ActivateValue`, which opens the hex editor for a binary value. A user who
+double-clicks a selected binary row must get the editor every time. These are the ways it can fail.
+
+### A list rebuild between the two presses
+
+`SetRows` calls `ResetRows`, which clears the selection and recycles every row element
+(`ItemsSource` is set to null and back). If a load finishes while the user's two presses are
+pending, the second press is hit-tested on a different element. The gesture then does not complete
+as a double tap, and the element that took the first press is detached (`Owner` is null) and
+ignores the event. Rule: a rebuild that arrives between the presses does not lose the double tap
+of the row that is still under the pointer at the second press.
+
+### A double tap that is not a double tap
+
+The second press comes after the system double-click time, or farther from the first press than
+the system double-click distance (SM_CXDOUBLECLK, scaled by DPI). A user does not see this, and
+the check must not rely on it. FlaUI sends its two presses back to back, so a missed double tap
+from a slow input is a test fault, not a product fault.
+
+### The click lands somewhere else
+
+Another window covers the row at the click point, the row has no clickable point because it is
+scrolled out, or the cursor is over the title bar. The presses then never reach the row. A check
+that reports only "opened=false" hides which of these happened. Rule: the double-click is sent only when the app is foreground and UI Automation finds the row
+or one of its children at the click point. The check waits up to five seconds for that. The
+result names what was at the click point when the wait ended. The editor must still open after the
+double-click; the precondition does not excuse a lost double tap.
+
+### A gate drops the activation
+
+`ValueCommands.ModifyValueAsync` returns without a dialog when another modal is open
+(`DialogOpen`), when the window handle is not attached, or when the selection is no longer the
+activated row. `StartCommand` drops the command while a registry write runs. A user sees nothing.
+Rule: the gates only protect a real modal or a real write. A double-click on a single selected row
+with no modal and no write opens the editor.
+
+### Evidence in the check
+
+`hexedit.dialog` records the click target and the list trace from the `BWC_E2E` build: the number of
+row presses, the double taps the rows received, the outcome of the last double tap (opened, ignored
+with its reason, or detached), and the number of row rebuilds. A failed open names its cause in the
+result file.
+
 ## E2E and cleanup
 
 ### Editing test

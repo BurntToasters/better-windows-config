@@ -115,6 +115,10 @@ public sealed partial class DetailsList : UserControl
     private string _e2eLastKey = "none";
     private string _e2ePrevKey = "none";
     private bool _e2eShift;
+    private int _e2eRowPresses;
+    private int _e2eDoubleTaps;
+    private int _e2eRebuilds;
+    private string _e2eDoubleTapResult = "none";
 #endif
 
     public DetailsList()
@@ -484,6 +488,7 @@ public sealed partial class DetailsList : UserControl
             return;
         }
 
+        E2ERowPressed();
         int index = row.Index;
         if (index < 0 || index >= _rows.Count)
         {
@@ -543,18 +548,45 @@ public sealed partial class DetailsList : UserControl
         int index = row.Index;
         if (_renaming || index < 0 || index >= _rows.Count)
         {
+            E2EDoubleTap(_renaming ? "renaming" : "stale-index");
             return;
         }
 
         if (_selected.Count != 1 || !_selected.Contains(index))
         {
+            E2EDoubleTap($"not-single-selected({_selected.Count})");
             return;
         }
 
+        E2EDoubleTap("activated");
         _focus = index;
         e.Handled = true;
         RowActivated?.Invoke(this, new DetailsRowActivatedEventArgs(_rows[index], index));
     }
+
+#if BWC_E2E
+    // E2E-only trace of the row presses and double taps, shown in the UIA help text of the list.
+    private void E2ERowPressed()
+    {
+        _e2eRowPresses++;
+        UpdateHelpText();
+    }
+
+    private void E2EDoubleTap(string outcome)
+    {
+        _e2eDoubleTaps++;
+        _e2eDoubleTapResult = outcome;
+        UpdateHelpText();
+    }
+#else
+    private static void E2ERowPressed()
+    {
+    }
+
+    private static void E2EDoubleTap(string outcome)
+    {
+    }
+#endif
 
     private void OnElementPrepared(ItemsRepeater sender, ItemsRepeaterElementPreparedEventArgs args)
     {
@@ -958,6 +990,9 @@ public sealed partial class DetailsList : UserControl
         _focus = -1;
         _typeAhead.Clear();
         EndRenameCore();
+#if BWC_E2E
+        _e2eRebuilds++;
+#endif
         Repeater.ItemsSource = null;
         Repeater.ItemsSource = _rows;
         RaiseSelectionChanged();
@@ -1266,7 +1301,9 @@ public sealed partial class DetailsList : UserControl
             this,
             $"Rows={_rows.Count};Selected={_selected.Count};Focus={_focus};Anchor={_anchor};" +
             $"Presses={_e2ePresses};Captured={_e2eCaptured};Moves={_e2eMoves};Releases={_e2eReleases};Lost={_e2eLost};" +
-            $"Key={_e2eLastKey};PrevKey={_e2ePrevKey};Shift={_e2eShift};Width0={_columns[0].Width}");
+            $"Key={_e2eLastKey};PrevKey={_e2ePrevKey};Shift={_e2eShift};Width0={_columns[0].Width};" +
+            $"RowPresses={_e2eRowPresses};DoubleTaps={_e2eDoubleTaps};TapResult={_e2eDoubleTapResult};" +
+            $"Rebuilds={_e2eRebuilds}");
 #endif
     }
 

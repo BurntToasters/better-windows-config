@@ -1,8 +1,8 @@
 # Handoff: Better Windows Config
 
-Written 2026-11-11 for branch `experimental`, HEAD `106180a` ("App services, import parity, classic
-value editors, integration fixes"). Commits since `4f0f30b` are listed in section 6. Another
-worker may have uncommitted source edits in the tree. Run `git status` before you change anything.
+Refreshed 2026-11-12 for branch `experimental`, HEAD `19fb773` ("Fix E2E failures: export types,
+import progress, tree focus, hub, hex"). Section 6 lists the package status. Another worker may
+have uncommitted source edits in the tree. Run `git status` before you change anything.
 
 ## 1. Read first
 
@@ -135,13 +135,20 @@ notes, known gaps). The gate deletes each E2E result before its step runs.
 
 ### 5.5 Last recorded evidence
 
-- Gate: `artifacts/gate/result.json` is a `--quick` run at `fae4c4f` with a dirty tree. It passed.
-  It is not a full gate for `106180a`.
-- E2E, win-arm64, e2e flavor: `artifacts/e2e/result-win-arm64-e2e.json` has 902 checks and 1
-  failure, `appsvc.font.rowHeight.changed`. Commit `106180a` reports 901 passed and 1 failed.
-- E2E, win-x64, e2e flavor: `artifacts/e2e/result-win-x64-e2e.json` is older (347 checks, passed).
-  Do not treat it as current.
-- E2E check counts by commit: 753 (`0c5f352`), 794 (`fae4c4f`), 901 passed and 1 failed (`106180a`).
+- Gate: `node scripts/test-all.js --quick --rid win-arm64` passed (11/11 steps) on the tree
+  committed as `19fb773`. A full gate (`--rid all`) has not been recorded for `19fb773`.
+- E2E, win-arm64, e2e flavor, full suite on the tree of `19fb773` before its last test fix: 1155
+  of 1169 checks passed. The robustness seed fix in `19fb773` made `Robustness_*` pass (26/26).
+  Remaining: `Permissions_AdvancedReplaceChildEntriesGivesChildrenOnlyInheritedEntries` (section 7)
+  and two intermittent tests that passed on rerun (`ImportResult_MalformedLine...`,
+  `HexEditing_EditsCancelsAndCopies`).
+- E2E, win-x64: not re-run for `19fb773`. Do not treat older x64 results as current.
+- E2E check counts by commit: 901 passed and 1 failed (`106180a`), 1051 passed and 3 failed
+  (`3c7253c`), 1095 passed and 17 failed (`a6072eb`), 1155 passed and 14 failed (`19fb773` tree
+  before the robustness fix).
+- A run on 2026-11-12 morning failed in bulk because the host OS crashed and the VM drew app
+  content solid black. Black screen copies (`still unpainted (100% pure black)`) across many tests
+  mean the display is broken, not the product. Reboot the VM and re-run.
 
 ## 6. Work package status
 
@@ -182,30 +189,29 @@ Done:
   apply helper, isolation tests. The release key is a placeholder (section 7).
 - D3 Hub updater UI (`96de8ba`).
 - D9 third-party notices (`d02c0df`): `scripts/generate-nuget-licenses.js`.
+- RF2 inline create and rename, E3 Find parity, C1 core hardening, D4 to D7 release tooling
+  (`287b122`; release tooling hardened again in `3c7253c`, self-test 38/38).
+- RF6 classic Find dialog and progress window (`39cca85`).
+- E5 text, hive, REGEDIT4, and whole-registry export (`0a1828f`).
+- RF7 export range panel and import/export progress (`45bff60`, `19fb773`). Import progress
+  matches classic DLG-019/020: no Cancel and no default button.
+- RF5 rest: classic Binary Data viewer with Byte, Word, Dword, and Qword formats; resource types
+  open the binary viewers (`3c7253c`).
+- Updater hardening (`3c7253c`): one signed manifest per channel, signature binds version, channel,
+  and expiry; staged installers reused and pruned; apply refuses to run elevated.
+- E2E harness stability (`a6072eb`, `19fb773`): settled screen copies, dialog focus restore,
+  foreground rules for WinUI InputSite windows, real-click settle waits for flyouts.
 
 Remaining:
 
-- RF2 inline create and rename: `New Key #1` and `New Value #1` edited inline, and inline Rename.
-- RF5 rest: resource list, descriptor, and requirements viewers; Binary Data viewer with
-  Byte, Word, and Dword formats.
-- RF6 Find: classic Find dialog, separate progress dialog with Cancel, `FindFlags` persisted in
-  the classic key, no extra options. Depends on E3.
-- RF7 Import and Export UI: export range panel, all file types, import progress, result
-  messages, cancellation.
-- RF8 rest: Select Computer through the object picker, remote root context menu, remote editing
-  (after E4).
-- RF9 accelerators and context menus from the oracle tables, text-edit context menu, the
-  "Go to HKEY_CURRENT_USER" variant, Expand and Collapse label switch.
-- RF10 Print: range panel, progress dialog, print-to-file report test.
-- E3 Find parity: resume when the cursor is gone, `CompareStringEx` ordering, data-matching rules
-  from an oracle capture, classic `FindFlags` codec.
-- E4 Security, remote, and privileges: SACL support, self-relative descriptor check, AddRef on
-  remote handles, serialized `PrivilegeScope`, remote write routing behind the write policy.
-- E5 Export formats: text export, hive export from the UI, REGEDIT4 selection, whole-registry export.
-- C1 Core hardening: `SingleInstance` backoff and timeout, current-user-only client, settings size cap.
+- RF8 rest: Select Computer through the object picker, remote root context menu, remote editing.
+- RF9 accelerators and context menus from the oracle tables: verify against the inventory.
+- RF10 Print: range panel, progress dialog, print-to-file report test: verify against the inventory.
+- E4 rest: SACL support (Auditing tab), remote write routing behind the write policy. Remote
+  handles are pinned and `SetKeySecurity` propagates (`3c7253c`).
+- Permissions Applies-to flags (section 7, item 11).
 - D1 compile and E2E, once NSIS is installed.
-- D4 to D8 release tooling: signer and manifest validators, release dry-run harness, session and
-  preflight policy, draft, verify, and publish. D8 (signing) needs GnuPG.
+- D8 signing, once GnuPG is installed and the user creates the release key.
 - D10 first beta dry run `0.1.0-beta.1` to a draft release. The user runs it on a release VM.
 - R15 parity audit: not started. Classify every inventory row as pass, declared difference, or
   gap, and write `docs/parity/regedit-audit.md`. Run it after the remaining packages.
@@ -216,10 +222,7 @@ Remaining:
 
 ## 7. Known issues
 
-1. `appsvc.font.rowHeight.changed` fails. After View > Font changes to 16 DIP, the list row
-   height reads 0 px (expected 64 px). Live font changes break the window's UI Automation tree.
-   The user reports a fix in progress. Re-run the arm64 E2E flavor before trusting `106180a`. The
-   screenshot path is in the E2E result file.
+1. Fixed in `16eb754`: `appsvc.font.rowHeight.changed` (live font changes kept the UIA tree).
 2. The update release key is a placeholder. `src/Bwc.Update/Signing/TrustedKeys.cs` sets
    `IsPlaceholder = true`, so updates fail closed. The user must create the real key and replace it.
    A release build must not ship with the placeholder.
@@ -229,14 +232,25 @@ Remaining:
 5. Classic regedit's `HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit\Favorites`
    subkey disappeared during the session. The cause is unknown. Check the favorites tests and
    captures before relying on them.
-6. Find still uses `CurrentCultureIgnoreCase` for matching and ordering
-   (`src/Bwc.Registry/Find/RegistryFinder.cs`). Classic uses `CompareStringEx`. E3 covers this.
+6. Fixed in `287b122` and `3c7253c`: Find matching uses the NLS functions (`FindNLSStringEx`).
 7. `scripts/test-all.js` help text and its `--quick` description say "three test projects". The gate
    runs four: `test-core`, `test-registry-e2e`, `test-registry-shipping`, and `test-update`.
 8. `.githooks/*` are not executable (mode 100644).
 9. CI (`.github/workflows/ci.yml`) runs the quick gate and the x64 E2E suite on `experimental`. The
    status for HEAD is not recorded here. Check the latest run before you call it green.
 10. The 100% scale oracle capture is still owed. The current captures are at 192 DPI.
+11. Permissions Applies-to labels. Inherited HKCU entries carry ACE flags `0x3` (CI|OI), but
+    `src/Bwc.Registry/RegistryInheritanceModes.cs` defines "This key and subkeys" as `0x2`, so aclui
+    labels those entries "Special" and `Permissions_AdvancedReplaceChildEntries...` fails. Do not
+    change the flags until classic is measured: in classic regedit add an entry with each Applies-to
+    choice under `HKCU\Software\BWC-Oracle` and read the flags with `Get-Acl`. A UIA driver cannot
+    reach classic regedit's SysTreeView32 tree, so this capture needs a person or a Win32 driver.
+12. WinUI drops a mouse press that arrives while a MenuFlyout is still opening. Tests wait for the
+    item's bounds to settle (at least 300 ms) before a real click (`PermissionsTests.cs`).
+13. The user hive `NTUSER.DAT` grew to 166 MB from large E2E seeds in earlier runs. Test seeds are
+    now capped at 5000 keys. Never seed more.
+14. The test host machine is a Parallels VM. If the host sleeps or crashes, WinUI content draws
+    black. See section 5.5.
 
 ## 8. User decisions
 
@@ -247,10 +261,11 @@ These stand until the user changes them.
 - Microsoft content from the oracle stays untracked. Regenerate it with `npm run oracle`.
 - Never prompt UAC. The elevated runner is opt-in, and the user installs it.
 - Implementation runs through `/oversee` with Haiku 5.5 workers (`model: "haiku"`,
-  `effort: "xhigh"`, `subagent_type: "general-purpose"`). The manager audits every change, runs
+  `effort: "high"` since 2026-11-12, `subagent_type: "general-purpose"`). The manager audits every change, runs
   every check, and looks at the screenshots.
 - Chat replies are terse. Files, docs, and code use normal prose.
-- Commits go on `experimental` only, and only when the user asks. No agent co-author trailers
+- Commits go on `experimental` only. During unattended sessions the user allows commits of
+  verified checkpoints (gate and E2E run, failures listed in the message). No agent co-author trailers
   (AGENTS.md). No push without the user.
 - Open for the user: install NSIS 3.10 or newer and GnuPG; provide a 100% scale session or VM;
   create the release key; choose the update server; decide whether to rewrite history to remove
@@ -272,14 +287,10 @@ These stand until the user changes them.
 
 ## 10. Next steps
 
-1. Confirm or fix `appsvc.font.rowHeight.changed` in the arm64 E2E flavor. Then run the full gate
-   for both RIDs with one command: `node scripts/test-all.js --rid all`. Record the result.
-2. Start the next three packages, also listed in `resume.md`:
-   - RF2 inline create and rename (regedit lane, no open dependencies).
-   - E3 Find parity (engine lane; RF6 depends on it).
-   - D4 to D7 release tooling (scripts only; no NSIS needed).
-3. Then, in any order that the dependencies allow: RF5 rest, RF6, RF7, RF8 rest, RF9, RF10, E4,
-   E5, C1, D8, D1 compile, and D10.
+1. Run the full gate for both RIDs: `node scripts/test-all.js --rid all`. Record the result.
+2. Measure classic's Applies-to flags (section 7, item 11) and fix `RegistryInheritanceModes`.
+3. Then, in any order that the dependencies allow: RF8 rest, RF9 and RF10 verification, E4 rest,
+   D1 compile (NSIS), D8 (GnuPG and the release key), and D10.
 4. Run R15 after the remaining packages. Every row is `open` until then, which means unclassified,
    not failing.
 5. Owed manual checks: the elevated runner run (the user enables the task), remote registry against

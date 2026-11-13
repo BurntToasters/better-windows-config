@@ -478,7 +478,9 @@ public static class RegeditMenu
 
         if (command.AcceleratorText is not null)
         {
+            // The shortcut is already the item's text. WinUI must not add an accelerator tooltip on top.
             item.KeyboardAcceleratorTextOverride = command.AcceleratorText;
+            item.KeyboardAcceleratorPlacementMode = Microsoft.UI.Xaml.Input.KeyboardAcceleratorPlacementMode.Hidden;
         }
 
         if (command.Invoke is not null)

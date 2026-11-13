@@ -6,6 +6,7 @@ using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
+using FlaUI.UIA3;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Win32;
 
@@ -117,7 +118,7 @@ public sealed class HexEditingTests
         E2EResults.Record(
             "hexedit.dialog",
             opened,
-            $"doubleClick opened editor={opened}.");
+            $"doubleClick opened editor={opened}. {_openDetail}");
 
         string status = StatusOf(driver);
         AutomationElement? firstRow = driver.WaitForElement("HexRow_0");
@@ -339,10 +340,15 @@ public sealed class HexEditingTests
             $"closed={closed}, focusReturnedToList={focusReturned}, unchangedLength={unchanged}.");
     }
 
+    /// <summary>Why the last <see cref="OpenEditor"/> call failed, or what it saw when it worked.</summary>
+    private static string _openDetail = string.Empty;
+
     private static bool OpenEditor(AppSession session, EditingDriver driver, string rowName)
     {
+        _openDetail = string.Empty;
         if (!driver.WaitForNoDialog(TimeSpan.FromSeconds(1)))
         {
+            _openDetail = "a dialog was already open before the double-click";
             return false;
         }
 
@@ -350,6 +356,19 @@ public sealed class HexEditingTests
         AutomationElement? row = FindRow(session, rowName);
         if (row is null)
         {
+            _openDetail = "the row was not found in the list";
+            return false;
+        }
+
+        // The input is valid only when the app is foreground and the click point belongs to this row. The
+        // wait covers that precondition; the editor must still open after the double-click.
+        string target = string.Empty;
+        bool onRow = ControlTestSupport.WaitUntil(
+            () => IsForeground(session) && ClickTargetIsRow(session, row, out target),
+            TimeSpan.FromSeconds(5));
+        if (!onRow)
+        {
+            _openDetail = $"the click point never reached the row. {target}. {ForegroundOf(session)}.";
             return false;
         }
 
@@ -357,15 +376,112 @@ public sealed class HexEditingTests
         {
             row.DoubleClick();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _openDetail = $"DoubleClick threw {ex.GetType().Name}: {ex.Message}. {target}.";
             return false;
         }
 
         bool dialog = driver.WaitForDialog();
         bool root = driver.WaitForElement("DialogRoot") is not null;
         bool editor = driver.WaitForElement("HexEditor") is not null;
-        return dialog && root && editor;
+        bool opened = dialog && root && editor;
+        _openDetail = opened
+            ? $"{target}. {ListTrace(session)}."
+            : $"no editor after the double-click. {target}. {ListTrace(session)}. {ForegroundOf(session)}.";
+        return opened;
+    }
+
+    private static bool IsForeground(AppSession session) =>
+        ForegroundGuard.Observe(session.MainHwnd, out _) == ForegroundState.Target;
+
+    /// <summary>
+    /// True when the row's click point is hit by the row itself or by one of its children. The description
+    /// names what UI Automation found at the point, so a covered or empty target is visible in the result.
+    /// </summary>
+    private static bool ClickTargetIsRow(AppSession session, AutomationElement row, out string description)
+    {
+        description = string.Empty;
+        try
+        {
+            if (!row.TryGetClickablePoint(out System.Drawing.Point point))
+            {
+                description = "no clickable point";
+                return false;
+            }
+
+            using var automation = new UIA3Automation();
+            AutomationElement? hit = automation.FromPoint(point);
+            string hitText = hit is null
+                ? "nothing"
+                : $"{hit.ControlType} '{ControlTestSupport.SafeName(hit)}' in pid {SafeProcessId(hit)}";
+            description = $"click point ({point.X},{point.Y}) hits {hitText}; app pid {session.ProcessId}";
+            return hit is not null && IsRowOrDescendant(hit, row);
+        }
+        catch (Exception ex)
+        {
+            description = $"target lookup threw {ex.GetType().Name}: {ex.Message}";
+            return false;
+        }
+    }
+
+    private static bool IsRowOrDescendant(AutomationElement element, AutomationElement row)
+    {
+        int[] rowId = RuntimeIdOf(row);
+        for (AutomationElement? current = element; current is not null; current = SafeParent(current))
+        {
+            if (rowId.Length > 0 && RuntimeIdOf(current).SequenceEqual(rowId))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static int[] RuntimeIdOf(AutomationElement element)
+    {
+        try
+        {
+            return element.FrameworkAutomationElement.RuntimeId.ValueOrDefault ?? [];
+        }
+        catch (Exception)
+        {
+            return [];
+        }
+    }
+
+    private static AutomationElement? SafeParent(AutomationElement element)
+    {
+        try
+        {
+            return element.Parent;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static int SafeProcessId(AutomationElement element)
+    {
+        try
+        {
+            return element.Properties.ProcessId.ValueOrDefault;
+        }
+        catch (Exception)
+        {
+            return -1;
+        }
+    }
+
+    private static string ListTrace(AppSession session) =>
+        "list trace: " + HelpTextOf(session.Find(ControlTestSupport.ListControl));
+
+    private static string ForegroundOf(AppSession session)
+    {
+        ForegroundState state = ForegroundGuard.Observe(session.MainHwnd, out string text);
+        return $"foreground {state}: {text}";
     }
 
     private static bool FocusEditor(
