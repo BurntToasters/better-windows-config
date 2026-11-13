@@ -7,6 +7,7 @@ import { resolveRepo, tagForVersion, isPrereleaseVersion } from "./github-releas
 import { loadReleaseBundle } from "./release-bundle.js";
 import {
   currentCommit,
+  embeddedReleaseKeys,
   git,
   readChangelogSection,
   readPackageVersion,
@@ -14,6 +15,7 @@ import {
   sessionPath,
   verifySessionFile,
 } from "./release-policy.js";
+import { stableReleaseOverrideProblems } from "../release-policy.js";
 import { readTrustedKeysFile } from "./trusted-keys.js";
 import { channelForVersion, tryParseSemVer } from "./semver.js";
 
@@ -55,10 +57,27 @@ export async function prepareReleaseContext(options) {
 
   let version = options.version ?? readPackageVersion(root);
   const sessionFile = options.session ? resolveUnder(root, options.session) : sessionPath(root);
-  const trustedKeys = (options.trustedKeys ?? []).map((value) => {
-    const candidate = resolveUnder(root, value);
-    return candidate && fs.existsSync(candidate) ? candidate : value;
-  });
+  // An explicit --trusted-key wins (dry runs and tests). Otherwise the trusted set is the embedded,
+  // non-placeholder keys of TrustedKeys.cs. A placeholder list leaves the set empty, and preflight
+  // refuses it with a pointer to docs/RELEASE.md.
+  let trustedKeySource = "explicit";
+  let trustedKeys = [];
+  if (options.trustedKeys?.length) {
+    trustedKeys = options.trustedKeys.map((value) => {
+      const candidate = resolveUnder(root, value);
+      return candidate && fs.existsSync(candidate) ? candidate : value;
+    });
+  } else {
+    const embedded = embeddedReleaseKeys(root);
+    trustedKeySource = embedded.ok ? "embedded" : "none";
+    trustedKeys = embedded.ok ? embedded.keys : [];
+  }
+  // A stable draft, verify, or publish refuses the beta overrides and non-canonical GitHub targets.
+  if (options.apply) {
+    for (const problem of stableReleaseOverrideProblems(process.env, version)) {
+      errors.push({ reason: "stable-override", detail: problem, exitCode: EXIT.REFUSED });
+    }
+  }
   if (!tryParseSemVer(version)) {
     return {
       ok: false,
@@ -119,7 +138,7 @@ export async function prepareReleaseContext(options) {
       version,
       channel,
       allowDetached: options.allowDetached,
-      trustedKey: trustedKeys[0],
+      trustedKey: trustedKeySource === "explicit" ? trustedKeys[0] : undefined,
       requireTrustedKey: true,
     });
     errors.push(...preflight.errors);
@@ -224,6 +243,7 @@ export async function prepareReleaseContext(options) {
     bundle,
     repo,
     trustedKeys,
+    trustedKeySource,
     notes: changelog.ok ? changelog.body : `Release ${version}.`,
     notesMissing: !changelog.ok,
   };

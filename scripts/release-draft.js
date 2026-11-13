@@ -338,6 +338,15 @@ async function run(options) {
     requireSession: true,
   });
 
+  // A stable release never replaces an uploaded asset, even when the flag is given explicitly.
+  if (options.apply && options.replaceAssets && context.channel === "stable") {
+    context.errors.push({
+      reason: "asset-replace-stable",
+      detail: "--replace-assets is refused for a stable release",
+      exitCode: EXIT.REFUSED,
+    });
+  }
+
   if (!context.repo) {
     printRefusals("release-draft", context.errors);
     return EXIT.USAGE;

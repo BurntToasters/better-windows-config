@@ -7,7 +7,13 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { EXIT, describeError, exitCodeForErrors, parseArguments, printRefusals, repoRootFrom, writeJson } from "./lib/cli.js";
-import { currentCommit, runPreflight, sessionPath } from "./lib/release-policy.js";
+import {
+  currentCommit,
+  qualityGateProof,
+  readQualityGateResult,
+  runPreflight,
+  sessionPath,
+} from "./lib/release-policy.js";
 
 const SCRIPT = "scripts/release-session.js";
 const REPO_ROOT = repoRootFrom(import.meta.url);
@@ -32,6 +38,8 @@ Options:
   --max-age-hours <n>     Session lifetime. Default ${DEFAULT_MAX_AGE_HOURS}.
   --session <path>        Session file. Default artifacts/release/session.json.
   --force                 create: replace an existing session.
+  --require-gate          create: refuse unless artifacts/gate/result.json passes for HEAD.
+                          The session then records the quality gate and its E2E state.
   --json                  Print one JSON line.
   --help                  Show this help.
 
@@ -41,7 +49,7 @@ Exit codes: 0 pass, 1 refused or expired, 2 usage, 3 missing session or input.`)
 function parseOptions(argv) {
   const parsed = parseArguments(argv, {
     values: ["root", "version", "channel", "trusted-key", "artifact-dir", "max-age-hours", "session"],
-    flags: ["allow-detached", "require-trusted-key", "force", "json", "help"],
+    flags: ["allow-detached", "require-trusted-key", "require-gate", "force", "json", "help"],
   });
   if (parsed.has("help")) return { help: true };
   if (parsed.positionals.length > 1) {
@@ -70,6 +78,7 @@ function parseOptions(argv) {
     allowDetached: parsed.has("allow-detached"),
     trustedKey: parsed.get("trusted-key"),
     requireTrustedKey: parsed.has("require-trusted-key"),
+    requireGate: parsed.has("require-gate"),
     artifactDir: parsed.get("artifact-dir") ? path.resolve(parsed.get("artifact-dir")) : null,
     maxAgeHours: maxAgeHours === undefined ? DEFAULT_MAX_AGE_HOURS : Number(maxAgeHours),
     session: parsed.get("session") ? path.resolve(parsed.get("session")) : null,
@@ -142,6 +151,14 @@ async function create(options) {
     return exitCodeForErrors(result.errors);
   }
 
+  // The gate proof is recorded only when it passes for HEAD. --require-gate makes its absence fatal.
+  const gate = qualityGateProof(readQualityGateResult(options.root), currentCommit(options.root));
+  if (options.requireGate && !gate.ok) {
+    console.error(`${SCRIPT}: REFUSED [${gate.reason}]: ${gate.detail}`);
+    console.error("release-session: no session was written.");
+    return EXIT.REFUSED;
+  }
+
   const session = {
     schema: 1,
     product: "Better Windows Config",
@@ -153,6 +170,7 @@ async function create(options) {
     packageVersion: result.release.packageVersion,
     changelogHeading: result.changelog?.heading ?? null,
     trustedKey: sessionKeySummary(result.trusted.key),
+    qualityGate: gate.ok ? gate.record : null,
     startedUtc: new Date().toISOString(),
     maxAgeHours: options.maxAgeHours,
   };

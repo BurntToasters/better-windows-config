@@ -4,7 +4,7 @@ import { EXIT, sha256FileStream } from "./cli.js";
 import { verifyBuffer, verifyFile, parseTrustedComment, isPlainFileName } from "./minisign.js";
 import { compareSemVer, isPrerelease, tryParseSemVer } from "./semver.js";
 import { parseStrictJson, decodeCanonicalBase64 } from "./strict-json.js";
-import { validateUrl } from "./url-policy.js";
+import { isLoopbackUrl, validateUrl } from "./url-policy.js";
 
 export const KNOWN_ARCHES = Object.freeze(["win-x64", "win-arm64"]);
 export const MAX_MANIFEST_BYTES = 256 * 1024;
@@ -62,6 +62,14 @@ function makeResult() {
       checks.push({ name, pass, detail });
     },
   };
+}
+
+/**
+ * Plain http is accepted only for a loopback URL and only when the caller opts in (the live check's
+ * test base). Every release path leaves the option off, so https stays required.
+ */
+function allowsHttp(options, url) {
+  return options.allowLoopbackHttp === true && isLoopbackUrl(url);
 }
 
 function stringField(object, name) {
@@ -141,7 +149,7 @@ export async function validateManifestBuffer(bytes, options = {}) {
     if (typeof manifest.notesUrl !== "string") {
       result.add("manifest-invalid", "notesUrl must be a string");
     } else {
-      const notes = validateUrl(manifest.notesUrl, { requireHttps: true });
+      const notes = validateUrl(manifest.notesUrl, { requireHttps: !allowsHttp(options, manifest.notesUrl) });
       if (!notes.ok) {
         result.add("url-rejected", `notesUrl: ${notes.detail}`);
       }
@@ -166,7 +174,7 @@ export async function validateManifestBuffer(bytes, options = {}) {
       if (!url) {
         result.add("manifest-invalid", `${architecture}: url must be a string`);
       } else {
-        const checkedUrl = validateUrl(url, { requireHttps: true });
+        const checkedUrl = validateUrl(url, { requireHttps: !allowsHttp(options, url) });
         if (!checkedUrl.ok) {
           result.add("url-rejected", `${architecture}: ${checkedUrl.detail}`);
         }

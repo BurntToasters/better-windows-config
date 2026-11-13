@@ -24,7 +24,8 @@ Options:
   --channel <stable|beta> Expected channel. Defaults to the version.
   --allow-detached        Allow a detached HEAD contained in the expected branch.
   --trusted-key <path>    Public release key to parse and report.
-  --require-trusted-key   Refuse when --trusted-key is absent.
+  --require-trusted-key   Refuse when there is no trusted key: no --trusted-key and no embedded
+                          non-placeholder key in TrustedKeys.cs.
   --artifact-dir <dir>    Validate a D5 artifact directory as part of preflight.
   --json                  Print one JSON line.
   --help                  Show this help.

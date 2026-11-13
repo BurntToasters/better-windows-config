@@ -1,22 +1,97 @@
 # Release
 
-This document covers the release tooling from D4 to D7: the minisign signer, the manifest
-validator, the offline dry run, the release session and preflight, and the GitHub draft,
-verify, and publish commands. It does not cover NSIS (D1), Authenticode or GnuPG signing (D8),
-or the first beta run on a release VM (D10).
+This document covers the release tooling: the minisign signer, the manifest validator, the
+offline dry run, the release session and preflight, the GitHub draft, verify, and publish
+commands, and the Windows release VM flow (`npm run release:win`) that builds, signs, and uploads
+the stable release. The first release is `0.1.0` on the stable channel, with no beta.
 
 The update format is fixed by [contracts/update-manifest.md](contracts/update-manifest.md).
 The release failure cases are in [failure-modes/release.md](failure-modes/release.md).
 
+## Release VM runbook
+
+Run these steps on the Windows release VM, in order. The sections after this one give the
+detail and the refusal reasons.
+
+### 1. One-time VM setup
+
+1. Install Node 22.22.2 or newer (or 24.15+), the .NET SDK 10.0.403 or newer, NSIS 3.10 or newer
+   (`makensis.exe` on PATH, or `NSIS_HOME` set), and GnuPG 2.4 or newer with the release signing
+   key imported.
+2. Run `gh auth login` for the account that can create releases in `BurntToasters/better-windows-config`.
+3. In an Administrator PowerShell, from the repository root, run `npm run setup:win:artifact-signing`.
+   It installs the Artifact Signing client tools (see "Windows code signing" below).
+4. Copy Zinnia's `.env` to this checkout's `.env`. Its signing variables are `TAURI_SIGNING_PRIVATE_KEY`,
+   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, `GPG_KEY_ID`, `GPG_PASSPHRASE`, and the `AZURE_*` values.
+   Nothing else is needed. The release flow reads only variables that Zinnia's `.env` has. The trusted
+   public key comes from `src/Bwc.Update/Signing/TrustedKeys.cs` (user step 2 below), not from `.env`.
+   `GH_REPO_OWNER` and `GH_REPO_NAME` may stay unset.
+
+### 2. Release branch
+
+Stable releases come from `main`. Merge `experimental` into `main` through the normal review, then:
+
+```powershell
+git switch main
+git pull --ff-only origin main
+```
+
+`package.json`, `Directory.Build.props`, and the `CHANGELOG.md` section for `0.1.0` must agree.
+The preflight checks this, and a dirty tree is refused.
+
+### 3. Build, gate, sign, and upload the draft
+
+```powershell
+npm run release:win
+```
+
+This runs, in order: the stable policy (no beta overrides, no non-canonical GitHub target), the
+preflight, the quick quality gate (`test:all --quick`, which runs no GUI E2E on this VM), a release
+session that records the gate with E2E `skipped`, a clean `artifacts/release/<version>/` folder, and
+then `npm run release:win:continue`. The continuation builds both RIDs (ship flavor), builds the two
+signed setup EXEs, assembles and signs the bundle, adds GPG signatures, checks Authenticode, creates
+or reuses the single draft and uploads its assets, verifies the draft, and runs `release:finalize`.
+
+`release:finalize` mirrors the release folder and then runs `git fetch origin && git reset --hard @{u}
+&& git clean -fd`. That discards local changes in this checkout, so run it only on this disposable
+release VM. The runner prints a warning before it starts. Artifacts under `artifacts/` are git-ignored
+and survive it.
+
+If a step fails, fix the cause, then run `npm run release:win:resume`. It runs the policy and the
+preflight, then the continuation. A session older than 24 hours is refused, so start again with
+`npm run release:win` in that case.
+
+### 4. Packaged-artifact QA
+
+On a clean x64 VM, install the signed setup EXE from `artifacts/release/<version>/stable/`, then test
+the update path, then uninstall. Check that each installed file is signed, that the Hub's update check
+finds the published feed, and that the shell integration registers and removes cleanly. Do not
+publish a draft that has not passed.
+
+### 5. Publish, then verify the live feed
+
+```powershell
+npm run release:publish
+npm run release:verify:published
+```
+
+`release:publish` runs the draft verification again against the downloaded assets before it flips
+the draft to published. `release:verify:published` then proves the live updater feed and the
+signatures for the published version.
+
 ## Status
 
-- D4 to D7 are implemented as scripts. Nothing is published, and no release exists.
+- The release tooling (D4 to D7) and the Windows release VM flow are implemented as scripts. Nothing
+  is published until the VM runbook above runs with `--apply` (`release:publish`).
 - The built-in update key is still the placeholder in
-  `src/Bwc.Update/Signing/TrustedKeys.cs`. Every `--apply` path refuses it.
+  `src/Bwc.Update/Signing/TrustedKeys.cs`. Preflight, draft, verify, and publish all refuse it, so
+  the real public key must be embedded first (user step 2 below).
 - The dry-run harness uses an ephemeral test key and a `.dry-run.json` installer stand-in
   when NSIS has not produced a real setup EXE. `--apply` refuses both.
-- NSIS 3.10 or newer and GnuPG 2.4 or newer are not installed. The scripts never call
-  `makensis` or `gpg`.
+- On the release VM, `build-installer.js` runs NSIS and `gpg-sign.js` runs GnuPG. A dry run calls
+  neither. `release:draft`, `release:verify`, and `release:publish` call `gh` only with `--apply`.
+- The stable policy is `scripts/release-policy.js`. Only the release entry points call it, so local
+  dev builds may still set `SKIP_WIN_CODESIGN=1`.
 
 ## Prerequisites
 
@@ -25,7 +100,7 @@ The release failure cases are in [failure-modes/release.md](failure-modes/releas
 | Node 22.22.2, 24.15, or 26+ | All scripts. |
 | .NET SDK 10.0.403 or newer | Only a non-dry-run publish uses it. |
 | NSIS 3.10+ | A real setup EXE. The dry run does not need it. |
-| GnuPG 2.4+ | The user's release signing policy (D8). These scripts do not call it. |
+| GnuPG 2.4+ | Detached signatures of the release folder (`scripts/gpg-sign.js`). Used on the release VM only. |
 | GitHub CLI, authenticated | Only `--apply` for draft, verify, and publish. Dry runs never start `gh`. |
 | A real minisign release key | Created and protected by the user. |
 
@@ -37,7 +112,8 @@ $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Env
 
 ## User-owned steps
 
-These are not implemented by D4 to D7.
+The release VM runbook above covers the day-to-day flow. These are the one-time duties the
+scripts do not do for you.
 
 1. Create the real minisign release key. Keep the secret key off the repository and off the
    release VM image history, and encrypt it with a password you keep in a password manager
@@ -54,23 +130,32 @@ These are not implemented by D4 to D7.
    Run `gh auth login` on the release VM. The stable manifest is the `bwc-stable.json` asset of the
    latest stable release (see the Hub's `UpdateSources.cs`), and each installer is an asset of
    `releases/download/v<version>/`. The beta URL stays empty until a beta channel is published.
-4. Install NSIS 3.10+ and compile `installer/bwc.nsi` (D1). Until then, a dry-run artifact
-   contains a stand-in, not an installer.
-5. Sign the setup EXE with the Windows code-signing certificate (D8). SmartScreen warns on
-   an unsigned download.
-6. The first release is `0.1.0`, stable, with no beta. Build it from `main` on the release VM (D10).
-   That is the first run that may use `--apply`.
+4. Install NSIS 3.10+ on the release VM. `build-installer.js` compiles `installer/bwc.nsi` with it. A
+   dry-run artifact contains a stand-in, not an installer, and a release never uses one.
+5. Authenticode-sign the BWC binaries and the setup EXE with Azure Artifact Signing (see "Windows code
+   signing" below). SmartScreen warns on an unsigned download.
+6. The first release is `0.1.0`, stable, with no beta. Build it from `main` on the release VM (see the
+   runbook above). That is the first run that may use `--apply`.
 
 ## Secrets (`.env`)
 
 `.env` is git-ignored. Copy `.env.example` to `.env` and fill it in. Zinnia's `.env` can be copied
 unchanged, because the variables BWC does not use are kept in `.env.example`. The release scripts that
-need it (`release:dry-run`, `release:assemble`, `release:sign`, `release:draft`, `release:verify`, and
-`release:publish`) load it with `node --env-file-if-exists=.env`. That needs Node 22.9 or newer, and it
-adds no dependency. Variables already set in the shell win over `.env`.
+need it (`release:win`, `release:win:continue`, `release:win:resume`, `release:policy`,
+`release:preflight`, `release:session:*`, `release:assemble`, `release:sign`, `release:sign:gpg`,
+`release:mirror`, `release:draft`, `release:verify`, `release:verify:draft`, `release:publish`,
+`installer:*`, and `release:dry-run`) load it with `node --env-file-if-exists=.env`. That needs Node
+22.9 or newer, and it adds no dependency. Variables already set in the shell win over `.env`. The
+PowerShell Authenticode step (`release:authenticode`) reads the environment of the run that loaded
+`.env`, so start it through `npm run release:win:continue`, or set the Azure variables in the shell.
 
 The variables this tooling reads are `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`,
-`GH_REPO`, `GH_REPO_OWNER`, and `GH_REPO_NAME`. The signing key is never printed, logged, written
+`GPG_KEY_ID`, `GPG_PASSPHRASE`, `GH_REPO`, `GH_REPO_OWNER`, and `GH_REPO_NAME`. The trusted public keys are
+not read from the environment: when no `--trusted-key` is given, the release tooling trusts exactly the
+non-placeholder keys embedded in `TrustedKeys.cs`. A stable release refuses
+`SKIP_WIN_CODESIGN`, `FORCE_UPLOAD`, `SKIP_RELEASE_MIRROR`, `ALLOW_ASSET_REPLACE`, and `SKIP_E2E` when
+they are truthy, and any GitHub target other than `BurntToasters/better-windows-config` (policy S1 to
+S5 in [failure-modes/release.md](failure-modes/release.md)). The signing key is never printed, logged, written
 unencrypted, or passed on a command line. `--key` and `--secret-key` accept a path only. The failure
 cases are K1 to K13 in [failure-modes/release.md](failure-modes/release.md).
 
@@ -452,6 +537,9 @@ A dry run that finds a refusal still prints the plan and exits 1.
 | `gh-missing`, `gh-failed`, `repo-invalid` | `gh` is absent or failed, or the repository is not owner/name. |
 | `build-failed`, `verification-failed` | A requested publish failed, or the pre-publish verify refused. |
 | `key-missing`, `key-unreadable`, `key-malformed` | No key source, a key given as text on the command line, or an environment value that is neither minisign key text, a key path, nor base64 of one. The value is never printed. |
+| `stable-override` | A stable release set a beta override (`SKIP_WIN_CODESIGN`, `FORCE_UPLOAD`, `SKIP_RELEASE_MIRROR`, `ALLOW_ASSET_REPLACE`, `SKIP_E2E`) or a non-canonical GitHub target. Exit 1. |
+| `asset-replace-stable` | `--replace-assets` was given for a stable release. Exit 1. |
+| `gate-missing`, `gate-failed`, `gate-commit-mismatch` | `release-session.js create --require-gate` found no passing quality gate for HEAD. Exit 1, no session written. |
 
 ## Self-test
 
@@ -461,6 +549,15 @@ It proves the signer, the named validation refusals, preflight, and session crea
 ```powershell
 node scripts/release-selftest.js
 ```
+
+The release VM flow has its own self-test, with no network, no `gh`, and no build:
+
+```powershell
+node scripts/run-release-selftest.js
+```
+
+It checks the stable policy refusals, the exact step lists of `release:win` and `release:win:continue`,
+the quality-gate proof, the trusted-key default, and the package.json entry points.
 
 Result: `artifacts/release/selftest/result.json`. It covers wrong key, bad hash, size
 mismatch, wrong channel, placeholder key, malformed JSON, wrong architecture, installer
@@ -501,10 +598,10 @@ never runs this setup itself and never starts UAC.
 
 ### Variables
 
-The variables have the same names as in Zinnia's `.env`. Copy that file, then make its values
-available to the build. The build reads them from the environment and does not load `.env` itself.
-Zinnia loads its `.env` with `dotenv-cli`. Either wrap the build the same way, or set the values in the
-session before the build.
+The variables have the same names as in Zinnia's `.env`. Copy that file. The `installer:x64` and
+`installer:arm64` scripts load it with `node --env-file-if-exists=.env`, so `npm run installer:x64`
+needs no extra setup. A direct run of `scripts/build-installer.js` reads the environment only, so load
+`.env` first in that case.
 
 | Variable | Use |
 | --- | --- |
@@ -544,10 +641,14 @@ Verify one file by hand: `powershell.exe -NoProfile -ExecutionPolicy Bypass -Fil
 
 ## What remains
 
-- D1: install NSIS 3.10+ and compile `installer/bwc.nsi`. A real release must use the setup
-  EXE, not the `.dry-run.json` stand-in.
-- D8: the real release key, Authenticode signing, and the user's GnuPG policy.
-- D10: the first `0.1.0` stable run on the release VM, with a real `gh` login and the real key.
+- The real release key: the placeholder in `TrustedKeys.cs` must be replaced with the public key. Until
+  then `npm run release:win` refuses before its first step. Nothing above can run a real release.
+- The first `0.1.0` stable run on the release VM (runbook above), with a real `gh` login and the real key.
+- `release:verify:published` (`scripts/validate-updater-live.js`) and `release:mirror`
+  (`scripts/finalize-release-assets.js`) and `release:sign:gpg` (`scripts/gpg-sign.js`) are called by
+  the flow but are not part of this change set. Each must exist before the flow reaches it.
+- `release:finalize` mirrors `artifacts/release/<version>/stable`, because its npm script names that
+  folder. A beta release on this VM would need its own finalize entry.
 - The stable manifest URL in `src/Bwc.Hub/Updates/UpdateSources.cs` points at the GitHub latest-release
   asset `bwc-stable.json`. The beta URL is empty. Until the real key replaces the placeholder, the
   Hub reports "not configured" and never fetches the manifest.

@@ -50,7 +50,7 @@ Options:
   --channel <stable|beta>  Default from the version.
   --dir <path>             D5 artifact directory. Default artifacts/release/<version>.
   --session <path>         Session file. Default artifacts/release/session.json.
-  --trusted-key <path>     Public release key. Repeatable. Required.
+  --trusted-key <path>     Public release key. Repeatable. Default: the keys embedded in TrustedKeys.cs.
   --root <dir>             Repository root. Default: the checkout this script is in.
   --repo <owner/name>      Default GH_REPO, then GH_REPO_OWNER and GH_REPO_NAME, then BurntToasters/better-windows-config.
   --commit <rev>           Default HEAD.
@@ -115,7 +115,10 @@ function verifyArgs(context, options) {
   if (options.channel) args.push("--channel", options.channel);
   args.push("--dir", context.dir);
   args.push("--session", context.sessionFile);
-  for (const key of context.trustedKeys) args.push("--trusted-key", key);
+  // The verify child reads the embedded keys itself. Only an explicit --trusted-key is passed on.
+  if (context.trustedKeySource === "explicit") {
+    for (const key of context.trustedKeys) args.push("--trusted-key", key);
+  }
   if (options.repo) args.push("--repo", options.repo);
   if (options.commit) args.push("--commit", options.commit);
   if (options.maxAgeHours !== undefined) args.push("--max-age-hours", String(options.maxAgeHours));
