@@ -125,6 +125,25 @@ export function publishBody({ prerelease }) {
   return { draft: false, prerelease: Boolean(prerelease) };
 }
 
+/** The folder name earlier runs wrote gh request bodies to inside the release folder. Readers skip it. */
+export const LEGACY_GH_REQUEST_DIR = "gh";
+
+/**
+ * Where the gh request bodies for a release folder go: a sibling folder (artifacts/release/<v>/gh-requests/<channel>),
+ * never inside the release folder, so the release folder holds only flat release assets for GPG and the mirror.
+ */
+export function ghRequestDir(releaseDir) {
+  return path.join(path.dirname(releaseDir), "gh-requests", path.basename(releaseDir));
+}
+
+/** gh runs on its own keyring login only, as on Zinnia's release VMs; token variables are dropped. */
+export function ghEnvironment(environment = process.env) {
+  const child = { ...environment };
+  delete child.GH_TOKEN;
+  delete child.GITHUB_TOKEN;
+  return child;
+}
+
 export function writeGhBody(filePath, body) {
   writeJson(filePath, body);
   return filePath;
@@ -169,6 +188,7 @@ export function runGhJson(args, { cwd } = {}) {
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
     windowsHide: true,
+    env: ghEnvironment(),
   });
   if (result.error) throw ghError(args, result.error);
   if (result.status !== 0) {
@@ -198,7 +218,7 @@ export function getRelease(repo, releaseId, { cwd } = {}) {
 
 export async function downloadAssetToFile(args, destination) {
   await fs.promises.mkdir(path.dirname(destination), { recursive: true });
-  const child = spawn("gh", args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  const child = spawn("gh", args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, env: ghEnvironment() });
   let stderr = "";
   child.stderr.on("data", (chunk) => {
     stderr += chunk.toString();
