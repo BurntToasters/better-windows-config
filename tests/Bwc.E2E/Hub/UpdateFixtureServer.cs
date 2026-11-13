@@ -61,13 +61,16 @@ internal sealed class UpdateFixtureServer : IDisposable
         _manifestHold?.TrySetResult();
     }
 
-    /// <summary>Serves a manifest and its signature for the next checks, and the installer files.</summary>
-    public void Offer(byte[] manifest, byte[] signature, byte[] installer)
+    /// <summary>
+    /// Serves a manifest and its signature for the next checks, and the installer file for each architecture. A test
+    /// that serves bytes other than the signed ones (the refusal case) passes the changed bytes here.
+    /// </summary>
+    public void Offer(byte[] manifest, byte[] signature, byte[] installerX64, byte[] installerArm64)
     {
         _routes[ManifestPath] = manifest;
         _routes[SignaturePath] = signature;
-        _routes["/installer-win-x64.exe"] = installer;
-        _routes["/installer-win-arm64.exe"] = installer;
+        _routes["/installer-" + UpdateFixture.ArchX64 + ".exe"] = installerX64;
+        _routes["/installer-" + UpdateFixture.ArchArm64 + ".exe"] = installerArm64;
     }
 
     public void Dispose()

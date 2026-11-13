@@ -8,31 +8,31 @@ using Bwc.E2E.Harness;
 namespace Bwc.E2E.Hub;
 
 /// <summary>
-/// A throwaway minisign key pair, signed release manifests, and signed installers for both
-/// architectures. Everything is generated per run in a temporary folder by the signer that
-/// Bwc.Update.Tests uses. The private key is never committed, and the folder is deleted on dispose.
+/// A throwaway minisign key pair, signed release manifests, and signed installers for both architectures.
+/// The installers are the real stand-in exe (tests/Bwc.E2E.FakeInstaller), one per architecture, published by
+/// the E2E build into artifacts/e2e/fake-installer. The private key is generated per run in a temporary folder
+/// by the signer that Bwc.Update.Tests uses, and the folder is deleted on dispose. Nothing is committed.
 /// </summary>
 internal sealed class UpdateFixture : IDisposable
 {
     public const string NewerVersion = "9.9.9";
-    private const int InstallerSize = 4096;
-    private const string ArchX64 = "win-x64";
-    private const string ArchArm64 = "win-arm64";
+    public const string ArchX64 = "win-x64";
+    public const string ArchArm64 = "win-arm64";
+
+    private const string StandInFileName = "FakeInstaller.exe";
 
     private readonly string _root;
     private readonly string _signer;
     private readonly string _keyDir;
-    private readonly byte[] _installer;
-    private readonly string _installerSha256;
+    private readonly IReadOnlyDictionary<string, byte[]> _installers;
 
-    private UpdateFixture(string root, string signer, string keyDir, string publicKeyText)
+    private UpdateFixture(string root, string signer, string keyDir, string publicKeyText, IReadOnlyDictionary<string, byte[]> installers)
     {
         _root = root;
         _signer = signer;
         _keyDir = keyDir;
         PublicKeyText = publicKeyText;
-        _installer = Enumerable.Range(0, InstallerSize).Select(i => (byte)(i * 37 + 11)).ToArray();
-        _installerSha256 = Convert.ToHexString(SHA256.HashData(_installer)).ToLowerInvariant();
+        _installers = installers;
     }
 
     /// <summary>The public key file text. The Hub and helper receive it base64 encoded.</summary>
@@ -41,7 +41,10 @@ internal sealed class UpdateFixture : IDisposable
     /// <summary>The public key as the helper reads it from BWC_E2E_UPDATE_TRUSTED_KEY.</summary>
     public string PublicKeyBase64 => Convert.ToBase64String(Encoding.UTF8.GetBytes(PublicKeyText));
 
-    /// <summary>Creates a key pair in a new temporary folder. Needs node on PATH.</summary>
+    /// <summary>
+    /// Creates a key pair in a new temporary folder and loads the stand-in installer for each architecture.
+    /// Needs node on PATH and the stand-ins published (the Bwc.E2E build publishes them).
+    /// </summary>
     public static UpdateFixture Create(E2EConfig config)
     {
         string signer = Path.Combine(config.RepoRoot, "tests", "Bwc.Update.Tests", "Support", "minisign.mjs");
@@ -50,12 +53,36 @@ internal sealed class UpdateFixture : IDisposable
             throw new FileNotFoundException("The update signer script is missing.", signer);
         }
 
+        var installers = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+        {
+            [ArchX64] = File.ReadAllBytes(StandInPath(config, ArchX64)),
+            [ArchArm64] = File.ReadAllBytes(StandInPath(config, ArchArm64)),
+        };
+
         string root = Path.Combine(Path.GetTempPath(), "bwc-hub-e2e-" + Guid.NewGuid().ToString("N"));
         string keyDir = Path.Combine(root, "key");
         Directory.CreateDirectory(keyDir);
         RunNode(signer, "keygen", keyDir);
         string publicKey = File.ReadAllText(Path.Combine(keyDir, "minisign.pub"));
-        return new UpdateFixture(root, signer, keyDir, publicKey);
+        return new UpdateFixture(root, signer, keyDir, publicKey, installers);
+    }
+
+    /// <summary>The stand-in installer bytes for one architecture, exactly as the signed manifest lists them.</summary>
+    public byte[] InstallerFor(string architecture) => _installers[architecture];
+
+    /// <summary>The SHA-256 (lower case hex) of the signed stand-in for one architecture.</summary>
+    public string Sha256For(string architecture) =>
+        Convert.ToHexString(SHA256.HashData(_installers[architecture])).ToLowerInvariant();
+
+    /// <summary>
+    /// The stand-in bytes with one byte changed. The size is the same, so only the SHA-256 and the signature
+    /// can refuse it. The manifest still signs the untouched bytes.
+    /// </summary>
+    public byte[] TamperedInstallerFor(string architecture)
+    {
+        byte[] copy = (byte[])_installers[architecture].Clone();
+        copy[copy.Length / 2] ^= 0x01;
+        return copy;
     }
 
     /// <summary>The manifest and its signature for one version, exactly as the server should serve them.</summary>
@@ -94,9 +121,6 @@ internal sealed class UpdateFixture : IDisposable
         return (File.ReadAllBytes(manifestPath), File.ReadAllBytes(manifestPath + ".minisig"));
     }
 
-    /// <summary>The installer bytes that the server serves for every architecture.</summary>
-    public byte[] Installer => _installer;
-
     public void Dispose()
     {
         try
@@ -112,10 +136,24 @@ internal sealed class UpdateFixture : IDisposable
         }
     }
 
+    /// <summary>The published stand-in for one architecture. The test fails, naming the build, when absent.</summary>
+    public static string StandInPath(E2EConfig config, string architecture)
+    {
+        string path = Path.Combine(config.ArtifactsDir, "fake-installer", architecture, StandInFileName);
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException(
+                $"The stand-in installer is missing at '{path}'. Build the E2E test project, which publishes it.",
+                path);
+        }
+
+        return path;
+    }
+
     private string SignInstaller(string folder, string architecture, string version)
     {
         string path = Path.Combine(folder, "installer-" + architecture + ".exe");
-        File.WriteAllBytes(path, _installer);
+        File.WriteAllBytes(path, _installers[architecture]);
         RunNode(
             _signer,
             "sign",
@@ -132,8 +170,8 @@ internal sealed class UpdateFixture : IDisposable
         new(StringComparer.Ordinal)
         {
             ["url"] = baseUrl + "/installer-" + architecture + ".exe",
-            ["size"] = InstallerSize,
-            ["sha256"] = _installerSha256,
+            ["size"] = _installers[architecture].Length,
+            ["sha256"] = Sha256For(architecture),
             ["signature"] = signatureEnvelope,
         };
 

@@ -265,6 +265,8 @@ installer starts relaunches the Hub with a result argument (`--update-result <Up
 | N10 | Helper runs elevated (high integrity or administrator token) | Medium-integrity processes can write %TEMP% staging, so an elevated run would load planted files | Refuse `RunningElevated` before any action; Hub relaunched with the code; no installer started | `Apply_Elevated_Refused` |
 | N11 | `__COMPAT_LAYER` in the helper environment | Compat layer leaks into the installer and the Hub | Removed from the helper's process environment before any child starts | `Compat_Layer_Removed_From_Children` |
 | N12 | The Hub's relaunch environment | Hub started with inherited compat flags | Covered by N11 (the helper scrubs its environment, and the Hub no longer sets the variable) | `Compat_Layer_Removed_From_Children` |
+| N13 | The GUI handoff: Download and Install pressed in the Hub, the helper from the publish folder | The helper or installer differs from what the user approved | The stand-in (the real signed bytes) runs from the staging folder after the Hub has exited, with exactly `/S /D=<install dir>`; the Hub starts again from the publish folder. Covered end to end by the GUI test, which reads the stand-in's record and the helper's log (`hub.install.*` checks in `docs/failure-modes/hub.md`) | `Hub_UpdateAvailable_InstallRunsVerifiedInstaller` |
+| N14 | The GUI handoff with a tampered download (bytes differ from the signed hash) | The changed bytes run, or the user sees no reason | The helper refuses `InstallerHashMismatch` during the download; the stand-in never runs; no Hub starts; the Hub's message names the failure | `Hub_UpdateAvailable_TamperedInstallerIsRefused` |
 
 ## O. Shared process predicate (`RunningImageRule`)
 
