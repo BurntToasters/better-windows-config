@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { EXIT, describeError, parseArguments, printRefusals, relativeTo, repoRootFrom } from "./lib/cli.js";
+import { LEGACY_GH_REQUEST_DIR } from "./lib/github-release.js";
 import { artifactDirectory } from "./lib/release-context.js";
 import { readPackageVersion } from "./lib/release-policy.js";
 import { isDirectExecutionOf } from "./direct-execution.mjs";
@@ -58,7 +59,7 @@ export function listSignableFiles(dir) {
   const files = [];
   const errors = [];
   for (const name of fs.readdirSync(dir).sort()) {
-    if (name.startsWith(".")) continue;
+    if (name.startsWith(".") || name === LEGACY_GH_REQUEST_DIR) continue;
     const full = path.join(dir, name);
     const info = fs.lstatSync(full);
     if (info.isSymbolicLink()) {

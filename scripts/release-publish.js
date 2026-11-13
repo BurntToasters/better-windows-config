@@ -30,6 +30,7 @@ import {
   publishBody,
   runGhJson,
   selectRelease,
+  ghRequestDir,
   writeGhBody,
 } from "./lib/github-release.js";
 import { prepareReleaseContext } from "./lib/release-context.js";
@@ -306,7 +307,7 @@ async function run(options) {
   }
   fs.mkdirSync(context.dir, { recursive: true });
   const publishFile = writeGhBody(
-    path.join(context.dir, "gh", "publish.json"),
+    path.join(ghRequestDir(context.dir), "publish.json"),
     publishBody({ prerelease: context.prerelease }),
   );
   const plan = publishPlan(context, options, publishFile);

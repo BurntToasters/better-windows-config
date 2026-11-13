@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { EXIT, describeError, parseArguments, printRefusals, relativeTo, repoRootFrom, sha256FileStream } from "./lib/cli.js";
+import { LEGACY_GH_REQUEST_DIR } from "./lib/github-release.js";
 import { artifactDirectory } from "./lib/release-context.js";
 import { readPackageVersion } from "./lib/release-policy.js";
 import { channelForVersion, tryParseSemVer } from "./lib/semver.js";
@@ -70,7 +71,7 @@ export function listReleaseFiles(releaseDir) {
   const files = [];
   const errors = [];
   for (const name of fs.readdirSync(releaseDir).sort()) {
-    if (name.startsWith(".")) continue;
+    if (name.startsWith(".") || name === LEGACY_GH_REQUEST_DIR) continue;
     const source = path.join(releaseDir, name);
     const info = fs.lstatSync(source);
     if (info.isSymbolicLink()) {
