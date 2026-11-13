@@ -449,17 +449,28 @@ public sealed class UpdateCheckerTests
     }
 
     [TestMethod]
-    public async Task Placeholder_Key_Fails_Closed()
+    public async Task Shipped_Key_List_Fails_Closed_Until_A_Release_Key_Is_Embedded()
     {
         await using var s = new Scenario();
         s.AddInstaller(Architectures.X64);
         s.Publish();
         var options = s.Options() with { TrustedPublicKeys = TrustedKeys.Embedded };
 
-        Assert.IsFalse(MinisignVerifier.ValidatePublicKeys(TrustedKeys.Embedded).Ok, "the shipped placeholder must not validate as a key");
-        var outcome = await new UpdateChecker(options).CheckAsync(s.Request(), CancellationToken.None);
-
-        Expect.Fails(outcome, UpdateFailure.TrustedKeysNotConfigured);
+        // Read through a method, not the constant, so both shipped states compile without unreachable-code warnings.
+        if (TrustedKeys.IsPlaceholderList(TrustedKeys.Embedded))
+        {
+            Assert.IsFalse(MinisignVerifier.ValidatePublicKeys(TrustedKeys.Embedded).Ok, "the shipped placeholder must not validate as a key");
+            var outcome = await new UpdateChecker(options).CheckAsync(s.Request(), CancellationToken.None);
+            Expect.Fails(outcome, UpdateFailure.TrustedKeysNotConfigured);
+        }
+        else
+        {
+            // A release key is embedded (scripts/embed-update-key.js). Every embedded key must validate, and a
+            // manifest signed by another key (this scenario's test key) must still be refused.
+            Assert.IsTrue(MinisignVerifier.ValidatePublicKeys(TrustedKeys.Embedded).Ok, "every embedded release key must validate");
+            var outcome = await new UpdateChecker(options).CheckAsync(s.Request(), CancellationToken.None);
+            Assert.IsFalse(outcome.Ok, "a manifest signed by a key that is not embedded must be refused");
+        }
     }
 
     [TestMethod]

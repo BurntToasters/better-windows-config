@@ -29,6 +29,9 @@ const REPO_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const RIDS = Object.freeze(["win-x64", "win-arm64"]);
 const FINALIZE_STEP = "release:finalize";
 const CLEAN_STEP = "release:clean";
+// The signed expiry of a release manifest, in hours (one year). Installed copies refuse an expired feed, and
+// releases are not re-signed between versions, so a short expiry would break update checks for everyone.
+export const RELEASE_EXPIRES_HOURS = 8760;
 
 function usageError(message, exitCode = EXIT.USAGE) {
   const error = new Error(message);
@@ -122,6 +125,8 @@ export function releaseSteps(mode, { version, env = process.env }) {
         installerPath(version, "win-x64"),
         "--installer-win-arm64",
         installerPath(version, "win-arm64"),
+        "--expires-hours",
+        String(RELEASE_EXPIRES_HOURS),
       ],
     },
     { name: "release:sign:gpg", args: ["--", "--dir", folder] },

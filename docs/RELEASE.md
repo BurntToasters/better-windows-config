@@ -27,6 +27,26 @@ detail and the refusal reasons.
    public key comes from `src/Bwc.Update/Signing/TrustedKeys.cs` (user step 2 below), not from `.env`.
    `GH_REPO_OWNER` and `GH_REPO_NAME` may stay unset.
 
+### 1a. Release update key (once per key)
+
+The update key signs `bwc-stable.json` and each setup EXE; installed copies trust only the public
+keys compiled into `src/Bwc.Update/Signing/TrustedKeys.cs`. Use a key of BWC's own, not Zinnia's.
+
+1. On a trusted machine: `npx @tauri-apps/cli signer generate -w C:\keys\bwc-updater.key` and set a
+   password. Keep `bwc-updater.key` and the password in your password manager.
+2. In the release VM's `.env`: `TAURI_SIGNING_PRIVATE_KEY` = the contents of `bwc-updater.key`,
+   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` = the password.
+3. In a dev checkout on a branch: `npm run release:embed-key -- --pub C:\keys\bwc-updater.key.pub`
+   (or `npm run release:embed-key -- --from-env` with that `.env`, which derives the public key from
+   the private key so the two cannot differ). It rewrites `TrustedKeys.cs` with `IsPlaceholder =
+   false`, reads it back, and prints the key id. Commit it and merge to `main`.
+4. Rotation later: `--rotate` keeps the old key beside the new one for one release, so installed
+   copies can verify the release that switches keys; drop the old key with `--replace` afterwards.
+
+The release flow signs each manifest with a one-year expiry (`RELEASE_EXPIRES_HOURS` in
+`scripts/run-release.js`). Installed copies refuse an expired feed, so publish a release (or re-sign
+the feed) at least once a year.
+
 ### 2. Release branch
 
 Stable releases come from `main`. Merge `experimental` into `main` through the normal review, then:
