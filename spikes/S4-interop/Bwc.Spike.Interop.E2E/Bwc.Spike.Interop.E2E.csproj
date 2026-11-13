@@ -1,0 +1,43 @@
+<Project Sdk="MSTest.Sdk/4.5.2">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <RootNamespace>Bwc.Spike.Interop.E2E</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- The app is built as a self-contained exe and copied as files (see CopySpikeAppToTestOutput);
+         it is never referenced as an assembly, so the self-contained/non-self-contained match check does not apply. -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FlaUI.UIA3" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="FlaUI.Core.WindowsAPI" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Restores and builds the app for ARM64 (the only platform this machine runs natively).
+         ReferenceOutputAssembly=false: the app is not referenced, it is copied to bin\...\app\ below. -->
+    <ProjectReference Include="..\Bwc.Spike.Interop\Bwc.Spike.Interop.csproj"
+                      ReferenceOutputAssembly="false"
+                      SetPlatform="Platform=ARM64"
+                      AdditionalProperties="RuntimeIdentifier=win-arm64" />
+  </ItemGroup>
+
+  <Target Name="CopySpikeAppToTestOutput" AfterTargets="Build">
+    <PropertyGroup>
+      <SpikeAppOutDir>$(MSBuildThisFileDirectory)..\Bwc.Spike.Interop\bin\ARM64\$(Configuration)\net10.0-windows10.0.26100.0\win-arm64\</SpikeAppOutDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <SpikeAppFiles Include="$(SpikeAppOutDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SpikeAppFiles)" DestinationFiles="@(SpikeAppFiles->'$(OutDir)app\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

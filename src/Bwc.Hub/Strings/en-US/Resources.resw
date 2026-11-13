@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ProductName" xml:space="preserve">
+    <value>Better Windows Config</value>
+  </data>
+  <data name="MenuFile" xml:space="preserve">
+    <value>&amp;File</value>
+  </data>
+  <data name="MenuFileLaunch" xml:space="preserve">
+    <value>&amp;Launch</value>
+  </data>
+  <data name="MenuFileExit" xml:space="preserve">
+    <value>E&amp;xit</value>
+  </data>
+  <data name="MenuTools" xml:space="preserve">
+    <value>&amp;Tools</value>
+  </data>
+  <data name="MenuHelp" xml:space="preserve">
+    <value>&amp;Help</value>
+  </data>
+  <data name="MenuHelpCheckForUpdates" xml:space="preserve">
+    <value>&amp;Check for Updates...</value>
+  </data>
+  <data name="MenuHelpUpdateSettings" xml:space="preserve">
+    <value>Update &amp;Settings...</value>
+  </data>
+  <data name="MenuHelpAbout" xml:space="preserve">
+    <value>&amp;About Better Windows Config</value>
+  </data>
+  <data name="ColumnName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="ColumnDescription" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="ColumnStatus" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="StatusInstalled" xml:space="preserve">
+    <value>Installed</value>
+  </data>
+  <data name="StatusNotInstalled" xml:space="preserve">
+    <value>Not installed</value>
+  </data>
+  <data name="LaunchButton" xml:space="preserve">
+    <value>Launch</value>
+  </data>
+  <data name="StatusReady" xml:space="preserve">
+    <value>Ready.</value>
+  </data>
+  <data name="StatusLaunched" xml:space="preserve">
+    <value>Launched {0}.</value>
+  </data>
+  <data name="StatusLaunchMissing" xml:space="preserve">
+    <value>{0} is not installed. Expected: {1}</value>
+  </data>
+  <data name="StatusLaunchFailed" xml:space="preserve">
+    <value>{0} did not start: {1}</value>
+  </data>
+  <data name="StatusSelectTool" xml:space="preserve">
+    <value>Select a tool to launch.</value>
+  </data>
+  <data name="StatusVersion" xml:space="preserve">
+    <value>Version {0}</value>
+  </data>
+  <data name="AboutTitle" xml:space="preserve">
+    <value>About Better Windows Config</value>
+  </data>
+  <data name="AboutText" xml:space="preserve">
+    <value>{0} {1}
+
+{2}
+Licensed under the Mozilla Public License 2.0 (MPL-2.0).
+https://www.mozilla.org/MPL/2.0/
+
+{3}</value>
+  </data>
+  <data name="AboutNoticesPresent" xml:space="preserve">
+    <value>Third-party notices are in the program folder.</value>
+  </data>
+  <data name="AboutNoticesAbsent" xml:space="preserve">
+    <value>This build does not include a third-party notices file.</value>
+  </data>
+  <data name="AboutNoticesButton" xml:space="preserve">
+    <value>&amp;Third-party notices</value>
+  </data>
+  <data name="AboutOkButton" xml:space="preserve">
+    <value>&amp;OK</value>
+  </data>
+  <data name="ProductCopyright" xml:space="preserve">
+    <value>Copyright (c) Better Windows Config contributors.</value>
+  </data>
+  <data name="UpdateCheckTitle" xml:space="preserve">
+    <value>Check for Updates</value>
+  </data>
+  <data name="UpdateChecking" xml:space="preserve">
+    <value>Checking for updates on the {0} channel...</value>
+  </data>
+  <data name="UpdateCancelButton" xml:space="preserve">
+    <value>&amp;Cancel</value>
+  </data>
+  <data name="UpdateNotConfigured" xml:space="preserve">
+    <value>Updates are not configured for this build yet. No update server is set, so there is nothing to check. Your installed tools have not been changed.</value>
+  </data>
+  <data name="UpdateNoReleaseKey" xml:space="preserve">
+    <value>Updates are not configured for this build yet. The release signing key is not part of this build, so no update can be verified. Your installed tools have not been changed.</value>
+  </data>
+  <data name="UpdateUpToDate" xml:space="preserve">
+    <value>Better Windows Config {0} is up to date.</value>
+  </data>
+  <data name="UpdateAvailableTitle" xml:space="preserve">
+    <value>Update Available</value>
+  </data>
+  <data name="UpdateAvailableText" xml:space="preserve">
+    <value>Better Windows Config {0} is available. You have {1}.
+
+Download and Install checks the update again, closes the Hub, and replaces the installed files. Later keeps your current version.</value>
+  </data>
+  <data name="UpdateInstallButton" xml:space="preserve">
+    <value>&amp;Download and Install</value>
+  </data>
+  <data name="UpdateLaterButton" xml:space="preserve">
+    <value>&amp;Later</value>
+  </data>
+  <data name="UpdateNotesButton" xml:space="preserve">
+    <value>Release notes</value>
+  </data>
+  <data name="UpdateFailedTitle" xml:space="preserve">
+    <value>Update Check Failed</value>
+  </data>
+  <data name="UpdateFailedText" xml:space="preserve">
+    <value>The update check did not finish. {0}</value>
+  </data>
+  <data name="UpdateTimedOut" xml:space="preserve">
+    <value>The update check took too long and was stopped.</value>
+  </data>
+  <data name="UpdateHelperMissing" xml:space="preserve">
+    <value>The update helper was not found. Expected: {0}</value>
+  </data>
+  <data name="UpdateNoResult" xml:space="preserve">
+    <value>The update helper returned no result (exit code {0}).</value>
+  </data>
+  <data name="UpdateRefused" xml:space="preserve">
+    <value>The update was refused: {0}. {1}</value>
+  </data>
+  <data name="UpdateStartFailed" xml:space="preserve">
+    <value>The update check could not start: {0}</value>
+  </data>
+  <data name="UpdateInstallBlocked" xml:space="preserve">
+    <value>Close these running tools before you install the update: {0}.</value>
+  </data>
+  <data name="UpdateVersionChanged" xml:space="preserve">
+    <value>The update server now offers a different version. Check for updates again.</value>
+  </data>
+  <data name="UpdateDownloading" xml:space="preserve">
+    <value>Downloading the update...</value>
+  </data>
+  <data name="UpdateDownloadProgress" xml:space="preserve">
+    <value>Downloading the update: {0}%</value>
+  </data>
+  <data name="UpdateTrustedKeysInvalid" xml:space="preserve">
+    <value>Updates cannot be checked: the update key list in this build is invalid. Your installed tools have not been changed.</value>
+  </data>
+  <data name="UpdateChannelMismatch" xml:space="preserve">
+    <value>The update server returned a release for a different channel than the one selected. Check the update channel in Update Settings.</value>
+  </data>
+  <data name="UpdateManifestExpired" xml:space="preserve">
+    <value>The update server returned a release list that has expired. Try again later.</value>
+  </data>
+  <data name="UpdateResultRunning" xml:space="preserve">
+    <value>The update was not installed because Better Windows Config apps were still running. Close them and check for updates again.</value>
+  </data>
+  <data name="UpdateResultElevated" xml:space="preserve">
+    <value>The update was not installed because its helper was started with administrator rights. Check for updates from Better Windows Config without administrator rights.</value>
+  </data>
+  <data name="UpdateResultNotInstalled" xml:space="preserve">
+    <value>The update was not installed (reason: {0}). Your installed tools have not been changed.</value>
+  </data>
+  <data name="UpdateInstallStartFailed" xml:space="preserve">
+    <value>The update could not be started: {0}</value>
+  </data>
+  <data name="UpdateCanceled" xml:space="preserve">
+    <value>The update check was canceled.</value>
+  </data>
+  <data name="UpdateStatusNotConfigured" xml:space="preserve">
+    <value>Updates are not configured.</value>
+  </data>
+  <data name="UpdateStatusUpToDate" xml:space="preserve">
+    <value>Up to date.</value>
+  </data>
+  <data name="UpdateStatusAvailable" xml:space="preserve">
+    <value>Update {0} is available.</value>
+  </data>
+  <data name="UpdateStatusFailed" xml:space="preserve">
+    <value>Update check failed.</value>
+  </data>
+  <data name="UpdateSettingsTitle" xml:space="preserve">
+    <value>Update Settings</value>
+  </data>
+  <data name="UpdateChannelLabel" xml:space="preserve">
+    <value>Update channel:</value>
+  </data>
+  <data name="UpdateChannelStable" xml:space="preserve">
+    <value>&amp;Stable</value>
+  </data>
+  <data name="UpdateChannelBeta" xml:space="preserve">
+    <value>&amp;Beta (preview builds)</value>
+  </data>
+  <data name="UpdateStartupCheck" xml:space="preserve">
+    <value>Check for updates when the &amp;Hub starts</value>
+  </data>
+  <data name="UpdateSettingsSave" xml:space="preserve">
+    <value>&amp;OK</value>
+  </data>
+  <data name="UpdateSettingsCancel" xml:space="preserve">
+    <value>&amp;Cancel</value>
+  </data>
+  <data name="SettingsSaveFailed" xml:space="preserve">
+    <value>The settings could not be saved: {0}</value>
+  </data>
+  <data name="ToolRegeditDescription" xml:space="preserve">
+    <value>Browse and edit the Windows registry.</value>
+  </data>
+</root>

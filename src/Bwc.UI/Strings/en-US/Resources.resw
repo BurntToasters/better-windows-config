@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="BwcProductName" xml:space="preserve">
+    <value>Better Windows Config</value>
+  </data>
+  <data name="ShellRootName" xml:space="preserve">
+    <value>Classic window shell</value>
+  </data>
+  <data name="ShellAddressBarName" xml:space="preserve">
+    <value>Address bar</value>
+  </data>
+  <data name="ShellTreePaneName" xml:space="preserve">
+    <value>Tree pane</value>
+  </data>
+  <data name="ShellListPaneName" xml:space="preserve">
+    <value>List pane</value>
+  </data>
+  <data name="ShellSplitterName" xml:space="preserve">
+    <value>Splitter</value>
+  </data>
+  <data name="HexEditorName" xml:space="preserve">
+    <value>Hex editor</value>
+  </data>
+  <data name="DetailsHeaderDividerName" xml:space="preserve">
+    <value>Column divider</value>
+  </data>
+  <data name="NumberErrorHexadecimal" xml:space="preserve">
+    <value>Enter a hexadecimal number from 0 to {0}.</value>
+  </data>
+  <data name="NumberErrorDecimal" xml:space="preserve">
+    <value>Enter a decimal number from 0 to {0}.</value>
+  </data>
+  <data name="MultiStringEmptyOne" xml:space="preserve">
+    <value>Data of type REG_MULTI_SZ cannot contain empty strings.&#13;&#10;Registry Editor will remove the empty string found.</value>
+  </data>
+  <data name="MultiStringEmptyMany" xml:space="preserve">
+    <value>Data of type REG_MULTI_SZ cannot contain empty strings.&#13;&#10;Registry Editor will remove all empty strings found.</value>
+  </data>
+  <data name="RegistryEditorTitle" xml:space="preserve">
+    <value>Registry Editor</value>
+  </data>
+  <data name="RemoveFavoritesEmptySelection" xml:space="preserve">
+    <value>Select at least one favorite to remove.</value>
+  </data>
+  <data name="HexViewerCaption" xml:space="preserve">
+    <value>Binary Data</value>
+  </data>
+  <!-- Oracle 302 and 305. Name of the *.reg filter. -->
+  <data name="FileDialogRegistrationFiles" xml:space="preserve">
+    <value>Registration Files (*.reg)</value>
+  </data>
+  <!-- Oracle 302. Hive filter for Import. -->
+  <data name="FileDialogRegistryHiveFiles" xml:space="preserve">
+    <value>Registry Hive Files (*.*)</value>
+  </data>
+  <!-- Oracle 305. Hive filter for Export. The pattern is *. as in the oracle. -->
+  <data name="FileDialogRegistryHiveFilesExport" xml:space="preserve">
+    <value>Registry Hive Files (*.*)</value>
+  </data>
+  <!-- Oracle 305. Text filter for Export. -->
+  <data name="FileDialogTextFiles" xml:space="preserve">
+    <value>Text Files (*.txt)</value>
+  </data>
+  <!-- Oracle 305. REGEDIT4 filter for Export. -->
+  <data name="FileDialogWin9xFiles" xml:space="preserve">
+    <value>Win9x/NT4 Registration Files (*.reg)</value>
+  </data>
+  <!-- Oracle 180. Load Hive, and the last filter of Import and Export. -->
+  <data name="FileDialogAllFiles" xml:space="preserve">
+    <value>All Files</value>
+  </data>
+  <!-- Written for this product: the classic Export range group label (DLG-001). -->
+  <data name="FileDialogExportRangeGroup" xml:space="preserve">
+    <value>Export range</value>
+  </data>
+  <!-- Oracle DLG-001 control 1280. -->
+  <data name="FileDialogExportRangeAll" xml:space="preserve">
+    <value>&amp;All</value>
+  </data>
+  <!-- Oracle DLG-001 control 1281. -->
+  <data name="FileDialogExportRangeSelectedBranch" xml:space="preserve">
+    <value>S&amp;elected branch</value>
+  </data>
+</root>

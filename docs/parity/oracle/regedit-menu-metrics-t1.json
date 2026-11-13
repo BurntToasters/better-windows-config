@@ -1,0 +1,783 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture menus",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26200",
+    "ubr": 9711,
+    "displayVersion": "25H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "note": "Positions are device pixels relative to the popup window's top-left corner. Gutters are measured from pixels of the open popup. Item text is untracked in docs/parity/oracle/local/menu-text.json.",
+  "menus": [
+    {
+      "name": "edit",
+      "kind": "menubar",
+      "popupWidth": 398,
+      "popupHeight": 366,
+      "itemCount": 11,
+      "metrics": {
+        "itemHeight": 44,
+        "separatorHeight": 44,
+        "separatorCount": 5,
+        "popupPaddingLeft": 3,
+        "popupPaddingTop": 3,
+        "popupPaddingRight": 3,
+        "popupPaddingBottom": 3,
+        "textLeftInset": 66,
+        "checkGutterLeft": -1,
+        "submenuArrowGutter": -1,
+        "hasCheckedItem": false,
+        "hasSubmenuItem": false
+      },
+      "items": [
+        {
+          "index": 0,
+          "separator": true,
+          "submenu": true,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 3,
+          "width": 392,
+          "height": 44
+        },
+        {
+          "index": 1,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 47,
+          "width": 392,
+          "height": 13
+        },
+        {
+          "index": 2,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 60,
+          "width": 392,
+          "height": 44
+        },
+        {
+          "index": 3,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 104,
+          "width": 392,
+          "height": 13
+        },
+        {
+          "index": 4,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 117,
+          "width": 392,
+          "height": 44
+        },
+        {
+          "index": 5,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 161,
+          "width": 392,
+          "height": 44
+        },
+        {
+          "index": 6,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 205,
+          "width": 392,
+          "height": 13
+        },
+        {
+          "index": 7,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 218,
+          "width": 392,
+          "height": 44
+        },
+        {
+          "index": 8,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 262,
+          "width": 392,
+          "height": 13
+        },
+        {
+          "index": 9,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 275,
+          "width": 392,
+          "height": 44
+        },
+        {
+          "index": 10,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 319,
+          "width": 392,
+          "height": 44
+        }
+      ]
+    },
+    {
+      "name": "favorites",
+      "kind": "menubar",
+      "popupWidth": 353,
+      "popupHeight": 94,
+      "itemCount": 2,
+      "metrics": {
+        "itemHeight": 44,
+        "separatorHeight": -1,
+        "separatorCount": 0,
+        "popupPaddingLeft": 3,
+        "popupPaddingTop": 3,
+        "popupPaddingRight": 3,
+        "popupPaddingBottom": 3,
+        "textLeftInset": 66,
+        "checkGutterLeft": -1,
+        "submenuArrowGutter": -1,
+        "hasCheckedItem": false,
+        "hasSubmenuItem": false
+      },
+      "items": [
+        {
+          "index": 0,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 3,
+          "width": 347,
+          "height": 44
+        },
+        {
+          "index": 1,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 47,
+          "width": 347,
+          "height": 44
+        }
+      ]
+    },
+    {
+      "name": "file",
+      "kind": "menubar",
+      "popupWidth": 548,
+      "popupHeight": 410,
+      "itemCount": 12,
+      "metrics": {
+        "itemHeight": 44,
+        "separatorHeight": 13,
+        "separatorCount": 4,
+        "popupPaddingLeft": 3,
+        "popupPaddingTop": 3,
+        "popupPaddingRight": 3,
+        "popupPaddingBottom": 3,
+        "textLeftInset": 66,
+        "checkGutterLeft": -1,
+        "submenuArrowGutter": -1,
+        "hasCheckedItem": false,
+        "hasSubmenuItem": false
+      },
+      "items": [
+        {
+          "index": 0,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 3,
+          "width": 542,
+          "height": 44
+        },
+        {
+          "index": 1,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 47,
+          "width": 542,
+          "height": 44
+        },
+        {
+          "index": 2,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 91,
+          "width": 542,
+          "height": 13
+        },
+        {
+          "index": 3,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 104,
+          "width": 542,
+          "height": 44
+        },
+        {
+          "index": 4,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 148,
+          "width": 542,
+          "height": 44
+        },
+        {
+          "index": 5,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 192,
+          "width": 542,
+          "height": 13
+        },
+        {
+          "index": 6,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 205,
+          "width": 542,
+          "height": 44
+        },
+        {
+          "index": 7,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 249,
+          "width": 542,
+          "height": 44
+        },
+        {
+          "index": 8,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 293,
+          "width": 542,
+          "height": 13
+        },
+        {
+          "index": 9,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 306,
+          "width": 542,
+          "height": 44
+        },
+        {
+          "index": 10,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 350,
+          "width": 542,
+          "height": 13
+        },
+        {
+          "index": 11,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 363,
+          "width": 542,
+          "height": 44
+        }
+      ]
+    },
+    {
+      "name": "help",
+      "kind": "menubar",
+      "popupWidth": 401,
+      "popupHeight": 50,
+      "itemCount": 1,
+      "metrics": {
+        "itemHeight": 44,
+        "separatorHeight": -1,
+        "separatorCount": 0,
+        "popupPaddingLeft": 3,
+        "popupPaddingTop": 3,
+        "popupPaddingRight": 3,
+        "popupPaddingBottom": 3,
+        "textLeftInset": 66,
+        "checkGutterLeft": -1,
+        "submenuArrowGutter": -1,
+        "hasCheckedItem": false,
+        "hasSubmenuItem": false
+      },
+      "items": [
+        {
+          "index": 0,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 3,
+          "width": 395,
+          "height": 44
+        }
+      ]
+    },
+    {
+      "name": "list-background-context",
+      "kind": "context",
+      "popupWidth": 209,
+      "popupHeight": 50,
+      "itemCount": 8,
+      "metrics": {
+        "itemHeight": 0,
+        "separatorHeight": 0,
+        "separatorCount": 1,
+        "popupPaddingLeft": -442,
+        "popupPaddingTop": -40,
+        "popupPaddingRight": 651,
+        "popupPaddingBottom": 90,
+        "textLeftInset": -1,
+        "checkGutterLeft": -1,
+        "submenuArrowGutter": -1,
+        "hasCheckedItem": false,
+        "hasSubmenuItem": false
+      },
+      "items": [
+        {
+          "index": 0,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": -442,
+          "y": -40,
+          "width": 0,
+          "height": 0
+        },
+        {
+          "index": 1,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": -442,
+          "y": -40,
+          "width": 0,
+          "height": 0
+        },
+        {
+          "index": 2,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": -442,
+          "y": -40,
+          "width": 0,
+          "height": 0
+        },
+        {
+          "index": 3,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": -442,
+          "y": -40,
+          "width": 0,
+          "height": 0
+        },
+        {
+          "index": 4,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": -442,
+          "y": -40,
+          "width": 0,
+          "height": 0
+        },
+        {
+          "index": 5,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": -442,
+          "y": -40,
+          "width": 0,
+          "height": 0
+        },
+        {
+          "index": 6,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": -442,
+          "y": -40,
+          "width": 0,
+          "height": 0
+        },
+        {
+          "index": 7,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": -442,
+          "y": -40,
+          "width": 0,
+          "height": 0
+        }
+      ]
+    },
+    {
+      "name": "tree-key-context",
+      "kind": "context",
+      "popupWidth": 333,
+      "popupHeight": 397,
+      "itemCount": 11,
+      "metrics": {
+        "itemHeight": 44,
+        "separatorHeight": 44,
+        "separatorCount": 4,
+        "popupPaddingLeft": 3,
+        "popupPaddingTop": 3,
+        "popupPaddingRight": 3,
+        "popupPaddingBottom": 3,
+        "textLeftInset": 66,
+        "checkGutterLeft": -1,
+        "submenuArrowGutter": -1,
+        "hasCheckedItem": false,
+        "hasSubmenuItem": false
+      },
+      "items": [
+        {
+          "index": 0,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 3,
+          "width": 327,
+          "height": 44
+        },
+        {
+          "index": 1,
+          "separator": true,
+          "submenu": true,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 47,
+          "width": 327,
+          "height": 44
+        },
+        {
+          "index": 2,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 91,
+          "width": 327,
+          "height": 44
+        },
+        {
+          "index": 3,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 135,
+          "width": 327,
+          "height": 13
+        },
+        {
+          "index": 4,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 148,
+          "width": 327,
+          "height": 44
+        },
+        {
+          "index": 5,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 192,
+          "width": 327,
+          "height": 44
+        },
+        {
+          "index": 6,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 236,
+          "width": 327,
+          "height": 13
+        },
+        {
+          "index": 7,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 249,
+          "width": 327,
+          "height": 44
+        },
+        {
+          "index": 8,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 293,
+          "width": 327,
+          "height": 44
+        },
+        {
+          "index": 9,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 337,
+          "width": 327,
+          "height": 13
+        },
+        {
+          "index": 10,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 350,
+          "width": 327,
+          "height": 44
+        }
+      ]
+    },
+    {
+      "name": "view",
+      "kind": "menubar",
+      "popupWidth": 407,
+      "popupHeight": 265,
+      "itemCount": 8,
+      "metrics": {
+        "itemHeight": 44,
+        "separatorHeight": 13,
+        "separatorCount": 3,
+        "popupPaddingLeft": 3,
+        "popupPaddingTop": 3,
+        "popupPaddingRight": 3,
+        "popupPaddingBottom": 3,
+        "textLeftInset": 66,
+        "checkGutterLeft": 19,
+        "submenuArrowGutter": -1,
+        "hasCheckedItem": true,
+        "hasSubmenuItem": false
+      },
+      "items": [
+        {
+          "index": 0,
+          "separator": false,
+          "submenu": false,
+          "checked": true,
+          "grayed": false,
+          "x": 3,
+          "y": 3,
+          "width": 401,
+          "height": 44
+        },
+        {
+          "index": 1,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 47,
+          "width": 401,
+          "height": 13
+        },
+        {
+          "index": 2,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 60,
+          "width": 401,
+          "height": 44
+        },
+        {
+          "index": 3,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 104,
+          "width": 401,
+          "height": 13
+        },
+        {
+          "index": 4,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 117,
+          "width": 401,
+          "height": 44
+        },
+        {
+          "index": 5,
+          "separator": true,
+          "submenu": false,
+          "checked": false,
+          "grayed": true,
+          "x": 3,
+          "y": 161,
+          "width": 401,
+          "height": 13
+        },
+        {
+          "index": 6,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 174,
+          "width": 401,
+          "height": 44
+        },
+        {
+          "index": 7,
+          "separator": false,
+          "submenu": false,
+          "checked": false,
+          "grayed": false,
+          "x": 3,
+          "y": 218,
+          "width": 401,
+          "height": 44
+        }
+      ]
+    }
+  ],
+  "notCaptured": [
+    {
+      "name": "list-value-context",
+      "reason": "The value context menu (Modify, Modify Binary Data, Delete, Rename) did not open by message: the list showed the background menu even with the value selected and the list focused. Not captured."
+    },
+    {
+      "name": "remote-root-context",
+      "reason": "Needs a remote registry connection; not opened without network access."
+    },
+    {
+      "name": "text-edit-context",
+      "reason": "Attaches to an edit control that is only shown while a dialog or inline edit is open; not captured."
+    }
+  ]
+}

@@ -1,0 +1,157 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture permissions",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26200",
+    "ubr": 9711,
+    "displayVersion": "25H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "key": "HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Perm",
+  "columns": [
+    "Principal",
+    "Type",
+    "Access",
+    "Inherited from",
+    "Applies to"
+  ],
+  "seededRowsFound": 7,
+  "rows": [
+    {
+      "sid": "S-1-5-32-545",
+      "aceFlags": 0,
+      "principal": "Users",
+      "type": "Allow",
+      "access": "Read",
+      "inheritedFrom": "None",
+      "appliesTo": "This key only"
+    },
+    {
+      "sid": "S-1-5-32-546",
+      "aceFlags": 1,
+      "principal": "Guests",
+      "type": "Allow",
+      "access": "Read",
+      "inheritedFrom": "None",
+      "appliesTo": "This key only"
+    },
+    {
+      "sid": "S-1-5-32-547",
+      "aceFlags": 2,
+      "principal": "Power Users",
+      "type": "Allow",
+      "access": "Read",
+      "inheritedFrom": "None",
+      "appliesTo": "This key and subkeys"
+    },
+    {
+      "sid": "S-1-5-32-551",
+      "aceFlags": 3,
+      "principal": "Backup Operators",
+      "type": "Allow",
+      "access": "Read",
+      "inheritedFrom": "None",
+      "appliesTo": "This key and subkeys"
+    },
+    {
+      "sid": "S-1-5-32-555",
+      "aceFlags": 9,
+      "principal": "Remote Desktop Users",
+      "type": "Allow",
+      "access": "Read",
+      "inheritedFrom": "None",
+      "appliesTo": "Special"
+    },
+    {
+      "sid": "S-1-5-32-558",
+      "aceFlags": 11,
+      "principal": "Performance Monitor Users",
+      "type": "Allow",
+      "access": "Read",
+      "inheritedFrom": "None",
+      "appliesTo": "Subkeys only"
+    },
+    {
+      "sid": "S-1-5-32-559",
+      "aceFlags": 10,
+      "principal": "Performance Log Users",
+      "type": "Allow",
+      "access": "Read",
+      "inheritedFrom": "None",
+      "appliesTo": "Subkeys only"
+    },
+    {
+      "sid": null,
+      "aceFlags": null,
+      "principal": "(other principal)",
+      "isCurrentUser": true,
+      "type": "Allow",
+      "access": "Full Control",
+      "inheritedFrom": "‪CURRENT_USER\\Software",
+      "appliesTo": "This key and subkeys"
+    },
+    {
+      "sid": null,
+      "aceFlags": null,
+      "principal": "(other principal)",
+      "isCurrentUser": false,
+      "type": "Allow",
+      "access": "Full Control",
+      "inheritedFrom": "‪CURRENT_USER\\Software",
+      "appliesTo": "This key and subkeys"
+    },
+    {
+      "sid": null,
+      "aceFlags": null,
+      "principal": "(other principal)",
+      "isCurrentUser": false,
+      "type": "Allow",
+      "access": "Full Control",
+      "inheritedFrom": "‪CURRENT_USER\\Software",
+      "appliesTo": "This key and subkeys"
+    },
+    {
+      "sid": null,
+      "aceFlags": null,
+      "principal": "(other principal)",
+      "isCurrentUser": false,
+      "type": "Allow",
+      "access": "Read",
+      "inheritedFrom": "‪CURRENT_USER\\Software",
+      "appliesTo": "This key and subkeys"
+    }
+  ],
+  "appliesToChoices": [
+    {
+      "text": "This key only",
+      "aceFlags": 0
+    },
+    {
+      "text": "This key and subkeys",
+      "aceFlags": 2
+    },
+    {
+      "text": "Subkeys only",
+      "aceFlags": 10
+    }
+  ],
+  "appliesToForEditorRow": {
+    "sid": "S-1-5-32-547",
+    "aceFlags": 2,
+    "selectedChoice": "This key and subkeys",
+    "selectedChoiceAceFlags": 2
+  },
+  "note": "Rows for the seeded groups carry the seeded ACE flags and the group name. Other rows (inherited from the parent keys) carry no SID and their principal is a placeholder, so no account or machine name is tracked. Display texts are the Microsoft strings of classic regedit."
+}

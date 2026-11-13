@@ -1,0 +1,154 @@
+{
+  "schema": 1,
+  "generator": "Hand measurement of classic C:\\Windows\\regedit.exe popups (UI Automation rectangles plus screen-copy pixel analysis)",
+  "measuredOn": "2026-11-11",
+  "os": {
+    "productName": "Windows 11 Enterprise",
+    "currentBuild": "26200",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "compatLayer": "RunAsInvoker, set on the child process only",
+    "readOnly": "Menus opened with Alt+letter, Down, Right and Escape. Only Alt+F4 closed the window. No value or key was changed."
+  },
+  "dpi": {
+    "window": 192,
+    "scale": 2,
+    "note": "Same 192 DPI as regedit-metrics.json. One DIP is two device pixels. Every px value below is a device pixel at 192 DPI."
+  },
+  "method": [
+    "Started regedit with __COMPAT_LAYER=RunAsInvoker on the child, found the new RegEdit_RegEdit window, and held Local\\BwcGuiTestLock while it ran.",
+    "Menu bar rectangles were read from UI Automation (MenuBar children) and match regedit-metrics.json exactly.",
+    "Each popup is a #32768 window. Its rectangle was read with Win32 GetWindowRect and its pixels were copied from the screen with Graphics.CopyFromScreen while it was open.",
+    "Item rectangles were read from UI Automation for the popup window. Separators are exposed as ControlType.Separator with height 13 px.",
+    "Ink extents, the background histogram, the separator line row, the check glyph, the submenu arrow, and the focus rectangle were read from the captured pixels.",
+    "Text widths were measured with TextRenderer at Segoe UI 24 px (9 pt at 192 DPI), with the mnemonic ampersand removed."
+  ],
+  "fonts": {
+    "popup": {
+      "faceName": "Segoe UI",
+      "heightPx": 24,
+      "heightDip": 12,
+      "weight": 400
+    },
+    "menuBar": {
+      "faceName": "Segoe UI",
+      "heightPx": 24,
+      "heightDip": 12,
+      "weight": 400
+    }
+  },
+  "menuBar": {
+    "heightPx": 38,
+    "heightDip": 19,
+    "textWidthPx": {
+      "File": 37,
+      "Edit": 40,
+      "View": 51,
+      "Favorites": 94,
+      "Help": 50
+    },
+    "itemPaddingEachSidePx": 14,
+    "itemPaddingEachSideDip": 7,
+    "note": "Every item has the same 14 px padding on each side of its text, so the oracle rectangles are text width plus 28 px."
+  },
+  "popup": {
+    "backgroundColor": "#F9F9F9",
+    "borderColor": "#E5E5E5",
+    "borderPx": 2,
+    "borderDip": 1,
+    "itemInsetFromPopupEdgePx": 3,
+    "itemInsetFromPopupEdgeDip": 1.5,
+    "itemHeightPx": 44,
+    "itemHeightDip": 22,
+    "separatorHeightPx": 13,
+    "separatorHeightDip": 6.5,
+    "separatorLine": {
+      "color": "#D7D7D7",
+      "thicknessPx": 1,
+      "offsetFromSeparatorTopPx": 6,
+      "insetFromItemEdgePx": 12,
+      "insetFromItemEdgeDip": 6
+    },
+    "highlight": {
+      "fillColor": "#F0F0F0",
+      "fillCoversItemRect": true,
+      "focusRectColor": "#000000",
+      "focusRectThicknessPx": 1,
+      "focusRectInsetFromItemLeftPx": 6,
+      "focusRectInsetFromItemRightPx": 7,
+      "focusRectSpansItemHeight": true,
+      "focusRectCornerRadiusPx": 3
+    },
+    "textLeftFromItemEdgePx": 66,
+    "textLeftFromItemEdgeDip": 33,
+    "textBaselineFromItemTopPx": 33,
+    "checkMark": {
+      "measuredOn": "View > Address Bar (checked on the reference machine)",
+      "glyphLeftFromItemEdgePx": 20,
+      "glyphLeftFromItemEdgeDip": 10,
+      "glyphInkTopFromItemTopPx": 19,
+      "glyphInkBottomFromItemTopPx": 30,
+      "glyphInkBoundsPx": {
+        "x0": 23,
+        "y0": 22,
+        "x1": 39,
+        "y1": 33
+      },
+      "glyphWidthPx": 17,
+      "glyphHeightPx": 12
+    },
+    "acceleratorRightInsetFromItemEdgePx": 45,
+    "acceleratorRightInsetFromItemEdgeDip": 22.5,
+    "submenuArrow": {
+      "measuredOn": "Edit > New",
+      "inkBoundsPx": {
+        "x0": 361,
+        "y0": 18,
+        "x1": 368,
+        "y1": 31
+      },
+      "rightInsetFromItemEdgePx": 27,
+      "rightInsetFromItemEdgeDip": 13.5,
+      "widthPx": 8,
+      "heightPx": 14
+    },
+    "mnemonicUnderline": "Shown on the bar and in every open popup after keyboard opening (Alt, F10, or a letter). The underline sits under the mnemonic letter.",
+    "popupCornerShape": "Square popup corners. The keyboard focus rectangle has rounded corners, about 3 px radius.",
+    "popupWidth": "Sized to the widest label plus the accelerator column. Measured popups: File 548 px, Edit 398 px, New 417 px, View 407 px, Help 401 px."
+  },
+  "popupsMeasured": {
+    "file": {
+      "items": 8,
+      "separators": 4,
+      "heightPx": 410,
+      "widthPx": 548
+    },
+    "edit": {
+      "items": 7,
+      "separators": 4,
+      "heightPx": 366,
+      "widthPx": 398
+    },
+    "editNew": {
+      "items": 7,
+      "separators": 1,
+      "heightPx": 327,
+      "widthPx": 417
+    },
+    "view": {
+      "items": 5,
+      "separators": 3,
+      "heightPx": 265,
+      "widthPx": 407
+    },
+    "help": {
+      "items": 1,
+      "separators": 0,
+      "heightPx": 50,
+      "widthPx": 401
+    }
+  },
+  "dipFormula": "DIP = device px / 2 at 192 DPI. At another scale the classic value is px * scale / 2, and the BWC values are computed in DIP so they scale with the window."
+}

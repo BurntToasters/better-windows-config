@@ -1,0 +1,13 @@
+// CsWin32 input: COM common item/file dialogs only (IFileOpenDialog / IFileSaveDialog).
+// The WinRT FileOpenPicker is deliberately not used. Window, subclass, and registry calls are
+// hand-written [LibraryImport] in Win32.cs.
+FileOpenDialog
+FileSaveDialog
+IFileOpenDialog
+IFileSaveDialog
+IShellItem
+SIGDN
+COMDLG_FILTERSPEC
+FILEOPENDIALOGOPTIONS
+CoCreateInstance
+CoTaskMemFree

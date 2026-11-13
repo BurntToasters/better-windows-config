@@ -1,0 +1,19 @@
+<UserControl
+    x:Class="Bwc.Spike.UI.ProbeBadge"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- WinUI 3 exposes no UIA element for the UserControl or the Border, so the AutomationId sits on the
+         TextBlock that carries the text. The UIA Name of that TextBlock is the badge text. -->
+    <Border
+        Background="{ThemeResource AccentFillColorDefaultBrush}"
+        CornerRadius="6"
+        Padding="12,6"
+        HorizontalAlignment="Left">
+        <TextBlock
+            x:Name="BadgeText"
+            AutomationProperties.AutomationId="ProbeBadge"
+            Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+    </Border>
+
+</UserControl>

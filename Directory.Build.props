@@ -1,0 +1,51 @@
+<Project>
+
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0.0</FileVersion>
+    <Company>Better Windows Config</Company>
+    <Product>Better Windows Config</Product>
+    <Copyright>Copyright (c) Better Windows Config contributors</Copyright>
+
+    <Platforms>x64;ARM64</Platforms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <BwcFlavor Condition="'$(BwcFlavor)' == ''">ship</BwcFlavor>
+  </PropertyGroup>
+
+  <!-- E2E build flavor: never signed or released. Enables the registry sandbox switch. -->
+  <PropertyGroup Condition="'$(BwcFlavor)' == 'E2E'">
+    <DefineConstants>$(DefineConstants);BWC_E2E</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+    Record the flavor in compiled metadata. The generated file is an input to CoreCompile,
+    so switching flavors always recompiles instead of trusting a stale incremental cache.
+  -->
+  <Target Name="WriteBwcFlavorSource" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BwcFlavorSource>$(IntermediateOutputPath)BwcFlavor.g.cs</BwcFlavorSource>
+    </PropertyGroup>
+    <WriteLinesToFile
+      File="$(BwcFlavorSource)"
+      Lines="// &lt;auto-generated/&gt;%0A[assembly: System.Reflection.AssemblyMetadata(&quot;BwcFlavor&quot;, &quot;$(BwcFlavor)&quot;)]"
+      Overwrite="true"
+      WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <Compile Remove="$(BwcFlavorSource)" />
+      <Compile Include="$(BwcFlavorSource)" />
+    </ItemGroup>
+  </Target>
+
+  <PropertyGroup Condition="'$(CI)' != ''">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+</Project>

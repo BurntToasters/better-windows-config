@@ -1,0 +1,1325 @@
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Drawing;
+using System.Runtime.InteropServices;
+using Bwc.E2E.Harness;
+using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Definitions;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace Bwc.E2E.Shell;
+
+/// <summary>
+/// End to end checks for the classic Registry Editor shell. Every test starts its own Registry
+/// Editor process so menu mode, the address bar, and the splitter width cannot leak across tests.
+/// All measurements are physical pixels at the window DPI. The expected geometry comes from
+/// docs/parity/oracle/regedit-metrics.json, converted to the window DPI by <see cref="OracleMetrics"/>.
+/// The tolerance is one DIP in device pixels.
+/// </summary>
+[TestClass]
+public sealed class ShellTests
+{
+    private const string RegeditTitle = "Registry Editor";
+    private const string MenuBarItemClass = "Microsoft.UI.Xaml.Controls.MenuBarItem";
+    private const string MenuFlyoutItemClass = "MenuFlyoutItem";
+    private const string MenuFlyoutSubItemClass = "MenuFlyoutSubItem";
+
+    private static readonly TimeSpan UiTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan MenuTimeout = TimeSpan.FromSeconds(5);
+    private static readonly IntPtr PerMonitorV2 = new(-4);
+    private static readonly object PidLock = new();
+    private static readonly List<int> StartedPids = [];
+
+    [ClassInitialize]
+    public static void ClassInitialize(TestContext testContext)
+    {
+        _ = testContext;
+        _ = Native.SetProcessDpiAwarenessContext(PerMonitorV2);
+        PrepareThread();
+    }
+
+    [ClassCleanup]
+    public static void ClassCleanup()
+    {
+        var checks = new Checks("shell.process");
+        var tracked = TrackedProcessIds();
+        var alive = tracked.Where(IsProcessAlive).ToArray();
+        foreach (var pid in alive)
+        {
+            KillTrackedProcess(pid);
+        }
+
+        var remaining = tracked.Where(IsProcessAlive).ToArray();
+        checks.Record(
+            "classCleanup",
+            remaining.Length == 0,
+            $"tracked=[{JoinIds(tracked)}] aliveBeforeCleanup=[{JoinIds(alive)}] remaining=[{JoinIds(remaining)}].");
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Shell")]
+    public void Shell_LaunchShowsClassicStructure()
+    {
+        PrepareThread();
+        var checks = new Checks("shell.launch");
+        using var session = OpenRegedit(checks);
+
+        var title = session.Window.Title;
+        checks.Record(
+            "title",
+            string.Equals(title, RegeditTitle, StringComparison.Ordinal),
+            $"expected '{RegeditTitle}', got '{title}'.");
+
+        var root = WaitForId(session, "RegeditRoot");
+        checks.Record(
+            "regeditRootPresent",
+            root is not null,
+            $"automation id 'RegeditRoot' found={root is not null}.");
+        checks.Record(
+            "regeditRootName",
+            string.Equals(SafeName(root), RegeditTitle, StringComparison.Ordinal),
+            $"automation id 'RegeditRoot' expected name '{RegeditTitle}', got '{SafeName(root)}'.");
+
+        var shell = WaitForId(session, "ClassicWindowShell");
+        checks.Record(
+            "shellPresent",
+            shell is not null,
+            $"automation id 'ClassicWindowShell' found={shell is not null}.");
+
+        var address = WaitForId(session, "AddressBar");
+        checks.Record(
+            "addressBarPresent",
+            address is not null,
+            $"automation id 'AddressBar' found={address is not null}.");
+        var addressText = WaitForValue(session, "AddressBar", "Computer");
+        checks.Record(
+            "addressBarText",
+            string.Equals(addressText, "Computer", StringComparison.Ordinal),
+            $"expected 'Computer', got '{addressText}'.");
+
+        var tree = WaitForId(session, "TreePane");
+        checks.Record(
+            "treePanePresent",
+            tree is not null,
+            $"automation id 'TreePane' found={tree is not null}.");
+
+        var list = WaitForId(session, "ListPane");
+        checks.Record(
+            "listPanePresent",
+            list is not null,
+            $"automation id 'ListPane' found={list is not null}.");
+
+        CheckText(session, checks, "headerName", "HeaderName", "Name");
+        CheckText(session, checks, "headerType", "HeaderType", "Type");
+        CheckText(session, checks, "headerData", "HeaderData", "Data");
+
+        var splitter = WaitForId(session, "Splitter");
+        checks.Record(
+            "splitterPresent",
+            splitter is not null,
+            $"automation id 'Splitter' found={splitter is not null}.");
+
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Shell")]
+    public void Shell_ClassicMetricsMatchOracleAtWindowScale()
+    {
+        PrepareThread();
+        var checks = new Checks("shell.metrics");
+        using var session = OpenRegedit(checks);
+
+        session.Window.Click();
+        var foreground = WaitUntil(() => Win32.IsForeground(session.MainHwnd), TimeSpan.FromSeconds(3));
+        checks.Note(
+            "foreground",
+            $"window HWND 0x{session.MainHwnd.ToInt64():X} is foreground={foreground}.");
+
+        var dpi = Native.GetDpiForWindow(session.MainHwnd);
+        checks.Record(
+            "dpi",
+            dpi > 0,
+            $"GetDpiForWindow={dpi}, rasterization scale={dpi / 96.0:0.##}.");
+
+        // Every expected value is an oracle pixel value converted to this window DPI. The tolerance is
+        // one DIP in device pixels, so it is 2 px at 200 percent and 1 px at 100 percent.
+        var oracle = OracleMetrics.Load(GuiGate.Config);
+        int tolerance = OracleMetrics.ToleranceDevicePixels(dpi);
+        var expectedMenuBar = oracle.DevicePixels(oracle.MenuBarHeight, dpi);
+
+        var menuBar = WaitForId(session, "MenuBarRoot");
+        var menuBarHeight = HeightOf(menuBar);
+        checks.Record(
+            "menuBarHeight",
+            Within(menuBarHeight, expectedMenuBar, tolerance),
+            $"expected {expectedMenuBar:0.#} px (oracle menuBar.height {oracle.MenuBarHeight} at {oracle.CaptureDpi} DPI), got {menuBarHeight:0.#} px.");
+
+        var topLevel = WaitForTopLevelItems(session, oracle.MenuItemHeights.Length);
+        var itemHeights = topLevel.Select(e => HeightOf(e)).ToArray();
+        var expectedItemHeights = oracle.MenuItemHeights.Select(h => oracle.DevicePixels(h, dpi)).ToArray();
+        checks.Record(
+            "menuItemHeights",
+            topLevel.Length == expectedItemHeights.Length &&
+                itemHeights.Zip(expectedItemHeights).All(pair => Within(pair.First, pair.Second, tolerance)),
+            $"expected {expectedItemHeights.Length} items at [{JoinDoubles(expectedItemHeights)}] px (oracle menuBar.items[].rect.height), got {itemHeights.Length} heights [{JoinDoubles(itemHeights)}] px.");
+
+        var itemWidths = topLevel.Select(e => WidthOf(e)).ToArray();
+        checks.Note(
+            "menuItemWidths",
+            $"widths [{JoinDoubles(itemWidths)}] px; oracle menuBar.items[].rect.width at {oracle.CaptureDpi} DPI is [{string.Join(",", oracle.MenuItemWidths)}]; not asserted.");
+        checks.Record(
+            "menuItemNames",
+            topLevel.Length == 5 &&
+            string.Equals(string.Join(",", topLevel.Select(SafeName)), "File,Edit,View,Favorites,Help", StringComparison.Ordinal),
+            $"expected File,Edit,View,Favorites,Help; got {string.Join(",", topLevel.Select(SafeName))}.");
+
+        var address = WaitForId(session, "AddressBar");
+        var addressHeight = HeightOf(address);
+        var expectedAddress = oracle.DevicePixels(oracle.AddressBarHeight, dpi);
+        checks.Record(
+            "addressBarHeight",
+            Within(addressHeight, expectedAddress, tolerance),
+            $"expected {expectedAddress:0.#} px (oracle addressBar.rect.height {oracle.AddressBarHeight}), got {addressHeight:0.#} px.");
+
+        var tree = WaitForId(session, "TreePane");
+        var treeWidth = WidthOf(tree);
+        var expectedTree = oracle.DevicePixels(oracle.TreeWidth, dpi);
+        checks.Record(
+            "treePaneWidth",
+            Within(treeWidth, expectedTree, tolerance),
+            $"expected {expectedTree:0.#} px (oracle tree.rect.width {oracle.TreeWidth}), got {treeWidth:0.#} px.");
+
+        var splitter = WaitForId(session, "Splitter");
+        var splitterWidth = WidthOf(splitter);
+        var expectedSplitter = oracle.DevicePixels(oracle.SplitterWidth, dpi);
+        checks.Record(
+            "splitterWidth",
+            Within(splitterWidth, expectedSplitter, tolerance),
+            $"expected {expectedSplitter:0.#} px (oracle splitter gap {oracle.SplitterWidth}), got {splitterWidth:0.#} px.");
+
+        var header = WaitForId(session, "HeaderName");
+        var headerTextHeight = HeightOf(header);
+        // The header label has no oracle measurement. The 12 DIP minimum is kept and scaled to the window DPI.
+        var minimumHeaderText = 12 * dpi / 96.0;
+        checks.Record(
+            "headerTextHeight",
+            headerTextHeight >= minimumHeaderText,
+            $"expected at least {minimumHeaderText:0.#} px (12 DIP minimum), got {headerTextHeight:0.#} px.");
+
+        var listHeader = WaitForId(session, "ListHeader");
+        var headerRowHeight = HeightOf(listHeader);
+        var expectedHeader = oracle.DevicePixels(oracle.ListHeaderHeight, dpi);
+        checks.Record(
+            "headerRowHeight",
+            listHeader is not null && Within(headerRowHeight, expectedHeader, tolerance),
+            $"expected {expectedHeader:0.#} px (oracle list.header.height {oracle.ListHeaderHeight}), got {headerRowHeight:0.#} px from UIA.");
+
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Shell")]
+    public void Shell_MenuTableMatchesCommandStates()
+    {
+        PrepareThread();
+        var checks = new Checks("shell.menu");
+        using var session = OpenRegedit(checks);
+
+        session.Window.Click();
+
+        var file = ExpandTopLevel(session, "File");
+        checks.Record(
+            "fileExpanded",
+            StateOf(file) == ExpandCollapseState.Expanded,
+            $"File ExpandCollapseState={StateOf(file)?.ToString() ?? "(missing)"}.");
+
+        var fileItems = WaitForVisibleMenuItems(session, 13);
+        var fileNames = string.Join(",", fileItems.Select(SafeName));
+        checks.Record(
+            "fileItemCount",
+            fileItems.Length == 13,
+            $"expected 13 visible MenuItem elements (5 top-level plus 8 File commands; separators have no UIA peer), got {fileItems.Length}: {fileNames}.");
+
+        var fileCommands = new (string Id, string Name, bool Enabled)[]
+        {
+            ("import", "Import...", true),
+            // Classic regedit enables Export on Computer because the save dialog offers
+            // Export range = All. The same command stays enabled for a selected key; the
+            // ImportExport suite covers both states (all.computer-range and range.export.menu).
+            ("export", "Export...", true),
+            ("unloadHive", "Unload Hive...", false),
+            ("connectNetworkRegistry", "Connect Network Registry...", true),
+            ("disconnectNetworkRegistry", "Disconnect Network Registry...", false),
+            ("print", "Print...", false),
+            ("exit", "Exit", true),
+        };
+
+        foreach (var command in fileCommands)
+        {
+            CheckMenuItemState(checks, session, command.Id, command.Name, command.Enabled);
+        }
+
+        // Computer is selected, so Load Hive is disabled (only HKEY_LOCAL_MACHINE and HKEY_USERS enable it).
+        CheckMenuItemState(checks, session, "loadHive", "Load Hive...", false);
+
+        Collapse(file);
+
+        var edit = ExpandTopLevel(session, "Edit");
+        checks.Record(
+            "editExpanded",
+            StateOf(edit) == ExpandCollapseState.Expanded,
+            $"Edit ExpandCollapseState={StateOf(edit)?.ToString() ?? "(missing)"}.");
+
+        var newItem = WaitForMenuItem(session, "New");
+        var newExpanded = false;
+        if (newItem is not null && newItem.Patterns.ExpandCollapse.IsSupported)
+        {
+            try
+            {
+                newItem.Patterns.ExpandCollapse.Pattern.Expand();
+                newExpanded = WaitUntil(() => StateOf(newItem) == ExpandCollapseState.Expanded, MenuTimeout);
+            }
+            catch (Exception ex)
+            {
+                checks.Record("newExpanded", false, ex.Message);
+            }
+        }
+
+        if (newItem is not null)
+        {
+            checks.Record(
+                "newExpanded",
+                newExpanded,
+                $"New ExpandCollapseState={StateOf(newItem)?.ToString() ?? "(missing)"}.");
+        }
+        else
+        {
+            checks.Record("newExpanded", false, "Edit > New was not found.");
+        }
+
+        var newChildren = new (string Id, string Name)[]
+        {
+            ("key", "Key"),
+            ("stringValue", "String Value"),
+            ("binaryValue", "Binary Value"),
+            ("dwordValue", "DWORD (32-bit) Value"),
+            ("qwordValue", "QWORD (64-bit) Value"),
+            ("multiStringValue", "Multi-String Value"),
+            ("expandableStringValue", "Expandable String Value"),
+        };
+
+        foreach (var child in newChildren)
+        {
+            CheckMenuItemState(checks, session, "new." + child.Id, child.Name, false);
+        }
+
+        if (newItem is not null && newItem.Patterns.ExpandCollapse.IsSupported)
+        {
+            try
+            {
+                newItem.Patterns.ExpandCollapse.Pattern.Collapse();
+            }
+            catch (Exception)
+            {
+                // The next menu expansion replaces the popup anyway.
+            }
+        }
+
+        Collapse(edit);
+
+        var view = ExpandTopLevel(session, "View");
+        checks.Record(
+            "viewExpanded",
+            StateOf(view) == ExpandCollapseState.Expanded,
+            $"View ExpandCollapseState={StateOf(view)?.ToString() ?? "(missing)"}.");
+
+        CheckMenuItemState(checks, session, "view.addressBar", "Address Bar", true);
+        CheckMenuItemState(checks, session, "view.split", "Split", true);
+        CheckMenuItemState(checks, session, "view.displayBinaryData", "Display Binary Data...", false);
+        CheckMenuItemState(checks, session, "view.refresh", "Refresh", true);
+        CheckMenuItemState(checks, session, "view.font", "Font", true);
+        Collapse(view);
+
+        var favorites = WaitForTopLevel(session, "Favorites");
+        checks.Record(
+            "favoritesPresent",
+            favorites is not null,
+            $"top-level Favorites found={favorites is not null}.");
+        var help = WaitForTopLevel(session, "Help");
+        checks.Record(
+            "helpPresent",
+            help is not null,
+            $"top-level Help found={help is not null}.");
+
+        session.Window.Click();
+        var escapeFile = ExpandTopLevel(session, "File");
+        var expandedBeforeEscape = StateOf(escapeFile) == ExpandCollapseState.Expanded;
+        var escapeSent = true;
+        try
+        {
+            session.SendKeys("Escape");
+        }
+        catch (Exception ex)
+        {
+            escapeSent = false;
+            checks.Record("escapeCloses", false, ex.Message);
+        }
+
+        if (escapeSent)
+        {
+            var collapsed = WaitUntil(() => StateOf(escapeFile) == ExpandCollapseState.Collapsed, MenuTimeout);
+            checks.Record(
+                "escapeCloses",
+                expandedBeforeEscape && collapsed,
+                $"File expanded before Escape={expandedBeforeEscape}, state after Escape={StateOf(escapeFile)?.ToString() ?? "(missing)"}.");
+        }
+
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Shell")]
+    public void Shell_AddressBarToggles()
+    {
+        PrepareThread();
+        var checks = new Checks("shell.addressbar");
+        using var session = OpenRegedit(checks);
+
+        var dpi = Native.GetDpiForWindow(session.MainHwnd);
+        var oracle = OracleMetrics.Load(GuiGate.Config);
+        int tolerance = OracleMetrics.ToleranceDevicePixels(dpi);
+        var expectedHeight = oracle.DevicePixels(oracle.AddressBarHeight, dpi);
+
+        var address = WaitForId(session, "AddressBar");
+        var initialHeight = HeightOf(address);
+        checks.Record(
+            "visibleBefore",
+            address is not null && Within(initialHeight, expectedHeight, tolerance),
+            $"initial AddressBar height {initialHeight:0.#} px, expected {expectedHeight:0.#} px (oracle addressBar.rect.height {oracle.AddressBarHeight}).");
+
+        ExpandTopLevel(session, "View");
+        InvokeMenuItem(session, "Address Bar");
+        var hidden = WaitUntil(() => AddressBarHidden(session), MenuTimeout);
+        checks.Record(
+            "hiddenAfterToggle",
+            hidden,
+            $"AddressBar absent={session.Find("AddressBar") is null}, height={HeightOf(session.Find("AddressBar")):0.#} px, offscreen={SafeOffscreen(session.Find("AddressBar"))}.");
+
+        ExpandTopLevel(session, "View");
+        InvokeMenuItem(session, "Address Bar");
+        var shown = WaitUntil(() =>
+        {
+            var current = session.Find("AddressBar");
+            return current is not null && !SafeOffscreen(current) && Within(HeightOf(current), expectedHeight, tolerance);
+        }, MenuTimeout);
+
+        var restored = session.Find("AddressBar");
+        checks.Record(
+            "visibleAfterToggle",
+            shown,
+            $"AddressBar found={restored is not null}, height={HeightOf(restored):0.#} px, expected {expectedHeight:0.#} px, offscreen={SafeOffscreen(restored)}.");
+
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Shell")]
+    public void Shell_SplitterKeyboardMovesAndReleasesFocus()
+    {
+        PrepareThread();
+        var checks = new Checks("shell.split");
+        using var session = OpenRegedit(checks);
+
+        session.Window.Click();
+        var dpi = Native.GetDpiForWindow(session.MainHwnd);
+        int tolerance = OracleMetrics.ToleranceDevicePixels(dpi);
+        // The arrow key step is an application value (8 DIP), not an oracle measurement.
+        var stepPx = 8 * dpi / 96.0;
+
+        ExpandTopLevel(session, "View");
+        InvokeMenuItem(session, "Split");
+
+        var splitter = WaitForId(session, "Splitter");
+        var focused = WaitUntil(() => HasFocus(splitter), MenuTimeout);
+        checks.Record(
+            "focus",
+            focused,
+            $"Splitter HasKeyboardFocus={HasFocus(splitter)} after View > Split.");
+
+        var before = WidthOf(WaitForId(session, "TreePane"));
+        session.SendKeys("Left");
+        var afterLeft = 0.0;
+        var movedLeft = WaitUntil(() =>
+        {
+            afterLeft = WidthOf(WaitForId(session, "TreePane"));
+            return afterLeft < before;
+        }, MenuTimeout);
+        checks.Record(
+            "leftMoves",
+            movedLeft && Math.Abs((before - afterLeft) - stepPx) <= tolerance,
+            $"tree width before {before:0.#} px, after Left {afterLeft:0.#} px, expected step {stepPx:0.#} px.");
+
+        session.SendKeys("Right");
+        var afterRight = 0.0;
+        var movedRight = WaitUntil(() =>
+        {
+            afterRight = WidthOf(WaitForId(session, "TreePane"));
+            return afterRight > afterLeft;
+        }, MenuTimeout);
+        checks.Record(
+            "rightRestores",
+            movedRight && Math.Abs(afterRight - before) <= tolerance,
+            $"tree width after Right {afterRight:0.#} px, expected {before:0.#} px.");
+
+        session.SendKeys("Enter");
+        var released = WaitUntil(() => !HasFocus(WaitForId(session, "Splitter")), MenuTimeout);
+        var shell = WaitForId(session, "ClassicWindowShell");
+        checks.Record(
+            "enterReleasesFocus",
+            released,
+            $"Splitter HasKeyboardFocus after Enter={HasFocus(WaitForId(session, "Splitter"))}, shell HasKeyboardFocus={HasFocus(shell)}.");
+
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Shell")]
+    public void Shell_AltAndF10DriveTheMenuBar()
+    {
+        PrepareThread();
+        var checks = new Checks("shell.keyboard");
+        using var session = OpenRegedit(checks);
+
+        session.Window.Click();
+
+        var altFSent = SendChord(checks, session, "altFSent", "ALT+F", "ALT+KEY_F");
+        var file = WaitForTopLevel(session, "File");
+        var fileExpanded = altFSent && WaitUntil(() => StateOf(file) == ExpandCollapseState.Expanded, MenuTimeout);
+        checks.Record(
+            "altFExpandsFile",
+            fileExpanded,
+            $"File ExpandCollapseState after ALT+F={StateOf(file)?.ToString() ?? "(missing)"}.");
+
+        session.SendKeys("Escape");
+        var fileCollapsed = WaitUntil(() => StateOf(file) == ExpandCollapseState.Collapsed, MenuTimeout);
+        checks.Record(
+            "escapeCollapsesFile",
+            fileCollapsed,
+            $"File ExpandCollapseState after Escape={StateOf(file)?.ToString() ?? "(missing)"}.");
+
+        session.SendKeys("Escape");
+        _ = WaitUntil(() => FocusedTopLevelName(session) is null, MenuTimeout);
+        checks.Note(
+            "secondEscapeLeavesMenuBar",
+            $"focused top-level menu item after second Escape={FocusedTopLevelName(session) ?? "(none)"}; the menu is closed even when a top-level item keeps focus.");
+
+        session.SendKeys("F10");
+        var f10Focused = WaitUntil(() => FocusedTopLevelName(session) is not null, MenuTimeout);
+        checks.Record(
+            "f10FocusesTopLevel",
+            f10Focused,
+            $"focused top-level menu item after F10={FocusedTopLevelName(session) ?? "(none)"}.");
+
+        session.SendKeys("Escape");
+        var f10Closed = WaitUntil(() => StateOf(file) == ExpandCollapseState.Collapsed, MenuTimeout);
+        checks.Record(
+            "escapeClosesF10Menu",
+            f10Closed,
+            $"after Escape: File state={StateOf(file)?.ToString() ?? "(missing)"}, focused top-level={FocusedTopLevelName(session) ?? "(none)"}.");
+
+        var altVSent = SendChord(checks, session, "altVSent", "ALT+V", "ALT+KEY_V");
+        var view = WaitForTopLevel(session, "View");
+        var viewExpanded = altVSent && WaitUntil(() => StateOf(view) == ExpandCollapseState.Expanded, MenuTimeout);
+        checks.Record(
+            "altVExpandsView",
+            viewExpanded,
+            $"View ExpandCollapseState after ALT+V={StateOf(view)?.ToString() ?? "(missing)"}.");
+
+        session.SendKeys("Escape");
+        var viewCollapsed = WaitUntil(() => StateOf(view) == ExpandCollapseState.Collapsed, MenuTimeout);
+        checks.Record(
+            "escapeClosesView",
+            viewCollapsed,
+            $"View ExpandCollapseState after Escape={StateOf(view)?.ToString() ?? "(missing)"}.");
+
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Shell")]
+    public void Shell_CloseLeavesNoTestProcess()
+    {
+        PrepareThread();
+        var checks = new Checks("shell.process");
+        var before = RegeditPids();
+        var session = OpenRegedit(checks);
+        var pid = session.ProcessId;
+        try
+        {
+            checks.Record(
+                "started",
+                !before.Contains(pid),
+                $"pid={pid}, before=[{JoinIds(before)}].");
+
+            session.Close();
+            var exited = WaitUntil(() => !IsProcessAlive(pid), TimeSpan.FromSeconds(10));
+            if (!exited)
+            {
+                KillTrackedProcess(pid);
+                exited = WaitUntil(() => !IsProcessAlive(pid), TimeSpan.FromSeconds(5));
+            }
+
+            checks.Record(
+                "exited",
+                exited,
+                $"pid={pid} exited={exited} after AppSession.Close.");
+        }
+        finally
+        {
+            session.Dispose();
+        }
+
+        var after = RegeditPids();
+        var newRemaining = after.Except(before).ToArray();
+        checks.Record(
+            "noTestProcessRemains",
+            newRemaining.Length == 0,
+            $"before=[{JoinIds(before)}], after=[{JoinIds(after)}], test pid={pid}, new remaining=[{JoinIds(newRemaining)}].");
+
+        checks.AssertAllPassed();
+    }
+
+    private static bool SendChord(Checks checks, AppSession session, string id, string key, string fallback)
+    {
+        try
+        {
+            session.SendKeys(key);
+            checks.Note(id, $"sent '{key}'.");
+            return true;
+        }
+        catch (ArgumentException ex)
+        {
+            // AppSession parses chords as FlaUI VirtualKeyShort names, and a bare letter is not
+            // a member of that enum. The same SendKeys path, including its foreground check, is
+            // used again with the enum name so the test still exercises the real input route.
+            try
+            {
+                session.SendKeys(fallback);
+                checks.Note(
+                    id,
+                    $"'{key}' is not a FlaUI key name ({ex.Message}); sent '{fallback}' through AppSession.SendKeys.");
+                return true;
+            }
+            catch (Exception fallbackError)
+            {
+                checks.Record(id, false, fallbackError.Message);
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            checks.Record(id, false, ex.Message);
+            return false;
+        }
+    }
+
+    private static AppSession OpenRegedit(Checks checks)
+    {
+        var config = GuiGate.Config;
+        try
+        {
+            config.EnsureExecutablesExist();
+            var session = new AppSession(config, config.RegeditExePath);
+            TrackProcess(session.ProcessId);
+            checks.Note(
+                "session",
+                $"pid={session.ProcessId}, publish={config.PublishDir}.");
+            return session;
+        }
+        catch (Exception ex)
+        {
+            checks.Record("session", false, ex.Message);
+            throw;
+        }
+    }
+
+    private static void CheckText(AppSession session, Checks checks, string id, string automationId, string expected)
+    {
+        var element = WaitForId(session, automationId);
+        var actual = SafeName(element);
+        checks.Record(
+            id,
+            string.Equals(actual, expected, StringComparison.Ordinal),
+            $"automation id '{automationId}' expected '{expected}', got '{actual}'.");
+    }
+
+    /// <summary>
+    /// Records a menu item's enabled state against the oracle. A matching state is a pass. A state that
+    /// differs is a known gap for the named work package, so it does not fail the test.
+    /// </summary>
+    private static void CheckMenuItemState(Checks checks, AppSession session, string id, string name, bool expectedEnabled)
+    {
+        var item = WaitForMenuItem(session, name);
+        if (item is null)
+        {
+            checks.Record(id, false, $"'{name}' was not found as a menu item.");
+            return;
+        }
+
+        var actual = SafeBool(() => item.IsEnabled);
+        checks.Record(
+            id,
+            actual == expectedEnabled,
+            $"'{name}' expected enabled={expectedEnabled}, got enabled={actual}.");
+    }
+
+    private static AutomationElement? ExpandTopLevel(AppSession session, string name)
+    {
+        var item = WaitForTopLevel(session, name);
+        if (item is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            if (item.Patterns.ExpandCollapse.IsSupported)
+            {
+                item.Patterns.ExpandCollapse.Pattern.Expand();
+            }
+        }
+        catch (Exception)
+        {
+            // The state check that follows reports whether the flyout opened.
+        }
+
+        _ = WaitUntil(() => StateOf(item) == ExpandCollapseState.Expanded, MenuTimeout);
+        return item;
+    }
+
+    private static void Collapse(AutomationElement? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (item.Patterns.ExpandCollapse.IsSupported)
+            {
+                item.Patterns.ExpandCollapse.Pattern.Collapse();
+            }
+        }
+        catch (Exception)
+        {
+            // A later expansion replaces the open flyout.
+        }
+
+        _ = WaitUntil(() => StateOf(item) == ExpandCollapseState.Collapsed, MenuTimeout);
+    }
+
+    private static AutomationElement? InvokeMenuItem(AppSession session, string name)
+    {
+        var item = WaitForMenuItem(session, name);
+        if (item is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            if (item.Patterns.Invoke.IsSupported)
+            {
+                item.Patterns.Invoke.Pattern.Invoke();
+            }
+            else
+            {
+                item.Click();
+            }
+        }
+        catch (Exception)
+        {
+            // The caller's state check reports whether the command took effect.
+        }
+
+        return item;
+    }
+
+    private static AutomationElement? WaitForTopLevel(AppSession session, string name)
+    {
+        AutomationElement? found = null;
+        _ = WaitUntil(
+            () =>
+            {
+                found = TopLevelItems(session).FirstOrDefault(
+                    e => string.Equals(SafeName(e), name, StringComparison.Ordinal));
+                return found is not null;
+            },
+            UiTimeout);
+        return found;
+    }
+
+    private static AutomationElement[] WaitForTopLevelItems(AppSession session, int expected)
+    {
+        AutomationElement[] found = [];
+        _ = WaitUntil(
+            () =>
+            {
+                found = TopLevelItems(session);
+                return found.Length == expected;
+            },
+            MenuTimeout);
+        return found;
+    }
+
+    private static AutomationElement[] WaitForVisibleMenuItems(AppSession session, int minimum)
+    {
+        AutomationElement[] found = [];
+        _ = WaitUntil(
+            () =>
+            {
+                found = VisibleMenuItems(session);
+                return found.Length >= minimum;
+            },
+            MenuTimeout);
+        return VisibleMenuItems(session);
+    }
+
+    private static AutomationElement? WaitForMenuItem(AppSession session, string name)
+    {
+        AutomationElement? found = null;
+        _ = WaitUntil(
+            () =>
+            {
+                found = session.Window
+                    .FindAllDescendants(cf => cf.ByName(name))
+                    .FirstOrDefault(e => e.ControlType == ControlType.MenuItem);
+                return found is not null;
+            },
+            MenuTimeout);
+        return found;
+    }
+
+    private static AutomationElement? WaitForId(AppSession session, string automationId)
+    {
+        AutomationElement? found = null;
+        _ = WaitUntil(() => (found = session.Find(automationId)) is not null, UiTimeout);
+        return found;
+    }
+
+    private static string WaitForValue(AppSession session, string automationId, string expected)
+    {
+        var last = "(missing)";
+        _ = WaitUntil(
+            () =>
+            {
+                var element = session.Find(automationId);
+                if (element is null)
+                {
+                    return false;
+                }
+
+                last = ValueOf(element);
+                return string.Equals(last, expected, StringComparison.Ordinal);
+            },
+            UiTimeout);
+        return last;
+    }
+
+    private static AutomationElement[] TopLevelItems(AppSession session)
+    {
+        try
+        {
+            return session.Window
+                .FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem))
+                .Where(e => string.Equals(SafeClassName(e), MenuBarItemClass, StringComparison.Ordinal))
+                .ToArray();
+        }
+        catch (Exception)
+        {
+            return [];
+        }
+    }
+
+    private static AutomationElement[] VisibleMenuItems(AppSession session)
+    {
+        try
+        {
+            return session.Window
+                .FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem))
+                .Where(
+                    e =>
+                    {
+                        var className = SafeClassName(e);
+                        return !SafeOffscreen(e) &&
+                            (string.Equals(className, MenuBarItemClass, StringComparison.Ordinal) ||
+                             string.Equals(className, MenuFlyoutItemClass, StringComparison.Ordinal) ||
+                             string.Equals(className, MenuFlyoutSubItemClass, StringComparison.Ordinal));
+                    })
+                .ToArray();
+        }
+        catch (Exception)
+        {
+            return [];
+        }
+    }
+
+    private static string? FocusedTopLevelName(AppSession session) =>
+        TopLevelItems(session).FirstOrDefault(HasFocus) is { } focused ? SafeName(focused) : null;
+
+    private static bool AddressBarHidden(AppSession session)
+    {
+        var element = session.Find("AddressBar");
+        if (element is null)
+        {
+            return true;
+        }
+
+        try
+        {
+            return element.IsOffscreen || element.BoundingRectangle.Height <= 1;
+        }
+        catch (Exception)
+        {
+            return true;
+        }
+    }
+
+    private static bool HasFocus(AutomationElement? element)
+    {
+        if (element is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return element.Properties.HasKeyboardFocus.Value;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static ExpandCollapseState? StateOf(AutomationElement? element)
+    {
+        if (element is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return element.Patterns.ExpandCollapse.Pattern.ExpandCollapseState.Value;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static string ValueOf(AutomationElement element)
+    {
+        try
+        {
+            if (element.Patterns.Value.IsSupported)
+            {
+                return element.Patterns.Value.Pattern.Value.Value ?? string.Empty;
+            }
+        }
+        catch (Exception)
+        {
+            // Fall through to the name.
+        }
+
+        return SafeName(element);
+    }
+
+    private static string SafeName(AutomationElement? element)
+    {
+        if (element is null)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return element.Name ?? string.Empty;
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string SafeClassName(AutomationElement? element)
+    {
+        if (element is null)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return element.ClassName ?? string.Empty;
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static bool SafeOffscreen(AutomationElement? element)
+    {
+        if (element is null)
+        {
+            return true;
+        }
+
+        try
+        {
+            return element.IsOffscreen;
+        }
+        catch (Exception)
+        {
+            return true;
+        }
+    }
+
+    private static bool SafeBool(Func<bool> read)
+    {
+        try
+        {
+            return read();
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static double HeightOf(AutomationElement? element) => element is null ? 0 : element.BoundingRectangle.Height;
+
+    private static double WidthOf(AutomationElement? element) => element is null ? 0 : element.BoundingRectangle.Width;
+
+    private static bool Within(double actual, double expected, int tolerance) => Math.Abs(actual - expected) <= tolerance;
+
+    private static string JoinDoubles(IEnumerable<double> values) =>
+        string.Join(",", values.Select(v => v.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)));
+
+    private static string JoinIds(IEnumerable<int> ids)
+    {
+        var text = string.Join(",", ids);
+        return text.Length == 0 ? "(none)" : text;
+    }
+
+    private static bool WaitUntil(Func<bool> condition, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (true)
+        {
+            try
+            {
+                if (condition())
+                {
+                    return true;
+                }
+            }
+            catch (Exception)
+            {
+                // A stale element is retried on the next pass.
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                return false;
+            }
+
+            Thread.Sleep(50);
+        }
+    }
+
+    private static void PrepareThread() => _ = Native.SetThreadDpiAwarenessContext(PerMonitorV2);
+
+    private static void TrackProcess(int pid)
+    {
+        lock (PidLock)
+        {
+            if (!StartedPids.Contains(pid))
+            {
+                StartedPids.Add(pid);
+            }
+        }
+    }
+
+    private static int[] TrackedProcessIds()
+    {
+        lock (PidLock)
+        {
+            return StartedPids.OrderBy(pid => pid).ToArray();
+        }
+    }
+
+    private static int[] RegeditPids()
+    {
+        var processes = Process.GetProcessesByName("BwcRegedit");
+        var ids = new List<int>();
+        try
+        {
+            foreach (var process in processes)
+            {
+                try
+                {
+                    ids.Add(process.Id);
+                }
+                catch (InvalidOperationException)
+                {
+                    // The process exited between enumeration and the id read.
+                }
+            }
+        }
+        finally
+        {
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
+        }
+
+        return ids.OrderBy(pid => pid).ToArray();
+    }
+
+    private static bool IsProcessAlive(int pid)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+        catch (Win32Exception)
+        {
+            return true;
+        }
+    }
+
+    private static void KillTrackedProcess(int pid)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            if (!process.HasExited &&
+                string.Equals(process.ProcessName, "BwcRegedit", StringComparison.OrdinalIgnoreCase))
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
+        {
+            // The process already exited or access was lost while it was exiting.
+        }
+    }
+
+    /// <summary>
+    /// Finds the bottom of the list header row by scanning a screen strip for the first full-width
+    /// divider row. The header row has no automation peer, so UIA cannot report its rectangle. The strip is a
+    /// settled, verified screen copy (see <see cref="WindowCapture"/>), so a header that is still painting is not measured.
+    /// </summary>
+    private static int MeasureHeaderRowHeight(Rectangle listPane)
+    {
+        var width = Math.Min(300, listPane.Width - 2);
+        const int StripHeight = 80;
+        if (width < 20 || listPane.Width <= 0)
+        {
+            return -1;
+        }
+
+        using Bitmap strip = WindowCapture.CaptureAreaOfCurrentSession(
+            new Rectangle(listPane.Left, listPane.Top, width, StripHeight));
+        var pixels = BgraPixels(strip);
+
+        var headerColor = DominantColor(0);
+        var bodyColor = DominantColor(StripHeight - 1);
+
+        static int Distance((int Red, int Green, int Blue) left, (int Red, int Green, int Blue) right) =>
+            Math.Max(
+                Math.Abs(left.Red - right.Red),
+                Math.Max(Math.Abs(left.Green - right.Green), Math.Abs(left.Blue - right.Blue)));
+
+        if (Distance(headerColor, bodyColor) > 8)
+        {
+            // The header and body use different layer colors. The header ends at the first
+            // row where the body color becomes dominant for at least three rows in a row.
+            var run = 0;
+            for (var y = 10; y < StripHeight; y++)
+            {
+                var color = DominantColor(y);
+                if (Distance(color, bodyColor) <= 3 && Distance(color, headerColor) > 8)
+                {
+                    run++;
+                    if (run >= 3)
+                    {
+                        return y - 2;
+                    }
+                }
+                else
+                {
+                    run = 0;
+                }
+            }
+
+            return -1;
+        }
+
+        var threshold = (int)(width * 0.9);
+        var dividerStart = -1;
+        var dividerEnd = -1;
+        for (var y = 4; y < StripHeight; y++)
+        {
+            var different = 0;
+            for (var x = 0; x < width; x++)
+            {
+                var index = ((y * width) + x) * 4;
+                var distance = Math.Max(
+                    Math.Abs(pixels[index] - headerColor.Blue),
+                    Math.Max(
+                        Math.Abs(pixels[index + 1] - headerColor.Green),
+                        Math.Abs(pixels[index + 2] - headerColor.Red)));
+                if (distance > 8)
+                {
+                    different++;
+                }
+            }
+
+            var isDivider = different >= threshold;
+            if (isDivider && dividerStart < 0)
+            {
+                dividerStart = y;
+            }
+
+            if (isDivider)
+            {
+                dividerEnd = y;
+            }
+            else if (dividerStart >= 0)
+            {
+                break;
+            }
+        }
+
+        return dividerStart < 0 ? -1 : dividerEnd + 1;
+
+        (int Red, int Green, int Blue) DominantColor(int y)
+        {
+            var counts = new Dictionary<int, int>();
+            for (var x = 0; x < width; x++)
+            {
+                var index = ((y * width) + x) * 4;
+                var key = (pixels[index + 2] << 16) | (pixels[index + 1] << 8) | pixels[index];
+                counts[key] = counts.TryGetValue(key, out var count) ? count + 1 : 1;
+            }
+
+            var best = 0;
+            var bestCount = -1;
+            foreach (var pair in counts)
+            {
+                if (pair.Value > bestCount)
+                {
+                    best = pair.Key;
+                    bestCount = pair.Value;
+                }
+            }
+
+            return ((best >> 16) & 0xFF, (best >> 8) & 0xFF, best & 0xFF);
+        }
+    }
+
+    /// <summary>The pixels of a 32 bit bitmap as BGRA bytes, one row after the other with no padding.</summary>
+    private static byte[] BgraPixels(Bitmap bitmap)
+    {
+        int rowBytes = bitmap.Width * 4;
+        var pixels = new byte[rowBytes * bitmap.Height];
+        System.Drawing.Imaging.BitmapData data = bitmap.LockBits(
+            new Rectangle(0, 0, bitmap.Width, bitmap.Height),
+            System.Drawing.Imaging.ImageLockMode.ReadOnly,
+            System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try
+        {
+            for (var y = 0; y < bitmap.Height; y++)
+            {
+                Marshal.Copy(IntPtr.Add(data.Scan0, y * data.Stride), pixels, y * rowBytes, rowBytes);
+            }
+        }
+        finally
+        {
+            bitmap.UnlockBits(data);
+        }
+
+        return pixels;
+    }
+
+    private sealed class Checks
+    {
+        private readonly string _prefix;
+        private readonly List<string> _failures = [];
+
+        public Checks(string prefix)
+        {
+            _prefix = prefix;
+        }
+
+        public void Record(string id, bool pass, string notes)
+        {
+            var fullId = $"{_prefix}.{id}";
+            _ = E2EResults.Record(fullId, pass, notes);
+            if (!pass)
+            {
+                _failures.Add($"{fullId}: {notes}");
+            }
+        }
+
+        /// <summary>Information that is not a pass or fail claim.</summary>
+        public void Note(string id, string text) => E2EResults.Note($"{_prefix}.{id}", text);
+
+        /// <summary>A pass when the observed value matches the oracle, otherwise a known gap.</summary>
+        public void RecordOrKnownGap(string id, bool matchesOracle, string workPackage, string oracleBehavior, string observed)
+        {
+            // A known gap is not a failure. Only a failed check adds to the test's failures.
+            _ = E2EResults.RecordOrKnownGap($"{_prefix}.{id}", matchesOracle, workPackage, oracleBehavior, observed);
+        }
+
+        public void AssertAllPassed()
+        {
+            Assert.AreEqual(
+                0,
+                _failures.Count,
+                $"Shell checks failed:{Environment.NewLine}{string.Join(Environment.NewLine, _failures)}");
+        }
+    }
+
+#pragma warning disable SYSLIB1054 // The small user32 and gdi32 surface does not justify LibraryImport plumbing.
+    private static class Native
+    {
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool SetProcessDpiAwarenessContext(IntPtr context);
+
+        [DllImport("user32.dll")]
+        internal static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+
+        [DllImport("user32.dll")]
+        internal static extern uint GetDpiForWindow(IntPtr hwnd);
+    }
+#pragma warning restore SYSLIB1054
+}
