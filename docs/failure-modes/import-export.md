@@ -183,9 +183,14 @@ In the window, a refused file shows string 133, 125, or 129 with the file path. 
 shows string 132 after the rest of the file has been applied. A file that imports with only skipped
 lines shows string 228. The window does not show a message for a skipped line.
 
-The import window has no Cancel button and no close box (section 14), so the window never cancels an
-import. The importer still stops between sections when a caller passes a canceled token, but the window
-passes none, so a window import always runs to the end and shows string 228, 132, or 133 for its result.
+The import progress window (DLG-019) has a caption, the `File:` label, the file name, and a progress bar.
+It has no Cancel button and no default button. Declared difference (known gap `UF7`): classic DLG-019 has
+style `0x90C001C4` with no `WS_SYSMENU`, so no Close box; the BWC window keeps the system menu and Close box.
+Cause: WinUI windowing restores `WS_SYSMENU` after the style is cleared, measured in the E2E build (see
+`classic-dialog.md` 4.7). The user cannot close the window while the import runs: the Close box and Alt+F4 are
+refused, and the owner stays disabled. The host closes the window when the import ends. The importer
+still stops between sections when a caller passes a canceled token, but the window passes none, so a
+window import always runs to the end and shows string 228, 132, or 133 for its result.
 
 Errors go to the log through `Bwc.Core.Log` and to standard error when that handle is available.
 The log writer flushes each entry itself; standard error is flushed before `Environment.Exit`
@@ -268,7 +273,9 @@ The production build uses the live reader and exports the real registry.
 | Import with the hive filter on a remote node or on Computer | Refused with the same invalid-key text (string 125) or the read-only text; nothing is written |
 | Import with the hive filter on a key that is not the one the user selected | The restore runs on the selected key only, after the classic confirmation (strings 55 and 56) |
 | Restore confirmation is declined | No restore; the key is unchanged |
-| Import progress shows a Cancel button | Classic DLG-019 has no Cancel button and no close box, so the import cannot be cancelled from the progress window |
+| Import progress shows a Cancel button | Classic DLG-019 has no Cancel button and no default button, so the import cannot be cancelled from the progress window |
+| Import progress caption has a Close box (declared difference, `UF7`) | Classic DLG-019 (style `0x90C001C4`, no `WS_SYSMENU`) has none. The WinUI caption keeps one because WinUI restores `WS_SYSMENU`; the Close box is refused until the import ends. Recorded as known gaps `importprogress.style` and `importprogress.no-close-button` |
+| Alt+F4 or a title-bar close during an import closes the progress window or re-enables the main window | The close is refused while the import runs; the window stays open and the main window stays disabled. The host closes the window when the import ends |
 | Import progress caption is the product name | Caption is string 300, `Import Registry File`, and the label is `File:` |
 | Status texts are hard-coded in code | All status and caption text comes from `Resources.resw` |
 | Export progress and import progress texts are inline | Moved to `Resources.resw` with the same wording |
@@ -278,4 +285,6 @@ The production build uses the live reader and exports the real registry.
 | E2E pause variable is not a number, is negative, or is too large | Non-numeric or negative values mean no pause; values above 1000 are clamped to 1000 ms per key or section |
 | Cancel arrives during the export pause | The pause waits on the cancellation token, so Cancel ends the wait at once; the export stops and the partial file is deleted |
 | An E2E seed grows the user's `NTUSER.DAT` without a bound | Test seeds are capped at 5000 keys; the import file has 1000 sections and the export branch has 5000 keys |
-| E2E import test checks the cancel controls | Replaced: the test checks the classic window (caption `Import Registry File`, no push button except the title bar Close, which the host refuses until the import ends; bar advance; main window disabled while it runs; completion message; imported keys) |
+| E2E import test checks the cancel controls | Replaced: the test checks the classic window (caption `Import Registry File`; no push button in the body; Alt+F4 refused with the main window still disabled; progress bar read at least twice with a strict increase while the window is open; main window disabled while it runs; completion message; imported keys). The caption Close box and `GWL_STYLE` are known gaps (`UF7`), not passes |
+| E2E progress check passes on the first partial value | The bar is read until two readings in the range 0 to maximum show an increase, so one reading at 1 of 1000 is not enough. The E2E pause is 10 ms per section, so the 1000-section import runs for about 10 s and stays open long enough to read |
+| Yes is pressed on the confirmation before it is under the pointer | The E2E harness presses only when the confirmation is foreground, its button is enabled and stable, and the window at the pointer is the confirmation; see `classic-dialog.md` 1.10 |

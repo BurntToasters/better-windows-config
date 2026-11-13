@@ -8,9 +8,11 @@ namespace Bwc.Regedit.Dialogs;
 
 /// <summary>
 /// The Import progress window (RT_DIALOG 110, DLG-019). It shows the caption, the file label, the
-/// file name, and a progress bar. The classic template has no Cancel button, no default button,
-/// and no system menu, so the user cannot cancel the import from this window. The host closes it
-/// when the import ends, and a close request from the title bar is refused until then.
+/// file name, and a progress bar. The classic template has no Cancel button and no default button, so
+/// the user cannot cancel the import from this window. Declared difference: classic DLG-019 (style
+/// 0x90C001C4) has no system menu and no Close box, but the WinUI caption keeps both, because WinUI
+/// restores WS_SYSMENU after the style is cleared. A close request from the Close box or Alt+F4 is
+/// refused until the host ends the import. See docs/failure-modes/import-export.md section 14.
 /// </summary>
 public sealed class ImportProgressDialog : ClassicDialog
 {
@@ -78,14 +80,18 @@ public sealed class ImportProgressDialog : ClassicDialog
         _canvas.Children.Add(_bar);
         SetFlowContent(_canvas);
 
-        // The title bar close box is refused until the host completes the import. The classic window
-        // has no system menu, so this is the only close path that a user can reach.
-        AppWindow.Closing += OnAppWindowClosing;
+        // A close request from the caption or Alt+F4 is refused by IsCloseAllowed until the import completes.
         Closed += OnProgressClosed;
     }
 
     /// <summary>True when the host closed the window because the import finished.</summary>
     public bool CompletedByHost => _completedByHost;
+
+    /// <summary>
+    /// Refuses a close request (Alt+F4) while the import runs. The owner stays disabled. The host's own close,
+    /// after the import ends, goes through <see cref="CompleteFromHost"/>, which sets the flag first.
+    /// </summary>
+    protected override bool IsCloseAllowed() => _completedByHost;
 
     /// <summary>Sets a determinate position. Completed and total are sections, as the import counts them.</summary>
     public void SetProgress(int completed, int total)
@@ -141,18 +147,9 @@ public sealed class ImportProgressDialog : ClassicDialog
         element.Height = DluY(cy);
     }
 
-    private void OnAppWindowClosing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
-    {
-        if (!_completedByHost)
-        {
-            args.Cancel = true;
-        }
-    }
-
     private void OnProgressClosed(object? sender, WindowEventArgs args)
     {
         Closed -= OnProgressClosed;
-        AppWindow.Closing -= OnAppWindowClosing;
         _closed = true;
     }
 }

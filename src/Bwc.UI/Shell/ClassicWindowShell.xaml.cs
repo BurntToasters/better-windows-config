@@ -110,6 +110,7 @@ public sealed partial class ClassicWindowShell : UserControl
         MenuBarRoot.PreviewKeyDown += OnMenuPreviewKeyDown;
         PreviewKeyDown += OnShellNavigationKeyDown;
         RegisterAddressBarAccelerators();
+        HideAcceleratorTooltips();
 
         // A popup's keys can arrive here before the window hook sees them. Letters are offered to an
         // open popup, and handled events are included so an earlier handler cannot hide the key.
@@ -131,6 +132,17 @@ public sealed partial class ClassicWindowShell : UserControl
         {
             AddressBox.Resources[key] = BwcBrushes.Window;
         }
+    }
+
+    /// <summary>
+    /// Classic regedit shows no accelerator tooltip. WinUI shows one for each owner of a KeyboardAccelerator
+    /// (the shell root here), so the placement is hidden. The accelerators themselves keep working.
+    /// </summary>
+    private void HideAcceleratorTooltips()
+    {
+        KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
+        AddressBox.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
+        MenuBarRoot.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
     }
 
     /// <summary>Ctrl+L and Alt+D both focus the address bar (ACC-013 and ACC-014, command 672).</summary>

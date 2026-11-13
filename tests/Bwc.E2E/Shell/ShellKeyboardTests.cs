@@ -44,6 +44,7 @@ public sealed class ShellKeyboardTests
     private static readonly TimeSpan MenuTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan SessionTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan KeySettle = TimeSpan.FromMilliseconds(300);
+    private static readonly TimeSpan TooltipSettle = TimeSpan.FromSeconds(2.5);
     private static readonly List<KeyValuePair<string, string>> Summary = [];
     private static readonly object SummaryLock = new();
 
@@ -474,6 +475,76 @@ public sealed class ShellKeyboardTests
     }
 
     // ---- sessions and focus -------------------------------------------------------------------------
+
+    /// <summary>Hovering the address bar and pressing Ctrl+L shows no accelerator tooltip.</summary>
+    [TestMethod]
+    [TestCategory("Shell")]
+    public void Shell_CtrlLShowsNoAcceleratorTooltip()
+    {
+        var checks = new Checks("shell.tooltip");
+        using var session = OpenBwc(checks, "shell-tooltip");
+        using var automation = new UIA3Automation();
+
+        bool reached = EnsurePane(session, automation, "tree", "TAB", 6);
+        checks.Record("startsOnTree", reached, $"focused pane before Ctrl+L={FocusedPane(automation)}.");
+
+        // Hover the address bar with the real mouse, then press Ctrl+L as a user would.
+        AutomationElement? address = WaitForId(session, AddressBarId);
+        Mouse.MoveTo(Center(address?.BoundingRectangle ?? Rectangle.Empty));
+        Thread.Sleep(KeySettle);
+        session.SendKeys("CONTROL+KEY_L");
+        var focused = WaitUntil(() => FocusedPane(automation) == "address", UiTimeout);
+
+        // WinUI shows an accelerator tooltip after a short delay, so the negative check waits for it.
+        Thread.Sleep(TooltipSettle);
+        List<string> tips = AcceleratorToolTipNames(session, automation);
+        checks.Record(
+            "noCtrlLToolTip",
+            tips.Count == 0,
+            $"ToolTip elements of the app after Ctrl+L: [{string.Join(", ", tips)}]; classic regedit shows none.");
+        checks.Record("ctrlLFocusesAddress", focused, $"focused pane after Ctrl+L={FocusedPane(automation)}.");
+        CaptureWindow(session, "shell-ctrl-l-no-tooltip.png");
+        checks.AssertAllPassed();
+    }
+
+    /// <summary>Names of every ToolTip element in the windows of the app process, found through UIA.</summary>
+    private static List<string> AcceleratorToolTipNames(AppSession session, UIA3Automation automation)
+    {
+        var names = new List<string>();
+        var toolTip = automation.ConditionFactory.ByControlType(ControlType.ToolTip);
+        foreach (AutomationElement window in automation.GetDesktop().FindAllChildren())
+        {
+            int processId = SafeProcessId(window);
+            if (processId != session.ProcessId)
+            {
+                continue;
+            }
+
+            if (window.ControlType == ControlType.ToolTip)
+            {
+                names.Add(SafeName(window));
+            }
+
+            foreach (AutomationElement tip in window.FindAllDescendants(toolTip))
+            {
+                names.Add(SafeName(tip));
+            }
+        }
+
+        return names;
+    }
+
+    private static int SafeProcessId(AutomationElement element)
+    {
+        try
+        {
+            return element.Properties.ProcessId.ValueOrDefault;
+        }
+        catch (Exception)
+        {
+            return -1;
+        }
+    }
 
     /// <summary>The tree pane width in pixels, or -1 when the pane is not found.</summary>
     private static int PaneWidth(AppSession session) => WaitForId(session, TreePaneId)?.BoundingRectangle.Width ?? -1;

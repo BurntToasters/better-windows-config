@@ -115,6 +115,32 @@ newline.
 E2E: after the import result message appears, Enter closes it (`dialog.message.dismissed`). Not yet
 confirmed in a passing run; the import step failed at the file dialog Save click in the last runs.
 
+### 1.9 A close request re-enables the owner while the window stays open
+
+`Closing` can be canceled. A window that refuses a close (the import progress window while the import
+runs) must keep its owner disabled. `ModalDialogWindow` re-enabled the owner in its `Closing` handler
+before it checked whether the close was canceled, so Alt+F4 or a title-bar close re-opened the main
+window while the progress window still ran, and the user could start a second command during an import.
+
+Guard: `ModalDialogWindow` asks `IsCloseAllowed()` in `Closing`. A refused close sets `Cancel` and
+returns with the owner still disabled. The owner is restored only when the close goes ahead. A
+programmatic `Close()` does not raise `Closing`, so a dialog that finishes its own work still closes.
+E2E: `importprogress.altf4` sends Alt+F4 during the import, then checks the window is still open and the
+main window is still disabled (`importprogress.main-disabled`).
+
+### 1.10 Yes clicked before the message box is under the pointer (E2E)
+
+A press sent to a message box that has just appeared can miss it. The window at the pointer is then the
+owner or another window, the box does not answer, and the harness had no way to tell that the click never
+arrived. One import test failed once with "the Yes button did not close the dialog after 1 attempt(s)".
+
+Guard (E2E harness, `AppServicesSupport.ClickButton`): the box is the foreground window, the button is
+enabled, on screen, and has the same bounds on two reads 150 ms apart, and the window at the pointer
+resolves to the box (`WindowFromPoint` and its root) before the press. A press is never sent to a point
+that does not resolve to the box, so a missed press is a wait, not a second click. A note records the
+state at each attempt that does not close the box.
+E2E: `ImportResult_MalformedLineIsSkippedWithoutStringThirtyTwo` and the other import result tests.
+
 ## 2. DPI and geometry
 
 ### 2.1 DLU converted at system DPI instead of window DPI
@@ -296,6 +322,22 @@ The generic exe icon in the title bar is not in the classic frame.
 
 Guard: `WS_EX_DLGMODALFRAME` is set on the dialog window, which removes the icon from the
 caption. The window keeps its system menu.
+
+### 4.7 Caption keeps the system menu and Close box (declared difference, UF7)
+
+Classic DLG-019 (the import progress window) has style `0x90C001C4`: `WS_CAPTION` and no `WS_SYSMENU`, so its
+caption has no Close box. The BWC window keeps `WS_SYSMENU`, so the caption shows a Close button.
+
+Cause, measured in the E2E build: `SetWindowLongPtr(GWL_STYLE)` with `WS_SYSMENU` cleared returns the old value
+and the stored style keeps the bit. A `WM_STYLECHANGING` hook that clears the bit before the window stores it
+saw the bit already clear, so an inner WinUI window procedure restores `WS_SYSMENU` before `WM_STYLECHANGED`. A
+WinUI window cannot drop the system menu this way. Removing the bit was tried and reverted; no code ships for it.
+
+What is enforced instead: the close request from the Close box or Alt+F4 is refused until the import ends
+(1.9), and the window has no Cancel button. The window is closed by the host when the import ends.
+
+E2E: `importprogress.style` and `importprogress.no-close-button` record a known gap (`UF7`) with the measured
+`GWL_STYLE` value and the UI Automation buttons. They do not pass or fail the run.
 
 ## 5. Text and values
 
@@ -517,6 +559,9 @@ reported, not claimed. Guard: rectangles are compared with RT_DIALOG 104 only.
 | Area | Guard | E2E check |
 | --- | --- | --- |
 | Owner disabled and re-enabled | 1.1, 1.2 | Owner `IsEnabled` during and after |
+| Refused close keeps the owner disabled | 1.9 | `importprogress.altf4`, `importprogress.main-disabled` |
+| Yes pressed before the box is ready | 1.10 | `ImportResult_*` (harness `ClickButton`, no press to a point that is not the button) |
+| Caption keeps the system menu and Close box on DLG-019 (declared difference) | 4.7 | Known gaps `importprogress.style`, `importprogress.no-close-button` (`UF7`) |
 | Client size and positions | 2.1, 2.2, 2.3, 2.5 | Rectangles within 1 DIP of `MapDialogRect` |
 | No heading | 4.5 | `DialogHeading` empty |
 | Tab order | 3.1 | Tab sequence matches template |

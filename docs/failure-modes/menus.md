@@ -175,6 +175,19 @@ not the face color. The shell paints its full area with the face brush and fills
 the only gap left is outside the content. A capture sampled at the last two columns and rows must
 match the face color.
 
+## Accelerator tooltips
+
+### Shortcut hints do not float as tooltips
+
+A menu item with a shortcut carries it as `KeyboardAcceleratorTextOverride`, so the text "Ctrl+X"
+is part of the item. WinUI would also show an accelerator ToolTip for the same shortcut when the
+owner's placement mode is Auto, which puts a second "Ctrl+X" box over the menu or the title bar.
+Rule: each menu item created from a command with accelerator text has
+`KeyboardAcceleratorPlacementMode` set to Hidden (`RegeditMenu.BuildFlyoutItem`). The shell root and the
+menu bar are hidden in `ClassicWindowShell`. Check: `Shell_CtrlLShowsNoAcceleratorTooltip` in
+`docs/failure-modes/shell.md` searches the app windows for ToolTip elements after Ctrl+L.
+The menu items are covered by the rule above and by code review, not by a UIA check.
+
 ## Measurement and E2E
 
 ### Classic regedit not found

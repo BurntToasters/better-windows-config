@@ -210,6 +210,14 @@ public partial class ModalDialogWindow : Window
     /// <summary>Subclasses set their result here and return false to keep the dialog open.</summary>
     protected virtual bool TryAccept() => true;
 
+    /// <summary>
+    /// Asked when a close request arrives from the title bar, Alt+F4, or the system menu. False refuses the
+    /// request: the window stays open and the owner stays disabled. Escape, Enter, OK, Cancel, and a
+    /// programmatic <c>Close()</c> do not ask, because they are not close requests from the caption.
+    /// The default allows every close, so other dialogs keep their Close box.
+    /// </summary>
+    protected virtual bool IsCloseAllowed() => true;
+
     /// <summary>Called once the visual tree is loaded. Subclasses focus their input.</summary>
     protected virtual void OnDialogLoaded()
     {
@@ -295,12 +303,19 @@ public partial class ModalDialogWindow : Window
     }
 
     /// <summary>
-    /// Runs before the dialog is hidden, on every close path: OK, Cancel, Escape, Enter, the title-bar X,
-    /// Alt+F4, and <see cref="Window.Close"/>. The owner is enabled and activated while the dialog still
-    /// exists, so the system does not pick another window (such as the XAML input site) to activate.
+    /// Runs before the dialog is hidden when a close request comes from the caption or Alt+F4. A refused close
+    /// keeps the owner disabled and the dialog open, so the owner is restored only when the close goes ahead.
+    /// The owner is enabled and activated while the dialog still exists, so the system does not pick another
+    /// window (such as the XAML input site) to activate.
     /// </summary>
     private void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
+        if (!IsCloseAllowed())
+        {
+            args.Cancel = true;
+            return;
+        }
+
         RestoreOwner();
     }
 

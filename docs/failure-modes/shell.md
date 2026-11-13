@@ -172,3 +172,21 @@ and bottom client edges must match the face color. The check is in `ShellKeyboar
 | --- | --- |
 | The icon from ExtractIconW leaks after ShellAboutW | DestroyIcon releases it after the call |
 | View > Font applies only the size | The chosen face and weight are applied (LOGFONT). Blocked on DenseMetrics (outside this package), see the report |
+
+## Accelerator tooltips
+
+### Ctrl+L shows an accelerator tooltip over the title bar
+
+The address bar accelerator (ACC-013 and ACC-014) is a `KeyboardAccelerator` owned by the shell root.
+WinUI shows an accelerator ToolTip ("Ctrl+L") for an owner whose placement mode is Auto. The tooltip
+floats at the top center of the Registry Editor window, over the title bar, after Ctrl+L or Alt+D.
+Classic regedit shows no accelerator tooltip, so the shell must not either.
+
+Rule: every element that owns a `KeyboardAccelerator` has `KeyboardAcceleratorPlacementMode` set to
+Hidden: the shell root, and the address bar and menu bar if they ever own one. The menu items that
+carry a `KeyboardAcceleratorTextOverride` show the shortcut as text in the item, so they get Hidden as
+well and never show a second tooltip. The accelerators keep working; only the tooltip is hidden.
+
+Check: `Shell_CtrlLShowsNoAcceleratorTooltip` hovers the address bar with the mouse, presses Ctrl+L,
+waits for the tooltip to settle, and searches the process windows for `ControlType.ToolTip` elements.
+No ToolTip named "Ctrl+L" may exist. The same check then confirms that Ctrl+L still focuses the address bar.
