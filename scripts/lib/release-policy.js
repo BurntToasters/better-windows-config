@@ -6,7 +6,12 @@ import { EXIT, isPathInside } from "./cli.js";
 import { isPlaceholderKeyText, loadKeyMaterial, parsePublicKeyText } from "./minisign.js";
 import { matchEmbeddedKey, readTrustedKeysFile } from "./trusted-keys.js";
 import { channelForVersion, tryParseSemVer } from "./semver.js";
-import { parsePackageVersion, readDirectoryBuildPropsVersion } from "../sync-version-helpers.js";
+import {
+  CHANGELOG_PLACEHOLDER,
+  findChangelogSection,
+  parsePackageVersion,
+  readDirectoryBuildPropsVersion,
+} from "../sync-version-helpers.js";
 import { manifestFileName, validateManifestBuffer } from "./update-manifest.js";
 import { validateUrl } from "./url-policy.js";
 
@@ -78,51 +83,41 @@ export function readBuildVersion(root) {
   return readDirectoryBuildPropsVersion(fs.readFileSync(file, "utf8"));
 }
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 export function readChangelogSection(root, version) {
   const file = path.join(root, "CHANGELOG.md");
   if (!fs.existsSync(file)) {
     return { ok: false, reason: "changelog-missing", detail: "CHANGELOG.md is missing" };
   }
   const text = fs.readFileSync(file, "utf8");
-  const headingPattern = new RegExp(`^## \\[${escapeRegExp(version)}\\](?:[ \\t]|$)`, "gm");
-  const matches = [...text.matchAll(headingPattern)];
-  if (matches.length === 0) {
+  const section = findChangelogSection(text, version);
+  if (section.count === 0) {
     return {
       ok: false,
       reason: "changelog-missing",
-      detail: `CHANGELOG.md has no heading "## [${version}]"`,
+      detail: `CHANGELOG.md has no heading "${section.heading}"`,
     };
   }
-  if (matches.length > 1) {
+  if (section.count > 1) {
     return {
       ok: false,
       reason: "changelog-missing",
-      detail: `CHANGELOG.md has ${matches.length} headings for ${version}; keep exactly one`,
+      detail: `CHANGELOG.md has ${section.count} "${section.heading}" headings; keep exactly one`,
     };
   }
-
-  const match = matches[0];
-  const headingEnd = text.indexOf("\n", match.index);
-  const bodyStart = headingEnd === -1 ? text.length : headingEnd + 1;
-  const rest = text.slice(bodyStart);
-  const nextHeading = rest.search(/^## /m);
-  const body = (nextHeading === -1 ? rest : rest.slice(0, nextHeading)).trim();
-  if (body.length === 0) {
+  if (section.body.length === 0 || section.body.includes(CHANGELOG_PLACEHOLDER)) {
     return {
       ok: false,
       reason: "changelog-empty",
-      detail: `CHANGELOG.md section for ${version} is empty`,
+      detail: `CHANGELOG.md section for ${version} is empty or still has the sync-version placeholder`,
     };
   }
+  // CHANGELOG.md is the BCLS release body (downloads, callouts, carried-forward
+  // sections, Release Info), so the GitHub notes are the whole file.
   return {
     ok: true,
     file,
-    heading: match[0].trim(),
-    body,
+    heading: section.heading,
+    body: text.trim(),
   };
 }
 

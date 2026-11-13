@@ -402,6 +402,11 @@ files under the artifact folder:
 - `gh/edit-draft.json`
 - `release-notes.md`
 
+The release notes are the whole `CHANGELOG.md`, which is written as a BCLS `binary` release body
+(downloads table, signing callout, `## Changes in \`vX.Y.Z:\`` sections, and Release Info). The
+draft needs exactly one non-empty `## Changes in` section for the version, without the
+sync-version placeholder.
+
 Apply, on the release VM, with the real key:
 
 ```powershell
