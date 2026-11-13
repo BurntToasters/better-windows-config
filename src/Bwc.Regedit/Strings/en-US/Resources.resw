@@ -1,0 +1,909 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="RegeditTitle" xml:space="preserve">
+    <value>Registry Editor</value>
+  </data>
+  <!--
+    Menu texts copied verbatim from docs/parity/oracle/regedit-resources.json (RT_MENU 103).
+    The ampersand marks the mnemonic. The oracle uses a TAB between text and accelerator;
+    &#x9; keeps that character instead of letting XML normalize it to a space.
+  -->
+  <data name="MenuFile" xml:space="preserve">
+    <value>&amp;File</value>
+  </data>
+  <data name="MenuFileImport" xml:space="preserve">
+    <value>&amp;Import...</value>
+  </data>
+  <data name="MenuFileExport" xml:space="preserve">
+    <value>&amp;Export...</value>
+  </data>
+  <data name="MenuFileLoadHive" xml:space="preserve">
+    <value>&amp;Load Hive...</value>
+  </data>
+  <data name="MenuFileUnloadHive" xml:space="preserve">
+    <value>&amp;Unload Hive...</value>
+  </data>
+  <data name="MenuFileConnectNetworkRegistry" xml:space="preserve">
+    <value>&amp;Connect Network Registry...</value>
+  </data>
+  <data name="MenuFileDisconnectNetworkRegistry" xml:space="preserve">
+    <value>&amp;Disconnect Network Registry...</value>
+  </data>
+  <data name="MenuFilePrint" xml:space="preserve">
+    <value>&amp;Print...&#x9;Ctrl+P</value>
+  </data>
+  <data name="MenuFileExit" xml:space="preserve">
+    <value>E&amp;xit</value>
+  </data>
+  <data name="MenuEdit" xml:space="preserve">
+    <value>&amp;Edit</value>
+  </data>
+  <data name="MenuEditNew" xml:space="preserve">
+    <value>&amp;New</value>
+  </data>
+  <data name="MenuEditNewKey" xml:space="preserve">
+    <value>&amp;Key</value>
+  </data>
+  <data name="MenuEditNewStringValue" xml:space="preserve">
+    <value>&amp;String Value</value>
+  </data>
+  <data name="MenuEditNewBinaryValue" xml:space="preserve">
+    <value>&amp;Binary Value</value>
+  </data>
+  <data name="MenuEditNewDwordValue" xml:space="preserve">
+    <value>&amp;DWORD (32-bit) Value</value>
+  </data>
+  <data name="MenuEditNewQwordValue" xml:space="preserve">
+    <value>&amp;QWORD (64-bit) Value</value>
+  </data>
+  <data name="MenuEditNewMultiStringValue" xml:space="preserve">
+    <value>&amp;Multi-String Value</value>
+  </data>
+  <data name="MenuEditNewExpandableStringValue" xml:space="preserve">
+    <value>&amp;Expandable String Value</value>
+  </data>
+  <data name="MenuEditPermissions" xml:space="preserve">
+    <value>&amp;Permissions...</value>
+  </data>
+  <data name="MenuEditDelete" xml:space="preserve">
+    <value>&amp;Delete&#x9;Del</value>
+  </data>
+  <data name="MenuEditRename" xml:space="preserve">
+    <value>&amp;Rename</value>
+  </data>
+  <data name="MenuEditCopyKeyName" xml:space="preserve">
+    <value>&amp;Copy Key Name</value>
+  </data>
+  <data name="MenuEditFind" xml:space="preserve">
+    <value>&amp;Find...&#x9;Ctrl+F</value>
+  </data>
+  <data name="MenuEditFindNext" xml:space="preserve">
+    <value>Find Ne&amp;xt&#x9;F3</value>
+  </data>
+  <!--
+    Context menu texts copied from the RT_MENU 104, 105, and 106 entries in
+    docs/parity/regedit-inventory.md. These are separate keys because several oracle context
+    strings differ from the main menu strings, for example Export without an ellipsis.
+  -->
+  <data name="ContextExpand" xml:space="preserve">
+    <value>Expand</value>
+  </data>
+  <data name="ContextCollapse" xml:space="preserve">
+    <!-- Oracle 25 (MSG-010). Shown for Expand (915) while the node is expanded. -->
+    <value>Collapse</value>
+  </data>
+  <data name="ContextFind" xml:space="preserve">
+    <value>&amp;Find...</value>
+  </data>
+  <data name="ContextDelete" xml:space="preserve">
+    <value>&amp;Delete</value>
+  </data>
+  <data name="ContextRename" xml:space="preserve">
+    <value>&amp;Rename</value>
+  </data>
+  <data name="ContextExport" xml:space="preserve">
+    <value>&amp;Export</value>
+  </data>
+  <data name="ContextPermissions" xml:space="preserve">
+    <value>&amp;Permissions...</value>
+  </data>
+  <data name="ContextCopyKeyName" xml:space="preserve">
+    <value>&amp;Copy Key Name</value>
+  </data>
+  <data name="ContextGoToHklm" xml:space="preserve">
+    <value>Go &amp;to HKEY_LOCAL_MACHINE</value>
+  </data>
+  <data name="ContextModify" xml:space="preserve">
+    <value>&amp;Modify...</value>
+  </data>
+  <data name="ContextModifyBinary" xml:space="preserve">
+    <value>Modify &amp;Binary Data...</value>
+  </data>
+  <data name="MenuView" xml:space="preserve">
+    <value>&amp;View</value>
+  </data>
+  <data name="MenuViewAddressBar" xml:space="preserve">
+    <value>Address &amp;Bar</value>
+  </data>
+  <data name="MenuViewSplit" xml:space="preserve">
+    <value>Sp&amp;lit</value>
+  </data>
+  <data name="MenuViewDisplayBinaryData" xml:space="preserve">
+    <value>&amp;Display Binary Data...</value>
+  </data>
+  <data name="MenuViewRefresh" xml:space="preserve">
+    <value>&amp;Refresh&#x9;F5</value>
+  </data>
+  <data name="MenuViewFont" xml:space="preserve">
+    <value>&amp;Font</value>
+  </data>
+  <data name="MenuFavorites" xml:space="preserve">
+    <value>F&amp;avorites</value>
+  </data>
+  <data name="MenuFavoritesAdd" xml:space="preserve">
+    <value>&amp;Add to Favorites...</value>
+  </data>
+  <data name="MenuFavoritesRemove" xml:space="preserve">
+    <value>&amp;Remove Favorite...</value>
+  </data>
+  <data name="MenuHelp" xml:space="preserve">
+    <value>&amp;Help</value>
+  </data>
+  <data name="MenuHelpAbout" xml:space="preserve">
+    <value>&amp;About Registry Editor...</value>
+  </data>
+  <data name="DialogOk" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="DialogCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="DialogYes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="DialogNo" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="DialogErrorTitle" xml:space="preserve">
+    <value>Registry Editor</value>
+  </data>
+  <data name="DialogPermissionsFailed" xml:space="preserve">
+    <value>The permissions dialog failed with HRESULT 0x{0:X8} (Win32 code {1}).</value>
+  </data>
+  <data name="DialogPrintFailed" xml:space="preserve">
+    <value>Printing the selected key failed.
+
+Key: {0}
+Error code: {1} (0x{1:X8})
+{2}</value>
+  </data>
+  <data name="DialogFavoriteAddTitle" xml:space="preserve">
+    <value>Add to Favorites</value>
+  </data>
+  <data name="DialogFavoriteNameLabel" xml:space="preserve">
+    <value>Favorite name:</value>
+  </data>
+  <data name="DialogFavoriteDuplicate" xml:space="preserve">
+    <value>There is already a favorite with that name.</value>
+  </data>
+  <data name="DialogErrorAddingFavorite" xml:space="preserve">
+    <value>Error Adding Favorite</value>
+  </data>
+  <data name="DialogFavoriteCaption" xml:space="preserve">
+    <value>Favorite</value>
+  </data>
+  <data name="DialogFavoriteRemoveTitle" xml:space="preserve">
+    <value>Remove Favorites</value>
+  </data>
+  <data name="DialogFavoriteSelectLabel" xml:space="preserve">
+    <value>Select Favorite(s):</value>
+  </data>
+  <data name="DialogFavoriteEmptyName" xml:space="preserve">
+    <value>Enter a favorite name.</value>
+  </data>
+  <data name="DialogFavoriteComputer" xml:space="preserve">
+    <value>Computer cannot be added to favorites. Select a key first.</value>
+  </data>
+  <data name="DialogFavoriteNone" xml:space="preserve">
+    <value>There are no favorites to remove.</value>
+  </data>
+  <data name="DialogFavoriteNoSelection" xml:space="preserve">
+    <value>Select at least one favorite to remove.</value>
+  </data>
+  <data name="DialogFavoriteLoadFailed" xml:space="preserve">
+    <value>The favorites list could not be read.</value>
+  </data>
+  <data name="DialogNewKeyTitle" xml:space="preserve">
+    <value>New Key</value>
+  </data>
+  <data name="DialogKeyNameLabel" xml:space="preserve">
+    <value>Key name</value>
+  </data>
+  <data name="DialogNewValueTitle" xml:space="preserve">
+    <value>New Value</value>
+  </data>
+  <data name="DialogValueNameLabel" xml:space="preserve">
+    <value>Value name</value>
+  </data>
+  <data name="DialogRenameKeyTitle" xml:space="preserve">
+    <value>Rename Key</value>
+  </data>
+  <data name="DialogRenameValueTitle" xml:space="preserve">
+    <value>Rename Value</value>
+  </data>
+  <data name="DialogDeleteValueTitle" xml:space="preserve">
+    <value>Confirm Value Delete</value>
+  </data>
+  <data name="DialogDeleteKeyTitle" xml:space="preserve">
+    <value>Confirm Key Delete</value>
+  </data>
+  <data name="DialogDeleteValueMessage" xml:space="preserve">
+    <value>Deleting certain registry values could cause system instability. Are you sure you want to permanently delete the selected value?</value>
+  </data>
+  <data name="DialogDeleteKeyMessage" xml:space="preserve">
+    <value>Deleting certain registry keys could cause system instability. Are you sure you want to permanently delete this key?</value>
+  </data>
+  <data name="DialogDeleteKeyChildrenWarning" xml:space="preserve">
+    <value>Deleting this key will delete all of its subkeys.</value>
+  </data>
+  <data name="DialogValueStringTitle" xml:space="preserve">
+    <value>New String Value</value>
+  </data>
+  <data name="DialogValueExpandableTitle" xml:space="preserve">
+    <value>New Expandable String Value</value>
+  </data>
+  <data name="DialogValueBinaryTitle" xml:space="preserve">
+    <value>New Binary Value</value>
+  </data>
+  <data name="DialogValueDwordTitle" xml:space="preserve">
+    <value>New DWORD (32-bit) Value</value>
+  </data>
+  <data name="DialogValueQwordTitle" xml:space="preserve">
+    <value>New QWORD (64-bit) Value</value>
+  </data>
+  <data name="DialogValueMultiStringTitle" xml:space="preserve">
+    <value>New Multi-String Value</value>
+  </data>
+  <data name="DialogRootKeyLocked" xml:space="preserve">
+    <value>A predefined registry root cannot be renamed or deleted.</value>
+  </data>
+  <data name="DialogDefaultValueLocked" xml:space="preserve">
+    <value>The default value cannot be renamed.</value>
+  </data>
+  <data name="DialogInvalidKeyName" xml:space="preserve">
+    <value>Enter a key name that is not empty, not a separator, and not longer than 255 characters.</value>
+  </data>
+  <data name="DialogInvalidValueName" xml:space="preserve">
+    <value>Enter a value name without NUL characters and no longer than 16383 characters.</value>
+  </data>
+  <data name="DialogNameExists" xml:space="preserve">
+    <value>A registry object with this name already exists.</value>
+  </data>
+  <data name="DialogNoSelection" xml:space="preserve">
+    <value>Select a key or value first.</value>
+  </data>
+  <data name="DialogExportNoSelection" xml:space="preserve">
+    <value>Select a key to export.</value>
+  </data>
+  <data name="DialogAddressBarInvalidPath" xml:space="preserve">
+    <value>Enter Computer, a predefined root such as HKCU, or a full key path such as HKCU\Software.</value>
+  </data>
+  <!-- Oracle 148. Also used when a key that was selected no longer exists. -->
+  <data name="DialogAddressBarKeyNotFound" xml:space="preserve">
+    <value>The selected branch does not exist. Make sure that the correct path is given.</value>
+  </data>
+  <data name="DialogFindTitle" xml:space="preserve">
+    <value>Find</value>
+  </data>
+  <data name="DialogFindWhat" xml:space="preserve">
+    <value>Find what:</value>
+  </data>
+  <data name="DialogFindLookAt" xml:space="preserve">
+    <value>Look at</value>
+  </data>
+  <data name="DialogFindKeys" xml:space="preserve">
+    <value>Keys</value>
+  </data>
+  <data name="DialogFindValues" xml:space="preserve">
+    <value>Values</value>
+  </data>
+  <data name="DialogFindData" xml:space="preserve">
+    <value>Data</value>
+  </data>
+  <data name="DialogFindMatchWhole" xml:space="preserve">
+    <value>Match whole string only</value>
+  </data>
+  <data name="DialogFindSubtree" xml:space="preserve">
+    <value>Search in subtree</value>
+  </data>
+  <data name="DialogFindNext" xml:space="preserve">
+    <value>Find Next</value>
+  </data>
+  <data name="DialogFindCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="DialogFindSearching" xml:space="preserve">
+    <value>Searching...</value>
+  </data>
+  <data name="DialogFindFound" xml:space="preserve">
+    <value>Found: {0}</value>
+  </data>
+  <data name="DialogFindFinished" xml:space="preserve">
+    <value>Finished searching through the registry.</value>
+  </data>
+  <data name="DialogFindEmptyText" xml:space="preserve">
+    <value>Enter text to find.</value>
+  </data>
+  <data name="DialogFindNoScope" xml:space="preserve">
+    <value>Select at least one of Keys, Values, or Data.</value>
+  </data>
+  <data name="DialogFindSearchFailed" xml:space="preserve">
+    <value>The search could not be completed.</value>
+  </data>
+  <data name="DialogHexTitle" xml:space="preserve">
+    <value>Binary Data</value>
+  </data>
+  <data name="DialogHexEditTitle" xml:space="preserve">
+    <value>Edit Binary Data</value>
+  </data>
+  <data name="DialogHexClose" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="DialogHexNoSelection" xml:space="preserve">
+    <value>Select a single value to display its binary data.</value>
+  </data>
+  <data name="DialogEditStringTitle" xml:space="preserve">
+    <value>Edit String</value>
+  </data>
+  <data name="DialogEditExpandableTitle" xml:space="preserve">
+    <value>Edit Expandable String Value</value>
+  </data>
+  <data name="DialogEditDwordTitle" xml:space="preserve">
+    <value>Edit DWORD (32-bit) Value</value>
+  </data>
+  <data name="DialogEditQwordTitle" xml:space="preserve">
+    <value>Edit QWORD (64-bit) Value</value>
+  </data>
+  <data name="DialogEditMultiStringTitle" xml:space="preserve">
+    <value>Edit Multi-String</value>
+  </data>
+  <data name="DialogLoadHiveTitle" xml:space="preserve">
+    <value>Load Hive</value>
+  </data>
+  <data name="DialogLoadHiveNameLabel" xml:space="preserve">
+    <value>Key name under HKEY_LOCAL_MACHINE:</value>
+  </data>
+  <data name="DialogLoadHiveNameInvalid" xml:space="preserve">
+    <value>Enter a single key name without separators. The name cannot be empty, cannot be "." or "..", cannot contain NUL characters, and cannot be longer than 255 characters.</value>
+  </data>
+  <data name="DialogLoadHiveNameExists" xml:space="preserve">
+    <value>A key with that name already exists under HKEY_LOCAL_MACHINE. Choose another name.</value>
+  </data>
+  <data name="DialogUnloadHiveTitle" xml:space="preserve">
+    <value>Unload Hive</value>
+  </data>
+  <data name="DialogUnloadHiveMessage" xml:space="preserve">
+    <value>Unload the hive at {0}? The hive file is not deleted.</value>
+  </data>
+  <data name="DialogConnectTitle" xml:space="preserve">
+    <value>Connect Network Registry</value>
+  </data>
+  <data name="DialogConnectLabel" xml:space="preserve">
+    <value>Computer name:</value>
+  </data>
+  <data name="DialogConnectEmpty" xml:space="preserve">
+    <value>Enter a computer name.</value>
+  </data>
+  <data name="DialogConnectInvalid" xml:space="preserve">
+    <value>A computer name must be one name without backslashes, slashes, or NUL.</value>
+  </data>
+  <data name="DialogConnectLocal" xml:space="preserve">
+    <value>You cannot connect to your own computer.</value>
+  </data>
+  <data name="DialogConnectDuplicate" xml:space="preserve">
+    <value>That computer is already connected.</value>
+  </data>
+  <data name="DialogConnectFailedTitle" xml:space="preserve">
+    <value>Error Connecting Network Registry</value>
+  </data>
+  <data name="DialogDisconnectTitle" xml:space="preserve">
+    <value>Disconnect Network Registry</value>
+  </data>
+  <data name="DialogDisconnectLabel" xml:space="preserve">
+    <value>Select a connected computer:</value>
+  </data>
+  <data name="DialogDisconnectEmpty" xml:space="preserve">
+    <value>No remote computer is connected.</value>
+  </data>
+  <data name="DialogDisconnectNoSelection" xml:space="preserve">
+    <value>Select a connected computer to disconnect.</value>
+  </data>
+  <!--
+    Classic message and caption texts. Each entry is a plain copy of the oracle string named in
+    its comment (docs/parity/oracle/regedit-resources.json, en-US/regedit.exe.mui), with %1 and %2
+    converted to {0} and {1}. Captions are listed first. Oracle 16, 41, 49 to 54, 152, 153, 171,
+    172, 173, 181, 186 and 148 reuse the existing keys above.
+  -->
+  <data name="MsgCaptionRenameKeyError" xml:space="preserve">
+    <!-- Oracle 64 -->
+    <value>Error Renaming Key</value>
+  </data>
+  <data name="MsgCaptionRenameValueError" xml:space="preserve">
+    <!-- Oracle 72 -->
+    <value>Error Renaming Value</value>
+  </data>
+  <data name="MsgCaptionDeleteKeyError" xml:space="preserve">
+    <!-- Oracle 80 -->
+    <value>Error Deleting Key</value>
+  </data>
+  <data name="MsgCaptionDeleteValuesError" xml:space="preserve">
+    <!-- Oracle 88 -->
+    <value>Error Deleting Values</value>
+  </data>
+  <data name="MsgCaptionOpenKeyError" xml:space="preserve">
+    <!-- Oracle 96 -->
+    <value>Error Opening Key</value>
+  </data>
+  <data name="MsgCaptionDisplayValueError" xml:space="preserve">
+    <!-- Oracle 100 -->
+    <value>Error Displaying Value</value>
+  </data>
+  <data name="MsgCaptionEditValueError" xml:space="preserve">
+    <!-- Oracle 112 -->
+    <value>Error Editing Value</value>
+  </data>
+  <data name="MsgCaptionCreateKeyError" xml:space="preserve">
+    <!-- Oracle 160 -->
+    <value>Error Creating Key</value>
+  </data>
+  <data name="MsgCaptionCreateValueError" xml:space="preserve">
+    <!-- Oracle 168 -->
+    <value>Error Creating Value</value>
+  </data>
+  <data name="MsgCaptionConfirmKeyDelete" xml:space="preserve">
+    <!-- Oracle 49 -->
+    <value>Confirm Key Delete</value>
+  </data>
+  <data name="MsgCaptionConfirmValueDelete" xml:space="preserve">
+    <!-- Oracle 51 -->
+    <value>Confirm Value Delete</value>
+  </data>
+  <data name="MsgCaptionConfirmUnloadHive" xml:space="preserve">
+    <!-- Oracle 54 -->
+    <value>Confirm Unload Hive</value>
+  </data>
+  <data name="MsgDeleteKeyConfirm" xml:space="preserve">
+    <!-- Oracle 48. Used for every key, with or without subkeys. -->
+    <value>Are you sure you want to permanently delete this key and all of its subkeys?</value>
+  </data>
+  <data name="MsgDeleteValueConfirm" xml:space="preserve">
+    <!-- Oracle 52 -->
+    <value>Deleting certain registry values could cause system instability. Are you sure you want to permanently delete this value?</value>
+  </data>
+  <data name="MsgDeleteValuesConfirm" xml:space="preserve">
+    <!-- Oracle 50 -->
+    <value>Deleting certain registry values could cause system instability. Are you sure you want to permanently delete these values?</value>
+  </data>
+  <data name="MsgUnloadHiveConfirm" xml:space="preserve">
+    <!-- Oracle 53 -->
+    <value>Are you sure you want to unload the current key and all of its subkeys?</value>
+  </data>
+  <data name="MsgRenameKeyFailed" xml:space="preserve">
+    <!-- Oracle 66 -->
+    <value>The Registry Editor cannot rename {0}. Error while renaming key.</value>
+  </data>
+  <data name="MsgRenameKeyTooLong" xml:space="preserve">
+    <!-- Oracle 67 -->
+    <value>The Registry Editor cannot rename {0}. The specified key name is too long. Type a shorter name and try again.</value>
+  </data>
+  <data name="MsgRenameKeyExists" xml:space="preserve">
+    <!-- Oracle 68 -->
+    <value>The Registry Editor cannot rename {0}. The specified key name already exists. Type another name and try again.</value>
+  </data>
+  <data name="MsgRenameKeyBackslash" xml:space="preserve">
+    <!-- Oracle 69 -->
+    <value>The Registry Editor cannot rename {0}. Specify a key name without a backslash (\).</value>
+  </data>
+  <data name="MsgRenameKeyEmpty" xml:space="preserve">
+    <!-- Oracle 70 -->
+    <value>The Registry Editor cannot rename {0}. The specified key name is empty. Type another name and try again.</value>
+  </data>
+  <data name="MsgRenameValueFailed" xml:space="preserve">
+    <!-- Oracle 73 -->
+    <value>The Registry Editor cannot rename {0}. Error while renaming value.</value>
+  </data>
+  <data name="MsgRenameValueExists" xml:space="preserve">
+    <!-- Oracle 74 -->
+    <value>The Registry Editor cannot rename {0}. The specified value name already exists. Type another name and try again.</value>
+  </data>
+  <data name="MsgRenameValueEmpty" xml:space="preserve">
+    <!-- Oracle 75 -->
+    <value>The Registry Editor cannot rename {0}. The specified value name is empty. Type another name and try again.</value>
+  </data>
+  <data name="MsgDeleteKeyFailed" xml:space="preserve">
+    <!-- Oracle 82 -->
+    <value>Cannot delete {0}:  Error while deleting key.</value>
+  </data>
+  <data name="MsgDeleteValuesFailed" xml:space="preserve">
+    <!-- Oracle 89 -->
+    <value>Unable to delete all specified values.</value>
+  </data>
+  <data name="MsgOpenKeyFailed" xml:space="preserve">
+    <!-- Oracle 97 -->
+    <value>{0} cannot be opened.
+An error is preventing this key from being opened.</value>
+  </data>
+  <data name="MsgOpenKeyFailedDetails" xml:space="preserve">
+    <!-- Oracle 98 -->
+    <value>{0} cannot be opened.
+An error is preventing this key from being opened.
+Details: {1}</value>
+  </data>
+  <data name="MsgDisplayValueFailed" xml:space="preserve">
+    <!-- Oracle 101 -->
+    <value>Cannot display {0}:  Error reading the value's contents.</value>
+  </data>
+  <data name="MsgEditValueReadFailed" xml:space="preserve">
+    <!-- Oracle 114 -->
+    <value>Cannot edit {0}:  Error reading the value's contents.</value>
+  </data>
+  <data name="MsgEditValueWriteFailed" xml:space="preserve">
+    <!-- Oracle 115 -->
+    <value>Cannot edit {0}:  Error writing the value's new contents.</value>
+  </data>
+  <data name="MsgImportInvalidKey" xml:space="preserve">
+    <!-- Oracle 125 -->
+    <value>Cannot import {0}: The key selected is invalid.</value>
+  </data>
+  <data name="MsgImportPrivileges" xml:space="preserve">
+    <!-- Oracle 126 -->
+    <value>Cannot import {0}: Insufficient privileges.</value>
+  </data>
+  <data name="MsgImportOpenFailed" xml:space="preserve">
+    <!-- Oracle 129 -->
+    <value>Cannot import {0}: Error opening the file. There may be a disk or file system error.</value>
+  </data>
+  <data name="MsgImportReadFailed" xml:space="preserve">
+    <!-- Oracle 130 -->
+    <value>Cannot import {0}: Error reading the file. There may be a disk error or the file may be corrupt.</value>
+  </data>
+  <data name="MsgImportRegistryAccess" xml:space="preserve">
+    <!-- Oracle 231 -->
+    <value>Cannot import {0}: Error accessing the registry.</value>
+  </data>
+  <data name="MsgImportPartial" xml:space="preserve">
+    <!-- Oracle 132 -->
+    <value>Cannot import {0}: Not all data was successfully written to the registry.  Some keys are open by the system or other processes, or you have insufficient privileges to perform this operation.</value>
+  </data>
+  <data name="MsgImportNotRegistryFile" xml:space="preserve">
+    <!-- Oracle 133 -->
+    <value>Cannot import {0}: The specified file is not a registry file. You can import only registry files.</value>
+  </data>
+  <data name="MsgImportFileMissing" xml:space="preserve">
+    <!-- Oracle 235 -->
+    <value>Cannot import {0}: The file specified does not exist.</value>
+  </data>
+  <data name="MsgExportOpenFailed" xml:space="preserve">
+    <!-- Oracle 138 -->
+    <value>Cannot export {0}: Error opening the file. There may be a disk or file system error.</value>
+  </data>
+  <data name="MsgExportWriteFailed" xml:space="preserve">
+    <!-- Oracle 141 -->
+    <value>Cannot export {0}: Error writing the file. There may be a disk or file system error.</value>
+  </data>
+  <data name="MsgExportPrivileges" xml:space="preserve">
+    <!-- Oracle 142 -->
+    <value>Cannot export {0}: Insufficient privileges.</value>
+  </data>
+  <data name="MsgExportKeyInvalid" xml:space="preserve">
+    <!-- Oracle 143 -->
+    <value>Cannot export {0}: The key selected is invalid.</value>
+  </data>
+  <data name="MsgPrintMemory" xml:space="preserve">
+    <!-- Oracle 144 -->
+    <value>Cannot print: Insufficient memory to begin job. Try closing down some applications, and try again. If you still see this message, try restarting Windows.</value>
+  </data>
+  <data name="MsgPrintFailed" xml:space="preserve">
+    <!-- Oracle 145 -->
+    <value>Cannot print: An error occurred during printing. Check your printer and your printer's settings for problems, and try again.</value>
+  </data>
+  <data name="MsgPrintReadFailed" xml:space="preserve">
+    <!-- Oracle 146 -->
+    <value>Cannot print:  Error reading a registry value's contents.</value>
+  </data>
+  <data name="MsgConnectFailed" xml:space="preserve">
+    <!-- Oracle 154 -->
+    <value>Unable to connect to {0}.  Make sure that this computer is on the network, has remote administration enabled, and that both computers are running the remote registry service.</value>
+  </data>
+  <data name="MsgConnectRootsFailed" xml:space="preserve">
+    <!-- Oracle 155 -->
+    <value>Unable to connect to all of the roots of the computer's registry.  Disconnect from the remote registry and then reconnect before trying again.</value>
+  </data>
+  <data name="MsgConnectPermission" xml:space="preserve">
+    <!-- Oracle 156 -->
+    <value>Unable to connect to {0}.  Make sure you have permission to administer this computer.</value>
+  </data>
+  <data name="MsgCreateKeyOpenFailed" xml:space="preserve">
+    <!-- Oracle 161 -->
+    <value>Cannot create key: Error while opening the key {0}.</value>
+  </data>
+  <data name="MsgCreateKeyWriteFailed" xml:space="preserve">
+    <!-- Oracle 162 -->
+    <value>Cannot create key: Error writing to the registry.</value>
+  </data>
+  <data name="MsgCreateKeyNoUniqueName" xml:space="preserve">
+    <!-- Oracle 163 -->
+    <value>Cannot create key: Unable to generate a unique name.</value>
+  </data>
+  <data name="MsgCreateKeyPermission" xml:space="preserve">
+    <!-- Oracle 164 -->
+    <value>Cannot create key: You do not have the requisite permissions to create a new key under {0}.</value>
+  </data>
+  <data name="MsgCreateValueWriteFailed" xml:space="preserve">
+    <!-- Oracle 169 -->
+    <value>Cannot create value: Error writing to the registry.</value>
+  </data>
+  <data name="MsgCreateValueNoUniqueName" xml:space="preserve">
+    <!-- Oracle 170 -->
+    <value>Cannot create value: Unable to generate a unique name.</value>
+  </data>
+  <data name="MsgLoadHivePrivileges" xml:space="preserve">
+    <!-- Oracle 182 -->
+    <value>Cannot Load {0}: Insufficient privileges.</value>
+  </data>
+  <data name="MsgLoadHiveFailed" xml:space="preserve">
+    <!-- Oracle 183 -->
+    <value>Cannot Load {0}: Error while loading hive.</value>
+  </data>
+  <data name="MsgLoadHiveAccessDenied" xml:space="preserve">
+    <!-- Oracle 189 -->
+    <value>Cannot Load {0}: Access is denied.</value>
+  </data>
+  <data name="MsgLoadHiveInUse" xml:space="preserve">
+    <!-- Oracle 188 -->
+    <value>Cannot Load {0}: The process cannot access the file because it is being used by another process.</value>
+  </data>
+  <data name="MsgUnloadHivePrivileges" xml:space="preserve">
+    <!-- Oracle 184 -->
+    <value>Cannot Unload {0}: Insufficient privileges.</value>
+  </data>
+  <data name="MsgUnloadHiveFailed" xml:space="preserve">
+    <!-- Oracle 185 -->
+    <value>Cannot Unload {0}: Error while unloading hive.</value>
+  </data>
+  <data name="MsgUnloadHiveAccessDenied" xml:space="preserve">
+    <!-- Oracle 187 -->
+    <value>Cannot Unload {0}: Access is denied.</value>
+  </data>
+  <data name="MsgSecurityRetrieveDenied" xml:space="preserve">
+    <!-- Oracle 7050 -->
+    <value>Registry Editor could not retrieve the security information.
+The key currently selected does not give you access to retrieve such information.</value>
+  </data>
+  <data name="MsgSecurityRetrieveDeleted" xml:space="preserve">
+    <!-- Oracle 7051 -->
+    <value>Registry Editor could not retrieve the security information.
+The key currently selected is marked for deletion.</value>
+  </data>
+  <data name="MsgSecurityRetrieveFailed" xml:space="preserve">
+    <!-- Oracle 7052 -->
+    <value>Registry Editor could not retrieve the security information.
+The key currently selected is not accessible.</value>
+  </data>
+  <data name="MsgSecuritySaveDenied" xml:space="preserve">
+    <!-- Oracle 7070 (MSG-184) -->
+    <value>Registry Editor could not save the security information.
+The key currently selected does not give you access to save such information.</value>
+  </data>
+  <data name="MsgSecuritySetFailed" xml:space="preserve">
+    <!-- Oracle 7072 (MSG-186). The oracle text ends with a space. -->
+    <value>Registry Editor could not set security in the key currently selected, or some of its subkeys. </value>
+  </data>
+  <data name="MsgReplaceSubkeysConfirm" xml:space="preserve">
+    <!-- Oracle 7017 (MSG-178). {0} is the key path. -->
+    <value>Do you want to replace the permission on all existing subkeys within {0}?</value>
+  </data>
+  <data name="PermissionsInheritThisKeyOnly" xml:space="preserve">
+    <!-- Oracle 7090 (MSG-191) -->
+    <value>This key only</value>
+  </data>
+  <data name="PermissionsInheritThisKeyAndSubkeys" xml:space="preserve">
+    <!-- Oracle 7091 (MSG-192) -->
+    <value>This key and subkeys</value>
+  </data>
+  <data name="PermissionsInheritSubkeysOnly" xml:space="preserve">
+    <!-- Oracle 7092 (MSG-193) -->
+    <value>Subkeys only</value>
+  </data>
+  <!-- Written for this product: the oracle has no generic text for a command that has no registry operation. -->
+  <data name="MsgCommandFailed" xml:space="preserve">
+    <value>The Registry Editor could not complete this command. Try again.</value>
+  </data>
+  <data name="MsgRegistryEditingDisabled" xml:space="preserve">
+    <!-- Oracle 40 (MSG-019). Shown when the DisableRegistryTools policy disables registry editing. -->
+    <value>Registry editing has been disabled by your administrator.</value>
+  </data>
+  <data name="MsgCaptionRegistryEditor" xml:space="preserve">
+    <!-- Oracle 16 -->
+    <value>Registry Editor</value>
+  </data>
+  <data name="MsgImportConfirm" xml:space="preserve">
+    <!-- Oracle 304. The {0} placeholder is the file path the user gave. -->
+    <value>Adding information can unintentionally change or delete values and cause components to stop working correctly. If you do not trust the source of this information in {0}, do not add it to the registry.
+
+ Are you sure you want to continue?</value>
+  </data>
+  <data name="MsgImportSucceeded" xml:space="preserve">
+    <!-- Oracle 228 -->
+    <value>The keys and values contained in {0} have been successfully added to the registry.</value>
+  </data>
+  <!-- Written for this product: the Theme submenu is a BWC addition, so the oracle has no text for it. -->
+  <data name="MenuViewTheme" xml:space="preserve">
+    <value>&amp;Theme</value>
+  </data>
+  <data name="MenuViewThemeSystem" xml:space="preserve">
+    <value>&amp;System</value>
+  </data>
+  <data name="MenuViewThemeLight" xml:space="preserve">
+    <value>&amp;Light</value>
+  </data>
+  <data name="MenuViewThemeDark" xml:space="preserve">
+    <value>&amp;Dark</value>
+  </data>
+  <!-- Oracle 311. The Ctrl+T and menu 918 text when the selection is under HKEY_LOCAL_MACHINE. -->
+  <data name="ContextGoToHkcu" xml:space="preserve">
+    <value>Go &amp;to HKEY_CURRENT_USER</value>
+  </data>
+  <!-- Oracle 300. Caption of the Import progress dialog (DLG-019). -->
+  <data name="MsgImportRegistryFileCaption" xml:space="preserve">
+    <value>Import Registry File</value>
+  </data>
+  <!-- Oracle DLG-019 static text, the label of the file name line. -->
+  <data name="ImportProgressFileLabel" xml:space="preserve">
+    <value>File:</value>
+  </data>
+  <!-- Written for this product: the export progress status before the first key. -->
+  <data name="ExportProgressPreparing" xml:space="preserve">
+    <value>Preparing the export.</value>
+  </data>
+  <!-- Written for this product: the export progress caption, with the file name. -->
+  <data name="ExportProgressTitle" xml:space="preserve">
+    <value>Exporting {0}</value>
+  </data>
+  <!-- Written for this product: the export progress status after a key. -->
+  <data name="ExportProgressCounts" xml:space="preserve">
+    <value>Exported {0} keys and {1} values.</value>
+  </data>
+  <!-- Written for this product: the export progress status after a skipped key. -->
+  <data name="ExportProgressSkipped" xml:space="preserve">
+    <value>Skipped an unreadable key. Exported {0} keys and {1} values.</value>
+  </data>
+  <!-- Oracle DLG-017 and DLG-018 static text (ordinal 0x66 icon beside it). -->
+  <data name="FindProgressSearching" xml:space="preserve">
+    <value>Searching the registry...</value>
+  </data>
+  <!-- Written for this product: the attempted path line in an address bar error. -->
+  <data name="AddressBarPathLine" xml:space="preserve">
+    <value>Path: </value>
+  </data>
+  <!-- Written for this product: the error when the print dialog returns no printer. -->
+  <data name="PrintNoDevice" xml:space="preserve">
+    <value>The Windows print dialog returned no printer device.</value>
+  </data>
+  <!-- Oracle 23 (New Key #%u). The index follows the prefix. -->
+  <data name="NewKeyNamePrefix" xml:space="preserve">
+    <value>New Key #</value>
+  </data>
+  <!-- Oracle 24 (New Value #%u). The index follows the prefix. -->
+  <data name="NewValueNamePrefix" xml:space="preserve">
+    <value>New Value #</value>
+  </data>
+  <!-- Written for this product: the file base name when the exported key has no usable name. -->
+  <data name="ExportFallbackName" xml:space="preserve">
+    <value>export</value>
+  </data>
+  <!-- Oracle 55. The {0} placeholder is the key the hive file is restored onto. -->
+  <data name="MsgRestoreKeyConfirm" xml:space="preserve">
+    <value>The key will be restored on top of key: {0}.
+All value entries and subkeys of this key will be deleted.
+Do you want to continue the operation?</value>
+  </data>
+  <!-- Oracle 56. Caption of the restore confirmation. -->
+  <data name="MsgRestoreKeyCaption" xml:space="preserve">
+    <value>Confirm Restore Key</value>
+  </data>
+  <!-- Written for this product: remote nodes refuse every write command. -->
+  <data name="DialogRemoteReadOnly" xml:space="preserve">
+    <value>Remote computers are read-only in this version. Select a key on this computer to change it.</value>
+  </data>
+  <!-- Written for this product: the About box version line. -->
+  <data name="AboutVersion" xml:space="preserve">
+    <value>Version {0}</value>
+  </data>
+  <!-- Written for this product: the About box version when no version is set. -->
+  <data name="AboutVersionUnknown" xml:space="preserve">
+    <value>unknown</value>
+  </data>
+  <!-- Oracle 8101. -->
+  <data name="PrintKeyName" xml:space="preserve">
+    <value>Key Name:          </value>
+  </data>
+  <!-- Oracle 8102. -->
+  <data name="PrintClassName" xml:space="preserve">
+    <value>Class Name:        </value>
+  </data>
+  <!-- Oracle 8103. -->
+  <data name="PrintLastWriteTime" xml:space="preserve">
+    <value>Last Write Time:   </value>
+  </data>
+  <!-- Oracle 8104. The value index follows. -->
+  <data name="PrintValueHeading" xml:space="preserve">
+    <value>Value </value>
+  </data>
+  <!-- Oracle 8105. -->
+  <data name="PrintValueName" xml:space="preserve">
+    <value>  Name:            </value>
+  </data>
+  <!-- Oracle 8106. -->
+  <data name="PrintValueType" xml:space="preserve">
+    <value>  Type:            </value>
+  </data>
+  <!-- Oracle 8107. -->
+  <data name="PrintValueDataSize" xml:space="preserve">
+    <value>  Data Size:       </value>
+  </data>
+  <!-- Oracle 8108. -->
+  <data name="PrintValueData" xml:space="preserve">
+    <value>  Data:            </value>
+  </data>
+  <!-- Oracle 8109. -->
+  <data name="PrintNoName" xml:space="preserve">
+    <value>&lt;NO NAME&gt;</value>
+  </data>
+  <!-- Oracle 8110. -->
+  <data name="PrintNoClass" xml:space="preserve">
+    <value>&lt;NO CLASS&gt;</value>
+  </data>
+</root>
+

@@ -1,0 +1,15 @@
+<Project Sdk="MSTest.Sdk/4.5.2">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Bwc.Spike.Minisign.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Bwc.Spike.Minisign\Bwc.Spike.Minisign.csproj" />
+  </ItemGroup>
+
+</Project>

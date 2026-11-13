@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Bwc.Update</RootNamespace>
+    <AssemblyName>BwcUpdate</AssemblyName>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <SelfContained>true</SelfContained>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <!-- The E2E flavor never elevates. Ship keeps app.manifest, which is also asInvoker: the updater never asks for elevation. -->
+  <PropertyGroup Condition="'$(BwcFlavor)' == 'E2E'">
+    <ApplicationManifest>app.e2e.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <!-- Drop the apphost and manifest outputs that both flavors share when the flavor changes. -->
+  <Target Name="BwcDropFlavorManifestOutputs" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <BwcFlavorStampFile>$(IntermediateOutputPath)bwc-flavor.txt</BwcFlavorStampFile>
+    </PropertyGroup>
+    <ReadLinesFromFile File="$(BwcFlavorStampFile)" Condition="Exists('$(BwcFlavorStampFile)')">
+      <Output TaskParameter="Lines" PropertyName="BwcPreviousFlavor" />
+    </ReadLinesFromFile>
+    <RemoveDir Directories="$(IntermediateOutputPath)Manifests" Condition="'$(BwcPreviousFlavor)' != '$(BwcFlavor)'" />
+    <Delete Files="$(IntermediateOutputPath)apphost.exe" Condition="'$(BwcPreviousFlavor)' != '$(BwcFlavor)'" />
+    <WriteLinesToFile File="$(BwcFlavorStampFile)" Lines="$(BwcFlavor)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
+
+  <PropertyGroup>
+    <RuntimeIdentifier Condition="'$(Platform)' == 'x64'">win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- .NET 10 has no Ed25519 or BLAKE2b in the BCL (see spikes/S5-minisign/README.md). -->
+    <PackageReference Include="BouncyCastle.Cryptography" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Bwc.Core\Bwc.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,539 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture metrics",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26200",
+    "ubr": 9711,
+    "displayVersion": "25H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "windowClass": "RegEdit_RegEdit",
+    "compatLayer": "RunAsInvoker",
+    "lastKey": "Computer\\HKEY_CURRENT_USER\\Software\\BWC-Oracle\\Mixed",
+    "selectedTreeItem": "Mixed",
+    "statusBarMenuItemPresent": false,
+    "statusBarVisibleAtLaunch": null
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "window": {
+    "className": "RegEdit_RegEdit",
+    "title": "Registry Editor",
+    "dpi": 192,
+    "windowWidth": 2700,
+    "windowHeight": 1610,
+    "clientWidth": 2674,
+    "clientHeight": 1500,
+    "clientOffsetX": 13,
+    "clientOffsetY": 97
+  },
+  "menuBar": {
+    "height": 38,
+    "rect": {
+      "x": 13,
+      "y": 58,
+      "width": 2674,
+      "height": 38
+    },
+    "items": [
+      {
+        "index": 0,
+        "text": "&File",
+        "rect": {
+          "x": 13,
+          "y": 58,
+          "width": 65,
+          "height": 38
+        }
+      },
+      {
+        "index": 1,
+        "text": "&Edit",
+        "rect": {
+          "x": 78,
+          "y": 58,
+          "width": 68,
+          "height": 38
+        }
+      },
+      {
+        "index": 2,
+        "text": "&View",
+        "rect": {
+          "x": 146,
+          "y": 58,
+          "width": 79,
+          "height": 38
+        }
+      },
+      {
+        "index": 3,
+        "text": "F&avorites",
+        "rect": {
+          "x": 225,
+          "y": 58,
+          "width": 122,
+          "height": 38
+        }
+      },
+      {
+        "index": 4,
+        "text": "&Help",
+        "rect": {
+          "x": 347,
+          "y": 58,
+          "width": 78,
+          "height": 38
+        }
+      }
+    ]
+  },
+  "systemMetrics": {
+    "SM_CYCAPTION": 45,
+    "SM_CYMENU": 39,
+    "SM_CXVSCROLL": 34,
+    "SM_CYHSCROLL": 34,
+    "SM_CXEDGE": 2,
+    "SM_CYEDGE": 2,
+    "SM_CXSMICON": 32
+  },
+  "nonClientFonts": {
+    "menu": {
+      "font": {
+        "faceName": "Segoe UI",
+        "height": -24,
+        "weight": 400,
+        "italic": false,
+        "charSet": 1,
+        "quality": 0,
+        "pitchAndFamily": 0
+      },
+      "height": 38
+    },
+    "status": {
+      "font": {
+        "faceName": "Segoe UI",
+        "height": -24,
+        "weight": 400,
+        "italic": false,
+        "charSet": 1,
+        "quality": 0,
+        "pitchAndFamily": 0
+      }
+    },
+    "caption": {
+      "font": {
+        "faceName": "Segoe UI",
+        "height": -24,
+        "weight": 400,
+        "italic": false,
+        "charSet": 1,
+        "quality": 0,
+        "pitchAndFamily": 0
+      },
+      "height": 44
+    },
+    "smallCaption": {
+      "font": {
+        "faceName": "Segoe UI",
+        "height": -24,
+        "weight": 400,
+        "italic": false,
+        "charSet": 1,
+        "quality": 0,
+        "pitchAndFamily": 0
+      },
+      "height": 44
+    },
+    "message": {
+      "font": {
+        "faceName": "Segoe UI",
+        "height": -24,
+        "weight": 400,
+        "italic": false,
+        "charSet": 1,
+        "quality": 0,
+        "pitchAndFamily": 0
+      }
+    },
+    "borderWidth": 2,
+    "paddedBorderWidth": 8
+  },
+  "tree": {
+    "className": "SysTreeView32",
+    "rect": {
+      "x": 13,
+      "y": 135,
+      "width": 432,
+      "height": 1462
+    },
+    "font": {
+      "faceName": "Segoe UI",
+      "height": -24,
+      "weight": 400,
+      "italic": false,
+      "charSet": 0,
+      "quality": 0,
+      "pitchAndFamily": 0
+    },
+    "itemHeight": 34,
+    "indent": 32,
+    "totalItems": 48,
+    "selectedItem": "Mixed",
+    "firstVisibleItems": [
+      {
+        "text": "Computer",
+        "rowRect": {
+          "x": 0,
+          "y": 0,
+          "width": 394,
+          "height": 34
+        },
+        "textRect": {
+          "x": 52,
+          "y": 0,
+          "width": 111,
+          "height": 34
+        }
+      },
+      {
+        "text": "HKEY_CLASSES_ROOT",
+        "rowRect": {
+          "x": 0,
+          "y": 34,
+          "width": 394,
+          "height": 34
+        },
+        "textRect": {
+          "x": 84,
+          "y": 34,
+          "width": 235,
+          "height": 34
+        }
+      },
+      {
+        "text": "HKEY_CURRENT_USER",
+        "rowRect": {
+          "x": 0,
+          "y": 68,
+          "width": 394,
+          "height": 34
+        },
+        "textRect": {
+          "x": 84,
+          "y": 68,
+          "width": 237,
+          "height": 34
+        }
+      },
+      {
+        "text": "AppEvents",
+        "rowRect": {
+          "x": 0,
+          "y": 102,
+          "width": 394,
+          "height": 34
+        },
+        "textRect": {
+          "x": 116,
+          "y": 102,
+          "width": 116,
+          "height": 34
+        }
+      },
+      {
+        "text": "Console",
+        "rowRect": {
+          "x": 0,
+          "y": 136,
+          "width": 394,
+          "height": 34
+        },
+        "textRect": {
+          "x": 116,
+          "y": 136,
+          "width": 90,
+          "height": 34
+        }
+      },
+      {
+        "text": "Control Panel",
+        "rowRect": {
+          "x": 0,
+          "y": 170,
+          "width": 394,
+          "height": 34
+        },
+        "textRect": {
+          "x": 116,
+          "y": 170,
+          "width": 147,
+          "height": 34
+        }
+      }
+    ]
+  },
+  "list": {
+    "className": "SysListView32",
+    "rect": {
+      "x": 453,
+      "y": 135,
+      "width": 2234,
+      "height": 1462
+    },
+    "font": {
+      "faceName": "Segoe UI",
+      "height": -24,
+      "weight": 400,
+      "italic": false,
+      "charSet": 0,
+      "quality": 0,
+      "pitchAndFamily": 0
+    },
+    "rowHeight": 36,
+    "itemCount": 8,
+    "topIndex": 0,
+    "header": {
+      "className": "SysHeader32",
+      "height": 40,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 2230,
+        "height": 40
+      },
+      "columns": [
+        {
+          "index": 0,
+          "text": "Name",
+          "width": 240
+        },
+        {
+          "index": 1,
+          "text": "Type",
+          "width": 240
+        },
+        {
+          "index": 2,
+          "text": "Data",
+          "width": 576
+        }
+      ]
+    },
+    "firstRows": [
+      {
+        "index": 0,
+        "name": "(Default)",
+        "bounds": {
+          "x": 0,
+          "y": 40,
+          "width": 1056,
+          "height": 36
+        },
+        "label": {
+          "x": 36,
+          "y": 40,
+          "width": 204,
+          "height": 36
+        },
+        "icon": {
+          "x": 4,
+          "y": 40,
+          "width": 32,
+          "height": 36
+        }
+      },
+      {
+        "index": 1,
+        "name": "Big",
+        "bounds": {
+          "x": 0,
+          "y": 76,
+          "width": 1056,
+          "height": 36
+        },
+        "label": {
+          "x": 36,
+          "y": 76,
+          "width": 204,
+          "height": 36
+        },
+        "icon": {
+          "x": 4,
+          "y": 76,
+          "width": 32,
+          "height": 36
+        }
+      },
+      {
+        "index": 2,
+        "name": "Blob",
+        "bounds": {
+          "x": 0,
+          "y": 112,
+          "width": 1056,
+          "height": 36
+        },
+        "label": {
+          "x": 36,
+          "y": 112,
+          "width": 204,
+          "height": 36
+        },
+        "icon": {
+          "x": 4,
+          "y": 112,
+          "width": 32,
+          "height": 36
+        }
+      },
+      {
+        "index": 3,
+        "name": "Expand",
+        "bounds": {
+          "x": 0,
+          "y": 148,
+          "width": 1056,
+          "height": 36
+        },
+        "label": {
+          "x": 36,
+          "y": 148,
+          "width": 204,
+          "height": 36
+        },
+        "icon": {
+          "x": 4,
+          "y": 148,
+          "width": 32,
+          "height": 36
+        }
+      },
+      {
+        "index": 4,
+        "name": "List",
+        "bounds": {
+          "x": 0,
+          "y": 184,
+          "width": 1056,
+          "height": 36
+        },
+        "label": {
+          "x": 36,
+          "y": 184,
+          "width": 204,
+          "height": 36
+        },
+        "icon": {
+          "x": 4,
+          "y": 184,
+          "width": 32,
+          "height": 36
+        }
+      },
+      {
+        "index": 5,
+        "name": "Number",
+        "bounds": {
+          "x": 0,
+          "y": 220,
+          "width": 1056,
+          "height": 36
+        },
+        "label": {
+          "x": 36,
+          "y": 220,
+          "width": 204,
+          "height": 36
+        },
+        "icon": {
+          "x": 4,
+          "y": 220,
+          "width": 32,
+          "height": 36
+        }
+      }
+    ]
+  },
+  "statusBar": {
+    "present": false,
+    "reason": "this regedit build has no status bar; View menu has no Status Bar item"
+  },
+  "addressBar": {
+    "className": "Edit",
+    "text": "",
+    "rect": {
+      "x": 13,
+      "y": 97,
+      "width": 2674,
+      "height": 38
+    }
+  },
+  "splitter": {
+    "treeRight": 445,
+    "listLeft": 453,
+    "gapPx": 8
+  },
+  "children": [
+    {
+      "className": "Edit",
+      "id": 0,
+      "text": "",
+      "visible": true,
+      "parentClass": "RegEdit_RegEdit",
+      "rect": {
+        "x": 13,
+        "y": 97,
+        "width": 2674,
+        "height": 38
+      }
+    },
+    {
+      "className": "SysHeader32",
+      "id": 0,
+      "text": "",
+      "visible": true,
+      "parentClass": "SysListView32",
+      "rect": {
+        "x": 455,
+        "y": 137,
+        "width": 2230,
+        "height": 40
+      }
+    },
+    {
+      "className": "SysListView32",
+      "id": 2,
+      "text": "",
+      "visible": true,
+      "parentClass": "RegEdit_RegEdit",
+      "rect": {
+        "x": 453,
+        "y": 135,
+        "width": 2234,
+        "height": 1462
+      }
+    },
+    {
+      "className": "SysTreeView32",
+      "id": 1,
+      "text": "",
+      "visible": true,
+      "parentClass": "RegEdit_RegEdit",
+      "rect": {
+        "x": 13,
+        "y": 135,
+        "width": 432,
+        "height": 1462
+      }
+    }
+  ]
+}

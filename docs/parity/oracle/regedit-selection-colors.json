@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "generator": "scratchpad sampler (PowerShell, PrintWindow + pixel histograms), read only",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26200",
+    "displayVersion": "25H2",
+    "processArchitecture": "Arm64",
+    "appsUseLightTheme": 0
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "note": "Sampled at 200 percent scale, the scale the machine runs at. Pixel values do not depend on scale; box sizes do."
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "launch": "Start-Process with __COMPAT_LAYER=RunAsInvoker set on the child only; no UAC prompt",
+    "windowClass": "RegEdit_RegEdit",
+    "closedWith": "Alt+F4"
+  },
+  "method": [
+    "Held Local\\BwcGuiTestLock for the whole run.",
+    "Keyboard only, plus SetCursorPos for hover. No clicks, no edits, no registry writes.",
+    "Navigated the tree from Computer with Home, Down, Down, Right, Down, Down to HKEY_CURRENT_USER\\AppEvents\\Console (the Console key shows values in the list).",
+    "Captured the main window with PrintWindow (PW_RENDERFULLCONTENT) into a 32 bpp bitmap and read pixels as 0xAARRGGBB.",
+    "Found each selection box by the exact fill color inside the pane rectangle, then read the pixel one device pixel outside the box (outer) and one inside (inner).",
+    "Hover was tested by moving the cursor over an unselected tree row and counting changed pixels against the focused baseline."
+  ],
+  "tree": {
+    "selectedFocused": {
+      "state": "Tree has keyboard focus, Console selected",
+      "fill": "#CCE8FF",
+      "border": "#0078D4",
+      "borderWidthDevicePixels": 1,
+      "borderPlacement": "outside the fill, all four sides",
+      "text": "#000000",
+      "textRole": "COLOR_WINDOWTEXT",
+      "boxScreen": "358,715 to 479,747 fill (exclusive right/bottom), border one pixel further out"
+    },
+    "selectedNotFocused": {
+      "state": "Tree lost focus (list focused or address bar focused), Console still selected",
+      "fill": "#D9D9D9",
+      "border": "#949494",
+      "borderWidthDevicePixels": 1,
+      "text": "#000000"
+    },
+    "hover": {
+      "state": "Cursor over an unselected row",
+      "result": "No visible highlight. Changed pixels in the row under the cursor vs the focused baseline: 0.",
+      "reason": "The tree does not use TVS_TRACKSELECT, so Explorer TREIS_HOT is never requested."
+    },
+    "hotSelected": {
+      "state": "Cursor over the selected row",
+      "result": "Identical to selectedFocused (fill #CCE8FF, border #0078D4)."
+    }
+  },
+  "list": {
+    "selectedFocused": {
+      "state": "List has keyboard focus, first value (Default) selected",
+      "fill": "#0078D4",
+      "border": "none (border color equals fill)",
+      "text": "#FFFFFF",
+      "textRole": "COLOR_HIGHLIGHTTEXT",
+      "fillRole": "COLOR_HIGHLIGHT",
+      "note": "Classic list view, not the Explorer visual style. The tree and list differ, so the Explorer ListView theme does not describe classic regedit."
+    },
+    "selectedNotFocused": {
+      "state": "List lost focus, value still selected",
+      "result": "No selection drawn. The row background is #FFFFFF (COLOR_WINDOW). The list does not keep the selection visible when unfocused (LVS_SHOWSELALWAYS not set)."
+    },
+    "hover": {
+      "state": "Cursor over an unselected value row",
+      "result": "No hot fill observed. Only window, text and icon colors appear in the row. Pixel diff was not computed for the list."
+    }
+  },
+  "unverified": [
+    "Tree text color under hover and unfocused states was read as the darkest pixel, #000000, not from a separate text-color query.",
+    "The list hover conclusion is from the color histogram only."
+  ]
+}
