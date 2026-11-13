@@ -310,6 +310,9 @@ thread and cannot wait for a ContentDialog. The text is `MsgReplaceSubkeysConfir
 `MsgCaptionRegistryEditor`. Test: the E2E permissions test records `permissions.propagation.replace-confirm`.
 Whether aclui shows its own message after `E_ABORT` is not verified on this machine.
 
+The question is raised by the Advanced OK (section 30), not by the sheet OK. The test answers it while the
+Advanced window is still open.
+
 ## 28. Edit > Permissions activation in the E2E path
 
 The Edit > Permissions item is enabled when a key is the target, and it runs `Permissions()` when
@@ -341,14 +344,33 @@ Test: `permissions.editmenu.settled` and `permissions.propagation.settled`.
 
 ## 30. Applies-to label for container and object inherit entries
 
-Registry entries that HKCU inherits carry `CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE` (flags 0x3), as a
-probe of a scratch key shows. The Advanced list labels an entry with the inherit type whose flags match it
-exactly. `RegistryInheritanceModes.ThisKeyAndSubkeys` is 0x2, so those entries are labelled "Special" and
-"This key and subkeys" is not shown (read through UIA on this build: Applies-to cell reads "Special").
-Candidate fix: `ThisKeyAndSubkeys = 0x3` and `SubkeysOnly = 0x3 | 0x8`. That changes the unit test
-`InheritModesUseTheWin32AceFlags` in `tests/Bwc.Registry.Tests`, which is outside this worker's scope, so it
-is not applied. Status: open.
+Registry entries that HKCU inherits carry `CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE` (flags 0x3). The
+inherit table aclui uses has three entries, and classic regedit's table is the same as BWC's (measured in
+`docs/parity/oracle/permissions-inherit.json`): "This key only" 0x0, "This key and subkeys" 0x2, "Subkeys only" 0xA.
+The measured labels per flag set are: 0x0 and 0x1 "This key only", 0x2 and 0x3 "This key and subkeys", 0xA and 0xB
+"Subkeys only", 0x9 "Special". Those labels match a table lookup that ignores OBJECT_INHERIT_ACE (0x1).
 
-Replace flow: pressing Advanced OK with the replace box checked makes aclui ask its own question, a
-`#32770` window titled "Windows Security" owned by the Advanced window. The test answers it with Yes. The
-classic MSG-178 question is then shown by the Registry Editor when the permissions sheet OK is pressed.
+BWC showed "Special" for 0x3 with the same table, so aclui's lookup was not the difference. The difference is
+`ISecurityInformation::MapGeneric`, which aclui calls with a pointer to the ACE flags. BWC left the flags alone.
+`MapGeneric` now clears OBJECT_INHERIT_ACE, which a key cannot use. This explains the measured labels, and the E2E
+check `permissions.propagation.advanced.container-controls` now passes. The inference is from the labels; classic's
+`MapGeneric` was not read. The other flag sets (0x1, 0x9, 0xB) were not re-measured against BWC. Status: fixed; see
+section 31 for the write-back question that is not measured.
+
+Replace flow: pressing Advanced OK with the replace box checked makes aclui ask its own question, a `#32770`
+window titled "Windows Security" owned by the Advanced window. The test answers it with Yes. BWC's `SetSecurity`
+runs inside that OK, so the classic MSG-178 question is shown next, while the Advanced window is still open. It is
+a message box owned by the main window, and it takes the foreground. Its text matches oracle string 178
+(`Do you want to replace the permission on all existing subkeys within %1?`, `docs/parity/regedit-inventory.md`
+MSG-178). The test answers it with Yes before it waits for the Advanced window to close, then presses the sheet OK.
+Failure before this fix: the test waited for MSG-178 after the sheet OK, so the foreground check failed and the
+Advanced window never closed.
+
+## 31. MapGeneric clears OBJECT_INHERIT_ACE on write-back (not measured)
+
+aclui may call `MapGeneric` with the ACE flags it is about to display or write. If aclui writes the cleared
+flags back on OK, an explicit ACE with 0x1, 0x3 or 0xB would be saved as 0x0, 0x2 or 0xA. The oracle cannot
+show this, because the oracle never presses OK (every window is cancelled). Classic's labels show the same
+clearing, so classic probably behaves the same, but this is not measured. Before shipping the change to a
+user's own ACLs, measure it on a scratch key under `HKCU\Software\BWC-E2E` in a sandbox test: an explicit 0x3
+ACE, Advanced OK or sheet OK, then read the raw flags. Status: open.

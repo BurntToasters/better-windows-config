@@ -124,6 +124,9 @@ internal sealed unsafe partial class RegistryKeySecurityInformation : ISecurityI
     private const uint GENERIC_EXECUTE = 0x20000000;
     private const uint GENERIC_ALL = 0x10000000;
 
+    // winnt.h ACE flag, cleared by MapGeneric (see there).
+    private const byte ObjectInheritAce = 0x01;
+
     private const int S_OK = 0;
     private const int E_POINTER = unchecked((int)0x80004003);
     private const int E_INVALIDARG = unchecked((int)0x80070057);
@@ -390,7 +393,14 @@ internal sealed unsafe partial class RegistryKeySecurityInformation : ISecurityI
     public int MapGeneric(Guid* pguidObjectType, byte* pAceFlags, uint* pMask)
     {
         _ = pguidObjectType;
-        _ = pAceFlags;
+
+        // A key has no object children, so OBJECT_INHERIT_ACE (0x1) means nothing on a key. Classic regedit clears it
+        // here. Measured in docs/parity/oracle/permissions-inherit.json: 0x1 is labeled like 0x0, 0x3 like 0x2,
+        // 0xB like 0xA.
+        if (pAceFlags is not null)
+        {
+            *pAceFlags &= unchecked((byte)~ObjectInheritAce);
+        }
 
         if (pMask is null)
         {

@@ -20,6 +20,7 @@ internal sealed class RepoPaths
         ImportBehaviorJson = Path.Combine(OracleDocs, "import-behavior.json");
         FindSequenceJson = Path.Combine(OracleDocs, "find-sequence.json");
         SortOrderJson = Path.Combine(OracleDocs, "sort-order.json");
+        PermissionsInheritJson = Path.Combine(OracleDocs, "permissions-inherit.json");
         ImportWorkDir = Path.Combine(root, "artifacts", "oracle", "import");
     }
 
@@ -43,6 +44,7 @@ internal sealed class RepoPaths
     internal string ImportBehaviorJson { get; }
     internal string FindSequenceJson { get; }
     internal string SortOrderJson { get; }
+    internal string PermissionsInheritJson { get; }
 
     // Scratch folder for generated .reg files (artifacts/ is git-ignored).
     internal string ImportWorkDir { get; }

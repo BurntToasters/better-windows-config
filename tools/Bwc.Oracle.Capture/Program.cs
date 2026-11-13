@@ -13,6 +13,7 @@ internal static class Program
         "  import    malformed .reg import behavior under BWC-Oracle (import-behavior.json)\n" +
         "  find      Find hit sequence under BWC-Oracle (find-sequence.json)\n" +
         "  sort      value list order and header click behavior (sort-order.json)\n" +
+        "  permissions  Advanced Security Settings entry list and Applies-to choices (permissions-inherit.json)\n" +
         "  cleanup   delete HKCU\\Software\\BWC-Oracle\n" +
         "  --allow-dpi  record UI captures at a DPI other than 96 (the DPI is written into each output)";
 
@@ -68,6 +69,10 @@ internal static class Program
 
                 case "sort":
                     OracleSession.Run("sort", () => SortCapture.Run(paths, allowDpi));
+                    return 0;
+
+                case "permissions":
+                    OracleSession.Run("permissions", () => PermissionsCapture.Run(paths, allowDpi));
                     return 0;
 
                 case "cleanup":

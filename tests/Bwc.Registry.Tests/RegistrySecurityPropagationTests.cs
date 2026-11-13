@@ -256,17 +256,23 @@ public sealed class RegistrySecurityPropagationTests
     {
         // The managed AceFlags values are the winnt.h ACE flag values. Identity keeps the analyzers from
         // folding these comparisons into constant assertions.
+        // Measured on classic regedit (docs/parity/oracle/permissions-inherit.json), from the Applies-to combo's
+        // inherit-type table: "This key only" 0x0, "This key and subkeys" 0x2, "Subkeys only" 0xA.
+        // The table has no 0x1 or 0x3 entry.
         Assert.AreEqual(Identity(0x2u), Identity((uint)AceFlags.ContainerInherit), "CONTAINER_INHERIT_ACE is 0x2 in winnt.h.");
         Assert.AreEqual(Identity(0x8u), Identity((uint)AceFlags.InheritOnly), "INHERIT_ONLY_ACE is 0x8 in winnt.h.");
-        Assert.AreEqual(Identity(0u), Identity(RegistryInheritanceModes.ThisKeyOnly), "This key only carries no inheritance flags.");
         Assert.AreEqual(
-            Identity((uint)AceFlags.ContainerInherit),
+            Identity(0u),
+            Identity(RegistryInheritanceModes.ThisKeyOnly),
+            "This key only is 0x0 (permissions-inherit.json).");
+        Assert.AreEqual(
+            Identity(0x2u),
             Identity(RegistryInheritanceModes.ThisKeyAndSubkeys),
-            "This key and subkeys is CONTAINER_INHERIT_ACE.");
+            "This key and subkeys is 0x2 (permissions-inherit.json).");
         Assert.AreEqual(
-            Identity((uint)(AceFlags.ContainerInherit | AceFlags.InheritOnly)),
+            Identity(0xAu),
             Identity(RegistryInheritanceModes.SubkeysOnly),
-            "Subkeys only is CONTAINER_INHERIT_ACE | INHERIT_ONLY_ACE.");
+            "Subkeys only is 0xA, CONTAINER_INHERIT_ACE | INHERIT_ONLY_ACE (permissions-inherit.json).");
     }
 
     [TestMethod]
