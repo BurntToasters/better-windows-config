@@ -25,6 +25,9 @@ internal static class UpdateSources
     /// a ship build.
     /// </summary>
     public const string E2EManifestUrlVariable = "BWC_E2E_UPDATE_MANIFEST_URL";
+
+    /// <summary>E2E-only. This value of <see cref="E2EManifestUrlVariable"/> means "no manifest URL is configured".</summary>
+    public const string E2ENoManifestUrl = "none";
 #endif
 
     /// <summary>
@@ -37,7 +40,9 @@ internal static class UpdateSources
         string? e2e = Environment.GetEnvironmentVariable(E2EManifestUrlVariable);
         if (!string.IsNullOrWhiteSpace(e2e))
         {
-            return e2e.Trim();
+            // "none" stands for a build with no update server, so the not-configured path stays testable once the
+            // build itself carries a release URL and key.
+            return string.Equals(e2e.Trim(), E2ENoManifestUrl, StringComparison.Ordinal) ? null : e2e.Trim();
         }
 #endif
 
