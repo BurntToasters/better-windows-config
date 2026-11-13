@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Fail when package.json's version has no matching `## [<version>]` heading in
- * CHANGELOG.md, or when that heading appears more than once.
+ * Fail when CHANGELOG.md (the BCLS release body) is not ready for
+ * package.json's version. The rules live in sync-version-helpers.js.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { validateChangelogForVersion } from "./sync-version-helpers.js";
 
 const SCRIPT = "scripts/validate-changelog-version.js";
 const DEFAULT_ROOT = path.dirname(
@@ -16,8 +17,10 @@ function printHelp() {
   console.log(`Usage:
   node ${SCRIPT} [--root <dir>] [--help]
 
-Reads <root>/package.json and <root>/CHANGELOG.md. Requires exactly one
-heading of the form "## [<package version>]" (a trailing date is optional).
+Reads <root>/package.json and <root>/CHANGELOG.md (the BCLS release body).
+Requires exactly one non-empty "## Changes in \`v<version>:\`" section, no
+sync-version placeholder, download links for that version only, and the Beta
+build callout on betas but not on stable.
 
 Options:
   --root <dir>  Repository root to check. Defaults to the parent of scripts/.
@@ -58,10 +61,6 @@ function parseArgs(argv) {
   return options;
 }
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function readTextFile(filePath) {
   try {
     return fs.readFileSync(filePath, "utf8");
@@ -99,29 +98,12 @@ function readPackageVersion(root) {
 function checkChangelog(root, version) {
   const changelogFile = path.join(root, "CHANGELOG.md");
   const changelog = readTextFile(changelogFile);
-  const pattern = new RegExp(
-    `^## \\[${escapeRegExp(version)}\\]`,
-    "gm",
-  );
-  const matches = [...changelog.matchAll(pattern)];
-
-  if (matches.length === 0) {
+  const errors = validateChangelogForVersion(changelog, version);
+  if (errors.length > 0) {
     throw new Error(
-      `${changelogFile} is missing heading "## [${version}]" for package.json version ${version}`,
+      `${changelogFile} is not ready for v${version}:\n  - ${errors.join("\n  - ")}`,
     );
   }
-  if (matches.length > 1) {
-    const lines = matches
-      .map(
-        (match) =>
-          changelog.slice(0, match.index).split("\n").length,
-      )
-      .join(", ");
-    throw new Error(
-      `${changelogFile} has ${matches.length} headings for version ${version} (lines ${lines}); keep exactly one`,
-    );
-  }
-
   return changelogFile;
 }
 
