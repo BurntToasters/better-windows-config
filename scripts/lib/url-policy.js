@@ -66,3 +66,16 @@ export function validateUrl(text, { requireHttps = true } = {}) {
 
   return { ok: true, url, text: url.toString() };
 }
+
+/** True for an http or https URL whose host is the loopback address or localhost. Tests only. */
+export function isLoopbackUrl(text) {
+  if (typeof text !== "string") return false;
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  return url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]";
+}

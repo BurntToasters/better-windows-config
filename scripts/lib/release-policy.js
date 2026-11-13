@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { EXIT, isPathInside } from "./cli.js";
-import { isPlaceholderKeyText, loadKeyMaterial } from "./minisign.js";
+import { isPlaceholderKeyText, loadKeyMaterial, parsePublicKeyText } from "./minisign.js";
 import { matchEmbeddedKey, readTrustedKeysFile } from "./trusted-keys.js";
 import { channelForVersion, tryParseSemVer } from "./semver.js";
 import { parsePackageVersion, readDirectoryBuildPropsVersion } from "../sync-version-helpers.js";
@@ -284,7 +284,8 @@ export function checkTrustedKey(root, trustedKeyValue, { requireKey = false } = 
   } else if (source.isPlaceholder || source.embedded.some((text) => isPlaceholderKeyText(text))) {
     errors.push({
       reason: "placeholder-key",
-      detail: "src/Bwc.Update/Signing/TrustedKeys.cs still carries the placeholder release key",
+      detail: `src/Bwc.Update/Signing/TrustedKeys.cs still carries the placeholder release key; ` +
+        `embed the real public key first (${USER_STEPS_POINTER})`,
       exitCode: EXIT.REFUSED,
     });
   } else {
@@ -314,10 +315,11 @@ export function checkTrustedKey(root, trustedKeyValue, { requireKey = false } = 
         checks.push({ name: "trusted-key", pass: true, detail: matched.keyIdHex });
       }
     }
-  } else if (requireKey) {
+  } else if (requireKey && source.ok && source.embedded.length === 0) {
+    // Without --trusted-key the embedded keys are the trusted set. Only an empty list refuses here.
     errors.push({
       reason: "missing-trusted-key",
-      detail: "a --trusted-key is required",
+      detail: "no --trusted-key was given and TrustedKeys.cs embeds no release key",
       exitCode: EXIT.REFUSED,
     });
   }
@@ -557,5 +559,81 @@ export function verifySessionFile(root, filePath, { version, channel, maxAgeHour
 
 export function isSessionPath(root, filePath) {
   return path.resolve(filePath) === path.resolve(sessionPath(root)) || isPathInside(path.join(root, "artifacts"), filePath);
+}
+
+export const QUALITY_GATE_RESULT_RELATIVE_PATH = "artifacts/gate/result.json";
+
+export const USER_STEPS_POINTER = 'docs/RELEASE.md, section "User-owned steps"';
+
+/**
+ * The trusted set when no --trusted-key is given: the non-placeholder keys embedded in
+ * TrustedKeys.cs. Returns { ok, keys } or { ok: false, reason, detail }. Nothing is read from the
+ * environment, so the release VM's .env needs no BWC-only variable.
+ */
+export function embeddedReleaseKeys(root) {
+  const source = readTrustedKeysSource(root);
+  if (!source.ok) {
+    return { ok: false, reason: source.reason, detail: String(source.detail ?? source.file) };
+  }
+  if (source.isPlaceholder || source.embedded.some((text) => isPlaceholderKeyText(text))) {
+    return {
+      ok: false,
+      reason: "placeholder-key",
+      detail: `src/Bwc.Update/Signing/TrustedKeys.cs still carries the placeholder release key; ` +
+        `embed the real public key first (${USER_STEPS_POINTER})`,
+    };
+  }
+  if (source.embedded.length === 0) {
+    return { ok: false, reason: "missing-trusted-key", detail: "TrustedKeys.cs embeds no release key" };
+  }
+  for (let index = 0; index < source.embedded.length; index += 1) {
+    const parsed = parsePublicKeyText(source.embedded[index]);
+    if (!parsed.ok) {
+      return { ok: false, reason: "malformed-key", detail: `embedded key ${index}: ${parsed.detail}` };
+    }
+  }
+  return { ok: true, keys: source.embedded };
+}
+
+/** The parsed artifacts/gate/result.json under root, or null when it is missing or unreadable. */
+export function readQualityGateResult(root) {
+  const file = path.join(root, QUALITY_GATE_RESULT_RELATIVE_PATH);
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Checks a quality-gate result for the release commit. A passing quick gate records e2e as
+ * "skipped" (the release VM runs no GUI E2E); a passing full gate records "passed".
+ */
+export function qualityGateProof(gate, head) {
+  if (!gate || typeof gate !== "object") {
+    return { ok: false, reason: "gate-missing", detail: `no passing quality gate at ${QUALITY_GATE_RESULT_RELATIVE_PATH}` };
+  }
+  if (gate.pass !== true) {
+    return { ok: false, reason: "gate-failed", detail: "the quality gate did not pass" };
+  }
+  const gateCommit = gate.git?.commit ?? null;
+  if (gateCommit !== head) {
+    return {
+      ok: false,
+      reason: "gate-commit-mismatch",
+      detail: `the quality gate ran on ${String(gateCommit).slice(0, 12)}, not HEAD ${String(head).slice(0, 12)}`,
+    };
+  }
+  const quick = gate.quick === true;
+  return {
+    ok: true,
+    record: {
+      source: QUALITY_GATE_RESULT_RELATIVE_PATH,
+      commit: gateCommit,
+      pass: true,
+      mode: quick ? "quick" : "full",
+      e2e: quick ? "skipped" : "passed",
+    },
+  };
 }
 

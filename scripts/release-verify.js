@@ -40,7 +40,7 @@ Options:
   --channel <stable|beta>  Default from the version.
   --dir <path>             D5 artifact directory. Default artifacts/release/<version>.
   --session <path>         Session file. Default artifacts/release/session.json.
-  --trusted-key <path>     Public release key. Repeatable. Required.
+  --trusted-key <path>     Public release key. Repeatable. Default: the keys embedded in TrustedKeys.cs.
   --repo <owner/name>      Default GH_REPO, then GH_REPO_OWNER and GH_REPO_NAME, then BurntToasters/better-windows-config.
   --commit <rev>           Default HEAD.
   --allow-detached         Allow a detached HEAD contained in the expected branch.

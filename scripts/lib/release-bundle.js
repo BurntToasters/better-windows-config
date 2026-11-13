@@ -121,7 +121,7 @@ export async function loadReleaseBundle(options) {
   if (trustedKeyValues.length === 0) {
     errors.push({
       reason: "trusted-key-missing",
-      detail: "at least one --trusted-key is required",
+      detail: "no trusted key: pass --trusted-key, or embed the release key in TrustedKeys.cs (docs/RELEASE.md, User-owned steps)",
       exitCode: EXIT.REFUSED,
     });
   } else {

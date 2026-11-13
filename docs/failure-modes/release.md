@@ -9,8 +9,9 @@ Scope: `scripts/sign-update-manifest.js`, `scripts/validate-updater-manifest.js`
 The update verifier's own failure modes are in
 [update-verifier.md](update-verifier.md). This file covers the release side: making a test
 manifest, validating it, recording a release session, and creating or publishing a GitHub
-draft. No release script calls `gh`, calls `gpg`, starts an elevated process, or opens a
-socket unless the command carries `--apply`. A non-dry-run D5 publish invokes
+draft. No release script calls `gh`, starts an elevated process, or opens a socket unless the
+command carries `--apply`. `release:sign:gpg` (`scripts/gpg-sign.js`) is the only script that calls
+`gpg`; its failure modes are in [release-assets.md](release-assets.md). A non-dry-run D5 publish invokes
 `scripts/dotnet-build.js`, which uses the local SDK and NuGet cache. `--apply` still never
 creates a release in the D4 to D7 work package; it is the seam the user runs on the release
 VM.
@@ -196,4 +197,77 @@ The beta URL is empty until a beta channel is published.
 | U3 | Windows Authenticode signing | D8, and it needs a certificate. The scripts here sign update manifests and installers with minisign only. |
 | U4 | NSIS compile | D1. The dry-run harness never needs it, and a real release does. |
 | U5 | Release VM | D10. The user runs `--apply` there, with a real `gh` login and the real release key. |
-| U6 | GnuPG | The user owns the release key and the signing policy. These scripts never call `gpg`. |
+| U6 | GnuPG | The user owns the GPG key (`GPG_KEY_ID`, `GPG_PASSPHRASE`). Only `scripts/gpg-sign.js` calls `gpg` (see release-assets.md). |
+
+## Release VM flow
+
+The Windows release VM runs one entry point, `npm run release:win`, then
+`npm run release:publish` and `npm run release:verify:published`. Secrets come from `.env`,
+loaded with `node --env-file-if-exists=.env`. The first release is stable `0.1.0`, so the
+stable policy applies. Written before the code, per AGENTS.md.
+
+The policy refuses an override only for a stable version (`X.Y.Z`, no suffix). A beta version
+keeps the beta recovery paths. `build-installer.js` never calls the policy, so a local dev build
+with `SKIP_WIN_CODESIGN=1` still works.
+
+### Stable policy (`scripts/release-policy.js`)
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| S1 | Stable version and `SKIP_WIN_CODESIGN` is truthy (`1`, `true`, `yes`, `on`, any case, surrounding spaces) | Unsigned stable installer | Refuse, naming the variable. Exit 1. |
+| S2 | Stable version and `FORCE_UPLOAD`, `SKIP_RELEASE_MIRROR`, `ALLOW_ASSET_REPLACE`, or `SKIP_E2E` is truthy | Forced upload, skipped mirror, replaced asset, or skipped proof | Refuse, naming each variable. Exit 1. |
+| S3 | Stable version and `GH_REPO` is not `BurntToasters/better-windows-config` | Release sent to a fork | Refuse, naming the value. Exit 1. |
+| S4 | Stable version and `GH_REPO_OWNER` or `GH_REPO_NAME` is not `BurntToasters` or `better-windows-config` | Release sent to a fork | Refuse, naming the value. Exit 1. |
+| S5 | Stable version and `RELEASE_DOWNLOAD_BASE_URL` is set and is not `https://github.com/BurntToasters/better-windows-config/releases/download/v<version>` (a trailing slash is allowed) | Installer URLs point elsewhere | Refuse, naming the value. Exit 1. |
+| S6 | Stable version, clean environment, or the variables set to `0`, `false`, empty, or the canonical values | False refusal | Accept. Exit 0. |
+| S7 | Beta version (`X.Y.Z-beta.N`) with any of S1 to S5 set | Beta recovery path blocked | Accept. The policy is stable only. |
+| S8 | `scripts/release-policy.js` is run and the stable policy refuses | Caller ignores the result | Print the refusal to stderr and exit 1. A clean policy prints `ok` and exits 0. |
+| S9 | `scripts/release-policy.js` gets an unknown argument | Silent ignore of a typo | Exit 2 with usage. |
+| S10 | Existing exports (`signingPolicy`, `bwcSigningTargets`, and the others) | Build scripts break | Keep them unchanged. `signingPolicy({ SKIP_WIN_CODESIGN: "1" }).skip` stays `true`. |
+
+### Run entry points (`scripts/run-release.js`)
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| R1 | Unknown flag (`--skip-tests`) or any positional argument | A typo runs a different gate | Exit 2 with `Unknown release flag` or usage. Nothing runs. |
+| R2 | `src/Bwc.Update/Signing/TrustedKeys.cs` still carries the placeholder, has no embedded key, or cannot be read | The flow builds, then refuses at draft or publish | Refuse before the first step: `placeholder-key` (exit 1), `missing-trusted-key` (exit 1), or `missing-trusted-key-source` (exit 3). The message points at docs/RELEASE.md, "User-owned steps". No step runs. The environment is not read. |
+| R13 | Operator copies Zinnia's `.env` unchanged | A BWC-only variable is missing, and the run refuses | Cannot happen. The release flow reads only variables Zinnia's `.env` has (`TAURI_SIGNING_*`, `AZURE_*`, `GPG_*`, `GH_REPO*`, `SKIP_*`, `FORCE_UPLOAD`, `ALLOW_ASSET_REPLACE`). The trusted set comes from TrustedKeys.cs. |
+| R3 | `release:win` order | A skipped gate or a draft before proof | Exactly: `release:policy`, `release:preflight`, `test:all -- --quick --rid all`, `release:session:create -- --require-gate --force`, `release:clean`, `release:win:continue`. The `--force` replaces a session from an earlier attempt, so the proof matches this gate. |
+| R4 | `release:win:continue` order | Signing after upload, or publish-side work before the signed bundle exists | Exactly: `release:policy`, `release:session:verify`, `build:win:x64`, `build:win:arm64`, `installer:x64`, `installer:arm64`, `release:assemble`, `release:sign:gpg`, `release:authenticode` once per setup EXE, `release:draft`, `release:verify:draft`, `release:finalize`. |
+| R5 | A step fails | Later steps run on a broken state | The first failing step stops the run with its exit code. Later steps are not started. |
+| R6 | Quality gate runs GUI E2E on the signing VM | The release VM cannot start the GUI session | The gate is `test:all --quick`. It runs no `test-e2e.js` step and records `e2e: "skipped"` in the release session. |
+| R7 | `release:win:continue` runs alone (resume) | Continue without the policy or session checks | It starts with `release:policy` and `release:session:verify`. `release:win:resume` runs `prerelease:prepare` (policy and preflight) first. |
+| R8 | Clean step removes the session | The verify step has no proof | The clean step removes only `artifacts/release/<version>/`. `artifacts/release/session.json` and `artifacts/gate/` survive. |
+| R9 | `release:finalize` runs | `git reset --hard` discards local work on a non-disposable checkout | It is the last step of continue. The runner prints a warning first. It runs only on the disposable release VM. |
+| R10 | Draft step passes `--replace-assets` for stable | Stable asset replaced | Never for stable. Non-stable passes it only with `ALLOW_ASSET_REPLACE=1`. |
+| R11 | Stable version with `--replace-assets` given to `release-draft.js --apply` | Stable asset replaced by an explicit flag | Refuse `asset-replace-stable`. Exit 1. |
+| R12 | `release:publish` runs without the verify step first | Publish of an unverified draft | `release-publish.js --apply` runs `release-verify.js --apply` before the PATCH (existing behavior). Any verify failure stops the publish. |
+
+### Quality gate proof and release session (`scripts/lib/release-policy.js`, `scripts/release-session.js`)
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| Q1 | `artifacts/gate/result.json` is missing, with `--require-gate` | Release with no gate | Refuse `gate-missing`. Exit 1. No session is written. |
+| Q2 | Gate result has `pass` other than `true` | A failing gate proves nothing | Refuse `gate-failed`. Exit 1. |
+| Q3 | Gate `git.commit` differs from HEAD | Gate proof for another commit | Refuse `gate-commit-mismatch`. Exit 1. |
+| Q4 | Quick gate passes for HEAD | E2E silently counted as run | Session records `qualityGate.mode: "quick"` and `qualityGate.e2e: "skipped"`. |
+| Q5 | Full gate passes for HEAD | E2E skipped or unrecorded | Session records `qualityGate.e2e: "passed"`. |
+| Q6 | Gate result is unreadable JSON | Garbage accepted | Treat as missing (Q1). |
+| Q7 | Preflight, session, draft, verify, or publish runs without `--trusted-key` | Trusted set is an unexpected key | The trusted set is the non-placeholder keys embedded in `TrustedKeys.cs`. Publish passes the verify child only an explicit `--trusted-key`; the child reads the embedded keys itself. |
+
+### Package scripts (`package.json`)
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| N1 | A required script is missing | A documented step does not run | `release:win`, `release:win:continue`, `release:win:resume`, `release:finalize`, `release:mirror`, `release:sign:gpg`, `release:verify:draft`, `release:verify:published`, and `release:publish` exist. |
+| N2 | `release:sign:gpg`, `release:mirror`, or `release:verify:published` differs from the given command | Wrong script runs | Exact strings from the release brief. The first two take `--dir` through `npm run ... -- <args>`. |
+| N3 | An existing script name is removed | Old runbook breaks | `release:session`, `release:draft`, `release:verify`, `release:preflight`, `release:assemble`, `release:sign`, `release:validate`, `release:dry-run`, `release:selftest`, `build:win:x64`, `build:win:arm64`, `installer:x64`, `installer:arm64`, `setup:win:artifact-signing`, `signing:selftest`, `test:all`, and `validate` stay. |
+| N4 | A script that needs secrets runs without `.env` | Missing `TAURI_SIGNING_PRIVATE_KEY` or Azure variables | Each such script loads `.env` with `node --env-file-if-exists=.env`. The PowerShell Authenticode step inherits the environment of the run that loaded `.env`. |
+
+### Not enforced by these scripts (user duties)
+
+| ID | Case | Note |
+|----|------|------|
+| V1 | Built-in trusted key is still the placeholder | Preflight refuses `placeholder-key` (P6). The user adds the real public key to `TrustedKeys.cs` first. |
+| V2 | An explicit `--trusted-key` names a `.pub` file that is not embedded in `TrustedKeys.cs` | A foreign key becomes trusted | Refuse `embedded-key-mismatch` in preflight, draft, verify, and publish. The check compares key id and bytes with the embedded list. |
+| V3 | `release:finalize` on a checkout with local work | Destructive by design (Zinnia parity). Run only on the disposable release VM. |
