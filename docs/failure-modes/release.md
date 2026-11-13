@@ -169,6 +169,26 @@ command line. A key given as text on the command line is refused.
 | K12 | Decoded key text is not UTF-8, or a CRLF pair appears in a raw or decoded key | Two readers disagree on the key bytes | Non-UTF-8 refuses `key-malformed`. CRLF is normalized to LF before parsing. A lone CR inside a line refuses `malformed-secret-key`. Exit 1. |
 | K13 | Encrypted layout differs from what minisign writes | A real key cannot be read, or reads wrong | Not checked here. The first real key is tested with the user's own minisign (existing D8 caveat, see `docs/RELEASE.md`). |
 
+## M. Embedding the release public key (`scripts/embed-update-key.js`)
+
+`npm run release:embed-key -- --pub <file>` or `npm run release:embed-key -- --from-env` writes the
+release public key into `src/Bwc.Update/Signing/TrustedKeys.cs` and sets `IsPlaceholder` to false.
+`--pub` takes the `.pub` file `tauri signer generate` writes (the base64 of a minisign public key
+file) or a raw minisign public key file. `--from-env` derives the public key from
+`TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, so the embedded key matches the
+signing key by construction. `--check` prints the result and writes nothing.
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| M1 | The `.pub` file is not minisign text or base64 of it, or the packet is malformed | A broken key compiles in, and every update fails | Refuse `malformed-key`. Exit 1. The file is unchanged. |
+| M2 | The key is a BWC test key or the placeholder | A throwaway key becomes the trusted key | Refuse `test-key` or `placeholder-key`. Exit 1. |
+| M3 | `--pub` is given and `TAURI_SIGNING_PRIVATE_KEY` is set to a different key | The embedded key does not match the key that signs, so every release is refused later, on the VM | Refuse `embedded-key-mismatch`, naming both key ids. Exit 1. When the env key cannot be read (no password), say so and continue with the `.pub` file. |
+| M4 | `--from-env` with the key or password missing, wrong, or malformed | Wrong key derived, or the secret is printed | Refuse with the signer's reasons (`key-missing`, `key-malformed`, `wrong-password`, `password-missing`). The key and password are never printed. |
+| M5 | `TrustedKeys.cs` already embeds a different real key | A rotation silently drops the old key, so installed copies cannot verify the new release | Refuse `key-already-embedded` unless `--rotate` (keep the old keys and add the new one) or `--replace` (only the new key) is given. |
+| M6 | The same key is already embedded | Duplicate entries | Exit 0 with "already embedded". The file is unchanged. |
+| M7 | The written file cannot be read back by `scripts/lib/trusted-keys.js` | The release tooling cannot see the key it must match | After writing, the file is parsed again and every embedded key must match; otherwise the old file is restored and the run fails. |
+| M8 | The public key is a secret | None: a public key is public | The key text and fingerprint are printed so the user can check them. |
+
 ## L. Repository and hosting names
 
 Release assets are named by channel. A stable manifest is `bwc-stable.json` with

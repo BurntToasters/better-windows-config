@@ -49,6 +49,8 @@
     "release:selftest": "node scripts/release-selftest.js",
     "release:flow:selftest": "node scripts/run-release-selftest.js",
     "release:assets:selftest": "node scripts/release-assets-selftest.js",
+    "release:embed-key": "node --env-file-if-exists=.env scripts/embed-update-key.js",
+    "release:embed-key:selftest": "node scripts/embed-update-key-selftest.js",
     "setup:win:artifact-signing": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/setup-windows-artifact-signing.ps1",
     "signing:selftest": "node scripts/artifact-signing-selftest.js"
   }
