@@ -39,7 +39,8 @@ function failure(errors, signed = []) {
 
 /** Normalizes GPG_KEY_ID. Accepts a key ID or a fingerprint, with or without spaces. */
 export function parseKeyId(value) {
-  const text = typeof value === "string" ? value.replace(/\s+/g, "").toUpperCase() : "";
+  // A 0x prefix (as gpg and a Zinnia .env accept) is dropped before the hex check.
+  const text = typeof value === "string" ? value.replace(/\s+/g, "").replace(/^0x/i, "").toUpperCase() : "";
   if (text.length === 0) {
     return { ok: false, error: refusal("key-id-missing", "GPG_KEY_ID is required", EXIT.USAGE) };
   }
