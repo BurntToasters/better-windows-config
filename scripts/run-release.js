@@ -161,6 +161,14 @@ function cleanRelease(root, version) {
   }
 }
 
+/** One cmd.exe argument. Plain tokens pass through; anything else is double-quoted with inner quotes doubled. */
+export function quoteForCmd(arg) {
+  const text = String(arg);
+  if (/^[A-Za-z0-9_\-.:/\\=@,+]+$/.test(text)) return text;
+  if (/[\r\n]/.test(text)) throw new Error("a release step argument cannot contain a line break");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
 /** The default runner: npm run <name> [args], or the internal clean step. Stops on any failure. */
 function npmRunner(root, version) {
   return (name, args = []) => {
@@ -168,14 +176,13 @@ function npmRunner(root, version) {
       cleanRelease(root, version);
       return;
     }
-    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-    const result = spawnSync(npm, ["run", name, ...args], {
-      cwd: root,
-      stdio: "inherit",
-      windowsHide: true,
-      shell: process.platform === "win32",
-      env: process.env,
-    });
+    const options = { cwd: root, stdio: "inherit", windowsHide: true, env: process.env };
+    // npm.cmd needs a shell on Windows. Node warns (DEP0190) when an argument array is passed with shell: true,
+    // so the command line is built here, quoting each argument for cmd.exe.
+    const result =
+      process.platform === "win32"
+        ? spawnSync(["npm.cmd", "run", name, ...args].map(quoteForCmd).join(" "), { ...options, shell: true })
+        : spawnSync("npm", ["run", name, ...args], options);
     if (result.error) {
       throw usageError(`could not start npm run ${name}: ${result.error.message}`, EXIT.EXTERNAL);
     }
