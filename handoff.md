@@ -1,7 +1,7 @@
 # Handoff: Better Windows Config
 
-Refreshed 2026-11-12 for branch `experimental`, HEAD `19fb773` ("Fix E2E failures: export types,
-import progress, tree focus, hub, hex"). Section 6 lists the package status. Another worker may
+Refreshed 2026-11-12 for branch `experimental`, at `373df52` ("Hide accelerator tooltips, refuse
+import close, steadier E2E clicks"). Section 6 lists the package status. Another worker may
 have uncommitted source edits in the tree. Run `git status` before you change anything.
 
 ## 1. Read first
@@ -142,7 +142,14 @@ notes, known gaps). The gate deletes each E2E result before its step runs.
   Remaining: `Permissions_AdvancedReplaceChildEntriesGivesChildrenOnlyInheritedEntries` (section 7)
   and two intermittent tests that passed on rerun (`ImportResult_MalformedLine...`,
   `HexEditing_EditsCancelsAndCopies`).
-- E2E, win-x64: not re-run for `19fb773`. Do not treat older x64 results as current.
+- At `373df52`: arm64 e2e flavor 1176 of 1182 checks passed with 2 known gaps (import progress
+  Close box, section 7 item 15); only `Permissions_AdvancedReplaceChildEntries...` failed.
+- Full x64 gate at `373df52` (`node scripts/test-all.js --rid win-x64`, under ARM64 emulation):
+  steps 1 to 16 passed, including the ship-flavor E2E. The e2e flavor had 12 of 1186 checks fail:
+  the permissions test above, and `print.cancel` / `print.ctrlp.cancel`. In the x64 build the
+  Windows 11 print dialog host (`ApplicationFrameWindow`) closed itself before any cancel input,
+  although a default printer (a WSD network printer) exists. arm64 passes these checks. It is not
+  known whether native x64 behaves the same; check on an x64 machine before treating it as a bug.
 - E2E check counts by commit: 901 passed and 1 failed (`106180a`), 1051 passed and 3 failed
   (`3c7253c`), 1095 passed and 17 failed (`a6072eb`), 1155 passed and 14 failed (`19fb773` tree
   before the robustness fix).
@@ -251,6 +258,13 @@ Remaining:
     now capped at 5000 keys. Never seed more.
 14. The test host machine is a Parallels VM. If the host sleeps or crashes, WinUI content draws
     black. See section 5.5.
+15. Declared difference: classic DLG-019 (Import progress) has no system menu or Close box. WinUI
+    restores `WS_SYSMENU` in `WM_STYLECHANGED`, so BWC's caption keeps the Close box. Close and
+    Alt+F4 are refused until the import ends (`ModalDialogWindow.IsCloseAllowed`). E2E records two
+    known gaps for it. A non-WinUI caption would be needed to remove it.
+16. Accelerator tooltips are hidden (`KeyboardAcceleratorPlacementMode.Hidden`) on the shell root,
+    address bar, menu bar, and menu items. Any new element that owns a `KeyboardAccelerator` needs
+    the same setting, or WinUI floats a "Ctrl+X" tooltip that classic never shows.
 
 ## 8. User decisions
 
