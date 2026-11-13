@@ -167,7 +167,7 @@ command line. A key given as text on the command line is refused.
 | K10 | Failing run prints the key or the password | Secret in logs or CI output | Every refusal above omits the value. The self-test checks stdout and stderr for the key text and the password. |
 | K11 | `--password-env` names a variable and `TAURI_SIGNING_PRIVATE_KEY` is also set | Ambiguous password source | The named variable wins. The Tauri password variable is read only for an env key with no `--password-env`. |
 | K12 | Decoded key text is not UTF-8, or a CRLF pair appears in a raw or decoded key | Two readers disagree on the key bytes | Non-UTF-8 refuses `key-malformed`. CRLF is normalized to LF before parsing. A lone CR inside a line refuses `malformed-secret-key`. Exit 1. |
-| K13 | Encrypted layout differs from what minisign writes | A real key cannot be read, or reads wrong | Not checked here. The first real key is tested with the user's own minisign (existing D8 caveat, see `docs/RELEASE.md`). |
+| K13 | Encrypted layout differs from what minisign writes | A real key cannot be read, or reads wrong (it happened: the first real Tauri key failed with `wrong-password` because keynum_sk was masked through XSalsa20 instead of the raw 104-byte scrypt output) | The keynum_sk mask is the 104-byte scrypt output XORed directly, as minisign C and the Rust crate Tauri uses do, with libsodium's integer pickparams. Check a real key with `npm run release:embed-key -- --from-env --check`: it must decrypt and report the embedded key id. |
 
 ## M. Embedding the release public key (`scripts/embed-update-key.js`)
 
