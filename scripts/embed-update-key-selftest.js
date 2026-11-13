@@ -6,13 +6,11 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { main } from "./embed-update-key.js";
 import { generateKeyPair } from "./lib/minisign.js";
 import { TRUSTED_KEYS_RELATIVE_PATH, matchEmbeddedKey, readTrustedKeysFile } from "./lib/trusted-keys.js";
 
-const REPO_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const results = [];
 
 function check(name, fn) {
@@ -39,7 +37,18 @@ function expectRefusal(fn, reason) {
 }
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "bwc-embed-key-"));
-const placeholderSource = fs.readFileSync(path.join(REPO_ROOT, TRUSTED_KEYS_RELATIVE_PATH), "utf8");
+// The shipped file before any key was embedded. A fixed copy, because the repository file holds the release key.
+const placeholderSource = `namespace Bwc.Update;
+
+public static class TrustedKeys
+{
+    public const bool IsPlaceholder = true;
+
+    private const string PlaceholderKey = "untrusted comment: PLACEHOLDER replace with the release public key\\nPLACEHOLDER-NOT-A-KEY";
+
+    public static readonly IReadOnlyList<string> Embedded = [PlaceholderKey];
+}
+`;
 
 function freshRoot(name) {
   const root = path.join(temp, name);
