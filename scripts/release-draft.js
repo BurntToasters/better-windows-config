@@ -150,9 +150,19 @@ function resolveCommitish(root, value) {
   return resolved && /^[0-9a-f]{40}$/i.test(resolved) ? resolved.toLowerCase() : null;
 }
 
+/**
+ * The public release assets: the manifest and the installers, each one's .minisig and .sig beside it when present,
+ * and the GPG .asc of every one of those (written by release:sign:gpg). Internal files such as assembly.json and
+ * the dry-run reports are never uploaded.
+ */
 function uniqueAssetPaths(bundle) {
-  const paths = [bundle.manifestPath, bundle.signaturePath, ...bundle.installers.map((installer) => installer.file)];
-  return [...new Set(paths.map((file) => path.resolve(file)))];
+  const primary = [bundle.manifestPath, ...bundle.installers.map((installer) => installer.file)];
+  const withSidecars = primary.flatMap((file) => [file, `${file}.minisig`, `${file}.sig`]);
+  const paths = [bundle.signaturePath, ...withSidecars].flatMap((file) => [file, `${file}.asc`]);
+  const required = new Set([bundle.manifestPath, bundle.signaturePath, ...primary].map((file) => path.resolve(file)));
+  return [...new Set(paths.map((file) => path.resolve(file)))].filter(
+    (file) => required.has(file) || fs.existsSync(file),
+  );
 }
 
 function commandsForPlan(context, options, bodyFiles) {
@@ -164,7 +174,7 @@ function commandsForPlan(context, options, bodyFiles) {
     list: ghListReleasesArgs(context.repo),
     create: ghCreateReleaseArgs(context.repo, bodyFiles.create),
     edit: ghEditReleaseArgs(context.repo, "<draft-id>", bodyFiles.edit),
-    upload: assetPaths.map((file) => ghUploadAssetArgs(context.repo, "<draft-id>", file)),
+    upload: assetPaths.map((file) => ghUploadAssetArgs(context.repo, { id: "<draft-id>" }, file)),
   };
 }
 
@@ -298,7 +308,7 @@ async function applyDraft(context, options, bodyFiles) {
     for (const assetPath of assetPaths) {
       const name = path.basename(assetPath);
       if (existingByName.has(name)) continue;
-      const uploadArgs = ghUploadAssetArgs(context.repo, release.id, assetPath);
+      const uploadArgs = ghUploadAssetArgs(context.repo, release, assetPath);
       console.log(`release-draft: running ${displayGh(uploadArgs)}`);
       runGhJson(uploadArgs, { cwd: context.root });
       uploaded += 1;

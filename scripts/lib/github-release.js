@@ -62,17 +62,39 @@ export function ghGetReleaseArgs(repo, releaseId) {
   return ["api", `${repo.api}/releases/${releaseId}`];
 }
 
-export function ghUploadAssetArgs(repo, releaseId, filePath) {
+/**
+ * The upload endpoint of a release. Assets upload to uploads.github.com, not to the API host (which answers 404).
+ * The release's own upload_url is used when present (as Zinnia does) and must be https on uploads.github.com;
+ * otherwise the endpoint is built from the repository and the release id.
+ */
+export function releaseUploadUrl(repo, release) {
+  const raw = typeof release?.upload_url === "string" && release.upload_url.length > 0
+    ? release.upload_url.replace(/\{\?[^}]*\}$/, "")
+    : `https://uploads.github.com${repo.api}/releases/${release?.id}/assets`;
+  if (String(release?.id).startsWith("<")) {
+    return raw;
+  }
+  const url = new URL(raw);
+  if (url.protocol !== "https:" || url.hostname !== "uploads.github.com") {
+    throw new Error(`refusing an unexpected GitHub upload URL: ${raw}`);
+  }
+  return url.toString();
+}
+
+export function ghUploadAssetArgs(repo, release, filePath) {
   const name = path.basename(filePath);
+  const contentType = /\.(asc|json|txt)$/i.test(name) ? "text/plain" : "application/octet-stream";
   return [
     "api",
     "--method",
     "POST",
     "-H",
-    "Content-Type: application/octet-stream",
+    "Accept: application/vnd.github+json",
+    "-H",
+    `Content-Type: ${contentType}`,
     "--input",
     filePath,
-    `${repo.api}/releases/${releaseId}/assets?name=${encodeURIComponent(name)}`,
+    `${releaseUploadUrl(repo, release)}?name=${encodeURIComponent(name)}`,
   ];
 }
 
