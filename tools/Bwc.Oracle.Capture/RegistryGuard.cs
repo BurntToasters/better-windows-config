@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Security.AccessControl;
 using Microsoft.Win32;
 
 namespace Bwc.Oracle.Capture;
@@ -57,6 +58,19 @@ internal static class RegistryGuard
         {
             throw new Win32Exception(rc, $"RegSetValueExW failed for '{keyFullPath}\\{valueName}' type {type}.");
         }
+    }
+
+    // Writes the DACL of one key under the Oracle root. The key is opened for WRITE_DAC only, for this call.
+    internal static void SetOracleKeySecurity(string relative, RegistrySecurity security)
+    {
+        AssertAllowed(OracleRoot + @"\" + relative);
+        // SetAccessControl needs a writable handle (EnsureWriteable) and WRITE_DAC. The rights argument limits the mask.
+        using RegistryKey key = Registry.CurrentUser.OpenSubKey(
+                OracleSubPath + @"\" + relative,
+                RegistryKeyPermissionCheck.ReadWriteSubTree,
+                RegistryRights.ChangePermissions)
+            ?? throw new IOException($"Could not open '{OracleRoot}\\{relative}' for WRITE_DAC.");
+        key.SetAccessControl(security);
     }
 
     // Same as SetRawValue but stores the bytes exactly (no NUL fix-up). Used only for the seeded no-NUL REG_SZ.

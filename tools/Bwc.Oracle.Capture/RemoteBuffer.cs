@@ -54,6 +54,18 @@ internal sealed class RemoteBuffer : IDisposable
 
     internal byte[] ReadAll() => Read(Size);
 
+    // Reads memory that this tool did not allocate, such as the inherit-type table aclui keeps in regedit.
+    internal static byte[] ReadRemote(IntPtr process, IntPtr address, int count)
+    {
+        byte[] buffer = new byte[count];
+        if (!Kernel.ReadProcessMemory(process, address, buffer, (IntPtr)count, out IntPtr read) || read.ToInt64() != count)
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), $"ReadProcessMemory at 0x{address:X} from regedit failed.");
+        }
+
+        return buffer;
+    }
+
     public void Dispose()
     {
         Kernel.VirtualFreeEx(_process, Address, IntPtr.Zero, MemRelease);

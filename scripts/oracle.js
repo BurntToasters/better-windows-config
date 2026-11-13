@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT = "scripts/oracle.js";
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const CAPTURES = ["export", "metrics", "dialogs", "menus", "import", "find", "sort"];
+const CAPTURES = ["export", "metrics", "dialogs", "menus", "import", "find", "sort", "permissions"];
 const ALL_STEPS = ["resources", ...CAPTURES];
 const RUN_RECORD = path.join(ROOT, "artifacts", "oracle", "last-run.json");
 

@@ -157,3 +157,66 @@ definition of done compares two consecutive runs by hashing the tracked files.
 
 The resource dump is written to a temporary file and renamed into place, so a test reading
 `regedit-resources.json` never sees a partial file.
+
+## 17. Permissions capture (Advanced Security Settings entry list)
+
+The `permissions` capture (`PermissionsCapture.cs`) seeds one key under `HKCU\Software\BWC-Oracle\Perm` with an
+explicit allow ACE per inheritance flag set (0x0, 0x1, 0x2, 0x3, 0x9, 0xA, 0xB), each for a different
+well-known group. It opens classic Edit > Permissions, presses Advanced, reads the entry list and the
+Applies-to choices of one entry editor, and cancels every window. The ways it can fail:
+
+- **ACE flags written differently than intended.** `InheritanceFlags` and `PropagationFlags` map to the
+  winnt.h bits (`ObjectInherit` is 0x1, `ContainerInherit` is 0x2, `InheritOnly` is 0x8). A mapping slip
+  would record the wrong label for a flag set. The seeded DACL is read back as raw bytes
+  (`RawSecurityDescriptor`) before classic starts. Each seeded ACE must carry exactly its flags, the allow
+  type, and KEY_READ, or the run fails before any window opens.
+- **Wrong principal matched to a seeded row.** Each seeded SID is matched to a list row by its account name
+  (translated from the SID, locale of the desktop). A row matches only when its principal is the name or the
+  name followed by " (". Zero or two matches fail the run. The capture never guesses a row by position.
+- **Column meaning misread.** The columns are found by header text (Type, Principal, Access, Inherited from,
+  Applies to), read with `LVM_GETCOLUMNW`. A missing header fails the run and the header texts are listed in the error.
+- **Wrong key or wrong dialog.** The Advanced window must be owned by the Permissions sheet, which must be
+  owned by the main window, and the Advanced window title must contain the key name `Perm`. The run fails
+  otherwise, so a dialog for the Regedit root or the user's own key is never recorded.
+- **Permissions command not the expected one.** The Edit menu item "Permissions..." must have command id
+  678 and not be grayed. Any other id fails before a message is posted.
+- **Advanced button missing or disabled.** The button is matched by its label with ampersands removed. The
+  button list is included in the error. The capture posts `BM_CLICK` with `PostMessage`, so the modal
+  Advanced window does not block a `SendMessage` call.
+- **Entry list not yet populated.** The list is read only after its row count is non-zero and unchanged on
+  two reads 800 ms apart. The row count must include all seven seeded rows.
+- **Wrong combo box read.** The entry editor has two combo boxes (Type and Applies to). The Applies-to combo
+  is the only one whose items carry inherit-type data (`CB_GETITEMDATA` points at aclui's 24-byte
+  `SI_INHERIT_TYPE` entry). The run fails unless exactly one combo has that data and it has at least three
+  items. The Type combo has no item data and is skipped.
+- **Misreading the inherit-type table.** The table is read with `ReadProcessMemory` from regedit. A bad
+  pointer or a short read throws. The table has the flags at offset 8 and a string resource id at offset 16
+  (not a pointer). Only the items the combo reports (`CB_GETCOUNT`) are read. Measured: the table holds three
+  entries, and the memory after them is heap data that must not be read as entries.
+- **Combo text read as empty.** `CB_GETLBTEXT` is marshalled across processes: Windows copies the text into the
+  caller's buffer. A buffer in regedit's address space is silently not written and reads back as zeros. The text
+  is read into a local (`Marshal.AllocHGlobal`) buffer. The run also fails when the returned length is not positive.
+- **Input reaching another window.** Every window is found by the process id the tool started. Input is
+  posted with `PostMessage` or sent with `SendMessageTimeout` to those windows only. The tool never calls
+  `SendInput`, `SetForegroundWindow` or `keybd_event`, so no keystroke can reach a terminal or another app.
+- **Unexpected window.** A message box or any other `#32770` window that the capture did not open (including a
+  "Registry Editor" question) makes the run fail. It is never clicked. A UAC or consent prompt belongs to
+  another process, so the tool cannot see it or answer it. The wait times out, the tool kills only the regedit
+  process it started, and the run fails. A user who sees a consent prompt must cancel it by hand.
+- **Cancel does not close a window.** Every window is closed with `IDCANCEL`, then `WM_CLOSE`, with a
+  5 second wait each (`RegeditWindow.CloseDialog`). The entry editor, Advanced window and sheet are closed in
+  that order. The process is killed only if it is still running at the end, and it is the process the tool started.
+- **OK is never posted.** The capture never posts `IDOK`, never presses Enter and never clicks OK, so no ACE
+  is changed by the dialog. The seeded DACL exists only under `HKCU\Software\BWC-Oracle\Perm`, which the
+  cleanup deletes.
+- **Writes outside BWC-Oracle.** The DACL write goes through `RegistryGuard.SetOracleKeySecurity`, which asserts
+  the path is under `HKCU\Software\BWC-Oracle` before it opens the key with `WRITE_DAC`. The applet key is restored
+  by the snapshot in `OracleSession`, as in every other capture.
+- **Personal data in tracked output.** Inherited rows can name the current user or the machine. The tracked
+  file records only the seeded group names. Other rows are recorded with the principal replaced by a
+  placeholder and a flag for the current user. The raw display texts go to `docs/parity/oracle/local/`, which
+  is untracked.
+- **Wrong DPI.** The capture runs under `RequireDpi` like the other UI captures. The DPI is written into the output.
+- **Cleanup fails.** The key has explicit ACEs for other SIDs but the user owns it and inherits full control,
+  so `DeleteSubKeyTree` succeeds. If it fails, `OracleSession` reports the error and the run fails. The next run
+  deletes the tree first, and that delete is checked the same way.

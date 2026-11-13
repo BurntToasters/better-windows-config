@@ -355,31 +355,26 @@ public sealed class PermissionsTests
                     nint aclConfirm = advancedOk ? WaitForOwnedDialogOf(session.ProcessId, advanced, TimeSpan.FromSeconds(10)) : 0;
                     bool aclConfirmText = aclConfirm != 0 && ContainsText(aclConfirm, AcluiReplaceConfirmFragment);
                     bool aclConfirmYes = aclConfirmText && ClickButtonNamed(aclConfirm, "Yes");
+                    // The replace is confirmed with the classic MSG-178 question before any key changes. BWC writes
+                    // inside the Advanced OK (SetSecurity runs there), so the question appears while the Advanced
+                    // window is still open. It is a message box owned by the main window, so the sheet is excluded.
+                    nint confirm = advancedOk
+                        ? WaitForOwnedDialogExcept(session.ProcessId, session.MainHwnd, sheet, TimeSpan.FromSeconds(10))
+                        : 0;
+                    bool confirmText = confirm != 0 && ContainsText(confirm, ReplaceConfirmFragment);
+                    bool confirmYes = confirmText && ClickButtonNamed(confirm, "Yes");
                     E2EResults.Record(
-                        "permissions.propagation.advanced.replace-confirm",
-                        aclConfirmYes,
-                        $"shown=0x{aclConfirm:X}, textMatched={aclConfirmText}, yesClicked={aclConfirmYes}.");
+                        "permissions.propagation.replace-confirm",
+                        confirmYes,
+                        $"shown=0x{confirm:X}, textMatched={confirmText}, yesClicked={confirmYes}.");
 
                     bool advancedGone = ControlTestSupport.WaitUntil(
                         () => !PermissionsNative.IsWindow(advanced),
-                        TimeSpan.FromSeconds(8));
+                        TimeSpan.FromSeconds(15));
                     E2EResults.Record("permissions.propagation.advanced.closed", advancedGone, $"gone={advancedGone}.");
                 }
 
                 bool sheetOk = ClickButtonNamed(sheet, "OK");
-
-                // The replace is confirmed with the classic MSG-178 question before any key changes. The question is
-                // a message box owned by the main window, as the sheet is, so the sheet itself is excluded.
-                nint confirm = sheetOk
-                    ? WaitForOwnedDialogExcept(session.ProcessId, session.MainHwnd, sheet, TimeSpan.FromSeconds(10))
-                    : 0;
-                bool confirmText = confirm != 0 && ContainsText(confirm, ReplaceConfirmFragment);
-                bool confirmYes = confirmText && ClickButtonNamed(confirm, "Yes");
-                E2EResults.Record(
-                    "permissions.propagation.replace-confirm",
-                    confirmYes,
-                    $"shown=0x{confirm:X}, textMatched={confirmText}, yesClicked={confirmYes}.");
-
                 bool sheetClosed = ControlTestSupport.WaitUntil(
                     () => !PermissionsNative.IsWindow(sheet),
                     TimeSpan.FromSeconds(15));
