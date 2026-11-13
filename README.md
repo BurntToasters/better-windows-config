@@ -90,7 +90,7 @@ those with [my public key](https://tuxedo.rosie.run/GPG/BurntToasters_0xF2FBC20F
 
 ## Contributing
 
-Read [`AGENTS.md`](AGENTS.md) and [`handoff.md`](handoff.md) first. Run `npm run validate` before you
+Read [`AGENTS.md`](AGENTS.md) first. Run `npm run validate` before you
 send a change. Commit subjects follow BCLS kind `commit` (for example `UI: Fix splitter drag.`), and
 release notes in [`CHANGELOG.md`](CHANGELOG.md) follow BCLS kind `binary`.
 
