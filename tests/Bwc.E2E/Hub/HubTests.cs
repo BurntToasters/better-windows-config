@@ -161,11 +161,9 @@ public sealed class HubTests
         E2EGuards.RequireE2EOnlyFlavor(config);
         EnsureExecutables(config);
 
-        // The shipped build carries the GitHub manifest URL and, once embedded, the release key, so "no server" is
-        // forced through the E2E-only override. Nothing reaches the network.
-        Dictionary<string, string> environment = Environment(config, UnconfiguredScope, null);
-        environment["BWC_E2E_UPDATE_MANIFEST_URL"] = "none";
-        using var hub = new AppSession(config, config.HubExePath, environment: environment);
+        // The shipped build carries the GitHub manifest URL and the release key, so "no server" is forced through the
+        // E2E-only override that Environment sets when no fixture server is given. Nothing reaches the network.
+        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, UnconfiguredScope, null));
         E2EResults.CurrentSession = hub;
         using var automation = new UIA3Automation();
 
@@ -1142,6 +1140,12 @@ public sealed class HubTests
             environment["BWC_E2E_UPDATE_MANIFEST_URL"] = server.ManifestUrl;
             environment["BWC_E2E_UPDATE_TRUSTED_KEY"] = fixture.PublicKeyBase64;
             environment["BWC_E2E_UPDATE_ALLOW_HTTP"] = "1";
+        }
+        else
+        {
+            // No fixture server: force "no manifest URL" so no test reaches the real GitHub feed, which the build
+            // now carries along with the release key. The ship flavor ignores this E2E-only variable.
+            environment["BWC_E2E_UPDATE_MANIFEST_URL"] = "none";
         }
 
         if (installerRecordPath is not null)
