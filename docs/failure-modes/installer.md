@@ -307,3 +307,235 @@ a shipped file.
 
 - Intended: packages are sorted by lowercase id, then by version. Line endings are LF. The
   summary line has a fixed format.
+
+## Authenticode signing
+
+Scope: `scripts/windows-artifact-sign.ps1`, `scripts/verify-windows-authenticode.ps1`,
+`scripts/setup-windows-artifact-signing.ps1`, `scripts/artifact-signing-tools.ps1`,
+`scripts/release-policy.js`, the signing steps of `scripts/build-installer.js`, and the
+`!finalize` and `!uninstfinalize` lines of `installer/bwc.nsi`. Written before the code, per
+AGENTS.md. The signing path has not run against Azure on this machine: no client tools, no
+certificate, and no NSIS. `scripts/artifact-signing-selftest.js` covers the parts that run offline.
+
+Signing is on unless `SKIP_WIN_CODESIGN` is exactly `1`. Exit codes follow the build script
+(`0` success, `1` failure). The setup script exits `1` when it refuses.
+
+### Signing policy
+
+`SKIP_WIN_CODESIGN` is unset, `0`, or any value other than `1`.
+
+- Intended: signing is enforced. Only the exact value `1` skips signing. A value such as `true`,
+  `yes`, or ` 1` (with spaces) enforces signing and prints a warning that names the value, so a
+  typo fails closed.
+
+`SKIP_WIN_CODESIGN=1` on a build meant for release.
+
+- Intended: the build leaves BWC binaries, the setup EXE, and the uninstaller unsigned, prints
+  `SKIP_WIN_CODESIGN=1; ...` with what was skipped, and records `signed: false` in the installer
+  record. The verify step is skipped with the same message.
+
+A required variable is missing or whitespace only.
+
+- Intended: the build exits `1` before publish or NSIS. The message lists every missing name
+  (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_ARTIFACT_SIGNING_ENDPOINT`,
+  `AZURE_ARTIFACT_SIGNING_ACCOUNT`, `AZURE_ARTIFACT_SIGNING_PROFILE`,
+  `AZURE_ARTIFACT_SIGNING_PUBLISHER`, `AZURE_ARTIFACT_SIGNING_PUBLISHER_DN`). Values are never
+  printed. The installer record is written with `pass: false`.
+- `AZURE_SUBSCRIPTION_ID` may be in the copied `.env`. Signing does not use it, so it is not
+  required.
+
+A variable is set to a placeholder value.
+
+- Intended: the build cannot detect a placeholder by itself. The signing step fails at SignTool or
+  at the identity check (publisher or subject mismatch), before a release is written.
+
+### Client tools
+
+Microsoft Artifact Signing Client Tools (`Azure.CodeSigning.Dlib.dll` and `signtool.exe`) are not
+installed.
+
+- Intended: the build exits `1` before publish and before NSIS. The message says
+  `Artifact Signing Client Tools were not found. Run npm run setup:win:artifact-signing first.`
+  The check is `windows-artifact-sign.ps1 -CheckOnly`, which only resolves the tools. It signs
+  nothing and reads no secret.
+
+`AZURE_ARTIFACT_SIGNING_SIGNTOOL_PATH` or `AZURE_ARTIFACT_SIGNING_DLIB_PATH` names a file that does
+not exist.
+
+- Intended: the check fails with `Configured SignTool was not found: <path>` or `Configured Artifact
+  Signing dlib was not found: <path>`. An override is never ignored in favor of a search.
+
+The override pair has different architectures (x64 SignTool with an x86 dlib, or the reverse).
+
+- Intended: refused with `SignTool and Artifact Signing dlib architectures do not match`.
+
+Only the Windows SDK SignTool is present (`C:\Program Files (x86)\Windows Kits\10\bin`), and the
+dlib is missing.
+
+- Intended: the SDK SignTool is used only in the search when no client-tools SignTool exists. A
+  missing dlib still refuses with the setup hint. The SDK copy never signs alone.
+
+`npm run setup:win:artifact-signing` runs from a session that is not elevated.
+
+- Intended: it refuses before any download or install, with the message that it must run once as
+  Administrator. It does not start UAC. When the tools are already installed, it exits `0` before
+  the administrator check.
+
+winget is missing, or its install fails.
+
+- Intended: the setup falls back to the Microsoft MSI from `download.microsoft.com`. The MSI goes to
+  a temp file, its Authenticode signature must be `Valid` and name `O=Microsoft Corporation`, and
+  the temp file is removed in `finally`. A wrong signer refuses before msiexec runs.
+
+msiexec returns `3010` or `1641` (restart required).
+
+- Intended: a warning that a restart is needed. The setup then checks for the tools again. If they
+  resolve, it exits `0`. If they do not yet resolve, it exits `1` with the setup hint, and a build run
+  before the restart fails with the same hint.
+
+The download is blocked (offline VM, proxy).
+
+- Intended: the setup fails with the web request error, and the temp MSI is removed. Nothing is
+  installed.
+
+### Signing one file
+
+`windows-artifact-sign.ps1 -FilePath <file>` runs SignTool with `/fd SHA256`,
+`/tr http://timestamp.acs.microsoft.com`, `/td SHA256`, `/dlib`, and `/dmdf <metadata>`.
+
+- Intended: the metadata JSON holds the endpoint, account, profile, and the same
+  `ExcludeCredentials` list that Zinnia uses (managed identity, workload identity, shared token
+  cache, Visual Studio, VS Code, Azure CLI, Azure PowerShell, azd, and interactive browser). A
+  developer's logged-in credentials can therefore never sign a release. The client secret stays in
+  the environment and is not written to the metadata.
+- The metadata file is removed in `finally`, even when SignTool fails.
+
+The file does not exist.
+
+- Intended: the script throws before SignTool runs, and names the path.
+
+The timestamp server is unreachable, or SignTool exits non-zero.
+
+- Intended: the script exits non-zero with the SignTool exit code. A file is never accepted without
+  a timestamp, so there is no unsigned fallback. The build exits `1`.
+
+SignTool succeeds, but the signature is not `Valid` (for example `UnknownError`, `HashMismatch`, or
+`NotTrusted`).
+
+- Intended: refused with the status and the status message.
+
+The signer is valid, but the publisher simple name differs from `AZURE_ARTIFACT_SIGNING_PUBLISHER`.
+
+- Intended: refused with the expected and the actual name.
+
+The subject differs from `AZURE_ARTIFACT_SIGNING_PUBLISHER_DN` (the trimmed full subject is compared).
+
+- Intended: refused. Read the value with `(Get-AuthenticodeSignature <file>).SignerCertificate.Subject`
+  on a file signed by the release certificate, as `docs/installer.md` describes.
+
+The signature has no RFC 3161 timestamp (`TimeStamperCertificate` is empty).
+
+- Intended: refused with `Missing RFC3161 timestamp`.
+
+The file is already signed (a rebuild of the same publish folder).
+
+- Intended: SignTool replaces the signature, because `/as` is not used. The verify step checks the
+  result, so a stale signature cannot pass.
+
+`-CopyTo <path>` is set.
+
+- Intended: the copy happens only after the signature check passes. The build creates the work
+  folder before NSIS runs, so the copy target exists in a normal run.
+
+### Publish folder binaries
+
+`scripts/build-installer.js` signs the BWC-built files in the publish folder root before the payload
+is listed: `BetterWindowsConfig.exe`, `BwcRegedit.exe`, `BwcUpdate.exe`, `BetterWindowsConfig.dll`,
+`BwcRegedit.dll`, `BwcUpdate.dll`, and `Bwc.*.dll`. The match is case-insensitive, root only, and
+limited to `.dll` and `.exe`.
+
+- Intended: no other file is signed. Microsoft and third-party runtime files (for example
+  `Microsoft.*.dll`, `hostfxr.dll`, `coreclr.dll`, and the self-contained runtime of `BwcUpdate`)
+  and any file in a subfolder keep their original signature or none. The self-test checks the exact
+  list for a fixture folder.
+
+The publish folder has no BWC binaries (dotnet-build did not run).
+
+- Intended: the build reuses or publishes the folder first, as before. The required-file check
+  (`BetterWindowsConfig.exe`, `BwcRegedit.exe`, `BwcUpdate.exe`) still exits `1` when one is missing.
+
+A signing step fails for one file in the middle of the list.
+
+- Intended: the build exits `1` with the file name and the SignTool output tail, and writes the
+  failure record. The files already signed stay signed. The next run signs every file again.
+
+The payload is listed before signing and again after it.
+
+- Intended: the payload sizes and the `BWC_ESTIMATED_KB` value come from the second listing, so they
+  match the signed files. The first listing only checks names and required files.
+
+### NSIS signing hooks
+
+`!finalize` signs the setup EXE after makensis writes it. `!uninstfinalize` signs the uninstaller
+that NSIS builds before it embeds it. Both need `BWC_SIGN`, which is passed only when signing is
+enforced. The commands run `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File
+"<windows-artifact-sign.ps1>" -FilePath "%1"`. The uninstaller command adds `-CopyTo` with a file in
+the work folder.
+
+- Intended: the embedded uninstaller is already signed when the setup EXE is signed, so the setup
+  signature covers it. The uninstaller copy in the work folder is what the verify step checks.
+- `!uninstfinalize` needs NSIS 3.08 or newer. The build requires 3.10, so it is available.
+- Expected (NSIS behavior, to be confirmed on the first compile): a `!finalize` or `!uninstfinalize`
+  command that exits non-zero fails makensis. The build then exits `1`, and no setup EXE is recorded
+  as passing. The build also checks the setup file after makensis, so a missing file fails too.
+- The NSIS source audit (`auditNsisSource`) treats `BWC_SIGN`, `BWC_SIGN_SCRIPT`, and
+  `BWC_SIGN_UNINST_COPY` as defined in both signing modes, so the unsigned build is not refused by the
+  static check.
+- A path with `"`, `'`, `$`, `%`, a backtick, or a line break cannot be placed safely in the NSIS
+  string. It is refused before NSIS with exit `1`.
+- The first compile must confirm that NSIS expands `${BWC_SIGN_SCRIPT}` inside `!finalize`, and that
+  `%1` is the output path. This is not verified on this machine (NSIS is not installed).
+
+The uninstaller copy is missing after makensis (the `!uninstfinalize` line did not run).
+
+- Intended: the verify step fails on the missing file, and the build exits `1`.
+
+### Verify step
+
+After makensis, with signing enforced, `scripts/verify-windows-authenticode.ps1 -Files` checks the
+signed BWC binaries in the publish folder, the setup EXE, and the uninstaller copy.
+
+- Intended: each file must have a `Valid` signature, the publisher and subject from the environment,
+  and an RFC 3161 timestamp. The first failure exits `1`, and the installer record is written with
+  `pass: false`.
+- An empty `-Files` list is refused. The verify step never passes with nothing checked.
+- A missing file is refused with its path.
+- `SKIP_WIN_CODESIGN=1` makes the verify script print `SKIP_WIN_CODESIGN=1; skipping Authenticode
+  verification` and exit `0`.
+- An unsigned file (for example, a fresh `dotnet publish` output) is refused with `Invalid or missing
+  Authenticode signature`.
+
+### Dry run
+
+`node scripts/build-installer.js --rid <rid> --dry-run` does not need NSIS or the client tools.
+
+- Intended: it prints the signing plan. The plan has the policy (enforced or skipped), the publish
+  files it would sign (or that the publish folder is missing), the setup EXE, and the uninstaller
+  copy. When signing is enforced and a variable is missing, it prints the names and says a real run
+  stops. It exits `0`, because the dry run checks the source and not the environment. It never runs
+  SignTool, PowerShell, or a secret read, and it writes no file.
+
+### Self-test
+
+`scripts/artifact-signing-selftest.js` checks the policy, the variable list, the target list, the
+PowerShell refusals, the override paths, the dry-run exit codes, and the verify refusals.
+
+- Intended: no network, no Azure, no certificate, and no store change. Each check prints PASS or
+  FAIL. The result is written to `artifacts/signing-selftest.json`.
+- The PowerShell checks run only on Windows. On other systems they are reported as skipped, and a
+  skip does not count as a pass.
+- The "no client tools" check runs only when the tools are absent. On a machine that has them, it is
+  reported as skipped, because the refusal it checks cannot happen there.
+- The unsigned-exe check uses a BWC-built file from `publish/<rid>` when one exists. Otherwise it
+  uses a minimal unsigned PE image that the self-test writes to its temp folder, and the result says
+  which one it used.

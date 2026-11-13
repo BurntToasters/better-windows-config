@@ -27,6 +27,9 @@
 ;   BWC_ICON           absolute path of resources\bwc.ico
 ;   BWC_ESTIMATED_KB   payload size in KiB, for Apps and Features
 ;   BWC_E2E            defined only for the E2E flavor (no value)
+;   BWC_SIGN           defined only when Authenticode signing is enforced (no value)
+;   BWC_SIGN_SCRIPT    scripts\windows-artifact-sign.ps1, which signs the setup EXE and the uninstaller
+;   BWC_SIGN_UNINST_COPY  where the signed uninstaller is copied, for the verify step
 
 !ifndef BWC_VERSION
   !error "BWC_VERSION is not defined. Run scripts/build-installer.js."
@@ -63,6 +66,20 @@
 !endif
 !ifndef BWC_ESTIMATED_KB
   !error "BWC_ESTIMATED_KB is not defined. Run scripts/build-installer.js."
+!endif
+
+; Authenticode signing. The setup EXE is signed after makensis writes it (!finalize). The uninstaller
+; is signed before NSIS embeds it (!uninstfinalize, NSIS 3.08+), so the setup signature covers it.
+; Both run the same script; the uninstaller copy is also kept for the verify step.
+!ifdef BWC_SIGN
+  !ifndef BWC_SIGN_SCRIPT
+    !error "BWC_SIGN is set but BWC_SIGN_SCRIPT is not. Run scripts/build-installer.js."
+  !endif
+  !ifndef BWC_SIGN_UNINST_COPY
+    !error "BWC_SIGN is set but BWC_SIGN_UNINST_COPY is not. Run scripts/build-installer.js."
+  !endif
+  !finalize 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${BWC_SIGN_SCRIPT}" -FilePath "%1"'
+  !uninstfinalize 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${BWC_SIGN_SCRIPT}" -FilePath "%1" -CopyTo "${BWC_SIGN_UNINST_COPY}"'
 !endif
 
 Unicode true

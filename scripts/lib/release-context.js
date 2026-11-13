@@ -103,7 +103,7 @@ export async function prepareReleaseContext(options) {
 
   let repo = null;
   try {
-    repo = resolveRepo(root, options.repo);
+    repo = resolveRepo(options.repo);
   } catch (error) {
     errors.push({ reason: "repo-invalid", detail: error instanceof Error ? error.message : String(error), exitCode: EXIT.USAGE });
   }

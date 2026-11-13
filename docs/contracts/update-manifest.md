@@ -5,8 +5,8 @@ publish), and the installer (D1) must follow. A change to this file is a manager
 Failure cases and their tests are in `docs/failure-modes/update-verifier.md`. The process commands the
 installer calls (`--close-running`, `--wait-pid`) are in `docs/contracts/update-cli.md`.
 
-Status: the verifier and helper are implemented and tested with test keys. The release public key
-and the hosting URLs are not decided. Until the placeholder key is replaced, every update is
+Status: the verifier and helper are implemented and tested with test keys. The release public key is
+not decided. The stable manifest URL is set to the GitHub latest-release asset in `UpdateSources.cs`. Until the placeholder key is replaced, every update is
 refused (`TrustedKeysNotConfigured`, which the Hub shows as "not configured"). A key list that is
 set but malformed is refused as `TrustedKeysInvalid`.
 
@@ -22,7 +22,8 @@ Each channel has its own manifest URL. A manifest is signed for one channel, so 
 
 The updater never assumes a URL pattern. The Hub passes both URLs. Convention for the release
 tooling: the signature sits beside the manifest as `<manifest>.minisig`, and when the manifest URL has a
-query string, the `.minisig` suffix goes before the query (`beta.json.minisig?token=...`).
+query string, the `.minisig` suffix goes before the query (`beta.json.minisig?token=...`). The release
+asset names are `bwc-stable.json` and `bwc-beta.json`, with `.minisig` signatures beside them.
 
 Every URL must be `https` (`http` is allowed only in tests). It may not contain user information,
 a fragment, a backslash, a space, a non-ASCII character, a dot segment (`.` or `..`), or an encoded

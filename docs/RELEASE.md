@@ -41,20 +41,38 @@ These are not implemented by D4 to D7.
 
 1. Create the real minisign release key. Keep the secret key off the repository and off the
    release VM image history, and encrypt it with a password you keep in a password manager
-   (`minisign -G`). The keygen in `scripts/sign-update-manifest.js` writes test keys only; never use
-   one for a release. Check the encrypted-key path once with a key that minisign made (see 2a).
+   (`minisign -G`, or `tauri signer generate`, which writes the same format). The keygen in
+   `scripts/sign-update-manifest.js` writes test keys only; never use one for a release. Check the
+   encrypted-key path once with a key that minisign made (see 2a). Put the key in `.env` as
+   `TAURI_SIGNING_PRIVATE_KEY` (base64 of the key file, the form `tauri signer generate` prints) and
+   its password in `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 2. Put the real public key in `src/Bwc.Update/Signing/TrustedKeys.cs`, in the `Embedded` list, and
    set `IsPlaceholder = false`. The release tooling trusts exactly the keys in that list, matched by
    key id and key bytes. Rotation lists the old and new key during the overlap.
-3. Choose the https hosting origin and path for the manifest, signature, notes page, and
-   installers. The dry run defaults to `https://example.invalid/bwc/<version>`. Replace it
-   with `--download-base-url`.
+3. Hosting is GitHub Releases, the same as Zinnia. The repository is
+   `BurntToasters/better-windows-config` unless `.env` sets `GH_REPO_OWNER` and `GH_REPO_NAME`.
+   Run `gh auth login` on the release VM. The stable manifest is the `bwc-stable.json` asset of the
+   latest stable release (see the Hub's `UpdateSources.cs`), and each installer is an asset of
+   `releases/download/v<version>/`. The beta URL stays empty until a beta channel is published.
 4. Install NSIS 3.10+ and compile `installer/bwc.nsi` (D1). Until then, a dry-run artifact
    contains a stand-in, not an installer.
 5. Sign the setup EXE with the Windows code-signing certificate (D8). SmartScreen warns on
    an unsigned download.
-6. Run the first beta (`0.1.0-beta.1`) on the release VM (D10). That is the first run that
-   may use `--apply`.
+6. The first release is `0.1.0`, stable, with no beta. Build it from `main` on the release VM (D10).
+   That is the first run that may use `--apply`.
+
+## Secrets (`.env`)
+
+`.env` is git-ignored. Copy `.env.example` to `.env` and fill it in. Zinnia's `.env` can be copied
+unchanged, because the variables BWC does not use are kept in `.env.example`. The release scripts that
+need it (`release:dry-run`, `release:assemble`, `release:sign`, `release:draft`, `release:verify`, and
+`release:publish`) load it with `node --env-file-if-exists=.env`. That needs Node 22.9 or newer, and it
+adds no dependency. Variables already set in the shell win over `.env`.
+
+The variables this tooling reads are `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`,
+`GH_REPO`, `GH_REPO_OWNER`, and `GH_REPO_NAME`. The signing key is never printed, logged, written
+unencrypted, or passed on a command line. `--key` and `--secret-key` accept a path only. The failure
+cases are K1 to K13 in [failure-modes/release.md](failure-modes/release.md).
 
 ## Version, channel, and branch
 
@@ -104,8 +122,8 @@ Validate a manifest, its signature, and optional installer bytes:
 
 ```powershell
 node scripts/validate-updater-manifest.js `
-  --manifest artifacts/release/0.1.0-beta.1/beta/manifest.json `
-  --signature artifacts/release/0.1.0-beta.1/beta/manifest.json.minisig `
+  --manifest artifacts/release/0.1.0-beta.1/beta/bwc-beta.json `
+  --signature artifacts/release/0.1.0-beta.1/beta/bwc-beta.json.minisig `
   --trusted-key artifacts/release/0.1.0-beta.1/beta/ephemeral/minisign.pub `
   --version 0.1.0-beta.1 --channel beta `
   --require-arch win-x64 --require-arch win-arm64 `
@@ -139,7 +157,9 @@ Options:
 | `--dry-run` | Do not publish. Describe the build commands and use existing artifacts. |
 | `--no-build` | Do not build, but do not label the run a dry run. |
 | `--pub-date <utc>` | Normalized UTC. Default now, or `SOURCE_DATE_EPOCH`. |
-| `--download-base-url <url>` | Default `https://example.invalid/bwc`. Must be https. |
+| `--download-base-url <url>` | Installer directory, https. Default `https://github.com/<owner>/<repo>/releases/download/v<version>`. |
+| `--notes-url <url>` | Notes page, https. Default `https://github.com/<owner>/<repo>/releases/tag/v<version>`. |
+| `--secret-key <dir\|file>` | Sign with this key file or folder instead of the ephemeral test key. The environment key is not read by the dry run. |
 | `--installer-<rid> <path>` | Use an explicit installer file for one RID. |
 | `--current-version <semver>` | Also check the generated version is newer. |
 | `--max-age-hours <n>` | Freshness limit used by the validation report. Default 24. |
@@ -149,9 +169,9 @@ folder also holds `publish-<rid>.json`:
 
 | File | Contents |
 |------|----------|
-| `manifest.json` | Schema 1 manifest for the chosen version and channel. |
-| `manifest.json.minisig` | Raw minisign signature. Its trusted comment is `version:<semver> channel:<channel> expires:<utc>`. |
-| `manifest.json.sig` | Base64 envelope of the same signature. |
+| `bwc-<channel>.json` | Schema 1 manifest for the chosen version and channel (`bwc-stable.json` or `bwc-beta.json`). These are the GitHub asset names. |
+| `bwc-<channel>.json.minisig` | Raw minisign signature. Its trusted comment is `version:<semver> channel:<channel> expires:<utc>`. |
+| `bwc-<channel>.json.sig` | Base64 envelope of the same signature. |
 | `BetterWindowsConfig-<version>-<rid>-setup.exe` | Real setup EXE, when a matching installer record exists. |
 | `BetterWindowsConfig-<version>-<rid>-setup.dry-run.json` | Stand-in when NSIS has not produced a setup EXE. |
 | `<installer>.minisig`, `<installer>.sig` | Installer signature, raw and base64. Its trusted comment is `version:<semver> arch:<win-x64 or win-arm64>`. |
@@ -179,6 +199,15 @@ node scripts/assemble-bundle.js --version 0.1.0-beta.1 `
   --secret-key C:\release-keys\bwc-release `
   --password-env BWC_RELEASE_KEY_PASSWORD
 ```
+
+With `TAURI_SIGNING_PRIVATE_KEY` set in `.env`, leave out `--secret-key` and `--password-env`. The key
+comes from that variable, and its password from `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Through npm the
+same command is `npm run release:assemble -- --version 0.1.0 --installer-win-x64 <setup.exe>`, which
+loads `.env`. The bundle is written to `artifacts/release/<version>/<channel>/` with
+`bwc-<channel>.json`, `bwc-<channel>.json.minisig`, and `bwc-<channel>.json.sig`. Stable is
+`bwc-stable.json`, and beta is `bwc-beta.json`. The installer URLs default to
+`https://github.com/<owner>/<repo>/releases/download/v<version>/`, and `--download-base-url` replaces
+that directory. `--notes-url` replaces the notes page.
 
 - The signing key's public half must be one of the `Embedded` keys in
   `src/Bwc.Update/Signing/TrustedKeys.cs`, matched by key id and key bytes. A key that is not
@@ -246,8 +275,9 @@ sections 1 and 2 only.
 
 `--commit <rev>` on draft, verify, and publish must resolve to HEAD. Any other commit is refused
 (`session-commit-mismatch`). A draft never targets the literal name `HEAD`. The GitHub repository
-must be named with `--repo`, `GH_REPO`, or an origin remote; the tooling never assumes one
-(`repo-invalid`). `--root <dir>` selects another checkout on the same commands.
+is `--repo`, then `GH_REPO`, then `GH_REPO_OWNER` and `GH_REPO_NAME`, then the default
+`BurntToasters/better-windows-config`. The origin remote is never read (`repo-invalid` for a
+malformed name). `--root <dir>` selects another checkout on the same commands.
 
 ## 4. Draft (D7)
 
@@ -338,8 +368,8 @@ expected prerelease flag, it prints a no-op and exits 0. It never creates a draf
 ## GitHub CLI commands
 
 All commands use `gh api`, so they work with a draft that has no git tag yet. Replace
-`<owner>/<repo>` with the repository resolved from `--repo`, `GH_REPO`, or the origin
-remote.
+`<owner>/<repo>` with the repository resolved from `--repo`, `GH_REPO`, `GH_REPO_OWNER` and
+`GH_REPO_NAME`, or the default `BurntToasters/better-windows-config`.
 
 List releases:
 
@@ -421,6 +451,7 @@ A dry run that finds a refusal still prints the plan and exits 1.
 | `asset-conflict`, `asset-size-mismatch`, `asset-hash-mismatch` | Remote asset differs from the local artifact. |
 | `gh-missing`, `gh-failed`, `repo-invalid` | `gh` is absent or failed, or the repository is not owner/name. |
 | `build-failed`, `verification-failed` | A requested publish failed, or the pre-publish verify refused. |
+| `key-missing`, `key-unreadable`, `key-malformed` | No key source, a key given as text on the command line, or an environment value that is neither minisign key text, a key path, nor base64 of one. The value is never printed. |
 
 ## Self-test
 
@@ -435,15 +466,90 @@ Result: `artifacts/release/selftest/result.json`. It covers wrong key, bad hash,
 mismatch, wrong channel, placeholder key, malformed JSON, wrong architecture, installer
 architecture mismatch, expired manifest, downgrade, dirty tree, version mismatch, missing
 artifact, wrong branch, and a successful preflight and session in a clean temporary repo.
-No network and no `gh` call.
+It also covers `TAURI_SIGNING_PRIVATE_KEY` (base64 form, folder path, wrong, empty, and malformed
+values, and a check that a failing run prints neither the key nor the password), the embedded-key
+refusal for an environment key, and the default repository. No network and no `gh` call.
+
+## Windows code signing (Azure Artifact Signing)
+
+The installer's Windows files are Authenticode-signed with Azure Artifact Signing, the same way
+Zinnia signs them. The build signs these files, and nothing else:
+
+- The BWC binaries in the publish folder root: `BetterWindowsConfig.exe`, `BwcRegedit.exe`,
+  `BwcUpdate.exe`, `BetterWindowsConfig.dll`, `BwcRegedit.dll`, `BwcUpdate.dll`, and `Bwc.*.dll`.
+  Microsoft and third-party runtime files are not touched.
+- The setup EXE (NSIS `!finalize`) and the uninstaller (NSIS `!uninstfinalize`, signed before it is
+  embedded, so the setup signature covers it).
+
+After signing, `scripts/verify-windows-authenticode.ps1` checks each of these files: a Valid
+signature, the publisher name, the full subject, and an RFC 3161 timestamp. The failure modes are in
+`docs/failure-modes/installer.md` ("Authenticode signing").
+
+### One-time setup on the release VM
+
+Run this once, in a PowerShell opened as Administrator, from the repository root:
+
+```powershell
+npm run setup:win:artifact-signing
+```
+
+It installs the Microsoft Artifact Signing Client Tools (SignTool and the Artifact Signing dlib) with
+winget, or from Microsoft's MSI when winget fails. The MSI must carry a valid Microsoft signature.
+The script refuses to run in a session that is not elevated, and it changes nothing when the tools are
+already installed. If Windows asks for a restart, restart before the first signed build. The build
+never runs this setup itself and never starts UAC.
+
+### Variables
+
+The variables have the same names as in Zinnia's `.env`. Copy that file, then make its values
+available to the build. The build reads them from the environment and does not load `.env` itself.
+Zinnia loads its `.env` with `dotenv-cli`. Either wrap the build the same way, or set the values in the
+session before the build.
+
+| Variable | Use |
+| --- | --- |
+| `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_SECRET` | The service principal that signs. The secret is never written to a file or printed. |
+| `AZURE_ARTIFACT_SIGNING_ENDPOINT` | The regional endpoint of the signing account. |
+| `AZURE_ARTIFACT_SIGNING_ACCOUNT`, `AZURE_ARTIFACT_SIGNING_PROFILE` | The code signing account and its certificate profile. |
+| `AZURE_ARTIFACT_SIGNING_PUBLISHER` | The publisher simple name the signature must carry (checked after each signature). |
+| `AZURE_ARTIFACT_SIGNING_PUBLISHER_DN` | The full certificate subject the signature must carry (checked after each signature). |
+| `AZURE_SUBSCRIPTION_ID` | Accepted in the `.env`. Signing does not use it. |
+| `SKIP_WIN_CODESIGN` | Only the exact value `1` skips signing and verification. Unset, `0`, or any other value enforces signing. Use `1` only for an unsigned test build, never for a release. |
+| `AZURE_ARTIFACT_SIGNING_SIGNTOOL_PATH`, `AZURE_ARTIFACT_SIGNING_DLIB_PATH` | Optional. Use these paths instead of the installed client tools. A path that does not exist fails the build. |
+
+A variable that is missing or blank stops the build before publish and before NSIS. The message lists
+each missing name, not the values. The client tools are checked the same way, before any file is
+signed.
+
+### Read the publisher name and subject
+
+Run this on a setup EXE signed with the release certificate to get the two values for the `.env`:
+
+```powershell
+$sig = Get-AuthenticodeSignature .\artifacts\installer\BetterWindowsConfig-<version>-win-x64-setup.exe
+$sig.SignerCertificate.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
+$sig.SignerCertificate.Subject
+```
+
+The first line is `AZURE_ARTIFACT_SIGNING_PUBLISHER`, and the second is `AZURE_ARTIFACT_SIGNING_PUBLISHER_DN`.
+
+### Build and check
+
+```powershell
+npm run installer:x64        # signs, builds, signs the setup EXE, then verifies everything
+node scripts/artifact-signing-selftest.js   # offline checks of the signing scripts (no Azure needed)
+```
+
+Verify one file by hand: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/verify-windows-authenticode.ps1 -Files <path>`.
 
 ## What remains
 
 - D1: install NSIS 3.10+ and compile `installer/bwc.nsi`. A real release must use the setup
   EXE, not the `.dry-run.json` stand-in.
 - D8: the real release key, Authenticode signing, and the user's GnuPG policy.
-- D10: the first `0.1.0-beta.1` run on the release VM, including the real hosting URL and a
-  real `gh` login.
-- The update server URLs in `src/Bwc.Hub/Updates/UpdateSources.cs` are still empty.
+- D10: the first `0.1.0` stable run on the release VM, with a real `gh` login and the real key.
+- The stable manifest URL in `src/Bwc.Hub/Updates/UpdateSources.cs` points at the GitHub latest-release
+  asset `bwc-stable.json`. The beta URL is empty. Until the real key replaces the placeholder, the
+  Hub reports "not configured" and never fetches the manifest.
 - The real key must replace the placeholder in `TrustedKeys.cs`; until then every updater
   check fails closed.

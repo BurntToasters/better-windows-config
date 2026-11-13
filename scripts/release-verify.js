@@ -41,7 +41,7 @@ Options:
   --dir <path>             D5 artifact directory. Default artifacts/release/<version>.
   --session <path>         Session file. Default artifacts/release/session.json.
   --trusted-key <path>     Public release key. Repeatable. Required.
-  --repo <owner/name>      Default GH_REPO or the origin remote.
+  --repo <owner/name>      Default GH_REPO, then GH_REPO_OWNER and GH_REPO_NAME, then BurntToasters/better-windows-config.
   --commit <rev>           Default HEAD.
   --allow-detached         Allow a detached HEAD contained in the expected branch.
   --skip-preflight         Dry run only.
@@ -153,9 +153,10 @@ async function applyVerify(context, options) {
     return EXIT.REFUSED;
   }
 
+  // The asset names are the local file names: bwc-<channel>.json, its .minisig, and the setup EXEs.
   const expected = [
-    { name: "manifest.json", file: context.bundle.manifestPath },
-    { name: "manifest.json.minisig", file: context.bundle.signaturePath },
+    { name: path.basename(context.bundle.manifestPath), file: context.bundle.manifestPath },
+    { name: path.basename(context.bundle.signaturePath), file: context.bundle.signaturePath },
     ...context.bundle.installers.map((installer) => ({ name: installer.fileName, file: installer.file })),
   ];
   const missing = expected.filter((entry) => !assetByName(release, entry.name));

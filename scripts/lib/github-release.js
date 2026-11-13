@@ -5,29 +5,23 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 
 import { formatCommand, writeJson } from "./cli.js";
-import { git } from "./release-policy.js";
 
-export function resolveRepo(root, explicit) {
-  let raw = explicit || process.env.GH_REPO || "";
-  if (!raw) {
-    const remote = git(root, ["config", "--get", "remote.origin.url"], { allowFailure: true });
-    if (remote) {
-      const match = remote.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/i);
-      if (match) raw = `${match[1]}/${match[2]}`;
-    }
-  }
-  if (!raw) {
-    // No default repository: a release must name its target, so it cannot reach the wrong one.
-    const failure = new Error(
-      "no GitHub repository: pass --repo owner/name, set GH_REPO, or add a GitHub origin remote",
-    );
-    failure.reason = "repo-invalid";
-    failure.exitCode = 2;
-    throw failure;
-  }
+export const DEFAULT_REPO_OWNER = "BurntToasters";
+export const DEFAULT_REPO_NAME = "better-windows-config";
+
+/**
+ * The repository the release tooling targets: --repo, then GH_REPO, then GH_REPO_OWNER and
+ * GH_REPO_NAME (either one overrides its part), then the BWC default. Empty values count as unset.
+ * The git origin remote is never read, so a fork cannot redirect a release.
+ */
+export function resolveRepo(explicit, env = process.env) {
+  const raw =
+    explicit ||
+    env.GH_REPO ||
+    `${env.GH_REPO_OWNER || DEFAULT_REPO_OWNER}/${env.GH_REPO_NAME || DEFAULT_REPO_NAME}`;
   const match = raw.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
   if (!match) {
-    const failure = new Error(`--repo must be owner/name; received ${raw}`);
+    const failure = new Error(`repository must be owner/name; received ${raw}`);
     failure.reason = "repo-invalid";
     failure.exitCode = 2;
     throw failure;

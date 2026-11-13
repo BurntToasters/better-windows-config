@@ -55,7 +55,7 @@ Options:
   --dir <path>             D5 artifact directory. Default artifacts/release/<version>.
   --session <path>         Session file. Default artifacts/release/session.json.
   --trusted-key <path>     Public release key. Repeatable.
-  --repo <owner/name>      Default GH_REPO or the origin remote.
+  --repo <owner/name>      Default GH_REPO, then GH_REPO_OWNER and GH_REPO_NAME, then BurntToasters/better-windows-config.
   --root <dir>             Repository root. Default: the checkout this script is in.
   --commit <rev>           Default HEAD. Any other commit is refused (session-commit-mismatch).
   --replace-assets         Delete an existing same-name asset before upload.
