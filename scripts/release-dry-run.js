@@ -25,27 +25,32 @@ import {
   sha256FileStream,
   writeJson,
 } from "./lib/cli.js";
-import { generateKeyPair, loadKeyMaterial, secretKeyNeedsPassword } from "./lib/minisign.js";
+import { generateKeyPair } from "./lib/minisign.js";
 import { publishInventory } from "./lib/publish-inventory.js";
 import { channelForVersion, tryParseSemVer } from "./lib/semver.js";
 import { validateUrl } from "./lib/url-policy.js";
-import { passwordArgumentGiven, resolvePassword } from "./lib/secret-input.js";
-import { assembleBundle, normalizePubDate } from "./assemble-bundle.js";
+import { passwordArgumentGiven } from "./lib/secret-input.js";
+import {
+  assembleBundle,
+  defaultDownloadBaseUrl,
+  defaultNotesUrl,
+  normalizePubDate,
+} from "./assemble-bundle.js";
 import { parsePackageVersion } from "./sync-version-helpers.js";
+import { resolveKeyPassword, secretKeyFromPath } from "./sign-update-manifest.js";
 
 const SCRIPT = "scripts/release-dry-run.js";
 const REPO_ROOT = repoRootFrom(import.meta.url);
 const RIDS = ["win-x64", "win-arm64"];
 const DEFAULT_OUT = path.join("artifacts", "release");
 const INSTALLER_DIR = path.join(REPO_ROOT, "artifacts", "installer");
-const DEFAULT_BASE_URL = "https://example.invalid/bwc";
 const DEFAULT_EXPIRES_HOURS = 168;
 
 function printHelp() {
   console.log(`Usage:
   node ${SCRIPT} [--rid win-x64|win-arm64|all] [--version <semver>] [--channel <stable|beta>]
                  [--dry-run] [--no-build] [--pub-date <utc>] [--expires-hours <n>] [--download-base-url <url>]
-                 [--secret-key <dir|file>] [--password-env <NAME>]
+                 [--notes-url <url>] [--secret-key <dir|file>] [--password-env <NAME>]
                  [--installer-win-x64 <path>] [--installer-win-arm64 <path>]
                  [--current-version <semver>] [--max-age-hours <n>] [--json]
 
@@ -58,9 +63,11 @@ Options:
   --no-build                   Do not build, but do not label the run a dry run.
   --pub-date <utc>             Default now, or SOURCE_DATE_EPOCH. Normalized UTC ending in Z.
   --expires-hours <n>          Signed expiry after the publish time. Default ${DEFAULT_EXPIRES_HOURS}.
-  --download-base-url <url>    Default ${DEFAULT_BASE_URL}. Must be https.
-  --secret-key <dir|file>      Sign with this minisign key instead of the ephemeral test key. The key
-                               must be embedded in TrustedKeys.cs.
+  --download-base-url <url>    Must be https. Default https://github.com/<owner>/<repo>/releases/download/v<version>.
+  --notes-url <url>            Must be https. Default https://github.com/<owner>/<repo>/releases/tag/v<version>.
+  --secret-key <dir|file>      Sign with this key file or folder instead of the ephemeral test key. The key
+                               must be embedded in TrustedKeys.cs. The environment key is not read here;
+                               release:assemble reads TAURI_SIGNING_PRIVATE_KEY.
   --password-env <NAME>        Environment variable with the password of an encrypted --secret-key.
                                A password is never a command-line argument.
   --installer-<rid> <path>     Use an explicit installer file for one RID.
@@ -69,8 +76,8 @@ Options:
   --json                       Print one JSON line summary.
   --help                       Show this help.
 
-Output: artifacts/release/<version>/<channel>/ with manifest.json, manifest.json.minisig,
-manifest.json.sig, installer copies with signatures, publish hashes, assembly.json,
+Output: artifacts/release/<version>/<channel>/ with bwc-<channel>.json, bwc-<channel>.json.minisig,
+bwc-<channel>.json.sig, installer copies with signatures, publish hashes, assembly.json,
 release-plan.json, and validation-report.json. Also artifacts/release/<version>/publish-<rid>.json.
 
 Exit codes: 0 pass, 1 validation refused, 2 usage, 3 input missing, 4 build failed.`);
@@ -84,14 +91,14 @@ function parseRids(value) {
   return [value];
 }
 
-function normalizeBaseUrl(value) {
+function normalizeBaseUrl(value, optionName = "--download-base-url") {
   const checked = validateUrl(value, { requireHttps: true });
   if (!checked.ok) {
-    throw new Error(`--download-base-url is refused: ${checked.detail}`);
+    throw new Error(`${optionName} is refused: ${checked.detail}`);
   }
   const url = checked.url.toString();
   if (url.includes("?") || url.includes("#")) {
-    throw new Error("--download-base-url may not carry a query or fragment");
+    throw new Error(`${optionName} may not carry a query or fragment`);
   }
   return url.replace(/\/+$/, "");
 }
@@ -217,25 +224,28 @@ function chooseInstaller({ rid, version, channel, artifactDir, explicitPath, pub
   };
 }
 
-/** Resolves the signing key: an ephemeral test key, or a key file the caller named. */
+/**
+ * Resolves the signing key: an ephemeral test key, or the key file or folder the caller named. The
+ * environment key is deliberately not read here, so a dry run never touches the release secret.
+ */
 async function signingKey(options) {
   if (!options.secretKey) {
     const pair = generateKeyPair({ comment: "untrusted comment: BWC RELEASE DRY-RUN TEST KEY" });
     return { text: pair.secretKeyText, password: undefined, ephemeral: true, pair };
   }
-  const loaded = loadKeyMaterial(options.secretKey, { kind: "secret" });
+  const loaded = secretKeyFromPath(options.secretKey);
   if (!loaded.ok) {
-    return { error: { reason: loaded.reason, detail: loaded.detail, exitCode: EXIT.MISSING } };
+    return { error: { reason: loaded.reason, detail: loaded.detail, exitCode: loaded.exitCode } };
   }
-  let password;
-  if (secretKeyNeedsPassword(loaded.text)) {
-    const resolved = await resolvePassword({ envName: options.passwordEnv });
-    if (!resolved.ok) {
-      return { error: { reason: resolved.reason, detail: resolved.detail, exitCode: EXIT.USAGE } };
-    }
-    password = resolved.password;
+  const resolved = await resolveKeyPassword({
+    text: loaded.text,
+    source: loaded.source,
+    passwordEnv: options.passwordEnv,
+  });
+  if (!resolved.ok) {
+    return { error: { reason: resolved.reason, detail: resolved.detail, exitCode: EXIT.USAGE } };
   }
-  return { text: loaded.text, password, ephemeral: false };
+  return { text: loaded.text, password: resolved.password, ephemeral: false };
 }
 
 async function run(options) {
@@ -339,13 +349,13 @@ async function run(options) {
     root: REPO_ROOT,
     version: options.version,
     channel,
-    secretKey: key.text,
+    keyText: key.text,
     password: key.password,
-    passwordEnv: options.passwordEnv,
     dryRun: key.ephemeral,
     pubDate: options.pubDate,
     expiresHours: options.expiresHours,
     baseUrl: options.baseUrl,
+    notesUrl: options.notesUrl,
     out: artifactRoot,
     installers: installerFiles,
   });
@@ -476,6 +486,7 @@ function main(argv = process.argv.slice(2)) {
         "pub-date",
         "expires-hours",
         "download-base-url",
+        "notes-url",
         "installer-win-x64",
         "installer-win-arm64",
         "current-version",
@@ -518,7 +529,8 @@ function main(argv = process.argv.slice(2)) {
       channel,
       pubDate: normalizePubDate(parsed.get("pub-date")),
       expiresHours,
-      baseUrl: normalizeBaseUrl(parsed.get("download-base-url") ?? DEFAULT_BASE_URL),
+      baseUrl: normalizeBaseUrl(parsed.get("download-base-url") ?? defaultDownloadBaseUrl(version)),
+      notesUrl: normalizeBaseUrl(parsed.get("notes-url") ?? defaultNotesUrl(version), "--notes-url"),
       explicitInstallers: {
         "win-x64": parsed.get("installer-win-x64"),
         "win-arm64": parsed.get("installer-win-arm64"),

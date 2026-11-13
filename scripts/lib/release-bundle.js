@@ -9,7 +9,7 @@ import {
 } from "./minisign.js";
 import { matchEmbeddedKey } from "./trusted-keys.js";
 import { validateUrl } from "./url-policy.js";
-import { KNOWN_ARCHES, validateManifestBuffer } from "./update-manifest.js";
+import { KNOWN_ARCHES, manifestFileName, validateManifestBuffer } from "./update-manifest.js";
 
 export function installerFilesFromManifest(directory, manifest) {
   const files = {};
@@ -66,7 +66,7 @@ export async function loadReleaseBundle(options) {
   const artifactDir = path.resolve(options.dir);
   const errors = [];
   const checks = [];
-  const manifestPath = path.join(artifactDir, "manifest.json");
+  const manifestPath = path.join(artifactDir, manifestFileName(options.channel));
   const signaturePath = `${manifestPath}.minisig`;
 
   if (!fs.existsSync(artifactDir) || !fs.statSync(artifactDir).isDirectory()) {

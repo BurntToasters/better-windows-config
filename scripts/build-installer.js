@@ -7,6 +7,10 @@
  * installer/bwc.nsi, run makensis, and write artifacts/installer/<name>-setup.json with the size and
  * SHA-256 of the EXE.
  *
+ * Authenticode signing (unless SKIP_WIN_CODESIGN=1, exactly): the BWC binaries in the publish folder are
+ * signed in place before the payload is listed. NSIS signs the setup EXE and the uninstaller through
+ * !finalize and !uninstfinalize. Then verify-windows-authenticode.ps1 checks every signed file.
+ *
  * --dry-run prints the exact makensis command line and exits 0 without NSIS, a publish, or any write.
  */
 import { spawnSync } from "node:child_process";
@@ -17,6 +21,12 @@ import { fileURLToPath } from "node:url";
 import { isDirectExecutionOf } from "./direct-execution.mjs";
 import { publishFolderName } from "./flavor-metadata.js";
 import { generateNugetNotices } from "./generate-nuget-licenses.js";
+import {
+  bwcSigningTargets,
+  missingSigningVariables,
+  SKIP_ENV,
+  signingPolicy,
+} from "./release-policy.js";
 import { parsePackageVersion } from "./sync-version-helpers.js";
 
 const SCRIPT = "scripts/build-installer.js";
@@ -46,6 +56,11 @@ const RESERVED_ROOT_NAMES = new Set([
   "uninstall.exe",
 ]);
 const RESERVED_DIRECTORY = "bwc-tools";
+const SIGN_SCRIPT = path.join(REPO_ROOT, "scripts", "windows-artifact-sign.ps1");
+const VERIFY_SCRIPT = path.join(REPO_ROOT, "scripts", "verify-windows-authenticode.ps1");
+const SETUP_COMMAND = "npm run setup:win:artifact-signing";
+// The NSIS defines that turn signing on (see installer/bwc.nsi). The audit checks them in both modes.
+export const SIGNING_DEFINE_NAMES = Object.freeze(["BWC_SIGN", "BWC_SIGN_SCRIPT", "BWC_SIGN_UNINST_COPY"]);
 
 function printHelp() {
   console.log(`Usage:
@@ -60,6 +75,9 @@ Options:
   --version <semver> Default: package.json version. Accepts X.Y.Z or X.Y.Z-beta.N.
   --dry-run          Print the exact makensis command line and exit 0. NSIS is not needed.
   --help             Show this help.
+
+Signing: enforced unless SKIP_WIN_CODESIGN=1 (exactly). It needs the AZURE_* variables and the
+Artifact Signing Client Tools (${SETUP_COMMAND}, once as Administrator). See docs/installer.md.
 
 Exit codes: 0 built (or dry run), 1 build or compile failure, 2 bad arguments,
 ${EXIT_NSIS_MISSING} NSIS not found or older than 3.10.
@@ -309,6 +327,139 @@ export function makensisArgs({ defines, scriptPath }) {
   return ["/V2", ...defines.map(([name, value]) => (value === true ? `/D${name}` : `/D${name}=${value}`)), scriptPath];
 }
 
+/** The signing state of one run: enforced unless SKIP_WIN_CODESIGN=1, and where the uninstaller copy goes. */
+export function signingPlanFor(names, env = process.env) {
+  const policy = signingPolicy(env);
+  return {
+    enforced: !policy.skip,
+    warning: policy.warning,
+    uninstallerCopy: path.join(names.work, "uninstaller-signed.exe"),
+  };
+}
+
+/** The NSIS defines for signing. Empty when signing is skipped, so bwc.nsi compiles without the hooks. */
+export function signingDefines({ enabled, scriptPath, uninstallerCopy }) {
+  if (!enabled) return [];
+  return [
+    ["BWC_SIGN", true],
+    ["BWC_SIGN_SCRIPT", scriptPath],
+    ["BWC_SIGN_UNINST_COPY", uninstallerCopy],
+  ];
+}
+
+/** A path that cannot be placed safely in an NSIS string or a PowerShell command. Returns null when fine. */
+export function signingPathProblem(filePath) {
+  if (/["'$%`\r\n]/.test(filePath)) {
+    return `path has a character that cannot go into the signing command: ${JSON.stringify(filePath)}`;
+  }
+  return null;
+}
+
+/** Absolute paths of the BWC binaries in the publish folder root that signing covers. */
+export function publishSigningTargets(publishDir) {
+  const names = fs
+    .readdirSync(publishDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name);
+  return bwcSigningTargets(names).map((name) => path.join(publishDir, name));
+}
+
+/** Runs one of the PowerShell scripts. Output is captured; signingFailure prints its tail on failure. */
+function runSigningScript(scriptPath, args) {
+  const result = spawnSync(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath, ...args],
+    { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 16 * 1024 * 1024, windowsHide: true },
+  );
+  return {
+    status: result.status,
+    error: result.error ?? null,
+    output: `${result.stdout ?? ""}\n${result.stderr ?? ""}`,
+  };
+}
+
+function signingFailure(message, result) {
+  for (const line of tailLines(result.output, 30)) {
+    console.error(`  ${line}`);
+  }
+  const detail = result.error ? result.error.message : `exit code ${result.status}`;
+  return new Error(`${message} (${detail})`);
+}
+
+/**
+ * Fails before NSIS and before any file is signed. It names the missing variables (never their values)
+ * or points at the one-time client tools setup. Runs only when signing is enforced.
+ */
+export function signingPreflight() {
+  if (process.platform !== "win32") {
+    throw new Error(`Authenticode signing runs on Windows only. Set ${SKIP_ENV}=1 for an unsigned build.`);
+  }
+  const missing = missingSigningVariables(process.env);
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing Azure Artifact Signing environment variables: ${missing.join(", ")}. ` +
+        `Copy them from the .env, or set ${SKIP_ENV}=1 for an unsigned build.`,
+    );
+  }
+  const result = runSigningScript(SIGN_SCRIPT, ["-CheckOnly"]);
+  if (result.error || result.status !== 0) {
+    throw signingFailure(
+      "Artifact Signing is not ready. If the client tools are not installed, run " +
+        `${SETUP_COMMAND} once as Administrator`,
+      result,
+    );
+  }
+}
+
+/** Signs BWC's own binaries in the publish folder, in place. Returns their absolute paths. */
+function signPublishBinaries(publishDir) {
+  const targets = publishSigningTargets(publishDir);
+  if (targets.length === 0) {
+    throw new Error(`no BWC binaries to sign were found in ${relativeToRepo(publishDir)}`);
+  }
+  for (const file of targets) {
+    const name = path.basename(file);
+    const result = runSigningScript(SIGN_SCRIPT, ["-FilePath", file]);
+    if (result.error || result.status !== 0) {
+      throw signingFailure(`Authenticode signing failed for ${name}`, result);
+    }
+    console.log(`build-installer: signed ${name}`);
+  }
+  return targets;
+}
+
+/** Checks each file with verify-windows-authenticode.ps1. One call per file keeps the arguments simple. */
+function verifySigned(files) {
+  for (const file of files) {
+    const result = runSigningScript(VERIFY_SCRIPT, ["-Files", file]);
+    if (result.error || result.status !== 0) {
+      throw signingFailure(`Authenticode verification failed for ${path.basename(file)}`, result);
+    }
+    console.log(`build-installer: verified ${path.basename(file)}`);
+  }
+}
+
+/** Prints the signing part of the dry run. Nothing is signed, and no tool or secret is read. */
+function printSigningPlan({ signing, publishDir, publishPresent, names }) {
+  if (!signing.enforced) {
+    console.log(`  signing: skipped (${SKIP_ENV}=1); nothing is signed or verified`);
+    return;
+  }
+  console.log(`  signing: enforced (${SKIP_ENV} is not 1)`);
+  if (signing.warning) console.log(`  signing: ${signing.warning}`);
+  const missing = missingSigningVariables(process.env);
+  if (missing.length > 0) {
+    console.log(`  signing: missing ${missing.join(", ")}; a real run stops here`);
+  }
+  const targets = publishPresent ? publishSigningTargets(publishDir).map((file) => path.basename(file)) : [];
+  console.log(
+    `  would sign (publish): ${targets.length > 0 ? targets.join(", ") : "none yet; the publish folder is missing"}`,
+  );
+  console.log(`  would sign (setup EXE, !finalize): ${relativeToRepo(names.setup)}`);
+  console.log(`  would sign (uninstaller, !uninstfinalize): copy to ${relativeToRepo(signing.uninstallerCopy)}`);
+  console.log("  would verify: the signed publish files, the setup EXE, and the uninstaller copy");
+}
+
 /**
  * Files the installer cannot work without. BwcUpdate.exe is the one the installer runs for the close
  * step, so a publish without it cannot produce a working upgrade.
@@ -374,7 +525,17 @@ export function auditNsisSource({ scriptPath, installerDir, defines, payloadText
   return problems;
 }
 
-function buildDefines({ version, rid, flavor, outputPath, payloadPath, noticesPath, estimatedKb, updaterPath }) {
+function buildDefines({
+  version,
+  rid,
+  flavor,
+  outputPath,
+  payloadPath,
+  noticesPath,
+  estimatedKb,
+  updaterPath,
+  signing,
+}) {
   const parsed = parsePackageVersion(version);
   const defines = [
     ["BWC_VERSION", version],
@@ -393,6 +554,13 @@ function buildDefines({ version, rid, flavor, outputPath, payloadPath, noticesPa
   if (flavor === "e2e") {
     defines.push(["BWC_E2E", true]);
   }
+  defines.push(
+    ...signingDefines({
+      enabled: signing.enforced,
+      scriptPath: SIGN_SCRIPT,
+      uninstallerCopy: signing.uninstallerCopy,
+    }),
+  );
   return defines;
 }
 
@@ -446,7 +614,7 @@ function tailLines(text, limit) {
     .slice(-limit);
 }
 
-function printDryRun({ options, names, publishDir, makensis, nsisVersion, payloadPath, noticesPath }) {
+function printDryRun({ options, names, publishDir, makensis, nsisVersion, payloadPath, noticesPath, signing }) {
   const publishPresent = fs.existsSync(path.join(publishDir, "BetterWindowsConfig.exe"));
   let estimatedKb = 0;
   if (publishPresent) {
@@ -464,6 +632,7 @@ function printDryRun({ options, names, publishDir, makensis, nsisVersion, payloa
     noticesPath,
     estimatedKb,
     updaterPath: path.join(publishDir, "BwcUpdate.exe"),
+    signing,
   });
   const args = makensisArgs({ defines, scriptPath: NSIS_SCRIPT });
   const command = [makensis.path ?? MAKENSIS, ...args].map(quoteForDisplay).join(" ");
@@ -472,7 +641,8 @@ function printDryRun({ options, names, publishDir, makensis, nsisVersion, payloa
   const problems = auditNsisSource({
     scriptPath: NSIS_SCRIPT,
     installerDir: path.dirname(NSIS_SCRIPT),
-    defines: defines.map(([name]) => name),
+    // Signing defines are checked in both modes: bwc.nsi uses them only inside !ifdef BWC_SIGN.
+    defines: [...defines.map(([name]) => name), ...SIGNING_DEFINE_NAMES],
     // With a publish folder, the real file list is checked. Without one, one placeholder file is
     // enough to exercise every macro the payload defines.
     payloadText: buildPayloadNsh(
@@ -497,6 +667,7 @@ function printDryRun({ options, names, publishDir, makensis, nsisVersion, payloa
   if (!publishPresent) {
     console.log("  estimated size: 0 KiB placeholder (computed from the publish folder on a real run)");
   }
+  printSigningPlan({ signing, publishDir, publishPresent, names });
   console.log("makensis command:");
   console.log(command);
   return 0;
@@ -541,10 +712,19 @@ function main(argv = process.argv) {
     }
   }
 
+  const signing = signingPlanFor(names);
+  const signingPathIssue = signing.enforced
+    ? signingPathProblem(SIGN_SCRIPT) ?? signingPathProblem(signing.uninstallerCopy)
+    : null;
+
   const makensis = findMakensis();
   if (options.dryRun) {
+    if (signingPathIssue) {
+      console.error(`build-installer: FAIL: ${signingPathIssue}`);
+      return 1;
+    }
     const nsisVersion = makensis.path ? readNsisVersion(makensis.path) : null;
-    return printDryRun({ options, names, publishDir, makensis, nsisVersion, payloadPath, noticesPath });
+    return printDryRun({ options, names, publishDir, makensis, nsisVersion, payloadPath, noticesPath, signing });
   }
 
   if (!makensis.path) {
@@ -588,6 +768,29 @@ function main(argv = process.argv) {
   // Remove the previous result first, so a failure below never leaves an old setup that looks new.
   fs.rmSync(names.setup, { force: true });
   fs.rmSync(names.record, { force: true });
+  fs.rmSync(signing.uninstallerCopy, { force: true });
+
+  // Signing is checked before any publish or NSIS work, so a missing variable or tool fails fast.
+  if (signing.enforced) {
+    if (signingPathIssue) {
+      writeRecord(failRecord(signingPathIssue));
+      console.error(`build-installer: FAIL: ${signingPathIssue}`);
+      return 1;
+    }
+    if (signing.warning) console.warn(`build-installer: ${signing.warning}`);
+    try {
+      signingPreflight();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      writeRecord(failRecord(message));
+      console.error(`build-installer: FAIL: ${message}`);
+      return 1;
+    }
+  } else {
+    console.warn(
+      `build-installer: ${SKIP_ENV}=1; the BWC binaries, the setup EXE, and the uninstaller are NOT signed.`,
+    );
+  }
 
   if (!ensurePublish({ rid, flavor, publishDir })) {
     const message = `dotnet-build failed for ${publishName}`;
@@ -598,11 +801,17 @@ function main(argv = process.argv) {
   try {
     fs.mkdirSync(names.work, { recursive: true });
     generateNugetNotices({ rid, outPath: noticesPath });
-    const files = listPublishFiles(publishDir);
+    let files = listPublishFiles(publishDir);
     validatePayload(files);
     const missingFiles = REQUIRED_PUBLISH_FILES.filter((name) => !files.some((file) => file.rel === name));
     if (missingFiles.length > 0) {
       throw new Error(`the publish folder is missing ${missingFiles.join(", ")}; run scripts/dotnet-build.js again`);
+    }
+    // Signing changes the file sizes, so the payload is listed again after it.
+    let signedPublish = [];
+    if (signing.enforced) {
+      signedPublish = signPublishBinaries(publishDir);
+      files = listPublishFiles(publishDir);
     }
     const payloadBytes = files.reduce((sum, file) => sum + file.size, 0);
     const noticesBytes = fs.statSync(noticesPath).size;
@@ -619,11 +828,12 @@ function main(argv = process.argv) {
       noticesPath,
       estimatedKb,
       updaterPath: path.join(publishDir, "BwcUpdate.exe"),
+      signing,
     });
     const problems = auditNsisSource({
       scriptPath: NSIS_SCRIPT,
       installerDir: path.dirname(NSIS_SCRIPT),
-      defines: defines.map(([name]) => name),
+      defines: [...defines.map(([name]) => name), ...SIGNING_DEFINE_NAMES],
       payloadText: buildPayloadNsh(files, { rid, flavor }),
     });
     if (problems.length > 0) {
@@ -652,6 +862,14 @@ function main(argv = process.argv) {
       return 1;
     }
 
+    // The setup EXE and the uninstaller copy were signed by NSIS. The publish binaries were signed above.
+    const signedFiles = signing.enforced
+      ? [...signedPublish, names.setup, signing.uninstallerCopy]
+      : [];
+    if (signing.enforced) {
+      verifySigned(signedFiles);
+    }
+
     const stat = fs.statSync(names.setup);
     const record = {
       schema: 1,
@@ -665,7 +883,8 @@ function main(argv = process.argv) {
       file: relativeToRepo(names.setup),
       size: stat.size,
       sha256: sha256File(names.setup),
-      signed: false,
+      signed: signing.enforced,
+      signedFiles: signedFiles.map((file) => path.basename(file)),
       publishDir: relativeToRepo(publishDir),
       payload: { files: files.length, bytes: payloadBytes },
       notices: {

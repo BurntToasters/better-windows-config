@@ -30,14 +30,17 @@ Options for `scripts/build-installer.js`:
 | `--rid win-x64\|win-arm64` | Required. Selects the publish folder and the architecture check. |
 | `--flavor ship\|e2e` | Default `ship`. `e2e` builds the test variant (see below). |
 | `--version <semver>` | Default: `package.json` version. Accepts `X.Y.Z` or `X.Y.Z-beta.N`. |
-| `--dry-run` | Checks the NSIS source (includes and defines), prints the exact `makensis` command line, and exits `0`. NSIS is not needed. |
+| `--dry-run` | Checks the NSIS source (includes and defines), prints the signing plan and the exact `makensis` command line, and exits `0`. NSIS is not needed. |
 
-A real run does these steps in order: it checks for NSIS, removes the previous result, reuses
+A real run does these steps in order: it checks for NSIS, removes the previous result, checks the
+signing variables and the Artifact Signing Client Tools (unless `SKIP_WIN_CODESIGN=1`), reuses
 `publish/<rid>` when the last publish passed or runs `scripts/dotnet-build.js`, requires
-`BetterWindowsConfig.exe`, `BwcRegedit.exe`, and `BwcUpdate.exe` in the publish folder, generates
-the notices, writes the payload include, checks the NSIS source, runs `makensis`, and writes a JSON
-record next to the EXE. The record holds the size, the SHA-256 of the EXE and of the notices, the
-payload file count, and the NSIS version.
+`BetterWindowsConfig.exe`, `BwcRegedit.exe`, and `BwcUpdate.exe` in the publish folder, signs the BWC
+binaries in that folder, generates the notices, writes the payload include, checks the NSIS source,
+runs `makensis` (which signs the setup EXE and the uninstaller), verifies every signed file, and writes
+a JSON record next to the EXE. The record holds the size, the SHA-256 of the EXE and of the notices, the
+payload file count, the NSIS version, and the list of signed files. Signing is described in
+"Signing and what remains" below and in `docs/RELEASE.md`.
 
 Exit codes: `0` built, `1` build or compile failure, `2` bad arguments, `3` NSIS not found or
 older than 3.10.
@@ -162,15 +165,22 @@ Never publish the E2E installer. It is for tests only.
 
 ## Signing and what remains
 
-The installer is not signed. Windows SmartScreen warns on an unsigned download. The release
-signing key belongs to the user, and signing belongs to the release steps (D8).
+The installer is Authenticode-signed when signing is enforced (the default). The BWC binaries, the setup
+EXE, and the uninstaller are signed with Azure Artifact Signing, and every one is verified after the
+build. Without signing, Windows SmartScreen warns on the download. The one-time client tools setup and
+the variables are in `docs/RELEASE.md`, "Windows code signing (Azure Artifact Signing)".
+
+`SKIP_WIN_CODESIGN=1` (exactly) builds an unsigned installer for testing. A build for release must not
+set it. The record then shows `signed: false`.
 
 Still to do, and not verified on this machine (NSIS is not installed here):
 
 1. Install NSIS 3.10+ and run the first compile of `installer/bwc.nsi`. The NSIS script, the
    include, and the generated payload were written without a compiler. `build-installer.js --dry-run`
    checks the includes, the defines, the macros, and the function calls, but it does not compile the
-   script. The first compile is part of acceptance.
+   script. The first compile is part of acceptance. It also confirms the `!finalize` and
+   `!uninstfinalize` lines of the signing hook (see "Authenticode signing" in
+   `docs/failure-modes/installer.md`).
 2. Check that the Start menu AUMID write works on this machine. `bwc-set-aumid.ps1` reads the value
    back and exits `4` on mismatch, and it also exits `4` under Constrained Language Mode, which blocks
    the `Add-Type` it uses. Either case only logs a warning.
@@ -179,8 +189,9 @@ Still to do, and not verified on this machine (NSIS is not installed here):
 4. Add the E2E install, update, and uninstall test. It should run the E2E installer with a unique
    `/RUNID=` and a temporary `/SHORTCUTS=` and `/D=` folder, then check the shortcuts, the uninstall
    key, the AUMIDs, and the uninstall. It should also produce a verifiable artifact.
-5. Sign the EXE and the manifest with the release key (D8), and record the signatures in the
-   manifest.
+5. Run the Authenticode signing once on the release VM (`npm run setup:win:artifact-signing`, as
+   Administrator), then build a signed installer and confirm the verify step passes. The minisign
+   signatures of the manifest and the installer are separate (D8, `docs/RELEASE.md`).
 6. Decide whether to offer a per-machine install (it would need elevation and a different uninstall
    root).
 7. Test the updater end to end against a real installer, including the case where an app stays

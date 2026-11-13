@@ -223,7 +223,8 @@ Remaining:
 - D10 first beta dry run `0.1.0-beta.1` to a draft release. The user runs it on a release VM.
 - R15 parity audit: not started. Classify every inventory row as pass, declared difference, or
   gap, and write `docs/parity/regedit-audit.md`. Run it after the remaining packages.
-- `docs/RELEASE.md`: not written.
+- `docs/RELEASE.md` is written. Its "User-owned steps" section lists the key creation (minisign
+  `-G`, `TrustedKeys.cs`, `IsPlaceholder = false`) and the update URLs (`UpdateSources.cs`).
 - x64 at 100% scale, and CI green on x64 for HEAD. Not confirmed.
 - Standard-user E2E pass, elevated suites (S4 interop, hive round trip), and remote registry tests
   against a second machine.

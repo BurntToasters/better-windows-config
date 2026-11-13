@@ -132,7 +132,7 @@ lives under `artifacts/release/session.json`, which is git-ignored.
 | G12 | Publish is attempted with no draft | Publish creates a release | Refuse `draft-missing`. Exit 1. |
 | G13 | `gh` is missing or exits non-zero under `--apply` | Silent partial release | Refuse `gh-missing` or `gh-failed`. Exit 4. |
 | G14 | `--commit` does not resolve to HEAD, or HEAD is not the session commit | Release from a commit that was not verified | Refuse `session-commit-mismatch`. Exit 1. A draft never falls back to the literal target `HEAD`. |
-| G15 | No `--repo`, no `GH_REPO`, and no `origin` remote with a GitHub URL | Release sent to a hard-coded repository | Refuse `repo-invalid`. Exit 2. The tooling never assumes an owner or name. |
+| G15 | Repository name is not `owner/name` after `--repo`, `GH_REPO`, `GH_REPO_OWNER`, and `GH_REPO_NAME` are resolved | Release sent to a malformed or unintended target | Refuse `repo-invalid`. Exit 2. The default is `BurntToasters/better-windows-config` (see L1). The `origin` remote is never read. |
 | G16 | Draft asset has the same name and size as the local file but a different SHA-256 | Size-only comparison accepts a tampered asset | Compare by the SHA-256 of the downloaded asset, never by size alone. A difference refuses `asset-conflict` unless `--replace-assets`. |
 | G17 | GitHub reports no digest for a draft asset | Digest-less comparison is unverified | The tool downloads the asset and hashes it. The result is the same comparison as G16. |
 | G18 | An asset id, name, or digest changes between verification and the publish PATCH | Race with another upload or edit | `release-publish --apply` re-reads the release immediately before the PATCH and refuses `asset-changed` when any asset id, name, or digest differs from the verified set. No PATCH is sent. Exit 1. |
@@ -141,12 +141,58 @@ lives under `artifacts/release/session.json`, which is git-ignored.
 requires a fresh verification of the downloaded draft assets before the PATCH that clears
 `draft`.
 
+## K. Signing key from the environment (`TAURI_SIGNING_PRIVATE_KEY`)
+
+`scripts/sign-update-manifest.js sign` and `scripts/assemble-bundle.js` take the key from
+`--key` or `--secret-key` (a file or folder path only), or else from `TAURI_SIGNING_PRIVATE_KEY`.
+The variable holds one of: the base64 of a whole minisign secret key file (what
+`tauri signer generate` prints), the raw minisign key file text, or a path. A password comes from
+`--password-env <NAME>` when given. Otherwise an env key takes `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+(an empty value is valid for an unencrypted key). A file key without `--password-env` prompts on a
+terminal. The key and the password are never printed, logged, written unencrypted, or put on a
+command line. A key given as text on the command line is refused.
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| K1 | No `--key`, no `--secret-key`, and `TAURI_SIGNING_PRIVATE_KEY` is unset or empty | Signing with no key, or with a stale default | Refuse `key-missing`. Exit 2. Nothing is written. |
+| K2 | Env value is not minisign text, not a path, and not canonical base64 of minisign text | A typo or a truncated paste signs nothing useful, or is read as another format | Refuse `key-malformed`. Exit 1. The message names the variable, never its value. |
+| K3 | Env value is larger than 16 KiB | Unbounded input | Refuse `key-malformed`. Exit 1. |
+| K4 | Key text passed as a command-line argument (`--key` or `--secret-key` that is not an existing path) | The secret reaches shell history and the process list | Refuse `key-unreadable`. Exit 3. The value is not echoed. |
+| K5 | `--key` or `--secret-key` names a path that is missing, or a folder with no `minisign.key` | Silent use of another key | Refuse `key-unreadable`. Exit 3. |
+| K6 | Encrypted key with `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` wrong | A wrong password looks like a valid key | Refuse `wrong-password`. Exit 1. Nothing is written. |
+| K7 | Encrypted key with `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` unset or empty | A blank password, or a prompt in an unattended run | Refuse `password-missing`. Exit 2. No prompt is shown for an env key. |
+| K8 | Unencrypted key with an empty or unset password variable | Valid key refused for no reason | Signs. The password is not used for an unencrypted key. |
+| K9 | Env key is not one of the keys embedded in `TrustedKeys.cs` (assemble, not dry run) | A foreign key signs a release bundle | Refuse `embedded-key-mismatch`. Exit 1. `sign` alone does not check trust; the bundle, preflight, draft, and publish gates do. |
+| K10 | Failing run prints the key or the password | Secret in logs or CI output | Every refusal above omits the value. The self-test checks stdout and stderr for the key text and the password. |
+| K11 | `--password-env` names a variable and `TAURI_SIGNING_PRIVATE_KEY` is also set | Ambiguous password source | The named variable wins. The Tauri password variable is read only for an env key with no `--password-env`. |
+| K12 | Decoded key text is not UTF-8, or a CRLF pair appears in a raw or decoded key | Two readers disagree on the key bytes | Non-UTF-8 refuses `key-malformed`. CRLF is normalized to LF before parsing. A lone CR inside a line refuses `malformed-secret-key`. Exit 1. |
+| K13 | Encrypted layout differs from what minisign writes | A real key cannot be read, or reads wrong | Not checked here. The first real key is tested with the user's own minisign (existing D8 caveat, see `docs/RELEASE.md`). |
+
+## L. Repository and hosting names
+
+Release assets are named by channel. A stable manifest is `bwc-stable.json` with
+`bwc-stable.json.minisig`. A beta manifest is `bwc-beta.json` with `bwc-beta.json.minisig`. The
+installers keep their versioned names, so no two releases share an asset name. The
+Hub reads the stable manifest from `https://github.com/BurntToasters/better-windows-config/releases/latest/download/bwc-stable.json`.
+The beta URL is empty until a beta channel is published.
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| L1 | `--repo`, `GH_REPO`, `GH_REPO_OWNER`, and `GH_REPO_NAME` are all unset | Release sent to a fork's origin, or nowhere | Use `BurntToasters/better-windows-config`. `GH_REPO_OWNER` or `GH_REPO_NAME` alone overrides one part. Empty values count as unset. The `origin` remote is not read. |
+| L2 | Resolved repository is not `owner/name` with safe characters | Malformed API path | Refuse `repo-invalid`. Exit 2. |
+| L3 | `--download-base-url` is not https, or carries a query or fragment | Installer URLs point outside the release | Refuse `url-rejected` (manifest) or exit 2 (dry run). The default is `https://github.com/<owner>/<repo>/releases/download/v<version>`. |
+| L4 | Stable manifest is published as the beta asset (or the reverse) | A stable manifest offered to beta users | The signed `channel:` and the validator decide (`channel-mismatch`, V26). The file name is not trusted. |
+| L5 | Draft exists for `v<version>` | Draft assets become visible to the Hub | Drafts are invisible to `releases/latest/download`. The Hub sees a release only after publish, which is the only point at which `bwc-stable.json` changes. |
+| L6 | Beta publish | A prerelease changes the stable manifest URL | `releases/latest` ignores prereleases, so the stable URL is unchanged by a beta. |
+| L7 | Installer URL file name is not an asset of the release | The Hub downloads a 404 | Draft and verify refuse `asset-missing` (G10). The installer URL file name is the asset name. |
+| L8 | Notes URL for a version | A broken notes link | `notesUrl` defaults to `https://github.com/<owner>/<repo>/releases/tag/v<version>`, and `--notes-url` overrides it. |
+
 ## F. Not enforced here (user duties)
 
 | ID | Case | Note |
 |----|------|------|
 | U1 | Real minisign release key | The user creates it and replaces `TrustedKeys.cs`. The built-in key is a placeholder. The keygen in this tool makes unencrypted test keys only. |
-| U2 | Hosting base URL | The dry-run harness defaults to `https://example.invalid/bwc/<version>`. The user chooses the real https origin and path. |
+| U2 | Hosting | Releases are GitHub release assets (section L). The user runs `gh auth login` on the release VM and keeps the repository owner and name in `.env` or the default. |
 | U3 | Windows Authenticode signing | D8, and it needs a certificate. The scripts here sign update manifests and installers with minisign only. |
 | U4 | NSIS compile | D1. The dry-run harness never needs it, and a real release does. |
 | U5 | Release VM | D10. The user runs `--apply` there, with a real `gh` login and the real release key. |

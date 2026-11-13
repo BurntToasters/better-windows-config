@@ -52,7 +52,7 @@ Options:
   --session <path>         Session file. Default artifacts/release/session.json.
   --trusted-key <path>     Public release key. Repeatable. Required.
   --root <dir>             Repository root. Default: the checkout this script is in.
-  --repo <owner/name>      Default GH_REPO or the origin remote. No default otherwise (repo-invalid).
+  --repo <owner/name>      Default GH_REPO, then GH_REPO_OWNER and GH_REPO_NAME, then BurntToasters/better-windows-config.
   --commit <rev>           Default HEAD.
   --allow-detached         Allow a detached HEAD contained in the expected branch.
   --skip-preflight         Dry run only.

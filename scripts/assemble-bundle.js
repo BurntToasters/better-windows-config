@@ -3,41 +3,42 @@
  * Assembles one channel's update bundle: copies each installer, signs it, writes the manifest,
  * signs the manifest, and validates the result with the same validator the updater uses.
  *
- * Output: <out>/<channel>/ holds manifest.json, manifest.json.minisig, manifest.json.sig, each
+ * Output: <out>/<channel>/ holds bwc-<channel>.json and bwc-<channel>.json.minisig (the GitHub
+ * asset names; stable is bwc-stable.json), bwc-<channel>.json.sig (the base64 envelope), each
  * installer with its .minisig and .sig, and assembly.json (a summary with no secret material).
- * One manifest per channel: the channel is part of the folder and of the signed comment.
+ * One manifest per channel: the channel is part of the folder, the file name, and the signed comment.
  *
  * Signed comments (exact):
  *   manifest:  version:<semver> channel:<stable|beta> expires:<yyyy-MM-ddTHH:mm:ssZ>
  *   installer: version:<semver> arch:<win-x64|win-arm64>
  *
- * The signing key must be one of the keys embedded in src/Bwc.Update/Signing/TrustedKeys.cs,
- * matched by key id and key bytes. --dry-run lifts that rule for a test key and labels the output.
+ * The signing key is --secret-key <path>, else TAURI_SIGNING_PRIVATE_KEY (see sign-update-manifest.js).
+ * It must be one of the keys embedded in src/Bwc.Update/Signing/TrustedKeys.cs, matched by key id and
+ * key bytes. --dry-run lifts that rule for a test key and labels the output.
  */
 import fs from "node:fs";
 import path from "node:path";
 
 import { isDirectExecutionOf } from "./direct-execution.mjs";
 import { EXIT, describeError, exitCodeForErrors, parseArguments, printRefusals, relativeTo, repoRootFrom, sha256FileStream, writeJson } from "./lib/cli.js";
-import {
-  envelope,
-  isPlaceholderKeyText,
-  loadKeyMaterial,
-  parseSecretKeyText,
-  publicKeyFingerprint,
-  secretKeyNeedsPassword,
-  signFile,
-} from "./lib/minisign.js";
-import { passwordArgumentGiven, resolvePassword } from "./lib/secret-input.js";
+import { envelope, isPlaceholderKeyText, parseSecretKeyText, publicKeyFingerprint, signFile } from "./lib/minisign.js";
+import { resolveRepo } from "./lib/github-release.js";
+import { passwordArgumentGiven } from "./lib/secret-input.js";
 import { channelForVersion } from "./lib/semver.js";
-import { buildManifest, manifestTrustedComment, serializeManifest, validateManifestBuffer } from "./lib/update-manifest.js";
+import {
+  buildManifest,
+  manifestFileName,
+  manifestTrustedComment,
+  serializeManifest,
+  validateManifestBuffer,
+} from "./lib/update-manifest.js";
 import { matchEmbeddedKey, readTrustedKeysFile } from "./lib/trusted-keys.js";
 import { validateUrl } from "./lib/url-policy.js";
 import { parsePackageVersion } from "./sync-version-helpers.js";
+import { resolveKeyPassword, resolveSigningKey } from "./sign-update-manifest.js";
 
 const SCRIPT = "scripts/assemble-bundle.js";
 const REPO_ROOT = repoRootFrom(import.meta.url);
-const DEFAULT_BASE_URL = "https://example.invalid/bwc";
 const DEFAULT_EXPIRES_HOURS = 168;
 const MAX_EXPIRES_HOURS = 87600;
 const PUBDATE_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
@@ -49,26 +50,44 @@ const RID_ARCH = [
 function printHelp() {
   console.log(`Usage:
   node ${SCRIPT} --version <semver> --installer-win-x64 <file> [--installer-win-arm64 <file>]
-                 --secret-key <dir|file> [--password-env <NAME>] [--root <repo>] [--out <dir>]
-                 [--pub-date <utc>] [--expires-hours <n>] [--download-base-url <url>] [--dry-run] [--json]
+                 [--secret-key <dir|file>] [--password-env <NAME>] [--root <repo>] [--out <dir>]
+                 [--pub-date <utc>] [--expires-hours <n>] [--download-base-url <url>]
+                 [--notes-url <url>] [--dry-run] [--json]
 
 Options:
   --version <semver>           Required. X.Y.Z or X.Y.Z-beta.N. The channel follows from it.
   --installer-win-x64 <file>   Setup EXE for win-x64. At least one installer option is required.
   --installer-win-arm64 <file> Setup EXE for win-arm64.
-  --secret-key <dir|file>      minisign secret key (minisign.key), plain or encrypted.
-  --password-env <NAME>        Environment variable with the key password. Never an argument.
+  --secret-key <dir|file>      minisign secret key file or folder. Without it, the key comes from
+                               TAURI_SIGNING_PRIVATE_KEY (base64 of the key file, the raw text, or a path).
+                               Key text is never a command-line argument.
+  --password-env <NAME>        Environment variable with the key password. Never an argument. For an
+                               environment key, TAURI_SIGNING_PRIVATE_KEY_PASSWORD is used by default.
   --root <repo>                Repository whose src/Bwc.Update/Signing/TrustedKeys.cs lists the keys.
                                Default: this checkout.
   --out <dir>                  Output root. Default: artifacts/release/<version>.
   --pub-date <utc>             Default now, or SOURCE_DATE_EPOCH. Normalized UTC ending in Z.
   --expires-hours <n>          Signed expiry after the publish time. Default ${DEFAULT_EXPIRES_HOURS}, at most ${MAX_EXPIRES_HOURS}.
-  --download-base-url <url>    Default ${DEFAULT_BASE_URL}. Must be https.
+  --download-base-url <url>    Directory that holds the installer assets. Must be https. Default
+                               https://github.com/<owner>/<repo>/releases/download/v<version>, with the
+                               repository from GH_REPO, GH_REPO_OWNER, and GH_REPO_NAME (see resolveRepo).
+  --notes-url <url>            Release notes page. Must be https. Default
+                               https://github.com/<owner>/<repo>/releases/tag/v<version>.
   --dry-run                    Allow a key that is not embedded (a test key). The output is labelled.
   --json                       Print one JSON line.
   --help                       Show this help.
 
 Exit codes: 0 assembled and validated, 1 refused, 2 usage, 3 input missing, 4 external failure.`);
+}
+
+/** The default installer directory for a version: the GitHub release download page for v<version>. */
+export function defaultDownloadBaseUrl(version) {
+  return `https://github.com/${resolveRepo().slug}/releases/download/v${version}`;
+}
+
+/** The default notes page for a version: the GitHub release tag page. */
+export function defaultNotesUrl(version) {
+  return `https://github.com/${resolveRepo().slug}/releases/tag/v${version}`;
 }
 
 export function normalizePubDate(value) {
@@ -148,31 +167,20 @@ export async function assembleBundle(options) {
   const outRoot = path.resolve(options.out);
   const channelDir = path.join(outRoot, channel);
   const baseUrl = options.baseUrl;
+  const keyText = options.keyText;
 
-  const loaded = loadKeyMaterial(options.secretKey, { kind: "secret" });
-  if (!loaded.ok) {
-    fail(errors, loaded.reason, loaded.detail, EXIT.MISSING);
+  if (typeof keyText !== "string" || keyText.length === 0) {
+    fail(errors, "key-missing", "no secret key text was given", EXIT.USAGE);
     return result;
   }
-  if (isPlaceholderKeyText(loaded.text)) {
+  if (isPlaceholderKeyText(keyText)) {
     fail(errors, "placeholder-key", "the secret key is a placeholder");
     return result;
   }
 
-  // The caller may already hold the password (release-dry-run asks once). Otherwise it is resolved here.
-  let password = options.password;
-  if (password === undefined && secretKeyNeedsPassword(loaded.text)) {
-    const resolved = await resolvePassword({ envName: options.passwordEnv, prompt: options.prompt });
-    if (!resolved.ok) {
-      fail(errors, resolved.reason, resolved.detail, EXIT.USAGE);
-      return result;
-    }
-    password = resolved.password;
-  }
-
   let parsedKey;
   try {
-    parsedKey = parseSecretKeyText(loaded.text, { password });
+    parsedKey = parseSecretKeyText(keyText, { password: options.password });
   } catch (error) {
     fail(errors, error.reason ?? "malformed-secret-key", describeError(error), error.exitCode ?? EXIT.REFUSED);
     return result;
@@ -213,13 +221,15 @@ export async function assembleBundle(options) {
     if (path.resolve(target) !== resolved) {
       fs.copyFileSync(resolved, target);
     }
-    const signatureText = await signFile(target, loaded.text, `version:${version} arch:${architecture}`, { password });
+    const signatureText = await signFile(target, keyText, `version:${version} arch:${architecture}`, {
+      password: options.password,
+    });
     fs.writeFileSync(`${target}.minisig`, signatureText, "utf8");
     fs.writeFileSync(`${target}.sig`, envelope(signatureText), "utf8");
     installers[architecture] = {
       file: target,
       fileName,
-      url: `${baseUrl}/${encodeURIComponent(version)}/${encodeURIComponent(fileName)}`,
+      url: `${baseUrl}/${encodeURIComponent(fileName)}`,
       size: fs.statSync(target).size,
       sha256: await sha256FileStream(target),
       signature: envelope(signatureText),
@@ -230,7 +240,7 @@ export async function assembleBundle(options) {
     version,
     channel,
     pubDate,
-    notesUrl: `${baseUrl}/${encodeURIComponent(version)}/notes`,
+    notesUrl: options.notesUrl,
     installers: Object.fromEntries(
       Object.entries(installers).map(([architecture, entry]) => [
         architecture,
@@ -239,13 +249,13 @@ export async function assembleBundle(options) {
     ),
   });
   const manifestBytes = serializeManifest(manifest);
-  const manifestPath = path.join(channelDir, "manifest.json");
+  const manifestPath = path.join(channelDir, manifestFileName(channel));
   fs.writeFileSync(manifestPath, manifestBytes);
   const manifestSignature = await signFile(
     manifestPath,
-    loaded.text,
+    keyText,
     manifestTrustedComment({ version, channel, expires }),
-    { password },
+    { password: options.password },
   );
   fs.writeFileSync(`${manifestPath}.minisig`, manifestSignature, "utf8");
   fs.writeFileSync(`${manifestPath}.sig`, envelope(manifestSignature), "utf8");
@@ -311,6 +321,7 @@ function parseOptions(argv) {
       "pub-date",
       "expires-hours",
       "download-base-url",
+      "notes-url",
       "out",
       "installer-win-x64",
       "installer-win-arm64",
@@ -334,10 +345,12 @@ function parseOptions(argv) {
   if (Object.keys(installers).length === 0) {
     throw new Error("at least one of --installer-win-x64 or --installer-win-arm64 is required");
   }
-  const secretKey = parsed.get("secret-key");
-  if (!secretKey) throw new Error("--secret-key is required");
-  const baseUrl = validateUrl(parsed.get("download-base-url") ?? DEFAULT_BASE_URL, { requireHttps: true });
+  const baseUrlOption = parsed.get("download-base-url");
+  const baseUrl = validateUrl(baseUrlOption ?? defaultDownloadBaseUrl(version), { requireHttps: true });
   if (!baseUrl.ok) throw new Error(`--download-base-url is refused: ${baseUrl.detail}`);
+  const notesOption = parsed.get("notes-url");
+  const notesUrl = validateUrl(notesOption ?? defaultNotesUrl(version), { requireHttps: true });
+  if (!notesUrl.ok) throw new Error(`--notes-url is refused: ${notesUrl.detail}`);
   const expiresText = parsed.get("expires-hours");
   const expiresHours = expiresText === undefined ? DEFAULT_EXPIRES_HOURS : Number(expiresText);
   if (!Number.isInteger(expiresHours)) throw new Error("--expires-hours must be a whole number of hours");
@@ -345,11 +358,12 @@ function parseOptions(argv) {
     version,
     channel: parsed.get("channel"),
     root: path.resolve(parsed.get("root") ?? REPO_ROOT),
-    secretKey,
+    secretKey: parsed.get("secret-key"),
     passwordEnv: parsed.get("password-env"),
     pubDate: normalizePubDate(parsed.get("pub-date")),
     expiresHours,
     baseUrl: baseUrl.url.toString().replace(/\/+$/, ""),
+    notesUrl: notesUrl.url.toString(),
     out: path.resolve(REPO_ROOT, parsed.get("out") ?? path.join("artifacts", "release", version)),
     installers,
     dryRun: parsed.has("dry-run"),
@@ -375,9 +389,25 @@ async function main(argv = process.argv.slice(2)) {
     return EXIT.OK;
   }
 
+  // The key and password are resolved here, never from argv text. Refusals print no key material.
+  const key = resolveSigningKey({ keyPath: options.secretKey });
+  if (!key.ok) {
+    console.error(`${SCRIPT}: REFUSED [${key.reason}]: ${key.detail}`);
+    return key.exitCode;
+  }
+  const passwordResult = await resolveKeyPassword({
+    text: key.text,
+    source: key.source,
+    passwordEnv: options.passwordEnv,
+  });
+  if (!passwordResult.ok) {
+    console.error(`${SCRIPT}: REFUSED [${passwordResult.reason}]: ${passwordResult.detail}`);
+    return EXIT.USAGE;
+  }
+
   let result;
   try {
-    result = await assembleBundle(options);
+    result = await assembleBundle({ ...options, keyText: key.text, password: passwordResult.password });
   } catch (error) {
     console.error(`${SCRIPT}: ${describeError(error)}`);
     return EXIT.EXTERNAL;

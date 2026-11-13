@@ -30,9 +30,19 @@ const PAST_EXPIRES = "2020-01-02T00:00:00Z";
 const PASSWORD_ENV = "BWC_SELFTEST_KEY_PASSWORD";
 const PASSWORD = "selftest-only-password";
 const FAKE_COMMIT = "0123456789abcdef0123456789abcdef01234567";
+const TAURI_KEY_ENV = "TAURI_SIGNING_PRIVATE_KEY";
+const TAURI_PASSWORD_ENV = "TAURI_SIGNING_PRIVATE_KEY_PASSWORD";
+const DEFAULT_REPO = "BurntToasters/better-windows-config";
+const RELEASE_ENV_NAMES = [TAURI_KEY_ENV, TAURI_PASSWORD_ENV, "GH_REPO", "GH_REPO_OWNER", "GH_REPO_NAME"];
 
+/**
+ * The caller's environment minus the release secrets and repository overrides, so a .env or shell
+ * setting cannot change a case. Each case then adds exactly what it sets.
+ */
 function childEnv(extra = {}, remove = []) {
-  const env = { ...process.env, ...extra };
+  const env = { ...process.env };
+  for (const name of RELEASE_ENV_NAMES) delete env[name];
+  Object.assign(env, extra);
   for (const name of remove) delete env[name];
   return env;
 }
@@ -675,11 +685,11 @@ async function runAssembleCases(temp, fixture, cases) {
     "bundle signed by an embedded encrypted key is assembled",
     assembled,
     cases,
-    "beta/manifest.json and installer signatures",
+    "beta/bwc-beta.json and installer signatures",
   );
 
   const channelDir = path.join(outDir, "beta");
-  const manifestPath = path.join(channelDir, "manifest.json");
+  const manifestPath = path.join(channelDir, "bwc-beta.json");
   const installerName = path.basename(fixture.installerPath);
   const installerCopy = path.join(channelDir, installerName);
   const expectedManifestComment = `trusted comment: ${manifestComment(VERSION, "beta", expiresAfter(PUBDATE, hours))}`;
@@ -690,6 +700,16 @@ async function runAssembleCases(temp, fixture, cases) {
     "manifest trusted comment is exactly version, channel, and expires",
     manifestLines[2] === expectedManifestComment,
     `${manifestLines[2] ?? "(missing)"}`,
+    cases,
+  );
+
+  const writtenManifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, "utf8")) : {};
+  expectCheck(
+    "bundle uses the GitHub release URLs and the channel asset name",
+    writtenManifest.installers?.["win-x64"]?.url ===
+      `https://github.com/${DEFAULT_REPO}/releases/download/v${VERSION}/${path.basename(fixture.installerPath)}` &&
+      writtenManifest.notesUrl === `https://github.com/${DEFAULT_REPO}/releases/tag/v${VERSION}`,
+    `${writtenManifest.installers?.["win-x64"]?.url ?? "(no url)"}`,
     cases,
   );
 
@@ -721,6 +741,161 @@ async function runAssembleCases(temp, fixture, cases) {
     ]),
     cases,
     "validator accepts the bundle the updater reads",
+  );
+}
+
+/**
+ * TAURI_SIGNING_PRIVATE_KEY cases: the `tauri signer generate` form (base64 of the key file), a key
+ * folder path, the refusals, and a check that a failing run prints neither the key nor the password.
+ */
+async function runEnvironmentKeyCases(temp, fixture, cases) {
+  const encryptedKeyText = fs.readFileSync(path.join(fixture.encryptedDir, "minisign.key"), "utf8");
+  const tauriValue = Buffer.from(encryptedKeyText, "utf8").toString("base64");
+  const unencryptedValue = Buffer.from(fixture.keyA.secretKeyText, "utf8").toString("base64");
+  const signInput = fixture.signInput;
+  const publicPath = path.join(temp, "env-public.pub");
+  writeText(publicPath, fixture.keyEPublic);
+  const commentArgs = ["--trusted-comment", `version:${VERSION}`];
+  const signWith = (name, env, extra = []) =>
+    run("scripts/sign-update-manifest.js", ["sign", signInput, ...commentArgs, "--out", path.join(temp, `${name}.minisig`), ...extra], { env });
+
+  expectPass(
+    "Tauri-format encrypted key from the environment signs and verifies",
+    (() => {
+      const signed = signWith("env-tauri", { [TAURI_KEY_ENV]: tauriValue, [TAURI_PASSWORD_ENV]: PASSWORD });
+      if (signed.status !== 0) return signed;
+      return run("scripts/sign-update-manifest.js", [
+        "verify",
+        signInput,
+        "--signature",
+        path.join(temp, "env-tauri.minisig"),
+        "--trusted-key",
+        publicPath,
+      ]);
+    })(),
+    cases,
+    "base64 of the minisign key file, encrypted; the password comes from the Tauri variable",
+  );
+
+  expectPass(
+    "key folder path in the environment signs with the Tauri password",
+    signWith("env-folder", { [TAURI_KEY_ENV]: fixture.encryptedDir, [TAURI_PASSWORD_ENV]: PASSWORD }),
+    cases,
+    "a path to the key folder is read from the environment",
+  );
+
+  expectPass(
+    "unencrypted Tauri-format key signs with an empty password variable",
+    signWith("env-plain", { [TAURI_KEY_ENV]: unencryptedValue, [TAURI_PASSWORD_ENV]: "" }),
+    cases,
+    "an empty password is valid for an unencrypted key",
+  );
+
+  expectRefusal(
+    "encrypted Tauri-format key with a wrong password refused",
+    signWith("env-wrong", { [TAURI_KEY_ENV]: tauriValue, [TAURI_PASSWORD_ENV]: "selftest-wrong-password" }),
+    ["wrong-password"],
+    cases,
+  );
+
+  expectRefusal(
+    "encrypted Tauri-format key with an empty password refused",
+    signWith("env-empty", { [TAURI_KEY_ENV]: tauriValue, [TAURI_PASSWORD_ENV]: "" }),
+    ["password-missing"],
+    cases,
+  );
+
+  expectRefusal(
+    "malformed base64 in the environment refused",
+    signWith("env-malformed", { [TAURI_KEY_ENV]: "!!! not base64 !!!", [TAURI_PASSWORD_ENV]: PASSWORD }),
+    ["key-malformed"],
+    cases,
+  );
+
+  expectRefusal(
+    "base64 of text that is not a minisign key refused",
+    signWith("env-not-key", {
+      [TAURI_KEY_ENV]: Buffer.from("this is not a minisign key\n").toString("base64"),
+      [TAURI_PASSWORD_ENV]: PASSWORD,
+    }),
+    ["key-malformed"],
+    cases,
+  );
+
+  const leak = signWith("env-leak", { [TAURI_KEY_ENV]: tauriValue, [TAURI_PASSWORD_ENV]: "selftest-leak-marker" });
+  const leakOutput = `${leak.stdout}${leak.stderr}`;
+  expectCheck(
+    "failing run prints neither the key nor the password",
+    leak.status !== 0 &&
+      !leakOutput.includes("selftest-leak-marker") &&
+      !leakOutput.includes(tauriValue) &&
+      !leakOutput.includes(encryptedKeyText.split("\n")[1]),
+    `exit ${leak.status}`,
+    cases,
+  );
+
+  expectRefusal(
+    "no key from the command line or the environment refused",
+    run("scripts/sign-update-manifest.js", ["sign", signInput, ...commentArgs]),
+    ["key-missing"],
+    cases,
+  );
+
+  expectRefusal(
+    "key value given as --key on the command line refused",
+    run("scripts/sign-update-manifest.js", ["sign", signInput, "--key", tauriValue, ...commentArgs]),
+    ["key-unreadable"],
+    cases,
+  );
+
+  const repoA = path.join(temp, "env-repo-a");
+  writeRepository(repoA, { embedded: [fixture.keyA.publicKeyText] });
+  expectRefusal(
+    "environment key not in TrustedKeys.cs refused outside a dry run",
+    run("scripts/assemble-bundle.js", [
+      "--root",
+      repoA,
+      "--version",
+      VERSION,
+      "--installer-win-x64",
+      fixture.installerPath,
+      "--pub-date",
+      PUBDATE,
+      "--out",
+      path.join(temp, "env-bundle-refused"),
+    ], { env: { [TAURI_KEY_ENV]: tauriValue, [TAURI_PASSWORD_ENV]: PASSWORD } }),
+    ["embedded-key-mismatch"],
+    cases,
+  );
+
+  const repoE = path.join(temp, "env-repo-e");
+  writeRepository(repoE, { embedded: [fixture.keyEPublic] });
+  const envBundle = path.join(temp, "env-bundle");
+  expectPass(
+    "bundle signed by the environment key is assembled with no --secret-key",
+    run("scripts/assemble-bundle.js", [
+      "--root",
+      repoE,
+      "--version",
+      VERSION,
+      "--installer-win-x64",
+      fixture.installerPath,
+      "--pub-date",
+      PUBDATE,
+      "--expires-hours",
+      "87600",
+      "--out",
+      envBundle,
+    ], { env: { [TAURI_KEY_ENV]: tauriValue, [TAURI_PASSWORD_ENV]: PASSWORD } }),
+    cases,
+    "beta/bwc-beta.json with its .minisig",
+  );
+  expectCheck(
+    "environment bundle is named by channel and carries the GitHub download URL",
+    fs.existsSync(path.join(envBundle, "beta", "bwc-beta.json.minisig")) &&
+      !fs.existsSync(path.join(envBundle, "beta", "manifest.json")),
+    "bwc-beta.json.minisig present, manifest.json absent",
+    cases,
   );
 }
 
@@ -834,8 +1009,8 @@ async function runPolicyCases(temp, fixture, cases) {
 
   const x64Artifact = path.join(temp, "x64-artifact");
   fs.mkdirSync(x64Artifact, { recursive: true });
-  fs.copyFileSync(fixture.primary.manifestPath, path.join(x64Artifact, "manifest.json"));
-  fs.copyFileSync(fixture.primary.signaturePath, path.join(x64Artifact, "manifest.json.minisig"));
+  fs.copyFileSync(fixture.primary.manifestPath, path.join(x64Artifact, "bwc-beta.json"));
+  fs.copyFileSync(fixture.primary.signaturePath, path.join(x64Artifact, "bwc-beta.json.minisig"));
   fs.copyFileSync(
     fixture.installerPath,
     path.join(x64Artifact, "BetterWindowsConfig-0.1.0-beta.1-win-x64-setup.exe"),
@@ -868,19 +1043,26 @@ async function runPolicyCases(temp, fixture, cases) {
     cases,
   );
 
+  const draftPlan = ["--root", repo, "--version", VERSION, "--channel", "beta", "--trusted-key", path.join(fixture.keys, "a.pub"), "--skip-session"];
+  expectCheck(
+    "draft with no repository option targets the BWC default repository",
+    run("scripts/release-draft.js", draftPlan).stdout.includes(`  repo: ${DEFAULT_REPO}\n`),
+    `plan names ${DEFAULT_REPO}`,
+    cases,
+  );
+
+  expectCheck(
+    "GH_REPO_NAME overrides only the name part of the default",
+    run("scripts/release-draft.js", draftPlan, { env: { GH_REPO_NAME: "selftest-name" } }).stdout.includes(
+      "  repo: BurntToasters/selftest-name\n",
+    ),
+    "plan names BurntToasters/selftest-name",
+    cases,
+  );
+
   expectRefusal(
-    "draft without a GitHub remote or --repo refused",
-    run("scripts/release-draft.js", [
-      "--root",
-      repo,
-      "--version",
-      VERSION,
-      "--channel",
-      "beta",
-      "--trusted-key",
-      path.join(fixture.keys, "a.pub"),
-      "--skip-session",
-    ], { remove: ["GH_REPO"] }),
+    "malformed GH_REPO_OWNER refused as repo-invalid",
+    run("scripts/release-draft.js", draftPlan, { env: { GH_REPO_OWNER: "bad owner" } }),
     ["repo-invalid"],
     cases,
   );
@@ -924,6 +1106,7 @@ async function main() {
     const fixture = await buildFixture(temp);
     await runValidatorCases(temp, fixture, cases);
     await runAssembleCases(temp, fixture, cases);
+    await runEnvironmentKeyCases(temp, fixture, cases);
     await runPolicyCases(temp, fixture, cases);
   } catch (error) {
     fatal = error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error);

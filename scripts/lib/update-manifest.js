@@ -15,6 +15,17 @@ const PUBDATE_PATTERN = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(
 // The signed expiry has whole seconds only, so every reader parses it the same way.
 const EXPIRES_PATTERN = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/;
 
+/**
+ * The release asset name of a channel's manifest: bwc-stable.json or bwc-beta.json. The signature is
+ * this name plus ".minisig". Each channel has its own name, so both can live in one GitHub release list.
+ */
+export function manifestFileName(channel) {
+  if (channel !== "stable" && channel !== "beta") {
+    throw new Error(`no manifest file name for channel ${String(channel)}`);
+  }
+  return `bwc-${channel}.json`;
+}
+
 /** The exact manifest trusted comment. Signing and validation both build it from the manifest fields. */
 export function manifestTrustedComment({ version, channel, expires }) {
   return `version:${version} channel:${channel} expires:${expires}`;

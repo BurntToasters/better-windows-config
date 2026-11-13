@@ -1,19 +1,22 @@
 namespace Bwc.Hub.Updates;
 
 /// <summary>
-/// Where the update check looks and which channel it asks for. The build default is empty until a
-/// release server is chosen, so a build with no server reports "not configured" instead of failing.
-/// Each channel has its own manifest URL: a manifest is signed for one channel, so one URL cannot serve both.
+/// Where the update check looks and which channel it asks for. Each channel has its own manifest URL: a manifest
+/// is signed for one channel, so one URL cannot serve both. Empty means none is configured.
 /// </summary>
 internal static class UpdateSources
 {
     public const string ChannelStable = "stable";
     public const string ChannelBeta = "beta";
 
-    /// <summary>The stable channel's manifest URL for this build. Empty means none is configured.</summary>
-    public const string BuildStableManifestUrl = "";
+    /// <summary>
+    /// The stable manifest: the bwc-stable.json asset of the latest stable GitHub release. GitHub's "latest"
+    /// skips prereleases and drafts, so a beta publish never changes this URL.
+    /// </summary>
+    public const string BuildStableManifestUrl =
+        "https://github.com/BurntToasters/better-windows-config/releases/latest/download/bwc-stable.json";
 
-    /// <summary>The beta channel's manifest URL for this build. Empty means none is configured.</summary>
+    /// <summary>The beta channel's manifest URL for this build. Empty: no beta channel is published yet.</summary>
     public const string BuildBetaManifestUrl = "";
 
 #if BWC_E2E

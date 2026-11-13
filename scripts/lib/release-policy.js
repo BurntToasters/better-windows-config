@@ -7,7 +7,7 @@ import { isPlaceholderKeyText, loadKeyMaterial } from "./minisign.js";
 import { matchEmbeddedKey, readTrustedKeysFile } from "./trusted-keys.js";
 import { channelForVersion, tryParseSemVer } from "./semver.js";
 import { parsePackageVersion, readDirectoryBuildPropsVersion } from "../sync-version-helpers.js";
-import { validateManifestBuffer } from "./update-manifest.js";
+import { manifestFileName, validateManifestBuffer } from "./update-manifest.js";
 import { validateUrl } from "./url-policy.js";
 
 export const RELEASE_BRANCHES = Object.freeze({ stable: "main", beta: "experimental" });
@@ -355,7 +355,7 @@ export async function checkArtifactDirectory(root, artifactDir, release, trusted
     };
   }
 
-  const manifestPath = path.join(directory, "manifest.json");
+  const manifestPath = path.join(directory, manifestFileName(release.channel));
   if (!fs.existsSync(manifestPath) || !fs.statSync(manifestPath).isFile()) {
     return {
       errors: [
