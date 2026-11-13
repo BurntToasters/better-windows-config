@@ -1,21 +1,21 @@
 namespace Bwc.Update;
 
 /// <summary>
-/// The minisign public keys this build trusts for manifests and installers.
-///
-/// PLACEHOLDER. The value below is not a key. It fails validation, so while it is in place every
-/// manifest and installer is refused (fail closed). The user creates the real release key and
-/// replaces <see cref="PlaceholderKey"/>, then sets <see cref="IsPlaceholder"/> to false. Rotation:
-/// list the old key and the new key together during the overlap.
+/// The minisign public keys this build trusts for manifests and installers. Written by
+/// scripts/embed-update-key.js (npm run release:embed-key). The matching secret key is the release VM's
+/// TAURI_SIGNING_PRIVATE_KEY. Rotation: run the script with --rotate so the old and the new key are both
+/// listed during the overlap, then drop the old one with --replace in a later release.
 /// </summary>
 public static class TrustedKeys
 {
     /// <summary>True while <see cref="PlaceholderKey"/> is in place. A release build must not ship with it.</summary>
-    public const bool IsPlaceholder = true;
+    public const bool IsPlaceholder = false;
 
     private const string PlaceholderKey = "untrusted comment: PLACEHOLDER replace with the release public key\nPLACEHOLDER-NOT-A-KEY";
 
-    public static readonly IReadOnlyList<string> Embedded = [PlaceholderKey];
+    private const string ReleaseKey0 = "untrusted comment: minisign public key: C1CF14730CFB8427\nRWQnhPsMcxTPwSN9+gKGfRU7y+vU+4x9KHzXVtojWuEyHVFsa3vIKCgB";
+
+    public static readonly IReadOnlyList<string> Embedded = [ReleaseKey0];
 
     /// <summary>True only for the shipped placeholder list, which means no release key is configured yet.</summary>
     public static bool IsPlaceholderList(IReadOnlyList<string> keys)

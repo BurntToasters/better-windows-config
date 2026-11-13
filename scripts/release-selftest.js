@@ -916,7 +916,16 @@ function writeRepository(temp, { placeholder = false, embedded = [] } = {}) {
   );
   writeText(
     path.join(temp, "CHANGELOG.md"),
-    `# Changelog\n\n## [${VERSION}] - Unreleased\n\n- Release tooling self-test.\n`,
+    [
+      "# ⬇️ Downloads",
+      "",
+      `[x64](https://github.com/example/bwc/releases/download/v${VERSION}/BetterWindowsConfig-${VERSION}-win-x64-setup.exe)`,
+      "",
+      `## Changes in \`v${VERSION}:\``,
+      "",
+      "- **Testing:** Release tooling self-test.",
+      "",
+    ].join("\n"),
   );
   writeText(path.join(temp, ".gitignore"), "artifacts/\n");
   const constants = embedded.map((text, index) => `    private const string Key${index} = ${csLiteral(text)};`);
