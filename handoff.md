@@ -148,8 +148,10 @@ notes, known gaps). The gate deletes each E2E result before its step runs.
   steps 1 to 16 passed, including the ship-flavor E2E. The e2e flavor had 12 of 1186 checks fail:
   the permissions test above, and `print.cancel` / `print.ctrlp.cancel`. In the x64 build the
   Windows 11 print dialog host (`ApplicationFrameWindow`) closed itself before any cancel input,
-  although a default printer (a WSD network printer) exists. arm64 passes these checks. It is not
-  known whether native x64 behaves the same; check on an x64 machine before treating it as a bug.
+  although a default printer (a WSD network printer) exists. A rerun of `Print_` on x64 with a fresh
+  build passed 17/17 (Cancel button and Escape both cancelled), so this is an intermittent close of
+  the system dialog host, not an x64 product bug. Watch for it on later runs.
+- At `1c07c01`: arm64 e2e flavor 1180 of 1180 checks passed, 2 known gaps. Quick gate passed.
 - E2E check counts by commit: 901 passed and 1 failed (`106180a`), 1051 passed and 3 failed
   (`3c7253c`), 1095 passed and 17 failed (`a6072eb`), 1155 passed and 14 failed (`19fb773` tree
   before the robustness fix).
@@ -216,7 +218,6 @@ Remaining:
 - RF10 Print: range panel, progress dialog, print-to-file report test: verify against the inventory.
 - E4 rest: SACL support (Auditing tab), remote write routing behind the write policy. Remote
   handles are pinned and `SetKeySecurity` propagates (`3c7253c`).
-- Permissions Applies-to flags (section 7, item 11).
 - D1 compile and E2E, once NSIS is installed.
 - D8 signing, once GnuPG is installed and the user creates the release key.
 - D10 first beta dry run `0.1.0-beta.1` to a draft release. The user runs it on a release VM.
@@ -246,12 +247,10 @@ Remaining:
 9. CI (`.github/workflows/ci.yml`) runs the quick gate and the x64 E2E suite on `experimental`. The
    status for HEAD is not recorded here. Check the latest run before you call it green.
 10. The 100% scale oracle capture is still owed. The current captures are at 192 DPI.
-11. Permissions Applies-to labels. Inherited HKCU entries carry ACE flags `0x3` (CI|OI), but
-    `src/Bwc.Registry/RegistryInheritanceModes.cs` defines "This key and subkeys" as `0x2`, so aclui
-    labels those entries "Special" and `Permissions_AdvancedReplaceChildEntries...` fails. Do not
-    change the flags until classic is measured: in classic regedit add an entry with each Applies-to
-    choice under `HKCU\Software\BWC-Oracle` and read the flags with `Get-Acl`. A UIA driver cannot
-    reach classic regedit's SysTreeView32 tree, so this capture needs a person or a Win32 driver.
+11. Fixed in `1c07c01`: Applies-to labels. The oracle step `permissions`
+    (`docs/parity/oracle/permissions-inherit.json`) showed classic labels 0x1 like 0x0, 0x3 like 0x2,
+    and 0xB like 0xA. `MapGeneric` now clears OBJECT_INHERIT_ACE. Open: whether aclui writes the
+    cleared flags back on OK (`docs/failure-modes/permissions.md` section 31); measure in the sandbox.
 12. WinUI drops a mouse press that arrives while a MenuFlyout is still opening. Tests wait for the
     item's bounds to settle (at least 300 ms) before a real click (`PermissionsTests.cs`).
 13. The user hive `NTUSER.DAT` grew to 166 MB from large E2E seeds in earlier runs. Test seeds are
@@ -302,7 +301,7 @@ These stand until the user changes them.
 ## 10. Next steps
 
 1. Run the full gate for both RIDs: `node scripts/test-all.js --rid all`. Record the result.
-2. Measure classic's Applies-to flags (section 7, item 11) and fix `RegistryInheritanceModes`.
+2. Measure whether aclui writes cleared OBJECT_INHERIT flags back on OK (section 7, item 11).
 3. Then, in any order that the dependencies allow: RF8 rest, RF9 and RF10 verification, E4 rest,
    D1 compile (NSIS), D8 (GnuPG and the release key), and D10.
 4. Run R15 after the remaining packages. Every row is `open` until then, which means unclassified,
