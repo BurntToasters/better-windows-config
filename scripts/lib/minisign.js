@@ -314,12 +314,12 @@ export function scryptParamsFor(opslimit, memlimit) {
     p = 1;
     const maxN = Math.floor(ops / (r * 4));
     for (nLog2 = 1; nLog2 < 63; nLog2 += 1) {
-      if (2 ** nLog2 > maxN / 2) break;
+      if (2 ** nLog2 > Math.floor(maxN / 2)) break;
     }
   } else {
     const maxN = Math.floor(mem / (r * 128));
     for (nLog2 = 1; nLog2 < 63; nLog2 += 1) {
-      if (2 ** nLog2 > maxN / 2) break;
+      if (2 ** nLog2 > Math.floor(maxN / 2)) break;
     }
     const maxRp = Math.floor(ops / 4 / 2 ** nLog2);
     p = Math.max(1, Math.floor(maxRp / r));
@@ -327,13 +327,23 @@ export function scryptParamsFor(opslimit, memlimit) {
   return { N: 2 ** nLog2, r, p };
 }
 
-function deriveStreamKey(password, salt, opslimit, memlimit) {
+/**
+ * The keynum_sk mask, exactly as minisign (C and Rust, which Tauri uses) derives it: scrypt writes as many bytes
+ * as keynum_sk has (104), and the mask is XORed straight over keynum_sk. There is no stream cipher step.
+ */
+function deriveKeynumMask(password, salt, opslimit, memlimit) {
   const { N, r, p } = scryptParamsFor(opslimit, memlimit);
   const memoryBytes = 128 * N * r;
   if (memoryBytes > SCRYPT_MAXMEM) {
     throw failure("unsupported-key-kdf", "the key's scrypt memory cost is above the 1.5 GiB limit", 1);
   }
-  return scryptSync(Buffer.from(password, "utf8"), salt, 32, { N, r, p, maxmem: SCRYPT_MAXMEM });
+  return scryptSync(Buffer.from(password, "utf8"), salt, KEYNUM_SK_LENGTH, { N, r, p, maxmem: SCRYPT_MAXMEM });
+}
+
+function xorBuffers(data, mask) {
+  const out = Buffer.alloc(data.length);
+  for (let index = 0; index < data.length; index += 1) out[index] = data[index] ^ mask[index];
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -481,8 +491,7 @@ export function parseSecretKeyText(text, { password } = {}) {
     if (!(opslimit >= 32768 && memlimit >= 1024 * 1024)) {
       throw failure("unsupported-key-kdf", "encrypted key has scrypt parameters outside the accepted range");
     }
-    const streamKey = deriveStreamKey(password, salt, opslimit, memlimit);
-    plain = xsalsa20Xor(body, streamKey, Buffer.alloc(24));
+    plain = xorBuffers(body, deriveKeynumMask(password, salt, opslimit, memlimit));
   } else {
     throw failure("unsupported-key-kdf", `secret key kdf ${JSON.stringify(kdf)} is not supported`);
   }
@@ -534,14 +543,14 @@ export function encryptSecretKeyText({ keyId, seed, publicBytes, password, opsli
     throw failure("password-missing", "encrypting a key needs a password", 2);
   }
   const salt = randomBytes(32);
-  const streamKey = deriveStreamKey(password, salt, opslimit, memlimit);
+  const mask = deriveKeynumMask(password, salt, opslimit, memlimit);
   const secret = Buffer.concat([seed, publicBytes]);
   const plain = Buffer.concat([
     Buffer.from(keyId),
     secret,
     blake2b(Buffer.concat([Buffer.from("Ed"), keyId, secret]), 32),
   ]);
-  const body = xsalsa20Xor(plain, streamKey, Buffer.alloc(24));
+  const body = xorBuffers(plain, mask);
   const opsBytes = Buffer.alloc(8);
   opsBytes.writeBigUInt64LE(BigInt(opslimit));
   const memBytes = Buffer.alloc(8);
