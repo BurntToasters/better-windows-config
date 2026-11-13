@@ -148,15 +148,12 @@ internal sealed class ImportExportCommands
         string caption = Get("MsgCaptionRegistryEditor");
         string? selectedPath = _context.Shell.TreeContent.SelectedNode?.RegistryPath;
 
-        var progress = new ImportProgressDialog(
-            Get("MsgImportRegistryFileCaption"),
-            Get("ImportProgressFileLabel"),
-            Path.GetFileName(filePath));
+        RegeditContext.Pane focusBefore = _context.FocusedPane();
+        ImportProgressDialog? progress = OpenImportProgress(filePath);
 
         var progressSink = new ImportProgressSink(
-            new Progress<ImportProgress>(update => progress.SetProgress(update.CompletedSections, update.TotalSections)));
+            new Progress<ImportProgress>(update => progress?.SetProgress(update.CompletedSections, update.TotalSections)));
 
-        Task<bool> dialogTask = _context.ShowDialogAsync(progress);
         Task<RegFileImportResult> importTask = _context.RunRegistryAsync(
             () => RegFileImporter.ApplyFile(
                 RegeditWritePolicy.CreateStore(),
@@ -178,10 +175,8 @@ internal sealed class ImportExportCommands
         }
         finally
         {
-            progress.CompleteFromHost();
+            CloseImportProgress(progress, focusBefore);
         }
-
-        _ = await dialogTask;
 
         if (error is not null)
         {
@@ -201,6 +196,67 @@ internal sealed class ImportExportCommands
         await _context.ShowMessageAsync(
             caption,
             string.Format(CultureInfo.CurrentCulture, Get(RegFileImportReport.MessageKey(result!)), filePath));
+    }
+
+    /// <summary>
+    /// Shows the DLG-019 window and marks a dialog open, as ShowDialogAsync does for a modal dialog. When the
+    /// window cannot be shown, or another modal is open, the import runs without a window.
+    /// </summary>
+    private ImportProgressDialog? OpenImportProgress(string filePath)
+    {
+        if (_context.DialogOpen)
+        {
+            Log.Warn("Registry Editor ignored the import progress window because another modal is already open.");
+            return null;
+        }
+
+        if (_context.WindowHwnd == 0)
+        {
+            Log.Warn("Registry Editor ignored the import progress window because the window handle is not attached.");
+            return null;
+        }
+
+        ImportProgressDialog? progress = ImportProgressDialog.TryShow(
+            _context.WindowHwnd,
+            Get("MsgImportRegistryFileCaption"),
+            Get("ImportProgressFileLabel"),
+            Path.GetFileName(filePath));
+        if (progress is not null)
+        {
+            _context.DialogOpen = true;
+        }
+
+        return progress;
+    }
+
+    /// <summary>
+    /// Destroys the DLG-019 window after the import ends. The owner is enabled and activated first, then the
+    /// dialog is marked closed and the pane that had focus gets it back, as ShowDialogAsync does.
+    /// </summary>
+    private void CloseImportProgress(ImportProgressDialog? progress, RegeditContext.Pane focusBefore)
+    {
+        if (progress is null)
+        {
+            return;
+        }
+
+        try
+        {
+            progress.Complete();
+        }
+        finally
+        {
+            _context.DialogOpen = false;
+        }
+
+        try
+        {
+            _context.RestorePaneFocus?.Invoke(focusBefore);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Registry Editor could not restore focus after the import progress window: " + ex.Message);
+        }
     }
 
     private async Task RefreshAfterImportAsync(string? selectedPath)

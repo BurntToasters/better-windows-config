@@ -258,10 +258,11 @@ Remaining:
     now capped at 5000 keys. Never seed more.
 14. The test host machine is a Parallels VM. If the host sleeps or crashes, WinUI content draws
     black. See section 5.5.
-15. Declared difference: classic DLG-019 (Import progress) has no system menu or Close box. WinUI
-    restores `WS_SYSMENU` in `WM_STYLECHANGED`, so BWC's caption keeps the Close box. Close and
-    Alt+F4 are refused until the import ends (`ModalDialogWindow.IsCloseAllowed`). E2E records two
-    known gaps for it. A non-WinUI caption would be needed to remove it.
+15. Import progress (DLG-019) is a native Win32 dialog built from the classic template
+    (`src/Bwc.UI/Dialogs/NativeProgressDialog.cs`, `Win32DialogTemplate.cs`), because WinUI restores
+    `WS_SYSMENU`. It has no system menu or Close box, ignores WM_CLOSE and SC_CLOSE until the import
+    ends, and follows dark mode (DWM dark caption, dark face and text, DarkMode_Explorer bar). E2E
+    has no known gaps left (1223 of 1223 checks on arm64).
 16. Accelerator tooltips are hidden (`KeyboardAcceleratorPlacementMode.Hidden`) on the shell root,
     address bar, menu bar, and menu items. Any new element that owns a `KeyboardAccelerator` needs
     the same setting, or WinUI floats a "Ctrl+X" tooltip that classic never shows.

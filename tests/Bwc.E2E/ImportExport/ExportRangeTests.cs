@@ -176,40 +176,45 @@ public sealed class ExportRangeTests
 
             if (progress != IntPtr.Zero)
             {
-                // The caption Close box is a declared difference (known gap UF7), so it is not in the body count.
+                // The native window has no push buttons, so the list is empty. Its caption has no Close box.
                 IReadOnlyList<string>? buttons = ImportExportWindows.ButtonNames(automation, progress);
                 string buttonList = string.Join(",", buttons ?? Array.Empty<string>());
                 bool noTitleClose = buttons is not null && !buttons.Contains("Close", StringComparer.Ordinal);
-                bool noBodyButtons = buttons is not null && buttons.All(button => button == "Close");
+                bool noBodyButtons = buttons is not null && buttons.Count == 0;
                 E2EResults.Record(
                     "importprogress.no-buttons",
                     noBodyButtons,
-                    $"buttons=[{buttonList}]; classic DLG-019 has no Cancel and no default button. Only the caption " +
-                    "Close is listed, and it is checked by importprogress.no-close-button.");
+                    $"buttons=[{buttonList}]; classic DLG-019 has no Cancel and no default button, and the native " +
+                    "window has no push button.");
+
+                string windowClass = Win32.ClassNameOf(progress);
+                E2EResults.Record(
+                    "importprogress.class",
+                    windowClass == ImportExportWindows.NativeDialogClass,
+                    $"window class='{windowClass}', expected '{ImportExportWindows.NativeDialogClass}' (a native dialog).");
 
                 long style = ImportExportWindows.StyleOf(progress);
                 bool noSystemMenu = (style & ImportExportWindows.WsSysMenu) == 0;
                 bool hasCaption = (style & ImportExportWindows.WsCaption) == ImportExportWindows.WsCaption;
-                E2EResults.RecordOrKnownGap(
+                E2EResults.Record(
                     "importprogress.no-close-button",
-                    noTitleClose,
-                    "UF7",
-                    "classic DLG-019 (style 0x90C001C4) has no Close box in the caption, and the caption Close is absent " +
-                    "from the UI Automation tree.",
-                    $"UI Automation buttons of the window=[{buttonList}]. Cause: WinUI windowing restores WS_SYSMENU " +
-                    "during WM_STYLECHANGING, after the outermost subclass has cleared it, so a WinUI window cannot " +
-                    "drop the system menu. Close and Alt+F4 are refused until the import ends.");
-                E2EResults.RecordOrKnownGap(
+                    noTitleClose && noSystemMenu,
+                    $"UI Automation buttons of the window=[{buttonList}]; the caption has no Close box, and " +
+                    $"WS_SYSMENU present={!noSystemMenu}.");
+                E2EResults.Record(
                     "importprogress.style",
                     noSystemMenu && hasCaption,
-                    "UF7",
-                    "GWL_STYLE 0x90C001C4: WS_CAPTION present, WS_SYSMENU absent.",
-                    $"GWL_STYLE=0x{style:X8}; WS_SYSMENU present={!noSystemMenu}, WS_CAPTION present={hasCaption}. " +
-                    "Cause: WinUI windowing restores WS_SYSMENU during WM_STYLECHANGING, after the outermost subclass " +
-                    "has cleared it; WM_STYLECHANGED then stores the bit. See docs/failure-modes/import-export.md 14.");
+                    $"GWL_STYLE=0x{style:X8}; WS_SYSMENU present={!noSystemMenu}, WS_CAPTION present={hasCaption}, " +
+                    "expected 0x90C001C4 without WS_SYSMENU.");
 
-                string label = ImportExportWindows.ReadText(automation, progress, "ImportFileLabel");
-                string name = ImportExportWindows.ReadText(automation, progress, "ImportFileName");
+                bool sized = ImportExportWindows.ClientSizeMatchesTemplate(progress, 240, 59, out string sizeDetail);
+                E2EResults.Record(
+                    "importprogress.size",
+                    sized,
+                    $"{sizeDetail}; each edge within 1 px.");
+
+                string label = ImportExportWindows.ReadNativeText(progress, ImportExportWindows.ImportFileLabelId);
+                string name = ImportExportWindows.ReadNativeText(progress, ImportExportWindows.ImportFileNameId);
                 E2EResults.Record(
                     "importprogress.labels",
                     label == "File:" && name == Path.GetFileName(importFile),
@@ -237,7 +242,7 @@ public sealed class ExportRangeTests
                             return true;
                         }
 
-                        lastBar = ImportExportWindows.ReadProgress(automation, progress);
+                        lastBar = ImportExportWindows.ReadNativeProgress(progress);
                         if (lastBar.Present && lastBar.Value > 0 && lastBar.Value < lastBar.Maximum)
                         {
                             readings.Add(lastBar.Value);
@@ -257,9 +262,8 @@ public sealed class ExportRangeTests
 
             if (progress != IntPtr.Zero)
             {
-                string shot = ImportExportWindows.CaptureWindow(
-                    progress,
-                    Path.Combine(visualDir, "import-progress.png"));
+                _ = ForegroundGuard.Ensure(progress, "importprogress.foreground", TimeSpan.FromSeconds(2));
+                string shot = ImportExportWindows.SaveScreenCopy(progress, Path.Combine(visualDir, "import-progress.png"));
                 E2EResults.Note("importprogress.screenshot", $"saved {shot}, written={File.Exists(shot)}.");
             }
 
@@ -321,6 +325,132 @@ public sealed class ExportRangeTests
         {
             sandbox.Cleanup();
         }
+    }
+
+    /// <summary>
+    /// The import progress window in the BWC dark palette (BWC_E2E_THEME=Dark, the E2E launch override). The
+    /// caption must use the immersive dark attribute, and the dialog face must be the palette face. The import
+    /// runs to the end so the sandbox can be removed.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("ImportExport")]
+    [TestCategory("Mutating")]
+    public void ImportProgress_DarkPaletteCaptionAndFace()
+    {
+        int checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+        RequireExecutables(config);
+
+        var sandbox = new SandboxRegistry(config);
+        string tempDir = Path.Combine(config.ArtifactsDir, "import-export", config.RunId, "import-progress-dark");
+        string visualDir = Path.Combine(config.ArtifactsDir, "visual", "importexport");
+
+        try
+        {
+            sandbox.Cleanup();
+            Directory.CreateDirectory(tempDir);
+            Directory.CreateDirectory(visualDir);
+            Seed(sandbox);
+            string importFile = WriteLargeImportFile(sandbox, tempDir, sections: ImportSections);
+
+            string dataRoot = CreateFreshDataRoot(config, "importexport-import-progress-dark");
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+                [SlowImportVariable] = SlowImportPauseMilliseconds,
+                ["BWC_E2E_THEME"] = "Dark",
+            };
+
+            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
+            using var driver = new EditingDriver(session);
+            using var dialogs = new SystemFileDialogDriver(session);
+            using var automation = new UIA3Automation();
+
+            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "importprogress.dark.sandbox.navigate");
+            E2EGuards.RequireImportFileInsideSandbox(importFile, sandbox, "importprogress.dark.file-inside");
+
+            if (!OpenDialog(driver, dialogs, MenuFileImport, "importprogress.dark.import", out IntPtr dialog))
+            {
+                FailIfNeeded(checkStart);
+                return;
+            }
+
+            bool typed = dialogs.TrySetFileName(dialog, importFile, out string typeNotes);
+            string acceptNotes = "not attempted";
+            bool accepted = typed && dialogs.TryAccept(dialog, "Open", out acceptNotes);
+            bool closed = accepted && dialogs.WaitGone(dialog, TimeSpan.FromSeconds(10));
+            E2EResults.Record(
+                "importprogress.dark.open",
+                typed && accepted && closed,
+                $"{typeNotes} {acceptNotes} closed={closed}.");
+
+            IntPtr progress = ImportExportWindows.WaitForProgress(automation, session.MainHwnd, TimeSpan.FromSeconds(15));
+            if (progress != IntPtr.Zero)
+            {
+                int darkCaption = ImportExportWindows.ImmersiveDarkCaption(progress);
+                E2EResults.Record(
+                    "importprogress.dark.caption",
+                    darkCaption == 1,
+                    $"DWMWA_USE_IMMERSIVE_DARK_MODE={darkCaption}, expected 1 in the dark palette.");
+
+                // The sample is read from the screen, so the dialog must be in front of the main window first.
+                bool foreground = ForegroundGuard.Ensure(progress, "importprogress.dark.foreground", TimeSpan.FromSeconds(2));
+                IntPtr topAtSample = ImportExportWindows.TopWindowAtClientCorner(progress);
+                bool onTop = topAtSample == progress;
+
+                // BWC dark palette face (BwcSystemColors.DarkFace), with a small tolerance for the screen copy.
+                // The window opens with a short animation, so the samples are read until they settle on the face.
+                System.Drawing.Color[] samples = Array.Empty<System.Drawing.Color>();
+                bool faceIsDark = false;
+                _ = ControlTestSupport.WaitUntil(
+                    () =>
+                    {
+                        samples = ImportExportWindows.ClientFaceSamples(progress);
+                        faceIsDark = onTop && IsDarkFace(samples);
+                        return faceIsDark;
+                    },
+                    TimeSpan.FromSeconds(5));
+                string sampleText = string.Join(" ", samples.Select(face => $"#{face.R:X2}{face.G:X2}{face.B:X2}"));
+                E2EResults.Record(
+                    "importprogress.dark.face",
+                    faceIsDark,
+                    $"foreground={foreground}, top window at the sample=0x{topAtSample.ToInt64():X}, " +
+                    $"progress=0x{progress.ToInt64():X}, bottom-margin samples=[{sampleText}], " +
+                    "expected every sample to be the dark face #2B2B2B within 4 per channel.");
+
+                // The bar moves for the whole import, so a settle-judged capture never passes here. This is a screen copy.
+                string shot = ImportExportWindows.SaveScreenCopy(progress, Path.Combine(visualDir, "import-progress-dark.png"));
+                E2EResults.Note("importprogress.dark.screenshot", $"saved {shot}, written={File.Exists(shot)}.");
+            }
+
+            bool progressClosed = progress != IntPtr.Zero &&
+                ControlTestSupport.WaitUntil(() => !Win32.IsWindow(progress), TimeSpan.FromSeconds(120));
+            E2EResults.Record(
+                "importprogress.dark.completed",
+                progress != IntPtr.Zero && progressClosed,
+                $"progress window found={progress != IntPtr.Zero}, closed after the import={progressClosed}.");
+
+            FailIfNeeded(checkStart);
+        }
+        finally
+        {
+            sandbox.Cleanup();
+        }
+    }
+
+    /// <summary>True when every sample is the BWC dark face #2B2B2B within 4 per channel.</summary>
+    private static bool IsDarkFace(System.Drawing.Color[] samples)
+    {
+        const int DarkFaceChannel = 0x2B;
+        const int Tolerance = 4;
+        return samples.Length > 0 && samples.All(face =>
+            !face.IsEmpty &&
+            Math.Abs(face.R - DarkFaceChannel) <= Tolerance &&
+            Math.Abs(face.G - DarkFaceChannel) <= Tolerance &&
+            Math.Abs(face.B - DarkFaceChannel) <= Tolerance);
     }
 
     [TestMethod]
