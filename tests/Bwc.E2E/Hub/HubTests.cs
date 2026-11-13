@@ -16,10 +16,10 @@ namespace Bwc.E2E.Hub;
 
 /// <summary>
 /// Drives the Hub from its published output. Tests that use no E2E seam run in the ship flavor: the classic
-/// window and tool list, Enter and the Alt+H keyboard path, About text, the not-configured update message,
-/// and the update settings file. Tests that force the palette (BWC_E2E_THEME) or serve update fixtures
-/// (BWC_E2E_UPDATE_*) are tagged E2EOnly: the light and dark captures, the pixel contrast of every dialog
-/// (<see cref="DialogContrast"/>), and the update checks in three states (up to date, update available, cancel).
+/// window and tool list, Enter and the Alt+H keyboard path, About text, and the update settings file. Tests that
+/// force the palette (BWC_E2E_THEME) or the update source (BWC_E2E_UPDATE_*) are tagged E2EOnly: the light and
+/// dark captures, the pixel contrast of every dialog (<see cref="DialogContrast"/>), the not-configured message
+/// (manifest URL forced to "none"), and the update checks in three states (up to date, update available, cancel).
 /// The install tests press Download and Install with the mouse. A stand-in installer (tests/Bwc.E2E.FakeInstaller)
 /// records the command line it is started with, and a tampered download must be refused before it runs.
 /// Update checks run against a loopback server that serves signed fixtures generated for the run; nothing
@@ -153,13 +153,19 @@ public sealed class HubTests
 
     [TestMethod]
     [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
     public void Hub_CheckForUpdates_ReportsNotConfiguredWithoutServer()
     {
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
         EnsureExecutables(config);
 
-        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, UnconfiguredScope, null));
+        // The shipped build carries the GitHub manifest URL and, once embedded, the release key, so "no server" is
+        // forced through the E2E-only override. Nothing reaches the network.
+        Dictionary<string, string> environment = Environment(config, UnconfiguredScope, null);
+        environment["BWC_E2E_UPDATE_MANIFEST_URL"] = "none";
+        using var hub = new AppSession(config, config.HubExePath, environment: environment);
         E2EResults.CurrentSession = hub;
         using var automation = new UIA3Automation();
 

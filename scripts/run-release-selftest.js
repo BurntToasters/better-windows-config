@@ -232,6 +232,8 @@ check("release:win:continue step list is exact for stable", () => {
           `artifacts/installer/BetterWindowsConfig-${VERSION}-win-x64-setup.exe`,
           "--installer-win-arm64",
           `artifacts/installer/BetterWindowsConfig-${VERSION}-win-arm64-setup.exe`,
+          "--expires-hours",
+          "8760",
         ],
       },
       { name: "release:sign:gpg", args: ["--", "--dir", folder] },
