@@ -36,6 +36,7 @@ import {
   removeDirectory,
   runGhJson,
   selectRelease,
+  ghRequestDir,
   writeGhBody,
 } from "./lib/github-release.js";
 import { prepareReleaseContext } from "./lib/release-context.js";
@@ -365,7 +366,7 @@ async function run(options) {
   fs.mkdirSync(context.dir, { recursive: true });
   const bodyFiles = {
     create: writeGhBody(
-      path.join(context.dir, "gh", "create-draft.json"),
+      path.join(ghRequestDir(context.dir), "create-draft.json"),
       draftBody({
         tag: context.tag,
         version: context.version,
@@ -375,7 +376,7 @@ async function run(options) {
       }),
     ),
     edit: writeGhBody(
-      path.join(context.dir, "gh", "edit-draft.json"),
+      path.join(ghRequestDir(context.dir), "edit-draft.json"),
       draftBody({
         tag: context.tag,
         version: context.version,
