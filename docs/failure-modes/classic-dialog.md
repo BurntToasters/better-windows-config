@@ -196,6 +196,17 @@ clipped. The classic dialogs do not wrap their labels, so the template width is 
 Guard: static text uses `NoWrap` and is measured in the E2E check against the template. A label
 that does not fit is a template transcription bug, not a runtime fallback.
 
+### 2.7 Native dialog template sized at the wrong DPI
+
+A dialog built from an in-memory `DLGTEMPLATEEX` (the native import progress window, 4.7) takes its
+DLU scale from the dialog font, not from BWC's `ClassicDialogMetrics`. The system can convert at a DPI
+other than the owner's, which changes the client size.
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| Client size uses the system DPI on a window at another DPI | DLG-019 client is 240 x 59 DLU at the window DPI, within 1 px per edge (`importprogress.size`) |
+| Font face is not the template face | Template face `MS Shell Dlg` 8 pt, as RT_DIALOG 110 declares, resolved through FontSubstitutes |
+
 ## 3. Focus, tab order, and keyboard
 
 ### 3.1 Tab order differs from template order
@@ -323,21 +334,41 @@ The generic exe icon in the title bar is not in the classic frame.
 Guard: `WS_EX_DLGMODALFRAME` is set on the dialog window, which removes the icon from the
 caption. The window keeps its system menu.
 
-### 4.7 Caption keeps the system menu and Close box (declared difference, UF7)
+### 4.7 Import progress caption keeps the system menu and Close box
 
 Classic DLG-019 (the import progress window) has style `0x90C001C4`: `WS_CAPTION` and no `WS_SYSMENU`, so its
-caption has no Close box. The BWC window keeps `WS_SYSMENU`, so the caption shows a Close button.
+caption has no Close box. A WinUI window cannot keep that style: WinUI restores `WS_SYSMENU` in its own window
+procedure after an outer subclass clears it (measured in the E2E build, UF7 before this change). The WinUI
+version showed a Close box that was refused until the import ended.
 
-Cause, measured in the E2E build: `SetWindowLongPtr(GWL_STYLE)` with `WS_SYSMENU` cleared returns the old value
-and the stored style keeps the bit. A `WM_STYLECHANGING` hook that clears the bit before the window stores it
-saw the bit already clear, so an inner WinUI window procedure restores `WS_SYSMENU` before `WM_STYLECHANGED`. A
-WinUI window cannot drop the system menu this way. Removing the bit was tried and reverted; no code ships for it.
+Guard: DLG-019 is a native Win32 dialog. `CreateDialogIndirectParamW` builds it from an in-memory
+`DLGTEMPLATEEX` with the classic style, extended style, and font, so no WinUI window procedure touches the style.
+The dialog manager adds `WS_CLIPSIBLINGS` (0x04000000), so the live `GWL_STYLE` is `0x94C001C4`; the check
+requires `WS_SYSMENU` absent and `WS_CAPTION` present, the bits the template defines.
+The dialog procedure also ignores `WM_CLOSE` and `SC_CLOSE` (Alt+F4 and the system menu) until the host
+destroys the window, and the window has no Cancel button. The host restores the owner before it destroys
+the window.
 
-What is enforced instead: the close request from the Close box or Alt+F4 is refused until the import ends
-(1.9), and the window has no Cancel button. The window is closed by the host when the import ends.
+E2E: `importprogress.style` (no `WS_SYSMENU`, `WS_CAPTION` present), `importprogress.no-close-button` (no Close
+button in UI Automation), `importprogress.class` (window class `#32770`), and `importprogress.altf4` (the window
+stays open and the owner stays disabled after Alt+F4).
 
-E2E: `importprogress.style` and `importprogress.no-close-button` record a known gap (`UF7`) with the measured
-`GWL_STYLE` value and the UI Automation buttons. They do not pass or fail the run.
+### 4.8 Native progress window ignores the BWC dark palette
+
+Guard: `NativeProgressDialog` reads `BwcTheme.Current` when it is shown and whenever the palette changes.
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| Dark caption stays light | `DWMWA_USE_IMMERSIVE_DARK_MODE` is set in `WM_INITDIALOG`, before the template makes the window visible |
+| Dark client or static text stays white or black | `WM_CTLCOLORDLG` and `WM_CTLCOLORSTATIC` return a brush from `BwcPalette.Face` and set `WindowText` as the text color; light and high contrast keep the system colors |
+| Progress bar stays light in dark mode | `SetWindowTheme(bar, "DarkMode_Explorer")` is applied; a failure falls back silently |
+| Brushes leak | The brush for the previous palette is deleted on a palette change, and both are deleted on destroy |
+| Palette changes while the window is open | `BwcTheme.Changed` re-applies the caption attribute and brushes and repaints |
+| High contrast shows BWC colors | High contrast uses the default dialog colors only |
+| Dark client stays the system face | The default erase paints the system face, so `WM_ERASEBKGND` fills the client with the dark brush and returns TRUE |
+| Dark static text stays black on the system face | `WM_CTLCOLORSTATIC` returns the dark brush itself and also stores it in `DWLP_MSGRESULT`; the text color is set on the DC |
+| Dark progress track stays light | `CCM_SETBKCOLOR` sets the track to the dark face; light mode resets it with `CLR_DEFAULT` |
+| E2E samples the face while the window is still animating | The E2E check reads the bottom-margin samples until they settle on the face (5 s), so a blend with the desktop does not fail or pass it |
 
 ## 5. Text and values
 
@@ -561,7 +592,9 @@ reported, not claimed. Guard: rectangles are compared with RT_DIALOG 104 only.
 | Owner disabled and re-enabled | 1.1, 1.2 | Owner `IsEnabled` during and after |
 | Refused close keeps the owner disabled | 1.9 | `importprogress.altf4`, `importprogress.main-disabled` |
 | Yes pressed before the box is ready | 1.10 | `ImportResult_*` (harness `ClickButton`, no press to a point that is not the button) |
-| Caption keeps the system menu and Close box on DLG-019 (declared difference) | 4.7 | Known gaps `importprogress.style`, `importprogress.no-close-button` (`UF7`) |
+| Caption keeps the system menu and Close box on DLG-019 | 4.7 | `importprogress.style`, `importprogress.no-close-button`, `importprogress.class`, `importprogress.altf4` |
+| DLG-019 client size or font off at the window DPI | 2.7 | `importprogress.size` |
+| DLG-019 dark caption, face, or text off the BWC palette | 4.8 | `importprogress.dark.caption`, `importprogress.dark.face` |
 | Client size and positions | 2.1, 2.2, 2.3, 2.5 | Rectangles within 1 DIP of `MapDialogRect` |
 | No heading | 4.5 | `DialogHeading` empty |
 | Tab order | 3.1 | Tab sequence matches template |

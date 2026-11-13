@@ -1,24 +1,31 @@
+using Bwc.Core;
 using Bwc.UI.Dialogs;
-using Bwc.UI.Theme;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Automation;
-using Microsoft.UI.Xaml.Controls;
 
 namespace Bwc.Regedit.Dialogs;
 
 /// <summary>
-/// The Import progress window (RT_DIALOG 110, DLG-019). It shows the caption, the file label, the
-/// file name, and a progress bar. The classic template has no Cancel button and no default button, so
-/// the user cannot cancel the import from this window. Declared difference: classic DLG-019 (style
-/// 0x90C001C4) has no system menu and no Close box, but the WinUI caption keeps both, because WinUI
-/// restores WS_SYSMENU after the style is cleared. A close request from the Close box or Alt+F4 is
-/// refused until the host ends the import. See docs/failure-modes/import-export.md section 14.
+/// The Import progress window (RT_DIALOG 110, DLG-019). It is a native Win32 dialog built from the classic
+/// template: style 0x90C001C4 (no WS_SYSMENU, so no Close box), 240 x 59 DLU at (32, 24), the MS Shell Dlg
+/// 8 pt font, and the controls in template order: 101 msctls_progress32, 100 the file name, and the "File:"
+/// label. There is no Cancel button and no default button. The window ignores close requests until the host
+/// completes the import. See docs/failure-modes/import-export.md section 14 and classic-dialog.md 4.7.
 /// </summary>
-public sealed class ImportProgressDialog : ClassicDialog
+public sealed class ImportProgressDialog : IDisposable
 {
-    // DLG-019 rectangles in dialog units, relative to the client area: 240 x 59 DLU.
+    // The RT_DIALOG 110 template values (en-US regedit.exe.mui), read from the resource.
+    private const uint ClassicStyle = 0x90C001C4;
+    private const int TemplateX = 32;
+    private const int TemplateY = 24;
     private const int DialogWidthDlu = 240;
     private const int DialogHeightDlu = 59;
+    private const ushort FontPointSize = 8;
+    private const uint ProgressStyle = 0x50000000; // WS_CHILD | WS_VISIBLE
+    private const uint StaticStyle = 0x50020000; // WS_CHILD | WS_VISIBLE | WS_GROUP
+
+    private const int ProgressBarId = 101;
+    private const int FileNameId = 100;
+    private const int FileLabelId = 0xFFFF; // IDC_STATIC
+
     private const int FileLabelX = 10;
     private const int FileLabelY = 10;
     private const int FileLabelWidth = 24;
@@ -29,127 +36,61 @@ public sealed class ImportProgressDialog : ClassicDialog
     private const int ContentWidth = 220;
     private const int LabelHeight = 8;
 
-    private readonly TextBlock _fileLabel;
-    private readonly TextBlock _fileName;
-    private readonly ProgressBar _bar;
-    private readonly Canvas _canvas;
-    private bool _completedByHost;
-    private bool _closed;
+    private readonly NativeProgressDialog _window;
 
-    /// <summary>Creates the window with the classic caption, the "File:" label, and the file name.</summary>
-    public ImportProgressDialog(string caption, string fileLabel, string fileName)
-        : base(caption, new ClassicFontSpec(ClassicDialogMetrics.TemplateFontFace, 8))
+    private ImportProgressDialog(NativeProgressDialog window)
+    {
+        _window = window;
+    }
+
+    /// <summary>
+    /// Shows the window owned by <paramref name="ownerHwnd"/>, with the owner disabled. Returns null when the
+    /// window cannot be created; the import then runs without a window, and the failure is logged.
+    /// </summary>
+    public static ImportProgressDialog? TryShow(nint ownerHwnd, string caption, string fileLabel, string fileName)
     {
         ArgumentException.ThrowIfNullOrEmpty(caption);
         ArgumentNullException.ThrowIfNull(fileLabel);
         ArgumentNullException.ThrowIfNull(fileName);
 
-        _fileLabel = new TextBlock
-        {
-            Text = fileLabel,
-            VerticalAlignment = VerticalAlignment.Center,
-            Foreground = BwcPaint.WindowText,
-        };
-        AutomationProperties.SetAutomationId(_fileLabel, "ImportFileLabel");
+        var template = new Win32DialogTemplate(
+            caption,
+            ClassicStyle,
+            exStyle: 0,
+            TemplateX,
+            TemplateY,
+            DialogWidthDlu,
+            DialogHeightDlu,
+            ClassicDialogMetrics.TemplateFontFace,
+            FontPointSize,
+            [
+                new Win32DialogItem(
+                    ProgressBarId, "msctls_progress32", ProgressStyle, string.Empty,
+                    FileLabelX, BarY, ContentWidth, BarHeight),
+                new Win32DialogItem(
+                    FileNameId, "Static", StaticStyle, fileName,
+                    FileLabelX, FileNameY, ContentWidth, FileNameHeight),
+                new Win32DialogItem(
+                    FileLabelId, "Static", StaticStyle, fileLabel,
+                    FileLabelX, FileLabelY, FileLabelWidth, LabelHeight),
+            ]);
 
-        _fileName = new TextBlock
-        {
-            Text = fileName,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            VerticalAlignment = VerticalAlignment.Center,
-            Foreground = BwcPaint.WindowText,
-        };
-        AutomationProperties.SetAutomationId(_fileName, "ImportFileName");
-
-        _bar = new ProgressBar
-        {
-            Minimum = 0,
-            Maximum = 1,
-            Value = 0,
-            IsIndeterminate = true,
-            Height = 12,
-            BorderBrush = BwcPaint.Shadow,
-            BorderThickness = new Thickness(1),
-        };
-        AutomationProperties.SetAutomationId(_bar, "ProgressBar");
-        AutomationProperties.SetName(_bar, "Progress");
-
-        _canvas = new Canvas();
-        _canvas.Children.Add(_fileLabel);
-        _canvas.Children.Add(_fileName);
-        _canvas.Children.Add(_bar);
-        SetFlowContent(_canvas);
-
-        // A close request from the caption or Alt+F4 is refused by IsCloseAllowed until the import completes.
-        Closed += OnProgressClosed;
-    }
-
-    /// <summary>True when the host closed the window because the import finished.</summary>
-    public bool CompletedByHost => _completedByHost;
-
-    /// <summary>
-    /// Refuses a close request (Alt+F4) while the import runs. The owner stays disabled. The host's own close,
-    /// after the import ends, goes through <see cref="CompleteFromHost"/>, which sets the flag first.
-    /// </summary>
-    protected override bool IsCloseAllowed() => _completedByHost;
-
-    /// <summary>Sets a determinate position. Completed and total are sections, as the import counts them.</summary>
-    public void SetProgress(int completed, int total)
-    {
-        if (_closed)
-        {
-            return;
-        }
-
-        _bar.IsIndeterminate = false;
-        _bar.Maximum = Math.Max(1, total);
-        _bar.Value = Math.Clamp(completed, 0, Math.Max(1, total));
-    }
-
-    /// <summary>Closes the window after the import finished. The close request is allowed here.</summary>
-    public void CompleteFromHost()
-    {
-        if (_closed)
-        {
-            return;
-        }
-
-        _completedByHost = true;
         try
         {
-            Close();
+            return new ImportProgressDialog(NativeProgressDialog.Show(ownerHwnd, template, ProgressBarId));
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // The window was already gone. The Closed handler did not run, so mark it closed here.
-            _closed = true;
+            Log.Warn("Registry Editor could not show the import progress window: " + ex.Message);
+            return null;
         }
     }
 
-    protected override void PrepareFlowLayout(ClassicFlowContext context)
-    {
-        ClassicDialogMetrics metrics = context.Metrics;
-        double scale = context.Scale;
+    /// <summary>Sets the determinate position. Completed and total are sections, as the import counts them.</summary>
+    public void SetProgress(int completed, int total) => _window.SetProgress(completed, total);
 
-        _canvas.Width = metrics.ToPixelsX(DialogWidthDlu) / scale;
-        _canvas.Height = metrics.ToPixelsY(DialogHeightDlu) / scale;
+    /// <summary>Re-enables the owner and destroys the window after the import finished.</summary>
+    public void Complete() => _window.Complete();
 
-        Place(_fileLabel, FileLabelX, FileLabelY, FileLabelWidth, LabelHeight);
-        Place(_fileName, FileLabelX, FileNameY, ContentWidth, FileNameHeight);
-        Place(_bar, FileLabelX, BarY, ContentWidth, BarHeight);
-    }
-
-    private void Place(FrameworkElement element, int x, int y, int cx, int cy)
-    {
-        Canvas.SetLeft(element, DluX(x));
-        Canvas.SetTop(element, DluY(y));
-        element.Width = DluX(cx);
-        element.Height = DluY(cy);
-    }
-
-    private void OnProgressClosed(object? sender, WindowEventArgs args)
-    {
-        Closed -= OnProgressClosed;
-        _closed = true;
-    }
+    public void Dispose() => _window.Dispose();
 }
