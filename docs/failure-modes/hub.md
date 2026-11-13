@@ -172,6 +172,51 @@ an elevated helper, and so on), it starts the Hub again with `--update-result <f
 shows the reason: "apps still running" and "elevated" have their own messages, and every other code
 reads "The update was not installed (reason: <code>)". The argument carries the failure name only.
 
+### Install from the Hub: failure modes (written before the E2E test)
+
+The GUI path is covered by `Hub_UpdateAvailable_InstallRunsVerifiedInstaller` and
+`Hub_UpdateAvailable_TamperedInstallerIsRefused` (`tests/Bwc.E2E/Hub/HubTests.cs`). Both start the E2E
+Hub against the loopback fixture server, open Help > Check for Updates and press "Download and Install"
+with real mouse clicks, and read the evidence below. The installer is the stand-in
+`tests/Bwc.E2E.FakeInstaller`. It writes one record file, starts the Hub again from the `/D=` folder (the
+installer does that per the update contract), and exits. The fixture signs the stand-in's real bytes.
+
+| ID | Failure | What the user sees | Detection (check id) |
+|----|---------|--------------------|----------------------|
+| HI1 | The install press is dropped, or the Available window stays open | Nothing happens after Download and Install | `hub.install.available.closed`, `hub.install.hubClosed` (Hub still running after 60 s) |
+| HI2 | The helper started is not the publish copy (wrong or stale `BwcUpdate.exe`) | The update does not run from this build | `hub.install.helperPath`: a `BwcUpdate.exe` from the publish folder is seen, and its pid is the pid the Hub logged |
+| HI3 | The helper starts the installer while the Hub still runs (files replaced under a live Hub) | Locked files, half-installed tools | `hub.install.hubExitedFirst`: the Hub pid has exited when the record appears |
+| HI4 | The installer command line is not `/S /D=<install dir>` (switches added, `/D=` quoted or not last) | Silent install with wrong options | `hub.install.commandLine`: the record holds exactly `/S` and `/D=<publish folder>`, unquoted |
+| HI5 | The bytes that run are not the signed bytes (staged file changed after verify, or a tampered download) | Code that was never signed runs | `hub.install.signedBytes`: the record's SHA-256 equals the signed SHA-256 |
+| HI6 | A tampered installer is downloaded and the helper refuses, but the Hub shows nothing useful | The user sees no reason | `hub.refuse.message`: the message names `InstallerHashMismatch` |
+| HI7 | The refused installer runs anyway | Unverified code runs | `hub.refuse.neverRan`: no record file exists, and no install process starts |
+| HI8 | After a successful install the Hub is not started again | The user is left with no app | `hub.install.relaunched`: a new Hub from the publish folder shows its main window |
+| HI9 | The Hub's window stays after a refused install or closes early on a refusal | Confusing state | `hub.refuse.hubStays`, and the message box is dismissed |
+| HI10 | A staged installer that failed verification is kept in staging | Staged bytes stay around | `hub.refuse.staging`: no staging folder created by the test holds a receipt |
+
+Not covered by these two tests (each is covered elsewhere or is a documented limit):
+
+- A tool running from the install folder blocks the install before the download (`UpdateInstallBlocked`).
+  It is a separate Hub check, not part of the handoff.
+- An elevated helper. The E2E run is never elevated, and the helper refuses `RunningElevated`
+  (`update-verifier.md` H and N).
+- A staged installer from an earlier run that was signed by another key. `UpdateChecker.TryReuse` checks the
+  signature again before reuse (`update-verifier.md` M). The tests use a fresh key pair per run.
+- Installer signature failure by a key the helper does not trust. The update-verifier tests cover it.
+
+Test-side failure modes, so a red run is not blamed on the product:
+
+- The helper runs for well under a second. The test samples process lists every 10 ms, and it cross-checks the
+  helper pid that the Hub logged. A miss is reported as `hub.install.helperPath`, not as a pass.
+- Logs and the record file are read from the test's own data root, so an old run cannot satisfy a check.
+- Staging folders are removed only when the test created them (the folder set is compared before and after).
+- The record file is opened with `CreateNew`. A second stand-in run fails rather than overwrite the first.
+
+The E2E test adds no product seam. The install folder is the publish folder, and it passes the install
+folder rules in `InstallDirectory.Validate` (absolute, no trailing separator, no quote). The stand-in reads
+`BWC_E2E_INSTALLER_RECORD` and `BWC_E2E_INSTALLER_RELAUNCH_HUB`, which only a test sets. A ship build reads
+neither.
+
 ## Update settings
 
 Help > Update Settings... stores the channel (`stable` or `beta`, default `stable`) and the startup
@@ -289,6 +334,10 @@ message, so the result lookup waits for the window that holds the message text. 
 open by the fixture: the manifest response waits until the test has checked and captured the window, then it
 is released (`UpdateFixtureServer.HoldManifest` and `ReleaseManifest`, bounded at 60 seconds). A window that
 closes before its capture fails the contrast checks with "no client area" (`e2e-harness.md` section 27).
+`Hub_UpdateAvailable_InstallRunsVerifiedInstaller` and `Hub_UpdateAvailable_TamperedInstallerIsRefused` cover the
+install handoff from the Hub (section "Install from the Hub"): the mouse press, the helper from the publish folder,
+the stand-in's record (the exact `/S /D=` command line, the signed hash, the staging path, the Hub exit before the
+run), the Hub started again, and the refusal of a tampered download.
 Captures go to
 `artifacts/e2e/visual/hub/`: each capture is the window's visible frame read from the screen, so the
 whole window is in the image. The captures are the main window in light and dark, About in light and

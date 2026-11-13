@@ -11,4 +11,12 @@
     <PackageReference Include="FlaUI.Core" />
   </ItemGroup>
 
+  <!--
+    The stand-in installer for the Hub install test. Only the build order matters: the reference copies no
+    assembly. Its build publishes FakeInstaller.exe for each architecture into artifacts/e2e/fake-installer.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Bwc.E2E.FakeInstaller\Bwc.E2E.FakeInstaller.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
 </Project>

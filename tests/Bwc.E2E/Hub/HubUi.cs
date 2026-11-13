@@ -324,6 +324,27 @@ internal static class HubUi
         }
     }
 
+    /// <summary>
+    /// Presses a dialog button with the mouse, the way a user does. The dialog is raised first, so the press lands on
+    /// the button and not on a window that covers it. The pointer rests on the button's centre before the press.
+    /// Returns false, and presses nothing, when the dialog could not be raised.
+    /// </summary>
+    public static bool ClickDialogButton(AutomationElement button, AutomationElement dialog)
+    {
+        var hwnd = (IntPtr)dialog.Properties.NativeWindowHandle.ValueOrDefault;
+        if (!RaiseDialog(hwnd, TimeSpan.FromSeconds(3)))
+        {
+            return false;
+        }
+
+        WaitForSettledBounds(button, TimeSpan.FromSeconds(2));
+        Rectangle bounds = button.BoundingRectangle;
+        Mouse.MoveTo(new Point(bounds.Left + (bounds.Width / 2), bounds.Top + (bounds.Height / 2)));
+        Thread.Sleep(150);
+        button.Click();
+        return true;
+    }
+
     /// <summary>True while an element is still on screen. An element that cannot be read has left the tree.</summary>
     private static bool IsShowing(AutomationElement element)
     {

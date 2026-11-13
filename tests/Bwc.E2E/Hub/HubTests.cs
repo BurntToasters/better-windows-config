@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Bwc.E2E.Controls;
@@ -19,6 +20,8 @@ namespace Bwc.E2E.Hub;
 /// and the update settings file. Tests that force the palette (BWC_E2E_THEME) or serve update fixtures
 /// (BWC_E2E_UPDATE_*) are tagged E2EOnly: the light and dark captures, the pixel contrast of every dialog
 /// (<see cref="DialogContrast"/>), and the update checks in three states (up to date, update available, cancel).
+/// The install tests press Download and Install with the mouse. A stand-in installer (tests/Bwc.E2E.FakeInstaller)
+/// records the command line it is started with, and a tampered download must be refused before it runs.
 /// Update checks run against a loopback server that serves signed fixtures generated for the run; nothing
 /// reaches the network. Captures are written to artifacts/e2e/visual/hub.
 /// </summary>
@@ -29,10 +32,25 @@ public sealed class HubTests
     private const string RegeditTitle = "Registry Editor";
     private const string RegeditProcessName = "BwcRegedit";
     private const string UpdateProcessName = "BwcUpdate";
+    private const string HelperExeName = "BwcUpdate.exe";
+    private const string HubProcessName = "BetterWindowsConfig";
     private const string AboutTitle = "About Better Windows Config";
     private const string CheckTitle = "Check for Updates";
     private const string AvailableTitle = "Update Available";
     private const string SettingsTitle = "Update Settings";
+    private const string FailedTitle = "Update Check Failed";
+    private const string FailedStatus = "Update check failed.";
+    private const string InstallScope = "hub-install";
+    private const string RefuseScope = "hub-refuse";
+    private const string InstalledHubCapture = "update-installed-hub.png";
+    private const string FakeInstallerRecordVariable = "BWC_E2E_INSTALLER_RECORD";
+    private const string FakeInstallerRelaunchVariable = "BWC_E2E_INSTALLER_RELAUNCH_HUB";
+    private const string RefusedCapture = "update-install-refused.png";
+    private const string HashMismatchName = "InstallerHashMismatch";
+    private const string InstallArgumentSwitch = "/S";
+    private const string InstallDirectoryArgumentPrefix = "/D=";
+    private static readonly TimeSpan InstallTimeout = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan NoRunWindow = TimeSpan.FromSeconds(2);
     private const string LightTheme = "Light";
     private const string DarkTheme = "Dark";
     private const string NoticesScope = "hub-main";
@@ -275,7 +293,7 @@ public sealed class HubTests
         using var automation = new UIA3Automation();
 
         // Same version: the helper refuses with SameVersion, which the Hub shows as up to date.
-        server.Offer(sameManifest, sameSignature, fixture.Installer);
+        server.Offer(sameManifest, sameSignature, fixture.InstallerFor(UpdateFixture.ArchX64), fixture.InstallerFor(UpdateFixture.ArchArm64));
         RunCheck(hub, automation);
         // The interactive check shows its progress window under the same title first, so the lookup waits
         // for the window that holds the result message.
@@ -302,7 +320,7 @@ public sealed class HubTests
 
         // Newer version. The progress window closes when the check ends, so the manifest is held until the window
         // has been checked and captured. The hold is released right after the capture, whatever the machine's speed.
-        server.Offer(newerManifest, newerSignature, fixture.Installer);
+        server.Offer(newerManifest, newerSignature, fixture.InstallerFor(UpdateFixture.ArchX64), fixture.InstallerFor(UpdateFixture.ArchArm64));
         server.HoldManifest();
         HubUi.OpenHelpMenuByMouse(hub, automation);
         AutomationElement? checkItem = HubUi.FindInProcess(automation, hub.ProcessId, "MenuItem_CheckForUpdates", ElementTimeout);
@@ -396,6 +414,89 @@ public sealed class HubTests
 
         hub.Close();
         AssertNoFailures("Hub update checks");
+    }
+
+    /// <summary>
+    /// The whole install path from the Hub: Help > Check for Updates finds a newer signed version,
+    /// Download and Install is pressed with the mouse, and the helper verifies the stand-in and starts it
+    /// with the contract's command line. The stand-in then starts the Hub again, as the installer does.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateAvailable_InstallRunsVerifiedInstaller()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        HashSet<string> stagingBefore = InstallEvidence.StagingFolders();
+        string recordPath = Path.Combine(config.DataRootFor(InstallScope), InstallEvidence.RecordFileName);
+
+        try
+        {
+            using var server = new UpdateFixtureServer();
+            using var fixture = UpdateFixture.Create(config);
+            (byte[] manifest, byte[] signature) = fixture.BuildManifest(UpdateFixture.NewerVersion, server.BaseUrl);
+            server.Offer(manifest, signature, fixture.InstallerFor(UpdateFixture.ArchX64), fixture.InstallerFor(UpdateFixture.ArchArm64));
+
+            using var hub = new AppSession(
+                config,
+                config.HubExePath,
+                environment: Environment(config, InstallScope, null, server, fixture, recordPath, relaunchHub: true));
+            E2EResults.CurrentSession = hub;
+            using var automation = new UIA3Automation();
+
+            VerifyInstallFromHub(config, hub, automation, fixture, recordPath);
+            hub.Close();
+        }
+        finally
+        {
+            InstallEvidence.RemoveStagingSince(stagingBefore);
+        }
+
+        AssertNoFailures("Hub install checks");
+    }
+
+    /// <summary>
+    /// The refusal through the GUI. The server sends an installer whose bytes differ from the signed hash. The helper
+    /// refuses during the download, so the stand-in never runs, no Hub starts, and the Hub shows the refusal.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateAvailable_TamperedInstallerIsRefused()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        HashSet<string> stagingBefore = InstallEvidence.StagingFolders();
+        string recordPath = Path.Combine(config.DataRootFor(RefuseScope), InstallEvidence.RecordFileName);
+
+        try
+        {
+            using var server = new UpdateFixtureServer();
+            using var fixture = UpdateFixture.Create(config);
+            (byte[] manifest, byte[] signature) = fixture.BuildManifest(UpdateFixture.NewerVersion, server.BaseUrl);
+            server.Offer(manifest, signature, fixture.InstallerFor(UpdateFixture.ArchX64), fixture.TamperedInstallerFor(config.Rid));
+
+            using var hub = new AppSession(
+                config,
+                config.HubExePath,
+                environment: Environment(config, RefuseScope, LightTheme, server, fixture, recordPath, relaunchHub: true));
+            E2EResults.CurrentSession = hub;
+            using var automation = new UIA3Automation();
+
+            RefuseTamperedInstall(config, hub, automation, recordPath, stagingBefore);
+            hub.Close();
+        }
+        finally
+        {
+            InstallEvidence.RemoveStagingSince(stagingBefore);
+        }
+
+        AssertNoFailures("Hub refused install checks");
     }
 
     [TestMethod]
@@ -670,6 +771,281 @@ public sealed class HubTests
         }
     }
 
+    /// <summary>
+    /// Presses Download and Install in the Update Available window with the mouse, then checks the handoff from the
+    /// evidence: the stand-in ran after the Hub exited, from the staging folder, with the signed bytes and the
+    /// contract's command line. The helper that started it is the publish copy, and the Hub started again.
+    /// </summary>
+    private static void VerifyInstallFromHub(
+        E2EConfig config,
+        AppSession hub,
+        UIA3Automation automation,
+        UpdateFixture fixture,
+        string recordPath)
+    {
+        using Process hubProcess = Process.GetProcessById(hub.ProcessId);
+        InstallEvidence.CacheHandle(hubProcess);
+        string dataRoot = config.DataRootFor(InstallScope);
+        string helperPath = Path.Combine(config.PublishDir, HelperExeName);
+        using var sampler = new ProcessSampler(UpdateProcessName, helperPath);
+
+        RunCheck(hub, automation);
+        AutomationElement? available = HubUi.FindWindowInProcess(automation, hub.ProcessId, AvailableTitle, DialogTimeout);
+        E2EResults.Record(
+            "hub.install.available.dialog",
+            available is not null,
+            available is null ? "The Update Available window did not show." : "The Update Available window showed.");
+        AutomationElement? install = available is null ? null : HubUi.WaitWithin(available, "UpdateInstall", DialogTimeout);
+        E2EResults.Record(
+            "hub.install.available.button",
+            install is not null,
+            install is null ? "Download and Install is missing." : "Download and Install is shown.");
+        if (available is null || install is null)
+        {
+            return;
+        }
+
+        DateTime pressedUtc = DateTime.UtcNow;
+        bool pressed = HubUi.ClickDialogButton(install, available);
+        E2EResults.Record(
+            "hub.install.click",
+            pressed,
+            pressed ? "Download and Install was pressed with the mouse." : "The Update Available window could not be raised.");
+        if (!pressed)
+        {
+            return;
+        }
+
+        E2EResults.Record(
+            "hub.install.available.closed",
+            HubUi.WaitForWindowGone(automation, hub.ProcessId, AvailableTitle, DialogTimeout),
+            "The Update Available window closed on Download and Install.");
+
+        // The helper waits for the Hub to exit, then starts the installer. So the Hub closes first.
+        bool hubExited = hubProcess.WaitForExit(InstallTimeout);
+        E2EResults.Record(
+            "hub.install.hubClosed",
+            hubExited,
+            hubExited ? "The Hub closed so the update could install." : "The Hub was still running 90 s after the install press.");
+
+        bool ran = InstallEvidence.WaitForFile(recordPath, InstallTimeout);
+        E2EResults.Record(
+            "hub.install.installerRan",
+            ran,
+            ran ? "The stand-in installer ran and wrote its record." : "No stand-in record appeared within 90 s.");
+        if (!ran)
+        {
+            return;
+        }
+
+        CheckInstallerRecord(config, fixture, InstallEvidence.ReadRecord(recordPath), hubProcess);
+
+        int helperPid = InstallEvidence.HelperPidFromHubLog(dataRoot);
+        bool helperSeen = helperPid > 0 && sampler.Seen.ContainsKey(helperPid);
+        E2EResults.Record(
+            "hub.install.helperPath",
+            helperSeen,
+            helperSeen
+                ? $"The helper pid {helperPid} that the Hub logged ran from the publish folder."
+                : $"The Hub logged helper pid {helperPid}, and it was not seen running from '{helperPath}'.");
+        E2EResults.Record(
+            "hub.install.helperLog",
+            InstallEvidence.HelperStartedInstaller(dataRoot),
+            "The helper's own log says it started the installer.");
+
+        // The installer starts the Hub again when it finishes (update-manifest.md). The stand-in does the same.
+        Process? relaunched = InstallEvidence.WaitForStartedProcess(
+            HubProcessName,
+            config.HubExePath,
+            hubProcess.Id,
+            pressedUtc,
+            InstallTimeout);
+        E2EResults.Record(
+            "hub.install.relaunched",
+            relaunched is not null,
+            relaunched is null ? "The installer did not start the Hub again." : "The Hub started again from the publish folder.");
+        if (relaunched is null)
+        {
+            return;
+        }
+
+        int relaunchedPid = relaunched.Id;
+        try
+        {
+            AutomationElement? window = HubUi.FindWindowInProcess(automation, relaunchedPid, HubTitle, DialogTimeout);
+            E2EResults.Record(
+                "hub.install.relaunched.window",
+                window is not null,
+                window is null ? "The relaunched Hub showed no main window." : "The relaunched Hub showed its main window.");
+            if (window is not null)
+            {
+                var hwnd = (IntPtr)window.Properties.NativeWindowHandle.ValueOrDefault;
+                _ = HubUi.Foreground(hwnd, TimeSpan.FromSeconds(3));
+                Thread.Sleep(500);
+                string saved = HubUi.CaptureWindow(hwnd, Path.Combine(HubUi.VisualDir(config), InstalledHubCapture));
+                E2EResults.Note("hub.capture.update-installed-hub", saved);
+            }
+        }
+        finally
+        {
+            InstallEvidence.StopProcess(relaunched);
+        }
+
+        E2EResults.Record(
+            "hub.install.relaunched.closed",
+            !IsRunning(relaunchedPid),
+            $"Closed the Hub that the installer started, pid {relaunchedPid}.");
+    }
+
+    /// <summary>
+    /// Checks the stand-in's record: the exact command line, the bytes that ran (the signed bytes), the staging path,
+    /// and that the Hub had exited before the installer ran.
+    /// </summary>
+    private static void CheckInstallerRecord(E2EConfig config, UpdateFixture fixture, Dictionary<string, string> record, Process hubProcess)
+    {
+        string installDir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(config.PublishDir));
+        string argc = RecordField(record, "argc");
+        string arg0 = RecordField(record, "arg0");
+        string arg1 = RecordField(record, "arg1");
+        bool exact = argc == "2" &&
+            arg0 == InstallArgumentSwitch &&
+            string.Equals(arg1, InstallDirectoryArgumentPrefix + installDir, StringComparison.OrdinalIgnoreCase);
+        E2EResults.Record(
+            "hub.install.commandLine",
+            exact,
+            $"The installer got {argc} argument(s), '{arg0}' and '{arg1}'. The contract is '{InstallArgumentSwitch}' and " +
+            $"'{InstallDirectoryArgumentPrefix}{installDir}', unquoted and last.");
+
+        string commandLine = RecordField(record, "commandLine");
+        string tail = " " + InstallArgumentSwitch + " " + InstallDirectoryArgumentPrefix + installDir;
+        E2EResults.Record(
+            "hub.install.commandLine.raw",
+            commandLine.EndsWith(tail, StringComparison.OrdinalIgnoreCase),
+            $"The raw command line was '{commandLine}'.");
+
+        string signedHash = fixture.Sha256For(config.Rid);
+        string ranHash = RecordField(record, "sha256");
+        E2EResults.Record(
+            "hub.install.signedBytes",
+            string.Equals(ranHash, signedHash, StringComparison.Ordinal),
+            $"The installer that ran hashes to {ranHash}. The signed SHA-256 is {signedHash}.");
+
+        string processPath = RecordField(record, "processPath");
+        E2EResults.Record(
+            "hub.install.stagedPath",
+            InstallEvidence.IsStagedInstaller(processPath),
+            $"The installer ran from '{processPath}'.");
+
+        DateTime? hubExit = InstallEvidence.ExitTimeUtc(hubProcess);
+        string stamp = RecordField(record, "timestampUtc");
+        bool stamped = DateTime.TryParse(
+            stamp,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal,
+            out DateTime started);
+        bool exitedFirst = stamped && hubExit is { } exited && exited <= started;
+        E2EResults.Record(
+            "hub.install.hubExitedFirst",
+            exitedFirst,
+            $"The Hub exited at {hubExit:O} UTC and the installer started at {stamp}.");
+    }
+
+    /// <summary>
+    /// Presses Download and Install on a tampered installer. The download is refused, so the stand-in never runs,
+    /// no Hub starts, the refusal message names the failure, and no staging folder of this test keeps a receipt.
+    /// </summary>
+    private static void RefuseTamperedInstall(
+        E2EConfig config,
+        AppSession hub,
+        UIA3Automation automation,
+        string recordPath,
+        HashSet<string> stagingBefore)
+    {
+        using Process hubProcess = Process.GetProcessById(hub.ProcessId);
+        InstallEvidence.CacheHandle(hubProcess);
+        string dataRoot = config.DataRootFor(RefuseScope);
+
+        RunCheck(hub, automation);
+        AutomationElement? available = HubUi.FindWindowInProcess(automation, hub.ProcessId, AvailableTitle, DialogTimeout);
+        E2EResults.Record(
+            "hub.refuse.available.dialog",
+            available is not null,
+            available is null ? "The Update Available window did not show." : "The Update Available window showed.");
+        AutomationElement? install = available is null ? null : HubUi.WaitWithin(available, "UpdateInstall", DialogTimeout);
+        if (available is null || install is null)
+        {
+            return;
+        }
+
+        DateTime pressedUtc = DateTime.UtcNow;
+        bool pressed = HubUi.ClickDialogButton(install, available);
+        E2EResults.Record(
+            "hub.refuse.click",
+            pressed,
+            pressed ? "Download and Install was pressed with the mouse." : "The Update Available window could not be raised.");
+        if (!pressed)
+        {
+            return;
+        }
+
+        AutomationElement? failed = HubUi.FindWindowWithChild(automation, hub.ProcessId, FailedTitle, "DialogMessage", DialogTimeout);
+        string text = MessageText(failed);
+        E2EResults.Record(
+            "hub.refuse.message",
+            failed is not null && text.Contains(HashMismatchName, StringComparison.Ordinal),
+            $"The Hub showed '{text}'. It must name {HashMismatchName}.");
+        if (failed is not null)
+        {
+            CaptureDialog(failed, RefusedCapture, "hub.refuse.contrast", LightTheme);
+            AutomationElement? ok = HubUi.WaitWithin(failed, "DialogPrimary", DialogTimeout);
+            if (ok is not null)
+            {
+                _ = HubUi.ClickDialogButton(ok, failed);
+            }
+        }
+
+        E2EResults.Record(
+            "hub.refuse.closed",
+            HubUi.WaitForWindowGone(automation, hub.ProcessId, FailedTitle, DialogTimeout),
+            "The refusal message closed on OK.");
+
+        // The helper reported the refusal and exited before the message appeared. Nothing starts after that, so a
+        // short wait is enough to see a record or a Hub that should not exist.
+        Thread.Sleep(NoRunWindow);
+        E2EResults.Record(
+            "hub.refuse.neverRan",
+            !File.Exists(recordPath),
+            "No stand-in record exists, so the refused installer never ran.");
+        E2EResults.Record(
+            "hub.refuse.helperLog",
+            !InstallEvidence.HelperStartedInstaller(dataRoot),
+            "The helper's log does not say it started an installer.");
+
+        Process? started = InstallEvidence.WaitForStartedProcess(HubProcessName, config.HubExePath, hubProcess.Id, pressedUtc, TimeSpan.Zero);
+        E2EResults.Record(
+            "hub.refuse.noRelaunch",
+            started is null,
+            started is null ? "No Hub started after the refusal." : "A Hub started after the refusal.");
+        if (started is not null)
+        {
+            InstallEvidence.StopProcess(started);
+        }
+
+        E2EResults.Record("hub.refuse.hubStays", !hubProcess.HasExited, "The Hub stays open after the refusal.");
+        string status = WaitForText(hub, "HubStatus");
+        E2EResults.Record(
+            "hub.refuse.status",
+            string.Equals(status, FailedStatus, StringComparison.Ordinal),
+            $"HubStatus after the refusal was '{status}'.");
+        E2EResults.Record(
+            "hub.refuse.staging",
+            !InstallEvidence.AnyReceiptSince(stagingBefore),
+            "No staging folder made by this test keeps a receipt for the refused installer.");
+    }
+
+    private static string RecordField(Dictionary<string, string> record, string key) =>
+        record.TryGetValue(key, out string? value) ? value : string.Empty;
+
     private static string CaptureMain(AppSession hub, string fileName)
     {
         string path = Path.Combine(HubUi.VisualDir(GuiGate.Config), fileName);
@@ -732,13 +1108,17 @@ public sealed class HubTests
     /// <summary>
     /// The child environment for one Hub run. The palette seam is set only when a theme is given, and the update
     /// seams only when a fixture server is given, so a null theme with no server is the ship-equivalent run.
+    /// The stand-in installer reads its record path and relaunch flag from the same environment, because the helper
+    /// and the installer inherit it from the Hub. The Hub itself never reads them.
     /// </summary>
     private static Dictionary<string, string> Environment(
         E2EConfig config,
         string scope,
         string? theme,
         UpdateFixtureServer? server = null,
-        UpdateFixture? fixture = null)
+        UpdateFixture? fixture = null,
+        string? installerRecordPath = null,
+        bool relaunchHub = false)
     {
         var environment = new Dictionary<string, string>(StringComparer.Ordinal);
         if (theme is not null)
@@ -756,6 +1136,12 @@ public sealed class HubTests
             environment["BWC_E2E_UPDATE_MANIFEST_URL"] = server.ManifestUrl;
             environment["BWC_E2E_UPDATE_TRUSTED_KEY"] = fixture.PublicKeyBase64;
             environment["BWC_E2E_UPDATE_ALLOW_HTTP"] = "1";
+        }
+
+        if (installerRecordPath is not null)
+        {
+            environment[FakeInstallerRecordVariable] = installerRecordPath;
+            environment[FakeInstallerRelaunchVariable] = relaunchHub ? "1" : "0";
         }
 
         return environment;
