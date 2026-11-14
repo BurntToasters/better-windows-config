@@ -72,6 +72,12 @@ the e2e run proves the sandbox fail-closed path. Failures are uploaded as
 artifacts; do not mark the step `continue-on-error` to hide a flake. Fix the
 harness or quarantine the specific check.
 
+The harness only touches what it started. The test host gets a filtered environment (`BWC_E2E_*`, `BWC_DATA_ROOT`,
+`NODE_OPTIONS` from the parent shell are dropped), it only kills or adopts a Registry Editor from the publish folder
+under test that started after the run began, and the e2e flavor is read from the app binaries. See
+`e2e-harness.md` sections 29 to 36. `scripts/check-registry-writer.js` also scans `tools/` and `scripts/`, so a
+PowerShell or Node helper cannot write the registry unseen (section 37).
+
 ## Artifact overwrite
 
 Every run rewrites `artifacts/gate/result.json`, and the full gate also rewrites
@@ -85,6 +91,27 @@ The repository has no `package-lock.json`, so CI uses
 `npm install --no-audit --no-fund`. `npm ci` would fail immediately. The
 `prepare` script installs the git hooks; on CI that only sets configuration and
 does not affect the build.
+
+## CI branch triggers
+
+The workflow runs on `main`, `next-*`, and `experimental`. `experimental` is the beta release branch (`RELEASE_BRANCHES.beta` in `scripts/lib/release-policy.js`), so a beta push must be gated too.
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| T1 | `experimental` is missing from the push or pull_request branch list | A beta release branch is not gated | Keep `experimental` in both lists. |
+| T2 | `cancel-in-progress` is true for `main` | A newer push cancels a release gate run on main | `cancel-in-progress` is `github.ref != 'refs/heads/main'`. |
+
+## Elevated runner environment (`scripts/elevated-runner/run-elevated.ps1`)
+
+The scheduled task runs elevated and inherits the environment of the task definition. The runner has
+no parameters, so nothing it runs may take a path or a setting from that environment.
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| E1 | `NODE_OPTIONS` or `NODE_PATH` is set for the task | Node loads code from outside the repository in an elevated run | Both are removed before any node process starts. |
+| E2 | `BWC_PUBLISH_DIR` is set for the task | The E2E publish folder is redirected to another folder | Removed. The runner never sets it, so `scripts/test-e2e.js` uses `publish/<rid>-e2e`. |
+| E3 | Any other `BWC_*` variable is set for the task | A variable changes the elevated test run | All `BWC_*` variables are removed before node starts. |
+| E4 | The installed copy in `%ProgramData%` predates this change | The fix is not in effect | Run `scripts/elevated-runner/install.ps1` again. The copy is not updated automatically. |
 
 ## Workflow permissions
 
@@ -104,3 +131,31 @@ run to finish rather than deleting its output.
 Reports use `path.join` for filesystem access and forward slashes for artifact
 paths. A Windows path printed into JSON stays readable in CI logs and in the
 artifact viewer. Do not compare raw paths across platforms.
+
+## Live updater client rehearsal (`scripts/updater-client-live.js`)
+
+`npm run release:rehearse:client` runs the built ship `publish/<rid>/BwcUpdate.exe` with `--check`
+and then `--download` against the live stable feed. It writes
+`artifacts/release/client-live/result.json`. Written before the code, per AGENTS.md.
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| C1 | `publish/<rid>/BwcUpdate.exe` missing | A rehearsal passes on a tree that was never built | Refuse `binary-missing` before any network call. Exit 3. |
+| C2 | `--rid` not win-x64 or win-arm64, or the host arch is neither | Wrong binary is tested | Usage error naming the valid RIDs. Exit 2. |
+| C3 | `--url-base` not https, and not loopback http | Feed traffic goes over plain HTTP | Refuse `base-url-refused`. Exit 2. |
+| C4 | Expected version not given and the manifest cannot be fetched or parsed | A stale or missing feed is accepted | Refuse `expect-unavailable`. Exit 4. |
+| C5 | `--expect-version` is not SemVer or is a prerelease | The stable feed is compared with the wrong version | Usage error `version-invalid`. Exit 2. |
+| C6 | Client exits nonzero (network, signature, policy, or a crash) | A refused update looks like success | Refuse `client-failed` with the exit code and a stderr tail. Exit 1. |
+| C7 | Client exits 0 but prints no final JSON line with a boolean `ok` | Progress lines are mistaken for a verdict | Refuse `output-unparsed`. Exit 1. |
+| C8 | Final JSON has `ok:false` | Client refusal hidden by exit 0 | Refuse `client-refused` and name `failure`. Exit 1. |
+| C9 | Final JSON `version` differs from the expected version | Stale CDN copy or a wrong release served | Refuse `version-mismatch`. Exit 1. |
+| C10 | `--download` final JSON lacks `stagingFolder`, or the folder is absent | Download claimed but nothing was staged | Refuse `staging-missing`. Exit 1. |
+| C11 | `stagingFolder` is not directly under `%TEMP%\BWC-Update` with a GUID name | The script deletes an arbitrary folder | Refuse `staging-path-refused`. Never delete. Exit 1. |
+| C12 | The staging folder already existed before the run | The script deletes a folder it did not create | Keep it, and record `staging-preexisting` in the result. |
+| C13 | Child hangs | The release VM stalls forever | Kill only the child this script started after 5 min. Refuse `timeout`. Exit 4. |
+| C14 | Staging folder cannot be removed (file lock, permissions) | Leftover update payloads accumulate silently | Refuse `cleanup-failed`. Exit 1. |
+| C15 | `result.json` cannot be written | The run passes with no artifact | Report `artifact-write-failed`. Exit 4. |
+| C16 | Progress line (`progress` key) is the only JSON with `ok` absent | Progress mistaken for the final line | Only the last line with a boolean `ok` counts. Covered by C7. |
+| C17 | `--rid` omitted on x64 Node under ARM64 Windows emulation | Node reports x64 and the x64 exe is tested | Document: pass `--rid` explicitly on a mixed host. |
+| C18 | Exe cannot start (wrong architecture, missing runtime) | Spawn error reads as a feed problem | Refuse `client-failed` with the spawn error text. Exit 4. |
+| C19 | `--download` exits nonzero or prints no verdict after it created a staging folder | A failed download leaves update payloads in the BWC-Update folder under TEMP | Remove the folder this run created, with the C11 and C12 guards. Record `staging.cleanup` in the result. Exit as the failure says. |

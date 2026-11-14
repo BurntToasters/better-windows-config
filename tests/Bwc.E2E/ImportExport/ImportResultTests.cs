@@ -3,6 +3,7 @@ using Bwc.E2E.AppServices;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Harness;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using static Bwc.E2E.Harness.RunFolders;
 using Microsoft.Win32;
 
 namespace Bwc.E2E.ImportExport;
@@ -269,6 +270,8 @@ public sealed class ImportResultTests
             {
                 Directory.Delete(folder, recursive: true);
             }
+
+            RemoveEmptyRunFolder(folder);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

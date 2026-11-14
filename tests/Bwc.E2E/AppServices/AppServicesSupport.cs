@@ -80,12 +80,13 @@ internal sealed class RegeditProcess : IDisposable
         E2EConfig config,
         string dataRoot,
         IReadOnlyList<string> arguments,
-        IReadOnlyDictionary<string, string>? environment = null)
+        IReadOnlyDictionary<string, string>? environment = null,
+        string? workingDirectory = null)
     {
         var startInfo = new ProcessStartInfo(config.RegeditExePath)
         {
             UseShellExecute = false,
-            WorkingDirectory = config.PublishDir,
+            WorkingDirectory = workingDirectory ?? config.PublishDir,
         };
         foreach (string argument in arguments)
         {

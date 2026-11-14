@@ -32,9 +32,30 @@ public static class AppPaths
                 }
             }
 
-            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            return Path.Combine(localAppData, ProductFolderName);
+            return Path.Combine(UserFallbackRoot(), ProductFolderName);
         }
+    }
+
+    /// <summary>
+    /// The per-user root when the override is not used. An empty or relative LocalApplicationData is replaced
+    /// by the temp folder, which lives under the same profile. Only a machine where both are empty throws.
+    /// </summary>
+    private static string UserFallbackRoot()
+    {
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (!string.IsNullOrWhiteSpace(localAppData) && Path.IsPathFullyQualified(localAppData))
+        {
+            return localAppData;
+        }
+
+        string temp = Path.GetTempPath();
+        if (!string.IsNullOrWhiteSpace(temp) && Path.IsPathFullyQualified(temp))
+        {
+            return temp;
+        }
+
+        throw new InvalidOperationException(
+            "No per-user data folder is available: LocalApplicationData and the temp folder are both empty.");
     }
 
     /// <summary>Gets the directory for a tool without creating it.</summary>

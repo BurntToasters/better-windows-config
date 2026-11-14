@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Text;
+using Bwc.E2E.AppServices;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
@@ -194,6 +196,88 @@ public sealed class HiveTests
             ControlTestSupport.CleanupRegistry(config);
             DeleteDataRoot(dataRoot);
         }
+    }
+
+    /// <summary>
+    /// Load Hive at the HKLM root in a process without SeRestorePrivilege shows the privilege message at once.
+    /// No file dialog or name prompt opens first. The test is skipped with a note in an elevated run, where the
+    /// privilege is present and the load would reach the file dialog.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hives")]
+    public void Hives_LoadHiveRefusesWithoutPrivilegeBeforeAskingForFile()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        try
+        {
+            config.EnsureExecutablesExist();
+        }
+        catch (Exception ex)
+        {
+            E2EResults.Record("hives.privilege.publish", false, ex.Message);
+            Assert.Fail(ex.Message);
+            return;
+        }
+
+        if (new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
+        {
+            E2EResults.Note(
+                "hives.privilege.elevated",
+                "The process is elevated, so the privilege is present and this refusal check does not apply.");
+            FailIfNeeded();
+            return;
+        }
+
+        string dataRoot = CreateFreshDataRoot(config, "hiveprivilege");
+        try
+        {
+            using RegeditProcess app = RegeditProcess.Start(config, dataRoot, Array.Empty<string>());
+            app.Focus();
+            AutomationElement? address = app.WaitFor("AddressBar", TimeSpan.FromSeconds(15));
+            if (address is null)
+            {
+                Assert.Fail("The address bar was not found.");
+            }
+
+            address.Focus();
+            address.AsTextBox().Text = "HKEY_LOCAL_MACHINE";
+            Keyboard.Press(VirtualKeyShort.ENTER);
+            Thread.Sleep(500);
+
+            app.InvokeMenu(MenuFile, CommandLoadHive);
+            IntPtr message = AppServicesSupport.WaitForOwnedWindowText(
+                app.MainHwnd,
+                null,
+                text => text.Contains("Insufficient privileges", StringComparison.Ordinal),
+                TimeSpan.FromSeconds(10));
+            E2EResults.Record(
+                "hives.privilege.message",
+                message != IntPtr.Zero,
+                "Load Hive at HKLM showed the privilege message (RT_STRING 182) without asking for a file.");
+
+            if (message != IntPtr.Zero)
+            {
+                AppServicesSupport.ClickButton(app, message, "OK");
+                _ = AppServicesSupport.WaitUntil(() => !AppServicesSupport.IsWindow(message), TimeSpan.FromSeconds(8));
+            }
+
+            // Give a file dialog or name prompt time to appear after the message. None may open.
+            Thread.Sleep(2000);
+            int owned = AppServicesSupport.OwnedWindows(app.MainHwnd).Count(w => IsWindowVisible(w.Hwnd));
+            E2EResults.Record(
+                "hives.privilege.noFollowUp",
+                owned == 0,
+                $"owned windows after the message={owned}; a file dialog or name prompt would be one of them.");
+
+            app.Close();
+        }
+        finally
+        {
+            DeleteDataRoot(dataRoot);
+        }
+
+        FailIfNeeded();
     }
 
     private static string[] HklmChildren()

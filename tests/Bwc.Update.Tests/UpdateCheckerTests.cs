@@ -47,6 +47,52 @@ public sealed class UpdateCheckerTests
         Assert.IsFalse(Directory.Exists(s.StagingRoot), "the check must not create a staging folder");
     }
 
+    // The manifest, its signature, and the installer each sit behind a GitHub-shaped 302 chain:
+    // latest/download -> releases/download/v0.1.0 -> release-assets with a long signed query.
+    [TestMethod]
+    public async Task Github_Shaped_Redirect_Chain_Accepted()
+    {
+        await using var s = new Scenario();
+        var payload = s.AddInstaller(Architectures.X64, path: "/releases/download/v0.1.0/win-x64.exe");
+        s.Publish();
+        var query = GithubShapedQuery.Build();
+        var (manifestHop, manifestFinal) = Chain(s, "/latest/download/beta.json", "/releases/download/v0.1.0/beta.json", "manifest", query);
+        var (signatureHop, signatureFinal) = Chain(s, "/latest/download/beta.json.minisig", "/releases/download/v0.1.0/beta.json.minisig", "signature", query);
+        var (_, installerFinal) = Chain(s, "/releases/download/v0.1.0/win-x64.exe", null, "installer", query);
+        s.Server.Map(manifestFinal, new Route(Body: s.ManifestBytes));
+        s.Server.Map(signatureFinal, new Route(Body: s.ManifestSignatureBytes));
+        s.Server.Map(installerFinal, new Route(Body: payload.Bytes));
+        var request = new UpdateRequest(
+            s.Server.Url(manifestHop), s.Server.Url(signatureHop), UpdateChannel.Beta, "0.1.0", Architectures.X64, s.StagingRoot);
+        var checker = new UpdateChecker(s.Options());
+
+        var check = await checker.CheckAsync(request, CancellationToken.None);
+        Assert.IsTrue(check.Ok, $"{check.Failure}: {check.Detail}");
+        Assert.AreEqual(1, s.Server.Hits(manifestFinal));
+
+        var download = await checker.DownloadAsync(request, CancellationToken.None);
+        Assert.IsTrue(download.Ok, $"{download.Failure}: {download.Detail}");
+        CollectionAssert.AreEqual(payload.Bytes, File.ReadAllBytes(download.Value!.InstallerPath));
+        Assert.AreEqual(1, s.Server.Hits(installerFinal));
+    }
+
+    // Maps a one-hop chain (second is null) or a two-hop chain. Returns the first hop and the final target with query.
+    private static (string First, string Final) Chain(Scenario s, string first, string? second, string name, string query)
+    {
+        var final = $"/github-production-release-asset/{name}/guid?{query}";
+        if (second is null)
+        {
+            s.Server.Map(first, new Route(Status: 302, Location: s.Server.Url(final).AbsoluteUri));
+        }
+        else
+        {
+            s.Server.Map(first, new Route(Status: 302, Location: s.Server.Url(second).AbsoluteUri));
+            s.Server.Map(second, new Route(Status: 302, Location: s.Server.Url(final).AbsoluteUri));
+        }
+
+        return (first, final);
+    }
+
     [TestMethod]
     public async Task Manifest_SignatureNotFound_Reported()
     {
@@ -240,19 +286,23 @@ public sealed class UpdateCheckerTests
         var stale = Path.Combine(s.StagingRoot, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(stale);
         File.WriteAllBytes(Path.Combine(stale, "installer.exe"), payload.Bytes);
+        var staleReceipt = Path.Combine(stale, UpdateReceipt.FileName);
         UpdateReceipt.Write(
-            Path.Combine(stale, UpdateReceipt.FileName),
+            staleReceipt,
             new UpdateReceipt("0.1.5", UpdateChannel.Beta, Architectures.X64, payload.Bytes.Length, payload.Sha256, payload.Envelope, payload.Comment));
+        Directory.SetCreationTimeUtc(stale, DateTime.UtcNow.AddDays(-2));
+        File.SetLastWriteTimeUtc(staleReceipt, DateTime.UtcNow.AddDays(-2));
 
         var outcome = await new UpdateChecker(s.Options()).DownloadAsync(s.Request(), CancellationToken.None);
 
         Assert.IsTrue(outcome.Ok, $"{outcome.Failure}: {outcome.Detail}");
         Assert.AreEqual(1, s.Server.Hits("/bwc/win-x64.exe"), "a receipt for another version is not reused");
-        Assert.IsFalse(Directory.Exists(stale), "the folder for another version is pruned");
+        Assert.IsFalse(Directory.Exists(stale), "the folder for another version is pruned once it is older than 24 hours");
     }
 
+    // S12: a folder younger than 24 hours belongs to another install's staged update, so it is kept.
     [TestMethod]
-    public async Task Download_Prunes_Other_Staging()
+    public async Task Download_Keeps_Younger_Staging()
     {
         await using var s = new Scenario();
         s.AddInstaller(Architectures.X64);
@@ -260,15 +310,63 @@ public sealed class UpdateCheckerTests
         var incomplete = Path.Combine(s.StagingRoot, "0123456789abcdef0123456789abcdef");
         Directory.CreateDirectory(incomplete);
         File.WriteAllText(Path.Combine(incomplete, "installer.exe"), "partial");
+        var younger = Path.Combine(s.StagingRoot, "fedcba9876543210fedcba9876543210");
+        Directory.CreateDirectory(younger);
+        File.WriteAllText(Path.Combine(younger, "receipt.json"), "{}");
+
+        var outcome = await new UpdateChecker(s.Options()).DownloadAsync(s.Request(), CancellationToken.None);
+
+        Assert.IsTrue(outcome.Ok, $"{outcome.Failure}: {outcome.Detail}");
+        var folders = Directory.GetDirectories(s.StagingRoot).Order().ToArray();
+        var expected = new[] { incomplete, younger, Path.GetDirectoryName(outcome.Value!.InstallerPath)! }.Order().ToArray();
+        CollectionAssert.AreEqual(expected, folders);
+    }
+
+    // S13: folders older than 24 hours are pruned. Age is the later of folder creation and receipt write time.
+    [TestMethod]
+    public async Task Download_Prunes_Older_Staging()
+    {
+        await using var s = new Scenario();
+        s.AddInstaller(Architectures.X64);
+        s.Publish();
+        var incomplete = Path.Combine(s.StagingRoot, "0123456789abcdef0123456789abcdef");
+        Directory.CreateDirectory(incomplete);
+        File.WriteAllText(Path.Combine(incomplete, "installer.exe"), "partial");
+        Directory.SetCreationTimeUtc(incomplete, DateTime.UtcNow.AddDays(-2));
         var older = Path.Combine(s.StagingRoot, "fedcba9876543210fedcba9876543210");
         Directory.CreateDirectory(older);
         File.WriteAllText(Path.Combine(older, "receipt.json"), "{}");
+        Directory.SetCreationTimeUtc(older, DateTime.UtcNow.AddDays(-2));
+        File.SetLastWriteTimeUtc(Path.Combine(older, "receipt.json"), DateTime.UtcNow.AddDays(-2));
 
         var outcome = await new UpdateChecker(s.Options()).DownloadAsync(s.Request(), CancellationToken.None);
 
         Assert.IsTrue(outcome.Ok, $"{outcome.Failure}: {outcome.Detail}");
         var folders = Directory.GetDirectories(s.StagingRoot);
         CollectionAssert.AreEqual(new[] { Path.GetDirectoryName(outcome.Value!.InstallerPath)! }, folders);
+    }
+
+    // S5: a staged installer that another process holds cannot be opened for reuse. The folder is skipped, not fatal.
+    [TestMethod]
+    public async Task Reuse_Unreadable_Folder_Skipped()
+    {
+        await using var s = new Scenario();
+        var payload = s.AddInstaller(Architectures.X64);
+        s.Publish();
+        var folder = Path.Combine(s.StagingRoot, "fedcba9876543210fedcba9876543210");
+        Directory.CreateDirectory(folder);
+        var installer = Path.Combine(folder, "installer.exe");
+        File.WriteAllBytes(installer, payload.Bytes);
+        UpdateReceipt.Write(
+            Path.Combine(folder, UpdateReceipt.FileName),
+            new UpdateReceipt(s.Version, UpdateChannel.Beta, Architectures.X64, payload.Bytes.Length, payload.Sha256, payload.Envelope, payload.Comment));
+
+        using var held = File.Open(installer, FileMode.Open, FileAccess.Read, FileShare.None);
+        var outcome = await new UpdateChecker(s.Options()).DownloadAsync(s.Request(), CancellationToken.None);
+        held.Dispose();
+
+        Assert.IsTrue(outcome.Ok, $"{outcome.Failure}: {outcome.Detail}");
+        Assert.AreEqual(1, s.Server.Hits("/bwc/win-x64.exe"), "the locked folder is not reused, so the installer is downloaded");
     }
 
     [TestMethod]

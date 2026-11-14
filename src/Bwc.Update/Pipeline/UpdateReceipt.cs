@@ -41,7 +41,18 @@ public sealed partial record UpdateReceipt(
             ["signature"] = receipt.Signature,
             ["trustedComment"] = receipt.TrustedComment,
         };
-        File.WriteAllText(path, json.ToJsonString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        // Written beside the target, then moved over it: a reader sees the old receipt or the new one, never a cut one.
+        var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temp, json.ToJsonString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            File.Move(temp, path, overwrite: true);
+        }
+        catch
+        {
+            TryDelete(temp);
+            throw;
+        }
     }
 
     public static Outcome<UpdateReceipt> Read(string path)
@@ -51,12 +62,22 @@ public sealed partial record UpdateReceipt(
             return Refuse("receipt is missing");
         }
 
-        if (new FileInfo(path).Length > MaxBytes)
+        byte[] bytes;
+        try
         {
-            return Refuse("receipt is larger than the limit");
+            if (new FileInfo(path).Length > MaxBytes)
+            {
+                return Refuse("receipt is larger than the limit");
+            }
+
+            bytes = File.ReadAllBytes(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Refuse("receipt cannot be read: " + ex.GetType().Name);
         }
 
-        var parsed = StrictJson.Parse(File.ReadAllBytes(path));
+        var parsed = StrictJson.Parse(bytes);
         if (!parsed.Ok)
         {
             return Refuse("receipt is not strict JSON");
@@ -123,4 +144,16 @@ public sealed partial record UpdateReceipt(
 
     private static Outcome<UpdateReceipt> Refuse(string detail) =>
         Outcome<UpdateReceipt>.Fail(UpdateFailure.ReceiptInvalid, detail);
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The temp file is harmless to a reader, which only looks at receipt.json.
+        }
+    }
 }

@@ -95,6 +95,9 @@
   <data name="StatusLaunchMissing" xml:space="preserve">
     <value>{0} is not installed. Expected: {1}</value>
   </data>
+  <data name="StatusLaunchCanceled" xml:space="preserve">
+    <value>Launch was canceled.</value>
+  </data>
   <data name="StatusLaunchFailed" xml:space="preserve">
     <value>{0} did not start: {1}</value>
   </data>
@@ -179,10 +182,52 @@ Download and Install checks the update again, closes the Hub, and replaces the i
     <value>The update helper was not found. Expected: {0}</value>
   </data>
   <data name="UpdateNoResult" xml:space="preserve">
-    <value>The update helper returned no result (exit code {0}).</value>
+    <value>The update helper did not return a result. Your installed tools have not been changed.</value>
   </data>
-  <data name="UpdateRefused" xml:space="preserve">
-    <value>The update was refused: {0}. {1}</value>
+  <data name="UpdateFailHashMismatch" xml:space="preserve">
+    <value>The downloaded update did not match the signed release, so it was not installed. Try again later.</value>
+  </data>
+  <data name="UpdateFailSignature" xml:space="preserve">
+    <value>The update could not be verified because its signature is not valid. Your installed tools have not been changed.</value>
+  </data>
+  <data name="UpdateFailUrl" xml:space="preserve">
+    <value>The update server address is not allowed, so the update was not checked. Check the update settings.</value>
+  </data>
+  <data name="UpdateFailManifest" xml:space="preserve">
+    <value>The update information from the server could not be read. Try again later.</value>
+  </data>
+  <data name="UpdateFailTooLarge" xml:space="preserve">
+    <value>The update server sent more data than expected, so the update was not used. Try again later.</value>
+  </data>
+  <data name="UpdateFailClock" xml:space="preserve">
+    <value>The update information is dated in the future, so it was not used. Check the date and time on this computer.</value>
+  </data>
+  <data name="UpdateFailNoInstaller" xml:space="preserve">
+    <value>No update is available for this type of computer yet.</value>
+  </data>
+  <data name="UpdateFailDownload" xml:space="preserve">
+    <value>The connection to the update server failed or was interrupted. Check your internet connection and try again.</value>
+  </data>
+  <data name="UpdateFailUnexpected" xml:space="preserve">
+    <value>The update could not be completed because of an unexpected error, so it was not installed. Your installed tools have not been changed. Try again later.</value>
+  </data>
+  <data name="UpdateFailGeneric" xml:space="preserve">
+    <value>The update could not be verified, so it was not installed. Your installed tools have not been changed. Try again later.</value>
+  </data>
+  <data name="UpdateDownloadFailedTitle" xml:space="preserve">
+    <value>Update Download Failed</value>
+  </data>
+  <data name="UpdateDownloadFailedText" xml:space="preserve">
+    <value>The update could not be downloaded. {0}</value>
+  </data>
+  <data name="UpdateDownloadTimedOut" xml:space="preserve">
+    <value>The download took too long and was stopped. Your installed tools have not been changed.</value>
+  </data>
+  <data name="UpdateDownloadCanceled" xml:space="preserve">
+    <value>The update download was canceled. Nothing was installed.</value>
+  </data>
+  <data name="UpdateStatusDownloadFailed" xml:space="preserve">
+    <value>Update download failed.</value>
   </data>
   <data name="UpdateStartFailed" xml:space="preserve">
     <value>The update check could not start: {0}</value>
@@ -206,16 +251,25 @@ Download and Install checks the update again, closes the Hub, and replaces the i
     <value>The update server returned a release for a different channel than the one selected. Check the update channel in Update Settings.</value>
   </data>
   <data name="UpdateManifestExpired" xml:space="preserve">
-    <value>The update server returned a release list that has expired. Try again later.</value>
+    <value>The update information from the server has expired, so it was not used. Try again later.</value>
+  </data>
+  <data name="UpdateNotInstalledTitle" xml:space="preserve">
+    <value>Update Not Installed</value>
   </data>
   <data name="UpdateResultRunning" xml:space="preserve">
-    <value>The update was not installed because Better Windows Config apps were still running. Close them and check for updates again.</value>
+    <value>The update did not install because Better Windows Config apps were still running. Close them and check for updates again. Better Windows Config {0} is still in place.</value>
   </data>
   <data name="UpdateResultElevated" xml:space="preserve">
-    <value>The update was not installed because its helper was started with administrator rights. Check for updates from Better Windows Config without administrator rights.</value>
+    <value>The update did not install because its helper was started with administrator rights. Check for updates from Better Windows Config without administrator rights. Better Windows Config {0} is still in place.</value>
+  </data>
+  <data name="UpdateResultUnexpected" xml:space="preserve">
+    <value>The update did not install because of an unexpected error. Better Windows Config {0} is still in place.</value>
+  </data>
+  <data name="UpdateResultInstallerFailed" xml:space="preserve">
+    <value>The update did not install because the installer did not finish. Better Windows Config {0} is still in place.</value>
   </data>
   <data name="UpdateResultNotInstalled" xml:space="preserve">
-    <value>The update was not installed (reason: {0}). Your installed tools have not been changed.</value>
+    <value>The update did not install. Better Windows Config {0} is still in place.</value>
   </data>
   <data name="UpdateInstallStartFailed" xml:space="preserve">
     <value>The update could not be started: {0}</value>
@@ -234,6 +288,9 @@ Download and Install checks the update again, closes the Hub, and replaces the i
   </data>
   <data name="UpdateStatusFailed" xml:space="preserve">
     <value>Update check failed.</value>
+  </data>
+  <data name="UpdateStatusNotInstalled" xml:space="preserve">
+    <value>The update did not install.</value>
   </data>
   <data name="UpdateSettingsTitle" xml:space="preserve">
     <value>Update Settings</value>

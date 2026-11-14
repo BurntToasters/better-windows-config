@@ -19,6 +19,12 @@ internal static class UpdateSources
     /// <summary>The beta channel's manifest URL for this build. Empty: no beta channel is published yet.</summary>
     public const string BuildBetaManifestUrl = "";
 
+    /// <summary>
+    /// True when this build offers the beta channel. Without a beta manifest URL, Update Settings does not offer
+    /// Beta, and a saved beta channel reads as stable.
+    /// </summary>
+    public static bool BetaAvailable => !string.IsNullOrWhiteSpace(BuildBetaManifestUrl);
+
 #if BWC_E2E
     /// <summary>
     /// E2E-only. Replaces the manifest URL for one launch, whichever channel is selected. Never read in
@@ -58,7 +64,9 @@ internal static class UpdateSources
     /// <summary>The signature URL for a manifest URL: the same URL with ".minisig" before any query string.</summary>
     public static string SignatureUrl(string manifestUrl) => Bwc.Update.ManifestLocation.SignatureUrlFor(manifestUrl);
 
-    /// <summary>"beta" only when the setting says beta; every other value is stable.</summary>
+    /// <summary>
+    /// "beta" only when the setting says beta and this build offers it; every other value is stable.
+    /// </summary>
     public static string Channel(HubSettings settings) =>
-        string.Equals(settings.UpdateChannel, ChannelBeta, StringComparison.Ordinal) ? ChannelBeta : ChannelStable;
+        BetaAvailable && string.Equals(settings.UpdateChannel, ChannelBeta, StringComparison.Ordinal) ? ChannelBeta : ChannelStable;
 }

@@ -23,9 +23,13 @@ internal sealed class ImportExportCommands
 
     private readonly RegeditContext _context;
 
+    /// <summary>.reg files forwarded by a second launch while the window was busy. They run in arrival order.</summary>
+    private readonly Queue<string> _pendingRegFiles = new();
+
     public ImportExportCommands(RegeditContext context)
     {
         _context = context;
+        _context.BecameIdle += OnBecameIdle;
     }
 
     private string Get(string key) => _context.Messages.Get(key);
@@ -38,7 +42,32 @@ internal sealed class ImportExportCommands
     /// Imports a .reg file named on the command line or sent by a second launch. Classic regedit asks
     /// first (RT_STRING 304), then reports the result (RT_STRING 228).
     /// </summary>
-    public void ImportRegistryFile(string filePath) => _context.StartCommand(() => ImportPathAsync(filePath));
+    public void ImportRegistryFile(string filePath)
+    {
+        if (_context.IsBusy)
+        {
+            // A dialog, a write, or a command is running. The file waits for an idle window and is never dropped.
+            _pendingRegFiles.Enqueue(filePath);
+            Log.Info("Registry Editor queued a .reg file from a second launch until the window is idle.");
+            return;
+        }
+
+        _context.StartCommand(() => ImportPathAsync(filePath));
+    }
+
+    private void OnBecameIdle(object? sender, EventArgs e) => RunNextPendingRegFile();
+
+    /// <summary>Starts the next queued .reg file, only when nothing is busy. The rest wait for the next idle.</summary>
+    private void RunNextPendingRegFile()
+    {
+        if (_pendingRegFiles.Count == 0 || _context.IsBusy)
+        {
+            return;
+        }
+
+        string next = _pendingRegFiles.Dequeue();
+        _context.StartCommand(() => ImportPathAsync(next));
+    }
 
     private async Task ImportPathAsync(string filePath)
     {
@@ -154,7 +183,8 @@ internal sealed class ImportExportCommands
         var progressSink = new ImportProgressSink(
             new Progress<ImportProgress>(update => progress?.SetProgress(update.CompletedSections, update.TotalSections)));
 
-        Task<RegFileImportResult> importTask = _context.RunRegistryAsync(
+        // The import runs under the write gate: the owner is disabled and a close request is held until it ends.
+        Task<RegFileImportResult> importTask = _context.RunRegistryWriteAsync(
             () => RegFileImporter.ApplyFile(
                 RegeditWritePolicy.CreateStore(),
                 filePath,

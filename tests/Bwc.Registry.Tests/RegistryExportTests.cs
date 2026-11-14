@@ -77,9 +77,11 @@ public sealed class RegistryExportTests
         Assert.AreEqual(ExportPhase.Completed, progress.Events[^1].Phase);
         Assert.AreEqual(2, progress.Events[^1].KeysExported);
         Assert.AreEqual(7, progress.Events[^1].ValuesExported);
+        // Value progress is throttled to one report per interval, so only the first value report is
+        // guaranteed. The Completed totals above carry the full count.
         Assert.IsTrue(
-            progress.Events.Any(item => item.Phase == ExportPhase.ValueExported && item.ValueName == "Units"),
-            "No value progress event named Units.");
+            progress.Events.Any(item => item.Phase == ExportPhase.ValueExported),
+            "No value progress event was reported.");
     }
 
     [TestMethod]

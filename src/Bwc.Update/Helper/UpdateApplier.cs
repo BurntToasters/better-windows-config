@@ -22,6 +22,7 @@ public sealed class UpdateApplier
 
     private readonly UpdateOptions _options;
     private readonly IUpdateProcessHost _host;
+    private bool _installerLaunched;
 
     public UpdateApplier(UpdateOptions options, IUpdateProcessHost host)
     {
@@ -29,9 +30,32 @@ public sealed class UpdateApplier
         _host = host ?? throw new ArgumentNullException(nameof(host));
     }
 
+    /// <summary>
+    /// Any unexpected exception before the installer starts ends as <see cref="UpdateFailure.Unexpected"/>, and the
+    /// Hub is relaunched with that code. After the installer starts, the helper never relaunches the Hub.
+    /// </summary>
     public async Task<ApplyOutcome> ApplyAsync(ApplyRequest request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        try
+        {
+            return await ApplyCoreAsync(request, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Exception("unexpected error while applying the update", ex);
+            if (_installerLaunched)
+            {
+                return new ApplyOutcome(UpdateFailure.Unexpected, "unexpected error after the installer started", InstallerStarted: true, HubLaunched: false);
+            }
+
+            // The wait for the pids is skipped here: the failure may have come from the process check itself.
+            return await RefuseAsync(request, UpdateFailure.Unexpected, "unexpected error: " + ex.GetType().Name, ct, alreadyWaited: true);
+        }
+    }
+
+    private async Task<ApplyOutcome> ApplyCoreAsync(ApplyRequest request, CancellationToken ct)
+    {
         ChildEnvironment.RemoveCompatibilityLayer();
 
         // Staging under %TEMP% is writable by medium-integrity processes, so an elevated helper must not load from it.
@@ -67,7 +91,8 @@ public sealed class UpdateApplier
             return await RefuseAsync(request, folder.Failure, folder.Detail, ct, alreadyWaited: false);
         }
 
-        var arguments = InstallerArguments.Build(request.InstallDir, request.InstallerSwitches);
+        // The installer relaunches the Hub on success and waits for this process to exit before it does.
+        var arguments = InstallerArguments.Build(request.InstallDir, request.InstallerSwitches, Environment.ProcessId);
         if (!arguments.Ok)
         {
             return await RefuseAsync(request, arguments.Failure, arguments.Detail, ct, alreadyWaited: false);
@@ -128,10 +153,25 @@ public sealed class UpdateApplier
 
         // The file stays open with FileShare.Read only. No other process can write or delete it from here
         // until this method returns, so the bytes checked below are the bytes started.
+        // The folder is held first, then the installer. Its final path must be the held folder's final path plus
+        // installer.exe. Short names and junctioned parents resolve the same way on both sides; a swap between the
+        // two opens does not. The folder handle stays open until the installer has started.
+        using var folder = InstallerPaths.OpenFolder(Path.GetDirectoryName(request.InstallerPath)!);
+        if (folder is null)
+        {
+            return await RefuseAsync(request, UpdateFailure.PathRejected, "staging folder cannot be opened for verification", ct, alreadyWaited: true);
+        }
+
         using var file = OpenInstaller(request.InstallerPath);
         if (file is null)
         {
             return await RefuseAsync(request, UpdateFailure.PathRejected, "installer cannot be opened for verification", ct, alreadyWaited: true);
+        }
+
+        var finalPath = InstallerPaths.FinalPathOf(file.SafeFileHandle);
+        if (finalPath is null || !InstallerPaths.InFolder(folder, finalPath))
+        {
+            return await RefuseAsync(request, UpdateFailure.PathRejected, "installer is not in the folder that was checked", ct, alreadyWaited: true);
         }
 
         var verified = InstallerVerifier.Verify(file, expected, keys);
@@ -143,10 +183,12 @@ public sealed class UpdateApplier
 
         try
         {
-            if (!_host.StartInstaller(request.InstallerPath, arguments))
+            if (!_host.StartInstaller(InstallerPaths.StripPrefix(finalPath), arguments))
             {
                 return await RefuseAsync(request, UpdateFailure.InstallerFailed, "installer did not start", ct, alreadyWaited: true);
             }
+
+            _installerLaunched = true;
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or Win32Exception)
         {

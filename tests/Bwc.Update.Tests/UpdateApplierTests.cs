@@ -12,13 +12,13 @@ public sealed class UpdateApplierTests
     private const string CompatVariable = "__COMPAT_LAYER";
 
     /// <summary>One verified-looking update in a staging folder, plus a fake host.</summary>
-    private sealed class Harness : IDisposable
+    internal sealed class Harness : IDisposable
     {
-        public Harness(string version = "0.2.0", string architecture = Architectures.X64)
+        public Harness(string version = "0.2.0", string architecture = Architectures.X64, string rootName = "staging")
         {
             Dir = new TempDir();
             Key = SigningKey.Generate(Dir.Sub("key"));
-            Root = Dir.Sub("staging");
+            Root = Dir.Sub(rootName);
             Folder = Path.Combine(Root, Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Folder);
             Installer = Path.Combine(Folder, "installer.exe");
@@ -634,8 +634,30 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(switches: ["/ALLUSERS", "/RUNID=abc"]), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
-        Assert.AreEqual($"/S /ALLUSERS /RUNID=abc /D={h.InstallDir}", h.Host.Runs[0].Arguments);
+        Assert.AreEqual($"/S /RELAUNCH /PARENTPID={Environment.ProcessId} /ALLUSERS /RUNID=abc /D={h.InstallDir}", h.Host.Runs[0].Arguments);
         Assert.IsTrue(h.InstallDir.Contains(' '), "the directory has a space, and it must stay unquoted after /D=");
+    }
+
+    [TestMethod]
+    public async Task Installer_Relaunch_Switches_Not_Duplicated()
+    {
+        using var h = new Harness();
+
+        var outcome = await h.Applier.ApplyAsync(h.Request(switches: ["/RELAUNCH", "/PARENTPID=1", "/ALLUSERS"]), CancellationToken.None);
+
+        Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
+        Assert.AreEqual($"/S /RELAUNCH /PARENTPID={Environment.ProcessId} /ALLUSERS /D={h.InstallDir}", h.Host.Runs[0].Arguments);
+    }
+
+    [TestMethod]
+    public async Task Installer_Command_Line_Without_Switches_Ends_With_Install_Dir()
+    {
+        using var h = new Harness();
+
+        var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
+
+        Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
+        Assert.AreEqual($"/S /RELAUNCH /PARENTPID={Environment.ProcessId} /D={h.InstallDir}", h.Host.Runs[0].Arguments);
     }
 
     [TestMethod]

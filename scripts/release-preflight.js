@@ -2,11 +2,22 @@
 /**
  * Release preflight: clean tree, version agreement, changelog section, branch, trusted key,
  * and optionally a complete D5 artifact directory. No network.
+ *
+ * --require-trusted-key also runs the signing readiness checks (update key, GPG probe, AFTER_PACK_LOC,
+ * signing variables and tools, makensis, Node engines, origin ancestry, and then gh auth and the
+ * release list). The network checks run only when every local check passes.
  */
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 
 import { EXIT, describeError, exitCodeForErrors, parseArguments, printRefusals, repoRootFrom } from "./lib/cli.js";
+import { listReleases, ghEnvironment, resolveRepo } from "./lib/github-release.js";
 import { runPreflight } from "./lib/release-policy.js";
+import { publicKeyFromEnvironment } from "./embed-update-key.js";
+import { findMakensis } from "./build-installer.js";
+import { runGpgProcess } from "./gpg-sign.js";
+import { isDirectExecutionOf } from "./direct-execution.mjs";
 
 const SCRIPT = "scripts/release-preflight.js";
 const REPO_ROOT = repoRootFrom(import.meta.url);
@@ -15,8 +26,8 @@ function printHelp() {
   console.log(`Usage:
   node ${SCRIPT} [options]
 
-Checks the release rules for the current checkout. It never writes a release session
-and never contacts the network.
+Checks the release rules for the current checkout. It never writes a release session.
+Without --require-trusted-key it never contacts the network.
 
 Options:
   --root <dir>            Repository root. Defaults to the parent of scripts/.
@@ -24,8 +35,10 @@ Options:
   --channel <stable|beta> Expected channel. Defaults to the version.
   --allow-detached        Allow a detached HEAD contained in the expected branch.
   --trusted-key <path>    Public release key to parse and report.
-  --require-trusted-key   Refuse when there is no trusted key: no --trusted-key and no embedded
-                          non-placeholder key in TrustedKeys.cs.
+  --require-trusted-key   Refuse when there is no trusted key, and run the signing readiness checks:
+                          update key, GPG probe, AFTER_PACK_LOC, signing tools, makensis, Node engines,
+                          origin ancestry, gh auth, and the release list. The readiness checks read
+                          the environment (.env through the npm script) and never print secrets.
   --artifact-dir <dir>    Validate a D5 artifact directory as part of preflight.
   --json                  Print one JSON line.
   --help                  Show this help.
@@ -70,10 +83,102 @@ function main(argv = process.argv.slice(2)) {
   return run(options);
 }
 
+/** The real readiness dependencies. Each one reads the machine; tests inject fakes instead. */
+export function realReadinessDeps(root) {
+  return {
+    loadUpdateKey(env) {
+      try {
+        return { ok: true, text: publicKeyFromEnvironment(env).text };
+      } catch (error) {
+        return { ok: false, reason: error?.reason ?? "key-malformed", detail: describeError(error) };
+      }
+    },
+    runGpg: runGpgProcess,
+    probeDirectory: probeWritableFolder,
+    findMakensis: (env) => findMakensis({ env }),
+    checkSigningTools,
+    nodeVersion: process.version,
+    refExists: (ref) => gitSucceeds(root, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]),
+    isAncestor: (commit, ref) => gitSucceeds(root, ["merge-base", "--is-ancestor", commit, ref]),
+    ghAuthStatus,
+    listReleases: () => listReleases(resolveRepo(undefined, process.env), { cwd: root }),
+  };
+}
+
+function gitSucceeds(root, args) {
+  const result = spawnSync("git", args, { cwd: root, windowsHide: true, stdio: ["ignore", "ignore", "ignore"] });
+  return result.status === 0;
+}
+
+/**
+ * The folder must exist, be a real folder (not a link), and accept a file. A missing or unmapped drive
+ * is a reason, never an exception.
+ */
+export function probeWritableFolder(value) {
+  let info;
+  try {
+    info = fs.lstatSync(value);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "after-pack-loc-unavailable",
+      detail: `${value} does not exist or its drive is not mapped (${error?.code ?? "unavailable"})`,
+    };
+  }
+  if (info.isSymbolicLink()) return { ok: false, reason: "after-pack-loc-invalid", detail: `${value} is a symbolic link` };
+  if (!info.isDirectory()) return { ok: false, reason: "after-pack-loc-invalid", detail: `${value} is not a folder` };
+  const probe = path.join(value, `.bwc-readiness-${process.pid}-${Date.now()}.tmp`);
+  try {
+    fs.writeFileSync(probe, "readiness\n", { flag: "wx" });
+    fs.rmSync(probe, { force: true });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, reason: "after-pack-loc-unwritable", detail: `${value} cannot be written (${error?.code ?? "error"})` };
+  }
+}
+
+/** Resolves SignTool and the Artifact Signing dlib through the existing check-only run. */
+export function checkSigningTools() {
+  const script = path.join(REPO_ROOT, "scripts", "windows-artifact-sign.ps1");
+  const result = spawnSync(
+    "powershell.exe",
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-CheckOnly"],
+    { encoding: "utf8", windowsHide: true, timeout: 120_000, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  if (result.error || result.status !== 0) {
+    return {
+      ok: false,
+      detail: `SignTool or the Artifact Signing dlib did not resolve (windows-artifact-sign.ps1 -CheckOnly exit ${result.status ?? "none"})`,
+    };
+  }
+  const line = String(result.stdout ?? "").split(/\r?\n/).find((text) => text.startsWith("SignTool:")) ?? "SignTool resolved";
+  return { ok: true, detail: line.trim() };
+}
+
+/** gh runs on its own keyring login (ghEnvironment drops the token variables). */
+export function ghAuthStatus() {
+  const result = spawnSync("gh", ["auth", "status"], {
+    encoding: "utf8",
+    windowsHide: true,
+    env: ghEnvironment(process.env),
+    timeout: 60_000,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.error?.code === "ENOENT") return { ok: false, reason: "gh-missing", detail: "gh was not found on PATH" };
+  if (result.error) return { ok: false, reason: "gh-failed", detail: describeError(result.error) };
+  if (result.status !== 0) {
+    return { ok: false, reason: "gh-auth-missing", detail: "gh is not logged in on this machine (run gh auth login)" };
+  }
+  return { ok: true };
+}
+
 async function run(options) {
   let result;
   try {
-    result = await runPreflight(options.root, options);
+    result = await runPreflight(options.root, {
+      ...options,
+      readiness: options.requireTrustedKey ? { env: process.env, deps: realReadinessDeps(options.root) } : null,
+    });
   } catch (error) {
     console.error(`${SCRIPT}: ${describeError(error)}`);
     return EXIT.REFUSED;
@@ -118,4 +223,6 @@ async function run(options) {
   return exitCodeForErrors(result.errors);
 }
 
-process.exitCode = await main();
+if (isDirectExecutionOf(import.meta.url)) {
+  process.exitCode = await main();
+}

@@ -128,3 +128,26 @@ It deletes its scoped data root and leaves the empty `HKCU\Software\BWC-E2E` par
 assembly cleanup. No test leaves a `BwcRegedit` process or writes outside the run subtree. The test
 also exercises a manually seeded missing path and dismisses the resulting error dialog instead of
 terminating the application.
+
+## Name comparison, default value, and whitespace names (regression set)
+
+### Names compare with the current culture
+
+Failure mode: `FavoritesStore` compared names with `CurrentCultureIgnoreCase`. Culture collation
+treats some different strings as equal, such as `ab` and `a` + soft hyphen + `b`, so a new favorite
+was refused as a duplicate of an existing one that it does not match. Names now compare with
+`OrdinalIgnoreCase`, the same rule the value list uses for duplicate names. Test:
+`FavoritesFixes_SoftHyphenNameIsNotADuplicate`.
+
+### A default value under the Favorites key
+
+Failure mode: a value with an empty name under the Favorites key loaded as a favorite named empty, so
+the menu showed an entry with no name and the list ordering and removal treated it as a favorite.
+The default value is not a favorite and is ignored on load with a log entry. Test:
+`FavoritesFixes_DefaultValueIsNotAFavorite`.
+
+### A whitespace-only name can be added but never removed
+
+Failure mode: the add prompt accepted a name made only of spaces. `Remove` skips whitespace names,
+so the entry could be seen but never deleted. Add now refuses a whitespace-only name with the
+same message as an empty name, so no such value is written. Test: `FavoritesFixes_WhitespaceNameIsRefused`.
