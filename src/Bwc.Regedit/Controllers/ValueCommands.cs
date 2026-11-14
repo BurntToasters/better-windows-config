@@ -52,9 +52,7 @@ internal sealed class ValueCommands
                 return;
             }
 
-            if (string.Equals(row.Name, MessageCatalog.DefaultValueLabel, StringComparison.Ordinal) ||
-                !_context.TryGetRawValueName(row, out string oldName) ||
-                oldName.Length == 0)
+            if (row.IsDefault || !_context.TryGetRawValueName(row, out string oldName))
             {
                 await _context.ShowMessageAsync(Get("DialogDefaultValueLocked"));
                 return;
@@ -217,7 +215,7 @@ internal sealed class ValueCommands
             return;
         }
 
-        await _context.RefreshValuesAsync(activatedRow.Name);
+        await _context.RefreshValuesAsync(rawName);
     }
 
     private async Task ModifyBinaryDataAsync()
@@ -313,7 +311,7 @@ internal sealed class ValueCommands
             return;
         }
 
-        if (_context.IsSyntheticDefault(row))
+        if (row.IsSynthetic)
         {
             await EditSyntheticDefaultAsync(key);
             return;
@@ -373,7 +371,7 @@ internal sealed class ValueCommands
 
         if (saved)
         {
-            await _context.RefreshValuesAsync(row.Name);
+            await _context.RefreshValuesAsync(rawName);
         }
     }
 
@@ -404,7 +402,7 @@ internal sealed class ValueCommands
             return;
         }
 
-        await _context.RefreshValuesAsync(MessageCatalog.DefaultValueLabel);
+        await _context.RefreshValuesAsync(string.Empty);
     }
 
     private async Task<bool> EditStringValueAsync(
@@ -572,7 +570,7 @@ internal sealed class ValueCommands
             return;
         }
 
-        await _context.RefreshValuesAsync(RegistryValueDisplay.FormatName(valueName));
+        await _context.RefreshValuesAsync(valueName);
         BeginListRenameSoon();
     }
 
@@ -633,22 +631,25 @@ internal sealed class ValueCommands
         var rawNames = new List<string>(rows.Count);
         foreach (DetailsRow row in rows)
         {
+            // The synthetic (Default) row has no value behind it, so it is never a raw name and never deletes the literal.
             if (_context.TryGetRawValueName(row, out string rawName))
             {
                 rawNames.Add(rawName);
             }
         }
 
-        if (rawNames.Count == 0)
+        bool syntheticSelected = rows.Any(row => row.IsSynthetic);
+        if (rawNames.Count == 0 && !syntheticSelected)
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
         }
 
         // Several values use the plural text, one value the singular text. Both use the same caption.
+        int valueCount = rawNames.Count + (syntheticSelected ? 1 : 0);
         var dialog = new ConfirmDialog(
             Get("MsgCaptionConfirmValueDelete"),
-            Get(rawNames.Count > 1 ? "MsgDeleteValuesConfirm" : "MsgDeleteValueConfirm"),
+            Get(valueCount > 1 ? "MsgDeleteValuesConfirm" : "MsgDeleteValueConfirm"),
             Get("DialogYes"),
             Get("DialogNo"));
 
@@ -682,8 +683,14 @@ internal sealed class ValueCommands
         {
             await _context.ShowRegistryErrorAsync(first, RegistryAction.DeleteValues, firstName);
         }
+        else if (syntheticSelected)
+        {
+            // Classic regedit refuses the (Default) row that has no value, after the confirmation, with this text.
+            await _context.ShowErrorAsync(
+                new ClassicMessage(Get("MsgCaptionDeleteValuesError"), Get("MsgDeleteValuesFailed")).ToErrorDialog());
+        }
 
-        await _context.RefreshValuesAsync(selectDisplayName: null);
+        await _context.RefreshValuesAsync(selectRawName: null);
     }
 
     private async Task RenameValueCoreAsync(RegistryPath key, string oldName, string newName)

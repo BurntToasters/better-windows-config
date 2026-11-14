@@ -1018,34 +1018,35 @@ public sealed partial class DetailsList : UserControl
     {
         bool InRange(int index) => index >= 0 && index < _rows.Count;
 
-        List<string> selectedNames = _selected.Where(InRange).Select(index => _rows[index].Name).ToList();
-        string? focusName = InRange(_focus) ? _rows[_focus].Name : null;
-        string? anchorName = InRange(_anchor) ? _rows[_anchor].Name : null;
-        string? renameName = _renaming && InRange(_renameIndex) ? _rows[_renameIndex].Name : null;
+        // Rows map by identity: two rows can show one name (the default value and a literal (Default)).
+        List<DetailsRow> selectedRows = _selected.Where(InRange).Select(index => _rows[index]).ToList();
+        DetailsRow? focusRow = InRange(_focus) ? _rows[_focus] : null;
+        DetailsRow? anchorRow = InRange(_anchor) ? _rows[_anchor] : null;
+        DetailsRow? renameRow = _renaming && InRange(_renameIndex) ? _rows[_renameIndex] : null;
 
-        var indexByName = new Dictionary<string, int>(StringComparer.Ordinal);
+        var indexByRow = new Dictionary<DetailsRow, int>(ReferenceEqualityComparer.Instance);
         for (var i = 0; i < sorted.Count; i++)
         {
-            _ = indexByName.TryAdd(sorted[i].Name, i);
+            _ = indexByRow.TryAdd(sorted[i], i);
         }
 
         _rows = sorted;
         _selected.Clear();
-        foreach (string name in selectedNames)
+        foreach (DetailsRow row in selectedRows)
         {
-            if (indexByName.TryGetValue(name, out int index))
+            if (indexByRow.TryGetValue(row, out int index))
             {
                 _ = _selected.Add(index);
             }
         }
 
-        _focus = focusName is not null && indexByName.TryGetValue(focusName, out int focus) ? focus : -1;
-        _anchor = anchorName is not null && indexByName.TryGetValue(anchorName, out int anchor) ? anchor : -1;
+        _focus = focusRow is not null && indexByRow.TryGetValue(focusRow, out int focus) ? focus : -1;
+        _anchor = anchorRow is not null && indexByRow.TryGetValue(anchorRow, out int anchor) ? anchor : -1;
         _typeAhead.Clear();
         Repeater.ItemsSource = null;
         Repeater.ItemsSource = _rows;
 
-        if (renameName is not null && indexByName.TryGetValue(renameName, out int renameIndex))
+        if (renameRow is not null && indexByRow.TryGetValue(renameRow, out int renameIndex))
         {
             _renameIndex = renameIndex;
             PositionRenameBox();
@@ -1059,12 +1060,15 @@ public sealed partial class DetailsList : UserControl
     }
 
     /// <summary>
-    /// Classic name order. The default value keys as empty and sorts first. OrderBy is stable, so
-    /// equal names keep their enumeration order.
+    /// Classic name order, the only sort of the list: the default row first (by IsDefault, not by its text), then the
+    /// native collation of the display names. OrderBy is stable, so equal names keep their order.
     /// </summary>
     private static List<DetailsRow> SortRows(IEnumerable<DetailsRow> rows)
     {
-        return rows.OrderBy(row => ListCollation.SortKey(row.Name), ListCollation.Comparer).ToList();
+        return rows
+            .OrderBy(row => row.IsDefault ? 0 : 1)
+            .ThenBy(row => row.Name, ListCollation.Comparer)
+            .ToList();
     }
 
     private int FindColumnIndex(string key)
