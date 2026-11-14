@@ -18,16 +18,43 @@ public static partial class StagingCleanup
     /// <summary>True for a name that a staging folder is created with.</summary>
     public static bool IsStagingFolderName(string name) => StagingNamePattern().IsMatch(name);
 
-    /// <summary>Removes every staging folder under <paramref name="root"/> except <paramref name="keepFolder"/>.</summary>
+    /// <summary>A folder younger than this may belong to another install's staged update, so it is kept.</summary>
+    public static readonly TimeSpan MinimumAge = TimeSpan.FromHours(24);
+
+    /// <summary>
+    /// Removes staging folders under <paramref name="root"/> that are older than <see cref="MinimumAge"/>, except
+    /// <paramref name="keepFolder"/>. A younger folder is left alone, so a second install's staged update survives.
+    /// </summary>
     public static void Prune(string root, string keepFolder)
     {
         var keep = Path.GetFullPath(keepFolder);
+        var now = DateTime.UtcNow;
         foreach (var folder in StagingFolders(root))
         {
-            if (!string.Equals(Path.GetFullPath(folder), keep, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(Path.GetFullPath(folder), keep, StringComparison.OrdinalIgnoreCase) && IsOlder(folder, now))
             {
                 Remove(folder);
             }
+        }
+    }
+
+    /// <summary>Age is the later of folder creation and receipt write time. Unknown counts as young.</summary>
+    private static bool IsOlder(string folder, DateTime nowUtc)
+    {
+        try
+        {
+            var last = Directory.GetCreationTimeUtc(folder);
+            var receipt = Path.Combine(folder, ReceiptName);
+            if (File.Exists(receipt) && File.GetLastWriteTimeUtc(receipt) > last)
+            {
+                last = File.GetLastWriteTimeUtc(receipt);
+            }
+
+            return nowUtc - last >= MinimumAge;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
         }
     }
 

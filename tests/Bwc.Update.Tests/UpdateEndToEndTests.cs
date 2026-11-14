@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -58,10 +57,9 @@ public sealed class UpdateEndToEndTests
 
     private sealed record Step(string Name, bool Pass, string Detail);
 
-    private static void WriteArtifact(List<Step> steps, [CallerFilePath] string? thisFile = null)
+    private static void WriteArtifact(List<Step> steps)
     {
-        var repoRoot = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile!)!, "..", ".."));
-        var folder = Path.Combine(repoRoot, "artifacts", "update-verifier");
+        var folder = Path.Combine(RepoPaths.Root(), "artifacts", "update-verifier");
         Directory.CreateDirectory(folder);
         var result = new
         {

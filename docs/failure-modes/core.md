@@ -11,9 +11,12 @@ is detected, and what the component does about it.
 `BWC_DATA_ROOT` is read on every lookup. If the value is blank, relative, malformed, or cannot
 be converted to a full path, the component ignores it and falls back to
 `%LOCALAPPDATA%\BetterWindowsConfig`. A bad override therefore never produces a relative data
-directory. The per-user fallback comes from `Environment.GetFolderPath`; if the operating system
-returns an empty value, callers see the resulting IO error when they create directories or
-files.
+directory. The per-user fallback comes from `Environment.GetFolderPath`. If the operating system
+returns an empty or relative value for `LocalApplicationData`, the base is
+`Path.GetTempPath()\BetterWindowsConfig` instead. `GetTempPath` is under the same user profile
+(`%LOCALAPPDATA%\Temp`), so the fallback stays per user and never returns a relative path. If
+`GetTempPath` is also empty, `BaseDirectory` throws `InvalidOperationException` with a clear message;
+`Log.Initialize` and `SettingsStore` callers already handle that case as a failed start.
 
 ### Tool id traversal
 
@@ -55,6 +58,16 @@ exceed `MaxFileBytes`. A single entry larger than the limit is still written to 
 the message is not lost. The next entry triggers the roll. Part files are named
 `log-YYYYMMDD.1.txt`, `.2`, and so on; an existing part is never overwritten. A part created by
 another process between the existence check and the open is skipped by retrying the next index.
+
+### Daily cap
+
+A runaway writer (a loop that logs on every frame) must not fill the disk. `LogOptions.MaxFilesPerDay`
+(default 10, which is 50 MB with the default part size) limits the files for one UTC day, counting the
+daily file as the first. When the next part would be index `MaxFilesPerDay` or higher, the logger writes
+one final WARN line ("Log cap reached ...") to the current file, even if that file is over its size, and
+then drops every later entry for that day. The flag resets when the UTC day changes. A process restarted on
+a capped day sees the full part list, reaches the cap on its first write, and drops entries the same way.
+Drops are silent by design: the final line says so, and no entry is written through `Trace`.
 
 ### Retention
 
@@ -100,11 +113,25 @@ process is shutting down.
 
 ### Exception while reporting
 
-`Report` is guarded by an atomic flag. A dialog that pumps messages can dispatch a second
-unhandled exception on the same thread; that nested report sees the flag and returns instead of
-recursing. All work is wrapped, so a failing logger or a failing `MessageBoxW` cannot throw out
-of the crash path. Trace fallback calls use `SafeTrace`, so even a throwing trace listener cannot
-escape during shutdown.
+`Report` writes the log entry first, on every call, including a nested one. Only the dialog is
+guarded by an atomic flag. A dialog that pumps messages can dispatch a second unhandled exception on
+the same thread; that nested report is still logged, but it sees the flag and skips its dialog instead
+of recursing. All work is wrapped, so a failing logger or a failing `MessageBoxW` cannot throw out of
+the crash path. Trace fallback calls use `SafeTrace`, so even a throwing trace listener cannot escape
+during shutdown.
+
+### Unobserved task exception
+
+`TaskScheduler.UnobservedTaskException` can fire on the finalizer thread, where a modal dialog would
+block the finalizer. Its handler reports with dialogs disabled: the exception is logged and nothing is
+shown. The `AppDomain` handler is fatal and keeps its dialog.
+
+### Owner window
+
+`CrashHandler.SetOwnerWindow(hwnd)` records the main window handle. The dialog uses it as the owner
+so it appears over that window. A zero handle (the default, and what the Hub sets when its window
+closes) means the MessageBox is unowned, as before. The owner is read when the dialog is shown, so a
+stale handle after close is cleared by the caller and never used for a later report.
 
 ### Logging was never initialized
 
@@ -227,10 +254,24 @@ server that is between accept iterations has a small window where a client waits
 
 ### Current-user-only client
 
-The client always uses the local machine name `.` and the bare pipe name. It never tries the
-global pipe namespace, a remote server name, or an impersonation token, so it can only reach the
-per-user pipe that the server created with `PipeOptions.CurrentUserOnly`. The constructed name
-contains no path separators, and the server and client both use the same identity suffix.
+The client always uses the local machine name `.` and the pipe name. It never tries the
+global pipe namespace, a remote server name, or an impersonation token. The client also passes
+`PipeOptions.CurrentUserOnly` (0.1.1 audit), so Windows refuses a server that another user owns:
+the client checks the owner before it sends. The constructed name contains no path separators,
+and the server and client both use the same identity suffix.
+
+### Session-scoped pipe name (0.1.1 audit)
+
+The pipe name ends with the id of the Windows session that created the instance, for example
+`Bwc.<tool>.<identity suffix>.s<session id>`. The mutex keeps its own name. Two sessions of one
+user therefore never share a pipe name, and a process in another session cannot take the name
+that this session's server needs. Rows:
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| SI1 | Second launch in the same session | Second copy runs | Activates the first; message delivered | `Second_Instance_Message_Reaches_First` (Bwc.Update.Tests) |
+| SI2 | Client connects to a server owned by another user | Message to a squatter | Refused by the client (`CurrentUserOnly`); result `AccessDenied` | `Doc` (needs a second account) |
+| SI3 | Two sessions of one user | Shared pipe, one session's activation lands in the other | Different pipe names; no cross-session delivery | `Doc` (needs a second session) |
 
 ### Accept loop backoff
 

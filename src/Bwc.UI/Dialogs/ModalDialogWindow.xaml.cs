@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+using Bwc.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -115,21 +117,42 @@ public partial class ModalDialogWindow : Window
             _ownerDisabled = true;
             Activate();
         }
-        catch
+        catch (Exception ex)
         {
-            RestoreOwner();
-            _completion.TrySetResult(false);
-            try
-            {
-                Close();
-            }
-            catch
-            {
-                // The window was never shown. There is nothing else to clean up.
-            }
+            UiDiagnostics.Warn?.Invoke("A modal dialog could not be shown: " + ex.Message);
+            AbandonShow();
         }
 
         return _completion.Task;
+    }
+
+    /// <summary>
+    /// Runs when the dialog could not be shown. The owner is restored, the caller gets false, and the window is
+    /// closed. A derived dialog releases what it subscribed to here, because its Closed event may never run.
+    /// </summary>
+    protected virtual void OnShowAbandoned()
+    {
+    }
+
+    private void AbandonShow()
+    {
+        RestoreOwner();
+        _completion?.TrySetResult(false);
+        OnShowAbandoned();
+        try
+        {
+            Close();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The window was never shown, so there is nothing else to clean up.
+            UiDiagnostics.Warn?.Invoke("A dialog that was not shown could not be closed: " + ex.Message);
+        }
+        catch (COMException ex)
+        {
+            // The window handle is already gone. The owner was restored above.
+            UiDiagnostics.Warn?.Invoke("A dialog whose window handle is gone could not be closed: " + ex.Message);
+        }
     }
 
     /// <summary>Sets the fixed size in DIP. The window is sized in physical pixels for the owner DPI.</summary>

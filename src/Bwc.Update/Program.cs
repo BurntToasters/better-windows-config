@@ -13,9 +13,25 @@ internal static class Program
     // Progress lines are written at most once per this many bytes, so a 1 GB download prints a few hundred lines.
     private const long ProgressStepBytes = 4L * 1024 * 1024;
 
+    /// <summary>Exit code for an unexpected error in any mode (update-cli.md, "Unexpected errors").</summary>
+    private const int UnexpectedExitCode = 7;
+
     private static async Task<int> Main(string[] args)
     {
-        var parsed = UpdateArguments.Parse(args);
+        UpdateArguments? parsed = null;
+        try
+        {
+            parsed = UpdateArguments.Parse(args);
+            return await RunModeAsync(parsed);
+        }
+        catch (Exception ex)
+        {
+            return WriteUnexpected(parsed, ex);
+        }
+    }
+
+    private static async Task<int> RunModeAsync(UpdateArguments parsed)
+    {
         switch (parsed.Mode)
         {
             case UpdateMode.Help:
@@ -189,8 +205,49 @@ internal static class Program
         UpdateFailure.ProcessesStillRunning => 4,
         UpdateFailure.InstallerFailed => 5,
         UpdateFailure.HubMissing => 6,
+        UpdateFailure.Unexpected => UnexpectedExitCode,
         _ => 3,
     };
+
+    /// <summary>
+    /// The last line of a mode that threw. Each mode keeps its own JSON shape. Apply mode also relaunches the Hub
+    /// (with <c>--update-result Unexpected</c>), so the user still gets the app. The installer is never started here.
+    /// </summary>
+    private static int WriteUnexpected(UpdateArguments? parsed, Exception ex)
+    {
+        Log.Exception("unexpected error in BwcUpdate", ex);
+        var detail = "unexpected " + ex.GetType().Name + "; see the log";
+        switch (parsed?.Mode)
+        {
+            case UpdateMode.Check:
+                return WriteCheck(UpdateFailure.Unexpected, detail, null, null, UnexpectedExitCode);
+            case UpdateMode.Download:
+                return WriteDownload(UpdateFailure.Unexpected, detail, null, null, null, UnexpectedExitCode);
+            case UpdateMode.Apply:
+                var installDir = parsed!.Single("--install-dir");
+                var hubLaunched = installDir is not null && StartHubAfterUnexpected(installDir);
+                return WriteApply(new ApplyOutcome(UpdateFailure.Unexpected, detail, InstallerStarted: false, HubLaunched: hubLaunched), UnexpectedExitCode);
+            default:
+                Console.WriteLine(JsonSerializer.Serialize(new { ok = false, failure = UpdateFailure.Unexpected.ToString(), detail }));
+                return UnexpectedExitCode;
+        }
+    }
+
+    private static bool StartHubAfterUnexpected(string installDir)
+    {
+        try
+        {
+            return new WindowsUpdateProcessHost().StartDetached(
+                Path.Combine(installDir, "BetterWindowsConfig.exe"),
+                ["--update-result", UpdateFailure.Unexpected.ToString()],
+                installDir);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or System.ComponentModel.Win32Exception or ArgumentException)
+        {
+            Log.Exception("could not start the Hub after an unexpected error", ex);
+            return false;
+        }
+    }
 
     private static int WriteCheck(UpdateFailure failure, string detail, string? version, string? notesUrl, int exitCode)
     {

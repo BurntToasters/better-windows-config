@@ -1,11 +1,15 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
-import { EXIT, isPathInside } from "./cli.js";
+import { EXIT, describeError, isPathInside } from "./cli.js";
 import { isPlaceholderKeyText, loadKeyMaterial, parsePublicKeyText } from "./minisign.js";
 import { matchEmbeddedKey, readTrustedKeysFile } from "./trusted-keys.js";
-import { channelForVersion, tryParseSemVer } from "./semver.js";
+import { selectRelease, tagForVersion } from "./github-release.js";
+import { channelForVersion, compareSemVer, tryParseSemVer } from "./semver.js";
+import { missingSigningVariables, signingPolicy } from "../release-policy.js";
+import { signReleaseAssets } from "../gpg-sign.js";
 import {
   CHANGELOG_PLACEHOLDER,
   findChangelogSection,
@@ -49,7 +53,8 @@ export function currentBranch(root) {
 }
 
 export function branchContains(root, commit, branch) {
-  const names = git(root, ["branch", "--contains", commit, "--format=%(refname:short)"], {
+  // -a lists remote-tracking branches too, so a detached HEAD pushed to origin/<branch> matches.
+  const names = git(root, ["branch", "-a", "--contains", commit, "--format=%(refname:short)"], {
     allowFailure: true,
   });
   if (!names) return false;
@@ -322,17 +327,39 @@ export function checkTrustedKey(root, trustedKeyValue, { requireKey = false } = 
   return { errors, checks, key, source };
 }
 
+/** The decoded file name at the end of a URL path, "" when there is none, or null when an escape is malformed. */
+function decodedAssetName(url) {
+  const last = new URL(url).pathname.split("/").filter(Boolean).at(-1) ?? "";
+  try {
+    return decodeURIComponent(last);
+  } catch {
+    return null;
+  }
+}
+
 export function assetFilesFromManifest(root, manifest) {
   const files = {};
   for (const [architecture, entry] of Object.entries(manifest?.installers ?? {})) {
     if (!entry || typeof entry.url !== "string") continue;
     const validated = validateUrl(entry.url, { requireHttps: true });
     if (!validated.ok) continue;
-    const name = decodeURIComponent(new URL(entry.url).pathname.split("/").filter(Boolean).at(-1) ?? "");
+    const name = decodedAssetName(entry.url);
     if (!name) continue;
     files[architecture] = path.join(root, name);
   }
   return files;
+}
+
+/** The architectures whose installer URL has a malformed percent escape. Such a manifest is refused. */
+export function malformedInstallerUrls(manifest) {
+  const named = [];
+  for (const [architecture, entry] of Object.entries(manifest?.installers ?? {})) {
+    if (!entry || typeof entry.url !== "string") continue;
+    const validated = validateUrl(entry.url, { requireHttps: true });
+    if (!validated.ok) continue;
+    if (decodedAssetName(entry.url) === null) named.push(architecture);
+  }
+  return named;
 }
 
 export async function checkArtifactDirectory(root, artifactDir, release, trustedKeyTexts) {
@@ -387,6 +414,19 @@ export async function checkArtifactDirectory(root, artifactDir, release, trusted
   } catch {
     // The D4 validator below reports the exact JSON reason.
   }
+  const malformed = malformedInstallerUrls(parsedJson ?? {});
+  if (malformed.length > 0) {
+    return {
+      errors: [
+        {
+          reason: "asset-url-malformed",
+          detail: `manifest installer URL has a malformed percent escape for: ${malformed.join(", ")}`,
+          exitCode: EXIT.REFUSED,
+        },
+      ],
+      checks,
+    };
+  }
   const installers = assetFilesFromManifest(directory, parsedJson ?? {});
   const validation = await validateManifestBuffer(bytes, {
     signature: fs.readFileSync(signaturePath, "utf8"),
@@ -431,6 +471,17 @@ export async function runPreflight(root, options = {}) {
   });
   errors.push(...trusted.errors);
   checks.push(...trusted.checks);
+
+  // The signing readiness checks run only when the caller injects dependencies (the signing VM).
+  if (options.readiness && release.ok) {
+    const ready = checkReleaseReadiness(
+      root,
+      { version: release.version, channel: release.channel, commit: currentCommit(root), env: options.readiness.env },
+      options.readiness.deps,
+    );
+    errors.push(...ready.errors);
+    checks.push(...ready.checks);
+  }
 
   let artifact = null;
   if (options.artifactDir && release.ok) {
@@ -530,6 +581,14 @@ export function verifySessionFile(root, filePath, { version, channel, maxAgeHour
     checks.push({ name: "session-commit", pass: true, detail: head.slice(0, 12) });
   }
 
+  if (!session.qualityGate || typeof session.qualityGate !== "object") {
+    errors.push({
+      reason: "missing-quality-gate",
+      detail: "session has no quality gate proof; run the gate, then release-session.js create",
+      exitCode: EXIT.REFUSED,
+    });
+  }
+
   const started = Date.parse(session.startedUtc);
   const limit = maxAgeHours ?? session.maxAgeHours ?? 24;
   if (!Number.isFinite(started)) {
@@ -619,6 +678,14 @@ export function qualityGateProof(gate, head) {
       detail: `the quality gate ran on ${String(gateCommit).slice(0, 12)}, not HEAD ${String(head).slice(0, 12)}`,
     };
   }
+  // test-all.js records git.dirty. A gate that ran on uncommitted files does not describe HEAD.
+  if (gate.git?.dirty === true) {
+    return {
+      ok: false,
+      reason: "gate-dirty-tree",
+      detail: "the quality gate ran on a dirty tree; rerun it on a clean checkout of HEAD",
+    };
+  }
   const quick = gate.quick === true;
   return {
     ok: true,
@@ -630,5 +697,201 @@ export function qualityGateProof(gate, head) {
       e2e: quick ? "skipped" : "passed",
     },
   };
+}
+
+// ---- signing readiness (preflight --require-trusted-key) ----------------------------------------
+// Every dependency is injected: the signing VM passes the real ones (scripts/release-preflight.js),
+// and scripts/release-selftest.js passes fakes. Local checks all run; gh runs only when they pass.
+
+/** Exit code per reason. Other reasons refuse with EXIT.REFUSED. Missing inputs use EXIT.MISSING. */
+const READINESS_EXIT = Object.freeze({
+  "key-missing": EXIT.MISSING,
+  "key-not-found": EXIT.MISSING,
+  "missing-trusted-key-source": EXIT.MISSING,
+  "makensis-missing": EXIT.MISSING,
+  "signing-tools-missing": EXIT.MISSING,
+  "gpg-missing": EXIT.EXTERNAL,
+  "gpg-failed": EXIT.EXTERNAL,
+  "sign-failed": EXIT.EXTERNAL,
+  "gh-missing": EXIT.EXTERNAL,
+  "gh-auth-missing": EXIT.EXTERNAL,
+  "gh-failed": EXIT.EXTERNAL,
+  "key-id-missing": EXIT.USAGE,
+  "key-id-invalid": EXIT.USAGE,
+  "passphrase-missing": EXIT.USAGE,
+});
+
+const ENGINE_VERSION = /^v?(\d+)\.(\d+)\.(\d+)/;
+const ENGINE_RANGE = /^(\^|>=)?v?(\d+)\.(\d+)\.(\d+)$/;
+
+/**
+ * True when `version` satisfies a "^X.Y.Z" or ">=X.Y.Z" range (the forms package.json engines use).
+ * Null when either value is not in one of those forms.
+ */
+export function satisfiesEngineRange(version, range) {
+  const have = String(version ?? "").match(ENGINE_VERSION);
+  const want = String(range ?? "").trim().match(ENGINE_RANGE);
+  if (!have || !want) return null;
+  const actual = [Number(have[1]), Number(have[2]), Number(have[3])];
+  const wanted = [Number(want[2]), Number(want[3]), Number(want[4])];
+  const order = actual[0] - wanted[0] || actual[1] - wanted[1] || actual[2] - wanted[2];
+  if (order < 0) return false;
+  return want[1] === "^" ? actual[0] === wanted[0] : true;
+}
+
+function readEnginesNode(root) {
+  const parsed = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  const range = parsed.engines?.node;
+  return typeof range === "string" && range.trim() ? range.trim() : null;
+}
+
+/** Null when the AFTER_PACK_LOC text is an absolute folder outside the repository; else the reason. */
+export function afterPackLocProblem(root, value) {
+  if (!path.isAbsolute(value)) return `AFTER_PACK_LOC must be an absolute path: ${value}`;
+  const resolved = path.resolve(value);
+  if (path.parse(resolved).root === resolved) return "AFTER_PACK_LOC cannot be a drive or filesystem root";
+  const fold = (text) => (process.platform === "win32" ? text.toLowerCase() : text);
+  const relative = path.relative(fold(path.resolve(root)), fold(resolved));
+  if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+    return "AFTER_PACK_LOC must be outside the repository";
+  }
+  return null;
+}
+
+/** Signs a probe file in a temporary folder with the release GPG key. Never touches a release asset. */
+function gpgProbe(env, runGpg) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bwc-readiness-"));
+  try {
+    fs.writeFileSync(path.join(dir, "probe.txt"), "BWC readiness probe\n");
+    const result = signReleaseAssets({ dir, keyId: env.GPG_KEY_ID, passphrase: env.GPG_PASSPHRASE, runGpg });
+    return result.ok ? { ok: true, fingerprint: result.fingerprint } : { ok: false, errors: result.errors };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Checks everything a signing run needs before the first build. Returns { errors, checks }. Each
+ * error has reason, detail, and exitCode. deps: loadUpdateKey(env), runGpg, probeDirectory(value),
+ * findMakensis(env), checkSigningTools(), nodeVersion, refExists(ref), isAncestor(commit, ref),
+ * ghAuthStatus(), listReleases(). Secrets are read from env and never copied into the result.
+ */
+export function checkReleaseReadiness(root, options, deps) {
+  const result = readinessChecks(root, options, deps);
+  return { ...result, ok: result.errors.length === 0 };
+}
+
+function readinessChecks(root, { version, channel, commit, env = process.env }, deps) {
+  const errors = [];
+  const checks = [];
+  const refuse = (reason, detail, exitCode = READINESS_EXIT[reason] ?? EXIT.REFUSED) => {
+    errors.push({ reason, detail, exitCode });
+  };
+  const pass = (name, detail = "") => checks.push({ name, pass: true, detail });
+
+  // Local checks. Every one runs, so a single run lists each local gap.
+  const embedded = embeddedReleaseKeys(root);
+  if (!embedded.ok) {
+    refuse(embedded.reason, embedded.detail, embedded.reason === "missing-trusted-key-source" ? EXIT.MISSING : EXIT.REFUSED);
+  }
+  const key = deps.loadUpdateKey(env);
+  if (!key.ok) {
+    refuse(key.reason, key.detail);
+  } else if (embedded.ok) {
+    const matched = matchEmbeddedKey(key.text, embedded.keys);
+    if (matched.ok) pass("update-key", matched.keyIdHex);
+    else refuse(matched.reason, matched.detail);
+  }
+
+  const probe = gpgProbe(env, deps.runGpg);
+  if (probe.ok) pass("gpg-signing", probe.fingerprint);
+  else for (const error of probe.errors) refuse(error.reason, error.detail, error.exitCode);
+
+  const stable = channel === "stable";
+  if (stable || String(env.OVERRIDE_BETA_MIRROR_SKIP ?? "").trim() === "1") {
+    const destination = String(env.AFTER_PACK_LOC ?? "").trim();
+    if (!destination) {
+      refuse("after-pack-loc-missing", `${version} requires AFTER_PACK_LOC, a folder outside the repository`);
+    } else {
+      const problem = afterPackLocProblem(root, destination);
+      if (problem) {
+        refuse("after-pack-loc-invalid", problem);
+      } else {
+        const usable = deps.probeDirectory(destination);
+        if (usable.ok) pass("after-pack-loc", destination);
+        else refuse(usable.reason, usable.detail);
+      }
+    }
+  }
+
+  if (!signingPolicy(env).skip) {
+    const missing = missingSigningVariables(env);
+    if (missing.length > 0) {
+      refuse("signing-env-missing", `unset or blank: ${missing.join(", ")}`);
+    } else {
+      const tools = deps.checkSigningTools();
+      if (tools.ok) pass("signing-tools", tools.detail);
+      else refuse("signing-tools-missing", tools.detail);
+    }
+  }
+
+  const nsis = deps.findMakensis(env);
+  if (nsis.path) pass("makensis", nsis.path);
+  else refuse("makensis-missing", `makensis.exe was not found (${nsis.searched.length} folder(s) searched); set NSIS_HOME`);
+
+  const range = readEnginesNode(root);
+  if (range) {
+    if (satisfiesEngineRange(deps.nodeVersion, range) === true) pass("node-version", deps.nodeVersion);
+    else refuse("node-version", `Node ${deps.nodeVersion} does not satisfy package.json engines.node ${range}`);
+  }
+
+  const branch = expectedBranch(channel);
+  if (!branch) {
+    refuse("channel-invalid", `no branch for channel ${channel}`, EXIT.REFUSED);
+  } else if (!deps.refExists(`origin/${branch}`)) {
+    refuse("remote-branch-missing", `origin/${branch} is not present; run git fetch origin first`);
+  } else if (!deps.isAncestor(commit, `origin/${branch}`)) {
+    refuse("head-not-pushed", `HEAD ${String(commit).slice(0, 12)} is not contained in origin/${branch}; push it first`);
+  } else {
+    pass("pushed", `origin/${branch}`);
+  }
+
+  if (errors.length > 0) return { errors, checks, networkSkipped: true };
+
+  // Network checks, only after every local check passed.
+  const auth = deps.ghAuthStatus();
+  if (!auth.ok) {
+    refuse(auth.reason ?? "gh-auth-missing", auth.detail, EXIT.EXTERNAL);
+    return { errors, checks, networkSkipped: false };
+  }
+  let releases;
+  try {
+    releases = deps.listReleases();
+  } catch (error) {
+    refuse(error?.reason ?? "gh-failed", describeError(error), EXIT.EXTERNAL);
+    return { errors, checks, networkSkipped: false };
+  }
+  const tag = tagForVersion(version);
+  const selected = selectRelease(releases, tag);
+  if (!selected.ok) {
+    refuse(selected.reason, selected.detail);
+  } else if (selected.kind === "published") {
+    refuse("release-published", `${tag} is already published (release ${selected.release.id}); a published release is never replaced`);
+  } else {
+    pass("tag-state", selected.kind === "draft" ? `draft ${selected.release.id} exists and is reused` : `${tag} is not released`);
+  }
+  let latest = null;
+  for (const release of releases ?? []) {
+    if (!release || release.draft || typeof release.tag_name !== "string") continue;
+    const candidate = release.tag_name.replace(/^v/, "");
+    if (!tryParseSemVer(candidate)) continue;
+    if (latest === null || compareSemVer(candidate, latest) > 0) latest = candidate;
+  }
+  if (latest !== null && compareSemVer(version, latest) <= 0) {
+    refuse("version-not-newer", `${version} is not newer than the latest published release ${latest}`);
+  } else {
+    pass("version-order", latest === null ? "no published release yet" : `after ${latest}`);
+  }
+  return { errors, checks, networkSkipped: false };
 }
 

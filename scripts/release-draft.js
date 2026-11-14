@@ -277,6 +277,30 @@ async function applyDraft(context, options, bodyFiles) {
       const local = localByName.get(name);
       const existing = existingByName.get(name) ?? assetByName(fresh, name);
       if (!existing) continue;
+      const removeAsset = () => {
+        const deleteArgs = ghDeleteAssetArgs(context.repo, existing.id);
+        console.log(`release-draft: running ${displayGh(deleteArgs)}  # ${name}`);
+        runGhJson(deleteArgs, { cwd: context.root });
+        existingByName.delete(name);
+      };
+      // A draft asset whose upload never finished cannot be downloaded. It is broken, not a SHA-256 mismatch.
+      if (existing.state !== "uploaded") {
+        if (!options.replaceAssets) {
+          conflicts.push({
+            name,
+            reason: "asset-incomplete",
+            detail: `draft asset state is ${existing.state ?? "unknown"}, not uploaded`,
+          });
+          continue;
+        }
+        removeAsset();
+        continue;
+      }
+      // --replace-assets deletes the same-name asset and uploads the local file. The old bytes are not downloaded.
+      if (options.replaceAssets) {
+        removeAsset();
+        continue;
+      }
       // Compared by the SHA-256 of the downloaded draft asset. Size alone never decides a match.
       const remoteSha256 = await downloadedSha256(context, existing);
       const sameBytes = assetBytesMatch({ remoteSha256, localSha256: local.sha256 });
@@ -284,22 +308,16 @@ async function applyDraft(context, options, bodyFiles) {
         console.log(`release-draft: asset ${name} already matches (SHA-256); skipping`);
         continue;
       }
-      if (!options.replaceAssets) {
-        conflicts.push({
-          name,
-          detail: `existing asset SHA-256 ${remoteSha256 ?? "unknown"} differs from local ${local.sha256}`,
-        });
-        continue;
-      }
-      const deleteArgs = ghDeleteAssetArgs(context.repo, existing.id);
-      console.log(`release-draft: running ${displayGh(deleteArgs)}  # ${name}`);
-      runGhJson(deleteArgs, { cwd: context.root });
-      existingByName.delete(name);
+      conflicts.push({
+        name,
+        reason: "asset-conflict",
+        detail: `existing asset SHA-256 ${remoteSha256 ?? "unknown"} differs from local ${local.sha256}`,
+      });
     }
 
     if (conflicts.length > 0) {
       for (const conflict of conflicts) {
-        console.error(`${SCRIPT}: REFUSED [asset-conflict]: ${conflict.name}: ${conflict.detail}`);
+        console.error(`${SCRIPT}: REFUSED [${conflict.reason}]: ${conflict.name}: ${conflict.detail}`);
       }
       console.error("release-draft: pass --replace-assets to delete and re-upload those assets.");
       return EXIT.REFUSED;

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Bwc.Update.Tests;
@@ -19,6 +18,7 @@ public sealed class StagingCleanupTests
         var keep = Path.Combine(root, KeepName);
         var foreign = Path.Combine(root, "not-a-staging-folder");
         Directory.CreateDirectory(old);
+        Directory.SetCreationTimeUtc(old, DateTime.UtcNow.AddDays(-2));
         Directory.CreateDirectory(keep);
         Directory.CreateDirectory(foreign);
         File.WriteAllText(Path.Combine(root, "notes.txt"), "keep me");
@@ -32,6 +32,39 @@ public sealed class StagingCleanupTests
     }
 
     [TestMethod]
+    public void Prune_Keeps_Folder_Younger_Than_24_Hours()
+    {
+        using var dir = new TempDir();
+        var root = dir.Sub("staging");
+        var young = Path.Combine(root, OldName);
+        var keep = Path.Combine(root, KeepName);
+        Directory.CreateDirectory(young);
+        Directory.CreateDirectory(keep);
+
+        StagingCleanup.Prune(root, keep);
+
+        Assert.IsTrue(Directory.Exists(young), "a second install's staged update is not destroyed");
+    }
+
+    [TestMethod]
+    public void Prune_Uses_Receipt_Write_Time_For_Age()
+    {
+        using var dir = new TempDir();
+        var root = dir.Sub("staging");
+        var folder = Path.Combine(root, OldName);
+        var keep = Path.Combine(root, KeepName);
+        Directory.CreateDirectory(folder);
+        Directory.SetCreationTimeUtc(folder, DateTime.UtcNow.AddDays(-3));
+        var receipt = Path.Combine(folder, "receipt.json");
+        File.WriteAllText(receipt, "{}");
+        Directory.CreateDirectory(keep);
+
+        StagingCleanup.Prune(root, keep);
+
+        Assert.IsTrue(Directory.Exists(folder), "a receipt written recently keeps an old folder");
+    }
+
+    [TestMethod]
     public void Prune_Skips_Reparse_Point()
     {
         using var dir = new TempDir();
@@ -40,7 +73,7 @@ public sealed class StagingCleanupTests
         File.WriteAllText(Path.Combine(target, "precious.txt"), "do not delete through the link");
         var link = Path.Combine(root, OldName);
         Directory.CreateDirectory(root);
-        if (!TryMakeJunction(link, target))
+        if (!Links.TryMakeJunction(link, target))
         {
             Assert.Inconclusive("mklink /J is not available here");
         }
@@ -81,16 +114,4 @@ public sealed class StagingCleanupTests
         Assert.AreEqual(0, StagingCleanup.DiscardIncomplete(Path.Combine(dir.Root, "missing")));
     }
 
-    private static bool TryMakeJunction(string link, string target)
-    {
-        var psi = new ProcessStartInfo("cmd.exe")
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            Arguments = $"/c mklink /J \"{link}\" \"{target}\"",
-        };
-        using var process = Process.Start(psi) ?? throw new InvalidOperationException("could not start cmd");
-        process.WaitForExit();
-        return process.ExitCode == 0;
-    }
 }

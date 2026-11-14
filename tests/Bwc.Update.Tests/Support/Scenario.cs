@@ -52,6 +52,8 @@ internal sealed class Scenario : IAsyncDisposable
 
     public byte[] ManifestBytes { get; private set; } = [];
 
+    public byte[] ManifestSignatureBytes { get; private set; } = [];
+
     public string StagingRoot => Path.Combine(Dir.Root, "staging");
 
     public InstallerPayload Installer(string architecture) => _installers[architecture];
@@ -120,9 +122,10 @@ internal sealed class Scenario : IAsyncDisposable
             ? Signing.Sign(file, signer ?? Key, rawComment)
             : Signing.SignManifest(file, signer ?? Key, commentVersion ?? Version, commentChannel ?? Channel, expires ?? DefaultExpires());
         Server.Map(ManifestPath, new Route(Body: ManifestBytes));
+        ManifestSignatureBytes = Encoding.UTF8.GetBytes(signed.Raw);
         if (publishSignature)
         {
-            Server.Map(ManifestSignaturePath, new Route(Body: Encoding.UTF8.GetBytes(signed.Raw)));
+            Server.Map(ManifestSignaturePath, new Route(Body: ManifestSignatureBytes));
         }
     }
 

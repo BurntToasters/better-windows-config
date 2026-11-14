@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Runtime.InteropServices;
 using Bwc.Core;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -20,8 +22,6 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        Log.Initialize(ToolId);
-        Log.Info("Hub starting.");
         CrashHandler.Install(ToolId, showDialog: true);
         UnhandledException += OnUnhandledException;
 
@@ -31,13 +31,19 @@ public partial class App : Application
         _instance = SingleInstance.Create(ToolId);
         if (!_instance.IsFirstInstance)
         {
+            // The log is not opened here: a second instance must not write the running instance's daily file.
+            // Its messages go to Trace until a log is initialized.
             Log.Info("Another Hub instance is running. Requesting activation.");
+            AllowForegroundForRunningInstance();
             SendActivate();
             Shutdown();
             Exit();
             return;
         }
 
+        Log.Initialize(ToolId);
+        Bwc.UI.UiDiagnostics.Warn = Log.Warn;
+        Log.Info("Hub starting.");
         _instance.MessageReceived += OnMessageReceived;
         var window = new MainWindow();
         _window = window;
@@ -96,6 +102,34 @@ public partial class App : Application
     {
         Shutdown();
     }
+
+    /// <summary>
+    /// Lets the running instance take the foreground for the activation that follows. The process the user just
+    /// started holds the right to grant it. A failed call is logged, and the handoff still runs.
+    /// </summary>
+    private static void AllowForegroundForRunningInstance()
+    {
+        try
+        {
+            if (!AllowSetForegroundWindow(AllowAnyProcess))
+            {
+                Log.Warn("The running Hub instance was not given foreground rights. Win32 error " +
+                    Marshal.GetLastWin32Error().ToString(CultureInfo.InvariantCulture) + ".");
+            }
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            Log.Warn("AllowSetForegroundWindow is unavailable: " + ex.Message);
+        }
+    }
+
+#pragma warning disable SYSLIB1054 // A single user32 call does not justify LibraryImport plumbing.
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool AllowSetForegroundWindow(uint processId);
+#pragma warning restore SYSLIB1054
+
+    /// <summary>ASFW_ANY: any process may take the foreground next.</summary>
+    private const uint AllowAnyProcess = unchecked((uint)-1);
 
     private void SendActivate()
     {

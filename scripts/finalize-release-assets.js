@@ -123,7 +123,13 @@ export function resolveDestination({ releaseDir, destination, version, repoRoot 
 
   const resolvedRelease = fs.realpathSync.native(releaseDir);
   const resolvedRepo = fs.realpathSync.native(repoRoot);
-  const resolvedDestination = resolveThroughMissing(requested);
+  let resolvedDestination;
+  try {
+    resolvedDestination = resolveThroughMissing(requested);
+  } catch (error) {
+    // An unmapped drive letter has no real path to resolve. That is a refusal, not a crash.
+    return fail(refusal("after-pack-loc-unavailable", `AFTER_PACK_LOC is not reachable: ${requested} (${describeError(error)})`));
+  }
   if (sameOrInside(resolvedDestination, resolvedRepo)) {
     return fail(refusal("destination-in-repo", `AFTER_PACK_LOC must be outside the repository: ${resolvedRepo}`));
   }

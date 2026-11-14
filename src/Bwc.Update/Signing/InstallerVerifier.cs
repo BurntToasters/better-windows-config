@@ -28,8 +28,17 @@ public static class InstallerVerifier
                 $"installer is {file.Length} bytes, expected {expected.Size}");
         }
 
-        file.Position = 0;
-        var digest = Convert.ToHexString(SHA256.HashData(file)).ToLowerInvariant();
+        string digest;
+        try
+        {
+            file.Position = 0;
+            digest = Convert.ToHexString(SHA256.HashData(file)).ToLowerInvariant();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Outcome<string>.Fail(UpdateFailure.Io, "installer cannot be read: " + ex.GetType().Name);
+        }
+
         if (!string.Equals(digest, expected.Sha256, StringComparison.Ordinal))
         {
             return Outcome<string>.Fail(UpdateFailure.InstallerHashMismatch, "installer SHA-256 does not match the manifest");

@@ -8,7 +8,7 @@ that the installer calls. The minisign layer is the verifier proven in
 
 Written before the tests and before the code, per AGENTS.md ("FIRST write all the ways it could
 fail, THEN write the code"). This revision adds sections L to R and changes rows MS14, NE4, IN15,
-HL5, HL8, HL10 to HL13, and HT7 and HT8.
+HL5, HL8, HL10 to HL13, and HT7 and HT8. The 0.1.1 audit adds section S and changes row M4.
 
 Terms:
 - **WA** = wrongly accept (a bad manifest, installer, or request passes).
@@ -83,13 +83,18 @@ Terms:
 | UR3 | User info in the URL (`https://user@host/`) | Credentials in logs, host confusion | Reject | `Url_UserInfo_Rejected` |
 | UR4 | Fragment in the URL | Ambiguous identity | Reject | `Url_Fragment_Rejected` |
 | UR5 | `.` or `..` path segment | Path traversal | Reject | `Url_Dot_Segment_Rejected` |
-| UR6 | Encoded traversal or separators (`%2e%2e`, `%2F`, `%5C`, `%00`) | Traversal after decoding | Reject | `Url_Encoded_Traversal_Rejected` |
+| UR6 | Encoded traversal or separators (`%2e%2e`, `%2F`, `%5C`, `%00`) in the path (the text before `?`, any case) | Traversal after decoding | Reject | `Url_Encoded_Traversal_Rejected` |
 | UR7 | Backslash, space, or control character in the URL | Parser disagreement | Reject | `Url_Bad_Characters_Rejected` |
-| UR8 | URL longer than 2048 characters | Log or buffer abuse | Reject | `Url_TooLong_Rejected` |
+| UR8 | URL longer than 4096 characters | Log or buffer abuse | Reject | `Url_TooLong_Rejected` |
 | UR9 | Redirect to a non-https URL while https is required | WA on the final hop | Reject the redirect before following it | `Redirect_To_Http_Rejected` |
 | UR10 | Redirect to another host over https | WR if rejected; the signature is the authority | Accept | `Redirect_To_Other_Host_Accepted` |
 | UR11 | More than 5 redirects | Loop | Reject `DownloadFailed` | `Redirect_Loop_Rejected` |
 | UR12 | Local installer file name derived from the URL or the trusted comment | Traversal into the staging root | Never derived. The file is always `installer.exe` in a new folder | `Local_File_Name_Is_Fixed` |
+| UR13 | GitHub-shaped release asset URL (about 1000 characters, final hop of a 302 chain) whose query holds `%2F`, `%3D`, `%3B`, `+`, `%20` | WR: every update check fails with `UrlRejected` | The query gets only the character-class check (UR15). Manifest and installer both succeed | `Github_Shaped_Redirect_Chain_Accepted` |
+| UR14 | `%2f` or `%2F` in the path when a query follows (`/a%2Fb?x=1`) | Traversal hidden by a query | Reject `UrlRejected` (the path check runs on the text before `?`) | `Encoded_Separator_In_Path_Refused_With_Query` |
+| UR15 | Query with a space, control character, non-ASCII character, backslash, double quote, or `#` | Parser disagreement | Reject `UrlRejected` | `Query_Bad_Characters_Rejected` |
+| UR16 | Redirect `Location` whose query has a raw space (the URI parser would escape it silently) | Parser disagreement after normalization | Reject the redirect before following it | `Redirect_Raw_Space_In_Query_Rejected` |
+| UR17 | URL of exactly 4096 characters | Limit off by one | Accept | `Url_At_Limit_Accepted` |
 
 ## D. Version policy
 
@@ -170,7 +175,8 @@ Terms:
 | HL6 | Install folder contains `"`, a control character, or a trailing backslash | Breaks the unquoted `/D=` argument | Refuse `InstallDirUnsafe` | `Install_Dir_Unsafe_Refused` |
 | HL7 | Install folder is relative or does not exist | Installs to the wrong place | Refuse `InstallDirUnsafe` | `Install_Dir_Missing_Refused` |
 | HL8 | Installer switch that is `/S`, `/D`, lowercase, has a space or quote, or has a value that breaks the rules in section O | Overriding the silent or directory switches, or a broken raw command line | Refuse `InstallerArgumentRejected`; allowed switches pass | `Installer_Arg_Validation` |
-| HL9 | Command line for the installer | `/D=` must be last and unquoted | Exactly `/S <switches> /D=<install dir>`, with the directory unquoted | `Installer_Command_Line_Exact` |
+| HL9 | Command line for the installer | `/D=` must be last and unquoted | Exactly `/S /RELAUNCH /PARENTPID=<helper pid> <switches> /D=<install dir>`, directory unquoted | `Installer_Command_Line_Exact` |
+| HL14 | Caller passes `/RELAUNCH` or `/PARENTPID` as an installer switch | Two values for one switch, or a PARENTPID that is not the helper | The helper drops them and writes its own, once each | `Installer_Relaunch_Switches_Not_Duplicated` |
 | HL10 | Installer exit code | Helper waits and reports the wrong thing | Removed: the helper does not wait for the installer (N1). The installer's own result is its duty | `Apply_Starts_Installer_And_Returns` |
 | HL11 | Installer does not exit | Hang in the helper | Removed: the helper has exited. The installer's time limit is its duty | `Doc` |
 | HL12 | Hub executable missing for a refusal relaunch | Crash | Reported as `HubMissing`, no exception, exit 6 | `Hub_Missing_Reported` |
@@ -236,14 +242,14 @@ staging folder. `--download` runs the same manifest checks, then reuses or downl
 | M1 | `--check` on a valid manifest | Downloads 330 MB for nothing | Reports version and notes URL; no installer request; no staging folder | `Check_Does_Not_Download_Or_Stage` |
 | M2 | `--download` with a verified staged installer of the same version, channel, architecture, size, SHA-256, and signature | Repeated download | Reuse: no installer request, and the same folder is returned | `Download_Reuses_Verified_Staging` |
 | M3 | Reused installer changed on disk | Tampered reuse | Re-verification fails, the folder is discarded, and a fresh download is verified | `Download_Reuse_Tampered_Installer_Redownloads` |
-| M4 | Successful download prunes every other staging folder, complete or incomplete | Growth of %TEMP% | Only the returned folder remains | `Download_Prunes_Other_Staging` |
+| M4 | Successful download prunes other staging folders, complete or incomplete | Growth of %TEMP%, or destroying a second install's staged update | Only folders older than 24 hours are removed (S13); younger ones are kept (S12). The returned folder always remains | `Download_Prunes_Older_Staging`, `Download_Keeps_Younger_Staging` |
 | M5 | Staging root holds a folder whose name is not 32 lowercase hex, or a file | Deleting foreign data | Left alone | `Prune_Leaves_Foreign_Entries` |
 | M6 | Staging folder is a reparse point (junction) | Deleting through a link | Skipped: not followed and not deleted | `Prune_Skips_Reparse_Point` |
 | M7 | Download progress | Silent wait | Progress reports rise and end at the manifest size | `Download_Reports_Progress` |
 | M8 | Cancellation or kill during the download | Partial folder kept | Helper deletes its own folder on cancellation (IN16). After a kill the Hub removes folders without `receipt.json` (M9) | `Cancellation_Removes_Partial_File` |
 | M9 | Helper killed (no cleanup possible) and a folder without `receipt.json` remains | Partial installer kept | Folders without `receipt.json` are removed by the Hub's cleanup, never folders with one | `Discard_Incomplete_Removes_Folders_Without_Receipt` |
 | M10 | Time limits | The Hub kills a helper that is still working | Hub limits match the helper: check 3 minutes (two 60 s manifest reads, margin); download 32 minutes (manifest pair plus the 30 minute installer limit). The helper's own limits are unchanged | `Doc` (hub.md) |
-| M11 | `--download` with a reused folder whose receipt names another version | Wrong receipt reused | Not reused; the folder is pruned as stale | `Download_Ignores_Receipt_Of_Other_Version` |
+| M11 | `--download` with a reused folder whose receipt names another version | Wrong receipt reused | Not reused; the folder is pruned once it is older than 24 hours (S13) | `Download_Ignores_Receipt_Of_Other_Version` |
 
 ## N. Apply hand-off
 
@@ -262,6 +268,8 @@ installer starts relaunches the Hub with a result argument (`--update-result <Up
 | N7 | The relaunch argument | Unsafe text on the command line | Only the failure code is passed, never the detail | `Refusal_Relaunches_Hub_With_Message` (asserts the argument list is exactly the code) |
 | N8 | Hub executable missing for a refusal relaunch | Crash | `HubMissing`, no exception (HL12) | `Hub_Missing_Reported` |
 | N9 | Verified installer held open | Replacement before launch | Lock held until the start (HT4) | `Verified_Installer_Is_Locked` |
+| N15 | Installer succeeds (the helper passed `/RELAUNCH /PARENTPID=<pid>`) | The installer must start the Hub itself | Installer duty (D1): after the files are replaced it starts `BetterWindowsConfig.exe`. The helper does not | `Doc` (installer side) |
+| N16 | Installer fails after the helper started it | Hub never comes back and the user sees nothing | Installer duty (D1): start the still-installed Hub with `--update-result InstallerFailed` | `Doc` (installer side) |
 | N10 | Helper runs elevated (high integrity or administrator token) | Medium-integrity processes can write %TEMP% staging, so an elevated run would load planted files | Refuse `RunningElevated` before any action; Hub relaunched with the code; no installer started | `Apply_Elevated_Refused` |
 | N11 | `__COMPAT_LAYER` in the helper environment | Compat layer leaks into the installer and the Hub | Removed from the helper's process environment before any child starts | `Compat_Layer_Removed_From_Children` |
 | N12 | The Hub's relaunch environment | Hub started with inherited compat flags | Covered by N11 (the helper scrubs its environment, and the Hub no longer sets the variable) | `Compat_Layer_Removed_From_Children` |
@@ -318,3 +326,33 @@ Documented in `docs/contracts/update-cli.md`.
 | R3 | Signature URL with a query string | `.minisig` appended after the query, so the signature is not found | The `.minisig` suffix goes before the query: `path.minisig?query` | `Signature_Url_Inserts_Before_Query` |
 | R4 | Signature URL with no query | Wrong suffix | `path.minisig` | `Signature_Url_Without_Query` |
 | R5 | Channel manifest URL | One URL serving both channels: one channel always fails | One manifest URL per channel (Hub). A channel mismatch is shown as its own message | `Doc` (hub.md) |
+
+## S. Hardening (0.1.1 audit)
+
+Added in the 0.1.1 audit. Every row is written before its test or code.
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| S1 | Receipt held open by another process (sharing violation) | An exception escapes; the user sees no app | `ReceiptInvalid` refusal, no exception; apply mode relaunches the Hub with the code | `Receipt_Locked_Refused_Not_Thrown` |
+| S2 | Receipt cannot be read (access denied) | Same as S1 | `ReceiptInvalid` refusal, no exception | `Receipt_Unreadable_Refused` |
+| S3 | A folder or file on the installer path cannot be inspected for reparse points (access denied, or a read error other than not-found) | Unknown is treated as safe | Refuse `PathRejected` (unknown counts as a link). Not-found counts as absent | `Doc` (an access-denied attribute read cannot be reproduced without elevation; the catch is checked by inspection) |
+| S4 | Installer read fails while the verifier hashes it (I/O error or access denied) | Exception escapes the verifier | `Io` refusal; the installer is not started | `Verify_Read_Failure_Refused` |
+| S5 | A staging folder cannot be enumerated, or its installer cannot be opened during reuse | Exception ends the download | Folder is not reused; the download continues | `Reuse_Unreadable_Folder_Skipped` |
+| S6 | The installer's final path (GetFinalPathNameByHandle) is not the final path of the staging folder it was opened from, plus `installer.exe`. The folder is held open first (backup semantics, share read, write, delete) | A different file runs than the one verified (a junction or swap between the two opens) | Refuse `PathRejected` before the installer starts. The folder handle stays open until the start | `Final_Path_Mismatch_Refused`, `Installer_Outside_Held_Folder_Refused` |
+| S7 | Final path spelling differs by a `\?\` prefix or by letter case | Refuses a good path | Equal after normalization (case-insensitive, prefix stripped) | `Final_Path_Compare_Normalizes` |
+| S8 | Installer started with the staging folder as its working directory | A planted DLL in staging loads | Started by the verified final path, working directory is the system directory; the handle stays open until the start | `Doc` (WindowsUpdateProcessHost; exe check) |
+| S9 | A BWC process of another session or another user runs from the install folder | Install blocked, or waits for a process the user cannot close | Ignored by the running check | `Other_Session_Process_Ignored` |
+| S10 | A process whose session id cannot be read | Fail-open if ignored | Counted as running (fail closed, section O5) | `Unknown_Session_Counts_As_Running` |
+| S11 | Wait pids given to `--apply` | Other sessions' pids held forever | Wait pids are not session-filtered (the caller names them) | `Doc` |
+| S12 | Successful download while another staging folder is younger than 24 hours (a second install's staged update) | That staged update is destroyed | Kept | `Download_Keeps_Younger_Staging` |
+| S13 | Staging folder older than 24 hours (age = receipt write time, or folder creation time when there is no receipt) | Growth of %TEMP% | Pruned | `Download_Prunes_Older_Staging` |
+| S14 | Receipt written in place and cut short by a crash | A partial receipt is read | Written to a temp file in the same folder, then moved over `receipt.json` with overwrite; no temp file remains | `Receipt_Write_Is_Atomic` |
+| S15 | Receipt write fails after the installer is verified | Temp file left in the folder | Temp file removed; the folder is discarded | `Doc` |
+| S16 | Unexpected exception in check or download mode | No output for the caller | One JSON line with failure `Unexpected`, exit code 7, logged | `Doc` (exe check) |
+| S17 | Unexpected exception in apply mode before the installer starts | The user is left with no app | Installer not started; the Hub is relaunched with `--update-result Unexpected`; exit code 7 | `Unexpected_In_Apply_Relaunches_Hub` |
+| S18 | Unexpected exception after the installer started | Hub relaunched while the installer runs | No relaunch; `installerStarted: true`, failure `Unexpected`, exit code 7 | `Doc` |
+| S19 | Proxy that requires the Windows account | Download fails behind an authenticated proxy | Default credentials sent to the proxy | `Doc` |
+| S20 | Second instance sends to a pipe name that another user or session owns | Squatting or collision | See core.md, SingleInstance: client uses CurrentUserOnly, pipe name carries the session id | `Second_Instance_Message_Reaches_First` (core.md section) |
+| S21 | The staging path is given in 8.3 short form (for example `C:\Users\JOHNSM~1\...`, which `Path.GetTempPath` can return) | Every update refused as PathRejected on such machines | Accepted: the final-path check compares resolved paths, so the short form applies. Skipped with a recorded reason only when 8.3 names are disabled on the volume | `Staging_Path_8dot3_Applies` |
+| S22 | The staging root is reached through a directory junction in a parent (TEMP relocated through a junction) | Every update refused as PathRejected | Accepted: both paths resolve to the same final path and the update applies. A junction as the staging root itself is still refused (section F) | `Staging_Via_Junction_Applies` |
+| S23 | Between the folder open and the installer open, the installer name is redirected to another folder (swap) | A different file is started | Refused `PathRejected`: the installer's final path is not the held folder's final path plus `installer.exe` | `Installer_Outside_Held_Folder_Refused` |

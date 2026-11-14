@@ -58,3 +58,43 @@ installer must not replace files that the running process holds: it should stop 
 
 The process name list is fixed in the updater: `BetterWindowsConfig` and the catalog tools. An installer
 that starts other programs from the folder must handle them itself.
+
+## Hand-off from the helper (`--apply`)
+
+The helper starts the installer once, with the raw command line:
+
+```
+installer.exe /S /RELAUNCH /PARENTPID=<helper pid> [allowed switches] /D=<install dir>
+```
+
+The helper writes `/RELAUNCH` and `/PARENTPID` itself, and drops a caller's copy of either. It then exits
+at once. The installer:
+
+1. Waits for `/PARENTPID` to exit (`--wait-pid`, above), closes the running apps (`--close-running`), and
+   replaces the files.
+2. On success, starts the Hub: `BetterWindowsConfig.exe` in the install folder. `/RELAUNCH` is the request.
+3. On failure, starts the still-installed Hub with `--update-result InstallerFailed`, so the Hub shows
+   the reason. The Hub is started only after the helper's pid has exited, because a second Hub would
+   only activate the first one.
+
+Failure cases: `docs/failure-modes/update-verifier.md`, sections HL9, HL14, N15, and N16.
+
+## Unexpected errors (all modes, 0.1.1)
+
+Any exception that escapes a mode is caught at the top of `Main`. The mode then:
+
+- logs the exception type and message through `Log`;
+- prints one JSON line with `"ok":false` and `"failure":"Unexpected"`, in the shape that mode already uses
+  (`--check` and `--download` and `--apply` use their own shapes; `--close-running`, `--wait-pid`, and
+  help or usage output print `{"ok":false,"failure":"Unexpected","detail":"..."}`);
+- exits with code `7`.
+
+In `--apply` mode, when the installer has not started, the helper also relaunches the Hub with
+`--update-result Unexpected` (the same way a refusal does), so the user is never left without the app.
+When the installer has started, the helper does not relaunch the Hub; the installer owns that.
+
+| Code | Meaning |
+|------|---------|
+| `7` | An unexpected error. The JSON line carries `"failure":"Unexpected"`. Logged. |
+
+Failure cases: `docs/failure-modes/update-verifier.md`, section S (S16 to S18).

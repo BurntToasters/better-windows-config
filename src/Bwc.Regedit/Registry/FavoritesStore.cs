@@ -52,7 +52,7 @@ public sealed class FavoritesStore
 
     private const int MaxNameLength = 16383;
 
-    private static readonly StringComparer NameComparer = StringComparer.CurrentCultureIgnoreCase;
+    private static readonly StringComparer NameComparer = StringComparer.OrdinalIgnoreCase;
 
     private readonly RegistryStore _store;
     private readonly RegistryReader _reader;
@@ -119,6 +119,12 @@ public sealed class FavoritesStore
 
             foreach (RegistryValueInfo value in values)
             {
+                // The default value is not a favorite. Loading it as one emptied the whole list.
+                if (value.Name.Length == 0)
+                {
+                    continue;
+                }
+
                 if (value.Type != (uint)RegistryValueType.String)
                 {
                     Log.Warn(
@@ -159,7 +165,7 @@ public sealed class FavoritesStore
 
         // The name is kept as given. Classic regedit does not trim it, so a trailing space is part of it.
         string displayName = name;
-        if (displayName.Length == 0)
+        if (string.IsNullOrWhiteSpace(displayName))
         {
             throw new ArgumentException("Enter a favorite name.", nameof(name));
         }

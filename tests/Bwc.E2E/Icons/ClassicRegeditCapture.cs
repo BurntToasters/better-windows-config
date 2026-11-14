@@ -43,10 +43,10 @@ internal static class ClassicRegeditCapture
             return;
         }
 
-        ControlTestSupport.AppletSnapshot before;
+        AppletState before;
         try
         {
-            before = ControlTestSupport.SnapshotAppletValues();
+            before = AppletState.Capture();
         }
         catch (Exception ex)
         {
@@ -84,6 +84,20 @@ internal static class ClassicRegeditCapture
             $"Not captured: {failure ?? "a capture file was not written"}. The check is not recorded.");
     }
 
+    // Null when the applet state matches the snapshot afterwards, otherwise the first difference.
+    private static string? RestoreAndCompare(AppletState before)
+    {
+        try
+        {
+            before.Restore();
+            return null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ex.Message;
+        }
+    }
+
     private static void CaptureWindows(E2EConfig config, string initialPath, string expandedPath)
     {
         // The session closes classic regedit on dispose. Classic regedit writes its applet values on exit.
@@ -116,17 +130,17 @@ internal static class ClassicRegeditCapture
         session.Close();
     }
 
-    private static void RestoreApplet(ControlTestSupport.AppletSnapshot before)
+    private static void RestoreApplet(AppletState before)
     {
         try
         {
-            string? mismatch = ControlTestSupport.RestoreAppletValues(before);
+            string? mismatch = RestoreAndCompare(before);
             if (mismatch is null)
             {
                 E2EResults.Record(
                     RestoreCheckId,
                     true,
-                    $"Applet values match the snapshot taken before classic regedit ran ({before.Values.Count} value(s), key existed={before.KeyExisted}).");
+                    $"Applet values match the snapshot taken before classic regedit ran ({before.ValueCount} value(s), key existed={before.KeyExisted}).");
             }
             else
             {

@@ -48,7 +48,14 @@ public sealed partial class MainWindow : Window
     private ClassicMenuKeyboard? _menuKeyboard;
     private bool _initialSizeApplied;
     private bool _startupCheckQueued;
-    private bool _checkInProgress;
+    private WindowBounds? _normalBounds;
+
+    /// <summary>The check that is running now, if any, with its cancel source. Null when no check runs.</summary>
+    private Task<UpdateCheckResult>? _activeCheck;
+    private CancellationTokenSource? _activeCancel;
+
+    /// <summary>Set when a manual check waits on the running check, which then leaves its result to that wait.</summary>
+    private bool _activeCheckHandedOver;
 
     public MainWindow()
     {
@@ -59,6 +66,7 @@ public sealed partial class MainWindow : Window
 
         InitializeComponent();
         _hwnd = WindowNative.GetWindowHandle(this);
+        CrashHandler.SetOwnerWindow(_hwnd);
 
         Title = HubStrings.Get("ProductName");
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "bwc.ico"));
@@ -69,6 +77,9 @@ public sealed partial class MainWindow : Window
 
         ApplyTheme();
         BwcTheme.Changed += OnThemeChanged;
+
+        // HubRoot is pinned to the palette, so a system theme change is seen here, on the unpinned probe.
+        ThemeProbe.ActualThemeChanged += (_, _) => BwcTheme.RefreshSystem();
 
         ConfigureListBrushes();
         ToolList.Header = BuildColumnHeader();
@@ -82,6 +93,7 @@ public sealed partial class MainWindow : Window
 
         HubRoot.Loaded += OnHubRootLoaded;
         AppWindow.Closing += OnAppWindowClosing;
+        AppWindow.Changed += OnAppWindowChanged;
         Closed += OnClosed;
         ToolList.SelectionChanged += OnSelectionChanged;
         // The item consumes Enter before the list sees it, so this handler also receives handled events.
@@ -278,12 +290,46 @@ public sealed partial class MainWindow : Window
         }
 
         e.Handled = true;
+
+        // A held Enter repeats the key down. Only the first press launches, so one hold starts one tool.
+        if (e.KeyStatus.WasKeyDown)
+        {
+            return;
+        }
+
         LaunchSelected();
     }
 
     private void OnToolListDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
+        // Only a tap on a tool row launches. The header, the empty area, and the scroll bar are not rows.
+        ListViewItem? item = RowUnder(e.OriginalSource as DependencyObject);
+        if (item is null)
+        {
+            return;
+        }
+
+        ToolList.SelectedItem = item;
         LaunchSelected();
+    }
+
+    /// <summary>The tool row that holds the element, or null when the element is outside every row.</summary>
+    private ListViewItem? RowUnder(DependencyObject? source)
+    {
+        for (DependencyObject? current = source; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is ListViewItem item)
+            {
+                return item;
+            }
+
+            if (ReferenceEquals(current, ToolList))
+            {
+                return null;
+            }
+        }
+
+        return null;
     }
 
     private void OnLaunchClicked(object sender, RoutedEventArgs e)
@@ -313,6 +359,9 @@ public sealed partial class MainWindow : Window
         Launch(tool);
     }
 
+    /// <summary>Win32 ERROR_CANCELLED: the user declined the UAC consent prompt.</summary>
+    private const int ErrorCancelled = 1223;
+
     private void Launch(ToolCatalog.Tool tool)
     {
         string exe = HubTools.ExePath(tool);
@@ -335,6 +384,12 @@ public sealed partial class MainWindow : Window
             })?.Dispose();
             StatusText.Text = HubStrings.Format("StatusLaunched", tool.DisplayName);
             Log.Info("Launched " + tool.DisplayName + " from " + exe + ".");
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == ErrorCancelled)
+        {
+            // The user canceled the consent prompt of an elevating tool. That is a choice, not a failure.
+            StatusText.Text = HubStrings.Get("StatusLaunchCanceled");
+            Log.Info("Launch of " + tool.DisplayName + " was canceled at the consent prompt.");
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
@@ -438,10 +493,12 @@ public sealed partial class MainWindow : Window
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
+        CrashHandler.SetOwnerWindow(0);
         BwcTheme.Changed -= OnThemeChanged;
         _menuKeyboard?.Dispose();
         _menuKeyboard = null;
         AppWindow.Closing -= OnAppWindowClosing;
+        AppWindow.Changed -= OnAppWindowChanged;
         HubRoot.Loaded -= OnHubRootLoaded;
     }
 
@@ -449,7 +506,23 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            return _settingsStore.Load();
+            bool existed = File.Exists(_settingsStore.Path);
+            HubSettings settings = _settingsStore.Load();
+            if (settings.Migrate() && existed)
+            {
+                // The migration runs once per file: the saved file carries the new version, so a later "off" is kept.
+                try
+                {
+                    _settingsStore.Save(settings);
+                    Log.Info("Hub settings were migrated to version " + HubSettings.CurrentSettingsVersion + ".");
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    Log.Warn("Hub settings could not be migrated: " + ex.Message);
+                }
+            }
+
+            return settings;
         }
         catch (IOException ex)
         {
@@ -481,12 +554,9 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            DisplayArea? display = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
-            if (display is null)
-            {
-                return;
-            }
-
+            // The display is the one the saved rectangle is on, as Regedit does, not the display the window was created on.
+            var saved = new RectInt32(bounds.X, bounds.Y, bounds.Width, bounds.Height);
+            DisplayArea display = DisplayArea.GetFromRect(saved, DisplayAreaFallback.Nearest);
             RectInt32 workArea = display.WorkArea;
             int width = Math.Min(Math.Max(bounds.Width, MinimumWidth), workArea.Width);
             int height = Math.Min(Math.Max(bounds.Height, MinimumHeight), workArea.Height);
@@ -498,8 +568,13 @@ public sealed partial class MainWindow : Window
             int x = Math.Clamp(bounds.X, workArea.X, workArea.X + Math.Max(0, workArea.Width - width));
             int y = Math.Clamp(bounds.Y, workArea.Y, workArea.Y + Math.Max(0, workArea.Height - height));
 
-            AppWindow.Move(new PointInt32(x, y));
-            AppWindow.Resize(new SizeInt32(width, height));
+            // One call sets position and size, as Regedit does. Two calls left the top edge at the wrong place.
+            AppWindow.MoveAndResize(new RectInt32(x, y, width, height));
+            _normalBounds = new WindowBounds { X = x, Y = y, Width = width, Height = height };
+            if (_settings.WindowMaximized && AppWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.Maximize();
+            }
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or COMException)
         {
@@ -517,15 +592,19 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            PointInt32 position = sender.Position;
-            SizeInt32 size = sender.Size;
-            _settings.WindowBounds = new WindowBounds
+            bool maximized = sender.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized };
+            if (!maximized)
             {
-                X = position.X,
-                Y = position.Y,
-                Width = size.Width,
-                Height = size.Height,
-            };
+                _normalBounds = CurrentBounds();
+            }
+
+            // A maximized window saves the rectangle it had before it was maximized.
+            if (_normalBounds is not null)
+            {
+                _settings.WindowBounds = _normalBounds;
+            }
+
+            _settings.WindowMaximized = maximized;
             SaveSettings();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
@@ -534,4 +613,23 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (!args.DidPositionChange && !args.DidSizeChange)
+        {
+            return;
+        }
+
+        if (sender.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Restored })
+        {
+            _normalBounds = CurrentBounds();
+        }
+    }
+
+    private WindowBounds CurrentBounds()
+    {
+        PointInt32 position = AppWindow.Position;
+        SizeInt32 size = AppWindow.Size;
+        return new WindowBounds { X = position.X, Y = position.Y, Width = size.Width, Height = size.Height };
+    }
 }

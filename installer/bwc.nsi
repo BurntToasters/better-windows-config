@@ -7,9 +7,10 @@
 ;   (none)             interactive install, per user, to %LOCALAPPDATA%\Programs\Better Windows Config
 ;   /S                 silent install or uninstall
 ;   /D=<dir>           install folder; must be the last switch and unquoted (NSIS rule)
-;   /RELAUNCH          start the Hub after a successful install. The updater does not pass this,
-;                      because it starts the Hub itself after the installer exits.
-;   /PARENTPID=<n>     the updater process that launched this setup. The setup waits for it to exit, then excludes it from the close step.
+;   /RELAUNCH          start the Hub when the run ends: the new Hub after success, or the installed Hub
+;                      with --update-result InstallerFailed after failure. Without it no Hub starts.
+;   /PARENTPID=<n>     the updater that launched this setup. The setup waits for it to exit, then
+;                      excludes it from the close step.
 ;   /RUNID=<id>        E2E builds only (required). Uninstall key under HKCU\Software\BWC-E2E\<id>.
 ;   /SHORTCUTS=<dir>   E2E builds only (required). Folder for the two Start menu shortcuts.
 ;
@@ -154,8 +155,14 @@ VIAddVersionKey "LegalCopyright" "Copyright (c) Better Windows Config contributo
 
 Function .onInit
   SetShellVarContext current
+  Call BwcCheckRawDir
+  Call BwcTrimInstDir
   Call BwcCheckHost
   Call BwcCheckArchitecture
+  ; Silent installs never reach .onVerifyInstDir, so the folder is checked here. Interactive runs check
+  ; the folder when the directory page is left.
+  IfSilent 0 +2
+  Call BwcCheckInstDir
   Call BwcFindPowerShell
   Call BwcReadParentPid
   !ifdef BWC_E2E
@@ -164,6 +171,12 @@ Function .onInit
     StrCpy $BwcUninstallKey "${BWC_UNINSTALL_SUBKEY}"
     StrCpy $BwcShortcutDir "$SMPROGRAMS"
   !endif
+FunctionEnd
+
+; Interactive only. Runs when the user leaves the directory page, so a refused folder keeps the page open.
+Function .onVerifyInstDir
+  Call BwcTrimInstDir
+  Call BwcCheckInstDir
 FunctionEnd
 
 Function un.onInit
@@ -211,32 +224,42 @@ Function .onInstSuccess
 FunctionEnd
 
 ; A failed install removes its staging folder. After the swap has started, BwcRollback owns the
-; cleanup, so the folders are left alone here.
+; cleanup, so the folders are left alone here. The staging folder is removed only when this run
+; confirmed it is ours (BwcStageOwned). With /RELAUNCH the installed Hub starts again and is
+; told the update failed. It is skipped when the Hub is missing (a rollback that did not finish).
 Function .onInstFailed
-  StrCmp $BwcCommitStarted "1" BwcFailed_keep 0
+  StrCmp $BwcCommitStarted "1" BwcFailed_relaunch 0
+  StrCmp $BwcStageOwned "1" 0 BwcFailed_relaunch
+  ; SetOutPath made the staging folder the working directory, and Windows cannot remove that folder.
+  SetOutPath "$TEMP"
   RMDir /r "$INSTDIR${BWC_STAGE_SUFFIX}"
-  BwcFailed_keep:
+  BwcFailed_relaunch:
+  ${GetParameters} $R0
+  ClearErrors
+  ${GetOptions} $R0 "/RELAUNCH" $R1
+  IfErrors BwcFailed_done 0
+  IfFileExists "$INSTDIR\${BWC_HUB_EXE}" 0 BwcFailed_done
+  Exec '"$INSTDIR\${BWC_HUB_EXE}" --update-result InstallerFailed'
+  BwcFailed_done:
 FunctionEnd
 
-; Close step for the install. The updater's own copy is not used: the copy of BwcUpdate.exe that
-; this setup carries is extracted to $PLUGINSDIR, so the close step runs the version being installed.
+; Close step for the install. It runs the BwcUpdate.exe in the staging folder, which has its .NET
+; runtime beside it and is the version being installed. The payload is staged before this runs.
 ; It runs only when an earlier version is present, because a first install has nothing to close.
 Function BwcCloseRunningApps
   IfFileExists "$INSTDIR\${BWC_UPDATER_EXE}" BwcCloseInst_update BwcCloseInst_first
   BwcCloseInst_first:
   Return
   BwcCloseInst_update:
-  InitPluginsDir
-  File "/oname=$PLUGINSDIR\${BWC_UPDATER_EXE}" "${BWC_UPDATER_SRC}"
   ; The updater that launched this setup exits right after it starts the setup. Wait for it first, so
   ; no file is replaced while its copy of BwcUpdate.exe is still in use. Then close the apps, excluding it.
   StrCmp $BwcParentPid "" BwcCloseInst_noparent 0
-  !insertmacro BWC_WAIT_PARENT_BODY "install" "$PLUGINSDIR\${BWC_UPDATER_EXE}"
+  !insertmacro BWC_WAIT_PARENT_BODY "install" "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_UPDATER_EXE}"
   BwcCloseInst_noparent:
   StrCpy $BwcCloseArgs ""
   StrCmp $BwcParentPid "" +2 0
   StrCpy $BwcCloseArgs "--exclude-pid $BwcParentPid"
-  !insertmacro BWC_CLOSE_APPS_BODY "install" "$PLUGINSDIR\${BWC_UPDATER_EXE}"
+  !insertmacro BWC_CLOSE_APPS_BODY "install" "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_UPDATER_EXE}"
 FunctionEnd
 
 ; Close step for the uninstall. The uninstaller cannot embed files, so it runs the BwcUpdate.exe
@@ -295,6 +318,7 @@ FunctionEnd
 ; staging and backup folders are removed only when every file is back in place.
 Function BwcRollback
   DetailPrint "The upgrade failed. Putting the previous version back."
+  SetOutPath "$TEMP"
   StrCmp $BwcMovedIn "1" BwcRb_removeNew BwcRb_restore
   BwcRb_removeNew:
   !insertmacro BWC_PAYLOAD_DELETE
@@ -327,10 +351,46 @@ Function BwcRollback
 FunctionEnd
 
 ; Runs after the registry and shortcuts are written. The upgrade is complete, so the backup of the
-; previous version and any staging folder are removed.
+; previous version is removed. The marker is written first: if the backup stays (a locked file), the
+; next run finds the marker and removes it. A failed cleanup is a warning, not a rollback, because
+; the new version is already in place.
 Function BwcFinishUpgrade
+  ClearErrors
+  FileOpen $R8 "$INSTDIR\${BWC_CLEANUP_MARKER}" w
+  IfErrors BwcFinish_nomarker 0
+  FileWrite $R8 "The upgrade finished. The backup folder can be removed.$\r$\n"
+  FileClose $R8
   RMDir /r "$INSTDIR${BWC_BACKUP_SUFFIX}"
+  IfFileExists "$INSTDIR${BWC_BACKUP_SUFFIX}" BwcFinish_keep 0
+  Delete "$INSTDIR\${BWC_CLEANUP_MARKER}"
+  Goto BwcFinish_stage
+  BwcFinish_keep:
+  DetailPrint "WARNING: could not remove $INSTDIR${BWC_BACKUP_SUFFIX}. The next run removes it."
+  Goto BwcFinish_stage
+  BwcFinish_nomarker:
+  DetailPrint "WARNING: could not write the cleanup marker. $INSTDIR${BWC_BACKUP_SUFFIX} is kept."
+  BwcFinish_stage:
+  SetOutPath "$TEMP"
   RMDir /r "$INSTDIR${BWC_STAGE_SUFFIX}"
+FunctionEnd
+
+; Leftover backup from an earlier upgrade. The marker is written before the backup is removed, so both
+; present means that upgrade finished and the backup is removed. Without the marker the folder may hold
+; the only copy of the previous version, so the install aborts before any change and names it.
+Function BwcClearFinishedBackup
+  IfFileExists "$INSTDIR${BWC_BACKUP_SUFFIX}" BwcLeft_found BwcLeft_clear
+  BwcLeft_found:
+  IfFileExists "$INSTDIR\${BWC_CLEANUP_MARKER}" BwcLeft_finished BwcLeft_leftover
+  BwcLeft_leftover:
+  Abort "A folder from an earlier failed upgrade is in the way: $INSTDIR${BWC_BACKUP_SUFFIX}. Check it, remove it, then run the installer again. Nothing was changed."
+  BwcLeft_finished:
+  DetailPrint "Removing the backup of an earlier upgrade that finished: $INSTDIR${BWC_BACKUP_SUFFIX}"
+  RMDir /r "$INSTDIR${BWC_BACKUP_SUFFIX}"
+  IfFileExists "$INSTDIR${BWC_BACKUP_SUFFIX}" BwcLeft_stuck BwcLeft_clear
+  BwcLeft_stuck:
+  Abort "Stopped: $INSTDIR${BWC_BACKUP_SUFFIX} could not be removed, probably because a file in it is in use. Close that program, then run the installer again. Nothing was changed."
+  BwcLeft_clear:
+  Delete "$INSTDIR\${BWC_CLEANUP_MARKER}"
 FunctionEnd
 
 ; ---------------------------------------------------------------------------
@@ -341,15 +401,16 @@ Section "Better Windows Config" SecMain
   SectionIn RO
   SetShellVarContext current
 
-  ; 1. Stop BWC processes that run from the install folder. Abort before any change when they stay.
-  Call BwcCloseRunningApps
+  ; 0. Abort before any change when <install folder>.new is a file or a folder that is not a staging folder.
+  Call BwcCheckStageFree
+  StrCpy $BwcStageOwned "1"
+
+  ; 1. Remove the backup of an earlier upgrade that finished. Abort before any change when a backup
+  ;    without the marker is in the way: it may hold the only copy of the old files.
+  Call BwcClearFinishedBackup
 
   ; 2. Stage the new version in <install folder>.new. The install folder is not touched in this step.
-  ;    A leftover backup folder is never removed here: it may hold the only copy of the old files.
-  IfFileExists "$INSTDIR${BWC_BACKUP_SUFFIX}" BwcBackup_leftover BwcBackup_clear
-  BwcBackup_leftover:
-  Abort "A folder from an earlier failed upgrade is in the way: $INSTDIR${BWC_BACKUP_SUFFIX}. Check it, remove it, then run the installer again. Nothing was changed."
-  BwcBackup_clear:
+  ;    Step 0 confirmed the folder is absent, empty, or this product's staging folder.
   RMDir /r "$INSTDIR${BWC_STAGE_SUFFIX}"
   CreateDirectory "$INSTDIR${BWC_STAGE_SUFFIX}"
   FileOpen $R9 "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_MANIFEST}" w
@@ -363,10 +424,14 @@ Section "Better Windows Config" SecMain
   FileClose $R9
   WriteUninstaller "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_UNINSTALLER}"
 
-  ; 3. Swap the files in. A failure restores the previous version (see BwcCommit and BwcRollback).
+  ; 3. Stop BWC processes that run from the install folder, using the staged BwcUpdate.exe. Abort
+  ;    before any installed file changes when they stay. .onInstFailed removes the staging folder.
+  Call BwcCloseRunningApps
+
+  ; 4. Swap the files in. A failure restores the previous version (see BwcCommit and BwcRollback).
   Call BwcCommit
 
-  ; 4. Uninstall entry, shortcuts, and the AppUserModelID the apps set at startup. The AUMID write is
+  ; 5. Uninstall entry, shortcuts, and the AppUserModelID the apps set at startup. The AUMID write is
   ;    non-fatal: the shortcut still works without it.
   WriteRegStr HKCU "$BwcUninstallKey" "DisplayName" "${BWC_PRODUCT}"
   WriteRegStr HKCU "$BwcUninstallKey" "DisplayVersion" "${BWC_VERSION}"
@@ -389,7 +454,7 @@ Section "Better Windows Config" SecMain
   !insertmacro BWC_SET_AUMID_BODY "$PLUGINSDIR\${BWC_AUMID_HELPER}" "$BwcShortcutDir\${BWC_HUB_SHORTCUT}" "${BWC_HUB_AUMID}"
   !insertmacro BWC_SET_AUMID_BODY "$PLUGINSDIR\${BWC_AUMID_HELPER}" "$BwcShortcutDir\${BWC_REGEDIT_SHORTCUT}" "${BWC_REGEDIT_AUMID}"
 
-  ; 5. The upgrade is complete. Remove the backup of the previous version and the staging folder.
+  ; 6. The upgrade is complete. Remove the backup of the previous version and the staging folder.
   Call BwcFinishUpgrade
 SectionEnd
 
@@ -413,21 +478,46 @@ Section "Uninstall"
   ; Payload. The lists come from this version's build, and the uninstaller is written by the same
   ; version, so they match what was installed. A file left by an older version was removed by the
   ; upgrade through the manifest.
+  ; The files BwcUpdate.exe loaded for the close step can stay locked for a moment after it exits (x64
+  ; emulation on ARM64 caches them), so the deletes are retried for up to 10 s. Delete sets the error flag
+  ; only for a file that exists and could not be removed.
+  StrCpy $R9 0
+  BwcUn_deleteFiles:
+  ClearErrors
   !insertmacro BWC_PAYLOAD_DELETE
   Delete "$INSTDIR\LICENSE"
   Delete "$INSTDIR\THIRD-PARTY-NOTICES.txt"
-  ; Helper from versions before 0.2.0. It is removed when present, with its folder if that is empty.
-  Delete "$INSTDIR\${BWC_LEGACY_TOOLS_DIR}\${BWC_LEGACY_CLOSE_HELPER}"
-  RMDir "$INSTDIR\${BWC_LEGACY_TOOLS_DIR}"
   Delete "$INSTDIR\${BWC_MANIFEST}"
+  Delete "$INSTDIR\${BWC_CLEANUP_MARKER}"
+  ; Helper from versions before 0.2.0. It is removed when present.
+  Delete "$INSTDIR\${BWC_LEGACY_TOOLS_DIR}\${BWC_LEGACY_CLOSE_HELPER}"
+  IfErrors 0 BwcUn_filesDeleted
+  IntOp $R9 $R9 + 1
+  IntCmp $R9 20 BwcUn_filesDeleted 0 BwcUn_filesDeleted
+  Sleep 500
+  Goto BwcUn_deleteFiles
+  BwcUn_filesDeleted:
+  RMDir "$INSTDIR\${BWC_LEGACY_TOOLS_DIR}"
   !insertmacro BWC_PAYLOAD_RMDIRS
 
   ; The updater's download and staging folder. A file still in use stays and does not stop the uninstall.
-  RMDir /r "$TEMP\BWC-Update"
+  ; The E2E flavor never touches the real %TEMP% folder of the updater.
+  !ifndef BWC_E2E
+    RMDir /r "$TEMP\BWC-Update"
+  !endif
 
   ; Remove the folder only when it is empty. User files in it stay.
   Delete "$INSTDIR\${BWC_UNINSTALLER}"
   RMDir "$INSTDIR"
 
+  ; The uninstall entry is removed only when its InstallLocation is this folder (case-insensitive). An
+  ; entry that names another folder belongs to another install, so it stays.
+  ReadRegStr $R0 HKCU "$BwcUninstallKey" "InstallLocation"
+  System::Call 'kernel32::lstrcmpiW(t "$R0", t "$INSTDIR") i .R1'
+  StrCmp $R1 "0" BwcUn_keyOwn 0
+  DetailPrint "Kept the uninstall entry $BwcUninstallKey: its InstallLocation is $R0, not $INSTDIR."
+  Goto BwcUn_keyDone
+  BwcUn_keyOwn:
   DeleteRegKey HKCU "$BwcUninstallKey"
+  BwcUn_keyDone:
 SectionEnd

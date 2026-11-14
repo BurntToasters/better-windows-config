@@ -67,6 +67,13 @@ internal static class ForegroundGuard
             return true;
         }
 
+        // A child control of the target (a check box in a system dialog, for example) can be reported as the
+        // foreground window. Its root window is the target, so input still goes to the target.
+        if (foreground != IntPtr.Zero && GetAncestor(foreground, GaRoot) == target)
+        {
+            return true;
+        }
+
         uint foregroundPid = foreground == IntPtr.Zero ? 0 : Win32.ProcessIdOf(foreground);
         uint targetPid = Win32.ProcessIdOf(target);
         if (foregroundPid != 0 && foregroundPid == targetPid)

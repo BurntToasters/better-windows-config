@@ -374,3 +374,10 @@ show this, because the oracle never presses OK (every window is cancelled). Clas
 clearing, so classic probably behaves the same, but this is not measured. Before shipping the change to a
 user's own ACLs, measure it on a scratch key under `HKCU\Software\BWC-E2E` in a sandbox test: an explicit 0x3
 ACE, Advanced OK or sheet OK, then read the raw flags. Status: open.
+
+
+## Logging on the security callbacks (fix 7)
+
+- `RegistryPermissionsDialog` catches specific types (`InvalidOperationException`, `COMException`,
+  `InvalidCastException`, `IOException`, `ArgumentException`) and logs them with `Log` before returning the HRESULT.
+- **E2E status.** A forced failure is not reproducible through aclui. No new E2E.

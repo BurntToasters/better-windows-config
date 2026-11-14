@@ -77,6 +77,7 @@ or a build first.
 - Per user, into `%LOCALAPPDATA%\Programs\Better Windows Config`. The install does not need
   elevation. `/D=<dir>` changes the folder. Per-machine install is not implemented yet. A reinstall
   with no `/D=` uses the folder recorded in `InstallLocation` of the uninstall entry.
+- Checks the folder before any change (see "Install folder rules" below).
 - Copies the whole published folder, plus `LICENSE`, `THIRD-PARTY-NOTICES.txt`, and the uninstaller.
 - Writes two Start menu shortcuts, each with the exe icon:
   - `Better Windows Config` runs `BetterWindowsConfig.exe`.
@@ -96,43 +97,68 @@ Command line:
 | Switch | Effect |
 | --- | --- |
 | `/S` | Silent install or uninstall. |
-| `/D=<dir>` | Install folder. Must be last and unquoted (an NSIS rule). |
-| `/RELAUNCH` | Start the Hub after a successful install. The updater does not pass it. |
-| `/PARENTPID=<n>` | The updater process that started this setup. It is never asked to close. Digits only. The updater passes it. |
+| `/D=<dir>` | Install folder. Must be last and unquoted (an NSIS rule). A drive or share root, a file, or a non-empty folder that is not a BWC install is refused (see "Install folder rules"). |
+| `/RELAUNCH` | Start the Hub when the run ends. On success it starts the new Hub. On failure it starts the Hub that is still installed with `--update-result InstallerFailed`. Without this switch no Hub starts. The updater passes it. |
+| `/PARENTPID=<n>` | The updater process that started this setup. The setup waits for it to exit, then never asks it to close. Digits only. The updater passes it. |
 
 Uninstall runs from **Apps > Installed apps** or `Uninstall.exe` in the install folder. It removes
 what the install placed and leaves files the user added.
+
+## Install folder rules
+
+The install folder is checked before any file changes. The same rules apply to `/D=` in silent mode
+and to the folder typed on the directory page (interactive mode checks it when you press Next).
+
+- Refused: a drive root (`C:\`, `D:`), a network share root (`\\server\share`), a file, and a folder
+  that is not empty and has no `installed-files.txt` (it is not a BWC install). A trailing `\` is
+  removed first. A refused folder is never changed, and a silent run exits with code `2`.
+- Accepted: a folder that does not exist yet, an empty folder, and a folder with `installed-files.txt`
+  from an earlier install of this product.
+- `<install folder>.new` must also be absent, empty, or a leftover staging folder of this product (it
+  has `installed-files.txt`). Any other folder with that name is refused, and it is never removed.
+- A line in `installed-files.txt` that contains `..`, `/`, or `:`, or that starts with `\`, is never
+  moved or restored. Such a line is skipped with a log line.
 
 ## Update in place
 
 Running the new installer over an existing install is the update path. Nothing is removed until the
 new version is complete on disk, and a failure puts the old version back.
 
-1. **Close.** When `BwcUpdate.exe` is in the install folder, the installer runs the copy of
-   `BwcUpdate.exe` that it carries, as
+1. **Stage.** The new files, the manifest (`installed-files.txt`), `LICENSE`,
+   `THIRD-PARTY-NOTICES.txt`, and `Uninstall.exe` are written to `<install folder>.new`. The install
+   folder is not touched in this step. A failure here removes the staging folder (only if this run
+   confirmed it is ours). A leftover `<install folder>.old` without the upgrade marker (see below) stops
+   the install before any change, because it may hold the only copy of the old files.
+2. **Close.** When `BwcUpdate.exe` is in the install folder, the installer runs the copy of
+   `BwcUpdate.exe` in the staging folder. That copy has its .NET runtime beside it, so it starts
+   there. With `/PARENTPID=` first it runs `BwcUpdate.exe --wait-pid <PARENTPID> --timeout-seconds 30`,
+   so the updater that launched the setup has exited before any file is replaced. Then it runs
    `BwcUpdate.exe --close-running --install-dir <folder> [--exclude-pid <PARENTPID>] --timeout-seconds 30`.
    That closes every BWC process that runs from the folder (`WM_CLOSE` to its windows) and waits up
-   to 30 seconds. Exit `0` continues. Exit `3` (a process stays open) offers Retry or Cancel in an
-   interactive run, and a silent run aborts with exit code `2`. Any other result aborts. No
-   PowerShell runs in this step, so a 32-bit installer reaches 64-bit and ARM64 processes.
-2. **Stage.** The new files, the manifest (`installed-files.txt`), `LICENSE`,
-   `THIRD-PARTY-NOTICES.txt`, and `Uninstall.exe` are written to `<install folder>.new`. The install
-   folder is not touched in this step. A failure here removes the staging folder. A leftover
-   `<install folder>.old` from an earlier failed run stops the install before any change, because it
-   may hold the only copy of the old files.
+   to 30 seconds. Exit `0` continues. Exit `3` (a process stays open or the updater still runs) offers
+   Retry or Cancel in an interactive run, and a silent run aborts with exit code `2`. Any other result
+   aborts. Nothing installed has changed yet. No PowerShell runs in this step, so a 32-bit installer
+   reaches 64-bit and ARM64 processes.
 3. **Swap.** The files that the previous manifest lists are moved to `<install folder>.old`, and the
    new files are moved in from `<install folder>.new`. A failed move puts every old file back, removes
    the new files that were moved in, and ends with "The upgrade was rolled back". If the restore
    itself fails, both folders are kept and the message names them.
-4. **Finish.** The uninstall entry, shortcuts, and AppUserModelIDs are written. Then the backup and
-   staging folders are removed.
+4. **Finish.** The uninstall entry, shortcuts, and AppUserModelIDs are written. Then the finish step
+   writes the marker file `<install folder>\upgrade-cleanup-pending`, removes `<install folder>.old` and
+   `<install folder>.new`, and deletes the marker. If `.old` cannot be removed, the install still
+   succeeds, a warning is logged, and the marker stays. The next run removes `.old` and the marker
+   before it does anything else. The marker is not in `installed-files.txt`; the uninstaller deletes it.
+
+With `/RELAUNCH`, the installer ends by starting the Hub: the new `BetterWindowsConfig.exe` after a
+success, or the installed one with `--update-result InstallerFailed` after a failure (only if that
+exe still exists). Without `/RELAUNCH` it starts nothing.
 
 Disk space: the staging step needs about the payload size again while both versions exist (roughly
 330 MB for the current build).
 
 The updater (`BwcUpdate.exe`, `docs/contracts/update-manifest.md`) starts this installer with
-`/S /D=<install-dir> /PARENTPID=<its pid>`. The updater waits for the apps to exit first, and it starts
-the Hub itself afterward. It must not pass `/RELAUNCH`, or two Hubs would start.
+`/S /RELAUNCH /PARENTPID=<its pid> /D=<install-dir>`. The installer waits for the updater to exit,
+closes the apps, and starts the Hub itself. The updater does not start the Hub.
 
 ## Uninstall
 
@@ -140,9 +166,12 @@ The uninstaller closes running BWC processes with the `BwcUpdate.exe` in the ins
 same exit-code rules. If that copy is missing, the uninstall stops and changes nothing.
 
 It deletes the installed files listed at build time, the two shortcuts, `LICENSE`,
-`THIRD-PARTY-NOTICES.txt`, `installed-files.txt`, `Uninstall.exe`, and the helper that version 0.1
-left in `bwc-tools`. It removes folders only when they are empty, removes `%TEMP%\BWC-Update` (the
-updater's staging folder), and removes the uninstall entry last.
+`THIRD-PARTY-NOTICES.txt`, `installed-files.txt`, `upgrade-cleanup-pending`, `Uninstall.exe`, and the
+helper that version 0.1 left in `bwc-tools`. It removes folders only when they are empty, removes
+`%TEMP%\BWC-Update` (the updater's staging folder; release flavor only), and removes the uninstall entry
+last. The entry is removed only when its `InstallLocation` is the folder being uninstalled (compared
+without case). An entry that names another folder is kept, and the log says why. The files are still
+removed.
 
 ## E2E variant
 
@@ -154,12 +183,16 @@ The `e2e` flavor is compiled with `-DBWC_E2E`, and its output is named
 `BetterWindowsConfig-<version>-<rid>-e2e-setup.exe`. It never writes to the real places:
 
 - It requires `/RUNID=<id>` and `/SHORTCUTS=<dir>`, and aborts before changing anything without
-  them. `<id>` is 1 to 64 letters, digits, `-`, or `_`.
+  them. `<id>` is 1 to 64 letters, digits, `-`, or `_`. When a switch is absent, the setup reads
+  `BWC_E2E_INSTALLER_RUNID` or `BWC_E2E_INSTALLER_SHORTCUTS` from the environment instead, so an
+  in-app update (the helper starts the setup without the switches) can use the same run. A switch
+  on the command line always wins. The release build never reads these variables.
 - The uninstall entry goes to `HKCU\Software\BWC-E2E\<id>\Uninstall\BetterWindowsConfig`, and the
   shortcuts go to `<dir>`.
 - The uninstaller requires `/RUNID=<id>` to find the same entry, and applies the same `<id>` rule.
 - It does not read the real uninstall key to choose a folder, so an E2E run without `/D=` cannot
   reach a real install.
+- It does not remove `%TEMP%\BWC-Update`, which belongs to the real updater.
 
 Never publish the E2E installer. It is for tests only.
 
@@ -173,22 +206,23 @@ the variables are in `docs/RELEASE.md`, "Windows code signing (Azure Artifact Si
 `SKIP_WIN_CODESIGN=1` (exactly) builds an unsigned installer for testing. A build for release must not
 set it. The record then shows `signed: false`.
 
-Still to do, and not verified on this machine (NSIS is not installed here):
+Status and what remains. NSIS 3.13 is installed on this machine. The E2E flavor compiles, and an
+unsigned E2E run passed on Windows 11 ARM64: a fresh install, an install over the top, an install
+after a leftover backup with the marker, the refusal of a leftover backup without the marker, and a
+silent uninstall. The steps below are still open.
 
-1. Install NSIS 3.10+ and run the first compile of `installer/bwc.nsi`. The NSIS script, the
-   include, and the generated payload were written without a compiler. `build-installer.js --dry-run`
-   checks the includes, the defines, the macros, and the function calls, but it does not compile the
-   script. The first compile is part of acceptance. It also confirms the `!finalize` and
-   `!uninstfinalize` lines of the signing hook (see "Authenticode signing" in
-   `docs/failure-modes/installer.md`).
+1. Compile the signed flavor (`BWC_SIGN` defined). Only the unsigned build (`SKIP_WIN_CODESIGN=1`)
+   has been compiled, so the `!finalize` and `!uninstfinalize` lines of the signing hook are not
+   yet checked by NSIS (see "Authenticode signing" in `docs/failure-modes/installer.md`).
 2. Check that the Start menu AUMID write works on this machine. `bwc-set-aumid.ps1` reads the value
    back and exits `4` on mismatch, and it also exits `4` under Constrained Language Mode, which blocks
    the `Add-Type` it uses. Either case only logs a warning.
 3. Test the upgrade rollback on a disposable machine: make one file in the new payload unwritable
    during the swap and confirm that the previous version runs again.
-4. Add the E2E install, update, and uninstall test. It should run the E2E installer with a unique
-   `/RUNID=` and a temporary `/SHORTCUTS=` and `/D=` folder, then check the shortcuts, the uninstall
-   key, the AUMIDs, and the uninstall. It should also produce a verifiable artifact.
+4. Turn the manual E2E run into a repeatable test that writes a verifiable artifact. It should run the
+   E2E installer with a unique `/RUNID=` and a temporary `/SHORTCUTS=` and `/D=` folder, then check the
+   shortcuts, the uninstall key, the AUMIDs, and the uninstall. The relaunch paths (`/RELAUNCH` on success
+   and on failure) are not yet exercised, because they start a Hub.
 5. Run the Authenticode signing once on the release VM (`npm run setup:win:artifact-signing`, as
    Administrator), then build a signed installer and confirm the verify step passes. The minisign
    signatures of the manifest and the installer are separate (D8, `docs/RELEASE.md`).

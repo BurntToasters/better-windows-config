@@ -180,17 +180,22 @@ public static class E2EGuards
         return path;
     }
 
+    /// <summary>
+    /// Reads the flavor from the app binaries in the publish folder, not from the environment or the flavor the
+    /// config chose. A ship folder fails here even when BWC_FLAVOR says e2e.
+    /// </summary>
     private static void RequireE2EFlavor(E2EConfig config, string category, string checkId)
     {
-        if (string.Equals(config.Flavor, "e2e", StringComparison.Ordinal))
+        string? problem = FlavorMetadata.E2EProblem(config.PublishDir);
+        if (problem is null)
         {
+            E2EResults.Record(checkId, true, $"Every app assembly in '{config.PublishDir}' declares {FlavorMetadata.AttributeName}=E2E.");
             return;
         }
 
         string message =
-            $"This test is tagged {category} and runs only against the e2e flavor, but '{config.PublishDir}' " +
-            $"is the '{config.Flavor}' flavor. Build the e2e flavor with: " +
-            $"node scripts/dotnet-build.js --rid {config.Rid} --flavor e2e";
+            $"This test is tagged {category} and runs only against the e2e flavor, but {problem}. " +
+            $"Build the e2e flavor with: node scripts/dotnet-build.js --rid {config.Rid} --flavor e2e";
         E2EResults.Record(checkId, false, message);
         Assert.Fail(message);
     }

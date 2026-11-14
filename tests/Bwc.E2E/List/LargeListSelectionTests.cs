@@ -9,16 +9,19 @@ using Microsoft.Win32;
 namespace Bwc.E2E.List;
 
 /// <summary>
-/// A key with more than 10,000 values is sorted in the background. The rows are shown at once in their
-/// input order and the classic name order is applied when the sort ends. A row the user selected while
-/// the sort ran must still be selected afterwards, because the re-sort keeps selection by row name.
+/// A row the user selects must stay selected while the list is re-sorted into classic name order, because the
+/// re-sort keeps selection by row name. The seed is kept at the 5000 entry limit (4,999 values plus the root).
+/// That is below the 10,000 row threshold where the product sorts in the background, so the background path is
+/// a known gap of this test and is recorded as one.
 /// </summary>
 [TestClass]
 public sealed class LargeListSelectionTests
 {
     private const string ListControl = "ListControl";
-    private const string TargetName = "V05000";
-    private const int ValueCount = 10_001;
+    private const string TargetName = "V02500";
+
+    // 4,999 values and the root key make 5000 entries, the most one test may seed.
+    private const int ValueCount = 4_999;
     private static readonly TimeSpan UiTimeout = TimeSpan.FromSeconds(30);
 
     private static int _checkStart;
@@ -30,6 +33,12 @@ public sealed class LargeListSelectionTests
         ControlTestSupport.PrepareDpi();
     }
 
+    private static bool IsInNameOrder(string[] names)
+    {
+        string[] sorted = names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        return names.Length > 0 && names.SequenceEqual(sorted, StringComparer.OrdinalIgnoreCase);
+    }
+
     [TestMethod]
     [TestCategory("List")]
     [TestCategory("Mutating")]
@@ -38,6 +47,9 @@ public sealed class LargeListSelectionTests
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
         E2EGuards.RequireMutatingFlavor(config);
+        E2EResults.Note(
+            "list.large.backgroundSort",
+            "Above 10,000 rows the product sorts in the background. The 5000 entry seed limit cannot reach that path, so only selection survival is checked.");
         try
         {
             config.EnsureExecutablesExist();
@@ -72,8 +84,6 @@ public sealed class LargeListSelectionTests
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
             E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "list.large.navigate");
 
-            // The unsorted rows appear first. Selecting the target at once is what makes the background sort
-            // end while the selection is set, which the check below depends on.
             // Only realized rows have UI Automation elements, so the target is the first row on screen.
             bool shown = ControlTestSupport.WaitUntil(() => ControlTestSupport.ListRowNames(session).Any(), UiTimeout);
             string target = ControlTestSupport.ListRowNames(session).FirstOrDefault() ?? string.Empty;
@@ -88,8 +98,11 @@ public sealed class LargeListSelectionTests
             bool selected = ControlTestSupport.WaitUntil(() => ControlTestSupport.IsSelected(row), TimeSpan.FromSeconds(5));
             E2EResults.Record("list.large.select", selected, $"'{target}' selected right after it appeared={selected}.");
 
-            // Give the background sort time to finish, then read the selection again.
-            Thread.Sleep(TimeSpan.FromSeconds(3));
+            // Wait for the re-sort to finish: the realized rows are in classic name order. The whole window is polled.
+            bool resorted = ControlTestSupport.WaitUntil(
+                () => IsInNameOrder(ControlTestSupport.ListRowNames(session)),
+                UiTimeout);
+            E2EResults.Note("list.large.resort", $"realized rows in name order={resorted}.");
             AutomationElement? after = ControlTestSupport.FindRowByName(session, ListControl, ControlType.DataItem, target);
             bool kept = ControlTestSupport.IsSelected(after);
             E2EResults.Record(

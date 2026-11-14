@@ -162,9 +162,37 @@ handles; no other handle is shared. `scripts/check-registry-writer.js` continues
 The connection objects live in the Registry Editor view, not in a static cache. Closing the view
 disposes them. No credential, password, or token is stored; authentication uses the process token.
 
+## 13. Expanding a remote key that cannot be enumerated
+
+`RemoteRegistryTreeSource.LoadChildren` no longer turns a failed enumeration into an empty child list.
+The `RegistryOperationException` propagates, the tree collapses the node and raises `ExpandFailed`, and
+`RegeditContext.ShowExpandFailedAsync` shows the classic `Cannot open key` message (`MsgOpenKeyFailed`
+with the system text as details) for any failed enumeration, not only access denied. Earlier builds
+expanded a denied remote key to nothing, with only a log line. A connection that was closed
+(`ObjectDisposedException`) is still logged only, because the view is going away.
+
+Rule: the node collapses, the message names the key path, and the next expand retries.
+
+Check: no automated check. The E2E suite has no second computer, so a remote expand cannot be driven. The
+path is the same code as the local expand failure that the value-list probe covers
+(value-display-enumeration.md, section 17), and the log line names the key and the Win32 code.
+
 ## Parity package: remote write refusal
 
 | Way it could fail | Expected behavior |
 | --- | --- |
 | A write command (Load Hive, Import, Edit, New, Delete, Rename) runs with a remote node selected | Refused or disabled. Nothing reaches the writer |
 | Disconnect dialog opens with the wrong size or colors | Port of DLG-013 on `ClassicDialog`: 250 x 111 DLU, label at (7, 7), list at (7, 18) 236 x 63, OK at (138, 90), Cancel at (193, 90) |
+
+
+## 14. Values under a remote key (fix 5)
+
+- Modify, Modify Binary Data, Display Binary Data, Enter, and double-click do nothing for a value under a
+  remote key. They no longer report "no selection".
+- The menu enable state is set in `RegeditContext.UpdateCommandStates` (Modify, Modify Binary Data, and Display
+  Binary Data are disabled when `RegeditSelectionGuards.IsRemoteSelected`). The context menu disables them in
+  `ContextMenuController.CreateValueContextMenu`. Enter and double-click reach `ValueCommands`, which returns early.
+- **E2E status: not driven.** A remote key exists only after File > Connect Network Registry reaches another
+  computer. The connect path refuses the local computer name, and no second computer or VM is available to the
+  E2E run, so no test can make a remote value selected. The gating is covered by code review and by the
+  unchanged disconnect and connect tests. A manual check on a second machine is needed before release.

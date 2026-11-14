@@ -1,17 +1,23 @@
 #!/usr/bin/env node
 /**
- * Windows release VM entry point (`npm run release:win`, `npm run release:win:continue`).
+ * Windows release VM entry point (`npm run release:win`, `npm run release:win:continue`,
+ * `npm run release:win:upload`).
  *
  * release:win      stable policy, preflight, the quick quality gate (no GUI E2E on a signing VM),
  *                  a release session that records that gate, a clean release folder, then continue.
- * --continue       session check, build both RIDs (ship), the installers, the signed bundle, GPG
- *                  signatures, Authenticode, the single draft with its assets, draft verification,
- *                  and release:finalize last.
+ * --continue       the gate (policy, preflight with the signing readiness checks, session verify),
+ *                  then build both RIDs, the live updater client rehearsal (release:rehearse:client, before any
+ *                  paid signing), the installers, the signed bundle, GPG signatures, Authenticode, the single
+ *                  draft with its assets, draft verification, and the mirror. The flow ends
+ *                  at the mirror and never runs git. Publish, then `npm run release:cleanup`.
+ * --from <step>    with --continue: run the gate, then the steps from <step> on. A gate step name starts
+ *                  the flow there. `release:win:upload` is `--continue --from release:draft`.
  *
  * Every step is an npm script, except release:clean, which removes only artifacts/release/<version>.
  * Steps run through an injected runner, so scripts/run-release-selftest.js records the order without
  * running anything. Secrets come from .env, which the package.json entries load with
- * node --env-file-if-exists=.env. Failure cases: docs/failure-modes/release.md, "Release VM flow".
+ * node --env-file-if-exists=.env. Each step gets only the credentials in STEP_ENV (stepEnv blanks the rest).
+ * Failure cases: docs/failure-modes/release.md, "Release VM flow".
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -22,12 +28,12 @@ import { isDirectExecutionOf } from "./direct-execution.mjs";
 import { EXIT, describeError } from "./lib/cli.js";
 import { embeddedReleaseKeys, readPackageVersion } from "./lib/release-policy.js";
 import { channelForVersion, tryParseSemVer } from "./lib/semver.js";
-import { isExplicitTruthy } from "./release-policy.js";
+import { isExplicitTruthy, SIGNING_REQUIRED_VARIABLES } from "./release-policy.js";
 
 const SCRIPT = "scripts/run-release.js";
 const REPO_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const RIDS = Object.freeze(["win-x64", "win-arm64"]);
-const FINALIZE_STEP = "release:finalize";
+const MIRROR_STEP = "release:mirror";
 const CLEAN_STEP = "release:clean";
 // The signed expiry of a release manifest, in hours (one year). Installed copies refuse an expired feed, and
 // releases are not re-signed between versions, so a short expiry would break update checks for everyone.
@@ -41,29 +47,54 @@ function usageError(message, exitCode = EXIT.USAGE) {
 
 function printHelp() {
   console.log(`Usage:
-  node ${SCRIPT}              Stable policy, preflight, quick gate, session, clean, then continue.
-  node ${SCRIPT} --continue   Build, sign, bundle, upload the draft, verify it, then finalize.
+  node ${SCRIPT}                       Stable policy, preflight, quick gate, session, clean, then continue.
+  node ${SCRIPT} --continue            Gate, build, sign, bundle, upload the draft, verify it, mirror.
+  node ${SCRIPT} --continue --from <step>
+                                       The gate, then the steps from <step> on (release:win:upload is
+                                       --from release:draft). Valid steps: ${continueStepNames().join(", ")}.
 
 The trusted release key is the one embedded in src/Bwc.Update/Signing/TrustedKeys.cs. A placeholder
-there refuses the run (docs/RELEASE.md, "User-owned steps"). No flag other than --continue and --help.`);
+there refuses the run (docs/RELEASE.md, "User-owned steps"). Flags: --continue, --from, --help.`);
 }
 
-/** The run mode from argv. Unknown flags and positional arguments are usage errors. */
+/** The run mode and the resume step from argv. Unknown flags and positional arguments are usage errors. */
 export function parseReleaseArgs(argv) {
-  const flags = argv.filter((arg) => arg.startsWith("-"));
-  const positionals = argv.filter((arg) => !arg.startsWith("-"));
   const known = new Set(["--continue", "--help", "-h"]);
-  const unknown = flags.filter((flag) => !known.has(flag));
-  if (unknown.length > 0) {
-    throw usageError(`Unknown release flag: ${unknown.join(", ")}`);
+  const positionals = [];
+  let continueFlag = false;
+  let help = false;
+  let from = null;
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--from") {
+      const value = argv[index + 1];
+      if (value === undefined || value.startsWith("-")) {
+        throw usageError(`--from needs a step name. Valid steps: ${continueStepNames().join(", ")}`);
+      }
+      from = value;
+      index += 1;
+    } else if (arg.startsWith("--from=")) {
+      from = arg.slice("--from=".length);
+    } else if (arg.startsWith("-")) {
+      if (!known.has(arg)) throw usageError(`Unknown release flag: ${arg}`);
+      if (arg === "--continue") continueFlag = true;
+      if (arg === "--help" || arg === "-h") help = true;
+    } else {
+      positionals.push(arg);
+    }
   }
   if (positionals.length > 0) {
-    throw usageError(`Unexpected argument: ${positionals[0]}. Usage: node ${SCRIPT} [--continue]`);
+    throw usageError(`Unexpected argument: ${positionals[0]}. Usage: node ${SCRIPT} [--continue] [--from <step>]`);
   }
-  return {
-    help: flags.includes("--help") || flags.includes("-h"),
-    mode: flags.includes("--continue") ? "continue" : "win",
-  };
+  if (help) return { help: true, mode: continueFlag ? "continue" : "win", from: null };
+  if (from !== null) {
+    if (!continueFlag) throw usageError("--from needs --continue");
+    if (from === "") throw usageError(`--from needs a step name. Valid steps: ${continueStepNames().join(", ")}`);
+    if (!continueStepNames().includes(from)) {
+      throw usageError(`Unknown --from step: ${from}. Valid steps: ${continueStepNames().join(", ")}`);
+    }
+  }
+  return { help: false, mode: continueFlag ? "continue" : "win", from };
 }
 
 /** Relative folder that holds one channel's assembled bundle: artifacts/release/<version>/<channel>. */
@@ -93,8 +124,22 @@ export function releaseCleanTargets(root, version) {
   return [path.join(root, "artifacts", "release", version)];
 }
 
+/** The gate every continue run starts with. It runs before any build, so a missing credential fails first. */
+function gateSteps() {
+  return [
+    { name: "release:policy", args: [] },
+    { name: "release:preflight", args: ["--", "--require-trusted-key"] },
+    { name: "release:session:verify", args: [] },
+  ];
+}
+
+/** The names release:win:continue accepts for --from: every step of the continue flow, once each. */
+export function continueStepNames() {
+  return [...new Set(releaseSteps("continue", { version: "0.0.0", env: {} }).map((step) => step.name))];
+}
+
 /** The ordered steps of release:win (mode "win") or release:win:continue (mode "continue"). */
-export function releaseSteps(mode, { version, env = process.env }) {
+export function releaseSteps(mode, { version, env = process.env, from = null }) {
   if (mode === "win") {
     return [
       { name: "release:policy", args: [] },
@@ -108,11 +153,12 @@ export function releaseSteps(mode, { version, env = process.env }) {
   }
   const folder = releaseFolder(version);
   const [x64, arm64] = RIDS.map((rid) => path.basename(installerPath(version, rid)));
-  return [
-    { name: "release:policy", args: [] },
-    { name: "release:session:verify", args: [] },
+  const gate = gateSteps();
+  const build = [
     { name: "build:win:x64", args: [] },
     { name: "build:win:arm64", args: [] },
+    // The shipped client checks the live feed before any paid signing step runs.
+    { name: "release:rehearse:client", args: [] },
     { name: "installer:x64", args: [] },
     { name: "installer:arm64", args: [] },
     {
@@ -134,21 +180,16 @@ export function releaseSteps(mode, { version, env = process.env }) {
     { name: "release:authenticode", args: ["--", "-Files", `${folder}/${arm64}`] },
     { name: "release:draft", args: draftArgs(version, env) },
     { name: "release:verify:draft", args: [] },
-    { name: FINALIZE_STEP, args: [] },
+    { name: MIRROR_STEP, args: ["--", "--dir", folder] },
   ];
-}
-
-function printFinalizeWarning() {
-  console.warn(
-    [
-      "",
-      "WARNING: release:finalize mirrors the release folder, then runs",
-      '  git fetch origin && git reset --hard @{u} && git clean -fd',
-      "That discards every local change and untracked file in this checkout. Run it only on the",
-      "disposable release VM. Git-ignored artifacts/ survive, and the draft is already verified.",
-      "",
-    ].join("\n"),
-  );
+  if (from === null || from === undefined) return [...gate, ...build];
+  // A build step: the gate, then from that step. The first match is used for a repeated name.
+  const inBuild = build.findIndex((step) => step.name === from);
+  if (inBuild >= 0) return [...gate, ...build.slice(inBuild)];
+  // A gate step: from that gate step through the whole build.
+  const inGate = gate.findIndex((step) => step.name === from);
+  if (inGate >= 0) return [...gate.slice(inGate), ...build];
+  throw usageError(`Unknown --from step: ${from}. Valid steps: ${continueStepNames().join(", ")}`);
 }
 
 function cleanRelease(root, version) {
@@ -169,6 +210,63 @@ export function quoteForCmd(arg) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
+const UPDATE_KEY_ENV = Object.freeze(["TAURI_SIGNING_PRIVATE_KEY", "TAURI_SIGNING_PRIVATE_KEY_PASSWORD"]);
+const AZURE_PUBLISHER_ENV = Object.freeze(["AZURE_ARTIFACT_SIGNING_PUBLISHER", "AZURE_ARTIFACT_SIGNING_PUBLISHER_DN"]);
+
+/** Every credential name. A step that is not granted one gets it blank (see stepEnv). Any AZURE_* name counts too. */
+export const CREDENTIAL_ENV = Object.freeze(["GPG_PASSPHRASE", ...UPDATE_KEY_ENV, ...SIGNING_REQUIRED_VARIABLES]);
+
+/**
+ * The credentials each npm step reads, from the step's script. Config such as GH_REPO, AFTER_PACK_LOC, and
+ * SKIP_WIN_CODESIGN is not a credential and reaches every step. The preflight is granted the readiness inputs it
+ * checks (update key, GPG passphrase, Azure presence). A step missing from this table gets no credential.
+ */
+export const STEP_ENV = Object.freeze({
+  "release:policy": Object.freeze([]),
+  "release:preflight": Object.freeze([...UPDATE_KEY_ENV, "GPG_PASSPHRASE", ...SIGNING_REQUIRED_VARIABLES]),
+  "release:session:create": Object.freeze([]),
+  "release:session:verify": Object.freeze([]),
+  "test:all": Object.freeze([]),
+  "build:win:x64": Object.freeze([]),
+  "build:win:arm64": Object.freeze([]),
+  "release:rehearse:client": Object.freeze([]),
+  // build-installer.js runs windows-artifact-sign.ps1 (Authenticode through Azure Artifact Signing).
+  "installer:x64": Object.freeze([...SIGNING_REQUIRED_VARIABLES]),
+  "installer:arm64": Object.freeze([...SIGNING_REQUIRED_VARIABLES]),
+  // assemble-bundle.js and sign-update-manifest.js read the update key (TAURI_SIGNING_*).
+  "release:assemble": UPDATE_KEY_ENV,
+  "release:sign:gpg": Object.freeze(["GPG_PASSPHRASE"]),
+  // verify-windows-authenticode.ps1 reads the publisher name and subject only.
+  "release:authenticode": AZURE_PUBLISHER_ENV,
+  "release:draft": Object.freeze([]),
+  "release:verify:draft": Object.freeze([]),
+  "release:mirror": Object.freeze([]),
+});
+
+/** Runners start other release steps, which filter their own environment. They get the full environment. */
+export const RUNNER_STEPS = Object.freeze(["release:win:continue"]);
+
+function isCredentialName(name) {
+  return CREDENTIAL_ENV.includes(name) || name.toUpperCase().startsWith("AZURE_");
+}
+
+/**
+ * The environment for one release step. A credential the step is not granted is set to "". A defined variable
+ * is never overwritten by a --env-file, so the step's own `node --env-file-if-exists=.env` cannot refill it.
+ */
+export function stepEnv(name, env = process.env) {
+  const out = { ...env };
+  if (RUNNER_STEPS.includes(name)) return out;
+  const granted = new Set(STEP_ENV[name] ?? []);
+  for (const key of Object.keys(out)) {
+    if (isCredentialName(key) && !granted.has(key)) out[key] = "";
+  }
+  for (const key of CREDENTIAL_ENV) {
+    if (!granted.has(key)) out[key] = "";
+  }
+  return out;
+}
+
 /** The default runner: npm run <name> [args], or the internal clean step. Stops on any failure. */
 function npmRunner(root, version) {
   return (name, args = []) => {
@@ -176,7 +274,7 @@ function npmRunner(root, version) {
       cleanRelease(root, version);
       return;
     }
-    const options = { cwd: root, stdio: "inherit", windowsHide: true, env: process.env };
+    const options = { cwd: root, stdio: "inherit", windowsHide: true, env: stepEnv(name, process.env) };
     // npm.cmd needs a shell on Windows. Node warns (DEP0190) when an argument array is passed with shell: true,
     // so the command line is built here, quoting each argument for cmd.exe.
     const result =
@@ -213,9 +311,7 @@ export function main(argv = process.argv.slice(2), runner = null, { root = REPO_
     throw usageError(keys.detail, keys.reason === "missing-trusted-key-source" ? EXIT.MISSING : EXIT.REFUSED);
   }
   const run = runner ?? npmRunner(root, version);
-  for (const step of releaseSteps(options.mode, { version, env })) {
-    // An injected runner (the selftest) runs nothing, so the warning is for real runs only.
-    if (step.name === FINALIZE_STEP && runner === null) printFinalizeWarning();
+  for (const step of releaseSteps(options.mode, { version, env, from: options.from })) {
     run(step.name, step.args);
   }
   return EXIT.OK;

@@ -9,6 +9,7 @@ using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using static Bwc.E2E.Harness.RunFolders;
 
 namespace Bwc.E2E.AppServices;
 
@@ -23,6 +24,7 @@ namespace Bwc.E2E.AppServices;
 public sealed class AppServicesTests
 {
     private const int MenuFile = 512;
+    private static readonly TimeSpan NoMessageWindow = TimeSpan.FromSeconds(3);
     private const int MenuView = 514;
     private const int MenuHelp = 515;
     private const int CommandFont = 699;
@@ -891,8 +893,21 @@ public sealed class AppServicesTests
             }
             else
             {
-                Thread.Sleep(1500);
-                IntPtr result = AppServicesSupport.FindOwnedWindow(app.MainHwnd, null, Caption);
+                // A success message that appears at any point in the window fails the check, so the whole window is polled.
+                IntPtr result = IntPtr.Zero;
+                DateTime noMessageUntil = DateTime.UtcNow + NoMessageWindow;
+                do
+                {
+                    result = AppServicesSupport.FindOwnedWindow(app.MainHwnd, null, Caption);
+                    if (result != IntPtr.Zero)
+                    {
+                        break;
+                    }
+
+                    Thread.Sleep(100);
+                }
+                while (DateTime.UtcNow < noMessageUntil);
+
                 E2EResults.Record(checkPrefix + ".result.none", result == IntPtr.Zero, "No success message appeared after No.");
             }
 
@@ -917,6 +932,8 @@ public sealed class AppServicesTests
                 {
                     Directory.Delete(folder, recursive: true);
                 }
+
+                RemoveEmptyRunFolder(folder);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {

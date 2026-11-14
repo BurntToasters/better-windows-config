@@ -70,6 +70,9 @@ and every click aimed at the app or one of its dialogs goes through `ForegroundG
 owner process, never from a forced topmost flag:
 
 - The foreground is the target: nothing is sent and nothing is recorded.
+- The foreground is a child control of the target (its root window, `GA_ROOT`, is the target). A
+  system dialog such as Advanced Security Settings can report one of its own check boxes as the
+  foreground. Input still goes to the target, so this counts as the target.
 - The foreground belongs to the app under test (any window of its process, including its own popups
   and dialogs) but is not the target: no re-assert. This is a product focus bug, so the guard records
   a failed check and the caller does not retry. Keys are not sent to the wrong window.
@@ -383,6 +386,106 @@ not one of the COM or invalid-operation types a caller usually catches, so it ab
   ("No visible static text control was found").
 - A skipped element is not a pass. The check that reads the pixels still decides the contrast of every
   text rectangle that was found.
+
+## 29. Closing or adopting a Registry Editor the test did not start
+
+Name matching is not ownership. `Process.GetProcessesByName("BwcRegedit")` returns the developer's own
+Registry Editor, a Registry Editor from the ship folder, and a Registry Editor from an earlier run. The Hub
+test used to close every one of them before its launch check, and it adopted the first new one it found.
+
+- A process is the test's only when its image is the `BwcRegedit.exe` in the publish folder under test
+  (`InstallEvidence.HasImage`) and it started after this test run began (`E2EConfig.StartedUtc`).
+- `CloseRegeditLeftovers` closes only processes that meet both rules. Each close is a note that names the pid.
+- `WaitForNewRegedit` adopts only a process that meets both rules and started after the launch check began.
+- A Registry Editor from another folder or another user is never closed, adopted, or waited for.
+
+## 30. Enter on the Hub tool row does not reach the launch path
+
+`hub.regedit.process` failed in the full suite and passed when the run was filtered to the Hub tests. The Hub
+log for that run had no launch line, the screenshot showed the Hub with the Registry Editor row selected and the
+status line still "Ready.", and no leftover Registry Editor was running when the check started
+(`hub.regedit.leftover` was never noted, and the About check recorded `bwcRegeditRunning=0`). The launch check
+therefore did not fail because a process was forwarded to an older instance.
+
+- The Hub's launch runs only from `OnToolListKeyDown` when the Enter reaches the tool list, and the Hub ignores
+  a key-down with `KeyStatus.WasKeyDown` set. A key that is still held from an earlier step makes the next
+  Enter look like a repeat.
+- Before the Enter, the check records the foreground window, the focused element, and whether VK_RETURN is still
+  down (`hub.regedit.preenter`). A held Enter is released and the check waits for it to come up before sending a key.
+- The Enter is sent only after the row is verified selected and the Hub is foreground. If the Hub log then has
+  no launch line, the check fails with the status text and the recorded foreground window.
+
+## 31. Flavor read from the binary, not from configuration
+
+The e2e flavor guard used to read the `BWC_FLAVOR` value, which the harness itself sets. An e2e test could run
+against a ship folder when the environment said e2e. `RequireE2EFlavor` now reads the `BwcFlavor`
+`AssemblyMetadata` attribute from `BetterWindowsConfig.dll`, `BwcRegedit.dll` and `BwcUpdate.dll` in the
+publish folder with `System.Reflection.Metadata`. The assemblies are never loaded or executed. A missing
+attribute, a missing assembly, or a value other than `E2E` fails the mutating or E2E-only test.
+
+## 32. Classic Registry Editor state changed by a test
+
+`C:\Windows\regedit.exe` saves its state (LastKey, View, FindFlags, window placement) under
+`HKCU\...\Applets\Regedit` when it exits. Tests that start it, and the classic oracle script, changed the
+developer's state.
+
+- `AppletState` captures the whole `Applets\Regedit` tree before a classic run: subkeys, value names, and
+  exact `RegistryValueKind` with the data read without environment expansion. Restore writes every value
+  back with its kind, deletes values and subkeys that were not in the snapshot, and deletes the key when it
+  did not exist. Restore runs in `finally`, and a mismatch after restore fails the check.
+- `classic-selection-oracle.ps1` starts its own `regedit.exe` and uses only the process object it got from
+  `Start-Process`. It refuses to run when another regedit is already running, instead of attaching to it, and it
+  restores `Applets\Regedit` the same way. Its header states that the applet state is restored.
+
+## 33. Probe key outside the sandbox left behind
+
+The command-line test probes `HKCU\Software\BWC-CLI-Outside` to show the write policy refuses it. A fixed name
+can collide with another run or a developer key. The probe key name now includes the run id
+(`Software\BWC-E2E-Outside-<run-id>`), which is still outside `Software\BWC-E2E\<run-id>`. The cleanup deletes it
+only when this test saw the app create it (`commandline.import.outside.denied` observed the key). It is not
+expected to exist, so a found key is a failed check.
+
+## 34. Seeds above the 5000 entry limit
+
+A test seed is at most 5000 keys and values in total, counting the root key. `LargeListSelectionTests` seeded
+10,001 values; it now seeds 4,999 values plus the root. The product sorts in the background only above 10,000
+rows, so that path cannot be seeded under the limit. It is recorded as the known gap `list.large.backgroundSort`.
+`ExportRangeTests` seeded 5,002 keys; it now seeds 4,997 keys under `CancelExport`, plus that key and the root.
+
+## 35. Test data and staging folders left behind
+
+- `artifacts/e2e/data/<run-id>` is deleted at the end of every run. It is kept only when the run failed and
+  `BWC_E2E_KEEP_DATA=1` is set, so a failure can be inspected.
+- The `<run-id>` parent folders made by the AppServices and ImportResult tests are deleted with the test.
+- The Hub's update helper stages to `%TEMP%\BWC-Update`, which is shared with the developer's own installs.
+  The Hub under test gets a per-run `TEMP` and `TMP` inside its data root, so its staging folders are created
+  there. Only a staging folder the test can prove it made (the snapshot diff in `InstallEvidence`, and a
+  receipt that names the fixture version) is removed from the shared root.
+
+## 36. Inherited environment reaching the test host
+
+`scripts/test-e2e.js` used to pass the whole parent environment to `dotnet test`. A shell that had
+`BWC_DATA_ROOT`, `BWC_E2E_*`, or `NODE_OPTIONS` set could redirect the test's data or change how Node ran.
+The test host now receives a filtered environment. `BWC_E2E_*`, `BWC_PUBLISH_DIR`, `BWC_DATA_ROOT`, and
+`NODE_OPTIONS` are dropped from the inherited set. `BWC_PUBLISH_DIR` is read once, then the runner sets
+`BWC_PUBLISH_DIR`, `BWC_RID`, `BWC_FLAVOR`, and `BWC_RUN_ID` itself. A run id of `.` or `..` is refused, because
+it would name the parent of the sandbox.
+
+## 37. Registry writes outside the scanned C# files
+
+`scripts/check-registry-writer.js` scanned only C# files, so a PowerShell or JavaScript helper could write the
+registry without being seen. The checker now also scans `tools/`, `scripts/`, `.ps1`, `.js`, and `.mjs` files for
+`reg add|delete|import` (in code, not only in literals), `Set-ItemProperty`, `New-Item`, and the other registry
+cmdlets on `HKCU:` or `HKLM:` paths, and `RegSetValueEx` or `NtSetValueKey`. A `CreateSubKey(` or `SetValue(`
+call in a file that does not name a registry type is flagged, unless the file is on the allowlist with a reason.
+Each allowlist entry names the sandbox the file writes into or why the call is not a registry write.
+
+## 38. Fixed sleeps before a negative check
+
+A check that a dialog or a sort does not appear used `Thread.Sleep` and then looked once. A slow machine can
+show the dialog after the sleep, and a fast one wastes the sleep. Negative checks now poll for the whole window
+(`DialogsThatAppear` in the Hub test, and a loop in the AppServices test), and the wait for the re-sort polls until
+the realized rows are in name order.
 
 ## Verification artifact
 

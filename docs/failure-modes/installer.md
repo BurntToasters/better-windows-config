@@ -2,9 +2,9 @@
 
 Scope: `installer/bwc.nsi`, `installer/include/*.nsh`, `installer/scripts/*.ps1`,
 `scripts/build-installer.js`, and `scripts/generate-nuget-licenses.js`. Written before the
-code, per AGENTS.md. Each entry states the failure and the intended behavior. The NSIS
-script has not been compiled on this machine yet (NSIS is not installed), so every
-"intended" behavior below is also a check for the first compile and the E2E install test.
+code, per AGENTS.md. Each entry states the failure and the intended behavior. The E2E flavor
+compiles with NSIS 3.13 and was installed, reinstalled over, upgraded from a leftover backup, and
+uninstalled silently on Windows 11 ARM64 (unsigned build). The signing hook is not covered by that run.
 
 Exit codes for `scripts/build-installer.js`: `0` success, `1` build or compile failure,
 `2` bad arguments, `3` NSIS not found or too old.
@@ -90,7 +90,7 @@ classic 260-character limit.
 ### Reserved payload names
 
 The publish folder contains a file named `LICENSE`, `THIRD-PARTY-NOTICES.txt`,
-`installed-files.txt`, or `Uninstall.exe`, or anything under `bwc-tools\`. Or a payload file
+`installed-files.txt`, `Uninstall.exe`, or `upgrade-cleanup-pending`, or anything under `bwc-tools\`. Or a payload file
 name contains `"`, `$`, or a line break.
 
 - Intended: exit `1` before makensis runs. The name would collide with an installer-owned
@@ -108,6 +108,74 @@ cache, or a package has no license expression and no license file.
 
 ## Installer runtime
 
+### Install folder is a drive root or share root
+
+`/D=C:\`, `/D=D:\`, `/D=\\server\share`, or the same path typed on the directory page. A trailing
+`\` is removed first, so `C:\` is checked as `C:`.
+
+- Intended: refused before any change. Silent mode (`/S`) aborts with a nonzero exit code and names
+  the folder. Interactive mode shows a message and keeps the directory page open. The check runs in
+  `.onVerifyInstDir` (interactive) and in `.onInit` (silent, because `.onVerifyInstDir` does not run
+  in silent mode).
+- NSIS drops a root given to `/D=` (`/D=C:\`, `/D=C:`) before `.onInit` and installs to the default
+  folder instead. So `.onInit` also reads the raw `/D=` value from the command line and refuses a root
+  there, in both modes. An empty `/D=` is not refused.
+- A `\\server` with no share is refused the same way.
+
+### Install folder is in use by something else
+
+The folder exists and is a file, or it is a folder that is not empty and does not contain
+`installed-files.txt`. Either way it is not a Better Windows Config install, so it may hold the user's
+own files.
+
+- Intended: refused before any change, with a message that names the folder. An empty folder, a
+  folder that does not exist yet, and a folder with `installed-files.txt` (an earlier install of this
+  product) are accepted. The uninstall step never removes a folder that is not empty, so a refused
+  folder is never touched.
+- An earlier install from before the manifest existed has no `installed-files.txt`. It is refused, and
+  the user must choose another folder or remove the old files by hand.
+
+### Staging folder `<install folder>.new` belongs to something else
+
+A sibling folder named `<folder>.new` already exists, for example a user folder or another program's
+folder. The staging step removes `<install folder>.new` with `RMDir /r`, so an unrelated folder would be
+lost.
+
+- Intended: the install refuses before any change and names the folder, when the folder is a file, or
+  when it is not empty and does not contain `installed-files.txt`. An empty `<install folder>.new` and
+  one that holds this product's staging manifest are removed and reused as before.
+- The same check runs in `.onInit` (silent and interactive), before the section starts.
+- `.onInstFailed` removes `<install folder>.new` only when this run passed the check, so a folder that
+  was refused is never removed by the failure path.
+
+### Manifest line names a path outside the install folder
+
+`installed-files.txt` from the previous version (moved out during an upgrade) or from the new staging
+folder. A line can hold a `..` segment (`a\..\..\x`), a `/`, or a `:` (an alternate data stream or a
+drive). Those would move a file outside the install folder.
+
+- Intended: the line is skipped with a log line in both the move-out and the restore walks. Empty,
+  leading `\`, drive-colon, and `..` lines were already skipped. The rule is now: a line that contains
+  `..` anywhere, a `/`, or a `:` is skipped. Build-time payload names never contain these characters,
+  so this rule only affects a damaged or hand-edited manifest.
+
+### Uninstall key belongs to another folder
+
+`HKCU\...\Uninstall\BetterWindowsConfig` has an `InstallLocation` that is not the folder being
+uninstalled. A user who moved an install, or a second copy in another folder, has a different key.
+
+- Intended: the uninstaller removes the uninstall key only when `InstallLocation` equals its own
+  `$INSTDIR`, compared without case. Otherwise the key is kept and the log says why. The files are still
+  removed. A missing key is not an error.
+
+### Trailing backslash in the install folder
+
+`$INSTDIR` ending in `\` would make the quoted `--install-dir "C:\folder\"` argument break the
+command line, because `\"` escapes the quote.
+
+- Intended: every trailing `\` is removed from `$INSTDIR` in `.onInit`, and in `.onVerifyInstDir`
+  before the check. The drive-root refusal then covers `C:\`.
+
 ### Host architecture
 
 The ARM64 installer runs on an x64 host, or the x64 installer runs on ARM64.
@@ -116,8 +184,9 @@ The ARM64 installer runs on an x64 host, or the x64 installer runs on ARM64.
   download the x64 installer.
 - x64 installer on ARM64: allowed. The app is x64 and runs under emulation, as the
   architecture notes in `docs/failure-modes/build-scripts.md` describe.
-- The check uses `GetNativeSystemInfo`, not `PROCESSOR_ARCHITECTURE`. If the call fails, the
-  installer aborts rather than guessing.
+- The check uses `IsWow64Process2` and reads the native machine (`43620` ARM64, `34404` AMD64).
+  `GetNativeSystemInfo` is not used: on an ARM64 PC it reports AMD64 to the emulated 32-bit setup
+  stub, which refused every install. If the call fails, the installer aborts rather than guessing.
 
 ### Windows build below the minimum, or unreadable
 
@@ -126,33 +195,34 @@ The ARM64 installer runs on an x64 host, or the x64 installer runs on ARM64.
 
 - Intended: the installer aborts before any change, with the required version in the
   message. An unreadable value is read as 0, which is below the minimum, so it refuses.
-- The comparison is `IntCmp <build> 19041 equal-label greater-label less-label` with equal
-  and greater going to the continue label and less going to the refusal label. A build of
-  19041 or newer is allowed. (An earlier draft had the labels inverted, which refused every
-  supported Windows and allowed every old one.)
+- The comparison is `IntCmp <build> 19041 continue-label refuse-label continue-label`. NSIS takes
+  the labels as equal, less, greater, so a build of 19041 or newer goes on and an older one refuses.
+  (The labels were once in the wrong order: every supported Windows, such as 26200, was refused.)
 
 ### Running processes in the install folder
 
 `BetterWindowsConfig.exe`, `BwcRegedit.exe`, or `BwcUpdate.exe` runs from the target folder.
 Replacing a running EXE fails.
 
-- Intended: the close step runs the copy of `BwcUpdate.exe` that the installer extracted to
-  `$PLUGINSDIR`, which is the version being installed. It is run as
+- Intended: the new payload is staged first (see "Staging the new payload"). The close step then
+  runs the `BwcUpdate.exe` in `<install folder>.new`, which is the version being installed and has
+  its .NET runtime beside it. It is run as
   `BwcUpdate.exe --close-running --install-dir "<folder>" [--exclude-pid <pid>] --timeout-seconds 30`.
   No PowerShell and no WOW64 path are involved, so a 32-bit installer reaches 64-bit and
   ARM64 processes. The helper posts `WM_CLOSE` to visible windows and waits up to 30 seconds.
+- The helper is not extracted to `$PLUGINSDIR`. A lone copy there has no runtime beside it and
+  cannot start, which made every install over an existing one fail.
 - An update is detected by `<folder>\BwcUpdate.exe` existing. A first install has nothing to
   close, and the step is skipped.
-- `/PARENTPID=<n>` (passed by the updater) becomes `--exclude-pid`, so the updater that
-  launched the installer is never asked to close. `n` must be 1 to 10 decimal digits. Any other
-  value aborts before the close step with nothing changed.
-- The installer does not wait for the parent updater to exit. The updater waits for the
-  installer, so waiting here would deadlock. Only processes running from the install folder
-  matter for file replacement, and the parent runs from the staging folder.
-- Interactive: exit `3` offers Retry or Cancel. Retry runs the close step again. Cancel aborts.
+- `/PARENTPID=<n>` (passed by the updater) runs first: `BwcUpdate.exe --wait-pid <n>` waits up to
+  30 seconds for the updater to exit, so no file is replaced while it still runs. Exit `3` is
+  handled like the close step's exit `3`. Then `--exclude-pid <n>` keeps the updater out of the
+  close step. `n` must be 1 to 10 decimal digits. Any other value aborts before any change.
+- Interactive: exit `3` offers Retry or Cancel. Retry runs the step again. Cancel aborts.
 - Silent (`/S`): exit `3` aborts with installer exit code `2` and changes nothing.
-- Any other exit code (including `2`, bad arguments, or a missing helper) aborts with the
-  code in the log and changes nothing. The installer never skips the close step.
+- Any other exit code (including `2`, bad arguments, or a helper that cannot start) aborts with
+  the code in the log. The install folder is untouched; `.onInstFailed` removes the staging folder.
+  The installer never skips the close step.
 
 ### Process cannot be closed
 
@@ -169,10 +239,10 @@ window (`BwcUpdate` in a hidden state), or an executable whose path cannot be re
 Copying the new files could fail (disk full, a locked staging path, antivirus).
 
 - Intended: the new payload, the manifest, `LICENSE`, and `THIRD-PARTY-NOTICES.txt` are written
-  to `<install folder>.new` first. The install folder is not touched during staging. A failure
-  here removes `<install folder>.new` (through `.onInstFailed`) and leaves the previous version
-  working. The staging copy needs about the payload size in extra disk space, roughly 330 MB
-  for the current build.
+  to `<install folder>.new` first, before the close step. The install folder is not touched during
+  staging. A failure here removes `<install folder>.new` (through `.onInstFailed`) and leaves the
+  previous version working. The staging copy needs about the payload size in extra disk space,
+  roughly 330 MB for the current build.
 - A leftover `<install folder>.new` from an earlier failed run is removed before staging. It is
   only ever staging data.
 
@@ -181,26 +251,47 @@ Copying the new files could fail (disk full, a locked staging path, antivirus).
 `<install folder>.old` is kept during an upgrade. Its only copies of the previous version's
 files are there until the upgrade succeeds, so it is never deleted blindly.
 
-- Intended: if `<install folder>.old` already exists when an upgrade starts, the installer
-  aborts before any change and names the folder. The user removes it or runs the installer
-  again after checking it, because it may hold the only copy of the previous version.
+- Finished upgrade: the finish step (see "Commit and rollback") writes the marker file
+  `<install folder>\upgrade-cleanup-pending` before it removes `<install folder>.old`, and deletes
+  the marker once `.old` is gone. If `.old` and the marker are both present at the start of a run,
+  the upgrade had finished. The installer removes `.old` and the marker, then continues. This runs
+  before the close step, so the run may still abort later with nothing else changed.
+- If `.old` cannot be removed by that cleanup (a file is still locked), the installer aborts before
+  the close step and names the folder. Nothing else changed. Close the program that holds the file,
+  then run the installer again.
+- Intended: if `<install folder>.old` exists without the marker, the installer aborts before any
+  change and names the folder. The user removes it or runs the installer again after checking it,
+  because it may hold the only copy of the previous version. A crash before the marker is written
+  leaves this state.
+- The uninstaller deletes the marker. The marker is not in `installed-files.txt`.
 
 ### Commit and rollback
 
-After staging succeeds, the installer swaps the files in three steps.
+After the close step succeeds, the installer swaps the files in three steps.
 
 1. Move every file that the previous manifest lists into `<install folder>.old`, keeping its
-   relative path. The previous manifest moves too. A line that is empty, absolute, or contains
-   `..` is skipped with a log line. A missing previous manifest moves nothing.
+   relative path. The previous manifest moves too. A line that is empty, absolute, contains `..`,
+   or contains `/` or `:` is skipped with a log line. A missing previous manifest moves nothing.
 2. Move each new file from `<install folder>.new` into the install folder, creating its folder
    first. Any existing file with the same name is removed first.
-3. Remove `<install folder>.old` and `<install folder>.new`, and remove folders that the
-   previous version left empty.
+3. Registry, shortcuts, and AUMIDs are written. Then the finish step writes the marker, removes
+   `<install folder>.old` and `<install folder>.new`, deletes the marker, and removes folders that
+   the previous version left empty.
 
 - A failure in step 1 or step 2 runs the rollback: the new files that were moved in are
   deleted, every file in `<install folder>.old` is moved back to its old place, and both
-  staging folders are removed. The installer aborts with the message "Upgrade rolled back.
-  Nothing was changed." The previous version keeps running.
+  staging folders are removed. The installer aborts with the message "The upgrade was rolled
+  back. The previous version is still installed." The previous version keeps running. With
+  `/RELAUNCH`, the previous Hub is started again (see "`/RELAUNCH` and the updater").
+- If the rollback itself fails (for example, a file is locked again), the installer stops, keeps
+  both folders, and its message names both paths and says to restore by hand. It never deletes
+  `<install folder>.old` while it may still hold the only copy of a file.
+- If the finish step cannot remove `<install folder>.old` (a locked file), the upgrade is still
+  complete: the new version is installed and the shortcuts and uninstall entry are written. The
+  installer logs a warning and keeps the marker. The next run removes the folder (see "Leftover
+  backup folder"). The installer does not roll back after the swap has finished.
+- If the finish step cannot write the marker, it does not remove `.old`, logs a warning, and
+  the next run aborts on `.old` as described above.
 - If the rollback itself fails (for example, a file is locked again), the installer stops, keeps
   both folders, and its message names both paths and says to restore by hand. It never deletes
   `<install folder>.old` while it may still hold the only copy of a file.
@@ -212,9 +303,9 @@ After staging succeeds, the installer swaps the files in three steps.
 ships. Lines can be missing, empty, or malicious.
 
 - Intended: the installer moves only listed relative paths, and only the ones that exist.
-  Lines that are empty, absolute, or contain `..` are skipped with a log line. A missing
-  manifest (first install, or a folder copied by hand) moves nothing, and stale files stay.
-  Files the user added stay.
+  Lines that are empty, absolute, contain `..` anywhere, or contain `/` or `:` are skipped with a log
+  line. A missing manifest (first install, or a folder copied by hand) moves nothing, and stale files
+  stay. Files the user added stay.
 
 ### Shortcut AUMID not written
 
@@ -229,6 +320,22 @@ blocks the `Add-Type` the helper uses).
   exists, so a 32-bit installer uses the 64-bit PowerShell. It falls back to `%SYSDIR%`.
 - `Add-Type` is kept, because a shell-property write needs a compiled COM interop type. Under
   Constrained Language Mode the helper exits `4` and the installer continues.
+
+### E2E environment fallback for the run id and shortcut folder
+
+The `-DBWC_E2E` build reads `BWC_E2E_INSTALLER_RUNID` and `BWC_E2E_INSTALLER_SHORTCUTS` only when
+`/RUNID=` or `/SHORTCUTS=` is absent. The helper starts the installer with neither switch, so an
+in-app update of an E2E install needs the variables. Command-line switches always win.
+
+- Intended: the fallback applies the same rules as the switches (`<id>` is 1 to 64 letters, digits,
+  `-`, `_`; the shortcut folder is non-empty). An empty or invalid variable counts as missing, and the
+  installer aborts before changing anything.
+- Intended: the release build (no `BWC_E2E`) never reads either variable, so its logic is unchanged.
+- Intended: the uninstaller reads the same variable for `/RUNID=` only.
+- Risk: a variable set in a shell that runs the E2E installer by hand points it at that run's key.
+  Only the test sets these variables, with a unique id per run, and it removes that key afterwards.
+- Risk: the helper or the Hub does not pass the environment to the installer. Then the installer
+  aborts as before, and the update test reports that the installer did not run.
 
 ### Installer lookup of an invalid switch
 
@@ -253,13 +360,27 @@ real Start menu or the real Uninstall key.
   install.
 - The uninstaller reads the shortcut folder from the uninstall key, so it removes the same
   shortcuts it created.
+- It does not remove `%TEMP%\BWC-Update`. That folder belongs to the real updater, and the E2E
+  flavor never writes to real places. The release uninstaller removes it.
 
 ### `/RELAUNCH` and the updater
 
-- Intended: `/RELAUNCH` starts the Hub after a successful install. A failed launch is logged
-  and does not change the exit code. The updater (`docs/contracts/update-manifest.md`) starts
-  the Hub itself after the installer exits, so the updater must not pass `/RELAUNCH`. Passing
-  it would start two Hubs.
+- Intended: the updater (`docs/contracts/update-manifest.md`) starts this installer with
+  `/S /RELAUNCH /PARENTPID=<its pid> /D=<folder>` and does not start the Hub itself. The installer
+  starts the Hub, so there is one Hub start per run.
+- On success with `/RELAUNCH`, the installed `BetterWindowsConfig.exe` is started with no
+  arguments. A failed launch is logged and does not change the exit code.
+- On failure with `/RELAUNCH` (any abort after the installer starts its section, including the
+  close step and the rollback), the Hub that is still installed is started with
+  `--update-result InstallerFailed`, if `BetterWindowsConfig.exe` exists in the install folder. The
+  Hub reports the failed update. If the rollback could not finish, the Hub may be missing or
+  incomplete, and the launch is skipped or fails without changing the exit code.
+- Without `/RELAUNCH`, no Hub is started, on success or failure.
+- A refusal before the installer section (a bad `/PARENTPID=`, a host or architecture check, or a
+  bad E2E switch) exits before `.onInstFailed` runs, so no Hub is started by the installer.
+- Known gap: when a silent close step finds the Hub still running (exit `3`), the failure path
+  starts a second Hub with `--update-result InstallerFailed`. Whether the Hub merges the two
+  starts is not verified.
 
 ### Install folder recorded for the next run
 
@@ -277,10 +398,15 @@ An older install wrote `InstallLocation`, or a user cleared it.
   stops before anything is removed. Reinstall, then uninstall.
 - It deletes the payload files listed at build time (generated `BWC_PAYLOAD_DELETE`), the two
   shortcuts recorded in the uninstall key, `LICENSE`, `THIRD-PARTY-NOTICES.txt`,
-  `installed-files.txt`, `Uninstall.exe`, and the old `bwc-tools\bwc-close-apps.ps1` if an
-  earlier version left it. It removes a folder only when it is empty, so user files in the
-  folder stay. The uninstall key is removed last.
-- It removes `%TEMP%\BWC-Update` (the updater's staging folder), so no downloaded installer or
+  `installed-files.txt`, `upgrade-cleanup-pending`, `Uninstall.exe`, and the old
+  `bwc-tools\bwc-close-apps.ps1` if an earlier version left it. It removes a folder only when it is
+  empty, so user files in the folder stay. The uninstall key is removed last, and only when its
+  `InstallLocation` is this folder.
+- The DLLs that `BwcUpdate.exe` loaded for the close step can stay locked for a moment after it exits.
+  This was seen with the x64 build under emulation on ARM64, where the files stayed and the folder with
+  them. The file deletes are retried every 500 ms for up to 10 s. A file still locked after that stays,
+  and the folder stays with it. Covered by the installer E2E uninstall case on both RIDs.
+- It removes `%TEMP%\BWC-Update` in the release flavor (the updater's staging folder), so no downloaded installer or
   receipt survives an uninstall. A staging file that is still in use stays and does not stop the
   uninstall.
 - Files from an older version that the upgrade already removed are gone. A file that an older
@@ -292,6 +418,8 @@ An old version wrote a different uninstall key, or a user deleted the key by han
 
 - Intended: the installer always writes the current key. Upgrades overwrite it. Removing the
   key only hides the app from Apps and Features; the installed files still run.
+- A key whose `InstallLocation` is another folder is kept by the uninstaller (see "Uninstall key
+  belongs to another folder" above). A missing key is skipped.
 
 ## Notices and licenses
 

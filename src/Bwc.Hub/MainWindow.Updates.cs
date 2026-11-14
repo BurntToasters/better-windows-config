@@ -65,29 +65,66 @@ public sealed partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// Runs one update check. The startup check (interactive false) is silent: it shows a window only when it
+    /// offers an update. A menu check (interactive true) shows its progress and its result. A menu check that is
+    /// clicked while a check runs waits for that check and shows its result, so no second check starts.
+    /// </summary>
     private async Task CheckForUpdatesAsync(bool interactive)
     {
-        if (_checkInProgress)
+        if (_activeCheck is not null)
         {
+            if (!interactive)
+            {
+                Log.Info("Startup update check skipped: a check is already running.");
+                return;
+            }
+
+            // The running check leaves its result to this wait, so the user sees one result window.
+            Task<UpdateCheckResult> running = _activeCheck;
+            CancellationTokenSource runningCancel = _activeCancel!;
+            _activeCheckHandedOver = true;
+            UpdateCheckResult shared = await WaitWithProgressAsync(running, runningCancel, UpdateSources.Channel(_settings));
+            await HandleCheckResultAsync(shared, interactive: true);
             return;
         }
 
-        _checkInProgress = true;
+        string channel = UpdateSources.Channel(_settings);
+        string? manifestUrl = UpdateSources.ManifestUrl(_settings, channel);
+        string currentVersion = _version.SemVer;
+
+        // Not disposed: a waiter that arrives late may still cancel it. A cancel source is a small object.
+        var cancel = new CancellationTokenSource();
+        Task<UpdateCheckResult> work = _updates.CheckAsync(manifestUrl, channel, currentVersion, cancel.Token);
+        _activeCheck = work;
+        _activeCancel = cancel;
+        _activeCheckHandedOver = false;
+
+        UpdateCheckResult result;
+        bool handedOver;
         try
         {
-            string channel = UpdateSources.Channel(_settings);
-            string? manifestUrl = UpdateSources.ManifestUrl(_settings, channel);
-            string currentVersion = _version.SemVer;
-
-            UpdateCheckResult result = interactive && !string.IsNullOrWhiteSpace(manifestUrl)
-                ? await RunCheckWithProgressAsync(manifestUrl, channel, currentVersion)
-                : await _updates.CheckAsync(manifestUrl, channel, currentVersion, CancellationToken.None);
-
-            await HandleCheckResultAsync(result, interactive);
+            result = interactive && !string.IsNullOrWhiteSpace(manifestUrl)
+                ? await WaitWithProgressAsync(work, cancel, channel)
+                : await work;
         }
         finally
         {
-            _checkInProgress = false;
+            handedOver = _activeCheckHandedOver;
+            _activeCheck = null;
+            _activeCancel = null;
+            _activeCheckHandedOver = false;
+        }
+
+        if (!handedOver)
+        {
+            // A check that finished just as Cancel was pressed still counts as canceled.
+            if (cancel.IsCancellationRequested)
+            {
+                result = new UpdateCheckResult(UpdateOutcomeKind.Canceled, string.Empty);
+            }
+
+            await HandleCheckResultAsync(result, interactive);
         }
     }
 
@@ -95,14 +132,12 @@ public sealed partial class MainWindow
     /// Shows the progress window while the check runs. The window closes when the check finishes.
     /// If the user presses Cancel first, the check is canceled and the helper process is stopped.
     /// </summary>
-    private async Task<UpdateCheckResult> RunCheckWithProgressAsync(string manifestUrl, string channel, string currentVersion)
+    private async Task<UpdateCheckResult> WaitWithProgressAsync(Task<UpdateCheckResult> work, CancellationTokenSource cancel, string channel)
     {
-        using var cancel = new CancellationTokenSource();
         var progress = new UpdateProgressDialog(HubStrings.Format("UpdateChecking", channel));
         Task<bool> closed = progress.ShowAsync(_hwnd);
         StatusText.Text = HubStrings.Format("UpdateChecking", channel);
 
-        Task<UpdateCheckResult> work = _updates.CheckAsync(manifestUrl, channel, currentVersion, cancel.Token);
         _ = work.ContinueWith(
             _ => DispatcherQueue.TryEnqueue(progress.FinishFromWorker),
             TaskScheduler.Default);
@@ -110,7 +145,10 @@ public sealed partial class MainWindow
         _ = await closed;
         if (!progress.Finished)
         {
+            // The status shows "canceled" now. The helper is stopped below, which can take seconds, and its late
+            // result is then ignored (CheckForUpdatesAsync maps a canceled check to Canceled).
             cancel.Cancel();
+            StatusText.Text = HubStrings.Get("UpdateCanceled");
         }
 
         try
@@ -123,36 +161,50 @@ public sealed partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// Maps one check result to the window or the status line. A silent check (startup) changes neither for
+    /// up to date, not configured, canceled, or a failure: those go to the log only.
+    /// </summary>
     private async Task HandleCheckResultAsync(UpdateCheckResult result, bool interactive)
     {
+        Log.Info("Update check finished: " + result.Kind + ".");
+        if (result.Code is not null)
+        {
+            Log.Info("Update check code: " + result.Code + ".");
+        }
+
         switch (result.Kind)
         {
             case UpdateOutcomeKind.Canceled:
-                StatusText.Text = HubStrings.Get("UpdateCanceled");
+                if (interactive)
+                {
+                    StatusText.Text = HubStrings.Get("UpdateCanceled");
+                }
+
                 return;
 
             case UpdateOutcomeKind.NotConfigured:
-                StatusText.Text = HubStrings.Get("UpdateStatusNotConfigured");
                 if (interactive)
                 {
+                    StatusText.Text = HubStrings.Get("UpdateStatusNotConfigured");
                     await ShowMessageAsync(HubStrings.Get("UpdateCheckTitle"), result.Message, ClassicMessageIcon.Information);
                 }
 
                 return;
 
             case UpdateOutcomeKind.UpToDate:
-                StatusText.Text = HubStrings.Get("UpdateStatusUpToDate");
                 if (interactive)
                 {
+                    StatusText.Text = HubStrings.Get("UpdateStatusUpToDate");
                     await ShowMessageAsync(HubStrings.Get("UpdateCheckTitle"), result.Message, ClassicMessageIcon.Information);
                 }
 
                 return;
 
             case UpdateOutcomeKind.Failed:
-                StatusText.Text = HubStrings.Get("UpdateStatusFailed");
                 if (interactive)
                 {
+                    StatusText.Text = HubStrings.Get("UpdateStatusFailed");
                     await ShowMessageAsync(
                         HubStrings.Get("UpdateFailedTitle"),
                         HubStrings.Format("UpdateFailedText", result.Message),
@@ -245,12 +297,15 @@ public sealed partial class MainWindow
         Task<bool> closed = dialog.ShowAsync(_hwnd);
         StatusText.Text = HubStrings.Get("UpdateDownloading");
 
+        // Progress<T> reports on the UI thread, so the window text and the status line change together.
         var progress = new Progress<DownloadProgressReport>(report =>
         {
             if (report.Total > 0)
             {
                 int percent = (int)Math.Min(100, report.Received * 100 / report.Total);
-                StatusText.Text = HubStrings.Format("UpdateDownloadProgress", percent.ToString(CultureInfo.InvariantCulture));
+                string text = HubStrings.Format("UpdateDownloadProgress", percent.ToString(CultureInfo.InvariantCulture));
+                dialog.SetProgress(text);
+                StatusText.Text = text;
             }
         });
 
@@ -263,6 +318,7 @@ public sealed partial class MainWindow
         if (!dialog.Finished)
         {
             cancel.Cancel();
+            StatusText.Text = HubStrings.Get("UpdateDownloadCanceled");
         }
 
         (UpdateCheckResult Result, StagedUpdate? Staged) outcome;
@@ -281,14 +337,20 @@ public sealed partial class MainWindow
                 return outcome.Staged;
 
             case UpdateOutcomeKind.Canceled:
-                StatusText.Text = HubStrings.Get("UpdateCanceled");
+                StatusText.Text = HubStrings.Get("UpdateDownloadCanceled");
                 return null;
 
             default:
-                StatusText.Text = HubStrings.Get("UpdateStatusFailed");
+                Log.Info("Update download finished without an installer: " + outcome.Result.Kind + ".");
+                if (outcome.Result.Code is not null)
+                {
+                    Log.Info("Update download code: " + outcome.Result.Code + ".");
+                }
+
+                StatusText.Text = HubStrings.Get("UpdateStatusDownloadFailed");
                 await ShowMessageAsync(
-                    HubStrings.Get("UpdateFailedTitle"),
-                    HubStrings.Format("UpdateFailedText", outcome.Result.Message),
+                    HubStrings.Get("UpdateDownloadFailedTitle"),
+                    HubStrings.Format("UpdateDownloadFailedText", outcome.Result.Message),
                     ClassicMessageIcon.Error);
                 return null;
         }
@@ -296,19 +358,23 @@ public sealed partial class MainWindow
 
     /// <summary>
     /// Shows why the helper did not install, when it relaunched the Hub with <c>--update-result</c>. The code is
-    /// the helper's failure name, which is a short fixed word, never free text.
+    /// the helper's failure name. It goes to the log only. Every text says the current version is still in place.
     /// </summary>
     internal async Task ShowUpdateResultAsync(string code)
     {
+        Log.Info("Hub started after an update did not install. Code " + code + ".");
+        string version = _version.SemVer;
         string text = code switch
         {
-            "ProcessesStillRunning" => HubStrings.Get("UpdateResultRunning"),
-            "RunningElevated" => HubStrings.Get("UpdateResultElevated"),
-            _ => HubStrings.Format("UpdateResultNotInstalled", code),
+            "ProcessesStillRunning" => HubStrings.Format("UpdateResultRunning", version),
+            "RunningElevated" => HubStrings.Format("UpdateResultElevated", version),
+            "InstallerFailed" => HubStrings.Format("UpdateResultInstallerFailed", version),
+            "Unexpected" => HubStrings.Format("UpdateResultUnexpected", version),
+            _ => HubStrings.Format("UpdateResultNotInstalled", version),
         };
 
-        StatusText.Text = HubStrings.Get("UpdateStatusFailed");
-        await ShowMessageAsync(HubStrings.Get("UpdateCheckTitle"), text, ClassicMessageIcon.Warning);
+        StatusText.Text = HubStrings.Get("UpdateStatusNotInstalled");
+        await ShowMessageAsync(HubStrings.Get("UpdateNotInstalledTitle"), text, ClassicMessageIcon.Warning);
     }
 
     private async Task ShowMessageAsync(string caption, string text, ClassicMessageIcon icon)

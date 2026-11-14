@@ -7,11 +7,11 @@ using Bwc.UI.Theme;
 namespace Bwc.Regedit.Dialogs;
 
 /// <summary>The point size the user chose in the system font dialog.</summary>
-public readonly record struct FontChoice(double PointSize);
+public readonly record struct FontChoice(double PointSize, string FaceName, int Weight, bool Italic);
 
 /// <summary>
-/// The system ChooseFont dialog, limited to the size. The registry editor draws every row with the
-/// face in <see cref="Bwc.UI.Theme.DenseMetrics"/>, so only the size is applied.
+/// The system ChooseFont dialog for the face, style (weight and italic), and size. The rows and the
+/// shell read the choice from <see cref="Bwc.UI.Theme.DenseMetrics"/>.
 /// </summary>
 public static class FontChooser
 {
@@ -24,10 +24,10 @@ public static class FontChooser
     private const uint CfLimitSize = 0x00002000;
 
     /// <summary>
-    /// Shows the font dialog owned by <paramref name="owner"/>, starting at <paramref name="currentPointSize"/>.
+    /// Shows the font dialog owned by <paramref name="owner"/>, starting at <paramref name="current"/>.
     /// Returns null on Cancel or when the dialog cannot be shown.
     /// </summary>
-    public static FontChoice? Show(nint owner, double currentPointSize)
+    public static FontChoice? Show(nint owner, FontChoice current)
     {
         if (owner == 0)
         {
@@ -41,7 +41,7 @@ public static class FontChooser
         }
 
         int startPoints = Math.Clamp(
-            (int)Math.Round(currentPointSize, MidpointRounding.AwayFromZero),
+            (int)Math.Round(current.PointSize, MidpointRounding.AwayFromZero),
             MinimumPointSize,
             MaximumPointSize);
 
@@ -51,11 +51,12 @@ public static class FontChooser
             {
                 lfHeight = -(int)Math.Round(startPoints * dpi / 72.0, MidpointRounding.AwayFromZero),
                 lfCharSet = 1,
-                lfWeight = 400,
+                lfWeight = Math.Clamp(current.Weight, 100, 900),
+                lfItalic = (byte)(current.Italic ? 1 : 0),
             };
 
-            // The face the dialog opens on is the face the rows use. The size is the only part applied.
-            string face = DenseMetrics.FontFamilyName;
+            // The dialog opens on the face, weight, and italic style in use. All three come back below.
+            string face = string.IsNullOrWhiteSpace(current.FaceName) ? DenseMetrics.FontFamilyName : current.FaceName;
             for (int index = 0; index < face.Length && index < 31; index++)
             {
                 logFont.lfFaceName[index] = face[index];
@@ -77,7 +78,18 @@ public static class FontChooser
                 return null;
             }
 
-            return new FontChoice(Math.Clamp(choose.iPointSize / 10.0, MinimumPointSize, MaximumPointSize));
+            var chosenFace = new System.Text.StringBuilder();
+            for (int index = 0; index < 32 && logFont.lfFaceName[index] != '\0'; index++)
+            {
+                chosenFace.Append(logFont.lfFaceName[index]);
+            }
+
+            string picked = chosenFace.Length == 0 ? face : chosenFace.ToString();
+            return new FontChoice(
+                Math.Clamp(choose.iPointSize / 10.0, MinimumPointSize, MaximumPointSize),
+                picked,
+                Math.Clamp(logFont.lfWeight, 100, 900),
+                logFont.lfItalic != 0);
         }
     }
 }

@@ -77,6 +77,15 @@ public sealed class RegeditSettings
     /// <summary>The font size in DIPs chosen with View > Font. 12 is the oracle size (9 point).</summary>
     public double FontSize { get; set; } = 12;
 
+    /// <summary>The font face chosen with View > Font. Segoe UI is the default.</summary>
+    public string FontFaceName { get; set; } = "Segoe UI";
+
+    /// <summary>The font weight chosen with View > Font, 100 to 900. 400 is normal.</summary>
+    public int FontWeight { get; set; } = 400;
+
+    /// <summary>True when the italic style was chosen with View > Font.</summary>
+    public bool FontItalic { get; set; }
+
     /// <summary>The View > Theme choice: System, Light, or Dark.</summary>
     public string ThemeOverride { get; set; } = "System";
 }

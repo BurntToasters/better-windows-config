@@ -29,7 +29,16 @@ public static class DenseMetrics
     private const double OracleMenuBarHeight = 19;
 
     /// <summary>Font family for the classic shell. Created on first use, which is the UI thread.</summary>
-    public static FontFamily FontFamily { get; } = new(FontFamilyName);
+    public static FontFamily FontFamily { get; private set; } = new(FontFamilyName);
+
+    /// <summary>The face name in use. Defaults to Segoe UI.</summary>
+    public static string FaceName { get; private set; } = FontFamilyName;
+
+    /// <summary>The font weight in use, 100 to 900. Defaults to 400 (normal).</summary>
+    public static int Weight { get; private set; } = 400;
+
+    /// <summary>True when the italic style is in use.</summary>
+    public static bool Italic { get; private set; }
 
     /// <summary>Current font size in DIPs. Defaults to 12.</summary>
     public static double FontSize { get; private set; } = BaseFontSize;
@@ -63,13 +72,28 @@ public static class DenseMetrics
     /// reproduces the oracle values exactly.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">The size is not a finite positive number.</exception>
-    public static void ApplyFont(double fontSize)
+    public static void ApplyFont(double fontSize) => ApplyFont(fontSize, FaceName, Weight, Italic);
+
+    /// <summary>
+    /// Applies a face, weight, italic style, and size. An empty or over-long face name keeps the current
+    /// face, and the weight is clamped to 100 to 900.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The size is not a finite positive number.</exception>
+    public static void ApplyFont(double fontSize, string faceName, int weight, bool italic)
     {
         if (double.IsNaN(fontSize) || double.IsInfinity(fontSize) || fontSize <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(fontSize), fontSize, "Font size must be a finite positive number.");
         }
 
+        if (!string.IsNullOrWhiteSpace(faceName) && faceName.Length < 32 && !string.Equals(faceName, FaceName, StringComparison.Ordinal))
+        {
+            FaceName = faceName;
+            FontFamily = new FontFamily(faceName);
+        }
+
+        Weight = Math.Clamp(weight, 100, 900);
+        Italic = italic;
         FontSize = fontSize;
         TreeRowHeight = Scale(OracleTreeRowHeight, fontSize);
         ListRowHeight = Scale(OracleListRowHeight, fontSize);
@@ -82,6 +106,14 @@ public static class DenseMetrics
     public static void Reset()
     {
         FontSize = BaseFontSize;
+        if (!string.Equals(FaceName, FontFamilyName, StringComparison.Ordinal))
+        {
+            FaceName = FontFamilyName;
+            FontFamily = new FontFamily(FontFamilyName);
+        }
+
+        Weight = 400;
+        Italic = false;
         TreeRowHeight = OracleTreeRowHeight;
         ListRowHeight = OracleListRowHeight;
         HeaderHeight = OracleHeaderHeight;

@@ -2,11 +2,13 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Dialogs;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
 using FlaUI.UIA3;
@@ -39,16 +41,33 @@ public sealed class HubTests
     private const string AvailableTitle = "Update Available";
     private const string SettingsTitle = "Update Settings";
     private const string FailedTitle = "Update Check Failed";
-    private const string FailedStatus = "Update check failed.";
+    private const string DownloadFailedTitle = "Update Download Failed";
+    private const string DownloadFailedStatus = "Update download failed.";
+    private const string DownloadNotVerifiedText = "did not match the signed release";
+    private const string NotInstalledTitle = "Update Not Installed";
     private const string InstallScope = "hub-install";
     private const string RefuseScope = "hub-refuse";
+    private const string MigrateScope = "hub-migrate";
+    private const string KeepOffScope = "hub-keepoff";
+    private const string StartupScope = "hub-startup";
+    private const string ResultScope = "hub-result";
     private const string InstalledHubCapture = "update-installed-hub.png";
     private const string FakeInstallerRecordVariable = "BWC_E2E_INSTALLER_RECORD";
-    private const string FakeInstallerRelaunchVariable = "BWC_E2E_INSTALLER_RELAUNCH_HUB";
     private const string RefusedCapture = "update-install-refused.png";
     private const string HashMismatchName = "InstallerHashMismatch";
     private const string InstallArgumentSwitch = "/S";
+    private const string InstallRelaunchSwitch = "/RELAUNCH";
+    private const string InstallParentPidPrefix = "/PARENTPID=";
     private const string InstallDirectoryArgumentPrefix = "/D=";
+    private const string UpdateResultArgument = "--update-result";
+    private const string InstallerFailedCode = "InstallerFailed";
+    private const string UnexpectedCode = "Unexpected";
+    private const string BoundsScope = "hub-bounds";
+    private const string CheckFinishedLine = "Update check finished: UpToDate.";
+    private const string SettingsFileName = "settings.json";
+    private const string LegacySettingsJson = "{\n  \"UpdateChannel\": \"stable\",\n  \"CheckForUpdatesOnStartup\": false\n}";
+    private const string VersionTwoOffJson = "{\n  \"CheckForUpdatesOnStartup\": false,\n  \"SettingsVersion\": 2\n}";
+    private const string BetaSavedJson = "{\n  \"UpdateChannel\": \"beta\",\n  \"CheckForUpdatesOnStartup\": false,\n  \"SettingsVersion\": 2\n}";
     private static readonly TimeSpan InstallTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan NoRunWindow = TimeSpan.FromSeconds(2);
     private const string LightTheme = "Light";
@@ -64,6 +83,7 @@ public sealed class HubTests
     private const int HeldManifestMilliseconds = 60_000;
     private const int AboutOpenAttempts = 2;
     private static readonly TimeSpan ElementTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan NoDialogWindow = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan DialogTimeout = TimeSpan.FromSeconds(20);
     private static readonly Regex FullCommitPattern = new("[0-9a-fA-F]{40}", RegexOptions.CultureInvariant);
@@ -181,7 +201,12 @@ public sealed class HubTests
         var config = GuiGate.Config;
         EnsureExecutables(config);
 
-        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, SettingsScope, null));
+        // A saved beta channel must read as stable while no beta manifest is built in. The startup check starts off,
+        // so the toggle below turns it on and the saved value must show that.
+        using var hub = new AppSession(
+            config,
+            config.HubExePath,
+            environment: Environment(config, SettingsScope, null, settingsJson: BetaSavedJson));
         E2EResults.CurrentSession = hub;
         using var automation = new UIA3Automation();
 
@@ -189,6 +214,262 @@ public sealed class HubTests
 
         hub.Close();
         AssertNoFailures("Hub update settings checks");
+    }
+
+    /// <summary>
+    /// A settings file written by 0.1.0 has no SettingsVersion and saved the startup check off. The first launch
+    /// turns the check on and writes version 2, both at load and again at close.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_SettingsMigration_LegacyStartupCheckTurnsOnOnce()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        string path = SettingsPath(config, MigrateScope);
+        using var hub = new AppSession(
+            config,
+            config.HubExePath,
+            environment: Environment(config, MigrateScope, null, settingsJson: LegacySettingsJson));
+        E2EResults.CurrentSession = hub;
+        (bool startupAtLoad, int versionAtLoad, string _) = ReadSettings(path) ?? (false, 0, string.Empty);
+        E2EResults.Record(
+            "hub.settings.migrate.on",
+            startupAtLoad && versionAtLoad == 2,
+            $"After load the settings file has CheckForUpdatesOnStartup={startupAtLoad} and SettingsVersion={versionAtLoad}. Expected true and 2.");
+
+        hub.Close();
+        (bool startupAtClose, int versionAtClose, string _) = ReadSettings(path) ?? (false, 0, string.Empty);
+        E2EResults.Record(
+            "hub.settings.migrate.saved",
+            startupAtClose && versionAtClose == 2,
+            $"After close the settings file has CheckForUpdatesOnStartup={startupAtClose} and SettingsVersion={versionAtClose}.");
+        AssertNoFailures("Hub settings migration checks");
+    }
+
+    /// <summary>
+    /// A version 2 file with the startup check off is a user choice. The migration must not run again and turn it on.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_SettingsVersionTwo_StartupCheckOffStaysOff()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        string path = SettingsPath(config, KeepOffScope);
+
+        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, KeepOffScope, null));
+        E2EResults.CurrentSession = hub;
+        hub.Close();
+
+        (bool startup, int version, string _) = ReadSettings(path) ?? (true, 0, string.Empty);
+        E2EResults.Record(
+            "hub.settings.migrate.keepsOff",
+            !startup && version == 2,
+            $"After a launch and close the settings file has CheckForUpdatesOnStartup={startup} and SettingsVersion={version}. Expected false and 2.");
+        AssertNoFailures("Hub settings keep-off checks");
+    }
+
+    /// <summary>
+    /// The startup check runs with no settings file (the default is on). The server offers the same version, so the
+    /// check finds nothing new. No window may appear: the check is silent unless an update is offered.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_StartupCheck_NoUpdateShowsNoDialog()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        string installed = ReadSemVer(config);
+        string dataRoot = config.DataRootFor(StartupScope);
+        using var server = new UpdateFixtureServer();
+        using var fixture = UpdateFixture.Create(config);
+        (byte[] sameManifest, byte[] sameSignature) = fixture.BuildManifest(installed, server.BaseUrl);
+        server.Offer(sameManifest, sameSignature, fixture.InstallerFor(UpdateFixture.ArchX64), fixture.InstallerFor(UpdateFixture.ArchArm64));
+
+        using var hub = new AppSession(
+            config,
+            config.HubExePath,
+            environment: Environment(config, StartupScope, null, server, fixture, startupCheckOn: true));
+        E2EResults.CurrentSession = hub;
+        using var automation = new UIA3Automation();
+
+        bool ran = WaitForHubLog(dataRoot, CheckFinishedLine, DialogTimeout);
+        E2EResults.Record(
+            "hub.startup.default",
+            ran,
+            ran ? "With no settings file the startup check ran and finished." : $"The log had no '{CheckFinishedLine}' line within 20 s.");
+
+        // The check has finished, so a dialog it would show appears within the window. The whole window is polled.
+        List<string> shown = DialogsThatAppear(
+            hub,
+            automation,
+            new[] { CheckTitle, AvailableTitle, FailedTitle, DownloadFailedTitle },
+            NoDialogWindow);
+
+        E2EResults.Record(
+            "hub.startup.noDialog",
+            ran && shown.Count == 0,
+            shown.Count == 0 ? "No update window appeared after the startup check." : "A window appeared: " + string.Join(", ", shown) + ".");
+        string status = WaitForText(hub, "HubStatus");
+        E2EResults.Record(
+            "hub.startup.status",
+            string.Equals(status, "Ready.", StringComparison.Ordinal),
+            $"HubStatus after a silent check was '{status}'.");
+
+        hub.Close();
+        AssertNoFailures("Hub startup check checks");
+    }
+
+    /// <summary>
+    /// The helper relaunched the Hub with --update-result InstallerFailed. The Hub must say the update did not install,
+    /// that the current version is still in place, and must not show the failure name.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateResult_InstallerFailedSaysNotInstalled()
+    {
+        CheckUpdateResultMessage(InstallerFailedCode, "hub.updateResult.installerFailed");
+        AssertNoFailures("Hub update result checks");
+    }
+
+    /// <summary>
+    /// The helper reports Unexpected when it stops on an error it did not expect. The Hub must say the update did not
+    /// install because of an unexpected error, name the current version, and must not show the code name.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateResult_UnexpectedSaysNotInstalled()
+    {
+        CheckUpdateResultMessage(UnexpectedCode, "hub.updateResult.unexpected");
+        AssertNoFailures("Hub update result checks");
+    }
+
+    /// <summary>Starts the Hub with --update-result code, then checks the window, the message, and OK.</summary>
+    private static void CheckUpdateResultMessage(string code, string checkId)
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        string semVer = ReadSemVer(config);
+
+        using Process hubProcess = StartHubWithArguments(
+            config,
+            Environment(config, ResultScope, null),
+            UpdateResultArgument,
+            code);
+        try
+        {
+            using var automation = new UIA3Automation();
+            AutomationElement? main = HubUi.FindWindowInProcess(automation, hubProcess.Id, HubTitle, ElementTimeout);
+            E2EResults.Record(
+                "hub.updateResult.window",
+                main is not null,
+                main is null ? "The Hub started with --update-result showed no main window." : "The Hub showed its main window.");
+
+            AutomationElement? dialog = HubUi.FindWindowWithChild(automation, hubProcess.Id, NotInstalledTitle, "DialogMessage", DialogTimeout);
+            string text = MessageText(dialog);
+            bool plain = text.Contains("did not install", StringComparison.Ordinal) &&
+                text.Contains("still in place", StringComparison.Ordinal) &&
+                text.Contains(semVer, StringComparison.Ordinal) &&
+                !text.Contains(code, StringComparison.Ordinal);
+            E2EResults.Record(
+                checkId,
+                plain,
+                $"The message was '{text}'. It must say the update did not install, name {semVer}, and not show {code}.");
+
+            if (dialog is not null)
+            {
+                AutomationElement? ok = HubUi.WaitWithin(dialog, "DialogPrimary", DialogTimeout);
+                if (ok is not null)
+                {
+                    HubUi.InvokeButton(ok);
+                }
+            }
+
+            E2EResults.Record(
+                checkId + ".closed",
+                HubUi.WaitForWindowGone(automation, hubProcess.Id, NotInstalledTitle, DialogTimeout),
+                "The Update Not Installed window closed on OK.");
+        }
+        finally
+        {
+            InstallEvidence.StopProcess(hubProcess);
+        }
+    }
+
+    /// <summary>
+    /// A saved normal rectangle with WindowMaximized starts the Hub maximized. Closing it again must save the normal
+    /// rectangle (not the maximized one) and keep the maximized flag.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    public void Hub_WindowBounds_RestoresMaximizedNormalRect()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        EnsureExecutables(config);
+        string path = SettingsPath(config, BoundsScope);
+        const string json = "{\n  \"CheckForUpdatesOnStartup\": false,\n  \"SettingsVersion\": 2," +
+            "\n  \"WindowBounds\": { \"X\": 120, \"Y\": 140, \"Width\": 720, \"Height\": 520 },\n  \"WindowMaximized\": true\n}";
+
+        using Process hubProcess = StartHubWithArguments(config, Environment(config, BoundsScope, null, settingsJson: json));
+        try
+        {
+            using var automation = new UIA3Automation();
+            AutomationElement? main = HubUi.FindWindowInProcess(automation, hubProcess.Id, HubTitle, ElementTimeout);
+            WindowVisualState? state = main?.Patterns.Window.PatternOrDefault?.WindowVisualState.ValueOrDefault;
+            E2EResults.Record(
+                "hub.bounds.maximized",
+                state == WindowVisualState.Maximized,
+                $"A saved WindowMaximized true must start the Hub maximized; the window state was '{state}'.");
+        }
+        finally
+        {
+            InstallEvidence.StopProcess(hubProcess);
+        }
+
+        JsonElement? saved = ReadSettingsRoot(path);
+        bool maximizedKept = saved is { } root && root.TryGetProperty("WindowMaximized", out JsonElement flag) &&
+            flag.ValueKind == JsonValueKind.True;
+        E2EResults.Record(
+            "hub.bounds.maximizedSaved",
+            maximizedKept,
+            "The close kept WindowMaximized true in the settings file.");
+
+        bool normal = saved is { } normalRoot && normalRoot.TryGetProperty("WindowBounds", out JsonElement bounds) &&
+            bounds.GetProperty("X").GetInt32() == 120 && bounds.GetProperty("Y").GetInt32() == 140 &&
+            bounds.GetProperty("Width").GetInt32() == 720 && bounds.GetProperty("Height").GetInt32() == 520;
+        E2EResults.Record(
+            "hub.bounds.normalRect",
+            normal,
+            "The close saved the restored rectangle 120,140 720x520, not the maximized size.");
+
+        AssertNoFailures("Hub window bounds checks");
+    }
+
+    /// <summary>Reads the settings file root, or null when the file does not exist.</summary>
+    private static JsonElement? ReadSettingsRoot(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+        return document.RootElement.Clone();
     }
 
     [TestMethod]
@@ -406,7 +687,7 @@ public sealed class HubTests
             "hub.update.cancel.closed",
             HubUi.WaitForWindowGone(automation, hub.ProcessId, CheckTitle, DialogTimeout),
             "The progress window closed on Cancel.");
-        string canceledStatus = WaitForText(hub, "HubStatus");
+        string canceledStatus = WaitForStatus(hub, "The update check was canceled.", ElementTimeout);
         E2EResults.Record(
             "hub.update.cancel.status",
             string.Equals(canceledStatus, "The update check was canceled.", StringComparison.Ordinal),
@@ -434,7 +715,8 @@ public sealed class HubTests
         var config = GuiGate.Config;
         E2EGuards.RequireE2EOnlyFlavor(config);
         EnsureExecutables(config);
-        HashSet<string> stagingBefore = InstallEvidence.StagingFolders();
+        string installStaging = InstallEvidence.StagingRoot(config, InstallScope);
+        HashSet<string> stagingBefore = InstallEvidence.StagingFolders(installStaging);
         string recordPath = Path.Combine(config.DataRootFor(InstallScope), InstallEvidence.RecordFileName);
 
         try
@@ -447,7 +729,7 @@ public sealed class HubTests
             using var hub = new AppSession(
                 config,
                 config.HubExePath,
-                environment: Environment(config, InstallScope, null, server, fixture, recordPath, relaunchHub: true));
+                environment: Environment(config, InstallScope, null, server, fixture, recordPath));
             E2EResults.CurrentSession = hub;
             using var automation = new UIA3Automation();
 
@@ -456,7 +738,7 @@ public sealed class HubTests
         }
         finally
         {
-            InstallEvidence.RemoveStagingSince(stagingBefore);
+            InstallEvidence.RemoveStagingSince(installStaging, stagingBefore);
         }
 
         AssertNoFailures("Hub install checks");
@@ -475,7 +757,8 @@ public sealed class HubTests
         var config = GuiGate.Config;
         E2EGuards.RequireE2EOnlyFlavor(config);
         EnsureExecutables(config);
-        HashSet<string> stagingBefore = InstallEvidence.StagingFolders();
+        string refuseStaging = InstallEvidence.StagingRoot(config, RefuseScope);
+        HashSet<string> stagingBefore = InstallEvidence.StagingFolders(refuseStaging);
         string recordPath = Path.Combine(config.DataRootFor(RefuseScope), InstallEvidence.RecordFileName);
 
         try
@@ -483,12 +766,18 @@ public sealed class HubTests
             using var server = new UpdateFixtureServer();
             using var fixture = UpdateFixture.Create(config);
             (byte[] manifest, byte[] signature) = fixture.BuildManifest(UpdateFixture.NewerVersion, server.BaseUrl);
-            server.Offer(manifest, signature, fixture.InstallerFor(UpdateFixture.ArchX64), fixture.TamperedInstallerFor(config.Rid));
+            // Only the architecture under test is tampered: that is the installer the Hub downloads.
+            bool x64 = config.Rid == UpdateFixture.ArchX64;
+            server.Offer(
+                manifest,
+                signature,
+                x64 ? fixture.TamperedInstallerFor(UpdateFixture.ArchX64) : fixture.InstallerFor(UpdateFixture.ArchX64),
+                x64 ? fixture.InstallerFor(UpdateFixture.ArchArm64) : fixture.TamperedInstallerFor(UpdateFixture.ArchArm64));
 
             using var hub = new AppSession(
                 config,
                 config.HubExePath,
-                environment: Environment(config, RefuseScope, LightTheme, server, fixture, recordPath, relaunchHub: true));
+                environment: Environment(config, RefuseScope, LightTheme, server, fixture, recordPath));
             E2EResults.CurrentSession = hub;
             using var automation = new UIA3Automation();
 
@@ -497,7 +786,7 @@ public sealed class HubTests
         }
         finally
         {
-            InstallEvidence.RemoveStagingSince(stagingBefore);
+            InstallEvidence.RemoveStagingSince(refuseStaging, stagingBefore);
         }
 
         AssertNoFailures("Hub refused install checks");
@@ -550,17 +839,29 @@ public sealed class HubTests
     }
 
     /// <summary>
-    /// Closes every Registry Editor process that an earlier test left running, so it cannot hold the foreground from
-    /// the Hub. Each close is recorded by the check that CloseChild writes.
+    /// Closes the Registry Editor processes this run started and left running, so one cannot hold the foreground
+    /// from the Hub. A process is closed only when its image is the publish folder's BwcRegedit.exe and it started
+    /// after this run began. A developer's Registry Editor, or one from another folder, is never touched.
     /// </summary>
     private static void CloseRegeditLeftovers()
     {
+        E2EConfig config = GuiGate.Config;
         foreach (Process process in Process.GetProcessesByName(RegeditProcessName))
         {
-            E2EResults.Note("hub.regedit.leftover", $"closing BwcRegedit pid {process.Id} left by an earlier test.");
+            if (!IsRunOwnedRegedit(process, config))
+            {
+                process.Dispose();
+                continue;
+            }
+
+            E2EResults.Note("hub.regedit.leftover", $"closing BwcRegedit pid {process.Id} this run started earlier.");
             CloseChild(process);
         }
     }
+
+    /// <summary>True when the process runs the publish folder's Registry Editor and started after this run began.</summary>
+    private static bool IsRunOwnedRegedit(Process process, E2EConfig config) =>
+        StartedSince(process, config.StartedUtc) && InstallEvidence.HasImage(process, config.RegeditExePath);
 
     private static void CheckHelpMenuOpensWithAltH(AppSession hub, UIA3Automation automation)
     {
@@ -662,14 +963,20 @@ public sealed class HubTests
         {
             CaptureDialog(window, "update-settings.png", "hub.settings.contrast", theme);
         }
-        AutomationElement? beta = HubUi.WaitWithin(window, "UpdateChannelBeta", DialogTimeout);
-        AutomationElement? startup = HubUi.WaitWithin(window, "UpdateStartupCheck", DialogTimeout);
 
-        // The two toggles are mouse clicks, so they are sent only once the dialog is confirmed foreground.
+        // No beta manifest is built in, so the dialog must not offer Beta.
+        AutomationElement? beta = HubUi.WaitWithin(window, "UpdateChannelBeta", TimeSpan.FromSeconds(2));
+        E2EResults.Record(
+            "hub.settings.noBeta",
+            beta is null,
+            beta is null ? "Update Settings does not offer Beta." : "Update Settings offers Beta with no beta manifest built in.");
+        AutomationElement? startup = HubUi.WaitWithin(window, "UpdateStartupCheck", DialogTimeout);
+        bool startupBefore = startup is not null && startup.AsCheckBox().IsChecked == true;
+
+        // The toggle is a mouse click, so it is sent only once the dialog is confirmed foreground.
         // Otherwise a click lands on the Hub or on a window that covers it, and the saved-settings check fails.
         if (HubUi.RaiseDialog((IntPtr)window.Properties.NativeWindowHandle.ValueOrDefault, TimeSpan.FromSeconds(3)))
         {
-            beta?.Click();
             startup?.Click();
         }
 
@@ -684,23 +991,117 @@ public sealed class HubTests
             HubUi.WaitForWindowGone(automation, hub.ProcessId, SettingsTitle, DialogTimeout),
             "Update Settings closed on OK.");
 
-        string path = Path.Combine(config.DataRootFor(scope), "hub", "settings.json");
-        bool saved = false;
-        string detail = $"settings file '{path}' was not written.";
-        if (File.Exists(path))
+        string path = SettingsPath(config, scope);
+        (bool startupOn, int _, string channel) = ReadSettings(path) ?? (false, 0, "(no file)");
+        bool toggled = startupOn == !startupBefore;
+        E2EResults.Record(
+            "hub.settings.saved",
+            toggled && channel == "stable",
+            $"settings file has UpdateChannel='{channel}' CheckForUpdatesOnStartup={startupOn}; the toggle started at {startupBefore}.");
+        E2EResults.Record(
+            "hub.settings.betaIsStable",
+            channel == "stable",
+            $"A saved beta channel is saved as stable when no beta manifest is built in; the file says '{channel}'.");
+    }
+
+    private static string SettingsPath(E2EConfig config, string scope) =>
+        Path.Combine(config.DataRootFor(scope), "hub", SettingsFileName);
+
+    /// <summary>Writes the settings file a test starts the Hub with. The Hub reads it at launch.</summary>
+    private static void SeedSettings(E2EConfig config, string scope, string json)
+    {
+        string path = SettingsPath(config, scope);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, json);
+    }
+
+    /// <summary>The fields the migration and the startup check set. Null when the file does not exist.</summary>
+    private static (bool Startup, int Version, string Channel)? ReadSettings(string path)
+    {
+        if (!File.Exists(path))
         {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
-            JsonElement root = document.RootElement;
-            string channel = root.TryGetProperty("UpdateChannel", out JsonElement channelValue)
-                ? channelValue.GetString() ?? string.Empty
-                : string.Empty;
-            bool startupOn = root.TryGetProperty("CheckForUpdatesOnStartup", out JsonElement startupValue) &&
-                startupValue.ValueKind == JsonValueKind.True;
-            saved = channel == "beta" && startupOn;
-            detail = $"settings file has UpdateChannel='{channel}' CheckForUpdatesOnStartup={startupOn}.";
+            return null;
         }
 
-        E2EResults.Record("hub.settings.saved", saved, detail);
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+        JsonElement root = document.RootElement;
+        bool startup = root.TryGetProperty("CheckForUpdatesOnStartup", out JsonElement startupValue) &&
+            startupValue.ValueKind == JsonValueKind.True;
+        int version = root.TryGetProperty("SettingsVersion", out JsonElement versionValue) &&
+            versionValue.ValueKind == JsonValueKind.Number
+            ? versionValue.GetInt32()
+            : 0;
+        string channel = root.TryGetProperty("UpdateChannel", out JsonElement channelValue)
+            ? channelValue.GetString() ?? string.Empty
+            : string.Empty;
+        return (startup, version, channel);
+    }
+
+    /// <summary>
+    /// Polls the status line until it shows the expected text or the timeout passes. Returns the last text read, so a
+    /// failure names what the line showed at the end.
+    /// </summary>
+    private static string WaitForStatus(AppSession hub, string expected, TimeSpan timeout)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        string text;
+        do
+        {
+            text = WaitForText(hub, "HubStatus");
+            if (string.Equals(text, expected, StringComparison.Ordinal))
+            {
+                return text;
+            }
+
+            Thread.Sleep(200);
+        }
+        while (DateTime.UtcNow < deadline);
+
+        return text;
+    }
+
+    /// <summary>Polls the Hub's log under the data root until a line holds the text, or the timeout passes.</summary>
+    private static bool WaitForHubLog(string dataRoot, string text, TimeSpan timeout)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        do
+        {
+            if (InstallEvidence.HubLogContains(dataRoot, text))
+            {
+                return true;
+            }
+
+            Thread.Sleep(200);
+        }
+        while (DateTime.UtcNow < deadline);
+
+        return false;
+    }
+
+    /// <summary>
+    /// Starts the Hub with command-line arguments. AppSession passes none, so this does what it does for the
+    /// environment and the compatibility layer, and waits for nothing: the caller finds the window.
+    /// </summary>
+    private static Process StartHubWithArguments(E2EConfig config, IReadOnlyDictionary<string, string> environment, params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo(config.HubExePath)
+        {
+            UseShellExecute = false,
+            WorkingDirectory = config.PublishDir,
+        };
+        startInfo.Environment["__COMPAT_LAYER"] = "RunAsInvoker";
+        startInfo.Environment[E2EConfig.DataRootEnvironmentVariable] = config.DataRoot;
+        foreach (KeyValuePair<string, string> pair in environment)
+        {
+            startInfo.Environment[pair.Key] = pair.Value;
+        }
+
+        foreach (string argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        return Process.Start(startInfo) ?? throw new InvalidOperationException($"Process.Start returned no process for '{config.HubExePath}'.");
     }
 
     private static void RunCheck(AppSession hub, UIA3Automation automation)
@@ -710,6 +1111,36 @@ public sealed class HubTests
         HubUi.ClickMenuItem(item);
     }
 
+    /// <summary>
+    /// Polls every title for the whole window and returns the ones that appeared. A negative check stops at the first
+    /// one, because a dialog that shows at all is a failure.
+    /// </summary>
+    private static List<string> DialogsThatAppear(AppSession hub, UIA3Automation automation, string[] titles, TimeSpan window)
+    {
+        var shown = new List<string>();
+        DateTime deadline = DateTime.UtcNow + window;
+        do
+        {
+            foreach (string title in titles)
+            {
+                if (!shown.Contains(title) && HubUi.FindWindowInProcess(automation, hub.ProcessId, title, TimeSpan.FromMilliseconds(100)) is not null)
+                {
+                    shown.Add(title);
+                }
+            }
+
+            if (shown.Count > 0)
+            {
+                break;
+            }
+
+            Thread.Sleep(100);
+        }
+        while (DateTime.UtcNow < deadline);
+
+        return shown;
+    }
+
     private static void VerifyRegeditLaunchWithEnter(AppSession hub, AutomationElement row)
     {
         var before = SnapshotRegeditProcessIds();
@@ -717,9 +1148,23 @@ public sealed class HubTests
 
         try
         {
-            _ = HubUi.Foreground(hub.MainHwnd, TimeSpan.FromSeconds(3));
+            bool foreground = HubUi.Foreground(hub.MainHwnd, TimeSpan.FromSeconds(3));
             row.Click();
             Thread.Sleep(200);
+            bool selected = ControlTestSupport.IsSelected(row);
+            ReleaseHeldKey(VkReturn);
+            bool returnDown = IsKeyDown(VkReturn);
+            E2EResults.Note("hub.regedit.preenter", $"foreground={foreground}, row selected={selected}, Enter held={returnDown}, {HubUi.DescribeForeground(hub.MainHwnd)}");
+            bool ready = foreground && selected && !returnDown && GetForegroundWindow() == hub.MainHwnd;
+            E2EResults.Record(
+                "hub.regedit.enter.precondition",
+                ready,
+                ready ? "The Hub is foreground, the row is selected, and Enter is up. Enter is sent." : "The Hub was not ready for Enter. No Enter was sent.");
+            if (!ready)
+            {
+                return;
+            }
+
             Keyboard.Type(VirtualKeyShort.RETURN);
             E2EResults.Note("hub.regedit.enter", "Enter pressed on the Registry Editor row.");
         }
@@ -737,7 +1182,7 @@ public sealed class HubTests
                 "hub.regedit.process",
                 child is not null,
                 child is null
-                    ? "No new BwcRegedit process appeared within 15 s."
+                    ? "No new BwcRegedit process appeared within 15 s. " + LaunchDiagnostics(hub)
                     : $"Started BwcRegedit pid {child.Id}.");
             if (child is null)
             {
@@ -842,9 +1287,8 @@ public sealed class HubTests
             return;
         }
 
-        CheckInstallerRecord(config, fixture, InstallEvidence.ReadRecord(recordPath), hubProcess);
-
         int helperPid = InstallEvidence.HelperPidFromHubLog(dataRoot);
+        CheckInstallerRecord(config, fixture, InstallEvidence.ReadRecord(recordPath), hubProcess, helperPid);
         bool helperSeen = helperPid > 0 && sampler.Seen.ContainsKey(helperPid);
         E2EResults.Record(
             "hub.install.helperPath",
@@ -905,23 +1349,42 @@ public sealed class HubTests
     /// Checks the stand-in's record: the exact command line, the bytes that ran (the signed bytes), the staging path,
     /// and that the Hub had exited before the installer ran.
     /// </summary>
-    private static void CheckInstallerRecord(E2EConfig config, UpdateFixture fixture, Dictionary<string, string> record, Process hubProcess)
+    private static void CheckInstallerRecord(
+        E2EConfig config,
+        UpdateFixture fixture,
+        Dictionary<string, string> record,
+        Process hubProcess,
+        int helperPid)
     {
         string installDir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(config.PublishDir));
         string argc = RecordField(record, "argc");
         string arg0 = RecordField(record, "arg0");
         string arg1 = RecordField(record, "arg1");
-        bool exact = argc == "2" &&
+        string arg2 = RecordField(record, "arg2");
+        string arg3 = RecordField(record, "arg3");
+        bool parentWellFormed = arg2.StartsWith(InstallParentPidPrefix, StringComparison.Ordinal) &&
+            int.TryParse(arg2[InstallParentPidPrefix.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out int parentPid) &&
+            parentPid > 0;
+        bool exact = argc == "4" &&
             arg0 == InstallArgumentSwitch &&
-            string.Equals(arg1, InstallDirectoryArgumentPrefix + installDir, StringComparison.OrdinalIgnoreCase);
+            arg1 == InstallRelaunchSwitch &&
+            parentWellFormed &&
+            string.Equals(arg3, InstallDirectoryArgumentPrefix + installDir, StringComparison.OrdinalIgnoreCase);
         E2EResults.Record(
             "hub.install.commandLine",
             exact,
-            $"The installer got {argc} argument(s), '{arg0}' and '{arg1}'. The contract is '{InstallArgumentSwitch}' and " +
-            $"'{InstallDirectoryArgumentPrefix}{installDir}', unquoted and last.");
+            $"The installer got {argc} argument(s): '{arg0}', '{arg1}', '{arg2}', '{arg3}'. The contract is " +
+            $"'{InstallArgumentSwitch} {InstallRelaunchSwitch} {InstallParentPidPrefix}<n> {InstallDirectoryArgumentPrefix}{installDir}', unquoted and last.");
+
+        string parentText = arg2.Length >= InstallParentPidPrefix.Length ? arg2[InstallParentPidPrefix.Length..] : string.Empty;
+        bool parentIsHelper = helperPid > 0 && string.Equals(parentText, helperPid.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        E2EResults.Record(
+            "hub.install.parentPid",
+            parentIsHelper,
+            $"The installer's parent pid is '{parentText}'. The helper pid the Hub logged is {helperPid}.");
 
         string commandLine = RecordField(record, "commandLine");
-        string tail = " " + InstallArgumentSwitch + " " + InstallDirectoryArgumentPrefix + installDir;
+        string tail = " " + InstallArgumentSwitch + " " + InstallRelaunchSwitch + " " + arg2 + " " + InstallDirectoryArgumentPrefix + installDir;
         E2EResults.Record(
             "hub.install.commandLine.raw",
             commandLine.EndsWith(tail, StringComparison.OrdinalIgnoreCase),
@@ -937,7 +1400,7 @@ public sealed class HubTests
         string processPath = RecordField(record, "processPath");
         E2EResults.Record(
             "hub.install.stagedPath",
-            InstallEvidence.IsStagedInstaller(processPath),
+            InstallEvidence.IsStagedInstaller(processPath, InstallEvidence.StagingRoot(GuiGate.Config, InstallScope)),
             $"The installer ran from '{processPath}'.");
 
         DateTime? hubExit = InstallEvidence.ExitTimeUtc(hubProcess);
@@ -992,12 +1455,18 @@ public sealed class HubTests
             return;
         }
 
-        AutomationElement? failed = HubUi.FindWindowWithChild(automation, hub.ProcessId, FailedTitle, "DialogMessage", DialogTimeout);
+        AutomationElement? failed = HubUi.FindWindowWithChild(automation, hub.ProcessId, DownloadFailedTitle, "DialogMessage", DialogTimeout);
+        E2EResults.Record(
+            "hub.refuse.title",
+            failed is not null,
+            failed is null ? "No 'Update Download Failed' window showed for the refused download." : "The refused download is titled Update Download Failed.");
         string text = MessageText(failed);
+        bool plain = text.Contains(DownloadNotVerifiedText, StringComparison.Ordinal) &&
+            !text.Contains(HashMismatchName, StringComparison.Ordinal);
         E2EResults.Record(
             "hub.refuse.message",
-            failed is not null && text.Contains(HashMismatchName, StringComparison.Ordinal),
-            $"The Hub showed '{text}'. It must name {HashMismatchName}.");
+            plain,
+            $"The Hub showed '{text}'. It must say the download did not match the signed release, and not show {HashMismatchName}.");
         if (failed is not null)
         {
             CaptureDialog(failed, RefusedCapture, "hub.refuse.contrast", LightTheme);
@@ -1010,7 +1479,7 @@ public sealed class HubTests
 
         E2EResults.Record(
             "hub.refuse.closed",
-            HubUi.WaitForWindowGone(automation, hub.ProcessId, FailedTitle, DialogTimeout),
+            HubUi.WaitForWindowGone(automation, hub.ProcessId, DownloadFailedTitle, DialogTimeout),
             "The refusal message closed on OK.");
 
         // The helper reported the refusal and exited before the message appeared. Nothing starts after that, so a
@@ -1039,11 +1508,11 @@ public sealed class HubTests
         string status = WaitForText(hub, "HubStatus");
         E2EResults.Record(
             "hub.refuse.status",
-            string.Equals(status, FailedStatus, StringComparison.Ordinal),
+            string.Equals(status, DownloadFailedStatus, StringComparison.Ordinal),
             $"HubStatus after the refusal was '{status}'.");
         E2EResults.Record(
             "hub.refuse.staging",
-            !InstallEvidence.AnyReceiptSince(stagingBefore),
+            !InstallEvidence.AnyReceiptSince(InstallEvidence.StagingRoot(GuiGate.Config, RefuseScope), stagingBefore),
             "No staging folder made by this test keeps a receipt for the refused installer.");
     }
 
@@ -1112,8 +1581,8 @@ public sealed class HubTests
     /// <summary>
     /// The child environment for one Hub run. The palette seam is set only when a theme is given, and the update
     /// seams only when a fixture server is given, so a null theme with no server is the ship-equivalent run.
-    /// The stand-in installer reads its record path and relaunch flag from the same environment, because the helper
-    /// and the installer inherit it from the Hub. The Hub itself never reads them.
+    /// The stand-in installer reads its record path from the same environment, because the helper and the installer
+    /// inherit it from the Hub. The Hub itself never reads it.
     /// </summary>
     private static Dictionary<string, string> Environment(
         E2EConfig config,
@@ -1122,8 +1591,24 @@ public sealed class HubTests
         UpdateFixtureServer? server = null,
         UpdateFixture? fixture = null,
         string? installerRecordPath = null,
-        bool relaunchHub = false)
+        string? settingsJson = null,
+        bool startupCheckOn = false)
     {
+        // Every launch starts from a known settings file: version 2 with the startup check off, so no test reaches the
+        // feed through the startup check. A test gives its own JSON, or opts into the default (on) with no file.
+        string settingsPath = SettingsPath(config, scope);
+        if (startupCheckOn)
+        {
+            if (File.Exists(settingsPath))
+            {
+                File.Delete(settingsPath);
+            }
+        }
+        else
+        {
+            SeedSettings(config, scope, settingsJson ?? VersionTwoOffJson);
+        }
+
         var environment = new Dictionary<string, string>(StringComparer.Ordinal);
         if (theme is not null)
         {
@@ -1131,6 +1616,11 @@ public sealed class HubTests
         }
 
         foreach (KeyValuePair<string, string> pair in config.DataRootEnvironment(scope))
+        {
+            environment[pair.Key] = pair.Value;
+        }
+
+        foreach (KeyValuePair<string, string> pair in config.TempEnvironment(scope))
         {
             environment[pair.Key] = pair.Value;
         }
@@ -1151,7 +1641,6 @@ public sealed class HubTests
         if (installerRecordPath is not null)
         {
             environment[FakeInstallerRecordVariable] = installerRecordPath;
-            environment[FakeInstallerRelaunchVariable] = relaunchHub ? "1" : "0";
         }
 
         return environment;
@@ -1187,6 +1676,49 @@ public sealed class HubTests
             $"{label} failed:{System.Environment.NewLine}{string.Join(System.Environment.NewLine, failures)}");
     }
 
+    private const int VkReturn = 0x0D;
+    private const uint KeyEventFKeyUp = 0x0002;
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern void keybd_event(byte virtualKey, byte scanCode, uint flags, UIntPtr extraInfo);
+
+    private static bool IsKeyDown(int virtualKey) => (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+
+    /// <summary>
+    /// Waits briefly for a key that an earlier step left held. A held Enter makes the Hub read the next Enter as a key
+    /// repeat, so the key is released when it is still down after the wait.
+    /// </summary>
+    private static void ReleaseHeldKey(int virtualKey)
+    {
+        DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+        while (IsKeyDown(virtualKey) && DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(50);
+        }
+
+        if (IsKeyDown(virtualKey))
+        {
+            keybd_event((byte)virtualKey, 0, KeyEventFKeyUp, UIntPtr.Zero);
+            E2EResults.Note("hub.regedit.enter", $"Virtual key 0x{virtualKey:X2} was still held and was released.");
+        }
+    }
+
+    // Names what the Hub showed and held when no Registry Editor appeared. The Hub log is read from the
+    // scope this test gave the Hub, so a launch line there shows whether Enter reached the launch path.
+    private static string LaunchDiagnostics(AppSession hub)
+    {
+        AutomationElement? status = hub.Find("HubStatus");
+        string text = status is null ? "(missing)" : hub.TextOf(status);
+        bool launched = InstallEvidence.HubLogContains(GuiGate.Config.DataRootFor(NoticesScope), "Launched ");
+        return $"Hub status={text}, Hub log has a launch line={launched}, {HubUi.DescribeForeground(hub.MainHwnd)}.";
+    }
+
     private static HashSet<int> SnapshotRegeditProcessIds()
     {
         var ids = new HashSet<int>();
@@ -1203,13 +1735,14 @@ public sealed class HubTests
 
     private static Process? WaitForNewRegedit(HashSet<int> before, DateTime notBeforeUtc, TimeSpan timeout)
     {
+        E2EConfig config = GuiGate.Config;
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
             Process? match = null;
             foreach (var process in Process.GetProcessesByName(RegeditProcessName))
             {
-                if (before.Contains(process.Id) || !StartedSince(process, notBeforeUtc))
+                if (before.Contains(process.Id) || !StartedSince(process, notBeforeUtc) || !InstallEvidence.HasImage(process, config.RegeditExePath))
                 {
                     process.Dispose();
                     continue;

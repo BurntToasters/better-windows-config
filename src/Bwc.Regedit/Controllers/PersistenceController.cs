@@ -62,7 +62,10 @@ internal sealed class PersistenceController
         // The font and the theme are applied here, before the first layout that reads them. The
         // Theme radio item follows the override that is in effect.
         state.FontSize = AppearanceSettings.ValidFontSizeDip(settings.FontSize);
-        DenseMetrics.ApplyFont(state.FontSize);
+        state.FontFaceName = string.IsNullOrWhiteSpace(settings.FontFaceName) ? DenseMetrics.FontFamilyName : settings.FontFaceName;
+        state.FontWeight = Math.Clamp(settings.FontWeight, 100, 900);
+        state.FontItalic = settings.FontItalic;
+        DenseMetrics.ApplyFont(state.FontSize, state.FontFaceName, state.FontWeight, state.FontItalic);
         state.ThemeOverride = AppearanceSettings.FormatTheme(AppearanceSettings.ParseTheme(settings.ThemeOverride));
         BwcTheme.SetOverride(AppearanceSettings.ParseTheme(state.ThemeOverride));
         RegeditMenu.SetThemeChecked(_context.Shell.MenuBar, BwcTheme.Override);
@@ -91,6 +94,9 @@ internal sealed class PersistenceController
             FindLastHitKind = state.FindLastHitKind,
             FindLastHitText = state.FindLastHitText,
             FontSize = state.FontSize,
+            FontFaceName = state.FontFaceName,
+            FontWeight = state.FontWeight,
+            FontItalic = state.FontItalic,
             ThemeOverride = state.ThemeOverride,
 
             TreePaneWidth = _context.Shell.TreePaneWidth,

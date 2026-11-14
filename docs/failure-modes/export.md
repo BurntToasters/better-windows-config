@@ -220,3 +220,29 @@ needs the hive privileges and a mount point outside the sandbox.
 The artifact test writes `artifacts/export-formats/result.json` with the case names, text output,
 whole-registry root list, and SHA-256 of each golden comparison. Re-running the test rewrites the
 same content.
+
+## Dot-named keys, text export skips, and progress volume (regression set)
+
+### A key named "." or ".." stops the whole export
+
+A registry key name may be `.` or `..`. The walk builds child paths with `RegistryPath.Append`, which
+rejects those names, so the export throws `ArgumentException` and the .reg or text file is never
+finished. Walks now build child paths from enumerated names with `AppendEnumeratedName`, which
+accepts `.` and `..` and still refuses separators, NUL, and empty or overlong names. User-typed
+paths keep using `Append`, which still refuses them. Note that the .reg reader refuses such a key
+on import (`reg-files.md`), so only export is fixed here. Test: `RegFileExportWritesKeysNamedDotAndDotDot`
+and `TextExportWritesKeysNamedDotAndDotDot`.
+
+### The text export skips fewer error codes than the .reg export
+
+The .reg export skips a child subtree when the open fails with error 2 (file not found), 5 (access
+denied), or 1018 (key deleted). The text export skipped only 5, so one key that vanished during the
+walk aborted the whole text export. Both exports now use the same skip set. Test:
+`TextExportSkipsChildrenThatVanishedOrWereDeletedLikeTheRegExport`.
+
+### Text export posts progress for every key
+
+Failure mode: the text export reported progress per key, so a hive with a million keys posted a
+million dispatcher messages and stalled the UI. Key progress is now throttled to about one report per
+100 ms, like the .reg export. The Starting and Completed reports always go out and carry the final
+counts. Test: `TextExportThrottlesKeyProgressReports`.

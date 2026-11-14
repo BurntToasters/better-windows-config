@@ -86,8 +86,47 @@ public sealed class GuiGate
             }
             finally
             {
-                ReleaseGate();
+                try
+                {
+                    if (_resultsStarted && _config is not null)
+                    {
+                        DeleteRunData(_config);
+                    }
+                }
+                finally
+                {
+                    ReleaseGate();
+                }
             }
+        }
+    }
+
+    /// <summary>
+    /// Deletes artifacts/e2e/data/&lt;run-id&gt; after the artifact is written. The folder is kept only when the run
+    /// failed and BWC_E2E_KEEP_DATA=1 is set, so a failure can be inspected. A folder that cannot be removed is
+    /// reported on the console, because the artifact is already written.
+    /// </summary>
+    private static void DeleteRunData(E2EConfig config)
+    {
+        string path = Path.Combine(config.ArtifactsDir, "data", config.RunId);
+        bool keep = !E2EResults.AllPassed() &&
+            string.Equals(Environment.GetEnvironmentVariable("BWC_E2E_KEEP_DATA"), "1", StringComparison.Ordinal);
+        if (keep)
+        {
+            Console.WriteLine($"Kept run data for this failed run: {path}");
+            return;
+        }
+
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, recursive: true);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Console.WriteLine($"Run data was not removed from {path}: {ex.Message}");
         }
     }
 
