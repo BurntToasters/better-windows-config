@@ -27,13 +27,13 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | --- | --- | --- | --- |
 | MENU | 35 | 0 | 2 |
 | CTX | 31 | 0 | 10 |
-| DLG | 21 | 2 | 28 |
+| DLG | 21 | 4 | 26 |
 | ACC | 14 | 0 | 14 |
 | MSG | 138 | 43 | 95 |
 | VIEW | 17 | 2 | 2 |
-| BEH | 34 | 5 | 10 |
+| BEH | 35 | 5 | 9 |
 | EXP | 32 | 0 | 0 |
-| All (535) | 322 | 52 | 161 |
+| All (535) | 323 | 54 | 158 |
 
 ## Gaps by piece
 
@@ -41,7 +41,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | --- | --- |
 | D1 | DLG-033, DLG-034, DLG-037, DLG-038, DLG-039, DLG-040, DLG-041, DLG-042, DLG-043, DLG-046, DLG-047, MSG-194, MSG-195, MSG-196, MSG-197, MSG-198, MSG-199, MSG-200, MSG-201, MSG-202, MSG-203, MSG-204, MSG-205, MSG-206, MSG-207, MSG-208, MSG-209, MSG-210, MSG-211, MSG-212, MSG-213, MSG-214, MSG-215, MSG-216, MSG-217, MSG-218, MSG-219, MSG-220, MSG-221, MSG-222, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276 |
 | F2 | DLG-023, DLG-035, DLG-036, MSG-022, MSG-052, MSG-053, MSG-060, MSG-061, MSG-062, MSG-066, MSG-109, MSG-110, MSG-111, VIEW-009, BEH-009, BEH-043 |
-| K1 | CTX-036, CTX-037, CTX-038, CTX-039, CTX-040, CTX-041, DLG-001, DLG-002, DLG-005, DLG-024, DLG-025, DLG-048, DLG-049, ACC-005, ACC-008, ACC-011, ACC-015, ACC-016, ACC-017, ACC-018, ACC-019, ACC-020, ACC-021, ACC-022, ACC-023, ACC-024, ACC-025, MSG-098, MSG-116, MSG-117, MSG-118, MSG-120, MSG-122, VIEW-019, BEH-010, BEH-021, BEH-049 |
+| K1 | CTX-036, CTX-037, CTX-038, CTX-039, CTX-040, CTX-041, DLG-001, DLG-002, DLG-005, DLG-024, DLG-025, ACC-005, ACC-008, ACC-011, ACC-015, ACC-016, ACC-017, ACC-018, ACC-019, ACC-020, ACC-021, ACC-022, ACC-023, ACC-024, ACC-025, MSG-098, MSG-116, MSG-117, MSG-118, MSG-120, MSG-122, VIEW-019, BEH-010, BEH-021 |
 | P1 | MENU-009, DLG-009, DLG-015, DLG-016, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276, BEH-027 |
 | R2 | MENU-008, CTX-032, CTX-033, CTX-034, CTX-035, DLG-013, DLG-014, DLG-031, DLG-032, MSG-021, MSG-069, MSG-072, MSG-073, BEH-023, BEH-024, BEH-025 |
 | S1 | MSG-174, MSG-175, MSG-176, MSG-177, MSG-179, MSG-181, MSG-182, MSG-183, MSG-184, MSG-185, MSG-187, MSG-188, MSG-189, MSG-190, BEH-026 |
@@ -60,7 +60,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MENU-006 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
 | MENU-007 | pass | Shell_MenuTableMatchesCommandStates; Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection (dialog content is DLG-031, R2) |  |
 | MENU-008 | gap | Item and state tested (Shell_MenuTableMatchesCommandStates); no test disconnects a real connection | R2 |
-| MENU-009 | gap | Disabled at Computer; classic enable rule at Computer to be measured (O1) | P1 |
+| MENU-009 | gap | Disabled at Computer; classic enables Print at Computer, a hive root and a key (regedit-print.json) | P1 |
 | MENU-010 | pass | Shell_MenuTableMatchesCommandStates; Shell_CloseLeavesNoTestProcess |  |
 | MENU-011 | pass | Shell_MenuTableMatchesCommandStates (New children); Editing_CreatesRenamesAndDeletesRegistryObjects |  |
 | MENU-012 | pass | Shell_MenuTableMatchesCommandStates (New children); Editing_CreatesRenamesAndDeletesRegistryObjects |  |
@@ -187,8 +187,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | DLG-045 | declared-difference | Developer dialog with no menu item, accelerator or string that opens it (OQ-17); BWC does not implement it |  |
 | DLG-046 | gap | Interrupt and DMA requirement viewers missing | D1 |
 | DLG-047 | gap | Interrupt and DMA requirement viewers missing | D1 |
-| DLG-048 | gap | Variant B is implemented (BinaryViewer_FollowsTheClassicLayoutAndFormats); variant A and its trigger missing (O1 measures) | K1 |
-| DLG-049 | gap | Variant B is implemented (BinaryViewer_FollowsTheClassicLayoutAndFormats); variant A and its trigger missing (O1 measures) | K1 |
+| DLG-048 | declared-difference | Template 2020 is never opened by classic in this build: Display Binary Data opens variant B (2021) for every value type (regedit-binary.json). BWC does not implement variant A |  |
+| DLG-049 | declared-difference | Template 2020 is never opened by classic in this build: Display Binary Data opens variant B (2021) for every value type (regedit-binary.json). BWC does not implement variant A |  |
 | DLG-050 | pass | BinaryViewer_FollowsTheClassicLayoutAndFormats; HexViewer_ClassicBinaryDataFollowsTheFormats |  |
 | DLG-051 | pass | BinaryViewer_FollowsTheClassicLayoutAndFormats; HexViewer_ClassicBinaryDataFollowsTheFormats |  |
 
@@ -578,13 +578,13 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | BEH-040 | pass | Find_FollowsTheClassicTwoDialogSequence; Find_FinishedIsStickyUntilTheSelectionMoves; RegistryFinderTests |  |
 | BEH-041 | pass | Find_FollowsTheClassicTwoDialogSequence; Find_FinishedIsStickyUntilTheSelectionMoves; RegistryFinderTests |  |
 | BEH-042 | pass | Find_FollowsTheClassicTwoDialogSequence; Find_FinishedIsStickyUntilTheSelectionMoves; RegistryFinderTests |  |
-| BEH-043 | gap | Shipping manifest says highestAvailable (src/Bwc.Regedit.App/app.manifest); no check guards it; classic level measured by O1 | F2 |
+| BEH-043 | gap | Classic and BWC both ask for highestAvailable (regedit-manifest.json; src/Bwc.Regedit.App/app.manifest); no check guards the BWC manifest | F2 |
 | BEH-044 | pass | Hives_LoadHiveRefusesWithoutPrivilegeBeforeAskingForFile |  |
 | BEH-045 | pass | Robustness_PolicyOverrideShowsRegistryEditingDisabled; Robustness_PolicyLevelTwoRefusesSilentImport |  |
 | BEH-046 | pass | Basics_EnterAndDoubleClickOpenTheEditorForEachType |  |
 | BEH-047 | pass | RegistryValueCodecTests; Robustness_InvalidLengthDwordOpensBinaryEditor |  |
 | BEH-048 | pass | Navigation_ShowsRootsAndRestoresLastKey |  |
-| BEH-049 | gap | Variant B only; which variant opens is measured by O1 | K1 |
+| BEH-049 | pass | BinaryViewer_FollowsTheClassicLayoutAndFormats; classic opens variant B for every type (regedit-binary.json) |  |
 
 ### EXP
 
@@ -631,9 +631,9 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ | Answer or owner |
 | --- | --- |
 | OQ-01 | Dialog 107 is Disconnect Network Registry. Dialog 115 (caption Import Registry File) picks the target computer for an import while remote computers are connected; strings 131 and 135 name that computer. Confirm with a loopback connection (O1); built by R2. |
-| OQ-02 | O1 measures where RT_MENU 108 appears (dialog edit boxes, address bar, hex editor). Built by K1. |
-| OQ-03 | O1 measures the Computer-root menu, Modify versus Modify Binary Data by type, and the remote menu items. |
-| OQ-04 | 640 and 641 are Tab and Shift+Tab (Shell_TabCyclesTreeListAddressBar, Shell_ShiftTabReversesCycle). 672 focuses the address bar (Shell_CtrlLAndAltDFocusAddressBar). 642, 689 to 698 and 896: O1. |
+| OQ-02 | RT_MENU 108 is the context menu of the hex area in Edit Binary Value. The address bar, Find what and Edit String data boxes show the system edit menu (regedit-context.json). Built by K1. |
+| OQ-03 | The Computer root shows RT_MENU 107. Hive and key menus show RT_MENU 104 as measured. The value menu (105) is the same for every type (regedit-context.json). Remote menus: not measured (the connect could not be automated); R2 follows the resources. |
+| OQ-04 | 640 and 641 are Tab and Shift+Tab (Shell_TabCyclesTreeListAddressBar, Shell_ShiftTabReversesCycle). 672 focuses the address bar (Shell_CtrlLAndAltDFocusAddressBar). 642 (F4) focuses the address bar and opens its suggestions; 698 (Alt+Up) selects the parent key; 896 (Shift+F10) opens the context menu; 689 to 697 (Alt+1 to Alt+9) change nothing (regedit-keys.json). |
 | OQ-05 | Ctrl+T toggles between HKEY_LOCAL_MACHINE and HKEY_CURRENT_USER, and the menu item text follows (Parity_CtrlT_TogglesBetweenLocalMachineAndCurrentUser). |
 | OQ-06 | Expand reads Collapse while the key is expanded (Robustness_ExpandedKeyMenuShowsCollapse). |
 | OQ-07 | Classic shows the shell About box. BWC shows its own About box with product version and copyright (AppServices_AboutShowsProductVersionAndCopyright); declared, because BWC must not claim to be Windows. |
@@ -643,7 +643,7 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-11 | Settled before this audit (RegistryFinderTests). |
 | OQ-12 | Hexadecimal is the default base (ClassicDialogs_EditStringAndDwordFollowTheTemplate). Overflow prompts: F2. |
 | OQ-13 | ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates. |
-| OQ-14 | Display Binary Data opens variant B (2021) in BWC (BinaryViewer_FollowsTheClassicLayoutAndFormats). Which command opens variant A: O1, then K1. |
+| OQ-14 | Classic opens variant B (2021) for every type, Byte format by default; variant A (2020) is never opened (regedit-binary.json). BWC matches (BinaryViewer_FollowsTheClassicLayoutAndFormats). |
 | OQ-15 | Runtime enable rules of template-disabled viewer controls: measured on classic with a resource value from HKEY_LOCAL_MACHINE\HARDWARE (readable unelevated); D1. |
 | OQ-16 | Viewer mapping per type: D1 (same measurement). |
 | OQ-17 | Not reachable in classic; not implemented (DLG-044, DLG-045 declared). |
@@ -653,7 +653,7 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-21 | Unload is enabled only on a direct child of HKLM or HKU (AppServices_HiveRulesEnableLoadAndUnloadByRoot). |
 | OQ-22 | Strings 55 and 56 are present; the binary hive import flow is checked in F2. |
 | OQ-23 | DisableRegistryTools 1 and 2 (Robustness_PolicyOverrideShowsRegistryEditingDisabled, Robustness_PolicyLevelTwoRefusesSilentImport). |
-| OQ-24 | BWC ships highestAvailable (src/Bwc.Regedit.App/app.manifest). Classic level: O1 reads the regedit.exe manifest. A guard check is F2. |
+| OQ-24 | BWC ships highestAvailable (src/Bwc.Regedit.App/app.manifest). Classic asks for highestAvailable too (regedit-manifest.json). A guard check is F2. |
 | OQ-25 | Value order: List_OrderTypeAheadAndHeaderClick. Tree order for non-ASCII and symbol names: F2. Export order follows the golden (RegistryExportTests). |
 | OQ-26 | sort-order.json and List_OrderTypeAheadAndHeaderClick; non-ASCII value names: V1. |
 | OQ-27 | Selection colors: regedit-selection-colors.json (Theme tests). Icon sizes: Icons_TreeAndListRowsMatchClassicLayout. |
@@ -673,8 +673,8 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-41 | Decision: BWC does not register a .reg file type or Merge verb. |
 | OQ-42 | BWC uses the OS ACL editor (Permissions tests). Owner, auditing, effective access and the prompts for strings 7015 to 7018: S1. |
 | OQ-43 | Favorites_AddRemoveNavigateAndReportMissingPath (duplicate name refused, no confirmation on Remove). |
-| OQ-44 | O1 captures the classic print report to a file; P1 matches it. |
-| OQ-45 | Classic opens the system object picker; R2. |
+| OQ-44 | Not measured: on this build classic opens the Windows print host, whose default view has no range controls, and the default printer is a physical printer, so nothing was printed (regedit-print.json). P1 follows templates 105 and 108. |
+| OQ-45 | Classic opens the system object picker (RichEdit name box); typing into it could not be automated, so the connect is not measured (regedit-remote.json). R2 follows the resources. |
 | OQ-46 | CommandLine_SilentImportExitCodesFollowTheResult; CommandLine_ExportsImportsAndRejectsOutsideSandbox. |
 | OQ-47 | The name box is read-only in every value editor (ClassicDialogs_EditStringAndDwordFollowTheTemplate). |
 | OQ-48 | Navigation_ShowsRootsAndRestoresLastKey; Basics_CopyKeyNameAndF5KeepTheView. |
