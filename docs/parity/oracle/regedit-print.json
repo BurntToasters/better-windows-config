@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture print",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26300",
+    "ubr": 9974,
+    "displayVersion": "26H2",
+    "processArchitecture": "Arm64"
+  },
+  "classicRegedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "note": "File > Print is read from the File menu popup with each selection. The Print dialog is cancelled. No print job is sent.",
+  "fileMenuPrint": [
+    {
+      "target": "computer",
+      "measured": true,
+      "printEnabled": true
+    },
+    {
+      "target": "hive-hkcu",
+      "measured": true,
+      "printEnabled": true
+    },
+    {
+      "target": "key-mixed",
+      "measured": true,
+      "printEnabled": true
+    }
+  ],
+  "printDialog": {
+    "measured": true,
+    "printed": false,
+    "printerVerified": false,
+    "regeditOwned": false,
+    "uia": {
+      "elementCount": 35,
+      "truncated": false,
+      "controlTypeCounts": {
+        "Button": 8,
+        "CheckBox": 1,
+        "ComboBox": 4,
+        "Edit": 1,
+        "Group": 3,
+        "Hyperlink": 2,
+        "ListItem": 4,
+        "ScrollBar": 1,
+        "Spinner": 1,
+        "Text": 9,
+        "Window": 1
+      },
+      "radioButtonCount": 0,
+      "selectedRadioIndex": null,
+      "hasAllRadio": false,
+      "hasBranchText": false,
+      "hasRangeText": false,
+      "hasPagesControl": false,
+      "printerSelectorFound": true,
+      "printerIsPdf": false,
+      "moreSettingsFound": true
+    },
+    "rangePanel": "not readable as Win32 controls; the UI Automation summary is under uia.",
+    "cancelled": true
+  },
+  "microsoftPrintToPdfInstalled": true,
+  "pdfExport": {
+    "measured": false,
+    "reason": "Printing to the PDF needs the save-path dialog, which this capture does not drive (failure modes, section 22). Nothing was printed."
+  },
+  "notMeasured": []
+}

@@ -14,6 +14,13 @@ internal static class Program
         "  find      Find hit sequence under BWC-Oracle (find-sequence.json)\n" +
         "  sort      value list order and header click behavior (sort-order.json)\n" +
         "  permissions  Advanced Security Settings entry list and Applies-to choices (permissions-inherit.json)\n" +
+        "  keys      navigation keys and accelerator commands, tree and list focus (regedit-keys.json)\n" +
+        "  context   tree, value, list background and text edit context menus (regedit-context.json)\n" +
+        "  binary    View > Display Binary Data variants and Modify Binary Data (regedit-binary.json)\n" +
+        "  print     File > Print enable states and the Print dialog range panel (regedit-print.json)\n" +
+        "  security  Edit > Permissions sheet and Advanced Security Settings windows (regedit-security.json)\n" +
+        "  remote    Connect Network Registry to 127.0.0.1, menus, Import picker, Disconnect (regedit-remote.json)\n" +
+        "  manifest  embedded RT_MANIFEST requestedExecutionLevel of regedit.exe (regedit-manifest.json)\n" +
         "  cleanup   delete HKCU\\Software\\BWC-Oracle\n" +
         "  --allow-dpi  record UI captures at a DPI other than 96 (the DPI is written into each output)";
 
@@ -73,6 +80,59 @@ internal static class Program
 
                 case "permissions":
                     OracleSession.Run("permissions", () => PermissionsCapture.Run(paths, allowDpi));
+                    return 0;
+
+                case "keys":
+                    OracleSession.Run("keys", () =>
+                    {
+                        SeedCommand.Run(paths);
+                        KeysCapture.Run(paths, allowDpi);
+                    });
+                    return 0;
+
+                case "context":
+                    OracleSession.Run("context", () =>
+                    {
+                        SeedCommand.Run(paths);
+                        ContextCapture.Run(paths, allowDpi);
+                    });
+                    return 0;
+
+                case "binary":
+                    OracleSession.Run("binary", () =>
+                    {
+                        SeedCommand.Run(paths);
+                        BinaryCapture.Run(paths, allowDpi);
+                    });
+                    return 0;
+
+                case "print":
+                    OracleSession.Run("print", () =>
+                    {
+                        SeedCommand.Run(paths);
+                        PrintCapture.Run(paths, allowDpi);
+                    });
+                    return 0;
+
+                case "security":
+                    OracleSession.Run("security", () =>
+                    {
+                        SeedCommand.Run(paths);
+                        SecurityCapture.Run(paths, allowDpi);
+                    });
+                    return 0;
+
+                case "remote":
+                    OracleSession.Run("remote", () =>
+                    {
+                        SeedCommand.Run(paths);
+                        RemoteCapture.Run(paths, allowDpi);
+                    });
+                    return 0;
+
+                case "manifest":
+                    // Reads the image resource only. regedit is not started, so no session or GUI lock is needed.
+                    ManifestCapture.Run(paths);
                     return 0;
 
                 case "cleanup":

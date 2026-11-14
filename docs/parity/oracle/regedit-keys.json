@@ -1,0 +1,1707 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture keys",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26300",
+    "ubr": 9974,
+    "displayVersion": "26H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "note": "Each run is a fresh regedit process with BWC-Oracle\\Mixed selected. Keys are posted as messages with the modifier state set on the regedit thread. Every window that opened was closed. Text is in local/keys-text.json.",
+  "runs": [
+    {
+      "name": "F4 (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": 642,
+      "commandId": null,
+      "measured": true,
+      "changed": true,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "Edit",
+        "focusId": 0,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [
+        {
+          "class": "Auto-Suggest Dropdown",
+          "visible": true,
+          "kind": "window"
+        },
+        {
+          "class": "SysShadow",
+          "visible": true,
+          "kind": "window"
+        }
+      ],
+      "vk": 115,
+      "modifiers": [],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "F4 (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": 642,
+      "commandId": null,
+      "measured": true,
+      "changed": true,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "Edit",
+        "focusId": 0,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [
+        {
+          "class": "Auto-Suggest Dropdown",
+          "visible": true,
+          "kind": "window"
+        },
+        {
+          "class": "SysShadow",
+          "visible": true,
+          "kind": "window"
+        }
+      ],
+      "vk": 115,
+      "modifiers": [],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+1 (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": 689,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 49,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+1 (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": 689,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 49,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+2 (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": 690,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 50,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+2 (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": 690,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 50,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+3 (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": 691,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 51,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+3 (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": 691,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 51,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+4 (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": 692,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 52,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+4 (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": 692,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 52,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+5 (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": 693,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 53,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+5 (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": 693,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 53,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+6 (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": 694,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 54,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+6 (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": 694,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 54,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+7 (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": 695,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 55,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+7 (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": 695,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 55,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+8 (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": 696,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 56,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+8 (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": 696,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 56,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+9 (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": 697,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 57,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+9 (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": 697,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 57,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+Up (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": 698,
+      "commandId": null,
+      "measured": true,
+      "changed": true,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 3,
+        "caretIndex": 3,
+        "listCount": 1,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 38,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Alt+Up (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": 698,
+      "commandId": null,
+      "measured": true,
+      "changed": true,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 3,
+        "caretIndex": 3,
+        "listCount": 1,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 38,
+      "modifiers": [
+        "Alt"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Shift+F10 (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": 896,
+      "commandId": null,
+      "measured": true,
+      "changed": true,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [
+        {
+          "class": "#32768",
+          "visible": true,
+          "kind": "popup",
+          "items": [
+            {
+              "index": 0,
+              "id": 915,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": null,
+              "separator": true,
+              "grayed": false,
+              "checked": false,
+              "submenu": true,
+              "children": [
+                {
+                  "index": 0,
+                  "id": 663,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 1,
+                  "id": null,
+                  "separator": true,
+                  "grayed": true,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 2,
+                  "id": 664,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 3,
+                  "id": 665,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 4,
+                  "id": 674,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 5,
+                  "id": 688,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 6,
+                  "id": 676,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 7,
+                  "id": 677,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "id": 662,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 913,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 914,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 6,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 7,
+              "id": 659,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 8,
+              "id": 678,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 9,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 10,
+              "id": 675,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ],
+      "vk": 121,
+      "modifiers": [
+        "Shift"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Shift+F10 (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": 896,
+      "commandId": null,
+      "measured": true,
+      "changed": true,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [
+        {
+          "class": "#32768",
+          "visible": true,
+          "kind": "popup",
+          "items": [
+            {
+              "index": 0,
+              "id": 663,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": 664,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 665,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 674,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 688,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 6,
+              "id": 676,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 7,
+              "id": 677,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ],
+      "vk": 121,
+      "modifiers": [
+        "Shift"
+      ],
+      "deliveryMismatch": false
+    },
+    {
+      "name": "Shift+F6 (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 117,
+      "modifiers": [
+        "Shift"
+      ],
+      "deliveryMismatch": null
+    },
+    {
+      "name": "Shift+F6 (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": null,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 117,
+      "modifiers": [
+        "Shift"
+      ],
+      "deliveryMismatch": null
+    },
+    {
+      "name": "Backspace (tree)",
+      "kind": "key",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": null,
+      "measured": true,
+      "changed": true,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 3,
+        "caretIndex": 3,
+        "listCount": 1,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 8,
+      "modifiers": [],
+      "deliveryMismatch": null
+    },
+    {
+      "name": "Backspace (list)",
+      "kind": "key",
+      "focus": "list",
+      "accelerator": null,
+      "commandId": null,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysListView32",
+        "focusId": 2,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [],
+      "vk": 8,
+      "modifiers": [],
+      "deliveryMismatch": null
+    },
+    {
+      "name": "WM_COMMAND 642",
+      "kind": "command",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": 642,
+      "measured": true,
+      "changed": true,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "Edit",
+        "focusId": 0,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [
+        {
+          "class": "Auto-Suggest Dropdown",
+          "visible": true,
+          "kind": "window"
+        },
+        {
+          "class": "SysShadow",
+          "visible": true,
+          "kind": "window"
+        }
+      ]
+    },
+    {
+      "name": "WM_COMMAND 689",
+      "kind": "command",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": 689,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": []
+    },
+    {
+      "name": "WM_COMMAND 690",
+      "kind": "command",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": 690,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": []
+    },
+    {
+      "name": "WM_COMMAND 691",
+      "kind": "command",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": 691,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": []
+    },
+    {
+      "name": "WM_COMMAND 692",
+      "kind": "command",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": 692,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": []
+    },
+    {
+      "name": "WM_COMMAND 693",
+      "kind": "command",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": 693,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": []
+    },
+    {
+      "name": "WM_COMMAND 694",
+      "kind": "command",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": 694,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": []
+    },
+    {
+      "name": "WM_COMMAND 695",
+      "kind": "command",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": 695,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": []
+    },
+    {
+      "name": "WM_COMMAND 696",
+      "kind": "command",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": 696,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": []
+    },
+    {
+      "name": "WM_COMMAND 697",
+      "kind": "command",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": 697,
+      "measured": true,
+      "changed": false,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": []
+    },
+    {
+      "name": "WM_COMMAND 698",
+      "kind": "command",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": 698,
+      "measured": true,
+      "changed": true,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 3,
+        "caretIndex": 3,
+        "listCount": 1,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": []
+    },
+    {
+      "name": "WM_COMMAND 896",
+      "kind": "command",
+      "focus": "tree",
+      "accelerator": null,
+      "commandId": 896,
+      "measured": true,
+      "changed": true,
+      "before": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "after": {
+        "focusClass": "SysTreeView32",
+        "focusId": 1,
+        "caretDepth": 4,
+        "caretIndex": 5,
+        "listCount": 8,
+        "listSelected": -1,
+        "addressLength": 0
+      },
+      "newWindows": [
+        {
+          "class": "#32768",
+          "visible": true,
+          "kind": "popup",
+          "items": [
+            {
+              "index": 0,
+              "id": 915,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": null,
+              "separator": true,
+              "grayed": false,
+              "checked": false,
+              "submenu": true,
+              "children": [
+                {
+                  "index": 0,
+                  "id": 663,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 1,
+                  "id": null,
+                  "separator": true,
+                  "grayed": true,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 2,
+                  "id": 664,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 3,
+                  "id": 665,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 4,
+                  "id": 674,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 5,
+                  "id": 688,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 6,
+                  "id": 676,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 7,
+                  "id": 677,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "id": 662,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 913,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 914,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 6,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 7,
+              "id": 659,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 8,
+              "id": 678,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 9,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 10,
+              "id": 675,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "notMeasured": []
+}

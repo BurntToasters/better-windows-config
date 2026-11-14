@@ -21,6 +21,14 @@ internal sealed class RepoPaths
         FindSequenceJson = Path.Combine(OracleDocs, "find-sequence.json");
         SortOrderJson = Path.Combine(OracleDocs, "sort-order.json");
         PermissionsInheritJson = Path.Combine(OracleDocs, "permissions-inherit.json");
+        ResourcesJson = Path.Combine(OracleDocs, "regedit-resources.json");
+        KeysJson = Path.Combine(OracleDocs, "regedit-keys.json");
+        ContextJson = Path.Combine(OracleDocs, "regedit-context.json");
+        BinaryJson = Path.Combine(OracleDocs, "regedit-binary.json");
+        PrintJson = Path.Combine(OracleDocs, "regedit-print.json");
+        SecurityJson = Path.Combine(OracleDocs, "regedit-security.json");
+        RemoteJson = Path.Combine(OracleDocs, "regedit-remote.json");
+        ManifestJson = Path.Combine(OracleDocs, "regedit-manifest.json");
         ImportWorkDir = Path.Combine(root, "artifacts", "oracle", "import");
     }
 
@@ -45,6 +53,20 @@ internal sealed class RepoPaths
     internal string FindSequenceJson { get; }
     internal string SortOrderJson { get; }
     internal string PermissionsInheritJson { get; }
+
+    // Written by `resources` (untracked). Read by the 0.1.2 captures to name menus, dialogs and accelerators by id.
+    internal string ResourcesJson { get; }
+
+    // Tracked outputs of the 0.1.2 captures. Text for each one goes to LocalDir.
+    internal string KeysJson { get; }
+    internal string ContextJson { get; }
+    internal string BinaryJson { get; }
+    internal string PrintJson { get; }
+    internal string SecurityJson { get; }
+    internal string RemoteJson { get; }
+    internal string ManifestJson { get; }
+
+    internal string LocalText(string name) => Path.Combine(LocalDir, name);
 
     // Scratch folder for generated .reg files (artifacts/ is git-ignored).
     internal string ImportWorkDir { get; }

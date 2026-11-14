@@ -1,0 +1,737 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture security",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26300",
+    "ubr": 9974,
+    "displayVersion": "26H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "note": "Both windows were cancelled with IDCANCEL. No button except Advanced was pressed. Titles and control text are in local/security-text.json.",
+  "permissionsSheet": {
+    "name": "permissions-sheet",
+    "class": "#32770",
+    "measured": true,
+    "tabCount": 1,
+    "buttonCount": 12,
+    "buttonsEnabled": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ],
+    "controls": [
+      {
+        "class": "#32770",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50010444",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 1,
+        "visible": true,
+        "enabled": true,
+        "style": "0x5001C003",
+        "checked": false
+      },
+      {
+        "class": "Button",
+        "id": 1,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50030001",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 2,
+        "visible": true,
+        "enabled": true,
+        "style": "0x5001C003",
+        "checked": false
+      },
+      {
+        "class": "Button",
+        "id": 2,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50010000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 5,
+        "visible": true,
+        "enabled": false,
+        "style": "0x5801C003",
+        "checked": true
+      },
+      {
+        "class": "Button",
+        "id": 6,
+        "visible": true,
+        "enabled": true,
+        "style": "0x5001C003",
+        "checked": false
+      },
+      {
+        "class": "Button",
+        "id": 9,
+        "visible": true,
+        "enabled": false,
+        "style": "0x5801C003",
+        "checked": false
+      },
+      {
+        "class": "Button",
+        "id": 9,
+        "visible": false,
+        "enabled": true,
+        "style": "0x40030000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 10,
+        "visible": true,
+        "enabled": false,
+        "style": "0x5801C003",
+        "checked": false
+      },
+      {
+        "class": "Button",
+        "id": 1001,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50010000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 1002,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50010000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 1003,
+        "visible": false,
+        "enabled": false,
+        "style": "0x48010000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 1005,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50010000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 12321,
+        "visible": true,
+        "enabled": false,
+        "style": "0x58010000",
+        "checked": null
+      },
+      {
+        "class": "CHECKLIST_ACLUI",
+        "id": 1004,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50800002",
+        "checked": null
+      },
+      {
+        "class": "Edit",
+        "id": 1015,
+        "visible": false,
+        "enabled": false,
+        "style": "0x48000880",
+        "checked": null
+      },
+      {
+        "class": "Edit",
+        "id": 6040,
+        "visible": false,
+        "enabled": true,
+        "style": "0x40200804",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x5000C08C",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 4,
+        "visible": true,
+        "enabled": true,
+        "style": "0x5000C08C",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 8,
+        "visible": true,
+        "enabled": true,
+        "style": "0x5001C18C",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 1008,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50020000",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 1009,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50020001",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 1010,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50020001",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 1012,
+        "visible": false,
+        "enabled": true,
+        "style": "0x40020000",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 1013,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50020000",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 1014,
+        "visible": false,
+        "enabled": false,
+        "style": "0x48020000",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 1016,
+        "visible": false,
+        "enabled": false,
+        "style": "0x48000003",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 6024,
+        "visible": false,
+        "enabled": false,
+        "style": "0x48020000",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 6026,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50020000",
+        "checked": null
+      },
+      {
+        "class": "Static",
+        "id": 6027,
+        "visible": false,
+        "enabled": false,
+        "style": "0x48020000",
+        "checked": null
+      },
+      {
+        "class": "SysHeader32",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x500000C8",
+        "checked": null
+      },
+      {
+        "class": "SysListView32",
+        "id": 1000,
+        "visible": true,
+        "enabled": true,
+        "style": "0x5001C01D",
+        "checked": null
+      },
+      {
+        "class": "SysTabControl32",
+        "id": 12320,
+        "visible": true,
+        "enabled": true,
+        "style": "0x54030240",
+        "checked": null
+      }
+    ]
+  },
+  "advancedSecuritySettings": {
+    "name": "advanced-security-settings",
+    "class": "#32770",
+    "measured": true,
+    "tabCount": 0,
+    "buttonCount": 8,
+    "buttonsEnabled": [
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true
+    ],
+    "controls": [
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": false,
+        "enabled": false,
+        "style": "0x58000000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": false,
+        "enabled": false,
+        "style": "0x58000000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": false,
+        "enabled": false,
+        "style": "0x58000000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": true,
+        "enabled": false,
+        "style": "0x58000000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": true,
+        "enabled": false,
+        "style": "0x58000000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": true,
+        "enabled": false,
+        "style": "0x58000000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x50000000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x50000000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x50002403",
+        "checked": false
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x50000000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50000000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50000000",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50002403",
+        "checked": false
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50000001",
+        "checked": null
+      },
+      {
+        "class": "Button",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x46000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x56000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x56000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x56000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x56000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x56000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x56000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x56000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x56000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x56000000",
+        "checked": null
+      },
+      {
+        "class": "CtrlNotifySink",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x56000000",
+        "checked": null
+      },
+      {
+        "class": "DirectUIHWND",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x56000000",
+        "checked": null
+      },
+      {
+        "class": "Edit",
+        "id": 0,
+        "visible": false,
+        "enabled": false,
+        "style": "0x58000880",
+        "checked": null
+      },
+      {
+        "class": "Edit",
+        "id": 0,
+        "visible": false,
+        "enabled": false,
+        "style": "0x58000880",
+        "checked": null
+      },
+      {
+        "class": "Edit",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x50000880",
+        "checked": null
+      },
+      {
+        "class": "Edit",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x50000880",
+        "checked": null
+      },
+      {
+        "class": "ScrollBar",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x50000001",
+        "checked": null
+      },
+      {
+        "class": "ScrollBar",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x50000000",
+        "checked": null
+      },
+      {
+        "class": "ScrollBar",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x50000000",
+        "checked": null
+      },
+      {
+        "class": "ScrollBar",
+        "id": 0,
+        "visible": false,
+        "enabled": true,
+        "style": "0x50000001",
+        "checked": null
+      },
+      {
+        "class": "SysHeader32",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x500000C2",
+        "checked": null
+      },
+      {
+        "class": "SysListView32",
+        "id": 0,
+        "visible": true,
+        "enabled": true,
+        "style": "0x5000014D",
+        "checked": null
+      }
+    ]
+  }
+}
