@@ -101,6 +101,18 @@ The workflow runs on `main`, `next-*`, and `experimental`. `experimental` is the
 | T1 | `experimental` is missing from the push or pull_request branch list | A beta release branch is not gated | Keep `experimental` in both lists. |
 | T2 | `cancel-in-progress` is true for `main` | A newer push cancels a release gate run on main | `cancel-in-progress` is `github.ref != 'refs/heads/main'`. |
 
+## CI GUI E2E on a hosted runner
+
+A `windows-latest` runner has a 1024x768 Server desktop where screen captures come back black and
+the clipboard and window placement differ from a real desktop. The first CI run that reached the GUI
+suite (0.1.1) failed 14 pixel, theme, placement, and clipboard checks there that pass on a real desktop,
+and then hung until the 60 minute job limit.
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| H1 | A test leaves an app running that inherited the dotnet output pipes | `test-e2e.js` waits on 'close' forever | It settles on 'exit' and cuts the pipes after a 10 s drain. |
+| H2 | GUI E2E fails on the hosted desktop | CI is always red and hides a real quick-gate failure | The quick gate blocks. The GUI and installer E2E steps run with `continue-on-error` and their own `timeout-minutes`, and upload their result. The local `node scripts/test-all.js --rid all` on a real desktop is the release gate. |
+
 ## Elevated runner environment (`scripts/elevated-runner/run-elevated.ps1`)
 
 The scheduled task runs elevated and inherits the environment of the task definition. The runner has
