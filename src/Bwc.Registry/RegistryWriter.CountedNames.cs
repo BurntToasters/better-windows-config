@@ -32,7 +32,8 @@ public sealed partial class RegistryWriter
         ArgumentNullException.ThrowIfNull(valueName);
 
         const string Operation = nameof(RegistryWriteOperation.SetValue);
-        _policy.EnsureWriteAllowed(key, RegistryWriteOperation.SetValue);
+        Authorize(key, RegistryWriteOperation.SetValue);
+        RejectRemote(key, Operation);
 
         if (type == (uint)REG_VALUE_TYPE.REG_LINK && !_policy.AllowsLinkValues)
         {
@@ -62,7 +63,8 @@ public sealed partial class RegistryWriter
         ArgumentNullException.ThrowIfNull(valueName);
 
         const string Operation = nameof(RegistryWriteOperation.DeleteValue);
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.DeleteValue);
+        Authorize(path, RegistryWriteOperation.DeleteValue);
+        RejectRemote(path, Operation);
 
         using SafeRegistryKeyHandle handle = OpenKey(
             path,
