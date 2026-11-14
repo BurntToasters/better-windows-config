@@ -188,7 +188,27 @@ function runStreaming(command, args, options) {
       output += chunk.toString();
     });
     child.on("error", reject);
-    child.on("close", (code) => resolve({ code, output }));
+    // 'close' waits for every holder of the pipes. An app the tests started and left running inherits them,
+    // so the run would never end. Settle on 'exit' and give the pipes a short drain before cutting them.
+    let settled = false;
+    const settle = (code) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(drainTimer);
+      child.stdout.destroy();
+      child.stderr.destroy();
+      resolve({ code, output });
+    };
+    let drainTimer;
+    child.on("close", (code) => settle(code));
+    child.on("exit", (code) => {
+      drainTimer = setTimeout(() => {
+        console.error("test-e2e: dotnet exited but a child process still holds its output; continuing.");
+        settle(code);
+      }, 10_000);
+    });
   });
 }
 
