@@ -1,0 +1,1130 @@
+{
+  "schema": 1,
+  "generator": "scripts/check-regedit-strings.js",
+  "source": "regedit.exe RT_STRING ids (untracked dump, regedit-resources.json)",
+  "compared": [
+    "src/Bwc.Regedit/Strings/en-US/Resources.resw",
+    "src/Bwc.UI/Strings/en-US/Resources.resw",
+    "src/**/*.cs (excluding bin and obj)"
+  ],
+  "counts": {
+    "equal": 135,
+    "differs": 7,
+    "template": 4,
+    "absent": 132
+  },
+  "strings": [
+    {
+      "id": 16,
+      "status": "equal"
+    },
+    {
+      "id": 17,
+      "status": "equal"
+    },
+    {
+      "id": 18,
+      "status": "equal"
+    },
+    {
+      "id": 19,
+      "status": "equal"
+    },
+    {
+      "id": 20,
+      "status": "equal"
+    },
+    {
+      "id": 21,
+      "status": "equal"
+    },
+    {
+      "id": 22,
+      "status": "equal"
+    },
+    {
+      "id": 23,
+      "status": "template"
+    },
+    {
+      "id": 24,
+      "status": "template"
+    },
+    {
+      "id": 25,
+      "status": "equal"
+    },
+    {
+      "id": 26,
+      "status": "equal"
+    },
+    {
+      "id": 27,
+      "status": "equal"
+    },
+    {
+      "id": 29,
+      "status": "template"
+    },
+    {
+      "id": 30,
+      "status": "equal"
+    },
+    {
+      "id": 31,
+      "status": "equal"
+    },
+    {
+      "id": 32,
+      "status": "template"
+    },
+    {
+      "id": 33,
+      "status": "equal"
+    },
+    {
+      "id": 34,
+      "status": "absent"
+    },
+    {
+      "id": 40,
+      "status": "equal"
+    },
+    {
+      "id": 41,
+      "status": "equal"
+    },
+    {
+      "id": 42,
+      "status": "absent"
+    },
+    {
+      "id": 43,
+      "status": "absent"
+    },
+    {
+      "id": 48,
+      "status": "equal"
+    },
+    {
+      "id": 49,
+      "status": "equal"
+    },
+    {
+      "id": 50,
+      "status": "equal"
+    },
+    {
+      "id": 51,
+      "status": "equal"
+    },
+    {
+      "id": 52,
+      "status": "equal"
+    },
+    {
+      "id": 53,
+      "status": "equal"
+    },
+    {
+      "id": 54,
+      "status": "equal"
+    },
+    {
+      "id": 55,
+      "status": "equal"
+    },
+    {
+      "id": 56,
+      "status": "equal"
+    },
+    {
+      "id": 64,
+      "status": "equal"
+    },
+    {
+      "id": 66,
+      "status": "equal"
+    },
+    {
+      "id": 67,
+      "status": "equal"
+    },
+    {
+      "id": 68,
+      "status": "equal"
+    },
+    {
+      "id": 69,
+      "status": "equal"
+    },
+    {
+      "id": 70,
+      "status": "equal"
+    },
+    {
+      "id": 72,
+      "status": "equal"
+    },
+    {
+      "id": 73,
+      "status": "equal"
+    },
+    {
+      "id": 74,
+      "status": "equal"
+    },
+    {
+      "id": 75,
+      "status": "equal"
+    },
+    {
+      "id": 80,
+      "status": "equal"
+    },
+    {
+      "id": 82,
+      "status": "equal"
+    },
+    {
+      "id": 88,
+      "status": "equal"
+    },
+    {
+      "id": 89,
+      "status": "equal"
+    },
+    {
+      "id": 96,
+      "status": "equal"
+    },
+    {
+      "id": 97,
+      "status": "equal"
+    },
+    {
+      "id": 98,
+      "status": "equal"
+    },
+    {
+      "id": 100,
+      "status": "equal"
+    },
+    {
+      "id": 101,
+      "status": "equal"
+    },
+    {
+      "id": 102,
+      "status": "absent"
+    },
+    {
+      "id": 110,
+      "status": "absent"
+    },
+    {
+      "id": 111,
+      "status": "absent"
+    },
+    {
+      "id": 112,
+      "status": "equal"
+    },
+    {
+      "id": 114,
+      "status": "equal"
+    },
+    {
+      "id": 115,
+      "status": "equal"
+    },
+    {
+      "id": 116,
+      "status": "equal"
+    },
+    {
+      "id": 117,
+      "status": "equal"
+    },
+    {
+      "id": 118,
+      "status": "absent"
+    },
+    {
+      "id": 119,
+      "status": "absent"
+    },
+    {
+      "id": 120,
+      "status": "absent"
+    },
+    {
+      "id": 123,
+      "status": "absent"
+    },
+    {
+      "id": 124,
+      "status": "equal"
+    },
+    {
+      "id": 125,
+      "status": "equal"
+    },
+    {
+      "id": 126,
+      "status": "equal"
+    },
+    {
+      "id": 128,
+      "status": "absent"
+    },
+    {
+      "id": 129,
+      "status": "equal"
+    },
+    {
+      "id": 130,
+      "status": "equal"
+    },
+    {
+      "id": 131,
+      "status": "absent"
+    },
+    {
+      "id": 132,
+      "status": "equal"
+    },
+    {
+      "id": 133,
+      "status": "equal"
+    },
+    {
+      "id": 134,
+      "status": "absent"
+    },
+    {
+      "id": 135,
+      "status": "absent"
+    },
+    {
+      "id": 138,
+      "status": "equal"
+    },
+    {
+      "id": 141,
+      "status": "equal"
+    },
+    {
+      "id": 142,
+      "status": "equal"
+    },
+    {
+      "id": 143,
+      "status": "equal"
+    },
+    {
+      "id": 144,
+      "status": "equal"
+    },
+    {
+      "id": 145,
+      "status": "equal"
+    },
+    {
+      "id": 146,
+      "status": "equal"
+    },
+    {
+      "id": 148,
+      "status": "equal"
+    },
+    {
+      "id": 152,
+      "status": "equal"
+    },
+    {
+      "id": 153,
+      "status": "equal"
+    },
+    {
+      "id": 154,
+      "status": "equal"
+    },
+    {
+      "id": 155,
+      "status": "equal"
+    },
+    {
+      "id": 156,
+      "status": "equal"
+    },
+    {
+      "id": 160,
+      "status": "equal"
+    },
+    {
+      "id": 161,
+      "status": "equal"
+    },
+    {
+      "id": 162,
+      "status": "equal"
+    },
+    {
+      "id": 163,
+      "status": "equal"
+    },
+    {
+      "id": 164,
+      "status": "equal"
+    },
+    {
+      "id": 168,
+      "status": "equal"
+    },
+    {
+      "id": 169,
+      "status": "equal"
+    },
+    {
+      "id": 170,
+      "status": "equal"
+    },
+    {
+      "id": 171,
+      "status": "equal"
+    },
+    {
+      "id": 172,
+      "status": "equal"
+    },
+    {
+      "id": 173,
+      "status": "equal"
+    },
+    {
+      "id": 180,
+      "status": "differs"
+    },
+    {
+      "id": 181,
+      "status": "equal"
+    },
+    {
+      "id": 182,
+      "status": "equal"
+    },
+    {
+      "id": 183,
+      "status": "equal"
+    },
+    {
+      "id": 184,
+      "status": "equal"
+    },
+    {
+      "id": 185,
+      "status": "equal"
+    },
+    {
+      "id": 186,
+      "status": "equal"
+    },
+    {
+      "id": 187,
+      "status": "equal"
+    },
+    {
+      "id": 188,
+      "status": "equal"
+    },
+    {
+      "id": 189,
+      "status": "equal"
+    },
+    {
+      "id": 212,
+      "status": "absent"
+    },
+    {
+      "id": 213,
+      "status": "absent"
+    },
+    {
+      "id": 214,
+      "status": "absent"
+    },
+    {
+      "id": 215,
+      "status": "absent"
+    },
+    {
+      "id": 228,
+      "status": "equal"
+    },
+    {
+      "id": 231,
+      "status": "equal"
+    },
+    {
+      "id": 235,
+      "status": "equal"
+    },
+    {
+      "id": 300,
+      "status": "equal"
+    },
+    {
+      "id": 301,
+      "status": "absent"
+    },
+    {
+      "id": 302,
+      "status": "differs"
+    },
+    {
+      "id": 303,
+      "status": "absent"
+    },
+    {
+      "id": 304,
+      "status": "equal"
+    },
+    {
+      "id": 305,
+      "status": "differs"
+    },
+    {
+      "id": 306,
+      "status": "absent"
+    },
+    {
+      "id": 309,
+      "status": "absent"
+    },
+    {
+      "id": 310,
+      "status": "absent"
+    },
+    {
+      "id": 311,
+      "status": "equal"
+    },
+    {
+      "id": 512,
+      "status": "absent"
+    },
+    {
+      "id": 513,
+      "status": "absent"
+    },
+    {
+      "id": 514,
+      "status": "absent"
+    },
+    {
+      "id": 515,
+      "status": "absent"
+    },
+    {
+      "id": 516,
+      "status": "absent"
+    },
+    {
+      "id": 517,
+      "status": "absent"
+    },
+    {
+      "id": 648,
+      "status": "absent"
+    },
+    {
+      "id": 657,
+      "status": "absent"
+    },
+    {
+      "id": 658,
+      "status": "absent"
+    },
+    {
+      "id": 659,
+      "status": "absent"
+    },
+    {
+      "id": 660,
+      "status": "absent"
+    },
+    {
+      "id": 661,
+      "status": "absent"
+    },
+    {
+      "id": 662,
+      "status": "absent"
+    },
+    {
+      "id": 663,
+      "status": "absent"
+    },
+    {
+      "id": 664,
+      "status": "absent"
+    },
+    {
+      "id": 665,
+      "status": "absent"
+    },
+    {
+      "id": 667,
+      "status": "absent"
+    },
+    {
+      "id": 668,
+      "status": "absent"
+    },
+    {
+      "id": 670,
+      "status": "absent"
+    },
+    {
+      "id": 671,
+      "status": "absent"
+    },
+    {
+      "id": 674,
+      "status": "absent"
+    },
+    {
+      "id": 675,
+      "status": "absent"
+    },
+    {
+      "id": 676,
+      "status": "absent"
+    },
+    {
+      "id": 677,
+      "status": "absent"
+    },
+    {
+      "id": 678,
+      "status": "absent"
+    },
+    {
+      "id": 679,
+      "status": "absent"
+    },
+    {
+      "id": 680,
+      "status": "absent"
+    },
+    {
+      "id": 681,
+      "status": "absent"
+    },
+    {
+      "id": 688,
+      "status": "absent"
+    },
+    {
+      "id": 768,
+      "status": "absent"
+    },
+    {
+      "id": 912,
+      "status": "absent"
+    },
+    {
+      "id": 913,
+      "status": "absent"
+    },
+    {
+      "id": 914,
+      "status": "absent"
+    },
+    {
+      "id": 915,
+      "status": "absent"
+    },
+    {
+      "id": 917,
+      "status": "absent"
+    },
+    {
+      "id": 1280,
+      "status": "absent"
+    },
+    {
+      "id": 1281,
+      "status": "absent"
+    },
+    {
+      "id": 7001,
+      "status": "equal"
+    },
+    {
+      "id": 7002,
+      "status": "equal"
+    },
+    {
+      "id": 7003,
+      "status": "equal"
+    },
+    {
+      "id": 7004,
+      "status": "equal"
+    },
+    {
+      "id": 7005,
+      "status": "equal"
+    },
+    {
+      "id": 7006,
+      "status": "equal"
+    },
+    {
+      "id": 7007,
+      "status": "equal"
+    },
+    {
+      "id": 7008,
+      "status": "equal"
+    },
+    {
+      "id": 7009,
+      "status": "equal"
+    },
+    {
+      "id": 7010,
+      "status": "equal"
+    },
+    {
+      "id": 7011,
+      "status": "equal"
+    },
+    {
+      "id": 7012,
+      "status": "equal"
+    },
+    {
+      "id": 7013,
+      "status": "absent"
+    },
+    {
+      "id": 7014,
+      "status": "absent"
+    },
+    {
+      "id": 7015,
+      "status": "absent"
+    },
+    {
+      "id": 7016,
+      "status": "absent"
+    },
+    {
+      "id": 7017,
+      "status": "equal"
+    },
+    {
+      "id": 7018,
+      "status": "absent"
+    },
+    {
+      "id": 7019,
+      "status": "equal"
+    },
+    {
+      "id": 7050,
+      "status": "differs"
+    },
+    {
+      "id": 7051,
+      "status": "differs"
+    },
+    {
+      "id": 7052,
+      "status": "differs"
+    },
+    {
+      "id": 7070,
+      "status": "differs"
+    },
+    {
+      "id": 7071,
+      "status": "absent"
+    },
+    {
+      "id": 7072,
+      "status": "equal"
+    },
+    {
+      "id": 7073,
+      "status": "absent"
+    },
+    {
+      "id": 7074,
+      "status": "absent"
+    },
+    {
+      "id": 7075,
+      "status": "absent"
+    },
+    {
+      "id": 7076,
+      "status": "absent"
+    },
+    {
+      "id": 7090,
+      "status": "equal"
+    },
+    {
+      "id": 7091,
+      "status": "equal"
+    },
+    {
+      "id": 7092,
+      "status": "equal"
+    },
+    {
+      "id": 7500,
+      "status": "absent"
+    },
+    {
+      "id": 7501,
+      "status": "absent"
+    },
+    {
+      "id": 7502,
+      "status": "absent"
+    },
+    {
+      "id": 7503,
+      "status": "absent"
+    },
+    {
+      "id": 7504,
+      "status": "absent"
+    },
+    {
+      "id": 7505,
+      "status": "absent"
+    },
+    {
+      "id": 7506,
+      "status": "absent"
+    },
+    {
+      "id": 7507,
+      "status": "absent"
+    },
+    {
+      "id": 7508,
+      "status": "absent"
+    },
+    {
+      "id": 7509,
+      "status": "absent"
+    },
+    {
+      "id": 7510,
+      "status": "absent"
+    },
+    {
+      "id": 7511,
+      "status": "absent"
+    },
+    {
+      "id": 7520,
+      "status": "absent"
+    },
+    {
+      "id": 7521,
+      "status": "absent"
+    },
+    {
+      "id": 7530,
+      "status": "absent"
+    },
+    {
+      "id": 7531,
+      "status": "absent"
+    },
+    {
+      "id": 7532,
+      "status": "absent"
+    },
+    {
+      "id": 7540,
+      "status": "absent"
+    },
+    {
+      "id": 7541,
+      "status": "absent"
+    },
+    {
+      "id": 7542,
+      "status": "absent"
+    },
+    {
+      "id": 7560,
+      "status": "absent"
+    },
+    {
+      "id": 7561,
+      "status": "absent"
+    },
+    {
+      "id": 7562,
+      "status": "absent"
+    },
+    {
+      "id": 7563,
+      "status": "absent"
+    },
+    {
+      "id": 7564,
+      "status": "absent"
+    },
+    {
+      "id": 7580,
+      "status": "absent"
+    },
+    {
+      "id": 7581,
+      "status": "absent"
+    },
+    {
+      "id": 7582,
+      "status": "absent"
+    },
+    {
+      "id": 7583,
+      "status": "absent"
+    },
+    {
+      "id": 8000,
+      "status": "equal"
+    },
+    {
+      "id": 8001,
+      "status": "equal"
+    },
+    {
+      "id": 8002,
+      "status": "equal"
+    },
+    {
+      "id": 8003,
+      "status": "equal"
+    },
+    {
+      "id": 8004,
+      "status": "equal"
+    },
+    {
+      "id": 8006,
+      "status": "equal"
+    },
+    {
+      "id": 8007,
+      "status": "equal"
+    },
+    {
+      "id": 8008,
+      "status": "equal"
+    },
+    {
+      "id": 8009,
+      "status": "equal"
+    },
+    {
+      "id": 8010,
+      "status": "equal"
+    },
+    {
+      "id": 8011,
+      "status": "equal"
+    },
+    {
+      "id": 8012,
+      "status": "equal"
+    },
+    {
+      "id": 8100,
+      "status": "equal"
+    },
+    {
+      "id": 8101,
+      "status": "equal"
+    },
+    {
+      "id": 8102,
+      "status": "equal"
+    },
+    {
+      "id": 8103,
+      "status": "equal"
+    },
+    {
+      "id": 8104,
+      "status": "equal"
+    },
+    {
+      "id": 8105,
+      "status": "equal"
+    },
+    {
+      "id": 8106,
+      "status": "equal"
+    },
+    {
+      "id": 8107,
+      "status": "equal"
+    },
+    {
+      "id": 8108,
+      "status": "equal"
+    },
+    {
+      "id": 8109,
+      "status": "equal"
+    },
+    {
+      "id": 8110,
+      "status": "equal"
+    },
+    {
+      "id": 8111,
+      "status": "absent"
+    },
+    {
+      "id": 8150,
+      "status": "absent"
+    },
+    {
+      "id": 8151,
+      "status": "absent"
+    },
+    {
+      "id": 8152,
+      "status": "absent"
+    },
+    {
+      "id": 8153,
+      "status": "absent"
+    },
+    {
+      "id": 8154,
+      "status": "absent"
+    },
+    {
+      "id": 8155,
+      "status": "absent"
+    },
+    {
+      "id": 8160,
+      "status": "absent"
+    },
+    {
+      "id": 8161,
+      "status": "absent"
+    },
+    {
+      "id": 8162,
+      "status": "absent"
+    },
+    {
+      "id": 8163,
+      "status": "absent"
+    },
+    {
+      "id": 8164,
+      "status": "absent"
+    },
+    {
+      "id": 8165,
+      "status": "absent"
+    },
+    {
+      "id": 8166,
+      "status": "absent"
+    },
+    {
+      "id": 8167,
+      "status": "absent"
+    },
+    {
+      "id": 8168,
+      "status": "absent"
+    },
+    {
+      "id": 8169,
+      "status": "absent"
+    },
+    {
+      "id": 8170,
+      "status": "absent"
+    },
+    {
+      "id": 8171,
+      "status": "absent"
+    },
+    {
+      "id": 8172,
+      "status": "absent"
+    },
+    {
+      "id": 8180,
+      "status": "absent"
+    },
+    {
+      "id": 8181,
+      "status": "absent"
+    },
+    {
+      "id": 8182,
+      "status": "absent"
+    },
+    {
+      "id": 8183,
+      "status": "absent"
+    },
+    {
+      "id": 8184,
+      "status": "absent"
+    },
+    {
+      "id": 8185,
+      "status": "absent"
+    },
+    {
+      "id": 8186,
+      "status": "absent"
+    },
+    {
+      "id": 8187,
+      "status": "absent"
+    },
+    {
+      "id": 8188,
+      "status": "absent"
+    },
+    {
+      "id": 8189,
+      "status": "absent"
+    },
+    {
+      "id": 8190,
+      "status": "absent"
+    },
+    {
+      "id": 8191,
+      "status": "absent"
+    },
+    {
+      "id": 8192,
+      "status": "absent"
+    }
+  ]
+}

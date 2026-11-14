@@ -1,0 +1,1498 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture binary",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26300",
+    "ubr": 9974,
+    "displayVersion": "26H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "note": "Variant A is template 2020 (no Value Type label). Variant B is template 2021 (with the label, id 2026). Text is in local/binary-text.json.",
+  "displayBinaryData": [
+    {
+      "name": "reg-sz",
+      "valueType": "REG_SZ",
+      "measured": true,
+      "enabled": true,
+      "opened": true,
+      "dialogTemplate": 2021,
+      "variant": "B",
+      "listClass": "ListBox",
+      "defaultRadioId": 2023,
+      "radioIds": [
+        2023,
+        2024,
+        2025,
+        2027
+      ],
+      "units": [
+        {
+          "radioId": 2023,
+          "lineCount": 2,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2024,
+          "lineCount": 2,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2025,
+          "lineCount": 2,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2027,
+          "lineCount": 2,
+          "firstLineReadable": false
+        }
+      ],
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50030001",
+          "x": 483,
+          "y": 428,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 502,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 12,
+          "y": 19,
+          "width": 60,
+          "height": 25
+        },
+        {
+          "id": 503,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020007",
+          "x": 12,
+          "y": 288,
+          "width": 636,
+          "height": 109
+        },
+        {
+          "id": 2022,
+          "class": "ListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010001",
+          "x": 12,
+          "y": 47,
+          "width": 1299,
+          "height": 199
+        },
+        {
+          "id": 2023,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010009",
+          "x": 72,
+          "y": 328,
+          "width": 90,
+          "height": 31,
+          "checked": true
+        },
+        {
+          "id": 2024,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 192,
+          "y": 328,
+          "width": 105,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2025,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 327,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2026,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 909,
+          "y": 328,
+          "width": 174,
+          "height": 25
+        },
+        {
+          "id": 2027,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 474,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 765,
+          "y": 328,
+          "width": 132,
+          "height": 25
+        }
+      ]
+    },
+    {
+      "name": "reg-expand-sz",
+      "valueType": "REG_EXPAND_SZ",
+      "measured": true,
+      "enabled": true,
+      "opened": true,
+      "dialogTemplate": 2021,
+      "variant": "B",
+      "listClass": "ListBox",
+      "defaultRadioId": 2023,
+      "radioIds": [
+        2023,
+        2024,
+        2025,
+        2027
+      ],
+      "units": [
+        {
+          "radioId": 2023,
+          "lineCount": 2,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2024,
+          "lineCount": 2,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2025,
+          "lineCount": 2,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2027,
+          "lineCount": 2,
+          "firstLineReadable": false
+        }
+      ],
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50030001",
+          "x": 483,
+          "y": 428,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 502,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 12,
+          "y": 19,
+          "width": 60,
+          "height": 25
+        },
+        {
+          "id": 503,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020007",
+          "x": 12,
+          "y": 288,
+          "width": 636,
+          "height": 109
+        },
+        {
+          "id": 2022,
+          "class": "ListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010001",
+          "x": 12,
+          "y": 47,
+          "width": 1299,
+          "height": 199
+        },
+        {
+          "id": 2023,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010009",
+          "x": 72,
+          "y": 328,
+          "width": 90,
+          "height": 31,
+          "checked": true
+        },
+        {
+          "id": 2024,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 192,
+          "y": 328,
+          "width": 105,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2025,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 327,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2026,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 909,
+          "y": 328,
+          "width": 174,
+          "height": 25
+        },
+        {
+          "id": 2027,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 474,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 765,
+          "y": 328,
+          "width": 132,
+          "height": 25
+        }
+      ]
+    },
+    {
+      "name": "reg-dword",
+      "valueType": "REG_DWORD",
+      "measured": true,
+      "enabled": true,
+      "opened": true,
+      "dialogTemplate": 2021,
+      "variant": "B",
+      "listClass": "ListBox",
+      "defaultRadioId": 2023,
+      "radioIds": [
+        2023,
+        2024,
+        2025,
+        2027
+      ],
+      "units": [
+        {
+          "radioId": 2023,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2024,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2025,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2027,
+          "lineCount": 1,
+          "firstLineReadable": false
+        }
+      ],
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50030001",
+          "x": 483,
+          "y": 428,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 502,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 12,
+          "y": 19,
+          "width": 60,
+          "height": 25
+        },
+        {
+          "id": 503,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020007",
+          "x": 12,
+          "y": 288,
+          "width": 636,
+          "height": 109
+        },
+        {
+          "id": 2022,
+          "class": "ListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010001",
+          "x": 12,
+          "y": 47,
+          "width": 1299,
+          "height": 199
+        },
+        {
+          "id": 2023,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010009",
+          "x": 72,
+          "y": 328,
+          "width": 90,
+          "height": 31,
+          "checked": true
+        },
+        {
+          "id": 2024,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 192,
+          "y": 328,
+          "width": 105,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2025,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 327,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2026,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 909,
+          "y": 328,
+          "width": 174,
+          "height": 25
+        },
+        {
+          "id": 2027,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 474,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 765,
+          "y": 328,
+          "width": 132,
+          "height": 25
+        }
+      ]
+    },
+    {
+      "name": "reg-qword",
+      "valueType": "REG_QWORD",
+      "measured": true,
+      "enabled": true,
+      "opened": true,
+      "dialogTemplate": 2021,
+      "variant": "B",
+      "listClass": "ListBox",
+      "defaultRadioId": 2023,
+      "radioIds": [
+        2023,
+        2024,
+        2025,
+        2027
+      ],
+      "units": [
+        {
+          "radioId": 2023,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2024,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2025,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2027,
+          "lineCount": 1,
+          "firstLineReadable": false
+        }
+      ],
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50030001",
+          "x": 483,
+          "y": 428,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 502,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 12,
+          "y": 19,
+          "width": 60,
+          "height": 25
+        },
+        {
+          "id": 503,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020007",
+          "x": 12,
+          "y": 288,
+          "width": 636,
+          "height": 109
+        },
+        {
+          "id": 2022,
+          "class": "ListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010001",
+          "x": 12,
+          "y": 47,
+          "width": 1299,
+          "height": 199
+        },
+        {
+          "id": 2023,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010009",
+          "x": 72,
+          "y": 328,
+          "width": 90,
+          "height": 31,
+          "checked": true
+        },
+        {
+          "id": 2024,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 192,
+          "y": 328,
+          "width": 105,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2025,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 327,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2026,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 909,
+          "y": 328,
+          "width": 174,
+          "height": 25
+        },
+        {
+          "id": 2027,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 474,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 765,
+          "y": 328,
+          "width": 132,
+          "height": 25
+        }
+      ]
+    },
+    {
+      "name": "reg-binary-one-byte",
+      "valueType": "REG_BINARY",
+      "measured": true,
+      "enabled": true,
+      "opened": true,
+      "dialogTemplate": 2021,
+      "variant": "B",
+      "listClass": "ListBox",
+      "defaultRadioId": 2023,
+      "radioIds": [
+        2023,
+        2024,
+        2025,
+        2027
+      ],
+      "units": [
+        {
+          "radioId": 2023,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2024,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2025,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2027,
+          "lineCount": 1,
+          "firstLineReadable": false
+        }
+      ],
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50030001",
+          "x": 483,
+          "y": 428,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 502,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 12,
+          "y": 19,
+          "width": 60,
+          "height": 25
+        },
+        {
+          "id": 503,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020007",
+          "x": 12,
+          "y": 288,
+          "width": 636,
+          "height": 109
+        },
+        {
+          "id": 2022,
+          "class": "ListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010001",
+          "x": 12,
+          "y": 47,
+          "width": 1299,
+          "height": 199
+        },
+        {
+          "id": 2023,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010009",
+          "x": 72,
+          "y": 328,
+          "width": 90,
+          "height": 31,
+          "checked": true
+        },
+        {
+          "id": 2024,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 192,
+          "y": 328,
+          "width": 105,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2025,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 327,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2026,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 909,
+          "y": 328,
+          "width": 174,
+          "height": 25
+        },
+        {
+          "id": 2027,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 474,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 765,
+          "y": 328,
+          "width": 132,
+          "height": 25
+        }
+      ]
+    },
+    {
+      "name": "reg-binary-300-bytes",
+      "valueType": "REG_BINARY",
+      "measured": true,
+      "enabled": true,
+      "opened": true,
+      "dialogTemplate": 2021,
+      "variant": "B",
+      "listClass": "ListBox",
+      "defaultRadioId": 2023,
+      "radioIds": [
+        2023,
+        2024,
+        2025,
+        2027
+      ],
+      "units": [
+        {
+          "radioId": 2023,
+          "lineCount": 19,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2024,
+          "lineCount": 19,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2025,
+          "lineCount": 19,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2027,
+          "lineCount": 19,
+          "firstLineReadable": false
+        }
+      ],
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50030001",
+          "x": 483,
+          "y": 428,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 502,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 12,
+          "y": 19,
+          "width": 60,
+          "height": 25
+        },
+        {
+          "id": 503,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020007",
+          "x": 12,
+          "y": 288,
+          "width": 636,
+          "height": 109
+        },
+        {
+          "id": 2022,
+          "class": "ListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50210001",
+          "x": 12,
+          "y": 47,
+          "width": 1299,
+          "height": 199
+        },
+        {
+          "id": 2023,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010009",
+          "x": 72,
+          "y": 328,
+          "width": 90,
+          "height": 31,
+          "checked": true
+        },
+        {
+          "id": 2024,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 192,
+          "y": 328,
+          "width": 105,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2025,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 327,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2026,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 909,
+          "y": 328,
+          "width": 174,
+          "height": 25
+        },
+        {
+          "id": 2027,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 474,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 765,
+          "y": 328,
+          "width": 132,
+          "height": 25
+        }
+      ]
+    },
+    {
+      "name": "reg-none",
+      "valueType": "REG_NONE",
+      "measured": true,
+      "enabled": true,
+      "opened": true,
+      "dialogTemplate": 2021,
+      "variant": "B",
+      "listClass": "ListBox",
+      "defaultRadioId": 2023,
+      "radioIds": [
+        2023,
+        2024,
+        2025,
+        2027
+      ],
+      "units": [
+        {
+          "radioId": 2023,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2024,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2025,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2027,
+          "lineCount": 1,
+          "firstLineReadable": false
+        }
+      ],
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50030001",
+          "x": 483,
+          "y": 428,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 502,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 12,
+          "y": 19,
+          "width": 60,
+          "height": 25
+        },
+        {
+          "id": 503,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020007",
+          "x": 12,
+          "y": 288,
+          "width": 636,
+          "height": 109
+        },
+        {
+          "id": 2022,
+          "class": "ListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010001",
+          "x": 12,
+          "y": 47,
+          "width": 1299,
+          "height": 199
+        },
+        {
+          "id": 2023,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010009",
+          "x": 72,
+          "y": 328,
+          "width": 90,
+          "height": 31,
+          "checked": true
+        },
+        {
+          "id": 2024,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 192,
+          "y": 328,
+          "width": 105,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2025,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 327,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2026,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 909,
+          "y": 328,
+          "width": 174,
+          "height": 25
+        },
+        {
+          "id": 2027,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 474,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 765,
+          "y": 328,
+          "width": 132,
+          "height": 25
+        }
+      ]
+    },
+    {
+      "name": "reg-multi-sz",
+      "valueType": "REG_MULTI_SZ",
+      "measured": true,
+      "enabled": true,
+      "opened": true,
+      "dialogTemplate": 2021,
+      "variant": "B",
+      "listClass": "ListBox",
+      "defaultRadioId": 2023,
+      "radioIds": [
+        2023,
+        2024,
+        2025,
+        2027
+      ],
+      "units": [
+        {
+          "radioId": 2023,
+          "lineCount": 3,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2024,
+          "lineCount": 3,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2025,
+          "lineCount": 3,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2027,
+          "lineCount": 3,
+          "firstLineReadable": false
+        }
+      ],
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50030001",
+          "x": 483,
+          "y": 428,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 502,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 12,
+          "y": 19,
+          "width": 60,
+          "height": 25
+        },
+        {
+          "id": 503,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020007",
+          "x": 12,
+          "y": 288,
+          "width": 636,
+          "height": 109
+        },
+        {
+          "id": 2022,
+          "class": "ListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010001",
+          "x": 12,
+          "y": 47,
+          "width": 1299,
+          "height": 199
+        },
+        {
+          "id": 2023,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010009",
+          "x": 72,
+          "y": 328,
+          "width": 90,
+          "height": 31,
+          "checked": true
+        },
+        {
+          "id": 2024,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 192,
+          "y": 328,
+          "width": 105,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2025,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 327,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2026,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 909,
+          "y": 328,
+          "width": 174,
+          "height": 25
+        },
+        {
+          "id": 2027,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 474,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 765,
+          "y": 328,
+          "width": 132,
+          "height": 25
+        }
+      ]
+    },
+    {
+      "name": "reg-resource-list",
+      "valueType": "REG_RESOURCE_LIST",
+      "measured": true,
+      "enabled": true,
+      "opened": true,
+      "dialogTemplate": 2021,
+      "variant": "B",
+      "listClass": "ListBox",
+      "defaultRadioId": 2023,
+      "radioIds": [
+        2023,
+        2024,
+        2025,
+        2027
+      ],
+      "units": [
+        {
+          "radioId": 2023,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2024,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2025,
+          "lineCount": 1,
+          "firstLineReadable": false
+        },
+        {
+          "radioId": 2027,
+          "lineCount": 1,
+          "firstLineReadable": false
+        }
+      ],
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50030001",
+          "x": 483,
+          "y": 428,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 502,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 12,
+          "y": 19,
+          "width": 60,
+          "height": 25
+        },
+        {
+          "id": 503,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020007",
+          "x": 12,
+          "y": 288,
+          "width": 636,
+          "height": 109
+        },
+        {
+          "id": 2022,
+          "class": "ListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010001",
+          "x": 12,
+          "y": 47,
+          "width": 1299,
+          "height": 199
+        },
+        {
+          "id": 2023,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010009",
+          "x": 72,
+          "y": 328,
+          "width": 90,
+          "height": 31,
+          "checked": true
+        },
+        {
+          "id": 2024,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 192,
+          "y": 328,
+          "width": 105,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2025,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 327,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 2026,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 909,
+          "y": 328,
+          "width": 174,
+          "height": 25
+        },
+        {
+          "id": 2027,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000009",
+          "x": 474,
+          "y": 328,
+          "width": 117,
+          "height": 31,
+          "checked": false
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 765,
+          "y": 328,
+          "width": 132,
+          "height": 25
+        }
+      ]
+    }
+  ],
+  "modifyBinaryData": {
+    "class": "#32770",
+    "visible": true,
+    "kind": "dialog",
+    "controls": [
+      {
+        "id": 1,
+        "class": "Button",
+        "visible": true,
+        "enabled": true,
+        "style": "0x50010001",
+        "x": 897,
+        "y": 494,
+        "width": 150,
+        "height": 44
+      },
+      {
+        "id": 2,
+        "class": "Button",
+        "visible": true,
+        "enabled": true,
+        "style": "0x50010000",
+        "x": 1065,
+        "y": 494,
+        "width": 150,
+        "height": 44
+      },
+      {
+        "id": 1000,
+        "class": "Edit",
+        "visible": true,
+        "enabled": true,
+        "style": "0x50010880",
+        "x": 18,
+        "y": 53,
+        "width": 1197,
+        "height": 38
+      },
+      {
+        "id": 1001,
+        "class": "HEX",
+        "visible": true,
+        "enabled": true,
+        "style": "0x50010000",
+        "x": 18,
+        "y": 138,
+        "width": 1197,
+        "height": 344
+      },
+      {
+        "id": 65535,
+        "class": "Static",
+        "visible": true,
+        "enabled": true,
+        "style": "0x50020000",
+        "x": 18,
+        "y": 19,
+        "width": 660,
+        "height": 25
+      },
+      {
+        "id": 65535,
+        "class": "Static",
+        "visible": true,
+        "enabled": true,
+        "style": "0x50020000",
+        "x": 18,
+        "y": 103,
+        "width": 660,
+        "height": 25
+      }
+    ],
+    "dialogTemplate": 103,
+    "measured": true,
+    "expectedTemplate": 103,
+    "matchesExpectedTemplate": true
+  },
+  "notMeasured": []
+}

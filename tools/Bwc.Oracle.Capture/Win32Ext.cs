@@ -7,6 +7,7 @@ namespace Bwc.Oracle.Capture;
 internal static class Wm
 {
     internal const uint KEYDOWN = 0x0100;
+    internal const uint CHAR = 0x0102;
     internal const uint CANCELMODE = 0x001F;
     internal const uint CONTEXTMENU = 0x007B;
     internal const uint SYSCOMMAND = 0x0112;

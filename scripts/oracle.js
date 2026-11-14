@@ -5,8 +5,8 @@
  * Steps, in order:
  *   1. Build tools/Bwc.Oracle.Resources and tools/Bwc.Oracle.Capture (Release, host platform).
  *   2. resources: dump C:\Windows\regedit.exe and its en-US MUI into docs/parity/oracle (untracked).
- *   3. One capture per command: export, metrics, dialogs, menus, import, find, sort (tracked numbers
- *      and goldens; screenshots and control text are untracked).
+ *   3. One capture per command: export, metrics, dialogs, menus, import, find, sort, permissions, keys, context,
+ * binary, print, security, remote, manifest (tracked numbers and goldens; screenshots and control text are untracked).
  *   4. cleanup: delete HKCU\Software\BWC-Oracle if anything left it behind.
  *
  * Usage:
@@ -35,7 +35,23 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT = "scripts/oracle.js";
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const CAPTURES = ["export", "metrics", "dialogs", "menus", "import", "find", "sort", "permissions"];
+const CAPTURES = [
+  "export",
+  "metrics",
+  "dialogs",
+  "menus",
+  "import",
+  "find",
+  "sort",
+  "permissions",
+  "keys",
+  "context",
+  "binary",
+  "print",
+  "security",
+  "remote",
+  "manifest",
+];
 const ALL_STEPS = ["resources", ...CAPTURES];
 const RUN_RECORD = path.join(ROOT, "artifacts", "oracle", "last-run.json");
 
