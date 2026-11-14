@@ -40,15 +40,14 @@ internal sealed partial class RegeditContext
     }
 
     /// <summary>
-    /// List rows and scroll position to restore after a refresh. The rows are applied when the
-    /// value list for the new tree selection arrives.
+    /// List rows and scroll position to restore after a refresh. The rows are identified by raw value name (empty
+    /// for the unnamed default value), so a literal (Default) and the default value are told apart. The rows are
+    /// applied when the value list for the new tree selection arrives.
     /// </summary>
-    public sealed record PendingListView(IReadOnlyList<string> RowNames, double ListOffset);
+    public sealed record PendingListView(IReadOnlyList<string> RawNames, double ListOffset);
 
-    /// <summary>The listing of a key that cannot be read: no rows and no names.</summary>
-    private static readonly RegistryValueListing EmptyListing = new(
-        Array.Empty<DetailsRow>(),
-        new Dictionary<string, string>(StringComparer.Ordinal));
+    /// <summary>The listing of a key that cannot be read: no rows.</summary>
+    private static readonly RegistryValueListing EmptyListing = new(Array.Empty<DetailsRow>());
 
     public RegeditContext(
         ClassicWindowShell shell,
@@ -134,13 +133,8 @@ internal sealed partial class RegeditContext
         return LastFocusedPane;
     }
 
-    /// <summary>
-    /// The list row for the synthetic (Default) row: the registry has no default value, so the row has
-    /// no raw name. It is listed for every key, as classic regedit does.
-    /// </summary>
-    public bool IsSyntheticDefault(DetailsRow row) =>
-        string.Equals(row.Name, MessageCatalog.DefaultValueLabel, StringComparison.Ordinal) &&
-        !ValueSource.RawNamesByName.ContainsKey(MessageCatalog.DefaultValueLabel);
+    /// <summary>Number of selected list rows, including the synthetic (Default) row. Delete acts on these.</summary>
+    public int SelectedRowCount() => Shell.ListContent.SelectedRows.Count;
 
     /// <summary>Number of selected rows that have a registry value behind them.</summary>
     public int SelectedRealValueCount()
@@ -148,7 +142,7 @@ internal sealed partial class RegeditContext
         int count = 0;
         foreach (DetailsRow row in Shell.ListContent.SelectedRows)
         {
-            if (!IsSyntheticDefault(row))
+            if (!row.IsSynthetic)
             {
                 count++;
             }
@@ -474,25 +468,13 @@ internal sealed partial class RegeditContext
     }
 
     /// <summary>
-    /// The registry value name behind a list row. False for the synthetic (Default) row, which has no
-    /// value behind it.
+    /// The registry value name behind a list row. False for the synthetic (Default) row, which has no value behind it.
+    /// The name comes from the row itself, never from its display text.
     /// </summary>
     public bool TryGetRawValueName(DetailsRow row, out string rawName)
     {
-        if (ValueSource.RawNamesByName.TryGetValue(row.Name, out string? mapped) && mapped is not null)
-        {
-            rawName = mapped;
-            return true;
-        }
-
-        if (string.Equals(row.Name, MessageCatalog.DefaultValueLabel, StringComparison.Ordinal))
-        {
-            rawName = string.Empty;
-            return false;
-        }
-
-        rawName = row.Name;
-        return true;
+        rawName = row.RawName;
+        return !row.IsSynthetic;
     }
 
     /// <summary>True for a direct child of HKLM or HKU, the only keys that Load Hive and Unload Hive accept.</summary>
@@ -549,7 +531,7 @@ internal sealed partial class RegeditContext
             RegeditMenu.SetCommandEnabled(Shell.MenuBar, id, hasKey);
         }
 
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 913, treeTarget ? mutableKey : realValues > 0);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 913, treeTarget ? mutableKey : SelectedRowCount() > 0);
         // Export on Computer is the classic whole-registry export; every other key is a branch.
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 659, hasKey || IsComputerSelected);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 660, hasKey);
@@ -613,8 +595,8 @@ internal sealed partial class RegeditContext
         IReadOnlyList<string> expanded = CollectExpandedPaths(TreeSource.Roots);
         double treeOffset = FindDescendant<ScrollViewer>(Shell.TreeContent)?.VerticalOffset ?? 0;
         double listOffset = FindDescendant<ScrollViewer>(Shell.ListContent)?.VerticalOffset ?? 0;
-        string[] listRowNames = keepView
-            ? Shell.ListContent.SelectedRows.Select(row => row.Name).ToArray()
+        string[] listRawNames = keepView
+            ? Shell.ListContent.SelectedRows.Select(row => row.RawName).ToArray()
             : Array.Empty<string>();
 
         var source = new RegistryTreeSource(Store.Reader, RemoteConnections);
@@ -653,7 +635,7 @@ internal sealed partial class RegeditContext
         if (keepView)
         {
             // Set before the selection, because the selection starts the value load that applies it.
-            PendingList = new PendingListView(listRowNames, listOffset);
+            PendingList = new PendingListView(listRawNames, listOffset);
         }
 
         Shell.TreeContent.SetRoots(source.Roots);
@@ -781,8 +763,11 @@ internal sealed partial class RegeditContext
         });
     }
 
-    /// <summary>Reloads the list rows for the selected key. Stale results are dropped by generation.</summary>
-    public async Task RefreshValuesAsync(string? selectDisplayName)
+    /// <summary>
+    /// Reloads the list rows for the selected key. Stale results are dropped by generation. selectRawName is the raw
+    /// value name to select (empty for the unnamed default value), or null to select nothing.
+    /// </summary>
+    public async Task RefreshValuesAsync(string? selectRawName)
     {
         ValueLoad?.Cancel();
         ValueLoad = null;
@@ -818,7 +803,6 @@ internal sealed partial class RegeditContext
         }
 
         IReadOnlyList<DetailsRow> rows = listing.Rows;
-        ValueSource.Apply(listing);
         Shell.ListContent.SetRows(rows);
         UpdateCommandStates();
 
@@ -834,14 +818,17 @@ internal sealed partial class RegeditContext
             return;
         }
 
-        if (!string.IsNullOrEmpty(selectDisplayName))
+        if (selectRawName is not null)
         {
-            SelectListRow(rows, selectDisplayName);
+            SelectListRow(rows, selectRawName);
         }
     }
 
-    /// <summary>Loads the list rows for a tree node on the thread pool. Stale results are dropped by generation.</summary>
-    public async Task LoadValuesAsync(TreeNode node, string? selectDisplayName = null)
+    /// <summary>
+    /// Loads the list rows for a tree node on the thread pool. Stale results are dropped by generation. selectRawName
+    /// is the raw value name to select once the rows are applied, or null.
+    /// </summary>
+    public async Task LoadValuesAsync(TreeNode node, string? selectRawName = null)
     {
         ValueLoad?.Cancel();
         var tokenSource = new CancellationTokenSource();
@@ -918,7 +905,6 @@ internal sealed partial class RegeditContext
             {
                 PendingListView? pending = PendingList;
                 PendingList = null;
-                ValueSource.Apply(listing);
                 Shell.ListContent.SetRows(listing.Rows);
                 if (unreadablePath is not null && unreadable is not null)
                 {
@@ -934,12 +920,12 @@ internal sealed partial class RegeditContext
 
                 if (pending is not null)
                 {
-                    SelectListRows(listing.Rows, pending.RowNames);
+                    SelectListRows(listing.Rows, pending.RawNames);
                     RestoreScrollOffset(Shell.ListContent, pending.ListOffset);
                 }
-                else if (!string.IsNullOrEmpty(selectDisplayName))
+                else if (selectRawName is not null)
                 {
-                    SelectListRow(listing.Rows, selectDisplayName);
+                    SelectListRow(listing.Rows, selectRawName);
                 }
             }
         });
@@ -964,24 +950,24 @@ internal sealed partial class RegeditContext
     }
 
     /// <summary>
-    /// Selects a row by display name through the row peer. The list control has no public select
+    /// Selects the row with this raw value name through the row peer. The list control has no public select
     /// API, and the row peer's SelectionItem pattern is the supported path from another control.
     /// </summary>
-    private void SelectListRow(IReadOnlyList<DetailsRow> rows, string displayName) =>
-        SelectListRows(rows, new[] { displayName });
+    private void SelectListRow(IReadOnlyList<DetailsRow> rows, string rawName) =>
+        SelectListRows(rows, new[] { rawName });
 
     /// <summary>
-    /// Selects the rows with these display names, in the order given. The first row is selected alone
-    /// and the rest are added to the selection. Names that are no longer in the list are skipped.
+    /// Selects the rows with these raw value names, in the order given. The first row is selected alone and the rest
+    /// are added to the selection. Names that are no longer in the list are skipped.
     /// </summary>
-    private void SelectListRows(IReadOnlyList<DetailsRow> rows, IReadOnlyList<string> displayNames)
+    private void SelectListRows(IReadOnlyList<DetailsRow> rows, IReadOnlyList<string> rawNames)
     {
         var indices = new List<int>();
-        foreach (string displayName in displayNames)
+        foreach (string rawName in rawNames)
         {
             for (var i = 0; i < rows.Count; i += 1)
             {
-                if (string.Equals(rows[i].Name, displayName, StringComparison.Ordinal))
+                if (string.Equals(rows[i].RawName, rawName, StringComparison.Ordinal))
                 {
                     if (!indices.Contains(i))
                     {

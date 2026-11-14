@@ -292,7 +292,7 @@ internal sealed class ImportExportCommands
     private async Task RefreshAfterImportAsync(string? selectedPath)
     {
         await _context.RefreshTreeAsync(selectedPath);
-        await _context.RefreshValuesAsync(selectDisplayName: null);
+        await _context.RefreshValuesAsync(selectRawName: null);
     }
 
     private async Task ExportAsync()

@@ -36,6 +36,17 @@ internal sealed class AppletState
         return key is null ? new AppletState(false, new Node()) : new AppletState(true, ReadNode(key));
     }
 
+    /// <summary>
+    /// Writes LastKey, so classic regedit opens on that key when it starts. Call after Capture and before the launch.
+    /// The applet key is restored afterwards by Restore.
+    /// </summary>
+    internal static void WriteLastKey(string displayPath)
+    {
+        using RegistryKey key = Registry.CurrentUser.CreateSubKey(SubPath, writable: true)
+            ?? throw new InvalidOperationException($@"Could not open HKCU\{SubPath} for writing.");
+        key.SetValue("LastKey", displayPath, RegistryValueKind.String);
+    }
+
     /// <summary>True when the applet key existed when the snapshot was taken.</summary>
     internal bool KeyExisted => _rootExisted;
 

@@ -29,11 +29,11 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | CTX | 31 | 0 | 10 |
 | DLG | 21 | 2 | 28 |
 | ACC | 14 | 0 | 14 |
-| MSG | 137 | 43 | 96 |
-| VIEW | 15 | 2 | 4 |
-| BEH | 32 | 5 | 12 |
+| MSG | 138 | 43 | 95 |
+| VIEW | 17 | 2 | 2 |
+| BEH | 34 | 5 | 10 |
 | EXP | 32 | 0 | 0 |
-| All (535) | 317 | 52 | 166 |
+| All (535) | 322 | 52 | 161 |
 
 ## Gaps by piece
 
@@ -45,7 +45,6 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | P1 | MENU-009, DLG-009, DLG-015, DLG-016, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276, BEH-027 |
 | R2 | MENU-008, CTX-032, CTX-033, CTX-034, CTX-035, DLG-013, DLG-014, DLG-031, DLG-032, MSG-021, MSG-069, MSG-072, MSG-073, BEH-023, BEH-024, BEH-025 |
 | S1 | MSG-174, MSG-175, MSG-176, MSG-177, MSG-179, MSG-181, MSG-182, MSG-183, MSG-184, MSG-185, MSG-187, MSG-188, MSG-189, MSG-190, BEH-026 |
-| V1 | MSG-016, VIEW-015, VIEW-016, BEH-037, BEH-038 |
 
 ## Rows
 
@@ -245,7 +244,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-013 | pass | Format template; ValueDisplay_DwordDataColumnShowsOracleHexAndDecimal |  |
 | MSG-014 | pass | String parity check: text equal (Bwc.Registry/RegistryValueDisplay.cs) |  |
 | MSG-015 | pass | String parity check: text equal (Bwc.UI/List/DetailsList.xaml.cs) |  |
-| MSG-016 | gap | QWORD display format untested | V1 |
+| MSG-016 | pass | Format template; ValueDisplayTests (QWORD rows compared with classic) |  |
 | MSG-017 | pass | String parity check: text equal (Bwc.Registry/RegistryValueDisplay.cs) |  |
 | MSG-018 | declared-difference | Classic shows string 19 (Computer) as the root in this build (regedit-100dpi.png); 34 is never shown (OQ-40) |  |
 | MSG-019 | pass | String parity check: text equal (MsgRegistryEditingDisabled) |  |
@@ -525,8 +524,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | VIEW-012 | pass | Shell_ClassicMetricsMatchOracleAtWindowScale; Icons_TreeAndListRowsMatchClassicLayout |  |
 | VIEW-013 | pass | Shell_ClassicMetricsMatchOracleAtWindowScale; Icons_TreeAndListRowsMatchClassicLayout |  |
 | VIEW-014 | pass | List_OrderTypeAheadAndHeaderClick; sort-order.json |  |
-| VIEW-015 | gap | Only REG_DWORD display is tested (ValueDisplay_DwordDataColumnShowsOracleHexAndDecimal) | V1 |
-| VIEW-016 | gap | Only REG_DWORD display is tested (ValueDisplay_DwordDataColumnShowsOracleHexAndDecimal) | V1 |
+| VIEW-015 | pass | ValueDisplayTests: every type compared row by row with classic (artifacts/e2e/value-display/classic-compare-*.json). REG_LINK is measured once only: the sandbox write policy refuses link values, so no repeatable seed exists |  |
+| VIEW-016 | pass | ValueDisplayTests: every type compared row by row with classic (artifacts/e2e/value-display/classic-compare-*.json). REG_LINK is measured once only: the sandbox write policy refuses link values, so no repeatable seed exists |  |
 | VIEW-017 | pass | Theme_E2EOnly_LightOverride_UsesSystemColorTable; regedit-selection-colors.json |  |
 | VIEW-018 | pass | Shell_LaunchShowsClassicStructure |  |
 | VIEW-019 | gap | Dialog rectangles are not compared with regedit-dialog-rects.json | K1 |
@@ -573,8 +572,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | BEH-034 | pass | RegistryLinkFixture; RegistryReaderTests |  |
 | BEH-035 | pass | RegistryLinkFixture; RegistryReaderTests |  |
 | BEH-036 | pass | Robustness_ExpandOfDeniedKeyShowsClassicError; AppServices_ValueEnumerationFailureShowsClassicError |  |
-| BEH-037 | gap | Long names untested; list collation is linguistic, not ordinal as the row says | V1 |
-| BEH-038 | gap | Long names untested; list collation is linguistic, not ordinal as the row says | V1 |
+| BEH-037 | pass | Limits pass through from the platform (Bwc.Registry.Tests). The list uses native CompareStringW like classic (List_OrderTypeAheadAndHeaderClick, sort-order.json), not ordinal. Classic does not list a 16,383-character name (note in ValueDisplayTests) |  |
+| BEH-038 | pass | LiteralDefaultRowTests; DefaultRowCommandTests; LargeValueSortTests |  |
 | BEH-039 | pass | Find_FollowsTheClassicTwoDialogSequence; Find_FinishedIsStickyUntilTheSelectionMoves; RegistryFinderTests |  |
 | BEH-040 | pass | Find_FollowsTheClassicTwoDialogSequence; Find_FinishedIsStickyUntilTheSelectionMoves; RegistryFinderTests |  |
 | BEH-041 | pass | Find_FollowsTheClassicTwoDialogSequence; Find_FinishedIsStickyUntilTheSelectionMoves; RegistryFinderTests |  |

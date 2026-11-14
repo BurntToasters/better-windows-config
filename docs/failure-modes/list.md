@@ -192,3 +192,87 @@ Failure mode: the list rename box cancelled when it lost focus, so a user who ty
 clicked another row lost the typed text. The tree rename commits on focus loss, and classic regedit
 commits a value rename the same way, so the list now commits on lost focus. Escape still cancels, and
 Enter still commits. Test: `ListRenameFocus_ClickingAnotherRowCommitsTheRename`.
+
+## 8. Value row identity: the default row and a literal (Default) (0.1.2)
+
+Each row carries its raw registry name, an `IsDefault` flag (the unnamed value, or the synthetic row
+that stands in for it), and `IsSynthetic` (the placeholder with no registry value behind it). Display
+text is never used to find a row or a registry value.
+
+Failure modes:
+
+- **Two rows show `(Default)`.** A key can hold the unnamed default value and a value literally named
+  `(Default)`. Classic lists both. A map keyed by display text keeps one of them, so Modify, Delete,
+  Rename, the binary viewer, and the Find cursor act on the wrong value.
+- **A synthetic row beside a literal (Default).** A key with a literal `(Default)` and no unnamed value
+  must still get the synthetic row, and the synthetic row must be the only row with an empty raw name.
+  The old check `ContainsKey("(Default)")` in the display map could not tell the two apart.
+- **Edit String on the synthetic row writes the literal.** The synthetic row must write the unnamed
+  default (raw name empty), never the value named `(Default)`.
+- **Rename of the literal row renames the default.** Rename is refused for the unnamed value only.
+  The literal row renames its own raw name.
+- **Delete of the synthetic row.** No registry value is behind it, so Delete skips it. Delete of the
+  literal row removes only the value named `(Default)`, and the unnamed default stays.
+- **Selection after refresh picks the wrong row.** F5, rename, new value, and an edit restore the
+  selection by raw name. Restoring by display text selects the first `(Default)` row, which may be the
+  synthetic or the literal one. The synthetic row has raw name empty, so it is restored by empty name.
+- **A new value named `(Default)` selects the default row.** Renaming a value to `(Default)` restores
+  the selection by its raw name, `(Default)`, which is the literal row.
+- **Background sort keeps the wrong selection.** Above 10,000 rows the sort applies on the UI thread.
+  It must map the selection, focus, anchor, and an open rename box by row identity, not by name.
+- **Find cursor reads the wrong row.** The Find cursor takes the raw name of the first selected row
+  through `TryGetRawValueName`, which must read the row's raw name.
+
+Design: `DetailsRow` holds `RawName`, `IsDefault`, and `IsSynthetic`. `RegistryValueSource` no longer
+builds a display-name map. `RegeditContext.TryGetRawValueName` and `IsSyntheticDefault` read the row.
+Refresh and selection restore use raw names. The background sort maps rows by reference.
+
+E2E: `List_LiteralDefaultRowsKeepTheirIdentity` (in `tests/Bwc.E2E/List/LiteralDefaultRowTests.cs`)
+selects the literal row and the synthetic row in turn, edits the literal row, and checks the registry
+value of each. `ValueDisplay_ListMatchesClassicForLiteralDefault` compares both rows with classic.
+
+## 8a. Commands on the (Default) rows (0.1.2)
+
+Classic regedit, one-off read on this machine: on a key with a literal (Default) and no unnamed value, Delete
+on the synthetic (Default) row asks "Deleting certain registry values could cause system instability. Are you
+sure...?" (Yes/No). Yes shows "Error Deleting Values" with "Unable to delete all specified values." and deletes
+nothing; the literal (Default) stays.
+
+Failure modes:
+
+- **Delete on the synthetic row is disabled.** Edit > Delete must stay enabled for the synthetic row, or the
+  command never reaches the confirmation classic shows.
+- **Delete on the synthetic row removes the literal.** The synthetic row has no raw name, so it must never
+  reach the delete call. The shared text is `MsgDeleteValuesFailed`.
+- **Delete of the literal removes the default too.** Delete of a literal row removes only the value named
+  `(Default)`.
+- **Modify of the literal creates the default.** Modify on the literal row writes the value named `(Default)`
+  and leaves the unnamed default absent.
+
+E2E: `tests/Bwc.E2E/List/DefaultRowCommandTests.cs` (`List_DeleteOnSyntheticDefaultRefusesAndKeepsLiteral`,
+`List_ModifyLiteralChangesOnlyTheLiteral`, `List_DeleteLiteralKeepsRealDefault`).
+
+## 9. One sort, one comparer (0.1.2)
+
+The list order comes from one comparer, `ListCollation`, in `DetailsList`. The value source does not
+sort. Sorting used `StringComparer.CurrentCultureIgnoreCase` in the source and the native collation in
+the list, so the two could disagree.
+
+Failure modes:
+
+- **Two comparers disagree.** A name that the managed culture orders one way and the native collation
+  orders the other way lands in a different place after the list sort. Only the list sort may order rows.
+- **`(Default)` sorted by text.** `ListCollation.SortKey` maps the display text `(Default)` to empty.
+  A literal `(Default)` then sorts first, ahead of the real default. The first row must be the default
+  row by `IsDefault`, and the literal row sorts by its own name.
+- **Default row not first when it is synthetic.** The synthetic row is first when the key has no
+  unnamed value, and the same rule applies.
+- **Background sort order differs from the small sort.** Above 10,000 rows the sort runs on the thread
+  pool. It must use the same comparer and the same default-first rule, and a stale result is dropped by
+  version.
+- **Sort order between two literal names that differ only by case.** Registry names are unique without
+  regard to case, so this cannot happen in one key.
+
+E2E: `List_TenThousandValuesSortInBackground` (in `tests/Bwc.E2E/List/LargeValueSortTests.cs`) seeds
+10,001 values in one key, checks that the first row is `(Default)`, and walks the realized rows with
+Home, PageDown, and End. It checks each row against the native collation order computed in the test.

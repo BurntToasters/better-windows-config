@@ -148,6 +148,7 @@ internal sealed class ContextMenuController
         // Modify Binary Data and Delete need a value behind the row, so the synthetic (Default) row
         // does not enable them.
         int realValues = writable ? _context.SelectedRealValueCount() : 0;
+        int selectedRows = writable ? _context.SelectedRowCount() : 0;
         var items = new List<ClassicCommandItem>
         {
             MenuCommand(912, "ContextModify", single, _values.ModifySelectedValue),
@@ -155,7 +156,7 @@ internal sealed class ContextMenuController
             ClassicCommandItem.Separator,
             // The value menu deletes values only. It does not go through the focused pane, which can be the
             // tree when the list did not take focus, and would delete the key.
-            MenuCommand(913, "ContextDelete", realValues > 0, _values.DeleteValues),
+            MenuCommand(913, "ContextDelete", selectedRows > 0, _values.DeleteValues),
             MenuCommand(914, "ContextRename", canRename, BeginListRenameFromMenu),
         };
 

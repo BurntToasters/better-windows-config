@@ -359,7 +359,7 @@ internal sealed class FindController
 
         if (hit.ValueName is not null)
         {
-            await _context.LoadValuesAsync(node, RegistryValueDisplay.FormatName(hit.ValueName));
+            await _context.LoadValuesAsync(node, hit.ValueName);
         }
 
         return true;

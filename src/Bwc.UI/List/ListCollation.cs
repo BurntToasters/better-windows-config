@@ -14,16 +14,6 @@ internal static partial class ListCollation
     private const uint NormIgnoreCase = 0x00000001;
     private const int CompareEqual = 2;
 
-    /// <summary>The name the Registry Editor shows for the default (empty name) value.</summary>
-    internal const string DefaultValueName = "(Default)";
-
-    /// <summary>
-    /// Sort key for a row name. The default value keys as the empty string, so it compares before
-    /// every other name, as the classic list shows it first.
-    /// </summary>
-    internal static string SortKey(string name) =>
-        string.Equals(name, DefaultValueName, StringComparison.Ordinal) ? string.Empty : name;
-
     /// <summary>Compares two names with the native collation at the user locale, ignoring case.</summary>
     internal static int Compare(string left, string right)
     {
