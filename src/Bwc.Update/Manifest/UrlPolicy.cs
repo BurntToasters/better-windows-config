@@ -1,12 +1,13 @@
 namespace Bwc.Update;
 
 /// <summary>
-/// Accepts only plain, absolute http(s) URLs. Every check runs on the raw text, before Uri
-/// normalizes it, so a "..", "%2e%2e", or "%2F" cannot be removed silently.
+/// Accepts only plain, absolute http(s) URLs. The path (the text before the first '?') gets every
+/// check on the raw text, before Uri normalizes it, so a "..", "%2e%2e", or "%2F" cannot be removed
+/// silently. The query gets only the character-class check, so signed release URLs keep their %2F, %3D, +.
 /// </summary>
 public static class UrlPolicy
 {
-    private const int MaxLength = 2048;
+    private const int MaxLength = 4096;
     private const int MaxRedirects = 5;
 
     private static readonly string[] EncodedDangers = ["%2e", "%2f", "%5c", "%00"];
@@ -21,7 +22,7 @@ public static class UrlPolicy
 
         if (text.Length > MaxLength)
         {
-            return Refuse("URL is longer than 2048 characters");
+            return Refuse("URL is longer than 4096 characters");
         }
 
         foreach (var c in text)
@@ -32,10 +33,11 @@ public static class UrlPolicy
             }
         }
 
-        var lower = text.ToLowerInvariant();
-        if (EncodedDangers.Any(danger => lower.Contains(danger, StringComparison.Ordinal)))
+        var cut = text.IndexOf('?', StringComparison.Ordinal);
+        var lowerPath = (cut >= 0 ? text[..cut] : text).ToLowerInvariant();
+        if (EncodedDangers.Any(danger => lowerPath.Contains(danger, StringComparison.Ordinal)))
         {
-            return Refuse("URL has an encoded path separator, dot, or NUL");
+            return Refuse("URL path has an encoded path separator, dot, or NUL");
         }
 
         if (!Uri.TryCreate(text, UriKind.Absolute, out var uri))
@@ -79,6 +81,12 @@ public static class UrlPolicy
         if (string.IsNullOrEmpty(location))
         {
             return Refuse("redirect has no location");
+        }
+
+        // The raw Location is checked too: Uri would escape a space or a non-ASCII character silently.
+        if (location.Length > MaxLength || location.Any(c => c <= 0x20 || c >= 0x7F || c is '\\' or '"' or '#'))
+        {
+            return Refuse("redirect target has a space, control character, non-ASCII character, backslash, quote, or fragment");
         }
 
         if (HasDotSegment(PathOf(location)))

@@ -714,11 +714,15 @@ public sealed class HexEditor : UserControl
         _ => -1,
     };
 
+    /// <summary>
+    /// The offset an edit writes to. An empty value has one position, the append position at offset 0.
+    /// The caret may sit at the length, the append position after the last byte.
+    /// </summary>
     private int CurrentEditOffset()
     {
         if (_length == 0)
         {
-            return -1;
+            return 0;
         }
 
         if (_selectionLength > 0)
@@ -726,7 +730,22 @@ public sealed class HexEditor : UserControl
             return checked((int)_selectionStart);
         }
 
-        return _caret >= 0 ? checked((int)Math.Min(_caret, _length - 1)) : 0;
+        return _caret >= 0 ? checked((int)Math.Min(_caret, _length)) : 0;
+    }
+
+    /// <summary>Moves the caret to an offset. The offset equal to the length is the append position.</summary>
+    private void PlaceCaret(int offset)
+    {
+        _anchor = offset;
+        _caret = offset;
+        if (offset < _length)
+        {
+            SetSelection(offset, 1);
+        }
+        else
+        {
+            SetSelection(_length, 0);
+        }
     }
 
     /// <summary>
@@ -747,6 +766,15 @@ public sealed class HexEditor : UserControl
             _nibble = 0;
         }
 
+        // The append position inserts a byte, in either mode. Typing there grows the value.
+        bool appending = offset == _length;
+        bool rowsChanged = false;
+        if (appending)
+        {
+            InsertByteAt(offset, 0);
+            rowsChanged = true;
+        }
+
         if (_selectionLength != 1 || _selectionStart != offset)
         {
             _anchor = offset;
@@ -754,8 +782,7 @@ public sealed class HexEditor : UserControl
             SetSelection(offset, 1);
         }
 
-        bool rowsChanged = false;
-        if (_insertMode && _nibble == 0)
+        if (!appending && _insertMode && _nibble == 0)
         {
             InsertByteAt(offset, 0);
             rowsChanged = true;
@@ -771,11 +798,9 @@ public sealed class HexEditor : UserControl
 
         _bytes[offset] = (byte)((_bytes[offset] & 0xF0) | digit);
         _nibble = 0;
-        int next = Math.Min(offset + 1, _length - 1);
-        _anchor = next;
-        _caret = next;
-        SetSelection(next, 1);
-        AfterEdit(next, rowsChanged);
+        int next = offset + 1;
+        PlaceCaret(next);
+        AfterEdit(Math.Min(next, _length - 1), rowsChanged);
     }
 
     private void ApplyAsciiByte(byte value)
@@ -786,30 +811,37 @@ public sealed class HexEditor : UserControl
             return;
         }
 
-        if (_selectionLength != 1 || _selectionStart != offset)
-        {
-            _anchor = offset;
-            _caret = offset;
-            SetSelection(offset, 1);
-        }
-
+        bool appending = offset == _length;
         bool rowsChanged = false;
-        if (_insertMode)
+        if (appending)
         {
             InsertByteAt(offset, value);
             rowsChanged = true;
         }
         else
         {
-            _bytes[offset] = value;
+            if (_selectionLength != 1 || _selectionStart != offset)
+            {
+                _anchor = offset;
+                _caret = offset;
+                SetSelection(offset, 1);
+            }
+
+            if (_insertMode)
+            {
+                InsertByteAt(offset, value);
+                rowsChanged = true;
+            }
+            else
+            {
+                _bytes[offset] = value;
+            }
         }
 
-        int next = Math.Min(offset + 1, _length - 1);
-        _anchor = next;
-        _caret = next;
         _nibble = 0;
-        SetSelection(next, 1);
-        AfterEdit(next, rowsChanged);
+        int next = offset + 1;
+        PlaceCaret(next);
+        AfterEdit(Math.Min(next, _length - 1), rowsChanged);
     }
 
     private void DeleteSelectionOrCaret(bool backspace)
@@ -817,7 +849,8 @@ public sealed class HexEditor : UserControl
         int start;
         int count;
 
-        if (_selectionLength > 0)
+        // A single selected byte is the caret position, so Backspace removes the byte before it.
+        if (_selectionLength > 1 || (_selectionLength == 1 && !backspace))
         {
             start = SelectionStart;
             count = _selectionLength;
@@ -1032,14 +1065,16 @@ public sealed class HexEditor : UserControl
             start = 0;
         }
 
-        bool replacedSelection = _selectionLength > 0;
+        // Overwrite mode writes over the bytes from the selection start or caret. Only insert mode
+        // removes a selection first.
+        bool replacedSelection = _selectionLength > 0 && _insertMode;
         if (replacedSelection)
         {
             RemoveRange(start, _selectionLength);
         }
 
         bool rowsChanged = replacedSelection;
-        if (_insertMode || replacedSelection || _length == 0)
+        if (_insertMode || _length == 0)
         {
             for (var index = 0; index < pasted.Length; index++)
             {

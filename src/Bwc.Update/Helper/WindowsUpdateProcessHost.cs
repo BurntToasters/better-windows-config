@@ -23,18 +23,11 @@ public sealed class WindowsUpdateProcessHost : IUpdateProcessHost
             }
         }
 
-        foreach (var name in ProcessCommands.ProcessNames)
+        // Only this session's processes count (a process of another user or session is not ours to wait for).
+        var sessionId = ProcessScan.CurrentSessionId();
+        foreach (var running in ProcessScan.RunningFrom(installDir, new HashSet<int>(), new SystemProcessSource(), sessionId))
         {
-            foreach (var process in Process.GetProcessesByName(name))
-            {
-                using (process)
-                {
-                    if (RunningImageRule.IsRunningFrom(process.Id, installDir))
-                    {
-                        live.Add(process.Id);
-                    }
-                }
-            }
+            live.Add(running.Pid);
         }
 
         return live;
@@ -45,11 +38,12 @@ public sealed class WindowsUpdateProcessHost : IUpdateProcessHost
     public bool StartInstaller(string installerPath, string arguments)
     {
         // UseShellExecute lets Windows show its own elevation prompt when the installer's manifest asks for
-        // one. This process never requests elevation itself. The installer is not waited for.
+        // one. This process never requests elevation itself. The installer is not waited for. The working
+        // directory is the system folder, not the staging folder, so a planted DLL there is never loaded.
         var psi = new ProcessStartInfo(installerPath, arguments)
         {
             UseShellExecute = true,
-            WorkingDirectory = Path.GetDirectoryName(installerPath),
+            WorkingDirectory = Environment.SystemDirectory,
         };
 
         using var process = Process.Start(psi) ?? throw new InvalidOperationException("the installer did not start");

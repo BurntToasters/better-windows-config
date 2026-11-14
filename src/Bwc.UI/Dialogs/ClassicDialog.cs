@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+using Bwc.UI;
 using Bwc.UI.Theme;
 using Microsoft.UI;
 using Microsoft.UI.Input;
@@ -159,6 +161,13 @@ public class ClassicDialog : ModalDialogWindow
     }
 
     private void OnPaletteChanged(object? sender, EventArgs e) => ApplyPalette();
+
+    /// <summary>A dialog that could not be shown never raises Closed, so its palette subscription is dropped here.</summary>
+    protected override void OnShowAbandoned()
+    {
+        BwcTheme.Changed -= OnPaletteChanged;
+        base.OnShowAbandoned();
+    }
 
     /// <summary>
     /// Windows resets keyboard focus when the window is activated. When focus is not inside the dialog, the
@@ -381,10 +390,11 @@ public class ClassicDialog : ModalDialogWindow
                 RestoreFocusInsideDialog();
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // A dialog that cannot finish loading closes and gives the owner back. It never
             // stays open with the owner disabled.
+            UiDiagnostics.Warn?.Invoke("A classic dialog could not finish loading: " + ex.Message);
             Cancel();
         }
 

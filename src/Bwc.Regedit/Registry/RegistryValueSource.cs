@@ -8,16 +8,17 @@ namespace Bwc.Regedit.Registry;
 /// <summary>
 /// The rows of one key and the display-name to raw-name map that goes with them. Built on the thread
 /// pool and never stored there: the caller applies it on the UI thread, and only when it is still the
-/// current load.
+/// current load. <paramref name="Failure"/> is the enumeration error when the rows could not be read.
 /// </summary>
 public sealed record RegistryValueListing(
     IReadOnlyList<DetailsRow> Rows,
-    IReadOnlyDictionary<string, string> RawNamesByName);
+    IReadOnlyDictionary<string, string> RawNamesByName,
+    RegistryOperationException? Failure = null);
 
 /// <summary>
 /// Loads the details rows for one key. Enumeration and formatting run on the thread pool and return a
 /// <see cref="RegistryValueListing"/>; the caller applies it on the UI thread with <see cref="Apply"/>.
-/// Registry failures produce an empty list, never an exception to the window.
+/// Registry failures produce an empty list with the error in Failure, never an exception to the window.
 /// </summary>
 public sealed class RegistryValueSource
 {
@@ -63,6 +64,7 @@ public sealed class RegistryValueSource
     {
         try
         {
+            ThrowIfInjectedEnumerationFailure(path);
             IReadOnlyList<RegistryValueInfo> values = _reader.EnumerateValues(path, cancellationToken);
 
             // The default value sorts first, then the remaining names in the approximate
@@ -106,7 +108,34 @@ public sealed class RegistryValueSource
         {
             Log.Warn(
                 $"Registry values for '{path.ToDisplayString()}' could not be read: Win32 {ex.Win32Error} ({ex.Message}).");
-            return new RegistryValueListing(NoRows, NoRawNames);
+            return new RegistryValueListing(NoRows, NoRawNames, ex);
         }
     }
+
+#if BWC_E2E
+    /// <summary>
+    /// E2E only: BWC_E2E_FAIL_VALUE_ENUMERATION names one display path whose value enumeration fails with
+    /// ERROR_NOT_ENOUGH_MEMORY. The ship build has no such check.
+    /// </summary>
+    private static readonly string? InjectedEnumerationFailure =
+        Environment.GetEnvironmentVariable("BWC_E2E_FAIL_VALUE_ENUMERATION");
+
+    private static void ThrowIfInjectedEnumerationFailure(RegistryPath path)
+    {
+        if (!string.IsNullOrEmpty(InjectedEnumerationFailure) &&
+            string.Equals(StripComputer(path.ToDisplayString()), StripComputer(InjectedEnumerationFailure), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new RegistryOperationException("EnumerateValues", path, 8, "injected by BWC_E2E_FAIL_VALUE_ENUMERATION");
+        }
+    }
+
+    /// <summary>Drops a leading "Computer\" so the address form and the tree form of a path compare equal.</summary>
+    private static string StripComputer(string displayPath) =>
+        displayPath.StartsWith("Computer\\", StringComparison.OrdinalIgnoreCase) ? displayPath["Computer\\".Length..] : displayPath;
+#else
+    private static void ThrowIfInjectedEnumerationFailure(RegistryPath path)
+    {
+        _ = path;
+    }
+#endif
 }

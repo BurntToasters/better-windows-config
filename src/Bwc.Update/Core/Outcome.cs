@@ -41,6 +41,7 @@ public enum UpdateFailure
     InstallerFailed,
     HubMissing,
     RunningElevated,
+    Unexpected,
 }
 
 /// <summary>A typed result. When Ok is false, Failure says why and Detail is safe to log.</summary>

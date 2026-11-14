@@ -266,7 +266,7 @@ public sealed class FavoritesTests
         sandbox.SetString("Favorites", MissingFavoriteName, missingDisplayPath);
     }
 
-    private static bool TryOpenMenu(EditingDriver driver, params int[] commandIds)
+    internal static bool TryOpenMenu(EditingDriver driver, params int[] commandIds)
     {
         try
         {
@@ -280,7 +280,7 @@ public sealed class FavoritesTests
         }
     }
 
-    private static string[] ReadFavoriteEntryNames(
+    internal static string[] ReadFavoriteEntryNames(
         AppSession session,
         EditingDriver driver,
         UIA3Automation automation,

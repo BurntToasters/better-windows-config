@@ -7,6 +7,9 @@
  *
  * UPDATER_LIVE_BASE_URL replaces the base URL for tests. It must be a loopback URL (127.0.0.1 or
  * localhost). Only the stable channel is checked: /latest never points at a prerelease.
+ *
+ * After those checks pass, the real updater client (publish/<rid>/BwcUpdate.exe) runs --check and --download
+ * against the same feed. scripts/updater-client-live.js does that and writes its own result file.
  */
 import fs from "node:fs";
 import os from "node:os";
@@ -23,6 +26,7 @@ import { readTrustedKeysFile } from "./lib/trusted-keys.js";
 import { KNOWN_ARCHES, manifestFileName, validateManifestBuffer } from "./lib/update-manifest.js";
 import { isLoopbackUrl } from "./lib/url-policy.js";
 import { isDirectExecutionOf } from "./direct-execution.mjs";
+import { defaultRid, runClientRehearsal } from "./updater-client-live.js";
 
 const SCRIPT = "scripts/validate-updater-live.js";
 const REPO_ROOT = repoRootFrom(import.meta.url);
@@ -203,6 +207,9 @@ Options:
 Environment:
   UPDATER_LIVE_BASE_URL    Tests only. A loopback http(s) base (127.0.0.1 or localhost) replaces GitHub.
 
+The real updater client then runs --check and --download against the same feed (publish/<rid>/BwcUpdate.exe,
+RID from process.arch). Its result: artifacts/release/client-live/result.json.
+
 Exit codes: 0 verified, 1 refused, 2 usage, 3 missing input, 4 network or transport failure.`);
 }
 
@@ -299,14 +306,28 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     }
     return exitFor(result.errors);
   }
+  // The real client only runs against GitHub. A loopback test feed is not signed for the shipped client.
+  const client = override
+    ? { ok: true, skipped: true, result: { rid: null, version: null, staging: { cleanup: "skipped" } } }
+    : await runClientRehearsal({ rid: defaultRid(), urlBase: base, expectVersion: expected.version, env });
+  if (!client.ok) {
+    printRefusals(SCRIPT, [{ reason: client.error.reason, detail: client.error.message }]);
+    if (json) {
+      console.log(JSON.stringify({ schema: 1, tool: SCRIPT, ok: false, version: expected.version, client: client.error.reason }));
+    }
+    return client.exitCode;
+  }
   if (json) {
-    console.log(JSON.stringify({ schema: 1, tool: SCRIPT, ok: true, version: expected.version, channel: CHANNEL, manifestUrl: result.manifestUrl, checks: result.checks }));
+    console.log(JSON.stringify({ schema: 1, tool: SCRIPT, ok: true, version: expected.version, channel: CHANNEL, manifestUrl: result.manifestUrl, checks: result.checks, client: { rid: client.result.rid, version: client.result.version, staging: client.result.staging.cleanup } }));
   } else {
     console.log(`${SCRIPT}: ok (${expected.version}, ${CHANNEL}, ${Object.keys(result.manifest.installers).join(", ")})`);
     console.log(`  manifest: ${result.manifestUrl}`);
     for (const check of result.checks) {
       console.log(`  ${check.pass ? "PASS" : "FAIL"} ${check.name}${check.detail ? `: ${check.detail}` : ""}`);
     }
+    console.log(client.skipped
+      ? "  SKIP client: UPDATER_LIVE_BASE_URL test feed"
+      : `  PASS client: ${client.result.rid} --check and --download, version ${client.result.version}`);
   }
   return EXIT.OK;
 }

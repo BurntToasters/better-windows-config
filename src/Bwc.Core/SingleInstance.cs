@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
@@ -84,7 +85,8 @@ public sealed partial class SingleInstance : IDisposable
 
         string suffix = BuildIdentitySuffix();
         string instanceName = @"Local\Bwc." + toolId + "." + suffix;
-        string pipeName = "Bwc." + toolId + "." + suffix;
+        // The session id keeps two sessions of one user, or two sessions of different users, on different pipe names.
+        string pipeName = "Bwc." + toolId + "." + suffix + ".s" + GetSessionId();
 
         var mutex = new Mutex(initiallyOwned: true, instanceName, out bool createdNew);
         try
@@ -112,8 +114,9 @@ public sealed partial class SingleInstance : IDisposable
 
     /// <summary>
     /// Sends one message to the first instance and reports a named result. The client only
-    /// targets the local machine with the bare per-user pipe name. It never tries the global
-    /// pipe namespace, a remote server, or an impersonation token.
+    /// targets the local machine with the per-user, per-session pipe name, and it requires a
+    /// server owned by the current user. It never tries the global pipe namespace, a remote
+    /// server, or an impersonation token.
     /// </summary>
     public SingleInstanceSendResult TrySendMessage(string message)
     {
@@ -144,11 +147,12 @@ public sealed partial class SingleInstance : IDisposable
 
         try
         {
+            // CurrentUserOnly makes the client refuse a server that another user owns, so a squatter gets nothing.
             using var client = new NamedPipeClientStream(
                 LocalServerName,
                 _pipeName,
                 PipeDirection.Out,
-                PipeOptions.Asynchronous);
+                PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
             client.Connect(ConnectTimeoutMilliseconds);
             client.Write(packet, 0, packet.Length);
             client.Flush();
@@ -491,6 +495,21 @@ public sealed partial class SingleInstance : IDisposable
     /// <summary>The full path without a trailing separator, in upper case. Windows paths are case-insensitive.</summary>
     private static string NormalizeFolder(string path) =>
         Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)).ToUpperInvariant();
+
+    /// <summary>The id of this process's session. "unknown" only if the query fails, which is not expected.</summary>
+    private static string GetSessionId()
+    {
+        try
+        {
+            using Process self = Process.GetCurrentProcess();
+            return self.SessionId.ToString(CultureInfo.InvariantCulture);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            SafeTrace.WriteLine("SingleInstance could not read the session id: " + ex.Message);
+            return "unknown";
+        }
+    }
 
     private static string GetUserSid()
     {

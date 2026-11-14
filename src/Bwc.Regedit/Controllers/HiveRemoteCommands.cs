@@ -1,7 +1,9 @@
+using System.Globalization;
 using Bwc.Core;
 using Bwc.Regedit.Dialogs;
 using Bwc.Regedit.Registry;
 using Bwc.Registry;
+using Bwc.Registry.Privileges;
 using Bwc.UI.Dialogs;
 using Bwc.UI.Tree;
 
@@ -141,6 +143,17 @@ internal sealed class HiveRemoteCommands
             return;
         }
 
+        // The privilege is checked before any input is asked for. A process without it cannot load a hive, so
+        // the file dialog and the name prompt would only lead to the same refusal.
+        if (!HivePrivilegesHeld())
+        {
+            Log.Info($"Registry Editor refused Load Hive under '{root.ToDisplayString()}' because the privilege is not held.");
+            await _context.ShowErrorAsync(new ClassicMessage(
+                Get("DialogLoadHiveTitle"),
+                string.Format(CultureInfo.CurrentCulture, Get("MsgLoadHivePrivileges"), root.ToDisplayString())).ToErrorDialog());
+            return;
+        }
+
         string? filePath = RegeditFileDialogs.ShowLoadHive(_context);
         if (string.IsNullOrEmpty(filePath))
         {
@@ -162,17 +175,26 @@ internal sealed class HiveRemoteCommands
 
         try
         {
-            await _context.RunRegistryAsync(() => _context.Store.LoadHive(target, filePath));
+            await _context.RunRegistryWriteAsync(() => _context.Store.LoadHive(target, filePath));
         }
         catch (RegistryOperationException ex)
         {
-            await _context.ShowRegistryErrorAsync(ex, RegistryAction.LoadHive, target.ToDisplayString());
+            // The subject is the file the user chose, so a bad or missing hive file names that file.
+            await _context.ShowRegistryErrorAsync(ex, RegistryAction.LoadHive, filePath);
             return;
         }
 
         await _context.RefreshTreeAsync(target.ToDisplayString());
         _context.FocusTreeAfterDialog();
     }
+
+    /// <summary>
+    /// True when the process holds both hive privileges. A privilege that is present but disabled counts as held,
+    /// because enabling it is the hive call's job. Nothing is enabled here.
+    /// </summary>
+    private static bool HivePrivilegesHeld() =>
+        PrivilegeScope.IsAvailable(PrivilegeScope.BackupPrivilege) &&
+        PrivilegeScope.IsAvailable(PrivilegeScope.RestorePrivilege);
 
     private string? ValidateHiveKeyName(RegistryPath root, string name)
     {
@@ -231,7 +253,7 @@ internal sealed class HiveRemoteCommands
 
         try
         {
-            await _context.RunRegistryAsync(() => _context.Store.UnloadHive(path));
+            await _context.RunRegistryWriteAsync(() => _context.Store.UnloadHive(path));
         }
         catch (RegistryOperationException ex)
         {

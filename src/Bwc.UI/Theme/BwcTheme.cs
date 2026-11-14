@@ -90,8 +90,8 @@ public static class BwcTheme
         _queue = DispatcherQueue.GetForCurrentThread();
 
         // An unpackaged app can be refused a WinRT event subscription (COM error 0x80070490, element
-        // not found). The settings objects are still kept, and the shell's ActualThemeChanged handler
-        // calls RefreshSystem, so a refused subscription costs only the immediate refresh. The
+        // not found). The settings objects are still kept, and an unpinned element's ActualThemeChanged
+        // handler calls RefreshSystem, so a refused subscription costs only the immediate refresh. The
         // subscription is attempted once, here, and never retried.
         try
         {
@@ -149,10 +149,12 @@ public static class BwcTheme
     }
 
     /// <summary>
-    /// Re-reads the system state. The shell calls this from its ActualThemeChanged handler, which is
-    /// the fallback when the WinRT settings events were refused. A call with no change does nothing.
+    /// Re-reads the system state. The shell and the Hub call this from an ActualThemeChanged handler on an element
+    /// that is not pinned to a RequestedTheme, which is the fallback when the WinRT settings events were refused.
+    /// A pinned element never reports a system change, so the pinned root must not be that element. A call with
+    /// no change does nothing.
     /// </summary>
-    internal static void RefreshSystem()
+    public static void RefreshSystem()
     {
         EnsureInitialized();
         OnSystemChanged();

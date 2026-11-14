@@ -1,5 +1,6 @@
 using Bwc.Core;
 using Bwc.Regedit.Commands;
+using Bwc.Regedit.Dialogs;
 using Bwc.Regedit.Registry;
 using Bwc.Registry;
 using Bwc.UI.Dialogs;
@@ -24,6 +25,9 @@ internal sealed partial class RegeditContext
 {
     /// <summary>Number of registry writes running. Nested writes count, so the gate holds until the last one ends.</summary>
     private int _writeDepth;
+
+    /// <summary>Number of commands started through <see cref="StartCommand"/> that have not finished.</summary>
+    private int _commandsRunning;
 
     /// <summary>The longest value name the registry accepts, in characters.</summary>
     public const int MaxValueNameLength = 16383;
@@ -163,6 +167,23 @@ internal sealed partial class RegeditContext
     public event EventHandler? WriteFinished;
 
     /// <summary>
+    /// Raised on the UI thread when nothing is busy: no command, dialog, file dialog, or registry write runs.
+    /// A .reg file forwarded by a second launch waits for this event.
+    /// </summary>
+    public event EventHandler? BecameIdle;
+
+    /// <summary>True while a command, a modal dialog, a file dialog, or a registry write is running.</summary>
+    public bool IsBusy => WriteInProgress || DialogOpen || FileDialogOpen || _commandsRunning > 0;
+
+    private void NotifyIfIdle()
+    {
+        if (!IsBusy)
+        {
+            BecameIdle?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
     /// Runs one command and reports its failure. Callers do not await the result: the command runs
     /// on the UI thread and its errors are shown as dialogs. A command started while a registry write
     /// runs is ignored, so no command races the write.
@@ -214,6 +235,7 @@ internal sealed partial class RegeditContext
         {
             EndWrite();
             DialogOpen = wasOpen;
+            NotifyIfIdle();
         }
     }
 
@@ -294,6 +316,7 @@ internal sealed partial class RegeditContext
         {
             DialogOpen = false;
             RestoreFocusAfterDialog(focusBefore);
+            NotifyIfIdle();
         }
     }
 
@@ -352,21 +375,38 @@ internal sealed partial class RegeditContext
     /// Shows the classic error for a key that cannot be opened for reading. The developer detail
     /// goes to the log only.
     /// </summary>
-    public Task ShowUnreadableKeyAsync(RegistryPath path, RegistryOperationException ex)
+    public Task ShowUnreadableKeyAsync(RegistryPath path, RegistryOperationException ex) =>
+        ShowUnreadableKeyAsync(path.ToDisplayString(), ex);
+
+    /// <summary>
+    /// Shows the classic "cannot open key" error for a key whose rows or children could not be read. The
+    /// display path may carry a remote computer prefix. The Win32 text is the details line.
+    /// </summary>
+    public Task ShowUnreadableKeyAsync(string displayPath, RegistryOperationException ex)
     {
         Log.Warn(
-            $"Registry Editor could not open '{path.ToDisplayString()}' for reading: Win32 {ex.Win32Error} ({ex.Message}).");
-        return ShowErrorAsync(Messages.ForUnreadableKey(path.ToDisplayString(), ex.Win32Error).ToErrorDialog());
+            $"Registry Editor could not open '{displayPath}' for reading: Win32 {ex.Win32Error} ({ex.Message}).");
+        return ShowErrorAsync(Messages.ForUnreadableKey(displayPath, ex.Win32Error).ToErrorDialog());
     }
 
     /// <summary>
-    /// Shows the classic "cannot open key" error when a tree expand fails with access denied. Other
-    /// failures are logged only. The tree has already collapsed the node.
+    /// Shows the classic "cannot open key" error for a failure that has no Win32 code. The message has no
+    /// details line. The developer detail goes to the log only.
+    /// </summary>
+    private Task ShowUnreadableKeyWithoutDetailAsync(string displayPath, Exception exception)
+    {
+        Log.Warn($"Registry Editor could not read '{displayPath}': {exception.GetType().Name} ({exception.Message}).");
+        return ShowErrorAsync(Messages.ForUnreadableKey(displayPath, -1).ToErrorDialog());
+    }
+
+    /// <summary>
+    /// Shows the classic "cannot open key" error when a tree expand fails with a registry error. Any
+    /// Win32 failure of the enumeration is shown, not only access denied. Other exceptions are logged only.
+    /// The tree has already collapsed the node, and the next expand retries.
     /// </summary>
     public Task ShowExpandFailedAsync(TreeNode node, Exception exception)
     {
-        if (exception is RegistryOperationException { Win32Error: AccessDeniedWin32 or PrivilegeNotHeldWin32 } ex &&
-            node.RegistryPath is { Length: > 0 } displayPath)
+        if (exception is RegistryOperationException ex && node.RegistryPath is { Length: > 0 } displayPath)
         {
             Log.Warn($"Registry Editor could not expand '{displayPath}': Win32 {ex.Win32Error} ({ex.Message}).");
             return ShowErrorAsync(Messages.ForUnreadableKey(displayPath, ex.Win32Error).ToErrorDialog());
@@ -376,18 +416,16 @@ internal sealed partial class RegeditContext
         return Task.CompletedTask;
     }
 
-    private const int AccessDeniedWin32 = 5;
-    private const int PrivilegeNotHeldWin32 = 1314;
-
     /// <summary>
-    /// Opens the key with the same rights as a read and returns the failure, or null when it opens.
-    /// The value source catches its own failures and would hide this one, so the probe runs first.
+    /// Opens the key with the given reader and returns the failure, or null when it opens. A failed value
+    /// enumeration after a good open comes back in the listing's Failure, so the values are read once.
     /// </summary>
-    public RegistryOperationException? ProbeKeyForRead(RegistryPath path)
+    public RegistryOperationException? ProbeKeyForRead(RegistryPath path, RegistryReader? reader = null)
     {
         try
         {
-            _ = Store.Reader.GetKeyInfo(path);
+            RegistryReader source = reader ?? Store.Reader;
+            _ = source.GetKeyInfo(path);
             return null;
         }
         catch (RegistryOperationException ex)
@@ -395,6 +433,7 @@ internal sealed partial class RegeditContext
             return ex;
         }
     }
+
 
     /// <summary>The name a message names for a key: the leaf name, or the root name for a root.</summary>
     public static string DefaultSubject(RegistryPath path) =>
@@ -514,7 +553,9 @@ internal sealed partial class RegeditContext
         // Export on Computer is the classic whole-registry export; every other key is a branch.
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 659, hasKey || IsComputerSelected);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 660, hasKey);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 679, singleRealValue);
+        // Values under a remote computer are read-only, so Display and Modify Binary Data stay disabled there.
+        bool remoteValue = RegeditSelectionGuards.IsRemoteSelected(this);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 679, singleRealValue && !remoteValue);
         // Permissions and Unload Hive act on the key of the pane with focus. A value selected in the list
         // blocks them only when the list is the target.
         bool keyTarget = treeTarget || !hasRows;
@@ -527,8 +568,8 @@ internal sealed partial class RegeditContext
             hasKey && keyTarget && IsUnloadableHiveRoot(key));
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 657, true);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 768, RemoteConnections.Count > 0);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 912, singleRow);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 917, singleRealValue);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 912, singleRow && !remoteValue);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 917, singleRealValue && !remoteValue);
         RegeditMenu.SetValueCommandsVisible(Shell.MenuBar, hasRows);
 
         bool canRename = treeTarget || !hasRows ? mutableKey : singleRow && rows[0].Renameable;
@@ -756,17 +797,19 @@ internal sealed partial class RegeditContext
 
         RegistryValueListing listing = EmptyListing;
         RegistryOperationException? unreadable = null;
+        Exception? failure = null;
         try
         {
             unreadable = await RunRegistryAsync(() => ProbeKeyForRead(path));
             if (unreadable is null)
             {
                 listing = await ValueSource.ReadAsync(path, CancellationToken.None);
+                unreadable = listing.Failure;
             }
         }
         catch (Exception ex)
         {
-            Log.Warn($"Registry values for '{path.ToDisplayString()}' could not be refreshed: {ex.Message}");
+            failure = ex;
         }
 
         if (generation != ValueGeneration)
@@ -785,6 +828,12 @@ internal sealed partial class RegeditContext
             return;
         }
 
+        if (failure is not null)
+        {
+            await ShowUnreadableKeyWithoutDetailAsync(path.ToDisplayString(), failure);
+            return;
+        }
+
         if (!string.IsNullOrEmpty(selectDisplayName))
         {
             SelectListRow(rows, selectDisplayName);
@@ -799,8 +848,9 @@ internal sealed partial class RegeditContext
         ValueLoad = tokenSource;
         int generation = ++ValueGeneration;
         RegistryValueListing listing = EmptyListing;
-        RegistryPath? unreadablePath = null;
+        string? unreadablePath = null;
         RegistryOperationException? unreadable = null;
+        Exception? failure = null;
 
         try
         {
@@ -811,22 +861,31 @@ internal sealed partial class RegeditContext
             else if (TryResolveRemoteNode(node, out RemoteRegistryConnection? remote, out RegistryPath? remotePath))
             {
                 // Remote machine and root nodes have no values below the root itself. A remote
-                // reader only accepts HKEY_LOCAL_MACHINE and HKEY_USERS paths.
+                // reader only accepts HKEY_LOCAL_MACHINE and HKEY_USERS paths. The probe uses the remote
+                // reader, and a failed remote enumeration comes back in the listing's Failure, so it is shown.
                 if (!remotePath.IsRoot)
                 {
-                    listing = await new RegistryValueSource(remote.CreateReader())
-                        .ReadAsync(remotePath, tokenSource.Token);
+                    RegistryPath remoteKey = remotePath;
+                    RegistryReader reader = remote.CreateReader();
+                    unreadablePath = displayPath;
+                    unreadable = await RunRegistryAsync(() => ProbeKeyForRead(remoteKey, reader), tokenSource.Token);
+                    if (unreadable is null)
+                    {
+                        listing = await new RegistryValueSource(reader).ReadAsync(remoteKey, tokenSource.Token);
+                        unreadable = listing.Failure;
+                    }
                 }
             }
             else if (RegistryPath.TryParse(displayPath, out RegistryPath? parsed) && parsed is not null)
             {
-                // A key that cannot be opened shows the classic error and an empty list. The probe
-                // runs first because the value source reports a failed read as an empty list.
+                // A key that cannot be opened or enumerated shows the classic error and an empty list. The probe
+                // catches a failed open; a failed enumeration comes back in the listing's Failure.
+                unreadablePath = parsed.ToDisplayString();
                 unreadable = await RunRegistryAsync(() => ProbeKeyForRead(parsed), tokenSource.Token);
-                unreadablePath = parsed;
                 if (unreadable is null)
                 {
                     listing = await ValueSource.ReadAsync(parsed, tokenSource.Token);
+                    unreadable = listing.Failure;
                 }
             }
         }
@@ -836,7 +895,7 @@ internal sealed partial class RegeditContext
         }
         catch (Exception ex)
         {
-            Log.Warn($"Registry values for '{node.Name}' could not be loaded: {ex.Message}");
+            failure = ex;
         }
         finally
         {
@@ -864,6 +923,12 @@ internal sealed partial class RegeditContext
                 if (unreadablePath is not null && unreadable is not null)
                 {
                     _ = ShowUnreadableKeyAsync(unreadablePath, unreadable);
+                    return;
+                }
+
+                if (failure is not null)
+                {
+                    _ = ShowUnreadableKeyWithoutDetailAsync(unreadablePath ?? node.Name, failure);
                     return;
                 }
 
@@ -1030,6 +1095,7 @@ internal sealed partial class RegeditContext
 
     private async Task RunCommandAsync(Func<Task> command)
     {
+        _commandsRunning += 1;
         try
         {
             await command();
@@ -1047,6 +1113,11 @@ internal sealed partial class RegeditContext
         {
             Log.Exception("Registry Editor command failed.", ex);
             await ShowErrorAsync(Messages.ForCommandFailure().ToErrorDialog());
+        }
+        finally
+        {
+            _commandsRunning -= 1;
+            NotifyIfIdle();
         }
     }
 

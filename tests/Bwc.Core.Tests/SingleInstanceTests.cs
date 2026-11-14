@@ -221,7 +221,9 @@ public sealed class SingleInstanceTests
         const string localPrefix = @"Local\";
         Assert.IsTrue(instance.InstanceName.StartsWith(localPrefix, StringComparison.OrdinalIgnoreCase),
             "the instance name should use the local namespace.");
-        return instance.InstanceName[localPrefix.Length..];
+        // The pipe name is the instance name plus the session id, so another session cannot reach this instance.
+        int session = System.Diagnostics.Process.GetCurrentProcess().SessionId;
+        return instance.InstanceName[localPrefix.Length..] + ".s" + session.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static string NewToolId()

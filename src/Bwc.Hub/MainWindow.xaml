@@ -3,86 +3,96 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Grid
-        x:Name="HubRoot"
-        AutomationProperties.AutomationId="HubRoot"
-        AutomationProperties.Name="Better Windows Config"
-        Background="{StaticResource BwcFaceBrush}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+    <Grid x:Name="WindowRoot">
+        <Grid
+            x:Name="HubRoot"
+            AutomationProperties.AutomationId="HubRoot"
+            AutomationProperties.Name="Better Windows Config"
+            Background="{StaticResource BwcFaceBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-        <MenuBar
-            x:Name="HubMenuBar"
-            Grid.Row="0"
-            AutomationProperties.AutomationId="HubMenuBar"
-            AutomationProperties.Name="Menu bar"
-            Style="{StaticResource BwcMenuBarStyle}" />
+            <MenuBar
+                x:Name="HubMenuBar"
+                Grid.Row="0"
+                AutomationProperties.AutomationId="HubMenuBar"
+                AutomationProperties.Name="Menu bar"
+                Style="{StaticResource BwcMenuBarStyle}" />
 
-        <Border
-            x:Name="ListFrame"
-            Grid.Row="1"
-            Margin="6,4,6,0"
-            Background="{StaticResource BwcWindowBrush}"
-            BorderBrush="{StaticResource BwcShadowBrush}"
-            BorderThickness="1">
-            <ListView
-                x:Name="ToolList"
-                AutomationProperties.AutomationId="ToolList"
-                AutomationProperties.Name="Tools"
-                Padding="0"
-                Margin="0"
-                BorderThickness="0"
+            <Border
+                x:Name="ListFrame"
+                Grid.Row="1"
+                Margin="6,4,6,0"
                 Background="{StaticResource BwcWindowBrush}"
-                SelectionMode="Single"
-                IsItemClickEnabled="False"
-                UseSystemFocusVisuals="False"
-                ScrollViewer.HorizontalScrollMode="Disabled"
-                ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
-        </Border>
+                BorderBrush="{StaticResource BwcShadowBrush}"
+                BorderThickness="1">
+                <ListView
+                    x:Name="ToolList"
+                    AutomationProperties.AutomationId="ToolList"
+                    AutomationProperties.Name="Tools"
+                    Padding="0"
+                    Margin="0"
+                    BorderThickness="0"
+                    Background="{StaticResource BwcWindowBrush}"
+                    SelectionMode="Single"
+                    IsItemClickEnabled="False"
+                    UseSystemFocusVisuals="False"
+                    ScrollViewer.HorizontalScrollMode="Disabled"
+                    ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+            </Border>
 
-        <Grid Grid.Row="2" Margin="6,6,6,0" HorizontalAlignment="Stretch">
-            <Button
-                x:Name="LaunchButton"
-                HorizontalAlignment="Right"
-                MinWidth="84"
-                MinHeight="23"
-                Padding="10,1"
-                AutomationProperties.AutomationId="LaunchSelected"
-                AutomationProperties.Name="Launch selected tool"
-                FontFamily="Segoe UI"
-                FontSize="{StaticResource BwcFontSize}" />
+            <Grid Grid.Row="2" Margin="6,6,6,0" HorizontalAlignment="Stretch">
+                <Button
+                    x:Name="LaunchButton"
+                    HorizontalAlignment="Right"
+                    MinWidth="84"
+                    MinHeight="23"
+                    Padding="10,1"
+                    AutomationProperties.AutomationId="LaunchSelected"
+                    AutomationProperties.Name="Launch selected tool"
+                    FontFamily="Segoe UI"
+                    FontSize="{StaticResource BwcFontSize}" />
+            </Grid>
+
+            <Border
+                Grid.Row="3"
+                Margin="0,6,0,0"
+                Padding="6,2,6,3"
+                Background="{StaticResource BwcFaceBrush}"
+                BorderBrush="{StaticResource BwcShadowBrush}"
+                BorderThickness="0,1,0,0">
+                <Grid>
+                    <TextBlock
+                        x:Name="StatusText"
+                        HorizontalAlignment="Left"
+                        AutomationProperties.AutomationId="HubStatus"
+                        FontFamily="Segoe UI"
+                        FontSize="{StaticResource BwcFontSize}"
+                        Foreground="{StaticResource BwcWindowTextBrush}"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        x:Name="VersionText"
+                        HorizontalAlignment="Right"
+                        Margin="12,0,0,0"
+                        AutomationProperties.AutomationId="HubVersion"
+                        FontFamily="Segoe UI"
+                        FontSize="{StaticResource BwcFontSize}"
+                        Foreground="{StaticResource BwcWindowTextBrush}" />
+                </Grid>
+            </Border>
         </Grid>
 
         <Border
-            Grid.Row="3"
-            Margin="0,6,0,0"
-            Padding="6,2,6,3"
-            Background="{StaticResource BwcFaceBrush}"
-            BorderBrush="{StaticResource BwcShadowBrush}"
-            BorderThickness="0,1,0,0">
-            <Grid>
-                <TextBlock
-                    x:Name="StatusText"
-                    HorizontalAlignment="Left"
-                    AutomationProperties.AutomationId="HubStatus"
-                    FontFamily="Segoe UI"
-                    FontSize="{StaticResource BwcFontSize}"
-                    Foreground="{StaticResource BwcWindowTextBrush}"
-                    TextTrimming="CharacterEllipsis" />
-                <TextBlock
-                    x:Name="VersionText"
-                    HorizontalAlignment="Right"
-                    Margin="12,0,0,0"
-                    AutomationProperties.AutomationId="HubVersion"
-                    FontFamily="Segoe UI"
-                    FontSize="{StaticResource BwcFontSize}"
-                    Foreground="{StaticResource BwcWindowTextBrush}" />
-            </Grid>
-        </Border>
+            x:Name="ThemeProbe"
+            Width="0"
+            Height="0"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            IsHitTestVisible="False" />
     </Grid>
 
 </Window>

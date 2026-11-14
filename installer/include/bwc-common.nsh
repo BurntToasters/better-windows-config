@@ -27,6 +27,9 @@
 ; the previous version until an upgrade succeeds, so they are never removed while they may be needed.
 !define BWC_STAGE_SUFFIX ".new"
 !define BWC_BACKUP_SUFFIX ".old"
+; Written in the install folder before the backup is removed. Both present at the next run means the
+; upgrade finished, so the backup is removed. The uninstaller deletes it. Not in the payload.
+!define BWC_CLEANUP_MARKER "upgrade-cleanup-pending"
 ; Folder from versions before 0.2.0. Its PowerShell helper is removed on upgrade and uninstall.
 !define BWC_LEGACY_TOOLS_DIR "bwc-tools"
 !define BWC_LEGACY_CLOSE_HELPER "bwc-close-apps.ps1"
@@ -47,6 +50,8 @@ Var BwcCommitStarted
 Var BwcMovedIn
 Var BwcOutFailed
 Var BwcRestoreFailed
+; "1" once the section has confirmed that <install folder>.new is free to use (absent, empty, or ours).
+Var BwcStageOwned
 
 ; ---------------------------------------------------------------------------
 ; Host checks (install only). Both run in .onInit, before any file is touched.
@@ -55,9 +60,9 @@ Var BwcRestoreFailed
 
 Function BwcCheckHost
   ; CurrentBuildNumber is a string such as "26200". A failed read is empty, which compares as 0
-  ; and refuses. The labels are: equal goes on, greater goes on, less refuses.
+  ; and refuses. IntCmp takes its labels as equal, less, greater: less refuses, the others go on.
   ReadRegStr $0 HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion" "CurrentBuildNumber"
-  IntCmp $0 ${BWC_MIN_BUILD} BwcHost_ok BwcHost_ok BwcHost_old
+  IntCmp $0 ${BWC_MIN_BUILD} BwcHost_ok BwcHost_old BwcHost_ok
   BwcHost_old:
   IfSilent +2 0
   MessageBox MB_OK|MB_ICONSTOP "${BWC_PRODUCT} needs Windows 10 build ${BWC_MIN_BUILD} or later. This PC reports build $0."
@@ -65,25 +70,178 @@ Function BwcCheckHost
   BwcHost_ok:
 FunctionEnd
 
-; PROCESSOR_ARCHITECTURE_AMD64 = 9, PROCESSOR_ARCHITECTURE_ARM64 = 12. GetNativeSystemInfo
-; reports the real machine, so an emulated shell cannot hide an ARM64 host.
+; The native machine comes from IsWow64Process2. GetNativeSystemInfo is not used: it reports AMD64 to
+; the emulated 32-bit setup stub on an ARM64 PC. IMAGE_FILE_MACHINE_AMD64 = 34404, ARM64 = 43620.
 ; The ARM64 installer needs an ARM64 host. The x64 installer also runs on ARM64, under emulation.
+; A failed call aborts rather than guessing.
 Function BwcCheckArchitecture
-  System::Alloc 64
-  Pop $1
-  System::Call 'kernel32::GetNativeSystemInfo(p $1)'
-  System::Call "*$1(&i2 .r2)"
-  System::Free $1
-  StrCmp "${BWC_ARCH}" "arm64" BwcArch_arm64 0
-  StrCmp $2 "9" BwcArch_ok 0
-  StrCmp $2 "12" BwcArch_ok BwcArch_bad
-  BwcArch_arm64:
-  StrCmp $2 "12" BwcArch_ok BwcArch_bad
+  System::Call 'kernel32::GetCurrentProcess() p .r1'
+  System::Call 'kernel32::IsWow64Process2(p r1, *i .r2, *i .r3) i .r0'
+  StrCmp $0 "0" BwcArch_unreadable 0
+  StrCmp "${BWC_ARCH}" "arm64" 0 BwcArch_x64
+  StrCmp $3 "43620" BwcArch_ok BwcArch_bad
+  BwcArch_x64:
+  StrCmp $3 "34404" BwcArch_ok 0
+  StrCmp $3 "43620" BwcArch_ok BwcArch_bad
+  BwcArch_unreadable:
+  StrCpy $3 "unreadable"
   BwcArch_bad:
   IfSilent +2 0
-  MessageBox MB_OK|MB_ICONSTOP "This installer is for ${BWC_RID}. This PC reports native architecture code $2. Download the matching installer."
-  Abort "Architecture mismatch: installer ${BWC_RID}, native code $2"
+  MessageBox MB_OK|MB_ICONSTOP "This installer is for ${BWC_RID}. This PC reports machine code $3. Download the matching installer."
+  Abort "Architecture mismatch: installer ${BWC_RID}, native machine $3"
   BwcArch_ok:
+FunctionEnd
+
+; ---------------------------------------------------------------------------
+; Install folder checks. .onInit (silent) and .onVerifyInstDir (interactive) run BwcCheckInstDir.
+; The folder is accepted when it is absent, empty, or holds this product's manifest. A file, a drive
+; root, and a share root are refused. BwcTrimInstDir removes trailing backslashes first.
+; ---------------------------------------------------------------------------
+
+!macro BWC_DIR_REFUSE TEXT
+  IfSilent +2 0
+  MessageBox MB_OK|MB_ICONSTOP "${TEXT}"
+  Abort "${TEXT}"
+!macroend
+
+; Removes every trailing backslash from $INSTDIR, so the quoted --install-dir argument stays intact.
+Function BwcTrimInstDir
+  BwcTrim_loop:
+  StrLen $R1 $INSTDIR
+  StrCmp $R1 "0" BwcTrim_done 0
+  StrCpy $R2 $INSTDIR 1 -1
+  StrCmp $R2 "\" 0 BwcTrim_done
+  StrCpy $INSTDIR $INSTDIR -1
+  Goto BwcTrim_loop
+  BwcTrim_done:
+FunctionEnd
+
+; NSIS drops /D= from $CMDLINE and replaces a root given to /D= with the default folder before .onInit runs.
+; This reads the raw /D= value from GetCommandLineW and refuses a root, so the refusal still happens.
+; An empty value is not refused. The value stays in $R9, which BwcTrimInstDir and BwcIsRoot do not use.
+Function BwcCheckRawDir
+  System::Call 'kernel32::GetCommandLineW() t .R9'
+  StrLen $R7 $R9
+  StrCpy $R6 0
+  BwcRaw_find:
+  IntCmp $R6 $R7 BwcRaw_done BwcRaw_scan BwcRaw_done
+  BwcRaw_scan:
+  StrCpy $R5 $R9 3 $R6
+  StrCmp $R5 "/D=" BwcRaw_found 0
+  IntOp $R6 $R6 + 1
+  Goto BwcRaw_find
+  BwcRaw_found:
+  IntOp $R6 $R6 + 3
+  StrCpy $R9 $R9 "" $R6
+  BwcRaw_trim:
+  StrLen $R7 $R9
+  StrCmp $R7 "0" BwcRaw_checked 0
+  StrCpy $R5 $R9 1 -1
+  StrCmp $R5 " " 0 BwcRaw_checked
+  StrCpy $R9 $R9 -1
+  Goto BwcRaw_trim
+  BwcRaw_checked:
+  StrCmp $R9 "" BwcRaw_done 0
+  StrCpy $R8 $INSTDIR
+  StrCpy $INSTDIR $R9
+  Call BwcTrimInstDir
+  Call BwcIsRoot
+  StrCpy $INSTDIR $R8
+  StrCmp $R0 "1" 0 BwcRaw_done
+  !insertmacro BWC_DIR_REFUSE "$R9 is the root of a drive or a network share. Choose a folder inside it. Nothing was changed."
+  BwcRaw_done:
+FunctionEnd
+
+; $R0 = "1" when $INSTDIR is empty, a drive root (C:), or a server or share root (\\server\share).
+; Counts the backslashes of a UNC path: \\server\share has 3, so 3 or fewer is a root or an incomplete path.
+Function BwcIsRoot
+  StrCpy $R0 "0"
+  StrLen $R1 $INSTDIR
+  StrCmp $R1 "0" BwcRoot_yes 0
+  StrCpy $R2 $INSTDIR 2 0
+  StrCmp $R2 "\\" BwcRoot_unc 0
+  StrCmp $R1 "2" 0 BwcRoot_no
+  StrCpy $R2 $INSTDIR 1 1
+  StrCmp $R2 ":" BwcRoot_yes BwcRoot_no
+  BwcRoot_unc:
+  StrCpy $R3 0
+  StrCpy $R4 0
+  BwcRoot_count:
+  IntCmp $R3 $R1 BwcRoot_counted BwcRoot_step BwcRoot_counted
+  BwcRoot_step:
+  StrCpy $R5 $INSTDIR 1 $R3
+  StrCmp $R5 "\" 0 +2
+  IntOp $R4 $R4 + 1
+  IntOp $R3 $R3 + 1
+  Goto BwcRoot_count
+  BwcRoot_counted:
+  IntCmp $R4 3 BwcRoot_yes BwcRoot_yes BwcRoot_no
+  BwcRoot_yes:
+  StrCpy $R0 "1"
+  BwcRoot_no:
+FunctionEnd
+
+; $R7 = folder. $R0 = "1" when the folder has no entry other than . and .., else "0".
+Function BwcFolderIsEmpty
+  StrCpy $R0 "1"
+  FindFirst $R1 $R2 "$R7\*.*"
+  BwcEmpty_loop:
+  StrCmp $R2 "" BwcEmpty_done 0
+  StrCmp $R2 "." BwcEmpty_next 0
+  StrCmp $R2 ".." BwcEmpty_next 0
+  StrCpy $R0 "0"
+  Goto BwcEmpty_done
+  BwcEmpty_next:
+  FindNext $R1 $R2
+  Goto BwcEmpty_loop
+  BwcEmpty_done:
+  FindClose $R1
+FunctionEnd
+
+; $R0 = "1" when <install folder>.new is absent, empty, or holds this product's staging manifest. "0" when
+; it is a file or any other folder. Such a folder is never removed.
+Function BwcStageFree
+  StrCpy $R0 "1"
+  IfFileExists "$INSTDIR${BWC_STAGE_SUFFIX}\*.*" BwcSf_dir BwcSf_notdir
+  BwcSf_notdir:
+  IfFileExists "$INSTDIR${BWC_STAGE_SUFFIX}" BwcSf_file BwcSf_done
+  BwcSf_dir:
+  IfFileExists "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_MANIFEST}" BwcSf_done 0
+  StrCpy $R7 "$INSTDIR${BWC_STAGE_SUFFIX}"
+  Call BwcFolderIsEmpty
+  Goto BwcSf_done
+  BwcSf_file:
+  StrCpy $R0 "0"
+  BwcSf_done:
+FunctionEnd
+
+; Aborts before any change when <install folder>.new belongs to something else. Names the folder.
+Function BwcCheckStageFree
+  Call BwcStageFree
+  StrCmp $R0 "1" BwcStage_ok 0
+  !insertmacro BWC_DIR_REFUSE "The folder $INSTDIR${BWC_STAGE_SUFFIX} is in the way and is not a Better Windows Config staging folder. Move it, then run the installer again. Nothing was changed."
+  BwcStage_ok:
+FunctionEnd
+
+; Refuses the install folder: a file, a drive or share root, or a folder that is not empty and has no
+; installed-files.txt. Then checks the staging folder. Runs before any change.
+Function BwcCheckInstDir
+  Call BwcIsRoot
+  StrCmp $R0 "1" BwcDir_root 0
+  IfFileExists "$INSTDIR" 0 BwcDir_free
+  IfFileExists "$INSTDIR\*.*" BwcDir_isdir BwcDir_isfile
+  BwcDir_isfile:
+  !insertmacro BWC_DIR_REFUSE "$INSTDIR is a file, not a folder. Choose another folder. Nothing was changed."
+  BwcDir_isdir:
+  IfFileExists "$INSTDIR\${BWC_MANIFEST}" BwcDir_free 0
+  StrCpy $R7 "$INSTDIR"
+  Call BwcFolderIsEmpty
+  StrCmp $R0 "1" BwcDir_free 0
+  !insertmacro BWC_DIR_REFUSE "$INSTDIR is not empty and is not a Better Windows Config install (no ${BWC_MANIFEST}). Choose another folder. Nothing was changed."
+  BwcDir_root:
+  !insertmacro BWC_DIR_REFUSE "$INSTDIR is the root of a drive or a network share. Choose a folder inside it. Nothing was changed."
+  BwcDir_free:
+  Call BwcCheckStageFree
 FunctionEnd
 
 ; Picks the 64-bit PowerShell when it exists. A 32-bit process sees System32 as SysWOW64, so the
@@ -114,10 +272,10 @@ FunctionEnd
   StrCpy $R8 ${ALLOWED} 1 $R7
   StrCmp $R8 $R5 BwcChk_${ID}_found 0
   IntOp $R7 $R7 + 1
-  IntCmp $R7 $R6 BwcChk_${ID}_bad BwcChk_${ID}_bad BwcChk_${ID}_allowed
+  IntCmp $R7 $R6 BwcChk_${ID}_bad BwcChk_${ID}_allowed BwcChk_${ID}_bad
   BwcChk_${ID}_found:
   IntOp $R4 $R4 + 1
-  IntCmp $R4 $R3 BwcChk_${ID}_all BwcChk_${ID}_all BwcChk_${ID}_char
+  IntCmp $R4 $R3 BwcChk_${ID}_all BwcChk_${ID}_char BwcChk_${ID}_all
   BwcChk_${ID}_all:
   StrCpy ${RESULT} "1"
   Goto BwcChk_${ID}_done
@@ -195,12 +353,40 @@ FunctionEnd
   DetailPrint "WARNING: AppUserModelID ${APPID} was not written to ${SHORTCUT} (helper exit $0). Taskbar grouping of a pinned shortcut may differ."
 !macroend
 
+; Sets RESULT to "1" when VALUE is a relative path that may be moved: no leading "\", no ":" at position 2,
+; and no "/", ":", or ".." anywhere. Uses $R5 to $R8. ID keeps the labels unique.
+!macro BWC_PATH_LINE_OK ID VALUE RESULT
+  StrCpy ${RESULT} "0"
+  StrCpy $R5 ${VALUE} 1 0
+  StrCmp $R5 "\" BwcPl_${ID}_done 0
+  StrCpy $R5 ${VALUE} 1 1
+  StrCmp $R5 ":" BwcPl_${ID}_done 0
+  StrLen $R6 ${VALUE}
+  StrCpy $R5 0
+  BwcPl_${ID}_char:
+  IntCmp $R5 $R6 BwcPl_${ID}_clean BwcPl_${ID}_scan BwcPl_${ID}_clean
+  BwcPl_${ID}_scan:
+  StrCpy $R7 ${VALUE} 1 $R5
+  StrCmp $R7 "/" BwcPl_${ID}_done 0
+  StrCmp $R7 ":" BwcPl_${ID}_done 0
+  IntOp $R8 $R5 + 1
+  StrCpy $R8 ${VALUE} 1 $R8
+  StrCmp $R7 "." 0 BwcPl_${ID}_next
+  StrCmp $R8 "." BwcPl_${ID}_done 0
+  BwcPl_${ID}_next:
+  IntOp $R5 $R5 + 1
+  Goto BwcPl_${ID}_char
+  BwcPl_${ID}_clean:
+  StrCpy ${RESULT} "1"
+  BwcPl_${ID}_done:
+!macroend
+
 ; ---------------------------------------------------------------------------
 ; Upgrade: move the files that the previous version listed in installed-files.txt out of the
 ; install folder and into <install folder>.old. Only relative paths that pass the checks are moved:
-; empty, absolute, and ".." lines are skipped. A folder that the move empties is removed, except the
-; install folder itself. The previous manifest moves too, and the rest of the commit reads it from
-; the backup. ID keeps labels unique. Sets $BwcOutFailed to "1" on a failed move.
+; empty, absolute, ".." and "/" or ":" lines are skipped. A folder that the move empties is removed,
+; except the install folder itself. The previous manifest moves too, and the rest of the commit reads
+; it from the backup. ID keeps labels unique. Sets $BwcOutFailed to "1" on a failed move.
 ; ---------------------------------------------------------------------------
 
 !macro BWC_MOVE_OUT_LISTED_BODY ID
@@ -221,12 +407,8 @@ FunctionEnd
   StrCmp $R3 "$\r" 0 +2
   StrCpy $R1 $R1 -1
   StrCmp $R1 "" BwcOut_${ID}_loop 0
-  StrCpy $R2 $R1 1 0
-  StrCmp $R2 "\" BwcOut_${ID}_loop 0
-  StrCpy $R2 $R1 1 1
-  StrCmp $R2 ":" BwcOut_${ID}_loop 0
-  StrCpy $R2 $R1 2 0
-  StrCmp $R2 ".." BwcOut_${ID}_loop 0
+  !insertmacro BWC_PATH_LINE_OK "${ID}_path" "$R1" $R2
+  StrCmp $R2 "1" 0 BwcOut_${ID}_loop
   IfFileExists "$INSTDIR\$R1" BwcOut_${ID}_move BwcOut_${ID}_loop
   BwcOut_${ID}_move:
   ${GetParent} "$INSTDIR${BWC_BACKUP_SUFFIX}\$R1" $R4
@@ -264,12 +446,8 @@ FunctionEnd
   StrCmp $R3 "$\r" 0 +2
   StrCpy $R1 $R1 -1
   StrCmp $R1 "" BwcRes_${ID}_loop 0
-  StrCpy $R2 $R1 1 0
-  StrCmp $R2 "\" BwcRes_${ID}_loop 0
-  StrCpy $R2 $R1 1 1
-  StrCmp $R2 ":" BwcRes_${ID}_loop 0
-  StrCpy $R2 $R1 2 0
-  StrCmp $R2 ".." BwcRes_${ID}_loop 0
+  !insertmacro BWC_PATH_LINE_OK "${ID}_path" "$R1" $R2
+  StrCmp $R2 "1" 0 BwcRes_${ID}_loop
   IfFileExists "$INSTDIR${BWC_BACKUP_SUFFIX}\$R1" BwcRes_${ID}_move BwcRes_${ID}_loop
   BwcRes_${ID}_move:
   ${GetParent} "$INSTDIR\$R1" $R4
@@ -300,14 +478,16 @@ Function BwcReadE2eSwitches
   ${GetParameters} $R0
   ClearErrors
   ${GetOptions} $R0 "/RUNID=" $BwcRunId
-  IfErrors BwcE2e_missing 0
+  IfErrors 0 +2
+  ReadEnvStr $BwcRunId "BWC_E2E_INSTALLER_RUNID"
   ClearErrors
   ${GetOptions} $R0 "/SHORTCUTS=" $BwcShortcutDir
-  IfErrors BwcE2e_missing 0
+  IfErrors 0 +2
+  ReadEnvStr $BwcShortcutDir "BWC_E2E_INSTALLER_SHORTCUTS"
   StrCmp $BwcRunId "" BwcE2e_missing 0
   StrCmp $BwcShortcutDir "" BwcE2e_missing 0
   StrLen $R3 $BwcRunId
-  IntCmp $R3 64 BwcE2e_lenok BwcE2e_missing BwcE2e_lenok
+  IntCmp $R3 64 BwcE2e_lenok BwcE2e_lenok BwcE2e_missing
   BwcE2e_lenok:
   !insertmacro BWC_CHARS_OK "install" "$BwcRunId" "${BWC_RUNID_CHARS}" $R2
   StrCmp $R2 "1" BwcE2e_idok 0
@@ -323,10 +503,11 @@ Function un.BwcReadE2eSwitches
   ${un.GetParameters} $R0
   ClearErrors
   ${un.GetOptions} $R0 "/RUNID=" $BwcRunId
-  IfErrors BwcE2eUn_missing 0
+  IfErrors 0 +2
+  ReadEnvStr $BwcRunId "BWC_E2E_INSTALLER_RUNID"
   StrCmp $BwcRunId "" BwcE2eUn_missing 0
   StrLen $R3 $BwcRunId
-  IntCmp $R3 64 BwcE2eUn_lenok BwcE2eUn_missing BwcE2eUn_lenok
+  IntCmp $R3 64 BwcE2eUn_lenok BwcE2eUn_lenok BwcE2eUn_missing
   BwcE2eUn_lenok:
   !insertmacro BWC_CHARS_OK "uninstall" "$BwcRunId" "${BWC_RUNID_CHARS}" $R2
   StrCmp $R2 "1" BwcE2eUn_idok 0

@@ -25,8 +25,8 @@ or losing focus to another application leaves the registry untouched.
 ### Oversized or zero-length values
 
 `SetData` copies the incoming memory into one `byte[]`, so memory stays O(n). A zero-length value
-has zero rows; hex typing, ASCII typing, Delete, and Backspace do nothing because there is no
-position. Paste into an empty buffer is allowed and appends the parsed bytes. A value that is not
+has zero rows but one append position at offset 0. Typing a hex pair or an ASCII character there
+appends the byte, as classic regedit does. Delete does nothing. A value that is not
 a multiple of sixteen has a short final row; cells past the length are never selectable and edits
 clamp to the last real byte.
 
@@ -69,15 +69,27 @@ same physical key can therefore mean `0x0A` or the letter `A` depending on where
 Overwrite is the default. Insert mode inserts a zero byte before applying the high nibble, or
 inserts the ASCII byte, which grows the buffer and shifts the remainder right. The Insert key
 toggles the mode when editable. Insert mode is preserved by `SetData` and is not reset by a new
-dialog. When the buffer is empty, insert mode still has no position to edit; a paste is the only
-way to add the first bytes.
+dialog. Typing into an empty buffer or past the last byte appends in both modes.
+
+### Append position
+
+Completing a byte on the last offset moves the caret to the append position: offset equal to the
+length, with no selection. Typing there appends a byte, so `FFEE` typed at the end of a three byte
+value yields five bytes. Arrow keys still stop at the last byte.
+
+### Paste in overwrite mode
+
+Overwrite-mode paste writes the pasted bytes over the bytes starting at the caret and grows the
+buffer past the end when needed. It does not remove the selection first. Insert-mode paste removes
+any selection and inserts the bytes.
 
 ### Delete and Backspace
 
-Delete removes the selected bytes. With no selection, Delete removes the byte at the caret and
-Backspace removes the byte before it. Backspace with a selection removes the selection, matching
-the common editor expectation. Removing the last remaining byte leaves an empty buffer and a
-cleared selection. Every deletion clamps the caret to the new length.
+Delete removes the selected bytes. With no selection, Delete removes the byte at the caret.
+Backspace with a single selected byte, the normal caret state, removes the byte before the caret,
+as classic regedit does. Backspace with a multi-byte selection removes the selection. Backspace at
+the append position removes the last byte. Removing the last remaining byte leaves an empty buffer
+and a cleared selection. Every deletion clamps the caret to the new length.
 
 ### Row count changes
 
@@ -100,9 +112,9 @@ selection remains usable.
 
 Ctrl+V accepts hexadecimal text with optional spaces and commas. Every remaining character must be
 a hex digit; otherwise the paste is ignored and the help text records an invalid clipboard. If
-there is a selection, the pasted bytes replace that range. With no selection, overwrite mode
-overwrites from the caret and appends past the end when necessary, while insert mode inserts the
-bytes and shifts the remainder right. A pasted block raises one `DataChanged`, not one per byte.
+overwrite mode writes the bytes over the buffer from the selection start or caret and appends past
+the end when necessary. Insert mode removes any selection and inserts the bytes, shifting the
+remainder right. A pasted block raises one `DataChanged`, not one per byte.
 
 ## Registry integration
 
@@ -194,8 +206,24 @@ is not an overwrite target, so the append inserts; in insert mode it inserts too
 
 ### Editing an empty value
 
-An empty value has no row. Paste into an empty value adds bytes, and typing a hex digit does nothing
-because there is no position. Test: `EmptyValuePasteOnly`.
+An empty value has no row. Typing a hex pair into an empty value appends one byte, and paste
+appends too. Failure mode: the first typed digit is dropped, so the user cannot enter any byte
+without a clipboard. Test: `HexEditingFixes_TypeIntoEmptyValue`.
+
+### Typing past the last byte
+
+Failure mode: after the last byte is completed, the caret clamps to that byte, so the next typed
+pair overwrites it and the value can never grow by typing. Test: `HexEditingFixes_TypeAppendsAtEnd`.
+
+### Backspace removes the byte under the caret
+
+Failure mode: a single selected byte was treated as a selection, so Backspace removed the byte
+under the caret instead of the byte before it. Test: `HexEditingFixes_BackspaceDeletesBeforeCaret`.
+
+### Paste in overwrite mode inserts
+
+Failure mode: overwrite-mode paste removed the selection and inserted, so the bytes after the
+caret shifted right instead of being replaced. Test: `HexEditingFixes_PasteOverwritesInOverwriteMode`.
 
 ### Shift selection and mouse selection
 

@@ -5,10 +5,11 @@ publish), and the installer (D1) must follow. A change to this file is a manager
 Failure cases and their tests are in `docs/failure-modes/update-verifier.md`. The process commands the
 installer calls (`--close-running`, `--wait-pid`) are in `docs/contracts/update-cli.md`.
 
-Status: the verifier and helper are implemented and tested with test keys. The release public key is
-not decided. The stable manifest URL is set to the GitHub latest-release asset in `UpdateSources.cs`. Until the placeholder key is replaced, every update is
-refused (`TrustedKeysNotConfigured`, which the Hub shows as "not configured"). A key list that is
-set but malformed is refused as `TrustedKeysInvalid`.
+Status: the verifier and helper are implemented and tested. The release public key is embedded in
+`src/Bwc.Update/Signing/TrustedKeys.cs`, and the placeholder is off (`IsPlaceholder` is false). The stable
+manifest URL is the GitHub latest-release asset set in `src/Bwc.Hub/Updates/UpdateSources.cs`. A key list
+that is malformed is refused as `TrustedKeysInvalid`. `TrustedKeysNotConfigured` (the Hub's "not configured"
+message) is returned only while the placeholder list is in place.
 
 ## Files published per channel
 
@@ -25,9 +26,18 @@ tooling: the signature sits beside the manifest as `<manifest>.minisig`, and whe
 query string, the `.minisig` suffix goes before the query (`beta.json.minisig?token=...`). The release
 asset names are `bwc-stable.json` and `bwc-beta.json`, with `.minisig` signatures beside them.
 
-Every URL must be `https` (`http` is allowed only in tests). It may not contain user information,
-a fragment, a backslash, a space, a non-ASCII character, a dot segment (`.` or `..`), or an encoded
-`%2e`, `%2f`, `%5c`, or `%00`. Each redirect target is checked the same way. At most 5 redirects.
+Every URL must be `https` (`http` is allowed only in tests), at most 4096 characters, with no user
+information and no fragment. The URL is split at its first `?`:
+
+- The path (the text before `?`) may not contain a dot segment (`.` or `..`), an encoded `%2e`, `%2f`,
+  `%5c`, or `%00` (in any letter case), a backslash, a space, a control or non-ASCII character, or a
+  double quote.
+- The query (the text after `?`) gets only a character check: no space, control or non-ASCII character,
+  backslash, double quote, or `#`. Signed release URLs carry `%2F`, `%3D`, `%3B`, and `+` in the query,
+  so those are allowed there.
+
+Each redirect target is checked the same way, including the raw `Location` text (a raw space in a query is
+refused, not escaped). At most 5 redirects.
 
 ## Manifest (schema 1)
 
@@ -95,8 +105,10 @@ Example manifest trusted comment:
 Example installer trusted comment:
 `timestamp:1794102823 file:BetterWindowsConfig-Setup-0.2.0-beta.1-x64.exe version:0.2.0-beta.1 arch:win-x64`
 
-The release tooling signs manifests with `tests/Bwc.Update.Tests/Support/minisign.mjs sign-manifest`, which
-writes exactly this comment. A manifest that is signed with any other comment is refused.
+The release tooling (`scripts/assemble-bundle.js` with `scripts/sign-update-manifest.js`) builds the comment
+with `manifestTrustedComment` in `scripts/lib/update-manifest.js`, which writes exactly this comment.
+`tests/Bwc.Update.Tests/Support/minisign.mjs` is a test-only copy of the signer. A manifest that is signed
+with any other comment is refused.
 
 ## Version and channel policy
 
@@ -188,8 +200,9 @@ Order:
    running). Default wait: 60 seconds. If they are still running, stop: nothing is installed.
 5. Open the installer with `FileShare.Read` only. Verify size, SHA-256, minisign signature, and the
    signed `version:` and `arch:`. The file stays open until the installer has been started.
-6. Start the installer as `installer.exe` with the raw command line `/S <switches> /D=<install-dir>`.
-   `/D=` is last and unquoted, as NSIS requires. The helper then returns at once. It does not wait for
+6. Start the installer as `installer.exe` with the raw command line
+   `/S /RELAUNCH /PARENTPID=<helper pid> <switches> /D=<install-dir>`. `/RELAUNCH` and `/PARENTPID` are always
+   written by the helper, and a caller's copy of either is dropped. `/D=` is last and unquoted, as NSIS requires. The helper then returns at once. It does not wait for
    the installer, and it does not start the Hub: the installer does both (see the notes below).
 
 Every refusal before step 6 starts the Hub again with one argument, `--update-result <UpdateFailure>`
@@ -200,7 +213,7 @@ gate does not hand the message to an old Hub. The argument carries only the fail
 Installer switches: `/NAME` or `/NAME=value`. NAME is an uppercase letter followed by uppercase letters,
 digits, or underscores (at most 32 characters), and is never `S` or `D`. The value is 1 to 256
 characters of letters, digits, `_`, `.`, `-`, `:`, and `\`, with no `..`. Examples: `/ALLUSERS`,
-`/RUNID=abc-123`, `/INSTDIR=C:\Apps\BWC`.
+`/RUNID=abc-123`, `/INSTDIR=C:\Apps\BWC`. `RELAUNCH` and `PARENTPID` are reserved: the helper writes them.
 
 The helper removes `__COMPAT_LAYER` from its own environment before it starts any child, so the installer
 and the Hub do not inherit a compatibility layer. The helper never requests elevation (`asInvoker`).
@@ -221,11 +234,13 @@ start, `6` refused and the Hub did not start. Stdout is one JSON line:
   1. Start the BWC applications it finds running, by calling
      `BwcUpdate.exe --close-running --install-dir "<install folder>" --exclude-pid <pid>` (see
      `update-cli.md`).
-  2. Wait for the helper to exit, with `BwcUpdate.exe --wait-pid <helper pid> --timeout-seconds <n>`,
+  2. Wait for the helper to exit, with `BwcUpdate.exe --wait-pid <helper pid> --timeout-seconds <n>` (the helper
+     pid is the `/PARENTPID` value),
      because the helper's own `BwcUpdate.exe` is a locked file until it exits. The installer should run
      its own copy of that file (for example from `$PLUGINSDIR`).
-  3. Replace the files, then start `BetterWindowsConfig.exe` (the installer relaunches the Hub, because the
-     helper does not).
+  3. Replace the files. On success, start `BetterWindowsConfig.exe`: the installer relaunches the Hub, because
+     the helper does not, and `/RELAUNCH` asks for it. On failure, start the still-installed
+     `BetterWindowsConfig.exe` with `--update-result InstallerFailed`, so the user sees the reason (N16).
   4. Give up after its own time limit (30 minutes) and say so; the helper is not waiting for it.
 - Real keys are created by the user. Rotation: list the old and the new key during the overlap,
   then remove the old key once no release uses it.

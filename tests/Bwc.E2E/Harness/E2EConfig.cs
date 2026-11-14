@@ -22,6 +22,7 @@ public sealed class E2EConfig
 
     private E2EConfig()
     {
+        StartedUtc = DateTime.UtcNow;
         RepoRoot = FindRepoRoot();
         Rid = ReadRid();
         Flavor = ReadFlavor();
@@ -30,6 +31,12 @@ public sealed class E2EConfig
     }
 
     public string PublishDir { get; }
+
+    /// <summary>
+    /// When this test run began. A Registry Editor or Hub is the run's own only when it started after this time
+    /// and its image is in <see cref="PublishDir"/>.
+    /// </summary>
+    public DateTime StartedUtc { get; }
 
     /// <summary>App runtime identifier of the publish folder. It can differ from the test host architecture.</summary>
     public string Rid { get; }
@@ -83,9 +90,24 @@ public sealed class E2EConfig
             [DataRootEnvironmentVariable] = DataRootFor(scope),
         };
 
+    /// <summary>
+    /// A per-run temp folder for one scope, inside that scope's data root. It is the TEMP and TMP of the processes
+    /// launched for the scope, so the update helper stages there and not in the developer's %TEMP%. The run data
+    /// cleanup removes it with the rest of the run.
+    /// </summary>
+    public string TempRootFor(string scope) => EnsureDataDirectory(Path.Combine(DataRootFor(scope), "tmp"));
+
+    /// <summary>TEMP and TMP for a launched process, pointing at <see cref="TempRootFor"/>.</summary>
+    public IReadOnlyDictionary<string, string> TempEnvironment(string scope)
+    {
+        string temp = TempRootFor(scope);
+        return new Dictionary<string, string>(StringComparer.Ordinal) { ["TEMP"] = temp, ["TMP"] = temp };
+    }
+
     public static bool IsValidRunId(string value)
     {
-        if (string.IsNullOrEmpty(value))
+        // "." and ".." name the sandbox parent or its parent, so they are never a run id or a scope.
+        if (string.IsNullOrEmpty(value) || value is "." or "..")
         {
             return false;
         }

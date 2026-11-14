@@ -8,14 +8,14 @@ namespace Bwc.E2E.FakeInstaller;
 
 /// <summary>
 /// The stand-in installer for the Hub install E2E test. It is not an installer. It writes one record file
-/// (the path comes from BWC_E2E_INSTALLER_RECORD), then starts the Hub again from the /D= folder when the test
-/// sets BWC_E2E_INSTALLER_RELAUNCH_HUB=1, because the installer starts the Hub (docs/contracts/update-manifest.md).
-/// It writes nothing else, installs nothing, and exits 0.
+/// (the path comes from BWC_E2E_INSTALLER_RECORD), then starts the Hub again from the /D= folder only when the
+/// command line has /RELAUNCH, because the real installer starts the new Hub when that switch is given
+/// (docs/contracts/update-manifest.md). It writes nothing else, installs nothing, and exits 0.
 /// </summary>
 internal static class Program
 {
     public const string RecordVariable = "BWC_E2E_INSTALLER_RECORD";
-    public const string RelaunchVariable = "BWC_E2E_INSTALLER_RELAUNCH_HUB";
+    private const string RelaunchSwitch = "/RELAUNCH";
 
     private const string HubExeName = "BetterWindowsConfig.exe";
     private const string DirectoryPrefix = "/D=";
@@ -40,7 +40,7 @@ internal static class Program
 
         // The hash is of the file this process runs, so a test can compare it with the signed bytes.
         string sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(ownPath))).ToLowerInvariant();
-        bool relaunch = Environment.GetEnvironmentVariable(RelaunchVariable) == "1";
+        bool relaunch = args.Any(arg => string.Equals(arg, RelaunchSwitch, StringComparison.OrdinalIgnoreCase));
 
         var lines = new List<string>
         {

@@ -60,7 +60,8 @@ artifacts/gate/logs/<NN>-<step-name>.log; logs from earlier runs are removed fir
 The default RID comes from process.arch, never PROCESSOR_ARCHITECTURE.
 
 Steps: sync-version, registry-writer, no-em-dash, changelog-version, comment-lint,
-build-arm64, build-x64, test-core, test-registry-e2e, test-registry-shipping,
+release-selftest, release-flow-selftest, release-assets-selftest, embed-key-selftest,
+signing-selftest, build-arm64, build-x64, test-core, test-registry-e2e, test-registry-shipping,
 test-update.
 Unless --quick, each RID then runs publish-ship, verify-flavor-ship, e2e-ship,
 publish-e2e, verify-flavor-e2e, e2e-flavor. verify-flavor-* checks the BwcFlavor
@@ -208,6 +209,12 @@ function sharedSteps(testPlatform) {
     nodeStep("no-em-dash", "scripts/validate-no-em-dash.js", ["--root", ROOT]),
     nodeStep("changelog-version", "scripts/validate-changelog-version.js", []),
     nodeStep("comment-lint", "scripts/lint-comments.mjs", []),
+    // Release tooling self-tests. They run in the quick gate, so a broken release script fails CI.
+    nodeStep("release-selftest", "scripts/release-selftest.js", []),
+    nodeStep("release-flow-selftest", "scripts/run-release-selftest.js", []),
+    nodeStep("release-assets-selftest", "scripts/release-assets-selftest.js", []),
+    nodeStep("embed-key-selftest", "scripts/embed-update-key-selftest.js", []),
+    nodeStep("signing-selftest", "scripts/artifact-signing-selftest.js", []),
     dotnetStep("build-arm64", [
       "build",
       "BetterWindowsConfig.slnx",

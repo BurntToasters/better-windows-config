@@ -88,30 +88,8 @@ public static class ProcessCommands
         }
     }
 
-    private static List<(int Pid, string Name)> RunningFrom(string installDir, HashSet<int> skip)
-    {
-        var found = new List<(int Pid, string Name)>();
-        foreach (var name in ProcessNames)
-        {
-            foreach (var process in Process.GetProcessesByName(name))
-            {
-                using (process)
-                {
-                    if (skip.Contains(process.Id))
-                    {
-                        continue;
-                    }
-
-                    if (RunningImageRule.IsRunningFrom(process.Id, installDir))
-                    {
-                        found.Add((process.Id, name));
-                    }
-                }
-            }
-        }
-
-        return found;
-    }
+    private static List<(int Pid, string Name)> RunningFrom(string installDir, HashSet<int> skip) =>
+        ProcessScan.RunningFrom(installDir, skip, new SystemProcessSource(), ProcessScan.CurrentSessionId());
 
     private static void PostCloseToWindows(int pid)
     {

@@ -11,6 +11,11 @@
     <PackageReference Include="BouncyCastle.Cryptography" />
   </ItemGroup>
 
+  <!-- The signer script is run from the output folder (see Support/SigningKit.cs). -->
+  <ItemGroup>
+    <None Include="Support\minisign.mjs" Link="minisign.mjs" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <!--
     Bwc.Update is a self-contained exe, and a framework-dependent project cannot reference it
     (NETSDK1150). The verifier source is compiled into this test assembly instead. Program.cs is

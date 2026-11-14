@@ -16,8 +16,16 @@ internal enum UpdateOutcomeKind
     Canceled,
 }
 
-/// <summary>What one check produced. Message is display text. Version and NotesUrl are set for an offer.</summary>
-internal sealed record UpdateCheckResult(UpdateOutcomeKind Kind, string Message, string? Version = null, string? NotesUrl = null);
+/// <summary>
+/// What one check produced. Message is display text and never holds a failure code. Code is the helper's failure
+/// name, for the log only. Version and NotesUrl are set for an offer.
+/// </summary>
+internal sealed record UpdateCheckResult(
+    UpdateOutcomeKind Kind,
+    string Message,
+    string? Version = null,
+    string? NotesUrl = null,
+    string? Code = null);
 
 /// <summary>A verified installer the helper staged. FolderPath holds installer.exe and receipt.json.</summary>
 internal sealed record StagedUpdate(string FolderPath, string Version);
@@ -95,14 +103,14 @@ internal sealed class UpdateService
         if (run.TimedOut)
         {
             Log.Warn("Update check timed out and the helper was stopped.");
-            return Failed(HubStrings.Get("UpdateTimedOut"));
+            return Failed(HubStrings.Get("UpdateTimedOut"), "Timeout");
         }
 
         JsonElement? result = ResultLine(run.Stdout);
         if (result is not { } line)
         {
             Log.Warn("Update helper printed no result. Exit code " + run.ExitCode.ToString(CultureInfo.InvariantCulture) + ".");
-            return Failed(HubStrings.Format("UpdateNoResult", run.ExitCode.ToString(CultureInfo.InvariantCulture)));
+            return Failed(HubStrings.Get("UpdateNoResult"), "NoResult");
         }
 
         return MapCheck(line, currentVersion);
@@ -149,14 +157,14 @@ internal sealed class UpdateService
         {
             Log.Warn("Update download timed out and the helper was stopped.");
             DiscardIncompleteStaging();
-            return (Failed(HubStrings.Get("UpdateTimedOut")), null);
+            return (Failed(HubStrings.Get("UpdateDownloadTimedOut"), "Timeout"), null);
         }
 
         JsonElement? result = ResultLine(run.Stdout);
         if (result is not { } line)
         {
             Log.Warn("Update helper printed no result. Exit code " + run.ExitCode.ToString(CultureInfo.InvariantCulture) + ".");
-            return (Failed(HubStrings.Format("UpdateNoResult", run.ExitCode.ToString(CultureInfo.InvariantCulture))), null);
+            return (Failed(HubStrings.Get("UpdateNoResult"), "NoResult"), null);
         }
 
         bool ok = line.TryGetProperty("ok", out JsonElement okElement) && okElement.ValueKind == JsonValueKind.True;
@@ -302,28 +310,45 @@ internal sealed class UpdateService
         switch (failure)
         {
             case "TrustedKeysNotConfigured":
-                return new UpdateCheckResult(UpdateOutcomeKind.NotConfigured, HubStrings.Get("UpdateNoReleaseKey"));
+                return new UpdateCheckResult(UpdateOutcomeKind.NotConfigured, HubStrings.Get("UpdateNoReleaseKey"), Code: failure);
             case "TrustedKeysInvalid":
                 Log.Warn("Update trusted key list is invalid. " + detail);
-                return Failed(HubStrings.Get("UpdateTrustedKeysInvalid"));
+                return Failed(HubStrings.Get("UpdateTrustedKeysInvalid"), failure);
             case "ChannelMismatch":
-                return Failed(HubStrings.Get("UpdateChannelMismatch"));
+                return Failed(HubStrings.Get("UpdateChannelMismatch"), failure);
             case "ManifestExpired":
-                return Failed(HubStrings.Get("UpdateManifestExpired"));
+                return Failed(HubStrings.Get("UpdateManifestExpired"), failure);
             case "SameVersion":
             case "Downgrade":
             case "PrereleaseOnStable":
                 return new UpdateCheckResult(
                     UpdateOutcomeKind.UpToDate,
-                    HubStrings.Format("UpdateUpToDate", currentVersion));
+                    HubStrings.Format("UpdateUpToDate", currentVersion),
+                    Code: failure);
             default:
-                Log.Warn("Update check refused: " + failure + ". " + detail);
-                return Failed(HubStrings.Format("UpdateRefused", failure, detail));
+                Log.Warn("Update refused. Code " + failure + ". " + detail);
+                return Failed(HubStrings.Get(FriendlyFailureKey(failure)), failure);
         }
     }
 
-    private static UpdateCheckResult Failed(string message) =>
-        new(UpdateOutcomeKind.Failed, message);
+    /// <summary>The resource key of the plain sentence for a helper failure code. Unknown codes use the generic key.</summary>
+    private static string FriendlyFailureKey(string failure) => failure switch
+    {
+        "InstallerHashMismatch" or "InstallerSizeMismatch" or "InstallerCommentMismatch" => "UpdateFailHashMismatch",
+        "ManifestSignatureInvalid" or "InstallerSignatureInvalid" => "UpdateFailSignature",
+        "UrlRejected" => "UpdateFailUrl",
+        "ManifestInvalid" or "UnsupportedSchema" => "UpdateFailManifest",
+        "ManifestTooLarge" or "InstallerTooLarge" => "UpdateFailTooLarge",
+        "ManifestDatedInFuture" => "UpdateFailClock",
+        "NoInstallerForArchitecture" => "UpdateFailNoInstaller",
+        "InstallerDownload" or "InstallerDownloadInterrupted" or "DownloadFailed" or "ManifestSignatureDownload" or "Timeout"
+            => "UpdateFailDownload",
+        "Unexpected" => "UpdateFailUnexpected",
+        _ => "UpdateFailGeneric",
+    };
+
+    private static UpdateCheckResult Failed(string message, string? code = null) =>
+        new(UpdateOutcomeKind.Failed, message, Code: code);
 
     private static string? ReadString(JsonElement element, string name)
     {
