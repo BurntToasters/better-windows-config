@@ -112,6 +112,7 @@ and then hung until the 60 minute job limit.
 |----|------|------|-----------------|
 | H1 | A test leaves an app running that inherited the dotnet output pipes | `test-e2e.js` waits on 'close' forever | It settles on 'exit' and cuts the pipes after a 10 s drain. |
 | H2 | GUI E2E fails on the hosted desktop | CI is always red and hides a real quick-gate failure | The quick gate blocks. The GUI and installer E2E steps run with `continue-on-error` and their own `timeout-minutes`, and upload their result. The local `node scripts/test-all.js --rid all` on a real desktop is the release gate. |
+| H3 | The hosted runner shell is elevated | The installer E2E refuses to start (the Hub must run asInvoker) | Expected on CI; the step reports it and does not block. Run it locally with `node scripts/test-installer-e2e.js`. |
 
 ## Elevated runner environment (`scripts/elevated-runner/run-elevated.ps1`)
 
