@@ -50,7 +50,7 @@ public sealed partial class RegistryWriter
         cancellationToken.ThrowIfCancellationRequested();
 
         const string Operation = nameof(RegistryWriteOperation.SetKeySecurity);
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.SetKeySecurity);
+        Authorize(path, RegistryWriteOperation.SetKeySecurity);
         ValidateSecurityArguments(information, securityDescriptor);
 
         if (!propagateToSubkeys)
@@ -133,7 +133,7 @@ public sealed partial class RegistryWriter
             cancellationToken.ThrowIfCancellationRequested();
 
             RegistryPath child = path.Append(name);
-            _policy.EnsureWriteAllowed(child, RegistryWriteOperation.SetKeySecurity);
+            Authorize(child, RegistryWriteOperation.SetKeySecurity);
 
             // The child's own subkeys are listed before the child's DACL changes. The new DACL may deny the
             // owner KEY_ENUMERATE_SUB_KEYS, which would stop the walk below the child.
@@ -336,7 +336,10 @@ public sealed partial class RegistryWriter
                 nameof(information));
         }
 
-        if (!RegistrySecurityDescriptor.TryGetLength(securityDescriptor, out int declaredLength) ||
+        // The layout is checked first, so the Win32 validity check never reads past the buffer. Both run
+        // before any registry call, for local and remote writes.
+        if (!RegistrySecurityDescriptor.HasSelfRelativeLayout(securityDescriptor) ||
+            !RegistrySecurityDescriptor.TryGetLength(securityDescriptor, out int declaredLength) ||
             declaredLength != securityDescriptor.Length)
         {
             throw new ArgumentException(

@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using Windows.Win32;
 using Windows.Win32.Security;
@@ -23,6 +24,57 @@ public static class RegistrySecurityDescriptor
                 "The buffer is not a valid self-relative security descriptor with an exact declared length.",
                 nameof(descriptor));
         }
+    }
+
+    /// <summary>
+    /// Checks the fixed header and the offsets of a self-relative descriptor without calling Win32. Returns false
+    /// when the buffer is shorter than the 20-byte header, the revision is not 1, the SE_SELF_RELATIVE control bit
+    /// is clear, or an owner, group, SACL or DACL offset points outside the buffer. An ACL must fit with its
+    /// declared size. Run this before <see cref="TryGetLength"/>, so the Win32 check never reads past the buffer.
+    /// </summary>
+    internal static bool HasSelfRelativeLayout(ReadOnlySpan<byte> descriptor)
+    {
+        const int HeaderLength = 20;
+        const ushort SelfRelative = 0x8000;
+        const int SaclOffsetField = 12;
+        const int DaclOffsetField = 16;
+
+        if (descriptor.Length < HeaderLength || descriptor[0] != 1)
+        {
+            return false;
+        }
+
+        ushort control = BinaryPrimitives.ReadUInt16LittleEndian(descriptor[2..]);
+        if ((control & SelfRelative) == 0)
+        {
+            return false;
+        }
+
+        for (int field = 4; field < HeaderLength; field += 4)
+        {
+            long offset = BinaryPrimitives.ReadUInt32LittleEndian(descriptor[field..]);
+            if (offset == 0)
+            {
+                continue;
+            }
+
+            // Every part starts with at least its eight-byte fixed header (a SID header or an ACL header).
+            if (offset + 8 > descriptor.Length)
+            {
+                return false;
+            }
+
+            if (field is SaclOffsetField or DaclOffsetField)
+            {
+                long aclSize = BinaryPrimitives.ReadUInt16LittleEndian(descriptor[((int)offset + 2)..]);
+                if (aclSize < 8 || offset + aclSize > descriptor.Length)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     /// <summary>

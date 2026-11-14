@@ -266,7 +266,7 @@ public sealed class RegistryHiveTests
     {
         public bool AllowsLinkValues => false;
 
-        public void EnsureWriteAllowed(RegistryPath path, RegistryWriteOperation operation)
+        public void EnsureWriteAllowed(string? computerName, RegistryPath path, RegistryWriteOperation operation)
         {
             ArgumentNullException.ThrowIfNull(path);
             throw new RegistryOperationException(operation.ToString(), path, ErrorAccessDenied);

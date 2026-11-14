@@ -2,8 +2,10 @@
 
 Scope: `RemoteRegistryConnection` in `src/Bwc.Registry`, the remote root routing in
 `RegistryReader`, the File > Connect Network Registry and File > Disconnect Network Registry
-commands, and the remote computer nodes in the Registry Editor tree. Remote access is read only
-in this implementation. It never sends a mutating API to a remote computer.
+commands, the remote computer nodes in the Registry Editor tree, and the remote write store (section 15).
+The Registry Editor UI stays read only for remote nodes until a later piece enables Modify, New, Delete,
+Rename, Permissions and Export. The engine can write a remote computer only through
+`RemoteRegistryConnection.CreateStore` and an explicit write policy.
 
 ## 1. Operation order
 
@@ -196,3 +198,92 @@ path is the same code as the local expand failure that the value-list probe cove
   computer. The connect path refuses the local computer name, and no second computer or VM is available to the
   E2E run, so no test can make a remote value selected. The gating is covered by code review and by the
   unchanged disconnect and connect tests. A manual check on a second machine is needed before release.
+
+## 15. Remote writes (R1 engine)
+
+Scope: `RemoteRegistryConnection.CreateStore`, `RegistryWriterRoots`, the computer argument of
+`IRegistryWritePolicy.EnsureWriteAllowed`, `RegistryWriter` on a remote root (including
+`RegistryWriter.RemoteCopy.cs`), and the `RegistrySecurityDescriptor` layout check. Writes are limited to the
+test sandbox. Hive operations are refused on a remote store (section 15.4). The UI does not call any of this yet.
+
+The write rule: a remote write runs only after the policy accepts `(computer, path, operation)`. A refusal throws
+before any native call. Local writes keep their existing rules and error codes.
+
+### 15.1 Ways a remote write can fail, and the expected result
+
+| Way it could fail | Expected result | Test |
+| --- | --- | --- |
+| Write on a store whose connection was disposed before the call | `ObjectDisposedException` from the root pin. No native call. | `DisposedConnectionRefusesWritesWithoutTouchingTheRegistry` |
+| Dispose while a write is in flight | Each native open takes its own pin on the root. Dispose drops only the connection's reference, so an open that holds a pin finishes. Measured: a child key handle stays valid after the root handle is closed (section 15.5). A write that starts after Dispose gets `ObjectDisposedException`. | `RootPinKeepsTheHandleUsableAfterTheConnectionIsDisposed` (existing); `DisposedConnectionRefusesWritesWithoutTouchingTheRegistry` |
+| Wrong root on a remote store (`HKEY_CURRENT_USER`, `HKEY_CLASSES_ROOT`, `HKEY_CURRENT_CONFIG`) | `ArgumentException` from the root pin, before any native call. Also refused with a permissive policy. | `RemoteStoreRefusesRootsOtherThanLocalMachineAndUsers` |
+| Local path form (`HKCU\Software\BWC-E2E\...`) passed to a remote store | Sandbox policy refuses (access denied). Shipping policy: `ArgumentException` from the root pin. Nothing is written. | `SandboxDeniesRemoteWritesOutsideTheSandboxSubtree`, `RemoteStoreRefusesRootsOtherThanLocalMachineAndUsers` |
+| Sandbox path on a non-loopback computer (`192.168.1.20`, `bwc-remote-test`, `127.0.0.2`, `0.0.0.0`, `localhost`, `::ffff:127.0.0.1`, empty) | Sandbox policy refuses with access denied (5). Only the addresses `127.0.0.1` and `::1` are loopback. | `SandboxDeniesRemoteWritesToOtherComputers` |
+| Sandbox path under another user's SID, or a SID one digit off | Refused (5). | `SandboxDeniesRemoteWritesOutsideTheSandboxSubtree` |
+| Case difference in the SID or the sandbox names (`s-1-5-21-...`, `bwc-e2e`) | Allowed. The registry names are case-insensitive, so it is the same key. | `SandboxAllowsRemoteWritesWhateverTheSidCase` |
+| Sandbox base itself, or a sibling such as `BWC-E2E2`, as a remote path | Refused (5). | `SandboxDeniesRemoteWritesOutsideTheSandboxSubtree` |
+| `..` or `.` component built with `RegistryPath.AppendEnumeratedName` | Sandbox policy refuses a remote write (5) before native code. Shipping allows it, as it does locally. | `SandboxDeniesDotComponentsOnRemoteWrites` |
+| Rename of the remote sandbox root | Refused (5) by the policy. Delete of the root is allowed, as locally. | `SandboxDeniesRenameOfTheRemoteSandboxRoot` |
+| Remote write through a symbolic link key, or a tree containing one, under a link-rejecting policy | Refused (5) by the guard, same rules as local. Measured: the remote `RegCreateKeyEx` honors `REG_OPTION_OPEN_LINK` (section 15.5). | `RemoteGuardRefusesSymbolicLinksOnRealLoopback`; `RoutedGuardRefusesSymbolicLinks` (local handles) |
+| Connect fails: `ERROR_BAD_NETPATH` (53), `RPC_S_SERVER_UNAVAILABLE` (1722), access denied (5), network access denied (65), and the other codes | `RemoteRegistryException` from `Connect`. The loopback tests report `Inconclusive` with `not run: remote registry unavailable (Win32 <code>)`. They never query or start the service. | `ConnectOrSkip` in every loopback test |
+| RPC error on a write (session lost, access denied on a key the user can open) | `RegistryOperationException` with the Win32 code and the operation. No retry, and no fallback to the local registry. | Not automated. Forcing an RPC failure needs a second machine. |
+| Rename of a remote key | `RegRenameKey` fails on a remote handle with 6 (`ERROR_INVALID_HANDLE`, measured). The engine runs the managed copy-then-delete fallback for 6, and also for 50, 120 and 1. Any other code throws. | `RemoteRenameKeyLeavesOneKeyAtTheNewName` (loopback); `RenameByCopyMovesTheTree` (route) |
+| Fallback: the new name already exists | Refused with 183 before any write. The copy would otherwise merge into the existing key. | `RenameByCopyRefusesAnExistingDestination` |
+| Fallback: case-only rename | Refused with 50 before any write. The copy source and destination are the same key. | `RenameByCopyRefusesACaseOnlyRename` |
+| Fallback: the copy fails part way | The destination key this call created is removed (best effort). The source is not touched. If the removal also fails, the error names both paths. | Not injected (a partial copy cannot be forced through the policy). Reviewed in code. |
+| Fallback: the copy succeeds but deleting the source fails | The error is thrown with operation `RenameKey` and the message starts "Both keys now exist" and names the original and the copy. The copy is kept: a recursive delete is not atomic, so removing the copy could destroy the only complete tree. The original may be partly removed. | `RenameByCopyKeepsTheCopyWhenTheSourceDeleteFails` (route) |
+| Remote `CopyTree` | Runs the managed copy, because `RegCopyTree` fails with 6 on a remote handle (measured). Merges into an existing destination, as `RegCopyTree` does. | `RemoteCopyTreeAndRecursiveDeleteOnRealLoopback` |
+| Hive operations (`LoadHive`, `UnloadHive`, `SaveKey`, `ReplaceKey`, `RestoreKey`) on a remote store | Refused with 50 (`ERROR_NOT_SUPPORTED`) after the policy and before any native call. `SaveKey` must not create its file. | `RemoteHiveOperationsAreNotSupportedAndTouchNothing` |
+| Counted-name value seam (E2E only) on a remote store | Refused with 50 before any native call. `NtSetValueKey` cannot take a remote handle. | `RemoteStoreRefusesCountedNameValuesBeforeNativeCode` |
+| Security descriptor that is not self-relative, is truncated, has a bad declared length, has an offset outside the buffer, or is random bytes | `ArgumentException` before any native registry call, for local and remote writes. Nothing changes. | `SetKeySecurityRejectsMalformedDescriptorsBeforeNativeCode` |
+| Propagating a descriptor to a remote subtree that contains a link | Refused by the sandbox before the first key changes, as locally. | Covered by the local propagation tests; not repeated remotely |
+
+### 15.2 Remote rename and copy: measured path
+
+Measured on loopback (`127.0.0.1`) on the R1 machine with a scratch P/Invoke probe under the remote sandbox (the
+probe is not kept in the repo):
+
+- `RegRenameKey` on a remote handle: 6 (`ERROR_INVALID_HANDLE`). The source is unchanged. So a remote rename runs
+  the fallback.
+- `RegCopyTree` (source key handle, null subkey, destination handle): 6 on a remote handle. So the fallback copies
+  with managed code, `RegistryWriter.CopyTreeByHand`: each key's values are written with `SetValue`, its children
+  with `CreateKey` and recursion, and its DACL last with `SetKeySecurity`. Reads come from the connection's reader.
+  The DACL is copied per key. Owner and group are not copied. Every write passes the policy.
+- The fallback deletes the original with `DeleteKey(recursive: true)`, which is `RegDeleteTree`. That works on a
+  remote handle (measured 0).
+- A failed delete of the original keeps the copy and throws, with a message that names both keys (section 15.1).
+
+### 15.3 Symbolic links on a remote store
+
+The guard opens each component with `RegCreateKeyEx` and `REG_OPTION_OPEN_LINK`, then reads `SymbolicLinkValue` on the
+returned handle. Measured on loopback: the remote open returns the link node, not its target. `RegQueryValueEx`
+reports `REG_LINK` (type 6), so the option is honored. The loopback test `RemoteGuardRefusesSymbolicLinksOnRealLoopback`
+checks the refusal.
+
+### 15.4 Hive operations
+
+Hive operations on a remote store throw `RegistryOperationException` with `ERROR_NOT_SUPPORTED` (50) after the policy
+check and before any native call. They are outside the remote write set. A later piece decides the UI.
+
+### 15.5 Measurements and remaining gaps
+
+Measured on loopback, R1 machine, RemoteRegistry trigger-started (a `RegConnectRegistry` starts it):
+
+| Call | Remote result |
+| --- | --- |
+| `RegConnectRegistry` to `127.0.0.1` and to `::1` | 0 and 0. Both connect. |
+| `RegRenameKey` (remote handle) | 6 `ERROR_INVALID_HANDLE` |
+| `RegCopyTree` (remote handles) | 6 `ERROR_INVALID_HANDLE` |
+| `RegDeleteTree` (remote handle) | 0 |
+| `RegGetKeySecurity` (DACL) and `RegSetKeySecurity` | 0 and 0 (size query returns 122, then the read) |
+| Child key handle after `RegCloseKey` on the connection's root | Still valid (query returns 0). Supports the per-open pin design. |
+| `RegCreateKeyEx` with `REG_OPTION_OPEN_LINK` on a link node | Opens the link node. `SymbolicLinkValue` is read with type 6, not followed. |
+
+Loopback tests (real, not Inconclusive): `RemoteWritesRoundTripOnRealLoopback`, `RemoteWritesRoundTripOverTheIPv6Loopback`,
+`RemoteRenameKeyLeavesOneKeyAtTheNewName`, `RemoteGuardRefusesSymbolicLinksOnRealLoopback`,
+`RemoteSecurityDescriptorRoundTripsOnRealLoopback`, `RemoteCopyTreeAndRecursiveDeleteOnRealLoopback`.
+
+Not covered by automated tests:
+
+- Real RPC failures on write (section 15.1), other than a failed connect.
+- Connect to a second computer. The loopback paths use the same RPC code.
+- The timing of an in-flight Dispose. The measured child-handle result and the pin test cover the design.

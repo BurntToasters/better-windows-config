@@ -487,9 +487,9 @@ public sealed class RegistryStoreTests
 
         public bool AllowsLinkValues => _inner.AllowsLinkValues;
 
-        public void EnsureWriteAllowed(RegistryPath path, RegistryWriteOperation operation)
+        public void EnsureWriteAllowed(string? computerName, RegistryPath path, RegistryWriteOperation operation)
         {
-            _inner.EnsureWriteAllowed(path, operation);
+            _inner.EnsureWriteAllowed(computerName, path, operation);
 
             if (operation == RegistryWriteOperation.DeleteValue && _remainingFailures > 0)
             {
