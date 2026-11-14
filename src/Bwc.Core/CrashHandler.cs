@@ -17,6 +17,7 @@ public static partial class CrashHandler
     private static bool _showDialog;
     private static string _toolId = "unknown";
     private static int _reporting;
+    private static nint _owner;
 
     public static void Install(string toolId, bool showDialog)
     {
@@ -63,7 +64,31 @@ public static partial class CrashHandler
         }
     }
 
+    /// <summary>
+    /// Sets the window that owns the crash dialog. Zero means no owner. Call with zero when that window closes.
+    /// </summary>
+    public static void SetOwnerWindow(nint hwnd)
+    {
+        try
+        {
+            lock (Gate)
+            {
+                _owner = hwnd;
+            }
+        }
+        catch (Exception ex)
+        {
+            SafeTrace.WriteLine("CrashHandler.SetOwnerWindow failed: " + ex);
+        }
+    }
+
     public static void Report(System.Exception ex, string context)
+    {
+        Report(ex, context, allowDialog: true);
+    }
+
+    /// <summary>Logs first, always. The dialog is shown only when allowed and not nested in a dialog.</summary>
+    private static void Report(System.Exception? ex, string context, bool allowDialog)
     {
         try
         {
@@ -74,27 +99,31 @@ public static partial class CrashHandler
             }
 
             string safeContext = string.IsNullOrWhiteSpace(context) ? "Unhandled exception" : context;
+            Log.Exception(_toolId + ": " + safeContext, ex);
+            if (!allowDialog || !_showDialog)
+            {
+                return;
+            }
+
             if (Interlocked.Exchange(ref _reporting, 1) != 0)
             {
-                SafeTrace.WriteLine("CrashHandler.Report skipped a recursive report.");
+                SafeTrace.WriteLine("CrashHandler.Report skipped the dialog of a nested report.");
                 return;
             }
 
             try
             {
-                Log.Exception(_toolId + ": " + safeContext, ex);
-                if (_showDialog)
+                string logPath = Log.CurrentFile ?? Log.Directory ?? "(log file unavailable)";
+                string text = safeContext + Environment.NewLine + Environment.NewLine +
+                    ex.GetType().Name + ": " + ex.Message + Environment.NewLine + Environment.NewLine +
+                    "Log: " + logPath;
+                nint owner;
+                lock (Gate)
                 {
-                    string logPath = Log.CurrentFile ?? Log.Directory ?? "(log file unavailable)";
-                    string text = safeContext + Environment.NewLine + Environment.NewLine +
-                        ex.GetType().Name + ": " + ex.Message + Environment.NewLine + Environment.NewLine +
-                        "Log: " + logPath;
-                    _ = MessageBoxW(
-                        IntPtr.Zero,
-                        text,
-                        "Better Windows Config",
-                        MessageBoxOk | MessageBoxIconError);
+                    owner = _owner;
                 }
+
+                _ = MessageBoxW(owner, text, "Better Windows Config", MessageBoxOk | MessageBoxIconError);
             }
             finally
             {
@@ -120,11 +149,12 @@ public static partial class CrashHandler
             "AppDomain.UnhandledException");
     }
 
+    /// <summary>Logs only. This handler can run on the finalizer thread, where a modal dialog would block it.</summary>
     private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
-        Report(e.Exception, "TaskScheduler.UnobservedTaskException");
+        Report(e.Exception, "TaskScheduler.UnobservedTaskException", allowDialog: false);
     }
 
     [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
-    private static partial int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
+    private static partial int MessageBoxW(nint hWnd, string text, string caption, uint type);
 }

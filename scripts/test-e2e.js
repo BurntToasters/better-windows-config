@@ -22,6 +22,27 @@ const E2E_FILTER = "TestCategory!=Elevated";
 // process, and it is never combined with the exclusion above.
 const ELEVATED_SELECTOR = /TestCategory=Elevated(?![A-Za-z0-9_])/;
 
+// Variables a shell may have left set that would redirect the test host: the test harness sets its own
+// BWC_E2E_* and data root, and NODE_OPTIONS would change how this runner's child processes start.
+const DROPPED_INHERITED_NAMES = new Set(["BWC_PUBLISH_DIR", "BWC_DATA_ROOT", "BWC_RID", "BWC_FLAVOR", "BWC_RUN_ID", "NODE_OPTIONS"]);
+// Developer switches the harness reads on purpose. BWC_E2E_KEEP_DATA=1 keeps a failed run's data folder.
+const KEPT_E2E_NAMES = new Set(["BWC_E2E_KEEP_DATA"]);
+
+// Copies the environment for the test host without the variables above. Windows names are case-insensitive.
+function testHostEnvironment(source) {
+  const env = {};
+  for (const [key, value] of Object.entries(source)) {
+    const upper = key.toUpperCase();
+    if ((upper.startsWith("BWC_E2E_") && !KEPT_E2E_NAMES.has(upper)) || DROPPED_INHERITED_NAMES.has(upper)) {
+      continue;
+    }
+
+    env[key] = value;
+  }
+
+  return env;
+}
+
 const usage = `Usage: node scripts/test-e2e.js [options]
 
 Runs the Bwc.E2E test project against a publish folder. The test project always
@@ -356,7 +377,7 @@ if (filter !== undefined) {
 console.log(`filter: ${filter ?? "(none)"}`);
 
 const childEnv = {
-  ...process.env,
+  ...testHostEnvironment(process.env),
   BWC_PUBLISH_DIR: publishDir,
   BWC_RID: rid,
   BWC_FLAVOR: flavor,

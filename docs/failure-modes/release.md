@@ -4,7 +4,8 @@ Scope: `scripts/sign-update-manifest.js`, `scripts/validate-updater-manifest.js`
 `scripts/assemble-bundle.js`, `scripts/release-dry-run.js`, `scripts/release-preflight.js`,
 `scripts/release-session.js`,
 `scripts/release-draft.js`, `scripts/release-verify.js`, `scripts/release-publish.js`,
-`scripts/release-selftest.js`, and `scripts/lib/**`. Written before the code, per AGENTS.md.
+`scripts/release-cleanup.js`, `scripts/run-release.js`, `scripts/release-selftest.js`, and
+`scripts/lib/**`. Written before the code, per AGENTS.md.
 
 The update verifier's own failure modes are in
 [update-verifier.md](update-verifier.md). This file covers the release side: making a test
@@ -106,10 +107,11 @@ run, then exits 1. This keeps the plan visible without pretending the release is
 | P2 | Package version, `Directory.Build.props`, or requested version disagree | Artifact version lies | Refuse `version-mismatch`. Exit 1. |
 | P3 | Changelog heading for the version is missing or empty | Blank release notes | Refuse `changelog-missing` or `changelog-empty`. Exit 1. |
 | P4 | Beta is not built from `experimental`, or stable is not built from `main` | Release from the wrong branch | Refuse `branch-mismatch`. Exit 1. |
-| P5 | Detached HEAD | Cannot prove the branch | Refuse `detached-head` unless `--allow-detached` is given and HEAD is contained in the expected branch. |
+| P5 | Detached HEAD | Cannot prove the branch | Refuse `detached-head` unless `--allow-detached` is given and HEAD is contained in the expected branch. A remote `origin/<branch>` counts, so a detached checkout of a pushed commit passes. |
 | P6 | Built-in release key is still the placeholder | Updates fail closed, or a release ships unusable | Refuse `placeholder-key`. Exit 1. |
 | P7 | Session file missing, expired, or for another version, channel, or commit | Reuse an old proof | Refuse `missing-session`, `session-expired`, `session-mismatch`, or `session-commit-mismatch`. Exit 3 or 1. |
 | P8 | `--artifact-dir` points at a release without a manifest, signature, or both architectures | Draft from incomplete artifacts | Refuse `missing-artifact`, `signature-missing`, or `missing-architecture`. Exit 1. |
+| P9 | A manifest installer URL has a malformed percent escape (for example `%ZZ`) | `decodeURIComponent` throws a URIError and the preflight crashes | Refuse `asset-url-malformed`. Exit 1. No throw. |
 
 The session is a local proof, not a signature. It records the version, channel, commit,
 branch, package version, changelog heading, trusted key fingerprint, and start time. It
@@ -137,6 +139,8 @@ lives under `artifacts/release/session.json`, which is git-ignored.
 | G16 | Draft asset has the same name and size as the local file but a different SHA-256 | Size-only comparison accepts a tampered asset | Compare by the SHA-256 of the downloaded asset, never by size alone. A difference refuses `asset-conflict` unless `--replace-assets`. |
 | G17 | GitHub reports no digest for a draft asset | Digest-less comparison is unverified | The tool downloads the asset and hashes it. The result is the same comparison as G16. |
 | G18 | An asset id, name, or digest changes between verification and the publish PATCH | Race with another upload or edit | `release-publish --apply` re-reads the release immediately before the PATCH and refuses `asset-changed` when any asset id, name, or digest differs from the verified set. No PATCH is sent. Exit 1. |
+| G19 | `--replace-assets` and a same-name draft asset exists | The existing asset is downloaded and hashed first, so a broken asset fails before the replace | With `--replace-assets`, the same-name asset is deleted and re-uploaded. No download of the old asset. |
+| G20 | A draft asset has `state` other than `uploaded` (for example `new` or `starter`) | `gh` download fails with an unclear error | Treat as broken. With `--replace-assets`, delete and re-upload. Without it, refuse `asset-incomplete`. Exit 1. |
 
 `release-draft.js --apply` creates or updates a draft only. `release-publish.js --apply`
 requires a fresh verification of the downloaded draft assets before the PATCH that clears
@@ -219,12 +223,21 @@ The beta URL is empty until a beta channel is published.
 | U5 | Release VM | D10. The user runs `--apply` there, with a real `gh` login and the real release key. |
 | U6 | GnuPG | The user owns the GPG key (`GPG_KEY_ID`, `GPG_PASSPHRASE`). Only `scripts/gpg-sign.js` calls `gpg` (see release-assets.md). |
 
+## N. Installer publish reuse (`scripts/build-installer.js`, `publishIsGood`)
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| N1 | The build record in `artifacts/build` names another version than `package.json` | A publish folder from an older version is reused in a new installer | Not reused. `dotnet-build.js` runs again. |
+| N2 | The build record has a `commit` that differs from HEAD | A publish from another commit is reused | Not reused. `dotnet-build.js` records no commit today, so only the version is checked. Add the commit check when it is recorded. |
+| N3 | The build record has `pass` other than true, or its `rid` or `flavor` differ | A failed or wrong-flavor publish is reused | Not reused (existing behavior). |
+
 ## Release VM flow
 
-The Windows release VM runs one entry point, `npm run release:win`, then
-`npm run release:publish` and `npm run release:verify:published`. Secrets come from `.env`,
-loaded with `node --env-file-if-exists=.env`. The first release is stable `0.1.0`, so the
-stable policy applies. Written before the code, per AGENTS.md.
+The Windows release VM runs one entry point, `npm run release:win` (or `npm run release:win:upload`
+to resume after a failed upload). Then the user runs `npm run release:publish`,
+`npm run release:verify:published`, and `npm run release:cleanup`. The automatic flow ends at the
+mirror step and never runs git. Secrets come from `.env`, loaded with `node --env-file-if-exists=.env`.
+The first release is stable `0.1.0`, so the stable policy applies. Written before the code, per AGENTS.md.
 
 The policy refuses an override only for a stable version (`X.Y.Z`, no suffix). A beta version
 keeps the beta recovery paths. `build-installer.js` never calls the policy, so a local dev build
@@ -252,34 +265,97 @@ with `SKIP_WIN_CODESIGN=1` still works.
 | R1 | Unknown flag (`--skip-tests`) or any positional argument | A typo runs a different gate | Exit 2 with `Unknown release flag` or usage. Nothing runs. |
 | R2 | `src/Bwc.Update/Signing/TrustedKeys.cs` still carries the placeholder, has no embedded key, or cannot be read | The flow builds, then refuses at draft or publish | Refuse before the first step: `placeholder-key` (exit 1), `missing-trusted-key` (exit 1), or `missing-trusted-key-source` (exit 3). The message points at docs/RELEASE.md, "User-owned steps". No step runs. The environment is not read. |
 | R13 | Operator copies Zinnia's `.env` unchanged | A BWC-only variable is missing, and the run refuses | Cannot happen. The release flow reads only variables Zinnia's `.env` has (`TAURI_SIGNING_*`, `AZURE_*`, `GPG_*`, `GH_REPO*`, `SKIP_*`, `FORCE_UPLOAD`, `ALLOW_ASSET_REPLACE`). The trusted set comes from TrustedKeys.cs. |
-| R3 | `release:win` order | A skipped gate or a draft before proof | Exactly: `release:policy`, `release:preflight`, `test:all -- --quick --rid all`, `release:session:create -- --require-gate --force`, `release:clean`, `release:win:continue`. The `--force` replaces a session from an earlier attempt, so the proof matches this gate. |
-| R4 | `release:win:continue` order | Signing after upload, or publish-side work before the signed bundle exists | Exactly: `release:policy`, `release:session:verify`, `build:win:x64`, `build:win:arm64`, `installer:x64`, `installer:arm64`, `release:assemble`, `release:sign:gpg`, `release:authenticode` once per setup EXE, `release:draft`, `release:verify:draft`, `release:finalize`. |
+| R3 | `release:win` order | A skipped gate or a draft before proof | Exactly: `release:policy`, `release:preflight --require-trusted-key`, `test:all -- --quick --rid all`, `release:session:create -- --require-gate --force`, `release:clean`, `release:win:continue`. The `--force` replaces a session from an earlier attempt, so the proof matches this gate. |
+| R4 | `release:win:continue` order | Signing after upload, or publish-side work before the signed bundle exists | Exactly: `release:policy`, `release:preflight --require-trusted-key`, `release:session:verify`, `build:win:x64`, `build:win:arm64`, `installer:x64`, `installer:arm64`, `release:assemble`, `release:sign:gpg`, `release:authenticode` once per setup EXE, `release:draft`, `release:verify:draft`, `release:mirror -- --dir artifacts/release/<version>/<channel>`. The flow ends at the mirror and never runs git. |
 | R5 | A step fails | Later steps run on a broken state | The first failing step stops the run with its exit code. Later steps are not started. |
 | R6 | Quality gate runs GUI E2E on the signing VM | The release VM cannot start the GUI session | The gate is `test:all --quick`. It runs no `test-e2e.js` step and records `e2e: "skipped"` in the release session. |
-| R7 | `release:win:continue` runs alone (resume) | Continue without the policy or session checks | It starts with `release:policy` and `release:session:verify`. `release:win:resume` runs `prerelease:prepare` (policy and preflight) first. |
+| R7 | `release:win:continue` runs alone (resume) | Continue without the policy, readiness, or session checks | It starts with `release:policy`, `release:preflight --require-trusted-key`, and `release:session:verify`. `release:win:resume` runs `prerelease:prepare` first, which is the same gate. |
 | R8 | Clean step removes the session | The verify step has no proof | The clean step removes only `artifacts/release/<version>/`. `artifacts/release/session.json` and `artifacts/gate/` survive. |
-| R9 | `release:finalize` runs | `git reset --hard` discards local work on a non-disposable checkout | It is the last step of continue. The runner prints a warning first. It runs only on the disposable release VM. |
+| R9 | The automatic flow runs git commands | `git reset --hard` moves HEAD, so `release:publish` refuses the next run | No step runs `git reset`, `git clean`, or `git fetch`. The flow ends at `release:mirror`. Cleanup is `release:cleanup` (section "Resume and cleanup"). |
 | R10 | Draft step passes `--replace-assets` for stable | Stable asset replaced | Never for stable. Non-stable passes it only with `ALLOW_ASSET_REPLACE=1`. |
 | R11 | Stable version with `--replace-assets` given to `release-draft.js --apply` | Stable asset replaced by an explicit flag | Refuse `asset-replace-stable`. Exit 1. |
 | R12 | `release:publish` runs without the verify step first | Publish of an unverified draft | `release-publish.js --apply` runs `release-verify.js --apply` before the PATCH (existing behavior). Any verify failure stops the publish. |
+| R14 | A step is given a credential it does not read | A child process holds a secret it can leak or misuse | Each step gets only the variables in the `STEP_ENV` table in `scripts/run-release.js` (exported, self-tested). Every other credential is set to an empty string in that step's environment. Empty counts as unset, so a `.env` loaded by the step's npm script does not refill it. |
+| R15 | A step's npm script loads `.env` after the runner filtered the environment | The filter is bypassed by `--env-file-if-exists` | Node does not overwrite a variable that is already defined, even as an empty string. The run-selftest proves this with a temporary env file. |
+| R16 | `release:win` runs `release:win:continue` as a step | The nested run has no credentials to sign with | `release:win` and `release:win:continue` are runners. They pass the full environment, and the nested run filters each of its own steps. |
+
+### Signing readiness (`scripts/release-preflight.js --require-trusted-key`)
+
+Runs before any build, so a missing credential fails before the paid signing. Local checks run
+first and all of them report. The network checks (`gh`) run only when every local check passes.
+The GPG check signs a probe file in a temporary folder, not a release asset. Each reason's exit
+code is in the JSON report (`--json`). The CLI exits 3 when any refusal is a missing input, and 1
+otherwise.
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| RP1 | `TAURI_SIGNING_PRIVATE_KEY` unset or blank | Signing fails after the build | Refuse `key-missing`. Exit 3. |
+| RP2 | Update key is encrypted and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` is unset | A prompt would hang the VM | Refuse `password-missing`. No prompt. Exit 1. |
+| RP3 | Update key does not decrypt or is malformed | Manifest signing fails later | Refuse with the parser reason (for example `malformed-secret-key`). The key text is never printed. Exit 1. |
+| RP4 | Public half of the update key is not one of the keys in `TrustedKeys.cs` | Signed bundle refused by the draft check | Refuse `embedded-key-mismatch`. Exit 1. |
+| RP5 | `GPG_KEY_ID` unset or not 8, 16, or 40 hex digits | GPG signing fails after the build | Refuse `key-id-missing` or `key-id-invalid`. Exit 2. |
+| RP6 | `GPG_PASSPHRASE` unset | GPG cannot sign | Refuse `passphrase-missing`. Exit 2. |
+| RP7 | `gpg` not on PATH | GPG cannot sign | Refuse `gpg-missing`. Exit 4. |
+| RP8 | No secret key matches `GPG_KEY_ID`, or the primary fingerprint differs | Signs with the wrong key | Refuse `key-not-found` (exit 3), or `key-mismatch` or `key-ambiguous` (exit 1). |
+| RP9 | Probe signature fails, or the passphrase is wrong | Signing fails after the build | Refuse `sign-failed` (exit 4), or `verify-failed` (exit 1). The passphrase is redacted from the output. |
+| RP10 | `AFTER_PACK_LOC` unset for stable, or for beta with `OVERRIDE_BETA_MIRROR_SKIP=1` | Mirror step fails after signing | Refuse `after-pack-loc-missing`. Exit 1. |
+| RP11 | `AFTER_PACK_LOC` on an unmapped drive, or the folder does not exist | The check or the mirror crashes on the drive letter | Refuse `after-pack-loc-unavailable` with the path. Never throws. Exit 1. |
+| RP12 | `AFTER_PACK_LOC` is not writable (probe file cannot be created) | Mirror fails after signing | Refuse `after-pack-loc-unwritable`. Exit 1. |
+| RP13 | `AFTER_PACK_LOC` is relative, a drive root, a symbolic link, or inside the repository | Mirror refuses later | Refuse `after-pack-loc-invalid`. Exit 1. |
+| RP14 | Azure Artifact Signing variables missing while `SKIP_WIN_CODESIGN` is not exactly `1` | Authenticode fails after the build | Refuse `signing-env-missing`, naming the variables (names only). Exit 1. |
+| RP15 | `makensis.exe` not found (PATH, `NSIS_HOME`, or the NSIS folders) | Installer build fails after the first build | Refuse `makensis-missing`. Exit 3. |
+| RP16 | SignTool or the Artifact Signing dlib cannot be resolved (`windows-artifact-sign.ps1 -CheckOnly` fails) | Authenticode fails after signing starts | Refuse `signing-tools-missing`. Exit 3. |
+| RP17 | Node does not satisfy `package.json` `engines.node` | Build tools misbehave | Refuse `node-version`. Exit 1. |
+| RP18 | HEAD is not an ancestor of `origin/<expected branch>` (`main` for stable, `experimental` for beta) | Release built from unpushed commits | Refuse `head-not-pushed`. Exit 1. Nothing is fetched; run `git fetch origin` first. |
+| RP19 | `origin/<expected branch>` does not exist locally | The check cannot run | Refuse `remote-branch-missing`. Exit 1. |
+| RP20 | `gh` not on PATH | Draft and publish fail after the signing | Refuse `gh-missing`. Exit 4. |
+| RP21 | `gh auth status` fails (run with `ghEnvironment()`, so token variables are ignored) | Draft upload fails after the signing | Refuse `gh-auth-missing`. Exit 4. |
+| RP22 | A published (not draft) release already exists for `v<version>` | Second release for one tag | Refuse `release-published`. Exit 1. |
+| RP23 | `<version>` is not greater than the latest published non-draft release | Update feed moves backward | Refuse `version-not-newer`. Exit 1. |
+| RP24 | A network check (RP20 to RP23) runs after a local check failed | Wasted gh calls | Not run. Only local findings are reported in that case. |
+
+### Resume and cleanup (`scripts/run-release.js --from`, `scripts/release-cleanup.js`)
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| F1 | `--from <step>` names a step that is not in the continue list | Typo runs a different tail | Exit 2. Lists the valid names. Nothing runs. |
+| F2 | `--from` without `--continue` | Ambiguous mode | Exit 2. Nothing runs. |
+| F3 | `--from <step>` names a build step | Earlier build steps are skipped | The gate (`release:policy`, `release:preflight --require-trusted-key`, `release:session:verify`) always runs first. The steps before `<step>` are skipped. |
+| F4 | `--from <step>` names a gate step | A gate is skipped | The list runs from that gate step, so `release:policy` or `release:preflight` can be run alone. |
+| F5 | `release:win:upload` runs | Upload resumes without the gate | It is `--continue --from release:draft`. The gate runs first (F3). Draft reuses the existing draft for the same commit. |
+| F6 | Resume after the draft exists, with an Authenticode re-run | Re-signed bytes differ from the draft and the draft check fails | Do not restart at `release:authenticode` after a draft exists. Restart at `release:draft`. A stable draft is never replaced (R10, R11). |
+| F7 | `--from release:draft` after the release folder was cleaned | Upload of missing or unsigned files | `release-draft.js` refuses through the bundle check (`missing-artifact`, `signature-missing`). Run `release:win` again. |
+| F8 | Session older than 24 hours on a resume | Stale gate proof | `session-expired` (P7). Run `release:win` again to record a new gate. |
+| F9 | `release:publish` rerun after a successful publish, with the assets matching | Second publish refused, so the operator thinks it failed | Exit 0 with a message that ends `no-op`. The published release's target and prerelease must match HEAD, and its assets are verified against the local files (`release-verify.js --allow-published`). `publish-result.json` is rewritten with `noop: true`. |
+| F10 | `release:publish` rerun after a publish, with an asset that differs | Published bytes differ from the local files | Refuse `asset-hash-mismatch` or `asset-size-mismatch`. Exit 1. |
+| C1 | `release:cleanup` with a dirty working tree (tracked or untracked, outside git-ignored paths) | Uncommitted work is discarded | Refuse `dirty-tree` with the paths. Exit 1. Nothing is reset. |
+| C2 | HEAD is not an ancestor of the upstream after `git fetch` | Unpushed commits are discarded | Refuse `head-not-upstream`. Exit 1. Nothing is reset. |
+| C3 | No upstream is configured for the current branch | Target of the reset is unknown | Refuse `no-upstream`. Exit 1. |
+| C4 | `publish-result.json` for this version and channel is missing or not `published: true` | Cleanup before the release is published | Refuse `not-published`. Exit 1. Nothing is reset. |
+| C5 | `git fetch origin` fails | Reset to a stale upstream | Refuse `fetch-failed`. Exit 4. Nothing is reset. |
+| C6 | `release:cleanup` succeeds | Lost git-ignored artifacts | Only `git reset --hard <upstream>` and `git clean -fd` run. Git-ignored `artifacts/` survives. The version comes from `package.json`, and the upstream is resolved by git. |
+| C7 | `release:cleanup` is wired into an npm script with `%npm_package_version%` or `@{u}` | Shell-specific expansion breaks on Windows | Not allowed. The script is `node scripts/release-cleanup.js`. |
 
 ### Quality gate proof and release session (`scripts/lib/release-policy.js`, `scripts/release-session.js`)
 
 | ID | Case | Risk | Required result |
 |----|------|------|-----------------|
-| Q1 | `artifacts/gate/result.json` is missing, with `--require-gate` | Release with no gate | Refuse `gate-missing`. Exit 1. No session is written. |
+| Q1 | `artifacts/gate/result.json` is missing, or has no pass for HEAD | Release with no gate | Refuse `gate-missing`. Exit 1. No session is written. `--require-gate` is the default for `create`; passing it is accepted and changes nothing. |
 | Q2 | Gate result has `pass` other than `true` | A failing gate proves nothing | Refuse `gate-failed`. Exit 1. |
 | Q3 | Gate `git.commit` differs from HEAD | Gate proof for another commit | Refuse `gate-commit-mismatch`. Exit 1. |
 | Q4 | Quick gate passes for HEAD | E2E silently counted as run | Session records `qualityGate.mode: "quick"` and `qualityGate.e2e: "skipped"`. |
 | Q5 | Full gate passes for HEAD | E2E skipped or unrecorded | Session records `qualityGate.e2e: "passed"`. |
 | Q6 | Gate result is unreadable JSON | Garbage accepted | Treat as missing (Q1). |
 | Q7 | Preflight, session, draft, verify, or publish runs without `--trusted-key` | Trusted set is an unexpected key | The trusted set is the non-placeholder keys embedded in `TrustedKeys.cs`. Publish passes the verify child only an explicit `--trusted-key`; the child reads the embedded keys itself. |
+| Q8 | Gate result has `git.dirty: true` (the gate ran on uncommitted files) | The pass does not describe HEAD | Refuse `gate-dirty-tree`. Exit 1. No session is written. |
+| Q9 | Session file has no `qualityGate`, or it is null | A session from an older tool or an edited file skips the gate | `release-session.js verify` refuses `missing-quality-gate`, and so do the draft, verify, and publish checks (`verifySessionFile`). Exit 1. |
+| Q10 | `release-session.js create` runs with no passing gate for HEAD | A session with no gate proof is written | Refuse `gate-missing`, since `--require-gate` is the default. Exit 1. No session is written. |
 
 ### Package scripts (`package.json`)
 
 | ID | Case | Risk | Required result |
 |----|------|------|-----------------|
-| N1 | A required script is missing | A documented step does not run | `release:win`, `release:win:continue`, `release:win:resume`, `release:finalize`, `release:mirror`, `release:sign:gpg`, `release:verify:draft`, `release:verify:published`, and `release:publish` exist. |
+| N1 | A required script is missing | A documented step does not run | `release:win`, `release:win:continue`, `release:win:resume`, `release:win:upload`, `release:cleanup`, `release:mirror`, `release:sign:gpg`, `release:verify:draft`, `release:verify:published`, and `release:publish` exist. `release:finalize` is removed, because it ran `git reset`. |
 | N2 | `release:sign:gpg`, `release:mirror`, or `release:verify:published` differs from the given command | Wrong script runs | Exact strings from the release brief. The first two take `--dir` through `npm run ... -- <args>`. |
 | N3 | An existing script name is removed | Old runbook breaks | `release:session`, `release:draft`, `release:verify`, `release:preflight`, `release:assemble`, `release:sign`, `release:validate`, `release:dry-run`, `release:selftest`, `build:win:x64`, `build:win:arm64`, `installer:x64`, `installer:arm64`, `setup:win:artifact-signing`, `signing:selftest`, `test:all`, and `validate` stay. |
 | N4 | A script that needs secrets runs without `.env` | Missing `TAURI_SIGNING_PRIVATE_KEY` or Azure variables | Each such script loads `.env` with `node --env-file-if-exists=.env`. The PowerShell Authenticode step inherits the environment of the run that loaded `.env`. |
@@ -290,4 +366,4 @@ with `SKIP_WIN_CODESIGN=1` still works.
 |----|------|------|
 | V1 | Built-in trusted key is still the placeholder | Preflight refuses `placeholder-key` (P6). The user adds the real public key to `TrustedKeys.cs` first. |
 | V2 | An explicit `--trusted-key` names a `.pub` file that is not embedded in `TrustedKeys.cs` | A foreign key becomes trusted | Refuse `embedded-key-mismatch` in preflight, draft, verify, and publish. The check compares key id and bytes with the embedded list. |
-| V3 | `release:finalize` on a checkout with local work | Destructive by design (Zinnia parity). Run only on the disposable release VM. |
+| V3 | `release:cleanup` on a checkout with local work | Discards uncommitted or unpushed work. `release:cleanup` refuses both (C1, C2). Run it only after `release:publish`. |

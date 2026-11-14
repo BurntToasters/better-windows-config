@@ -3,8 +3,8 @@
   <!--
     The stand-in installer for the Hub install E2E test. It is never a release artifact: it is not in any
     publish folder and it is not signed by the release key. The E2E fixture signs its bytes with the
-    throwaway test key. Each architecture is published as one framework-dependent single-file exe, because
-    the helper stages and starts a lone installer.exe with nothing beside it. The outputs are written to
+    throwaway test key. Each architecture is published as one single-file exe, because the helper stages
+    and starts a lone installer.exe with nothing beside it. The outputs are written to
     artifacts/e2e/fake-installer/<rid>/FakeInstaller.exe, where the E2E fixture reads them.
   -->
   <PropertyGroup>
@@ -26,6 +26,8 @@
   <!--
     Publishes both architectures after the normal build. The nested publish sets BwcStandInInner, so it does
     not publish again. Each publish is a single-file bundle, so the staged file runs with no other file.
+    The x64 bundle is self-contained: an ARM64 machine running the x64 suite under emulation usually has no
+    x64 .NET runtime, and a framework-dependent stand-in then exits 0x80008083 before it writes its record.
   -->
   <Target Name="BwcPublishStandIns" AfterTargets="Build" Condition="'$(BwcStandInInner)' != 'true'">
     <PropertyGroup>
@@ -34,7 +36,7 @@
     <MSBuild
       Projects="$(MSBuildProjectFullPath)"
       Targets="Publish"
-      Properties="BwcStandInInner=true;Platform=x64;RuntimeIdentifier=win-x64;PublishSingleFile=true;SelfContained=false;PublishDir=$(BwcStandInOut)\win-x64\" />
+      Properties="BwcStandInInner=true;Platform=x64;RuntimeIdentifier=win-x64;PublishSingleFile=true;SelfContained=true;PublishDir=$(BwcStandInOut)\win-x64\" />
     <MSBuild
       Projects="$(MSBuildProjectFullPath)"
       Targets="Publish"

@@ -25,8 +25,9 @@ import { mirrorReleaseAssets } from "./finalize-release-assets.js";
 const SCRIPT = "scripts/release-assets-selftest.js";
 const REPO_ROOT = repoRootFrom(import.meta.url);
 const RESULT_PATH = path.join(REPO_ROOT, "artifacts", "release", "selftest", "release-assets-result.json");
-const VERSION = "0.1.0";
-const BETA_VERSION = "0.1.0-beta.1";
+// The fixtures use the package version, so "--expected-version current" matches them after a version bump.
+const VERSION = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8")).version;
+const BETA_VERSION = `${VERSION}-beta.1`;
 const FUTURE_EXPIRES = "2099-01-01T00:00:00Z";
 const PAST_EXPIRES = "2020-01-02T00:00:00Z";
 const PUBDATE = "2026-11-11T00:00:00Z";
@@ -549,6 +550,29 @@ async function runMirrorCases(temp, cases) {
     { status: EXIT.REFUSED, reasons: ["symlink-refused"] },
   );
 
+  // An unmapped drive letter is a refusal with a reason, never an unhandled exception.
+  const unmappedDrive = ["Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"].map((letter) => `${letter}:\\`).find((root) => !fs.existsSync(root));
+  if (unmappedDrive) {
+    const unmappedDest = `${unmappedDrive}BWC-mirror`;
+    const unmapped = await runChild("scripts/finalize-release-assets.js", ["--dir", src, "--version", VERSION], {
+      env: childEnv(withDest(unmappedDest)),
+    });
+    expectExit(cases, "mirror: an unmapped drive in AFTER_PACK_LOC refuses with after-pack-loc-unavailable", unmapped, {
+      status: EXIT.REFUSED,
+      reasons: ["after-pack-loc-unavailable"],
+    });
+    record(cases, "mirror: a refused unmapped destination is not created", !fs.existsSync(unmappedDest), "a folder was created");
+    const direct = await mirrorReleaseAssets({ releaseDir: src, destination: unmappedDest, version: VERSION, repoRoot: REPO_ROOT });
+    record(
+      cases,
+      "mirror: mirrorReleaseAssets returns the refusal instead of throwing for an unmapped drive",
+      direct.ok === false && direct.reason === "after-pack-loc-unavailable",
+      JSON.stringify(direct),
+    );
+  } else {
+    record(cases, "mirror: unmapped drive case skipped (Q: to Z: are all mapped on this machine)", true, "skipped");
+  }
+
   // A real mirror: copies, verifies, replaces only the same-name file, keeps everything else.
   const dest = freshDest();
   write(path.join(dest, VERSION, "bwc-stable.json"), "OLD MANIFEST\n");
@@ -723,7 +747,7 @@ async function runLiveCases(temp, cases) {
     record(cases, "live: a good bundle passes with exit 0", pass.status === 0 && pass.stdout.includes("ok"), tail(pass), pass.status);
 
     const current = await runChild("scripts/validate-updater-live.js", liveArgs(TRUSTED_A_ROOT, "current"), { env: baseEnv() });
-    record(cases, "live: --expected-version current reads package.json (0.1.0) and passes", current.status === 0, tail(current), current.status);
+    record(cases, `live: --expected-version current reads package.json (${VERSION}) and passes`, current.status === 0, tail(current), current.status);
 
     const jsonPass = await runChild("scripts/validate-updater-live.js", [...liveArgs(TRUSTED_A_ROOT), "--json"], { env: baseEnv() });
     let jsonOk = false;
@@ -737,7 +761,7 @@ async function runLiveCases(temp, cases) {
     expectExit(
       cases,
       "live: a wrong expected version refuses with version-mismatch",
-      await runChild("scripts/validate-updater-live.js", liveArgs(TRUSTED_A_ROOT, "0.1.1"), { env: baseEnv() }),
+      await runChild("scripts/validate-updater-live.js", liveArgs(TRUSTED_A_ROOT, "9.9.9"), { env: baseEnv() }),
       { status: EXIT.REFUSED, reasons: ["version-mismatch"] },
     );
 

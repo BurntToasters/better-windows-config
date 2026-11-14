@@ -1,8 +1,10 @@
 using System.Globalization;
+using System.Threading;
 using Bwc.Core;
 using Bwc.Regedit.Registry;
 using Bwc.Registry;
 using Bwc.UI.Dialogs;
+using Bwc.Regedit.Dialogs;
 using Bwc.UI.List;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -13,6 +15,7 @@ namespace Bwc.Regedit.Controllers;
 internal sealed class ValueCommands
 {
     private readonly RegeditContext _context;
+    private int _modifyInFlight;
 
     public ValueCommands(RegeditContext context)
     {
@@ -70,6 +73,12 @@ internal sealed class ValueCommands
 
     private async Task ShowBinaryDataAsync()
     {
+        if (RegeditSelectionGuards.IsRemoteSelected(_context))
+        {
+            // Values under a remote computer are read-only in this version, so the binary viewer does nothing.
+            return;
+        }
+
         if (_context.DialogOpen || _context.WindowHwnd == 0)
         {
             Log.Warn(
@@ -213,6 +222,11 @@ internal sealed class ValueCommands
 
     private async Task ModifyBinaryDataAsync()
     {
+        if (RegeditSelectionGuards.IsRemoteSelected(_context))
+        {
+            return;
+        }
+
         if (_context.DialogOpen || _context.WindowHwnd == 0)
         {
             Log.Warn(
@@ -240,6 +254,32 @@ internal sealed class ValueCommands
     /// </summary>
     private async Task ModifyValueAsync(DetailsRow? activated)
     {
+        // A second Enter or double-click while the first one is still reading the value would open a
+        // second editor, which the dialog gate then refuses. Only one dispatch runs at a time.
+        if (Interlocked.CompareExchange(ref _modifyInFlight, 1, 0) != 0)
+        {
+            Log.Info("Registry Editor ignored a repeated Modify while a value editor was being opened.");
+            return;
+        }
+
+        try
+        {
+            await ModifyValueCoreAsync(activated);
+        }
+        finally
+        {
+            Volatile.Write(ref _modifyInFlight, 0);
+        }
+    }
+
+    private async Task ModifyValueCoreAsync(DetailsRow? activated)
+    {
+        if (RegeditSelectionGuards.IsRemoteSelected(_context))
+        {
+            // Values under a remote computer are read-only in this version, so Modify does nothing.
+            return;
+        }
+
         if (_context.DialogOpen || _context.WindowHwnd == 0)
         {
             Log.Warn(
@@ -482,7 +522,13 @@ internal sealed class ValueCommands
 
         try
         {
-            _context.Store.SetMultiString(key, rawName, dialog.Value);
+            // Encoding against the bytes that were read keeps an odd trailing byte, and an unchanged edit
+            // writes the original data back exactly.
+            _context.Store.SetValue(
+                key,
+                rawName,
+                RegistryValueType.MultiString,
+                RegistryValueCodec.EncodeMultiString(dialog.Value, value.Data));
             return true;
         }
         catch (RegistryOperationException ex)

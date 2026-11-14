@@ -14,7 +14,8 @@ namespace Bwc.E2E.CommandLine;
 [TestClass]
 public sealed class CommandLineTests
 {
-    private const string OutsideSubKey = @"Software\BWC-CLI-Outside";
+    // Outside the sandbox root (Software\BWC-E2E\<run-id>) but named for this run.
+    private static string OutsideSubKey => @"Software\BWC-E2E-Outside-" + GuiGate.Config.RunId;
 
     private static int _checkStart;
 
@@ -44,9 +45,10 @@ public sealed class CommandLineTests
         string regedit4File = Path.Combine(tempDir, "export-4.reg");
         string outsideFile = Path.Combine(tempDir, "outside.reg");
 
-        // The outside key is removed in finally only when this test created it. A key that already
-        // exists belongs to someone else, so the test fails before any write and leaves it alone.
+        // The outside key is removed in finally only when the app created it during this test (outsideAppCreated).
+        // A key that already exists belongs to someone else, so the test fails before any write and leaves it alone.
         bool outsidePreexisted = OutsideKeyExists();
+        bool outsideAppCreated = false;
         E2EResults.Record(
             "commandline.outside.absent",
             !outsidePreexisted,
@@ -145,6 +147,7 @@ public sealed class CommandLineTests
 
             CommandResult denied = Run(config, sandbox, "/s", outsideFile);
             bool outsideCreated = OutsideKeyExists();
+            outsideAppCreated = outsideCreated;
             E2EResults.Record(
                 "commandline.import.outside.denied",
                 denied.Exited && denied.ExitCode != 0 && !outsideCreated,
@@ -165,7 +168,7 @@ public sealed class CommandLineTests
         finally
         {
             sandbox.Cleanup();
-            if (!outsidePreexisted)
+            if (outsideAppCreated)
             {
                 DeleteOutsideKey();
             }
@@ -212,6 +215,7 @@ public sealed class CommandLineTests
         var sandbox = new SandboxRegistry(config);
         string tempDir = Path.Combine(config.ArtifactsDir, "command-line-silent", config.RunId);
         bool outsidePreexisted = OutsideKeyExists();
+        bool outsideAppCreated = false;
         E2EResults.Record(
             "commandline.silent.outsideAbsent",
             !outsidePreexisted,
@@ -276,6 +280,7 @@ public sealed class CommandLineTests
             CommandResult denied = Run(config, sandbox, "/s", deniedFile);
             bool goodWritten = sandbox.ReadString("Import\\Good", "Value") == "good";
             bool outsideAbsent = !OutsideKeyExists();
+            outsideAppCreated = !outsideAbsent;
             E2EResults.Record(
                 "commandline.silent.denied.exit",
                 denied.Exited && denied.ExitCode == 1 && !denied.SawWindow && goodWritten && outsideAbsent,
@@ -290,7 +295,7 @@ public sealed class CommandLineTests
         finally
         {
             sandbox.Cleanup();
-            if (!outsidePreexisted)
+            if (outsideAppCreated)
             {
                 DeleteOutsideKey();
             }
@@ -323,6 +328,147 @@ public sealed class CommandLineTests
         {
             child.SetValue("Qword", 0x1122334455667788UL, RegistryValueKind.QWord);
         }
+    }
+
+    /// <summary>
+    /// A whole-registry /e streams to a temp file and moves it over the target. A successful run leaves a valid
+    /// version 5 file and no temp file. A run whose target is locked fails, keeps the old content, and leaves no temp file.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("CommandLine")]
+    [TestCategory("Mutating")]
+    public void CommandLine_WholeRegistryExportReplacesTheTargetAtomically()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+
+        try
+        {
+            config.EnsureExecutablesExist();
+        }
+        catch (Exception ex)
+        {
+            E2EResults.Record("commandline.whole.publish", false, ex.Message);
+            Assert.Fail(ex.Message);
+            return;
+        }
+
+        var sandbox = new SandboxRegistry(config);
+        string tempDir = Path.Combine(config.ArtifactsDir, "command-line", config.RunId + "-whole");
+        string target = Path.Combine(tempDir, "whole.reg");
+        try
+        {
+            sandbox.Cleanup();
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+
+            Directory.CreateDirectory(tempDir);
+            File.WriteAllText(target, OldWholeContent, Encoding.ASCII);
+
+            WholeExport export = RunWholeRegistryExport(config, sandbox, target);
+            byte[] bytes = File.ReadAllBytes(target);
+            bool bom = bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE;
+            string text = bom ? Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2) : string.Empty;
+            bool validRegFile = text.StartsWith("Windows Registry Editor Version 5.00\r\n\r\n", StringComparison.Ordinal) &&
+                text.Contains("[HKEY_LOCAL_MACHINE", StringComparison.OrdinalIgnoreCase);
+            Record(
+                "commandline.whole.export",
+                export.Exited && export.ExitCode == 0 && validRegFile,
+                $"exited={export.Exited}, exit={export.ExitCode}, bom={bom}, valid .reg={validRegFile}, bytes={bytes.Length}, stderr='{export.StandardError.Trim()}'.");
+            Record(
+                "commandline.whole.noTempAfterSuccess",
+                LeftoversBeside(tempDir, target).Length == 0,
+                $"other files beside the target={string.Join(",", LeftoversBeside(tempDir, target))}.");
+
+            File.WriteAllText(target, OldWholeContent, Encoding.ASCII);
+            WholeExport failed;
+            using (new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                failed = RunWholeRegistryExport(config, sandbox, target);
+            }
+
+            string kept = File.ReadAllText(target, Encoding.ASCII);
+            Record(
+                "commandline.whole.lockedTarget",
+                failed.Exited && failed.ExitCode != 0 && string.Equals(kept, OldWholeContent, StringComparison.Ordinal),
+                $"exited={failed.Exited}, exit={failed.ExitCode}, old content kept={string.Equals(kept, OldWholeContent, StringComparison.Ordinal)}.");
+            Record(
+                "commandline.whole.noTempAfterFailure",
+                LeftoversBeside(tempDir, target).Length == 0,
+                $"other files beside the target={string.Join(",", LeftoversBeside(tempDir, target))}.");
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, recursive: true);
+                }
+            }
+            catch (IOException)
+            {
+                // The temp folder is scoped to this run and is removed best effort.
+            }
+        }
+
+        var failures = E2EResults.FailedChecksSince(_checkStart);
+        Assert.AreEqual(
+            0,
+            failures.Count,
+            $"Whole-registry export checks failed:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
+    }
+
+    private const string OldWholeContent = "OLD CONTENT, KEEP ME\r\n";
+    private static readonly TimeSpan WholeRegistryTimeout = TimeSpan.FromMinutes(15);
+
+    private readonly record struct WholeExport(bool Exited, int ExitCode, string StandardError);
+
+    private static void Record(string id, bool pass, string notes) => _ = E2EResults.Record(id, pass, notes);
+
+    /// <summary>Files in the folder other than the target. A stray temp file is reported here.</summary>
+    private static string[] LeftoversBeside(string folder, string target) =>
+        Directory.GetFiles(folder, "*", SearchOption.AllDirectories)
+            .Where(file => !string.Equals(Path.GetFullPath(file), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+    /// <summary>
+    /// Runs /e with no key, which is the whole registry. The window path never shows, so the wait is longer than
+    /// the 10 second limit <see cref="Run"/> uses for the sandbox exports.
+    /// </summary>
+    private static WholeExport RunWholeRegistryExport(E2EConfig config, SandboxRegistry sandbox, string file)
+    {
+        var startInfo = new ProcessStartInfo(config.RegeditExePath)
+        {
+            UseShellExecute = false,
+            WorkingDirectory = config.PublishDir,
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+        };
+        startInfo.ArgumentList.Add("/e");
+        startInfo.ArgumentList.Add(file);
+        startInfo.Environment["__COMPAT_LAYER"] = "RunAsInvoker";
+        startInfo.Environment[E2EConfig.DataRootEnvironmentVariable] = config.DataRootFor("command-line-whole");
+        startInfo.Environment["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath;
+
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException($"Process.Start returned no process for '{config.RegeditExePath}'.");
+        Task<string> stderr = process.StandardError.ReadToEndAsync();
+        Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+        bool exited = process.WaitForExit(WholeRegistryTimeout);
+        if (!exited)
+        {
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit(5000);
+        }
+
+        _ = stdout.Wait(TimeSpan.FromSeconds(5));
+        string error = stderr.Wait(TimeSpan.FromSeconds(5)) ? stderr.Result : string.Empty;
+        return new WholeExport(exited, exited ? process.ExitCode : -1, error);
     }
 
     private static CommandResult Run(

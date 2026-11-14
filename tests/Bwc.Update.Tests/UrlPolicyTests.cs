@@ -77,8 +77,54 @@ public sealed class UrlPolicyTests
     [TestMethod]
     public void Url_TooLong_Rejected()
     {
-        var url = "https://example.invalid/" + new string('a', 2100);
+        var url = "https://example.invalid/" + new string('a', 4100);
         Expect.Fails(UrlPolicy.Validate(url, requireHttps: true), UpdateFailure.UrlRejected);
+    }
+
+    [TestMethod]
+    public void Url_At_Limit_Accepted()
+    {
+        const string prefix = "https://example.invalid/?q=";
+        var url = prefix + new string('a', 4096 - prefix.Length);
+        Assert.AreEqual(4096, url.Length);
+        Assert.IsTrue(UrlPolicy.Validate(url, requireHttps: true).Ok);
+    }
+
+    [TestMethod]
+    public void Github_Shaped_Query_Accepted()
+    {
+        var url = "https://release-assets.example.invalid/asset/1/guid?" + GithubShapedQuery.Build();
+        Assert.IsTrue(url.Length is >= 900 and <= 1100, url.Length.ToString());
+        Assert.IsTrue(UrlPolicy.Validate(url, requireHttps: true).Ok);
+    }
+
+    [TestMethod]
+    [DataRow("https://example.invalid/a%2Fb?x=1")]
+    [DataRow("https://example.invalid/a%2fb?x=1")]
+    [DataRow("https://example.invalid/a%5Cb?x=1&y=2")]
+    [DataRow("https://example.invalid/%2E%2E/b?x=1")]
+    public void Encoded_Separator_In_Path_Refused_With_Query(string url)
+    {
+        Expect.Fails(UrlPolicy.Validate(url, requireHttps: true), UpdateFailure.UrlRejected);
+    }
+
+    [TestMethod]
+    [DataRow("https://example.invalid/a?x=a b")]
+    [DataRow("https://example.invalid/a?x=a\\b")]
+    [DataRow("https://example.invalid/a?x=a\"b")]
+    [DataRow("https://example.invalid/a?x=aéb")]
+    [DataRow("https://example.invalid/a?x=a\u0001b")]
+    [DataRow("https://example.invalid/a?x=a#b")]
+    public void Query_Bad_Characters_Rejected(string url)
+    {
+        Expect.Fails(UrlPolicy.Validate(url, requireHttps: true), UpdateFailure.UrlRejected);
+    }
+
+    [TestMethod]
+    public void Redirect_Raw_Space_In_Query_Rejected()
+    {
+        var from = new Uri("https://example.invalid/x.exe");
+        Expect.Fails(UrlPolicy.ValidateRedirect(from, "https://cdn.example.invalid/y?x=a b", requireHttps: true), UpdateFailure.UrlRejected);
     }
 
     [TestMethod]

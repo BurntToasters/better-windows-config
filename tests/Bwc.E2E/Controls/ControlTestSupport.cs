@@ -579,6 +579,21 @@ internal static class ControlTestSupport
     }
 
     /// <summary>
+    /// Sends a key-up for one key that the system reports as still down, such as an Enter an earlier step left held.
+    /// A held key makes the next key-down read as a repeat, which some controls ignore. Returns true when it was released.
+    /// </summary>
+    internal static bool ReleaseStuckKey(int virtualKey)
+    {
+        if ((unchecked((ushort)GetAsyncKeyState(virtualKey)) & 0x8000) == 0)
+        {
+            return false;
+        }
+
+        keybd_event(unchecked((byte)virtualKey), 0, KeyEventKeyUp, UIntPtr.Zero);
+        return true;
+    }
+
+    /// <summary>
     /// Sends a key-up for each of Shift, Ctrl and Alt that the system reports as down. Returns true
     /// when any key was released.
     /// </summary>
@@ -822,125 +837,6 @@ internal static class ControlTestSupport
             .Select(SafeName)
             .Where(name => name.Length > 0)
             .ToArray();
-    }
-
-    /// <summary>The applet key classic regedit writes LastKey and view state to when it exits.</summary>
-    internal const string AppletKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Applets\Regedit";
-
-    internal readonly record struct AppletValue(RegistryValueKind Kind, object? Data);
-
-    /// <summary>
-    /// The values under the applet key at one moment. KeyExisted records whether the key itself was
-    /// there, so a restore can tell values it created from values that were already there.
-    /// </summary>
-    internal sealed record AppletSnapshot(bool KeyExisted, IReadOnlyDictionary<string, AppletValue> Values);
-
-    /// <summary>Reads every value under HKCU\...\Applets\Regedit. Read only.</summary>
-    internal static AppletSnapshot SnapshotAppletValues()
-    {
-        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(AppletKeyPath, writable: false);
-        var values = new Dictionary<string, AppletValue>(StringComparer.OrdinalIgnoreCase);
-        if (key is not null)
-        {
-            foreach (string name in key.GetValueNames())
-            {
-                values[name] = new AppletValue(
-                    key.GetValueKind(name),
-                    key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames));
-            }
-        }
-
-        return new AppletSnapshot(key is not null, values);
-    }
-
-    /// <summary>
-    /// Puts the applet values back as they were in <paramref name="before"/>. Values that were not in the
-    /// snapshot are deleted, because classic regedit created them. Values that were in it are written
-    /// back with their kind and data. The key itself is left in place. Returns null when the values
-    /// match the snapshot afterwards, or a description of the first difference.
-    /// </summary>
-    internal static string? RestoreAppletValues(AppletSnapshot before)
-    {
-        bool present;
-        using (RegistryKey? probe = Registry.CurrentUser.OpenSubKey(AppletKeyPath, writable: false))
-        {
-            present = probe is not null;
-        }
-
-        if (!present && before.Values.Count == 0)
-        {
-            return null;
-        }
-
-        using (RegistryKey key = Registry.CurrentUser.CreateSubKey(AppletKeyPath, writable: true)
-            ?? throw new InvalidOperationException($@"Could not open HKCU\{AppletKeyPath} for writing."))
-        {
-            string[] names = key.GetValueNames();
-            foreach (string name in names)
-            {
-                if (!before.Values.ContainsKey(name))
-                {
-                    key.DeleteValue(name, throwOnMissingValue: false);
-                }
-            }
-
-            foreach (KeyValuePair<string, AppletValue> pair in before.Values)
-            {
-                bool exists = names.Contains(pair.Key, StringComparer.OrdinalIgnoreCase);
-                if (exists && SameAppletValue(key, pair.Key, pair.Value))
-                {
-                    continue;
-                }
-
-                key.SetValue(pair.Key, pair.Value.Data ?? Array.Empty<byte>(), pair.Value.Kind);
-            }
-        }
-
-        return FindAppletMismatch(before);
-    }
-
-    private static string? FindAppletMismatch(AppletSnapshot expected)
-    {
-        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(AppletKeyPath, writable: false);
-        string[] names = key?.GetValueNames() ?? Array.Empty<string>();
-        foreach (string name in names)
-        {
-            if (!expected.Values.ContainsKey(name))
-            {
-                return $"value '{name}' was not in the snapshot";
-            }
-        }
-
-        foreach (KeyValuePair<string, AppletValue> pair in expected.Values)
-        {
-            if (key is null || !names.Contains(pair.Key, StringComparer.OrdinalIgnoreCase))
-            {
-                return $"value '{pair.Key}' is missing";
-            }
-
-            if (!SameAppletValue(key, pair.Key, pair.Value))
-            {
-                return $"value '{pair.Key}' differs in kind or data";
-            }
-        }
-
-        return null;
-    }
-
-    private static bool SameAppletValue(RegistryKey key, string name, AppletValue expected)
-    {
-        if (key.GetValueKind(name) != expected.Kind)
-        {
-            return false;
-        }
-
-        object? current = key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
-        return (current, expected.Data) switch
-        {
-            (byte[] left, byte[] right) => left.AsSpan().SequenceEqual(right),
-            (string[] left, string[] right) => left.AsSpan().SequenceEqual(right),
-            _ => Equals(current, expected.Data),
-        };
     }
 
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);

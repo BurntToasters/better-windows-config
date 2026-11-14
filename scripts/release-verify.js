@@ -44,6 +44,7 @@ Options:
   --repo <owner/name>      Default GH_REPO, then GH_REPO_OWNER and GH_REPO_NAME, then BurntToasters/better-windows-config.
   --commit <rev>           Default HEAD.
   --allow-detached         Allow a detached HEAD contained in the expected branch.
+  --allow-published        With --apply: compare the assets of an already published release (rerun of publish).
   --skip-preflight         Dry run only.
   --skip-session           Dry run only.
   --max-age-hours <n>      Session limit. Default 24.
@@ -57,7 +58,7 @@ Exit codes: 0 verified or plan printed, 1 refused, 2 usage, 3 missing input,
 function parseOptions(argv) {
   const parsed = parseArguments(argv, {
     values: ["version", "channel", "dir", "session", { name: "trusted-key", multi: true }, "repo", "commit", "max-age-hours"],
-    flags: ["apply", "dry-run", "skip-preflight", "skip-session", "allow-detached", "json", "help"],
+    flags: ["apply", "dry-run", "skip-preflight", "skip-session", "allow-detached", "allow-published", "json", "help"],
   });
   if (parsed.has("help")) return { help: true };
   if (parsed.positionals.length > 0) throw new Error(`unexpected argument: ${parsed.positionals[0]}`);
@@ -86,6 +87,8 @@ function parseOptions(argv) {
     skipPreflight: parsed.has("skip-preflight"),
     skipSession: parsed.has("skip-session"),
     allowDetached: parsed.has("allow-detached"),
+    // Set by release-publish.js on a rerun: the published release's assets are compared, not refused.
+    allowPublished: parsed.has("allow-published"),
     json: parsed.has("json"),
   };
 }
@@ -132,7 +135,7 @@ async function applyVerify(context, options) {
     console.error(`${SCRIPT}: REFUSED [draft-missing]: no draft exists for ${context.tag}`);
     return EXIT.REFUSED;
   }
-  if (selected.kind === "published") {
+  if (selected.kind === "published" && !options.allowPublished) {
     console.error(`${SCRIPT}: REFUSED [already-published]: ${context.tag} is published, not a draft`);
     return EXIT.REFUSED;
   }
@@ -246,7 +249,7 @@ async function applyVerify(context, options) {
       completedUtc: new Date().toISOString(),
     });
     console.log(
-      `release-verify: PASS draft ${context.tag} id ${release.id} (${expected.length} assets, ` +
+      `release-verify: PASS ${selected.kind} ${context.tag} id ${release.id} (${expected.length} assets, ` +
         `HEAD ${String(context.commit).slice(0, 12)})`,
     );
     return EXIT.OK;

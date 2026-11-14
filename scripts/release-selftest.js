@@ -16,8 +16,19 @@ import path from "node:path";
 
 import { EXIT, repoRootFrom, writeJson } from "./lib/cli.js";
 import { assetBytesMatch } from "./lib/github-release.js";
+import {
+  assetFilesFromManifest,
+  checkBranch,
+  checkReleaseReadiness,
+  malformedInstallerUrls,
+  qualityGateProof,
+  satisfiesEngineRange,
+} from "./lib/release-policy.js";
+import { publishIsGood } from "./build-installer.js";
 import { envelope, generateKeyPair, signFile } from "./lib/minisign.js";
 import { buildManifest, serializeManifest } from "./lib/update-manifest.js";
+import { SIGNING_REQUIRED_VARIABLES } from "./release-policy.js";
+import { publishedReleaseMismatch } from "./release-publish.js";
 
 const SCRIPT = "scripts/release-selftest.js";
 const REPO_ROOT = repoRootFrom(import.meta.url);
@@ -946,6 +957,14 @@ function writeRepository(temp, { placeholder = false, embedded = [] } = {}) {
   );
 }
 
+const GATE_PATH = path.join("artifacts", "gate", "result.json");
+
+/** Writes artifacts/gate/result.json. Fields not given describe a passing quick gate for HEAD. */
+function writeGate(repo, fields = {}) {
+  const head = git(repo, ["rev-parse", "HEAD"]);
+  writeJson(path.join(repo, GATE_PATH), { schema: 1, pass: true, quick: true, git: { commit: head, dirty: false }, ...fields });
+}
+
 function commitAll(temp, message) {
   git(temp, ["add", "-A"]);
   git(temp, ["-c", "user.name=BWC Selftest", "-c", "user.email=selftest@example.invalid", "commit", "-q", "-m", message]);
@@ -982,6 +1001,7 @@ async function runPolicyCases(temp, fixture, cases) {
     cases,
   );
 
+  writeGate(repo);
   expectPass(
     "release session create and verify",
     (() => {
@@ -1106,6 +1126,368 @@ async function runPolicyCases(temp, fixture, cases) {
   commitAll(repo, "restore real key marker");
 }
 
+// ---- signing readiness (preflight --require-trusted-key), with injected dependencies -----------
+
+const GPG_FPR = "0123456789ABCDEF0123456789ABCDEF01234567";
+const READY_VERSION = "0.1.0";
+const READY_BETA = VERSION;
+const READY_ENV = Object.freeze({
+  GPG_KEY_ID: GPG_FPR,
+  GPG_PASSPHRASE: "selftest-only-passphrase",
+  ...Object.fromEntries(SIGNING_REQUIRED_VARIABLES.map((name) => [name, "selftest-value"])),
+});
+
+/** A gpg stand-in for the readiness probe: --version, --list-secret-keys, --detach-sign, --verify. */
+function fakeGpg({ version = "ok", keyList = "ok", sign = "ok", verify = "ok" } = {}) {
+  return (args) => {
+    const ok = { status: 0, stdout: "", stderr: "", error: null };
+    if (args[0] === "--version") {
+      if (version === "missing") return { ...ok, status: null, error: Object.assign(new Error("spawn gpg ENOENT"), { code: "ENOENT" }) };
+      return { ...ok, stdout: "gpg (GnuPG) 2.4.9\n" };
+    }
+    if (args.includes("--list-secret-keys")) {
+      if (keyList === "none") return { ...ok, status: 2, stderr: "gpg: no secret key" };
+      const fingerprint = keyList === "other" ? "F".repeat(40) : GPG_FPR;
+      return { ...ok, stdout: `sec:u:255:22:0000000000000000:0:::u:::scESC:::::::::\nfpr:::::::::${fingerprint}:\n` };
+    }
+    if (args.includes("--detach-sign")) {
+      if (sign === "fail") return { ...ok, status: 2, stderr: "gpg: bad passphrase" };
+      fs.writeFileSync(args[args.indexOf("--output") + 1], "-----BEGIN PGP SIGNATURE-----\n");
+      return ok;
+    }
+    if (args.includes("--verify")) {
+      if (verify === "bad") return { ...ok, status: 1 };
+      return {
+        ...ok,
+        stdout: `[GNUPG:] GOODSIG 0 BWC\n[GNUPG:] VALIDSIG ${GPG_FPR} 2026-01-01 1767225600 0 4 0 1 8 00 ${GPG_FPR}\n`,
+      };
+    }
+    return { ...ok, status: 1, stderr: "unexpected gpg call" };
+  };
+}
+
+/** Runs checkReleaseReadiness. An env value of undefined removes the variable. */
+function readiness(root, fixture, { env = {}, deps = {}, version = READY_BETA, channel = "beta" } = {}) {
+  const merged = { ...READY_ENV, ...env };
+  for (const name of Object.keys(merged)) if (merged[name] === undefined) delete merged[name];
+  const calls = { gh: 0, listReleases: 0 };
+  const base = {
+    loadUpdateKey: () => ({ ok: true, text: fixture.keyA.publicKeyText }),
+    runGpg: fakeGpg(),
+    probeDirectory: () => ({ ok: true }),
+    findMakensis: () => ({ path: "C:\\NSIS\\makensis.exe", searched: ["C:\\NSIS\\makensis.exe"] }),
+    checkSigningTools: () => ({ ok: true, detail: "SignTool" }),
+    nodeVersion: "v26.13.1",
+    refExists: () => true,
+    isAncestor: () => true,
+    ghAuthStatus: () => {
+      calls.gh += 1;
+      return { ok: true };
+    },
+    listReleases: () => {
+      calls.listReleases += 1;
+      return [];
+    },
+  };
+  const result = checkReleaseReadiness(root, { version, channel, commit: FAKE_COMMIT, env: merged }, { ...base, ...deps });
+  return { ...result, calls, reasons: result.errors.map((entry) => entry.reason), text: JSON.stringify(result) };
+}
+
+function readinessRepo(temp, fixture, { placeholder = false } = {}) {
+  const dir = path.join(temp, placeholder ? "ready-placeholder" : "ready");
+  writeRepository(dir, { placeholder, embedded: [fixture.keyA.publicKeyText] });
+  writeText(
+    path.join(dir, "package.json"),
+    `${JSON.stringify({ name: "ready", version: READY_BETA, engines: { node: "^26.13.1", npm: ">=12.2.2" } }, null, 2)}\n`,
+  );
+  return dir;
+}
+
+function expectReason(cases, name, result, reason, exitCode) {
+  const found = result.errors.find((entry) => entry.reason === reason);
+  const pass = Boolean(found) && (exitCode === undefined || found.exitCode === exitCode);
+  cases.push({
+    name,
+    pass,
+    exitCode: null,
+    matchedReasons: found ? [found.reason] : [],
+    detail: pass ? "" : `expected ${reason}${exitCode === undefined ? "" : ` exit ${exitCode}`}; got ${result.reasons.join(", ") || "no reason"}`,
+  });
+}
+
+function expectNoReason(cases, name, result, reason) {
+  expectCheck(name, !result.reasons.includes(reason), `${reason} was reported: ${result.reasons.join(", ")}`, cases);
+}
+
+function unmappedDriveRoot() {
+  for (const letter of "QRSTUVWXYZ") {
+    if (!fs.existsSync(`${letter}:\\`)) return `${letter}:\\BWC`;
+  }
+  return null;
+}
+
+async function runReadinessCases(temp, fixture, cases) {
+  const root = readinessRepo(temp, fixture);
+  const placeholderRoot = readinessRepo(temp, fixture, { placeholder: true });
+  const abs = path.join(temp, "pack-loc");
+  const stable = { channel: "stable", version: READY_VERSION };
+  const withPack = (value, extra = {}) => ({ env: { AFTER_PACK_LOC: value }, ...extra });
+
+  const good = readiness(root, fixture);
+  expectCheck("readiness: every check passes for a beta with the embedded key", good.ok, JSON.stringify(good.errors), cases);
+  expectCheck("readiness: a passing run calls gh once for the auth check and once for the releases", good.calls.gh === 1 && good.calls.listReleases === 1, JSON.stringify(good.calls), cases);
+
+  // update key (RP1 to RP4)
+  expectReason(cases, "readiness RP1: no update key refuses key-missing with exit 3", readiness(root, fixture, { deps: { loadUpdateKey: () => ({ ok: false, reason: "key-missing", detail: "TAURI_SIGNING_PRIVATE_KEY is not set" }) } }), "key-missing", 3);
+  expectReason(cases, "readiness RP2: an encrypted key without its password refuses password-missing", readiness(root, fixture, { deps: { loadUpdateKey: () => ({ ok: false, reason: "password-missing", detail: "encrypted" }) } }), "password-missing", 1);
+  expectReason(cases, "readiness RP3: a key that does not decrypt refuses with the parser reason", readiness(root, fixture, { deps: { loadUpdateKey: () => ({ ok: false, reason: "malformed-secret-key", detail: "checksum" }) } }), "malformed-secret-key", 1);
+  expectReason(cases, "readiness RP4: an update key not embedded refuses embedded-key-mismatch", readiness(root, fixture, { deps: { loadUpdateKey: () => ({ ok: true, text: fixture.keyB.publicKeyText }) } }), "embedded-key-mismatch", 1);
+  expectReason(cases, "readiness: a placeholder TrustedKeys.cs refuses placeholder-key", readiness(placeholderRoot, fixture), "placeholder-key", 1);
+
+  // GPG (RP5 to RP9)
+  expectReason(cases, "readiness RP5: GPG_KEY_ID unset refuses key-id-missing", readiness(root, fixture, { env: { GPG_KEY_ID: undefined } }), "key-id-missing", 2);
+  expectReason(cases, "readiness RP5: GPG_KEY_ID that is not hex refuses key-id-invalid", readiness(root, fixture, { env: { GPG_KEY_ID: "NOT-A-KEY" } }), "key-id-invalid", 2);
+  expectReason(cases, "readiness RP6: GPG_PASSPHRASE unset refuses passphrase-missing", readiness(root, fixture, { env: { GPG_PASSPHRASE: undefined } }), "passphrase-missing", 2);
+  expectReason(cases, "readiness RP7: gpg not on PATH refuses gpg-missing with exit 4", readiness(root, fixture, { deps: { runGpg: fakeGpg({ version: "missing" }) } }), "gpg-missing", 4);
+  expectReason(cases, "readiness RP8: no secret key for GPG_KEY_ID refuses key-not-found", readiness(root, fixture, { deps: { runGpg: fakeGpg({ keyList: "none" }) } }), "key-not-found", 3);
+  expectReason(cases, "readiness RP8: a different primary fingerprint refuses key-mismatch", readiness(root, fixture, { deps: { runGpg: fakeGpg({ keyList: "other" }) } }), "key-mismatch", 1);
+  expectReason(cases, "readiness RP9: a failing probe signature refuses sign-failed", readiness(root, fixture, { deps: { runGpg: fakeGpg({ sign: "fail" }) } }), "sign-failed", 4);
+  expectReason(cases, "readiness RP9: a probe that does not verify refuses verify-failed", readiness(root, fixture, { deps: { runGpg: fakeGpg({ verify: "bad" }) } }), "verify-failed", 1);
+  const gpgFailure = readiness(root, fixture, { deps: { runGpg: fakeGpg({ sign: "fail" }) } });
+  expectCheck("readiness RP9: the passphrase never appears in the output", !gpgFailure.text.includes(READY_ENV.GPG_PASSPHRASE), "passphrase printed", cases);
+
+  // AFTER_PACK_LOC (RP10 to RP13)
+  expectReason(cases, "readiness RP10: stable without AFTER_PACK_LOC refuses after-pack-loc-missing", readiness(root, fixture, { ...stable, env: { AFTER_PACK_LOC: undefined } }), "after-pack-loc-missing", 1);
+  expectReason(cases, "readiness RP10: beta with OVERRIDE_BETA_MIRROR_SKIP=1 needs AFTER_PACK_LOC", readiness(root, fixture, { env: { AFTER_PACK_LOC: undefined, OVERRIDE_BETA_MIRROR_SKIP: "1" } }), "after-pack-loc-missing", 1);
+  expectNoReason(cases, "readiness RP10: beta without the override does not need AFTER_PACK_LOC", readiness(root, fixture, { env: { AFTER_PACK_LOC: undefined } }), "after-pack-loc-missing");
+  expectReason(cases, "readiness RP13: a relative AFTER_PACK_LOC refuses after-pack-loc-invalid", readiness(root, fixture, { ...stable, ...withPack("mirror-out") }), "after-pack-loc-invalid", 1);
+  expectReason(cases, "readiness RP13: a drive root refuses after-pack-loc-invalid", readiness(root, fixture, { ...stable, ...withPack(path.parse(temp).root) }), "after-pack-loc-invalid", 1);
+  expectReason(cases, "readiness RP13: a folder inside the repository refuses after-pack-loc-invalid", readiness(root, fixture, { ...stable, ...withPack(path.join(root, "mirror")) }), "after-pack-loc-invalid", 1);
+  const unmapped = unmappedDriveRoot();
+  if (unmapped) {
+    let threw = null;
+    let unmappedResult = null;
+    try {
+      unmappedResult = readiness(root, fixture, {
+        ...stable,
+        ...withPack(unmapped),
+        deps: { probeDirectory: (value) => ({ ok: false, reason: "after-pack-loc-unavailable", detail: `${value} is not mapped` }) },
+      });
+    } catch (error) {
+      threw = error;
+    }
+    cases.push({
+      name: "readiness RP11: an unmapped drive is reported as a reason, never thrown",
+      pass: threw === null && unmappedResult?.reasons.includes("after-pack-loc-unavailable") === true,
+      exitCode: null,
+      detail: threw ? String(threw.message) : JSON.stringify(unmappedResult?.reasons ?? []),
+    });
+  } else {
+    cases.push({ name: "readiness RP11: unmapped drive case (every drive letter Q to Z is mapped; skipped)", pass: true, exitCode: null, detail: "skipped" });
+  }
+  expectReason(cases, "readiness RP12: a folder that is not writable refuses after-pack-loc-unwritable", readiness(root, fixture, { ...stable, ...withPack(abs), deps: { probeDirectory: () => ({ ok: false, reason: "after-pack-loc-unwritable", detail: "denied" }) } }), "after-pack-loc-unwritable", 1);
+
+  // signing environment and tools (RP14 to RP16)
+  const azureMissing = readiness(root, fixture, { env: { AZURE_CLIENT_ID: undefined } });
+  expectReason(cases, "readiness RP14: a missing Azure variable refuses signing-env-missing, naming the variable", azureMissing, "signing-env-missing", 1);
+  expectCheck("readiness RP14: the report names the variable but not its value", azureMissing.text.includes("AZURE_CLIENT_ID") && !azureMissing.text.includes("selftest-value"), azureMissing.text, cases);
+  expectNoReason(cases, "readiness RP14: SKIP_WIN_CODESIGN=1 (exactly) needs no Azure variables", readiness(root, fixture, { env: { AZURE_CLIENT_ID: undefined, SKIP_WIN_CODESIGN: "1" } }), "signing-env-missing");
+  expectReason(cases, "readiness RP16: SignTool or the dlib that does not resolve refuses signing-tools-missing with exit 3", readiness(root, fixture, { deps: { checkSigningTools: () => ({ ok: false, detail: "SignTool not found" }) } }), "signing-tools-missing", 3);
+  expectReason(cases, "readiness RP15: no makensis.exe refuses makensis-missing with exit 3", readiness(root, fixture, { deps: { findMakensis: () => ({ path: null, searched: [] }) } }), "makensis-missing", 3);
+
+  // node engines (RP17)
+  expectReason(cases, "readiness RP17: Node 26.13.0 does not satisfy ^26.13.1", readiness(root, fixture, { deps: { nodeVersion: "v26.13.0" } }), "node-version", 1);
+  expectReason(cases, "readiness RP17: Node 27 does not satisfy ^26.13.1", readiness(root, fixture, { deps: { nodeVersion: "v27.0.0" } }), "node-version", 1);
+  expectNoReason(cases, "readiness RP17: Node 26.14.0 satisfies ^26.13.1", readiness(root, fixture, { deps: { nodeVersion: "v26.14.0" } }), "node-version");
+
+  // git (RP18, RP19)
+  expectReason(cases, "readiness RP18: HEAD not contained in origin/experimental refuses head-not-pushed", readiness(root, fixture, { deps: { isAncestor: () => false } }), "head-not-pushed", 1);
+  expectReason(cases, "readiness RP19: origin/experimental missing refuses remote-branch-missing", readiness(root, fixture, { deps: { refExists: () => false } }), "remote-branch-missing", 1);
+  const stableGit = readiness(root, fixture, { ...stable, env: { AFTER_PACK_LOC: abs }, deps: { refExists: (ref) => ref === "origin/main" } });
+  expectCheck("readiness: a stable release is checked against origin/main", stableGit.ok, JSON.stringify(stableGit.errors), cases);
+
+  // local failures stop before any network call (RP24)
+  const local = readiness(root, fixture, { env: { AZURE_CLIENT_ID: undefined } });
+  expectCheck("readiness RP24: a failed local check makes no gh call", local.calls.gh === 0 && local.calls.listReleases === 0, JSON.stringify(local.calls), cases);
+
+  // gh and releases (RP20 to RP23)
+  expectReason(cases, "readiness RP20: gh not on PATH refuses gh-missing with exit 4", readiness(root, fixture, { deps: { ghAuthStatus: () => ({ ok: false, reason: "gh-missing", detail: "gh was not found" }) } }), "gh-missing", 4);
+  expectReason(cases, "readiness RP21: gh not logged in refuses gh-auth-missing with exit 4", readiness(root, fixture, { deps: { ghAuthStatus: () => ({ ok: false, reason: "gh-auth-missing", detail: "not logged in" }) } }), "gh-auth-missing", 4);
+  const releasedTag = [{ id: 9, tag_name: `v${READY_BETA}`, draft: false, prerelease: true, assets: [] }];
+  expectReason(cases, "readiness RP22: a published release for the tag refuses release-published", readiness(root, fixture, { deps: { listReleases: () => releasedTag } }), "release-published", 1);
+  expectReason(cases, "readiness RP23: a version not newer than the latest published release refuses version-not-newer", readiness(root, fixture, { deps: { listReleases: () => [{ id: 8, tag_name: "v0.1.0", draft: false, assets: [] }] } }), "version-not-newer", 1);
+  expectNoReason(cases, "readiness RP23: a version newer than the latest published release passes", readiness(root, fixture, { deps: { listReleases: () => [{ id: 7, tag_name: "v0.0.9", draft: false, assets: [] }] } }), "version-not-newer");
+  const draftOnly = readiness(root, fixture, { deps: { listReleases: () => [{ id: 3, tag_name: `v${READY_BETA}`, draft: true, assets: [] }] } });
+  expectCheck("readiness: an existing draft for the tag is reused, not refused", draftOnly.ok, JSON.stringify(draftOnly.errors), cases);
+  expectReason(cases, "readiness: two drafts for the tag refuse duplicate-drafts", readiness(root, fixture, { deps: { listReleases: () => [{ id: 1, tag_name: `v${READY_BETA}`, draft: true }, { id: 2, tag_name: `v${READY_BETA}`, draft: true }] } }), "duplicate-drafts", 1);
+  expectReason(cases, "readiness: a failed releases listing refuses gh-failed with exit 4", readiness(root, fixture, { deps: { listReleases: () => { throw Object.assign(new Error("gh failed"), { reason: "gh-failed", exitCode: 4 }); } } }), "gh-failed", 4);
+
+  // engines helper
+  const engineCases = [
+    ["v26.13.1", "^26.13.1", true],
+    ["v26.13.0", "^26.13.1", false],
+    ["v26.14.0", "^26.13.1", true],
+    ["v27.0.0", "^26.13.1", false],
+    ["26.13.1", "^26.13.1", true],
+    ["v20.0.0", ">=20.0.0", true],
+    ["v20.0.0", "not-a-range", null],
+  ];
+  for (const [version, range, expected] of engineCases) {
+    expectCheck(`engines: ${version} against ${range} is ${expected}`, satisfiesEngineRange(version, range) === expected, String(satisfiesEngineRange(version, range)), cases);
+  }
+}
+
+// ---- publish of an existing release (rerun) and the preflight CLI ---------------------------------
+
+function runPublishDecisionCases(cases) {
+  const release = { id: 5, target_commitish: FAKE_COMMIT, prerelease: false };
+  expectCheck(
+    "publish rerun: a published release on HEAD with the same prerelease flag is not a mismatch",
+    publishedReleaseMismatch(release, { commit: FAKE_COMMIT, targetCommit: FAKE_COMMIT, prerelease: false }) === null,
+    "mismatch",
+    cases,
+  );
+  const other = publishedReleaseMismatch(release, { commit: FAKE_COMMIT, targetCommit: "f".repeat(40), prerelease: false });
+  expectCheck("publish rerun: a published release on another commit refuses draft-target-mismatch", other?.reason === "draft-target-mismatch", JSON.stringify(other), cases);
+  const pre = publishedReleaseMismatch(release, { commit: FAKE_COMMIT, targetCommit: FAKE_COMMIT, prerelease: true });
+  expectCheck("publish rerun: a prerelease flag that differs refuses prerelease-mismatch", pre?.reason === "prerelease-mismatch", JSON.stringify(pre), cases);
+}
+
+function runReadinessCliCases(temp, fixture, cases) {
+  const repo = path.join(temp, "readiness-cli");
+  writeRepository(repo, { embedded: [fixture.keyA.publicKeyText] });
+  git(repo, ["init", "-q", "-b", "experimental"]);
+  commitAll(repo, "readiness cli fixture");
+  // No update key, GPG, or Azure variables: the local checks report, and no gh or gpg runs.
+  const result = run(
+    "scripts/release-preflight.js",
+    ["--root", repo, "--version", VERSION, "--channel", "beta", "--trusted-key", path.join(fixture.keys, "a.pub"), "--require-trusted-key"],
+    { remove: ["GPG_KEY_ID", "GPG_PASSPHRASE", "SKIP_WIN_CODESIGN", "AFTER_PACK_LOC", ...SIGNING_REQUIRED_VARIABLES] },
+  );
+  expectRefusal("preflight --require-trusted-key reports the missing update key before any build", result, ["key-missing"], cases);
+  expectCheck(
+    "preflight --require-trusted-key with a missing key exits 3 (missing input)",
+    result.status === EXIT.MISSING,
+    `exit ${result.status}`,
+    cases,
+  );
+  expectRefusal("preflight --require-trusted-key reports the missing GPG key in the same run", result, ["key-id-missing"], cases);
+  const plain = run("scripts/release-preflight.js", ["--root", repo, "--version", VERSION, "--channel", "beta", "--trusted-key", path.join(fixture.keys, "a.pub")]);
+  expectPass("preflight without --require-trusted-key keeps the existing checks only", plain, cases, "no readiness checks");
+}
+
+/** Session and gate cases. Every session refusal is listed in docs/failure-modes/release.md. */
+async function runSessionGateCases(temp, fixture, cases) {
+  const repo = path.join(temp, "gate-repo");
+  fs.mkdirSync(repo, { recursive: true });
+  git(repo, ["init", "-q", "-b", "experimental"]);
+  writeRepository(repo, { embedded: [fixture.keyA.publicKeyText] });
+  commitAll(repo, "gate fixture");
+  const head = git(repo, ["rev-parse", "HEAD"]);
+  const session = path.join(repo, "artifacts", "release", "session.json");
+  const common = ["--root", repo, "--version", VERSION, "--channel", "beta", "--trusted-key", path.join(fixture.keys, "a.pub")];
+  const create = (extra = []) => run("scripts/release-session.js", ["create", ...common, ...extra]);
+
+  expectRefusal("session create refuses with no gate result (gate-missing), by default", create(), ["gate-missing"], cases);
+  expectCheck("a refused session create writes no session file", !fs.existsSync(session), "", cases);
+  writeGate(repo, { pass: false });
+  expectRefusal("session create refuses a failing gate (gate-failed)", create(), ["gate-failed"], cases);
+  writeGate(repo, { git: { commit: "f".repeat(40), dirty: false } });
+  expectRefusal("session create refuses a gate for another commit (gate-commit-mismatch)", create(), ["gate-commit-mismatch"], cases);
+  writeGate(repo, { git: { commit: head, dirty: true } });
+  expectRefusal("session create refuses a gate recorded on a dirty tree (gate-dirty-tree)", create(), ["gate-dirty-tree"], cases);
+  writeGate(repo);
+  expectPass("session create records a passing quick gate without any flag", create(), cases, "quality gate recorded");
+  const recorded = JSON.parse(fs.readFileSync(session, "utf8")).qualityGate;
+  expectCheck("the recorded quick gate has e2e skipped", recorded?.mode === "quick" && recorded?.e2e === "skipped", JSON.stringify(recorded), cases);
+  expectPass("--require-gate is still accepted as a no-op", create(["--require-gate", "--force"]), cases, "accepted");
+  expectPass("session verify passes with a recorded gate", run("scripts/release-session.js", ["verify", ...common]), cases, "gate present");
+
+  const data = JSON.parse(fs.readFileSync(session, "utf8"));
+  delete data.qualityGate;
+  writeJson(session, data);
+  expectRefusal(
+    "session verify refuses a session with no quality gate (missing-quality-gate)",
+    run("scripts/release-session.js", ["verify", ...common]),
+    ["missing-quality-gate"],
+    cases,
+  );
+}
+
+/** A detached HEAD contained only in origin/<expected branch> passes --allow-detached (remote branches count). */
+function runDetachedBranchCases(temp, cases) {
+  const repo = path.join(temp, "detached-repo");
+  fs.mkdirSync(repo, { recursive: true });
+  git(repo, ["init", "-q", "-b", "experimental"]);
+  writeText(path.join(repo, "file.txt"), "one\n");
+  commitAll(repo, "detached fixture");
+  git(repo, ["update-ref", "refs/remotes/origin/experimental", git(repo, ["rev-parse", "HEAD"])]);
+  git(repo, ["checkout", "-q", "--detach"]);
+  const contained = checkBranch(repo, { channel: "beta" }, { allowDetached: true });
+  expectCheck("--allow-detached accepts HEAD contained in origin/experimental", contained.errors.length === 0, JSON.stringify(contained.errors), cases);
+  writeText(path.join(repo, "file.txt"), "two\n");
+  commitAll(repo, "unpushed detached commit");
+  const unrelated = checkBranch(repo, { channel: "beta" }, { allowDetached: true });
+  expectCheck(
+    "--allow-detached still refuses a detached HEAD that no expected branch contains",
+    unrelated.errors[0]?.reason === "branch-mismatch",
+    JSON.stringify(unrelated.errors),
+    cases,
+  );
+}
+
+/** Pure gate-proof and manifest-URL cases: a dirty gate and a malformed escape are refusals, not throws. */
+function runGateProofAndUrlCases(cases) {
+  const dirty = qualityGateProof({ pass: true, quick: true, git: { commit: FAKE_COMMIT, dirty: true } }, FAKE_COMMIT);
+  expectCheck("qualityGateProof refuses git.dirty true (gate-dirty-tree)", dirty.reason === "gate-dirty-tree", JSON.stringify(dirty), cases);
+  const clean = qualityGateProof({ pass: true, quick: true, git: { commit: FAKE_COMMIT, dirty: false } }, FAKE_COMMIT);
+  expectCheck("qualityGateProof accepts git.dirty false for HEAD", clean.ok === true, JSON.stringify(clean), cases);
+
+  const base = `https://github.com/BurntToasters/better-windows-config/releases/download/v${VERSION}`;
+  const manifest = {
+    installers: {
+      "win-x64": { url: `${base}/Bad%ZZ.exe` },
+      "win-arm64": { url: `${base}/ok.exe` },
+    },
+  };
+  const named = malformedInstallerUrls(manifest);
+  expectCheck("a malformed percent escape names its architecture (asset-url-malformed)", JSON.stringify(named) === '["win-x64"]', JSON.stringify(named), cases);
+  let thrown = null;
+  let files = null;
+  try {
+    files = assetFilesFromManifest("C:/unused", manifest);
+  } catch (error) {
+    thrown = error;
+  }
+  expectCheck(
+    "assetFilesFromManifest does not throw on a malformed escape",
+    thrown === null && files !== null && !("win-x64" in files) && "win-arm64" in files,
+    thrown ? String(thrown) : JSON.stringify(files),
+    cases,
+  );
+}
+
+/** Publish folder reuse: the build record must match this version and pass, and name HEAD when it names a commit. */
+function runPublishReuseCases(temp, cases) {
+  const build = path.join(temp, "reuse-build");
+  const publish = path.join(temp, "reuse-publish", "win-x64");
+  writeText(path.join(publish, "BetterWindowsConfig.exe"), "exe");
+  const reuse = (fields, extra = {}) => {
+    writeJson(path.join(build, "win-x64.json"), { schema: 2, version: VERSION, rid: "win-x64", flavor: "ship", pass: true, ...fields });
+    return publishIsGood({ rid: "win-x64", flavor: "ship", publishDir: publish, buildArtifactDir: build, packageVersion: VERSION, ...extra });
+  };
+  expectCheck("publish reuse: a passing record for this version is reused", reuse({}) === true, "reused", cases);
+  expectCheck("publish reuse: a record for another version is not reused", reuse({ version: OTHER_VERSION }) === false, "not reused", cases);
+  expectCheck("publish reuse: a failed record is not reused", reuse({ pass: false }) === false, "not reused", cases);
+  expectCheck("publish reuse: a record naming HEAD is reused", reuse({ commit: FAKE_COMMIT }, { head: FAKE_COMMIT }) === true, "reused", cases);
+  expectCheck(
+    "publish reuse: a record naming another commit is not reused",
+    reuse({ commit: FAKE_COMMIT }, { head: "f".repeat(40) }) === false,
+    "not reused",
+    cases,
+  );
+}
+
 async function main() {
   const started = Date.now();
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "bwc-release-selftest-"));
@@ -1117,6 +1499,22 @@ async function main() {
     await runAssembleCases(temp, fixture, cases);
     await runEnvironmentKeyCases(temp, fixture, cases);
     await runPolicyCases(temp, fixture, cases);
+    await runSessionGateCases(temp, fixture, cases);
+    runDetachedBranchCases(temp, cases);
+    runGateProofAndUrlCases(cases);
+    runPublishReuseCases(temp, cases);
+    await runReadinessCases(temp, fixture, cases);
+    runPublishDecisionCases(cases);
+    runReadinessCliCases(temp, fixture, cases);
+    expectCheck(
+      "release-verify accepts --allow-published (the publish rerun check)",
+      (() => {
+        const result = run("scripts/release-verify.js", ["--allow-published", "--json"]);
+        return result.status !== EXIT.USAGE && !result.stderr.includes("unrecognized option");
+      })(),
+      "the flag is refused as an unknown option",
+      cases,
+    );
   } catch (error) {
     fatal = error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error);
     cases.push({ name: "self-test harness", pass: false, detail: fatal });

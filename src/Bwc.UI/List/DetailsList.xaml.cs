@@ -1224,9 +1224,10 @@ public sealed partial class DetailsList : UserControl
 
     private void OnRenameLostFocus(object sender, RoutedEventArgs e)
     {
+        // Classic regedit commits the typed name when focus leaves the box, as the tree rename does.
         if (_renaming)
         {
-            CancelRename();
+            CommitRename();
         }
     }
 

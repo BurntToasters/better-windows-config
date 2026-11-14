@@ -507,6 +507,119 @@ public sealed class FindTests
         FailIfNeeded();
     }
 
+    /// <summary>
+    /// A key search that reaches the end shows Finished. F3 repeats Finished only while the selection stays where
+    /// the search ended. After the selection moves to an earlier key, F3 searches again and finds the next hit.
+    /// The tree keeps the keyboard after the progress dialog closes.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Find")]
+    [TestCategory("E2EOnly")]
+    public void Find_FinishedIsStickyUntilTheSelectionMoves()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        try
+        {
+            config.EnsureExecutablesExist();
+        }
+        catch (Exception ex)
+        {
+            E2EResults.Record("find.sticky.publish", false, ex.Message);
+            Assert.Fail(ex.Message);
+            return;
+        }
+
+        var sandbox = SeedSandbox(config);
+        string dataRoot = CreateFreshDataRoot(config, "findsticky");
+        var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+            ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+        };
+
+        try
+        {
+            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
+            using var driver = new FindDialogDriver(session);
+            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+            Record("find.sticky.navigate", navigated, $"navigated to run root={navigated}.");
+            if (!navigated)
+            {
+                FailIfNeeded();
+                return;
+            }
+
+            // Keys named Alpha in the run root: Alpha, then Alphabet, then no more hits.
+            bool opened = SendAccelerator(session, "CONTROL+KEY_F") && driver.WaitForFindOpen();
+            bool prepared = opened &&
+                driver.SetChecked("FindKeys", true) &&
+                driver.SetChecked("FindValues", false) &&
+                driver.SetChecked("FindData", false) &&
+                driver.TypeFindText("Alpha");
+            bool clicked = prepared && driver.Click("DialogPrimary");
+            bool firstFindClosed = clicked && driver.WaitForFindClosed();
+            bool firstProgressClosed = firstFindClosed && driver.WaitForProgressClosed(TimeSpan.FromSeconds(15));
+            bool alphaSelected = firstProgressClosed &&
+                ControlTestSupport.WaitForTreeSelection(session, "Alpha", TimeSpan.FromSeconds(30));
+            bool treeFocused = alphaSelected &&
+                Win32.IsForeground(session.MainHwnd) &&
+                ControlTestSupport.WaitForTreeKeyboardFocus(session, "Alpha", TimeSpan.FromSeconds(5));
+            Record(
+                "find.sticky.first",
+                firstFindClosed && firstProgressClosed && alphaSelected,
+                $"Find closed={firstFindClosed}, progress closed={firstProgressClosed}, Alpha selected={alphaSelected}.");
+            Record(
+                "find.focus.treeAfterProgress",
+                treeFocused,
+                $"main window foreground and tree row 'Alpha' has keyboard focus={treeFocused}.");
+
+            // F3 finds Alphabet, then F3 runs out of hits and shows Finished with the progress dialog first.
+            bool f3Alphabet = alphaSelected && WaitForOwnerEnabled(session) && SendAccelerator(session, "F3") &&
+                driver.WaitForProgressOpen() &&
+                driver.WaitForProgressClosed(TimeSpan.FromSeconds(15)) &&
+                ControlTestSupport.WaitForTreeSelection(session, "Alphabet", TimeSpan.FromSeconds(30));
+            bool f3Finished = f3Alphabet && WaitForOwnerEnabled(session) && SendAccelerator(session, "F3") &&
+                driver.WaitForProgressOpen() &&
+                driver.WaitForProgressClosed(TimeSpan.FromSeconds(15)) &&
+                driver.WaitForMessageText(FinishedMessage, TimeSpan.FromSeconds(15));
+            bool dismissed = f3Finished && driver.DismissMessage();
+            Record(
+                "find.sticky.finished",
+                f3Alphabet && f3Finished && dismissed,
+                $"F3 found Alphabet={f3Alphabet}, F3 showed Finished={f3Finished}, dismissed={dismissed}.");
+
+            // The selection is still on Alphabet, where the search finished. F3 shows Finished again, with no progress.
+            bool repeatSent = dismissed && WaitForOwnerEnabled(session) && SendAccelerator(session, "F3");
+            bool repeatFinished = repeatSent && driver.WaitForMessageText(FinishedMessage, TimeSpan.FromSeconds(10));
+            bool repeatDismissed = repeatFinished && driver.DismissMessage();
+            Record(
+                "find.sticky.repeat",
+                repeatFinished && repeatDismissed,
+                $"F3 at the finish point showed Finished={repeatFinished}, dismissed={repeatDismissed}.");
+
+            // Move the selection to the earlier key Alpha. F3 now searches again from there and finds Alphabet.
+            bool moved = repeatDismissed && ClickTreeRow(session, "Alpha");
+            bool searchedAgain = moved && WaitForOwnerEnabled(session) && SendAccelerator(session, "F3") &&
+                driver.WaitForProgressOpen() &&
+                driver.WaitForProgressClosed(TimeSpan.FromSeconds(15));
+            bool nextHit = searchedAgain &&
+                ControlTestSupport.WaitForTreeSelection(session, "Alphabet", TimeSpan.FromSeconds(30));
+            bool messageAbsent = !driver.MessageOpen;
+            Record(
+                "find.sticky.movedSelection",
+                moved && searchedAgain && nextHit && messageAbsent,
+                $"Alpha selected={moved}, F3 searched again={searchedAgain}, Alphabet selected={nextHit}, no message={messageAbsent}.");
+        }
+        finally
+        {
+            ControlTestSupport.CleanupRegistry(config);
+        }
+
+        FailIfNeeded();
+    }
+
     private static SandboxRegistry SeedSandbox(E2EConfig config)
     {
         var sandbox = new SandboxRegistry(config);

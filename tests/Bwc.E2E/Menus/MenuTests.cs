@@ -932,6 +932,8 @@ public sealed class MenuTests
         return session;
     }
 
+    // Classic regedit saves LastKey, View, and window placement under Applets\Regedit when it exits. The state is
+    // captured before it starts and restored after it exits, so the developer's own state is unchanged.
     private static AppSession OpenClassic(E2EConfig config, string scope)
     {
         _ = scope;
@@ -940,7 +942,9 @@ public sealed class MenuTests
             throw new FileNotFoundException("The classic Registry Editor is missing.", ClassicRegeditPath);
         }
 
+        AppletState applet = AppletState.Capture();
         var session = new AppSession(config, ClassicRegeditPath, SessionTimeout);
+        session.OnDispose("applet-state", () => applet.Restore());
         _ = ControlTestSupport.EnsureForeground(session);
         return session;
     }

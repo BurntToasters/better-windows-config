@@ -65,6 +65,16 @@ More classic tools will follow once the Registry Editor is solid.
    `x64` for most PCs, `arm64` for Windows on ARM.
 2. Run it. The installer is per-user, so it doesn't need administrator rights.
 
+If Windows SmartScreen says it protected your PC, choose **More info** and then **Run anyway**. The
+installer is signed, but a new release can take a while to build up SmartScreen reputation.
+
+To update, accept the update the Hub offers, or run a newer setup EXE over the installed copy.
+Coming from 0.1.0? 0.1.0 can't update itself, so download the latest setup EXE and run it once.
+
+To uninstall, use **Settings** > **Apps** > **Installed apps** > **Better Windows Config** >
+**Uninstall**. Your settings stay in `%LOCALAPPDATA%\BetterWindowsConfig`; delete that folder too
+if you want them gone.
+
 Requirements: Windows 10 version 2004 (build 19041) or later, or Windows 11.
 
 Release assets are Authenticode-signed and come with my GPG signatures (`.asc`). You can verify
@@ -83,10 +93,17 @@ those with [my public key](https://tuxedo.rosie.run/GPG/BurntToasters_0xF2FBC20F
   ```
 
 - Pick a theme in `View` > `Theme`. By default it follows the Windows setting.
-- Updates are checked from the Hub. The updater only installs an update whose signatures match the
+- The Hub checks for updates when it starts and tells you when one is available. You can turn that
+  off in the Hub's update settings. The updater only installs an update whose signatures match the
   key built into the app.
 
 ### ℹ️ Enjoying Better Windows Config? Consider [❤️ Supporting Me! ❤️](https://rosie.run/support)
+
+## Report a problem
+
+Open an issue on [GitHub](https://github.com/BurntToasters/better-windows-config/issues). If the
+Registry Editor behaves differently from classic `regedit.exe`, say what you did and what each one
+showed. Logs are in `%LOCALAPPDATA%\BetterWindowsConfig\<tool>\logs`.
 
 ## Contributing
 

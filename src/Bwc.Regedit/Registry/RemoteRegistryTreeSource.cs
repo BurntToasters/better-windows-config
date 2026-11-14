@@ -121,6 +121,7 @@ public sealed class RemoteRegistryTreeSource : ITreeNodeSource
 
     private IReadOnlyList<TreeNode> LoadChildren(RegistryPath path, CancellationToken cancellationToken)
     {
+        // A registry error propagates: the tree collapses the node and shows the classic Cannot open key message.
         try
         {
             IReadOnlyList<string> names = _reader.EnumerateSubKeyNames(path, cancellationToken);
@@ -153,12 +154,6 @@ public sealed class RemoteRegistryTreeSource : ITreeNodeSource
             }
 
             return children;
-        }
-        catch (RegistryOperationException ex)
-        {
-            Log.Warn(
-                $"Remote registry tree could not enumerate '{path.ToDisplayString()}': Win32 {ex.Win32Error} ({ex.Message}).");
-            return NoChildren;
         }
         catch (ObjectDisposedException ex)
         {

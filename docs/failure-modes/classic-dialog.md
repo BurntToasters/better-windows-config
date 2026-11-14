@@ -620,3 +620,19 @@ work area. These are listed in the report, not claimed as covered.
 | Import progress is 280 x 82 DLU with a Cancel button | DLG-019: 240 x 59 DLU, `File:` at (10, 10), file name at (10, 22) 220 x 8, bar at (10, 40) 220 x 9, no Cancel |
 | Disconnect is a 470 x 360 px window | DLG-013 template, 250 x 111 DLU |
 | Disconnect text contrast is wrong | Labels and list use the palette text and face colors (`DialogContrast`) |
+
+
+## 11. Repeated Modify and abandoned show (fix 6)
+
+- A second Enter or double-click while the first Modify is still reading is ignored
+  (`ValueCommands.ModifyValueAsync` guard), so no second editor is built.
+- A dialog whose `ShowAsync` fails never raises Closed. `ModalDialogWindow` calls `OnShowAbandoned`, and
+  `ClassicDialog` drops its `BwcTheme.Changed` subscription there.
+- Window setup exceptions are caught (`ModalDialogWindow.ShowAsync` and `ClassicDialog.OnRootLoaded`) and each
+  catch calls `UiDiagnostics.Warn`. Bwc.UI does not reference Bwc.Core. `src/Bwc.UI/UiDiagnostics.cs` holds the
+  hook, and both app startups set it to `Log.Warn`. A null hook drops the message. The catches are not narrowed
+  to typed exceptions any more, so an unexpected exception still gives the owner back.
+- **E2E status.** `tests/Bwc.E2E/Dialogs/ValueEnterTests.cs` `ValueEnter_TwoFastPressesOpenOneEditor` presses Enter
+  twice with no pause on a string value. It counts the visible "Edit String" windows of the app process (at most
+  one), cancels the editor, and checks the owner is enabled and foreground. The log hook has no E2E trigger: a
+  failed dialog show cannot be forced with real input, so it is checked by build and by the no-Bwc.Core rule only.

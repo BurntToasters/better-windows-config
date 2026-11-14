@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using Bwc.Core;
 using Bwc.Hub.Theme;
+using Bwc.Hub.Updates;
 using Bwc.UI.Dialogs;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -11,31 +12,87 @@ using Microsoft.UI.Xaml.Media;
 namespace Bwc.Hub.Dialogs;
 
 /// <summary>
-/// The "Checking for updates" window. It has one Cancel button. The check runs on a worker and
-/// calls <see cref="FinishFromWorker"/> when it is done, so the window closes by itself. Cancel
-/// closes it with <see cref="Finished"/> false, which the caller reads as "the user stopped it".
+/// The "Checking for updates" and "Downloading the update" window. It has one Cancel button and one text line,
+/// which <see cref="SetProgress"/> changes to show the download percentage. The worker calls
+/// <see cref="FinishFromWorker"/> when it is done, so the window closes by itself. Cancel closes it with
+/// <see cref="Finished"/> false, which the caller reads as "the user stopped it".
 /// </summary>
-internal sealed class UpdateProgressDialog : ClassicMessageBox
+internal sealed class UpdateProgressDialog : ClassicDialog
 {
+    private const int CancelId = 1;
+
+    private readonly TextBlock _text;
+    private readonly Button _cancel;
+
     public UpdateProgressDialog(string text)
-        : base(
-            HubStrings.Get("UpdateCheckTitle"),
-            text,
-            ClassicMessageIcon.Information,
-            ClassicMessageButtons.Ok,
-            primaryText: HubStrings.Get("UpdateCancelButton"),
-            textAutomationId: "UpdateProgressText")
+        : base(HubStrings.Get("UpdateCheckTitle"), ClassicFontSpec.MessageFont)
     {
+        _text = new TextBlock
+        {
+            Text = text,
+            TextWrapping = TextWrapping.Wrap,
+            FontFamily = new FontFamily(ClassicFontSpec.MessageFont.Face),
+            FontSize = ClassicFontSpec.MessageFont.DipSize,
+            Foreground = HubBrushes.WindowText,
+        };
+        AutomationProperties.SetAutomationId(_text, "UpdateProgressText");
+        AutomationProperties.SetName(_text, text);
+
+        var layout = new StackPanel { Padding = new Thickness(12), Spacing = 8, MinWidth = 380 };
+        layout.Children.Add(_text);
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 8, 0, 0),
+        };
+        _cancel = (Button)CreateControl(new ClassicControlDefinition(
+            ClassicControlKind.Button,
+            CancelId,
+            "DialogPrimary",
+            HubStrings.Get("UpdateCancelButton"),
+            0,
+            0,
+            0,
+            0)
+        {
+            TabStop = true,
+            IsDefault = true,
+        });
+        buttons.Children.Add(_cancel);
+        layout.Children.Add(buttons);
+        SetFlowContent(layout);
     }
 
     /// <summary>True once the worker has closed the window itself.</summary>
     public bool Finished { get; private set; }
+
+    /// <summary>Shows the download percentage text. Call only on the UI thread.</summary>
+    public void SetProgress(string text)
+    {
+        _text.Text = text;
+        AutomationProperties.SetName(_text, text);
+    }
 
     /// <summary>Closes the window from the worker's result. Call only on the UI thread, once.</summary>
     public void FinishFromWorker()
     {
         Finished = true;
         Cancel();
+    }
+
+    protected override void OnDialogLoaded()
+    {
+        _ = _cancel.Focus(FocusState.Programmatic);
+    }
+
+    protected override void OnCommand(int id, string automationId)
+    {
+        if (id == CancelId)
+        {
+            Cancel();
+        }
     }
 }
 
@@ -161,8 +218,7 @@ internal sealed class UpdateSettingsDialog : ClassicDialog
     private const int OkId = 1;
     private const int CancelId = 2;
 
-    private readonly RadioButton _stable;
-    private readonly RadioButton _beta;
+    private readonly RadioButton? _beta;
     private readonly CheckBox _startup;
 
     public UpdateSettingsDialog(string channel, bool checkOnStartup)
@@ -171,44 +227,49 @@ internal sealed class UpdateSettingsDialog : ClassicDialog
         bool beta = string.Equals(channel, "beta", StringComparison.Ordinal);
 
         var layout = new StackPanel { Padding = new Thickness(12), Spacing = 8, MinWidth = 340 };
-        layout.Children.Add(new TextBlock
-        {
-            Text = HubStrings.Get("UpdateChannelLabel"),
-            FontFamily = new FontFamily(ClassicFontSpec.MessageFont.Face),
-            FontSize = ClassicFontSpec.MessageFont.DipSize,
-            Foreground = HubBrushes.WindowText,
-        });
 
-        var channels = new StackPanel { Spacing = 4, Margin = new Thickness(12, 0, 0, 0) };
-        _stable = (RadioButton)CreateControl(new ClassicControlDefinition(
-            ClassicControlKind.RadioButton,
-            0,
-            "UpdateChannelStable",
-            HubStrings.Get("UpdateChannelStable"),
-            0,
-            0,
-            0,
-            0)
+        // The channel group is shown only when this build offers beta. Without a beta manifest there is no choice.
+        if (UpdateSources.BetaAvailable)
         {
-            TabStop = true,
-            Checked = !beta,
-        });
-        _beta = (RadioButton)CreateControl(new ClassicControlDefinition(
-            ClassicControlKind.RadioButton,
-            0,
-            "UpdateChannelBeta",
-            HubStrings.Get("UpdateChannelBeta"),
-            0,
-            0,
-            0,
-            0)
-        {
-            TabStop = true,
-            Checked = beta,
-        });
-        channels.Children.Add(_stable);
-        channels.Children.Add(_beta);
-        layout.Children.Add(channels);
+            layout.Children.Add(new TextBlock
+            {
+                Text = HubStrings.Get("UpdateChannelLabel"),
+                FontFamily = new FontFamily(ClassicFontSpec.MessageFont.Face),
+                FontSize = ClassicFontSpec.MessageFont.DipSize,
+                Foreground = HubBrushes.WindowText,
+            });
+
+            var channels = new StackPanel { Spacing = 4, Margin = new Thickness(12, 0, 0, 0) };
+            var stable = (RadioButton)CreateControl(new ClassicControlDefinition(
+                ClassicControlKind.RadioButton,
+                0,
+                "UpdateChannelStable",
+                HubStrings.Get("UpdateChannelStable"),
+                0,
+                0,
+                0,
+                0)
+            {
+                TabStop = true,
+                Checked = !beta,
+            });
+            _beta = (RadioButton)CreateControl(new ClassicControlDefinition(
+                ClassicControlKind.RadioButton,
+                0,
+                "UpdateChannelBeta",
+                HubStrings.Get("UpdateChannelBeta"),
+                0,
+                0,
+                0,
+                0)
+            {
+                TabStop = true,
+                Checked = beta,
+            });
+            channels.Children.Add(stable);
+            channels.Children.Add(_beta);
+            layout.Children.Add(channels);
+        }
 
         _startup = (CheckBox)CreateControl(new ClassicControlDefinition(
             ClassicControlKind.CheckBox,
@@ -261,8 +322,8 @@ internal sealed class UpdateSettingsDialog : ClassicDialog
         SetFlowContent(layout);
     }
 
-    /// <summary>"beta" when the beta radio button is checked, otherwise "stable".</summary>
-    public string Channel => _beta.IsChecked == true ? "beta" : "stable";
+    /// <summary>"beta" when the beta radio button is checked, otherwise "stable". Without beta, always "stable".</summary>
+    public string Channel => _beta?.IsChecked == true ? "beta" : "stable";
 
     public bool CheckOnStartup => _startup.IsChecked == true;
 

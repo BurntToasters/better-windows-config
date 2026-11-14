@@ -27,6 +27,7 @@ import {
   SKIP_ENV,
   signingPolicy,
 } from "./release-policy.js";
+import { currentCommit, readPackageVersion } from "./lib/release-policy.js";
 import { parsePackageVersion } from "./sync-version-helpers.js";
 
 const SCRIPT = "scripts/build-installer.js";
@@ -54,6 +55,7 @@ const RESERVED_ROOT_NAMES = new Set([
   "third-party-notices.txt",
   "installed-files.txt",
   "uninstall.exe",
+  "upgrade-cleanup-pending",
 ]);
 const RESERVED_DIRECTORY = "bwc-tools";
 const SIGN_SCRIPT = path.join(REPO_ROOT, "scripts", "windows-artifact-sign.ps1");
@@ -579,15 +581,31 @@ function relativeToRepo(absolute) {
   return rel && !rel.startsWith("..") ? rel : absolute;
 }
 
-/** True when artifacts/build says the publish for this flavor passed and the main EXE exists. */
-export function publishIsGood({ rid, flavor, publishDir, buildArtifactDir = BUILD_ARTIFACT_DIR }) {
+/**
+ * True when artifacts/build says the publish for this flavor passed, for the current package version, and
+ * the main EXE exists. A record that names a commit must name HEAD. dotnet-build.js records no commit today,
+ * so only the version is checked for it. Any read or git failure answers false, so the publish runs again.
+ */
+export function publishIsGood({
+  rid,
+  flavor,
+  publishDir,
+  buildArtifactDir = BUILD_ARTIFACT_DIR,
+  packageVersion = readPackageVersion(REPO_ROOT),
+  head = null,
+}) {
   const artifactPath = path.join(buildArtifactDir, `${publishFolderName(rid, flavor)}.json`);
   if (!fs.existsSync(artifactPath) || !fs.existsSync(path.join(publishDir, "BetterWindowsConfig.exe"))) {
     return false;
   }
   try {
     const record = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
-    return record.pass === true && record.flavor === flavor && record.rid === rid;
+    if (record.pass !== true || record.flavor !== flavor || record.rid !== rid) return false;
+    if (record.version !== packageVersion) return false;
+    if (record.commit !== undefined && record.commit !== null) {
+      return record.commit === (head ?? currentCommit(REPO_ROOT));
+    }
+    return true;
   } catch {
     return false;
   }

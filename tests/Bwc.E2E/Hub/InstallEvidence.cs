@@ -23,19 +23,22 @@ internal static class InstallEvidence
 
     private static readonly Regex StagingFolderPattern = new("^[0-9a-f]{32}$", RegexOptions.CultureInvariant);
 
-    /// <summary>The per-user staging root that the helper writes to and accepts installers from.</summary>
-    public static string StagingRoot => Path.Combine(Path.GetTempPath(), StagingFolderName);
+    /// <summary>
+    /// The staging root the update helper uses for a process launched with the scope's TEMP (see
+    /// <see cref="E2EConfig.TempEnvironment"/>). It is inside the run's data folder, not the developer's %TEMP%.
+    /// </summary>
+    public static string StagingRoot(E2EConfig config, string scope) => Path.Combine(config.TempRootFor(scope), StagingFolderName);
 
-    /// <summary>The names of the staging folders that exist now.</summary>
-    public static HashSet<string> StagingFolders()
+    /// <summary>The names of the staging folders under the root that exist now.</summary>
+    public static HashSet<string> StagingFolders(string root)
     {
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (!Directory.Exists(StagingRoot))
+        if (!Directory.Exists(root))
         {
             return names;
         }
 
-        foreach (string folder in Directory.EnumerateDirectories(StagingRoot))
+        foreach (string folder in Directory.EnumerateDirectories(root))
         {
             string name = Path.GetFileName(folder);
             if (StagingFolderPattern.IsMatch(name))
@@ -47,20 +50,20 @@ internal static class InstallEvidence
         return names;
     }
 
-    /// <summary>The staging folders that were created after the snapshot.</summary>
-    public static IReadOnlyList<string> StagingFoldersSince(HashSet<string> before)
+    /// <summary>The staging folders under the root that were created after the snapshot.</summary>
+    public static IReadOnlyList<string> StagingFoldersSince(string root, HashSet<string> before)
     {
-        return StagingFolders().Where(name => !before.Contains(name)).Select(name => Path.Combine(StagingRoot, name)).ToList();
+        return StagingFolders(root).Where(name => !before.Contains(name)).Select(name => Path.Combine(root, name)).ToList();
     }
 
     /// <summary>True when a staging folder the test made holds a receipt. A refused install must leave none.</summary>
-    public static bool AnyReceiptSince(HashSet<string> before) =>
-        StagingFoldersSince(before).Any(folder => File.Exists(Path.Combine(folder, ReceiptFileName)));
+    public static bool AnyReceiptSince(string root, HashSet<string> before) =>
+        StagingFoldersSince(root, before).Any(folder => File.Exists(Path.Combine(folder, ReceiptFileName)));
 
-    /// <summary>Removes the staging folders the test made, and nothing else. A locked file is left for later.</summary>
-    public static void RemoveStagingSince(HashSet<string> before)
+    /// <summary>Removes the staging folders the test made under the root, and nothing else. A locked file stays.</summary>
+    public static void RemoveStagingSince(string root, HashSet<string> before)
     {
-        foreach (string folder in StagingFoldersSince(before))
+        foreach (string folder in StagingFoldersSince(root, before))
         {
             try
             {
@@ -73,8 +76,8 @@ internal static class InstallEvidence
         }
     }
 
-    /// <summary>True when the path is installer.exe in a staging folder directly under the staging root.</summary>
-    public static bool IsStagedInstaller(string path)
+    /// <summary>True when the path is installer.exe in a staging folder directly under the given staging root.</summary>
+    public static bool IsStagedInstaller(string path, string root)
     {
         if (!string.Equals(Path.GetFileName(path), InstallerFileName, StringComparison.OrdinalIgnoreCase))
         {
@@ -87,7 +90,7 @@ internal static class InstallEvidence
             parent is not null &&
             string.Equals(
                 Path.GetFullPath(parent).TrimEnd(Path.DirectorySeparatorChar),
-                Path.GetFullPath(StagingRoot).TrimEnd(Path.DirectorySeparatorChar),
+                Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar),
                 StringComparison.OrdinalIgnoreCase);
     }
 
@@ -117,6 +120,10 @@ internal static class InstallEvidence
 
         return 0;
     }
+
+    /// <summary>True when one of the Hub's own log lines (under the data root) contains the text.</summary>
+    public static bool HubLogContains(string dataRoot, string text) =>
+        ReadLogLines(Path.Combine(dataRoot, "hub", "logs")).Any(line => line.Contains(text, StringComparison.Ordinal));
 
     /// <summary>True when the helper's own log says it started the installer.</summary>
     public static bool HelperStartedInstaller(string dataRoot) =>

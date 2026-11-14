@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
  * Self-test for the Windows release VM flow. No network, no gh, no builds, no npm run.
- * Covers the stable policy, the ordered step lists of release:win and release:win:continue, the
- * trusted set read from TrustedKeys.cs (a placeholder refuses), the quality-gate proof, and the
- * package.json entry points. Failure cases are listed in docs/failure-modes/release.md
- * (section "Release VM flow").
+ * Covers the stable policy, the ordered step lists of release:win and release:win:continue, --from
+ * resume, the trusted set read from TrustedKeys.cs (a placeholder refuses), the quality-gate proof,
+ * the package.json entry points, and release:cleanup in temporary git repositories. Failure cases are
+ * listed in docs/failure-modes/release.md (sections "Release VM flow" and "Resume and cleanup").
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -22,7 +22,17 @@ import {
   signingPolicy,
   STABLE_FORBIDDEN_ENV,
 } from "./release-policy.js";
-import { draftArgs, main, parseReleaseArgs, releaseCleanTargets, releaseSteps } from "./run-release.js";
+import {
+  CREDENTIAL_ENV,
+  draftArgs,
+  main,
+  parseReleaseArgs,
+  RUNNER_STEPS,
+  releaseCleanTargets,
+  releaseSteps,
+  STEP_ENV,
+  stepEnv,
+} from "./run-release.js";
 
 const SCRIPT = "scripts/run-release-selftest.js";
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -217,9 +227,11 @@ check("release:win:continue step list is exact for stable", () => {
     releaseSteps("continue", { version: VERSION, env: cleanEnv() }),
     [
       { name: "release:policy", args: [] },
+      { name: "release:preflight", args: ["--", "--require-trusted-key"] },
       { name: "release:session:verify", args: [] },
       { name: "build:win:x64", args: [] },
       { name: "build:win:arm64", args: [] },
+      { name: "release:rehearse:client", args: [] },
       { name: "installer:x64", args: [] },
       { name: "installer:arm64", args: [] },
       {
@@ -241,15 +253,23 @@ check("release:win:continue step list is exact for stable", () => {
       { name: "release:authenticode", args: ["--", "-Files", `${folder}/BetterWindowsConfig-${VERSION}-win-arm64-setup.exe`] },
       { name: "release:draft", args: ["--", "--apply"] },
       { name: "release:verify:draft", args: [] },
-      { name: "release:finalize", args: [] },
+      { name: "release:mirror", args: ["--", "--dir", folder] },
     ],
     "continue",
   );
 });
 
-check("continue: finalize is last, and the quality gate never runs GUI E2E", () => {
+check("continue: mirror is last, the automatic flow never runs git, and no GUI E2E step runs", () => {
   const steps = releaseSteps("continue", { version: VERSION, env: cleanEnv() });
-  assertEqual(steps.at(-1).name, "release:finalize", "last");
+  assertEqual(steps.at(-1).name, "release:mirror", "last");
+  for (const step of steps) {
+    if (/^git\b/.test(step.name) || step.args.some((arg) => /\bgit\b|reset|clean/.test(arg))) {
+      throw new Error(`git step found: ${step.name} ${step.args.join(" ")}`);
+    }
+  }
+  if (steps.some((step) => step.name === "release:finalize" || step.name === "release:cleanup")) {
+    throw new Error("the automatic flow still names release:finalize or release:cleanup");
+  }
   const all = releaseSteps("win", { version: VERSION, env: cleanEnv() }).concat(steps);
   for (const step of all) {
     if (/e2e/i.test(step.name) || step.args.some((arg) => /e2e/i.test(arg))) {
@@ -421,7 +441,8 @@ check("package.json: the release entry points exist", () => {
     "release:win",
     "release:win:continue",
     "release:win:resume",
-    "release:finalize",
+    "release:win:upload",
+    "release:cleanup",
     "release:mirror",
     "release:sign:gpg",
     "release:verify:draft",
@@ -455,6 +476,7 @@ check("package.json: existing script names are kept", () => {
     "release:selftest",
     "build:win:x64",
     "build:win:arm64",
+    "release:rehearse:client",
     "installer:x64",
     "installer:arm64",
     "setup:win:artifact-signing",
@@ -476,6 +498,363 @@ check("package.json: no script reads a BWC-only release key variable", () => {
     if (/RELEASE_TRUSTED_KEY/.test(command)) throw new Error(`${name} names RELEASE_TRUSTED_KEY`);
   }
 });
+
+// ---- per-step credentials: stepEnv and STEP_ENV -------------------------------------------------
+// Sentinel values stand in for secrets. No real credential is read, and no value is printed.
+
+const SENTINEL = Object.fromEntries(CREDENTIAL_ENV.map((name) => [name, `sentinel-${name.toLowerCase()}`]));
+const SOURCE_ENV = { ...cleanEnv(), ...SENTINEL, GH_REPO: "BurntToasters/better-windows-config", AFTER_PACK_LOC: "D:/mirror" };
+const STEP_NAMES = new Set(
+  [...releaseSteps("continue", { version: VERSION, env: {} }), ...releaseSteps("win", { version: VERSION, env: {} })]
+    .map((step) => step.name)
+    .filter((name) => name !== "release:clean"),
+);
+
+check("env table: every release step has a STEP_ENV entry or is a runner", () => {
+  for (const name of STEP_NAMES) {
+    if (!(name in STEP_ENV) && !RUNNER_STEPS.includes(name)) throw new Error(`no STEP_ENV entry for ${name}`);
+  }
+});
+
+check("env table: each step gets exactly its granted credentials, others blank", () => {
+  for (const name of Object.keys(STEP_ENV)) {
+    const env = stepEnv(name, SOURCE_ENV);
+    for (const key of CREDENTIAL_ENV) {
+      const want = STEP_ENV[name].includes(key) ? SENTINEL[key] : "";
+      if (env[key] !== want) throw new Error(`${name} ${key}: expected ${want === "" ? "blank" : "its value"}`);
+    }
+  }
+});
+
+check("env table: a step not in the table gets no credential", () => {
+  const env = stepEnv("not:a-step", SOURCE_ENV);
+  for (const key of CREDENTIAL_ENV) assertEqual(env[key], "", `unknown step ${key}`);
+});
+
+check("env table: runner steps keep the full environment", () => {
+  const env = stepEnv("release:win:continue", SOURCE_ENV);
+  for (const key of CREDENTIAL_ENV) assertEqual(env[key], SENTINEL[key], `runner ${key}`);
+});
+
+check("env table: config reaches every step and the source environment is not changed", () => {
+  for (const name of ["build:win:x64", "release:draft", "release:mirror"]) {
+    const env = stepEnv(name, SOURCE_ENV);
+    assertEqual(env.GH_REPO, SOURCE_ENV.GH_REPO, `${name} GH_REPO`);
+    assertEqual(env.AFTER_PACK_LOC, SOURCE_ENV.AFTER_PACK_LOC, `${name} AFTER_PACK_LOC`);
+  }
+  assertEqual(SOURCE_ENV.GPG_PASSPHRASE, SENTINEL.GPG_PASSPHRASE, "source untouched");
+});
+
+check("env table: a blank credential is not refilled by the step's own --env-file", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bwc-run-release-envfile-"));
+  try {
+    const file = path.join(dir, "probe.env");
+    fs.writeFileSync(file, "GPG_PASSPHRASE=from-file\nGH_REPO_NAME=from-file\n");
+    const probe = "process.stdout.write(JSON.stringify([process.env.GPG_PASSPHRASE, process.env.GH_REPO_NAME]))";
+    const read = (step) => {
+      const result = spawnSync(process.execPath, [`--env-file-if-exists=${file}`, "-e", probe], {
+        encoding: "utf8",
+        env: stepEnv(step, { ...cleanEnv(), GPG_PASSPHRASE: "granted-or-not" }),
+        windowsHide: true,
+      });
+      if (result.status !== 0) throw new Error(`probe exited ${result.status}: ${result.stderr}`);
+      return JSON.parse(result.stdout);
+    };
+    assertEqual(read("build:win:x64"), ["", "from-file"], "blank credential stays blank");
+    assertEqual(read("release:sign:gpg"), ["granted-or-not", "from-file"], "granted credential is kept");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- --from: resume at a named step -------------------------------------------------------------
+
+const PROLOGUE = [
+  { name: "release:policy", args: [] },
+  { name: "release:preflight", args: ["--", "--require-trusted-key"] },
+  { name: "release:session:verify", args: [] },
+];
+
+function stepNames(steps) {
+  return steps.map((step) => step.name);
+}
+
+const fromWork = fs.mkdtempSync(path.join(os.tmpdir(), "bwc-run-release-from-"));
+const fromRoot = path.join(fromWork, "repo");
+writeRepo(fromRoot, { embedded: [generateKeyPair({ comment: "untrusted comment: BWC run-release from key" }).publicKeyText] });
+
+check("--from: parsed with a separate value or with =, and the mode stays continue", () => {
+  assertEqual(parseReleaseArgs(["--continue", "--from", "release:draft"]).from, "release:draft", "separate");
+  assertEqual(parseReleaseArgs(["--continue", "--from=release:draft"]).from, "release:draft", "equals");
+  assertEqual(parseReleaseArgs(["--continue", "--from", "release:draft"]).mode, "continue", "mode");
+});
+
+check("--from: without --continue, or without a value, is a usage error (exit 2)", () => {
+  for (const argv of [["--from", "release:draft"], ["--continue", "--from"], ["--continue", "--from", "--continue"]]) {
+    try {
+      parseReleaseArgs(argv);
+    } catch (error) {
+      assertEqual(error.exitCode, EXIT.USAGE, `exit for ${argv.join(" ")}`);
+      continue;
+    }
+    throw new Error(`accepted ${argv.join(" ")}`);
+  }
+});
+
+check("--from: an unknown step is refused with exit 2 and lists the valid names; nothing runs", () => {
+  const calls = [];
+  try {
+    main(["--continue", "--from", "release:nope"], (name) => calls.push(name), { root: fromRoot, env: cleanEnv() });
+  } catch (error) {
+    assertEqual(error.exitCode, EXIT.USAGE, "exit");
+    for (const name of ["release:draft", "release:mirror", "release:sign:gpg", "release:authenticode"]) {
+      if (!error.message.includes(name)) throw new Error(`valid name ${name} not listed: ${error.message}`);
+    }
+    assertEqual(calls, [], "calls");
+    return;
+  }
+  throw new Error("an unknown step was accepted");
+});
+
+check("--from release:draft: the gate runs, then draft, verify, and mirror only", () => {
+  assertEqual(
+    stepNames(releaseSteps("continue", { version: VERSION, env: cleanEnv(), from: "release:draft" })),
+    [...stepNames(PROLOGUE), "release:draft", "release:verify:draft", "release:mirror"],
+    "steps",
+  );
+});
+
+check("--from release:sign:gpg: the gate, then signing, Authenticode, draft, verify, and mirror", () => {
+  assertEqual(
+    stepNames(releaseSteps("continue", { version: VERSION, env: cleanEnv(), from: "release:sign:gpg" })),
+    [
+      ...stepNames(PROLOGUE),
+      "release:sign:gpg",
+      "release:authenticode",
+      "release:authenticode",
+      "release:draft",
+      "release:verify:draft",
+      "release:mirror",
+    ],
+    "steps",
+  );
+});
+
+check("--from release:authenticode starts at the first Authenticode step", () => {
+  const steps = releaseSteps("continue", { version: VERSION, env: cleanEnv(), from: "release:authenticode" });
+  assertEqual(steps.filter((step) => step.name === "release:authenticode").length, 2, "both signing steps");
+  assertEqual(steps.find((step) => step.name === "release:authenticode").args[1], "-Files", "args");
+});
+
+check("--from a gate step: the flow runs from that gate through every build step", () => {
+  const steps = releaseSteps("continue", { version: VERSION, env: cleanEnv(), from: "release:preflight" });
+  assertEqual(stepNames(steps).slice(0, 2), ["release:preflight", "release:session:verify"], "gate");
+  assertEqual(steps.at(-1).name, "release:mirror", "last");
+  assertEqual(steps.length, releaseSteps("continue", { version: VERSION, env: cleanEnv() }).length - 1, "one policy step less");
+});
+
+check("--from through main records the same steps as releaseSteps", () => {
+  const calls = [];
+  main(["--continue", "--from", "release:draft"], (name, args) => calls.push({ name, args }), {
+    root: fromRoot,
+    env: cleanEnv(),
+  });
+  assertEqual(
+    calls,
+    releaseSteps("continue", { version: VERSION, env: cleanEnv(), from: "release:draft" }),
+    "recorded",
+  );
+});
+
+check("release:win:upload is the continue flow from release:draft, and release:finalize is gone", () => {
+  assertEqual(
+    pkgScripts["release:win:upload"],
+    "node --env-file-if-exists=.env scripts/run-release.js --continue --from release:draft",
+    "upload",
+  );
+  if ("release:finalize" in pkgScripts) throw new Error("release:finalize is still in package.json");
+});
+
+check("release:cleanup is a plain node script, with no npm_package_version or @{u} expansion", () => {
+  assertEqual(pkgScripts["release:cleanup"], "node scripts/release-cleanup.js", "cleanup");
+  for (const [name, command] of Object.entries(pkgScripts)) {
+    if (/%npm_package_version%|@\{u\}|git reset/.test(command)) throw new Error(`${name} has a forbidden expansion or git reset`);
+  }
+});
+
+// ---- release:cleanup, run against temporary git repositories (no network, no BWC remote) -----
+
+const CLEANUP_SCRIPT = path.join(ROOT, "scripts", "release-cleanup.js");
+const GIT_IDENTITY = ["-c", "user.name=BWC Selftest", "-c", "user.email=selftest@example.invalid"];
+
+function gitIn(cwd, args) {
+  const result = spawnSync("git", [...GIT_IDENTITY, ...args], {
+    cwd,
+    encoding: "utf8",
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed in ${cwd}: ${result.stderr}`);
+  return result.stdout.trim();
+}
+
+function writeIn(root, relative, text) {
+  fs.mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
+  fs.writeFileSync(path.join(root, relative), text);
+}
+
+function runCleanup(root) {
+  return spawnSync(process.execPath, [CLEANUP_SCRIPT, "--root", root], {
+    cwd: ROOT,
+    encoding: "utf8",
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: cleanEnv(),
+    timeout: 120_000,
+  });
+}
+
+/** A bare origin and a work clone on main, pushed. publish-result.json records a published release. */
+function cleanupFixture(base, { published = true } = {}) {
+  const origin = path.join(base, "origin.git");
+  gitIn(base, ["init", "--bare", "-q", "-b", "main", origin]);
+  const work = path.join(base, "work");
+  fs.mkdirSync(work);
+  gitIn(work, ["init", "-q", "-b", "main"]);
+  writeIn(work, ".gitignore", "artifacts/\n");
+  writeIn(work, "package.json", `${JSON.stringify({ name: "cleanup-selftest", version: VERSION }, null, 2)}\n`);
+  writeIn(work, "README.md", "one\n");
+  gitIn(work, ["add", "-A"]);
+  gitIn(work, ["commit", "-q", "-m", "release"]);
+  gitIn(work, ["remote", "add", "origin", origin]);
+  gitIn(work, ["push", "-q", "-u", "origin", "main"]);
+  if (published) {
+    writeIn(
+      work,
+      `artifacts/release/${VERSION}/stable/publish-result.json`,
+      `${JSON.stringify({ schema: 1, ok: true, tag: `v${VERSION}`, version: VERSION, channel: "stable", published: true })}\n`,
+    );
+  }
+  return { origin, work };
+}
+
+/** Pushes one commit to origin from a second clone, so the work clone falls behind. */
+function pushFromSecondClone(base, origin, relative) {
+  const other = path.join(base, "other");
+  gitIn(base, ["clone", "-q", origin, other]);
+  writeIn(other, relative, "upstream change\n");
+  gitIn(other, ["add", "-A"]);
+  gitIn(other, ["commit", "-q", "-m", "upstream change"]);
+  gitIn(other, ["push", "-q", "origin", "main"]);
+}
+
+const cleanupBases = [];
+function freshBase() {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "bwc-cleanup-selftest-"));
+  cleanupBases.push(base);
+  return base;
+}
+
+cleanupBases.push(fromWork);
+
+try {
+  check("cleanup: a clean tree behind its upstream is reset to it; git-ignored artifacts survive", () => {
+    const base = freshBase();
+    const { origin, work } = cleanupFixture(base);
+    pushFromSecondClone(base, origin, "upstream.txt");
+    writeIn(work, "artifacts/keep.txt", "ignored, must survive\n");
+    const result = runCleanup(work);
+    assertEqual(result.status, EXIT.OK, `exit (${result.stderr})`);
+    assertEqual(gitIn(work, ["rev-parse", "HEAD"]), gitIn(origin, ["rev-parse", "main"]), "HEAD is upstream");
+    if (!fs.existsSync(path.join(work, "upstream.txt"))) throw new Error("upstream file missing after reset");
+    if (!fs.existsSync(path.join(work, "artifacts", "keep.txt"))) throw new Error("ignored artifact was removed");
+  });
+
+  check("cleanup: a modified tracked file refuses with dirty-tree and resets nothing", () => {
+    const base = freshBase();
+    const { work } = cleanupFixture(base);
+    const before = gitIn(work, ["rev-parse", "HEAD"]);
+    writeIn(work, "README.md", "edited\n");
+    const result = runCleanup(work);
+    assertEqual(result.status, EXIT.REFUSED, "exit");
+    if (!result.stderr.includes("[dirty-tree]")) throw new Error(`stderr: ${result.stderr}`);
+    assertEqual(fs.readFileSync(path.join(work, "README.md"), "utf8"), "edited\n", "edit kept");
+    assertEqual(gitIn(work, ["rev-parse", "HEAD"]), before, "HEAD unchanged");
+  });
+
+  check("cleanup: an untracked file refuses with dirty-tree and is kept", () => {
+    const base = freshBase();
+    const { work } = cleanupFixture(base);
+    writeIn(work, "scratch.txt", "scratch\n");
+    const result = runCleanup(work);
+    assertEqual(result.status, EXIT.REFUSED, "exit");
+    if (!result.stderr.includes("[dirty-tree]")) throw new Error(`stderr: ${result.stderr}`);
+    if (!fs.existsSync(path.join(work, "scratch.txt"))) throw new Error("untracked file removed");
+  });
+
+  check("cleanup: no publish record refuses with not-published", () => {
+    const base = freshBase();
+    const { work } = cleanupFixture(base, { published: false });
+    const result = runCleanup(work);
+    assertEqual(result.status, EXIT.REFUSED, "exit");
+    if (!result.stderr.includes("[not-published]")) throw new Error(`stderr: ${result.stderr}`);
+  });
+
+  check("cleanup: a publish record that is not published refuses with not-published", () => {
+    const base = freshBase();
+    const { work } = cleanupFixture(base);
+    writeIn(
+      work,
+      `artifacts/release/${VERSION}/stable/publish-result.json`,
+      `${JSON.stringify({ ok: true, tag: `v${VERSION}`, version: VERSION, channel: "stable", published: false })}\n`,
+    );
+    const result = runCleanup(work);
+    if (!result.stderr.includes("[not-published]")) throw new Error(`stderr: ${result.stderr}`);
+  });
+
+  check("cleanup: a local commit that is not on the upstream refuses with head-not-upstream and keeps it", () => {
+    const base = freshBase();
+    const { work } = cleanupFixture(base);
+    writeIn(work, "local.txt", "unpushed\n");
+    gitIn(work, ["add", "-A"]);
+    gitIn(work, ["commit", "-q", "-m", "local only"]);
+    const before = gitIn(work, ["rev-parse", "HEAD"]);
+    const result = runCleanup(work);
+    assertEqual(result.status, EXIT.REFUSED, "exit");
+    if (!result.stderr.includes("[head-not-upstream]")) throw new Error(`stderr: ${result.stderr}`);
+    assertEqual(gitIn(work, ["rev-parse", "HEAD"]), before, "HEAD unchanged");
+  });
+
+  check("cleanup: no upstream refuses with no-upstream", () => {
+    const base = freshBase();
+    const { work } = cleanupFixture(base);
+    gitIn(work, ["branch", "--unset-upstream"]);
+    const result = runCleanup(work);
+    assertEqual(result.status, EXIT.REFUSED, "exit");
+    if (!result.stderr.includes("[no-upstream]")) throw new Error(`stderr: ${result.stderr}`);
+  });
+
+  check("cleanup: a failed fetch refuses with fetch-failed (exit 4) and resets nothing", () => {
+    const base = freshBase();
+    const { work } = cleanupFixture(base);
+    gitIn(work, ["remote", "set-url", "origin", path.join(base, "missing.git")]);
+    const before = gitIn(work, ["rev-parse", "HEAD"]);
+    const result = runCleanup(work);
+    assertEqual(result.status, 4, "exit");
+    if (!result.stderr.includes("[fetch-failed]")) throw new Error(`stderr: ${result.stderr}`);
+    assertEqual(gitIn(work, ["rev-parse", "HEAD"]), before, "HEAD unchanged");
+  });
+
+  check("cleanup: a package.json version that is not SemVer refuses with exit 2", () => {
+    const base = freshBase();
+    const { work } = cleanupFixture(base);
+    writeIn(work, "package.json", `${JSON.stringify({ name: "x", version: "v9" })}\n`);
+    const result = runCleanup(work);
+    assertEqual(result.status, EXIT.USAGE, "exit");
+  });
+} finally {
+  for (const base of cleanupBases) fs.rmSync(base, { recursive: true, force: true });
+}
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`FAIL ${failure}`);

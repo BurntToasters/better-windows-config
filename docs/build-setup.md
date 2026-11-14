@@ -4,10 +4,10 @@
 
 | Tool | Version | Notes |
 |---|---|---|
-| .NET SDK | 10.0.403 (pinned in `global.json`, `rollForward: latestFeature`) | `winget install Microsoft.DotNet.SDK.10` |
+| .NET SDK | 10.0.404 (pinned in `global.json`, `rollForward: latestFeature`) | `winget install Microsoft.DotNet.SDK.10` |
 | Windows App SDK | 2.6.5 (NuGet `Microsoft.WindowsAppSDK`) | Restored from NuGet; nothing to install |
 | Windows SDK projection | `net10.0-windows10.0.26100.0` | Restored from NuGet |
-| Node.js | 22.22.2+, 24.15+, or 26+ | Build and release scripts |
+| Node.js | `^26.13.1` (`engines.node` in `package.json`) | Build and release scripts; CI reads the same field |
 | NSIS | 3.10+ | Installer (not needed for app builds) |
 | GnuPG | 2.4+ | Release signing only |
 

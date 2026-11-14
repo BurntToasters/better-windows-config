@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -8,8 +7,8 @@ namespace Bwc.Update.Tests;
 /// <summary>Drives Support/minisign.mjs, a copy of the S5 spike signer. Needs `node` on PATH.</summary>
 internal static class NodeSigner
 {
-    private static string ScriptPath([CallerFilePath] string? thisFile = null) =>
-        Path.Combine(Path.GetDirectoryName(thisFile!)!, "minisign.mjs");
+    // Copied to the output folder by the test project. Source paths are not used: CI builds map them away.
+    private static string ScriptPath() => Path.Combine(AppContext.BaseDirectory, "minisign.mjs");
 
     public static void Run(params string[] args)
     {

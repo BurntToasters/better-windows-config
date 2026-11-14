@@ -265,6 +265,22 @@ In an E2E build with `BWC_E2E_SANDBOX_ROOT` set, "All" still calls
 test from reading the developer's whole registry into a test artifact and keeps the export bounded.
 The production build uses the live reader and exports the real registry.
 
+## 16. Import behind the write gate
+
+File > Import of a .reg file, and a .reg file named on the command line or sent by a second launch,
+apply the file under the write gate (`RunRegistryWriteAsync`). The gate disables the owner window and
+holds a close request until the write ends, and the close then runs. Earlier builds ran the import as a
+plain read on the thread pool, so closing the window during a large import let the process exit with
+part of the file written.
+
+Rule: a close during an import waits for the last key and value. The import is not cancelled, because
+the DLG-019 progress window has no Cancel. A second launch that names another .reg file during the
+import is queued (app-services.md, regedit file.reg).
+
+Check: `ImportWriteGateTests.Import_CloseDuringImportWaitsForEveryKey` imports a 2000-key file, closes the
+window as soon as the progress window is up, and checks that the process exits and that every key and
+value is in the sandbox. The file is inside the run's artifact folder and writes only under the sandbox.
+
 ## Parity package: hive import, progress, and text
 
 | Way it could fail | Expected behavior |

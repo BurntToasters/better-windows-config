@@ -35,10 +35,31 @@ import {
 } from "./lib/github-release.js";
 import { prepareReleaseContext } from "./lib/release-context.js";
 import { git } from "./lib/release-policy.js";
+import { isDirectExecutionOf } from "./direct-execution.mjs";
 
 const SCRIPT = "scripts/release-publish.js";
 const REPO_ROOT = repoRootFrom(import.meta.url);
 const VERIFY_SCRIPT = path.join(REPO_ROOT, "scripts", "release-verify.js");
+
+/**
+ * Why an already-published release does not match this checkout, or null when it matches. The asset
+ * bytes are checked separately by release-verify.js --allow-published.
+ */
+export function publishedReleaseMismatch(release, { commit, targetCommit, prerelease }) {
+  if (targetCommit !== commit) {
+    return {
+      reason: "draft-target-mismatch",
+      detail: `published release targets ${release?.target_commitish ?? "(unknown)"}, not HEAD ${commit}`,
+    };
+  }
+  if (Boolean(release?.prerelease) !== Boolean(prerelease)) {
+    return {
+      reason: "prerelease-mismatch",
+      detail: `published prerelease=${release?.prerelease}, expected ${Boolean(prerelease)}`,
+    };
+  }
+  return null;
+}
 
 function printHelp() {
   console.log(`Usage:
@@ -110,7 +131,7 @@ function resolveCommitish(root, value) {
   return resolved && /^[0-9a-f]{40}$/i.test(resolved) ? resolved.toLowerCase() : null;
 }
 
-function verifyArgs(context, options) {
+function verifyArgs(context, options, { allowPublished = false } = {}) {
   const args = [VERIFY_SCRIPT];
   if (options.version) args.push("--version", options.version);
   if (options.channel) args.push("--channel", options.channel);
@@ -124,6 +145,7 @@ function verifyArgs(context, options) {
   if (options.commit) args.push("--commit", options.commit);
   if (options.maxAgeHours !== undefined) args.push("--max-age-hours", String(options.maxAgeHours));
   if (options.allowDetached) args.push("--allow-detached");
+  if (allowPublished) args.push("--allow-published");
   args.push("--apply");
   return args;
 }
@@ -161,8 +183,8 @@ function printPlan(context, plan) {
   console.log(`  # PATCH body: ${JSON.stringify(body)}`);
 }
 
-function runVerification(context, options) {
-  const args = verifyArgs(context, options);
+function runVerification(context, options, { allowPublished = false } = {}) {
+  const args = verifyArgs(context, options, { allowPublished });
   console.log(`release-publish: running ${formatCommand(process.execPath, args)}`);
   const result = spawnSync(process.execPath, args, { cwd: context.root, stdio: "inherit", windowsHide: true });
   if (result.error) {
@@ -189,7 +211,53 @@ function uniqueAssetPaths(bundle) {
   return [...new Set(paths.map((file) => path.resolve(file)))];
 }
 
+function writePublishResult(context, { releaseId, htmlUrl, noop }) {
+  writeJson(path.join(context.dir, "publish-result.json"), {
+    schema: 1,
+    tool: SCRIPT,
+    ok: true,
+    tag: context.tag,
+    version: context.version,
+    channel: context.channel,
+    prerelease: context.prerelease,
+    commit: context.commit,
+    releaseId,
+    htmlUrl,
+    published: true,
+    noop,
+    completedUtc: new Date().toISOString(),
+  });
+}
+
+/**
+ * A rerun after a successful publish. The release must match HEAD, and its assets must match the local
+ * files (release-verify.js --allow-published). Then nothing is sent to GitHub: exit 0, a no-op.
+ */
+async function rerunPublished(context, options, release) {
+  const mismatch = publishedReleaseMismatch(release, {
+    commit: context.commit,
+    targetCommit: resolveCommitish(context.root, release.target_commitish),
+    prerelease: context.prerelease,
+  });
+  if (mismatch) {
+    console.error(`${SCRIPT}: REFUSED [${mismatch.reason}]: ${mismatch.detail}`);
+    return EXIT.REFUSED;
+  }
+  const verification = runVerification(context, options, { allowPublished: true });
+  if (verification !== EXIT.OK) return verification;
+  writePublishResult(context, { releaseId: release.id, htmlUrl: release.html_url ?? null, noop: true });
+  console.log(
+    `release-publish: ${context.tag} is already published (release ${release.id}); the assets match the local files; no-op`,
+  );
+  return EXIT.OK;
+}
+
 async function applyPublish(context, options, publishFile) {
+  const initial = selectRelease(listReleases(context.repo, { cwd: context.root }), context.tag);
+  if (initial.ok && initial.kind === "published") {
+    return rerunPublished(context, options, initial.release);
+  }
+
   // Snapshot the draft before verification. The re-check right before the PATCH must match it.
   const beforeVerify = selectRelease(listReleases(context.repo, { cwd: context.root }), context.tag);
   const baseline =
@@ -274,19 +342,10 @@ async function applyPublish(context, options, publishFile) {
   const args = ["api", "--method", "PATCH", `${context.repo.api}/releases/${release.id}`, "--input", publishFile];
   console.log(`release-publish: running ${displayGh(args)}`);
   const published = runGhJson(args, { cwd: context.root });
-  writeJson(path.join(context.dir, "publish-result.json"), {
-    schema: 1,
-    tool: SCRIPT,
-    ok: true,
-    tag: context.tag,
-    version: context.version,
-    channel: context.channel,
-    prerelease: context.prerelease,
-    commit: context.commit,
+  writePublishResult(context, {
     releaseId: release.id,
     htmlUrl: published?.html_url ?? release.html_url ?? null,
-    published: true,
-    completedUtc: new Date().toISOString(),
+    noop: false,
   });
   console.log(
     `release-publish: PASS ${context.tag} id ${release.id} (${published?.html_url ?? "no URL returned"})`,
@@ -374,4 +433,6 @@ async function main(argv = process.argv.slice(2)) {
   return run(options);
 }
 
-process.exitCode = await main();
+if (isDirectExecutionOf(import.meta.url)) {
+  process.exitCode = await main();
+}

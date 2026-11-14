@@ -237,9 +237,12 @@ public sealed class HexEditingTests
             insertStatus,
             $"insert={insert}, status='{StatusOf(driver)}', help='{HelpTextOf(editor)}'.");
 
+        // Ctrl+Home puts the caret on byte 0, and one Right moves it to byte 1: Delete removes that byte and
+        // Backspace removes the byte before the caret.
         bool moved = insertStatus;
         if (moved)
         {
+            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.HOME);
             Keyboard.Press(VirtualKeyShort.RIGHT);
         }
 
@@ -341,9 +344,9 @@ public sealed class HexEditingTests
     }
 
     /// <summary>Why the last <see cref="OpenEditor"/> call failed, or what it saw when it worked.</summary>
-    private static string _openDetail = string.Empty;
+    internal static string _openDetail = string.Empty;
 
-    private static bool OpenEditor(AppSession session, EditingDriver driver, string rowName)
+    internal static bool OpenEditor(AppSession session, EditingDriver driver, string rowName)
     {
         _openDetail = string.Empty;
         if (!driver.WaitForNoDialog(TimeSpan.FromSeconds(1)))
@@ -484,7 +487,7 @@ public sealed class HexEditingTests
         return $"foreground {state}: {text}";
     }
 
-    private static bool FocusEditor(
+    internal static bool FocusEditor(
         AppSession session,
         AutomationElement? firstRow,
         AutomationElement? editor)
@@ -506,14 +509,14 @@ public sealed class HexEditingTests
             TimeSpan.FromSeconds(5));
     }
 
-    private static AutomationElement? FindRow(AppSession session, string name) =>
+    internal static AutomationElement? FindRow(AppSession session, string name) =>
         ControlTestSupport.FindRowByName(
             session,
             ControlTestSupport.ListControl,
             ControlType.DataItem,
             name);
 
-    private static bool SelectRow(AppSession session, string name)
+    internal static bool SelectRow(AppSession session, string name)
     {
         AutomationElement? row = FindRow(session, name);
         ControlTestSupport.Select(row);
@@ -604,7 +607,7 @@ public sealed class HexEditingTests
         return string.Empty;
     }
 
-    private static string HelpTextOf(AutomationElement? element)
+    internal static string HelpTextOf(AutomationElement? element)
     {
         if (element is null)
         {
@@ -621,7 +624,7 @@ public sealed class HexEditingTests
         }
     }
 
-    private static bool HasKeyboardFocus(AutomationElement? element)
+    internal static bool HasKeyboardFocus(AutomationElement? element)
     {
         if (element is null)
         {
@@ -638,7 +641,7 @@ public sealed class HexEditingTests
         }
     }
 
-    private static string CreateFreshDataRoot(E2EConfig config, string scope)
+    internal static string CreateFreshDataRoot(E2EConfig config, string scope)
     {
         string path = config.DataRootFor(scope);
         if (Directory.Exists(path))
@@ -650,7 +653,7 @@ public sealed class HexEditingTests
         return path;
     }
 
-    private static void DeleteDataRoot(string? path)
+    internal static void DeleteDataRoot(string? path)
     {
         if (string.IsNullOrEmpty(path))
         {

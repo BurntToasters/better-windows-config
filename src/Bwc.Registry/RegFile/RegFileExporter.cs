@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace Bwc.Registry;
 
 /// <summary>
@@ -18,7 +16,6 @@ public static class RegFileExporter
     private const string ExportValueNameOperation = "ExportValueName";
     private const string ExportKeyNameOperation = "ExportKeyName";
     private const string ComputerPrefix = "Computer\\";
-    private static readonly TimeSpan ThrottleInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
     /// Exports <paramref name="startKey"/> and every readable descendant. An unreadable
@@ -119,7 +116,7 @@ public static class RegFileExporter
         cancellationToken.ThrowIfCancellationRequested();
 
         var state = new ExportState();
-        var gate = new ProgressGate(progress);
+        var gate = new ExportProgressGate(progress);
         gate.Always(Starting(startKey, state));
         Walk(source, startKey, isStart: true, cancellationToken, gate, state, emit);
         gate.Always(Completed(startKey, state));
@@ -135,7 +132,7 @@ public static class RegFileExporter
         cancellationToken.ThrowIfCancellationRequested();
 
         var state = new ExportState();
-        var gate = new ProgressGate(progress);
+        var gate = new ExportProgressGate(progress);
         IReadOnlyList<RegistryPath> roots = RegistryExportRoots.Classic;
         gate.Always(Starting(roots[0], state));
 
@@ -153,7 +150,7 @@ public static class RegFileExporter
         RegistryPath path,
         bool isStart,
         CancellationToken cancellationToken,
-        ProgressGate gate,
+        ExportProgressGate gate,
         ExportState state,
         Action<RegFileKey> emit)
     {
@@ -235,7 +232,7 @@ public static class RegFileExporter
                     "A key name contains a NUL, line feed, or carriage return and cannot be written to a .reg file.");
             }
 
-            Walk(source, path.Append(subKeyName), isStart: false, cancellationToken, gate, state, emit);
+            Walk(source, path.AppendEnumeratedName(subKeyName), isStart: false, cancellationToken, gate, state, emit);
         }
     }
 
@@ -274,47 +271,5 @@ public static class RegFileExporter
         public int ValuesExported { get; set; }
 
         public int KeysSkipped { get; set; }
-    }
-
-    /// <summary>
-    /// Passes progress to the caller. Starting, skip, and completion events always go through. Key and
-    /// value events are throttled to one report per <see cref="ThrottleInterval"/> for each kind, so a large
-    /// export does not flood the UI thread. The first event of each kind goes through at once. Value events
-    /// have their own interval, so a value report cannot use up the slot of the key report that follows it.
-    /// Completion carries the final running totals.
-    /// </summary>
-    private sealed class ProgressGate
-    {
-        private readonly IProgress<ExportProgress>? _progress;
-        private long _lastKeyReport;
-        private long _lastValueReport;
-
-        internal ProgressGate(IProgress<ExportProgress>? progress)
-        {
-            _progress = progress;
-        }
-
-        internal void Always(ExportProgress report)
-        {
-            _progress?.Report(report);
-        }
-
-        internal void Throttled(ExportProgress report)
-        {
-            if (_progress is null)
-            {
-                return;
-            }
-
-            ref long last = ref report.Phase == ExportPhase.ValueExported ? ref _lastValueReport : ref _lastKeyReport;
-            long now = Stopwatch.GetTimestamp();
-            if (last != 0 && Stopwatch.GetElapsedTime(last, now) < ThrottleInterval)
-            {
-                return;
-            }
-
-            last = now;
-            _progress.Report(report);
-        }
     }
 }

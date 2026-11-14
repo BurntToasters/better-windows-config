@@ -36,7 +36,9 @@ public sealed class ExportRangeTests
     // 1000 sections at 10 ms each keeps the import open for about 10 s, so the bar can be read several times.
     private const string SlowImportPauseMilliseconds = "10";
     private const int ImportSections = 1000;
-    private const int ExportBranchKeys = 5000;
+    // The run root, CancelExport, and these keys make 4,999 entries, under the 5000 seed limit.
+    // The slow export pause keeps the export running long enough to cancel.
+    private const int ExportBranchKeys = 4_997;
 
     [ClassInitialize]
     public static void ClassInitialize(TestContext testContext)

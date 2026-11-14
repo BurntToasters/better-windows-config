@@ -36,7 +36,7 @@ public sealed class UpdateArguments
                         [--wait-pid <pid>]... [--wait-timeout-ms <ms>]
                         [--installer-switch <SWITCH[=value]>]...
             Waits for the Hub and tools to exit, verifies the installer again, and starts it
-            silently (/S <switches> /D=<folder>). The installer relaunches the Hub.
+            silently (/S /RELAUNCH /PARENTPID=<this pid> <switches> /D=<folder>). The installer relaunches the Hub.
             Exit: 0 installer started, 2 usage, 3 refused, 4 apps still running,
                   5 installer did not start, 6 refused and the Hub did not start.
 

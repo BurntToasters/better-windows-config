@@ -38,8 +38,9 @@ Options:
   --max-age-hours <n>     Session lifetime. Default ${DEFAULT_MAX_AGE_HOURS}.
   --session <path>        Session file. Default artifacts/release/session.json.
   --force                 create: replace an existing session.
-  --require-gate          create: refuse unless artifacts/gate/result.json passes for HEAD.
-                          The session then records the quality gate and its E2E state.
+  --require-gate          Accepted for compatibility. create always requires a passing gate for HEAD
+                          (artifacts/gate/result.json, clean tree) and records its E2E state.
+                          verify refuses a session with no recorded gate (missing-quality-gate).
   --json                  Print one JSON line.
   --help                  Show this help.
 
@@ -78,7 +79,6 @@ function parseOptions(argv) {
     allowDetached: parsed.has("allow-detached"),
     trustedKey: parsed.get("trusted-key"),
     requireTrustedKey: parsed.has("require-trusted-key"),
-    requireGate: parsed.has("require-gate"),
     artifactDir: parsed.get("artifact-dir") ? path.resolve(parsed.get("artifact-dir")) : null,
     maxAgeHours: maxAgeHours === undefined ? DEFAULT_MAX_AGE_HOURS : Number(maxAgeHours),
     session: parsed.get("session") ? path.resolve(parsed.get("session")) : null,
@@ -151,9 +151,9 @@ async function create(options) {
     return exitCodeForErrors(result.errors);
   }
 
-  // The gate proof is recorded only when it passes for HEAD. --require-gate makes its absence fatal.
+  // A session is never written without a passing gate for HEAD. --require-gate is accepted, not needed.
   const gate = qualityGateProof(readQualityGateResult(options.root), currentCommit(options.root));
-  if (options.requireGate && !gate.ok) {
+  if (!gate.ok) {
     console.error(`${SCRIPT}: REFUSED [${gate.reason}]: ${gate.detail}`);
     console.error("release-session: no session was written.");
     return EXIT.REFUSED;
@@ -170,7 +170,7 @@ async function create(options) {
     packageVersion: result.release.packageVersion,
     changelogHeading: result.changelog?.heading ?? null,
     trustedKey: sessionKeySummary(result.trusted.key),
-    qualityGate: gate.ok ? gate.record : null,
+    qualityGate: gate.record,
     startedUtc: new Date().toISOString(),
     maxAgeHours: options.maxAgeHours,
   };
@@ -234,6 +234,14 @@ async function verify(options) {
     });
   } else {
     checks.push({ name: "session-commit", pass: true, detail: head.slice(0, 12) });
+  }
+
+  if (!session.qualityGate || typeof session.qualityGate !== "object") {
+    errors.push({
+      reason: "missing-quality-gate",
+      detail: "session has no quality gate proof; run the gate, then release-session.js create",
+      exitCode: EXIT.REFUSED,
+    });
   }
 
   const started = Date.parse(session.startedUtc);

@@ -80,8 +80,13 @@ public sealed partial class MainWindow : Window
             presenter.Restore();
         }
 
-        Activate();
-        _ = SetForegroundWindow(WindowNative.GetWindowHandle(this));
+        // A forwarded .reg file does not take the foreground. Its confirmation, or the open dialog it waits
+        // behind, keeps focus; stealing it here would leave the user's open dialog without keyboard input.
+        if (regFile is null)
+        {
+            Activate();
+            _ = SetForegroundWindow(WindowNative.GetWindowHandle(this));
+        }
 
         if (regFile is not null)
         {

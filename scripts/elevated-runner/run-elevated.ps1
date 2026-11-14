@@ -152,6 +152,15 @@ Set-Location -LiteralPath $repo
 $env:Path = (Join-Path $env:SystemRoot 'System32') + ';' + [Environment]::GetEnvironmentVariable('Path', 'Machine')
 $env:MSBUILDDISABLENODEREUSE = '1'
 $env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER = '1'
+# The task's inherited environment must not steer node or the E2E publish folder. NODE_OPTIONS and NODE_PATH
+# load code, and BWC_* (BWC_PUBLISH_DIR above all) moves the folder under test. The runner takes no
+# parameters, so BWC_PUBLISH_DIR is never set here: test-e2e.js then uses its default publish folder.
+foreach ($inherited in @('NODE_OPTIONS', 'NODE_PATH')) {
+    Remove-Item -LiteralPath ('Env:' + $inherited) -ErrorAction SilentlyContinue
+}
+Get-ChildItem -LiteralPath 'Env:' | Where-Object { $_.Name -like 'BWC_*' } | ForEach-Object {
+    Remove-Item -LiteralPath ('Env:' + $_.Name) -ErrorAction SilentlyContinue
+}
 
 $rid = Get-HostRid $script:NodePath
 if ($null -eq $rid) {

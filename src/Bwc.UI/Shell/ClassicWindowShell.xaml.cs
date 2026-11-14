@@ -79,11 +79,12 @@ public sealed partial class ClassicWindowShell : UserControl
 
         // The palette is applied here on the UI thread, after the Dense.xaml brushes exist.
         BwcTheme.EnsureInitialized();
-        RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
+        RootGrid.RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
         ClassicMenuBrushes.Refresh();
 
-        // Fallback for the WinRT theme events, which an unpackaged app can be refused. A change of
-        // the effective Windows theme changes this element's ActualTheme, so the palette re-reads.
+        // Fallback for the WinRT theme events, which an unpackaged app can be refused. The palette is pinned on
+        // RootGrid, so this UserControl root keeps no RequestedTheme and its ActualTheme follows Windows. A change
+        // of the effective Windows theme then raises ActualThemeChanged here, and the palette re-reads.
         ActualThemeChanged += (_, _) => BwcTheme.RefreshSystem();
 
         // The system focus visual draws a rounded rectangle around the whole pane. The focus
@@ -282,7 +283,7 @@ public sealed partial class ClassicWindowShell : UserControl
         }
 
         BwcTheme.Changed += OnThemeChanged;
-        RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
+        RootGrid.RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
         ClassicMenuBrushes.Refresh();
         ApplyMetrics();
         SyncAddressBarCheck();
@@ -307,7 +308,7 @@ public sealed partial class ClassicWindowShell : UserControl
 
     private void OnThemeChanged(object? sender, EventArgs e)
     {
-        RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
+        RootGrid.RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
         ClassicMenuBrushes.Refresh();
     }
 

@@ -5,7 +5,10 @@
 # captures the main window with PrintWindow. It samples the tree and list selection colors from the
 # captured pixels, saves three PNG captures, and composes each one side by side with the matching
 # BWC capture written by ThemeTests (artifacts/e2e/visual/theme/main-light-light-*.png).
-# No clicks on items, no edits, no registry writes. The window is closed with Alt+F4.
+# No clicks on items and no edits. It starts its own regedit.exe, uses only that process (it never attaches to
+# a regedit it did not start), and closes only that process. Classic regedit writes its applet state under
+# HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit when it exits, so that key is exported before the
+# run and restored exactly after it, the same way the test harness restores it.
 #
 # Usage: pwsh -NoProfile -File tests/Bwc.E2E/Theme/classic-selection-oracle.ps1
 
@@ -73,15 +76,39 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 function Hx([int]$rgb) { return ('#{0:X6}' -f $rgb) }
 
-function Get-RegEditWindow {
+# The window of the process this script started. Other regedit processes are never used.
+function Get-RegEditWindow([System.Diagnostics.Process]$Process) {
     $deadline = (Get-Date).AddSeconds(20)
     while ((Get-Date) -lt $deadline) {
-        foreach ($p in (Get-Process regedit -ErrorAction SilentlyContinue)) {
-            if ($p.MainWindowHandle -ne [IntPtr]::Zero) { return $p.MainWindowHandle }
-        }
+        $Process.Refresh()
+        if ($Process.MainWindowHandle -ne [IntPtr]::Zero) { return $Process.MainWindowHandle }
         Start-Sleep -Milliseconds 200
     }
-    throw 'regedit window not found'
+    throw 'the regedit process this script started has no main window'
+}
+
+# Applet state: exported before the run and restored exactly after it with reg.exe, which keeps every value type.
+# Only the Applets\Regedit key is ever written, and only from this export.
+$AppletKey = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit'
+function Export-Applet([string]$File) {
+    & reg.exe export $AppletKey $File /y | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+function Restore-Applet([bool]$Existed, [string]$Backup) {
+    & reg.exe delete $AppletKey /f 2>$null | Out-Null
+    if ($Existed) {
+        & reg.exe import $Backup | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "reg import of the applet backup failed with exit code $LASTEXITCODE" }
+    }
+    $after = [System.IO.Path]::GetTempFileName()
+    try {
+        $present = Export-Applet $after
+        if ($present -ne $Existed) { throw 'applet key presence differs after restore' }
+        if ($Existed -and ((Get-Content -Raw -LiteralPath $after) -ne (Get-Content -Raw -LiteralPath $Backup))) {
+            throw 'applet key contents differ after restore'
+        }
+    }
+    finally { Remove-Item -LiteralPath $after -Force -ErrorAction SilentlyContinue }
 }
 
 function Get-WinRect([IntPtr]$hwnd) {
@@ -154,19 +181,23 @@ $CE8 = 0xCCE8FF
 $BLUE = 0x0078D4
 $out = [ordered]@{ generator = 'tests/Bwc.E2E/Theme/classic-selection-oracle.ps1'; read_only = $true }
 $hwnd = [IntPtr]::Zero
+$proc = $null
+$appletExisted = $false
+$appletCaptured = $false
+$appletBackup = [System.IO.Path]::GetTempFileName()
 $mutex = [System.Threading.Mutex]::new($false, 'Local\BwcGuiTestLock')
 if (-not $mutex.WaitOne([TimeSpan]::FromMinutes(15))) { throw 'Timed out waiting for Local\BwcGuiTestLock' }
 try {
-    if (Get-Process regedit -ErrorAction SilentlyContinue) {
-        $older = Get-Process regedit | Where-Object { ((Get-Date) - $_.StartTime).TotalMinutes -gt 20 }
-        if ($older) { throw 'an older regedit is running; not touching it' }
-    }
-    if (-not (Get-Process regedit -ErrorAction SilentlyContinue)) {
-        $env:__COMPAT_LAYER = 'RunAsInvoker'
-        $null = Start-Process -FilePath 'C:\Windows\regedit.exe' -PassThru
-        Remove-Item Env:\__COMPAT_LAYER
-    }
-    $hwnd = Get-RegEditWindow
+    # A regedit that is already running belongs to someone else. The script stops rather than attach to it.
+    if (Get-Process regedit -ErrorAction SilentlyContinue) { throw 'a regedit is already running; this script does not attach to it' }
+    # An existing key that cannot be exported stops the run: restoring it would then delete it.
+    $appletExisted = Test-Path -LiteralPath ('Registry::' + $AppletKey)
+    if ($appletExisted -and -not (Export-Applet $appletBackup)) { throw 'the applet state could not be exported' }
+    $appletCaptured = $true
+    $env:__COMPAT_LAYER = 'RunAsInvoker'
+    try { $proc = Start-Process -FilePath 'C:\Windows\regedit.exe' -PassThru }
+    finally { Remove-Item Env:\__COMPAT_LAYER -ErrorAction SilentlyContinue }
+    $hwnd = Get-RegEditWindow $proc
     # Kept above other applications until the finally block clears it (flags NOMOVE|NOSIZE|NOACTIVATE).
     [void][OracleWin32]::SetWindowPos($hwnd, [IntPtr](-1), 0, 0, 0, 0, 0x0013)
     Start-Sleep -Milliseconds 1500
@@ -241,8 +272,18 @@ finally {
             [System.Windows.Forms.SendKeys]::SendWait('%{F4}'); Start-Sleep -Milliseconds 800
         } catch { Write-Host "close failed: $($_.Exception.Message)" }
     }
+    # Only the process this script started is closed here.
+    if ($proc -and -not $proc.HasExited) {
+        if (-not $proc.WaitForExit(10000)) { $proc.Kill(); $proc.WaitForExit(5000) | Out-Null }
+    }
+    if ($appletCaptured) {
+        try { Restore-Applet $appletExisted $appletBackup; Write-Host 'applet state restored' }
+        catch { Write-Host "applet restore failed: $($_.Exception.Message)"; $script:restoreFailed = $true }
+    }
+    Remove-Item -LiteralPath $appletBackup -Force -ErrorAction SilentlyContinue
     $mutex.ReleaseMutex(); $mutex.Dispose()
 }
+if ($script:restoreFailed) { throw 'Applets\Regedit was not restored exactly' }
 
 # Side by side: classic on the left, BWC (ThemeTests, light case) on the right, for each state.
 $pairs = @(

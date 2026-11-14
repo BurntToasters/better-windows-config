@@ -71,12 +71,13 @@ checks the refusal text, exit code 1, and that nothing is written.
 ### Unhandled exception in a window handler
 
 An exception thrown by a synchronous XAML handler reaches `Application.UnhandledException`. The
-handler reports it through `CrashHandler.Report`, which logs it and shows the classic error box that
-names the log file. The exception is marked handled, so the window stays usable. Out-of-memory
-exceptions are not handled and end the process as before.
+handler reports it through `CrashHandler.Report`, which logs it first and then shows the classic error
+box that names the log file. The exception is not marked handled, so the process ends after the report,
+as the Hub does (`Hub.UnhandledException` leaves `Handled` false). Earlier builds marked every exception
+handled, which kept a window with possibly corrupt state running after a failure.
 
-Check: no automated check. A forced XAML handler exception needs a test-only hook in the window,
-which this change does not add. The log entry is the evidence.
+Check: no automated check. A forced XAML handler exception needs a test-only hook in the window, which
+this change does not add. The log entry and the process exit are the evidence.
 
 ### Log initialization failure
 
@@ -126,6 +127,39 @@ arrives after the window closed is dropped, because the process is exiting.
 `/m` skips `SingleInstance` entirely: the process neither takes the mutex nor listens on the pipe,
 and it always opens its own window. A later launch without `/m` can still become the first instance
 while a `/m` process is running. This matches classic regedit, where `/m` allows several copies.
+
+### Relative .reg path is resolved in the second launch
+
+The second launch sends `import:<path>` with the path made absolute by `Path.GetFullPath` in the
+second process. A relative name such as `rel.reg` therefore means the file in the folder the second
+launch was started from. Earlier builds forwarded the raw argument, and the running instance resolved
+it against its own folder, so a file the user named was reported as missing.
+
+Check: `AppServices_SecondLaunchResolvesRelativeRegFileInItsOwnFolder` starts the first instance in the
+publish folder, runs the second launch from a folder that holds `rel.reg`, and checks that the
+confirmation shows the full path of that file. It answers No, so nothing is written.
+
+### Forwarded .reg file waits for an open dialog or write
+
+A second launch that names a .reg file while a modal dialog, a file dialog, or a registry write is open
+is queued, not dropped. The queue runs one file at a time when the window is idle: no dialog is open and
+no write is running. Each queued file gets its own confirmation, so a file is never imported without a
+question. Earlier builds refused the command while a dialog or write was open and logged it, so the file
+vanished without a message.
+
+Check: `AppServices_ForwardedRegFileWaitsForOpenDialogInsteadOfBeingDropped` leaves the first confirmation
+open, forwards a second file, answers No to the first, and checks that the second confirmation appears
+with its full path. It answers No again.
+
+### Activation grants foreground rights
+
+Before it sends the message, the second process calls `AllowSetForegroundWindow(ASFW_ANY)`, as the Hub
+does, so the running window may take the foreground. `SingleInstance` does not expose the first
+instance's process id, so the grant is not limited to that pid. A failed call is logged, and the message
+is still sent.
+
+Check: `AppServices_SecondLaunchBringsFirstWindowToForeground` checks that the first window is the
+foreground window after a plain second launch.
 
 ## Window placement
 
@@ -333,6 +367,14 @@ Loading or unloading a hive needs `SeRestorePrivilege` and `SeBackupPrivilege`. 
 load hives: they check only the enable rules at the four selections, and they never write the
 registry outside the sandbox. A non-elevated load fails with the existing privilege message.
 
+Load Hive checks the privilege before it opens the file dialog or the name prompt. A process without
+`SeRestorePrivilege` (a standard user, or an administrator's filtered medium-integrity token) gets the
+`Cannot Load ...: Insufficient privileges.` message at once, and no file or name is asked for. The
+check is `PrivilegeScope.IsAvailable`, which enables nothing. See hives.md section 9.
+
+Check: `Hives_LoadHiveRefusesWithoutPrivilegeBeforeAskingForFile` (Hives E2E) selects HKLM, invokes Load
+Hive, and checks that the message appears and no file dialog opens.
+
 ## Settings file
 
 ### Corrupt file
@@ -349,3 +391,26 @@ starting key. The read happens only when `BWC_DATA_ROOT` is not set, so isolated
 on the developer's classic state. A missing value, a key that no longer resolves, or a read error
 leaves Computer selected. The migration never writes classic's key, and it runs once because the
 first save creates `settings.json`.
+
+
+## View > Font: face, style, and size (fix 1)
+
+- The ChooseFont dialog opens on the current face, weight, italic style, and size. All four are applied
+  through `DenseMetrics.ApplyFont(size, face, weight, italic)`. The root view inherits face, weight, and
+  italic, so rows and labels follow them.
+- An empty or 32-character-or-longer face keeps the current face. Weight is clamped to 100 to 900.
+- **Persisted.** `RegeditSettings` has `FontFaceName`, `FontWeight`, and `FontItalic` beside `FontSize`.
+  `RegeditRootView` writes them after the Font dialog, `PersistenceController` restores them through
+  `DenseMetrics.ApplyFont(size, face, weight, italic)` before the first layout, and `CaptureSettings` saves them.
+- **E2E status.** `tests/Bwc.E2E/Theme/FontPersistenceTests.cs` `Font_FaceStyleAndSizePersistAcrossRestart`
+  chooses Courier New, Bold Italic, 14 pt with the real ChooseFont dialog, closes, checks `settings.json`, starts
+  again on the same data root, and checks that the Font dialog opens on the restored face, style, and size.
+
+## Command line: whole-registry export (fix 4)
+
+- `/e file` with no key streams to `.<file>.<guid>.tmp` in the target folder, then `File.Move(overwrite)`
+  replaces the target. A failure leaves the old target untouched and the temp file is deleted in a `finally`.
+- **E2E status.** `CommandLine_WholeRegistryExportReplacesTheTargetAtomically` runs a whole-registry `/e` with a
+  10 minute wait (the sandbox export helper kills after 10 seconds), checks the file is a version 5 `.reg` and
+  that no other file is left beside it. Then it holds the target open with `FileShare.None`, runs the export
+  again, and checks the run fails, the old content is kept, and no temp file is left.

@@ -225,3 +225,22 @@ that its window is foreground first. Screenshots are written under `artifacts/e2
 The E2E also snapshots the real `Applets\Regedit` values before and after the run and asserts that
 the `FindFlags` DWORD is unchanged. The process is closed by the `AppSession` using block, and the
 class cleanup is expected to leave no `BwcRegedit` process and no run key behind.
+
+
+## 15. Unshowable hits, moved selection, and progress close (fixes 2, 3, 8)
+
+- **Hit that cannot be shown.** A hit whose key no longer resolves in the tree is skipped. Find Next
+  resumes after it (`RegistryFindCursor.FromHit`) and repeats until a hit is shown or the search is
+  exhausted. Each step moves forward, so the loop ends. Finished is not shown for a skipped hit.
+- **F3 after Finished.** Finished records the selection it finished from. F3 reports Finished only while
+  that selection is still selected. Once the selection moves, Find Next searches again from it.
+- **Progress close focus.** Every search ends with `FocusTreeAfterDialog`, including Cancel, Escape, and
+  the close box.
+- **E2E status.** `Find_FinishedIsStickyUntilTheSelectionMoves` (in `tests/Bwc.E2E/Find/FindTests.cs`) searches
+  keys named Alpha: Alpha, then Alphabet, then Finished. F3 shows Finished again with no progress while the
+  selection stays on Alphabet. After a click on Alpha, F3 searches again and selects Alphabet. After Alpha is
+  selected by the search, the tree row has keyboard focus and the main window is foreground.
+- **Skipped hit path: no E2E.** The skip path needs a hit whose key is gone when the hit is shown. That is a race
+  between the search and the show. Real input cannot delete a key between those two steps reliably, and the
+  harness has no hook for it. The loop is checked by code review: it resumes after the skipped hit each time,
+  and a cancel or an error leaves the last hit and the exhausted state as they were.

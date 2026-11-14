@@ -1,6 +1,8 @@
 using System.Globalization;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
+using Bwc.Core;
 using Bwc.Registry;
 
 namespace Bwc.Regedit.Dialogs;
@@ -283,8 +285,9 @@ internal sealed unsafe partial class RegistryKeySecurityInformation : ISecurityI
         {
             return ex.HResult;
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or COMException or InvalidCastException)
         {
+            Log.Exception("Registry permissions could not read the security descriptor.", ex);
             return E_FAIL;
         }
     }
@@ -341,12 +344,14 @@ internal sealed unsafe partial class RegistryKeySecurityInformation : ISecurityI
         {
             return ex.HResult;
         }
-        catch (ArgumentException)
+        catch (ArgumentException ex)
         {
+            Log.Warn("Registry permissions rejected an argument: " + ex.Message);
             return E_INVALIDARG;
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or COMException or IOException)
         {
+            Log.Exception("Registry permissions could not write the security descriptor.", ex);
             return E_FAIL;
         }
     }

@@ -155,6 +155,33 @@ public static class RegistryValueCodec
         return Encoding.Unicode.GetBytes(builder.ToString());
     }
 
+    /// <summary>
+    /// Encodes the strings for a value that was read as <paramref name="original"/>. When the strings
+    /// are the ones decoded from the original, the original bytes are returned unchanged. Otherwise the
+    /// strings are encoded and the odd trailing byte of the original, which
+    /// <see cref="DecodeMultiString"/> ignores, is kept after them.
+    /// </summary>
+    public static byte[] EncodeMultiString(IReadOnlyList<string> values, ReadOnlySpan<byte> original)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+
+        if (DecodeMultiString(original).Strings.SequenceEqual(values))
+        {
+            return original.ToArray();
+        }
+
+        byte[] encoded = EncodeMultiString(values);
+        if (original.Length % 2 == 0)
+        {
+            return encoded;
+        }
+
+        byte[] result = new byte[encoded.Length + 1];
+        encoded.CopyTo(result, 0);
+        result[^1] = original[^1];
+        return result;
+    }
+
     private static bool HasDoubleNullTerminator(ReadOnlySpan<byte> data) =>
         data.Length >= 4
         && data[^1] == 0

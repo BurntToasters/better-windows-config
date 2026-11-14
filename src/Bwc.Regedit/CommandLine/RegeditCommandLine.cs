@@ -139,21 +139,15 @@ public static class RegeditCommandLine
                 ? RegFileFormat.V5
                 : RegFileFormat.Regedit4;
 
-            using var buffer = new MemoryStream();
             if (key is null)
             {
                 // No key means the whole registry, as classic regedit does: every root under Computer.
-                CreateExportService(store).WriteRegFile(
-                    startKey: null,
-                    buffer,
-                    format,
-                    RegistryExportScope.WholeRegistry,
-                    CancellationToken.None);
-                File.WriteAllBytes(file, buffer.ToArray());
+                WriteWholeRegistryAtomically(store, file, format);
                 Log.Info($"Registry Editor export succeeded: {file}, the whole registry, {format} format.");
                 return 0;
             }
 
+            using var buffer = new MemoryStream();
             RegFileDocument document = RegFileExporter.Export(store.Reader, key, format, CancellationToken.None);
             if (format == RegFileFormat.V5)
             {
@@ -176,6 +170,49 @@ public static class RegeditCommandLine
             Log.Exception(message, ex);
             WriteStandardError("BwcRegedit: " + message);
             return 1;
+        }
+    }
+
+    /// <summary>
+    /// Streams the whole registry to a temp file beside the target, then moves it over the target. A failure
+    /// leaves the old target untouched and the temp file is removed.
+    /// </summary>
+    private static void WriteWholeRegistryAtomically(RegistryStore store, string file, RegFileFormat format)
+    {
+        string fullPath = Path.GetFullPath(file);
+        string directory = Path.GetDirectoryName(fullPath)
+            ?? throw new IOException("The export target has no folder: " + fullPath);
+        string temp = Path.Combine(directory, "." + Path.GetFileName(fullPath) + "." + Guid.NewGuid().ToString("N") + ".tmp");
+
+        try
+        {
+            using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                CreateExportService(store).WriteRegFile(
+                    startKey: null,
+                    stream,
+                    format,
+                    RegistryExportScope.WholeRegistry,
+                    CancellationToken.None);
+                stream.Flush(flushToDisk: true);
+            }
+
+            File.Move(temp, fullPath, overwrite: true);
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(temp);
+            }
+            catch (IOException ex)
+            {
+                Log.Warn("Registry Editor could not remove the export temp file " + temp + ": " + ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Log.Warn("Registry Editor could not remove the export temp file " + temp + ": " + ex.Message);
+            }
         }
     }
 

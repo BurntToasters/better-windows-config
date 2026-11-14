@@ -23,6 +23,12 @@ public sealed class LogOptions
     /// <summary>Gets or sets how many days log files are kept.</summary>
     public int RetainDays { get; init; } = 7;
 
+    /// <summary>
+    /// Gets or sets how many files one UTC day may use, the daily file included. Entries past that are dropped after
+    /// one final WARN line. The default is 10 parts, which is 50 MB at the default part size.
+    /// </summary>
+    public int MaxFilesPerDay { get; init; } = 10;
+
     /// <summary>Gets or sets the lowest level that is written.</summary>
     public LogLevel MinimumLevel { get; init; } = LogLevel.Info;
 }
@@ -40,6 +46,7 @@ public static class Log
     private static string? _toolId;
     private static LogOptions _options = new();
     private static DateOnly _currentDay;
+    private static bool _capReached;
 
     /// <summary>Gets the last initialized log directory, or null when never initialized.</summary>
     public static string? Directory { get; private set; }
@@ -63,6 +70,11 @@ public static class Log
                 throw new ArgumentOutOfRangeException(nameof(options), "RetainDays must be zero or greater.");
             }
 
+            if (settings.MaxFilesPerDay <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(options), "MaxFilesPerDay must be positive.");
+            }
+
             string directory = ResolveDirectory(toolId, settings.Directory);
 
             lock (Gate)
@@ -71,6 +83,7 @@ public static class Log
                 _options = settings;
                 Directory = directory;
                 CurrentFile = null;
+                _capReached = false;
 
                 System.IO.Directory.CreateDirectory(directory);
                 _currentDay = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -175,10 +188,16 @@ public static class Log
                 if (today != _currentDay)
                 {
                     _currentDay = today;
+                    _capReached = false;
                     DeleteExpiredLocked(Directory, _options.RetainDays);
                     string daily = DailyPath(Directory, today, 0);
                     EnsureWritable(daily);
                     CurrentFile = daily;
+                }
+
+                if (_capReached)
+                {
+                    return;
                 }
 
                 string text = FormatEntry(_toolId, level, message, ex);
@@ -187,17 +206,26 @@ public static class Log
                 long length = GetFileLength(file);
                 if (length > 0 && length + bytes.Length > _options.MaxFileBytes)
                 {
-                    file = FindNextPart(Directory, _currentDay);
+                    int part = NextPartIndex(Directory, _currentDay);
+                    if (part >= _options.MaxFilesPerDay)
+                    {
+                        // The notice may pass the part size by one entry; it is the last write of the day.
+                        _capReached = true;
+                        string notice = FormatEntry(
+                            _toolId,
+                            LogLevel.Warn,
+                            "Log cap reached: " + _options.MaxFilesPerDay.ToString(CultureInfo.InvariantCulture) +
+                            " files for this day. Further entries are dropped until the next UTC day.",
+                            null);
+                        AppendLocked(file, Encoding.UTF8.GetBytes(notice));
+                        return;
+                    }
+
+                    file = DailyPath(Directory, _currentDay, part);
                     CurrentFile = file;
                 }
 
-                using var stream = new FileStream(
-                    file,
-                    FileMode.Append,
-                    FileAccess.Write,
-                    FileShare.ReadWrite | FileShare.Delete);
-                stream.Write(bytes, 0, bytes.Length);
-                stream.Flush();
+                AppendLocked(file, bytes);
             }
         }
         catch (Exception writeError)
@@ -212,6 +240,17 @@ public static class Log
                 SafeTrace.WriteLine("Log trace fallback failed: " + traceError.Message);
             }
         }
+    }
+
+    private static void AppendLocked(string file, byte[] bytes)
+    {
+        using var stream = new FileStream(
+            file,
+            FileMode.Append,
+            FileAccess.Write,
+            FileShare.ReadWrite | FileShare.Delete);
+        stream.Write(bytes, 0, bytes.Length);
+        stream.Flush();
     }
 
     private static string FormatEntry(string toolId, LogLevel level, string message, System.Exception? ex)
@@ -278,19 +317,16 @@ public static class Log
         }
     }
 
-    private static string FindNextPart(string directory, DateOnly day)
+    /// <summary>The index of the first part of the day that does not exist yet. Part 0 is the daily file.</summary>
+    private static int NextPartIndex(string directory, DateOnly day)
     {
         int part = 1;
-        while (true)
+        while (File.Exists(DailyPath(directory, day, part)))
         {
-            string candidate = DailyPath(directory, day, part);
-            if (!File.Exists(candidate))
-            {
-                return candidate;
-            }
-
             part++;
         }
+
+        return part;
     }
 
     private static string DailyPath(string directory, DateOnly day, int part)

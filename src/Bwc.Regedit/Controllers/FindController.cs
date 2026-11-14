@@ -30,6 +30,7 @@ internal sealed class FindController
     private RegistryFindQuery? _lastFindQuery;
     private RegistryFindHit? _lastFindHit;
     private bool _findExhausted;
+    private (string Key, string? Value)? _exhaustedFrom;
 
     public FindController(RegeditContext context)
     {
@@ -89,6 +90,20 @@ internal sealed class FindController
         _lastFindQuery = TryRestoreFindQuery();
         _lastFindHit = _lastFindQuery is null ? null : TryRestoreFindHit();
         _findExhausted = false;
+        _exhaustedFrom = null;
+    }
+
+    /// <summary>The selected key and value name (null for a key selection), or null when no key is selected.</summary>
+    private (string Key, string? Value)? CurrentPosition()
+    {
+        if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
+        {
+            return null;
+        }
+
+        IReadOnlyList<DetailsRow> rows = _context.Shell.ListContent.SelectedRows;
+        string? value = rows.Count > 0 && _context.TryGetRawValueName(rows[0], out string rawName) ? rawName : null;
+        return (key.ToDisplayString(), value);
     }
 
     private async Task ShowFindDialogAsync()
@@ -171,12 +186,14 @@ internal sealed class FindController
 
         // Find Next resumes after the last hit only while the selection is still on that hit. Once the
         // user has moved the selection, the search starts from the selection (classic behavior).
-        bool selectionMoved = repeatsLastQuery && _lastFindHit is not null && SelectionMovedSinceHit(_lastFindHit);
-        if (repeatsLastQuery && _lastFindHit is not null && !selectionMoved)
+        bool hitSelectionKept = repeatsLastQuery && _lastFindHit is not null && !SelectionMovedSinceHit(_lastFindHit);
+        bool finishedHere = repeatsLastQuery && _findExhausted && _exhaustedFrom is { } from &&
+            CurrentPosition() == from;
+        if (hitSelectionKept)
         {
-            cursor = RegistryFindCursor.FromHit(_lastFindHit);
+            cursor = RegistryFindCursor.FromHit(_lastFindHit!);
         }
-        else if (repeatsLastQuery && _findExhausted && !selectionMoved)
+        else if (finishedHere)
         {
             await ShowFinishedMessageAsync();
             return;
@@ -202,19 +219,35 @@ internal sealed class FindController
 
         RegistryFindHit? hit = result.Hit;
         _lastFindQuery = query;
+
+        // A hit that cannot be shown (its key no longer resolves) is skipped: the search resumes after it
+        // until a hit is shown or the registry is exhausted. Each step moves forward, so this ends.
+        while (hit is not null && !await ApplyFindHitAsync(hit, CancellationToken.None))
+        {
+            result = await FindWithProgressAsync(query, RegistryFindCursor.FromHit(hit));
+            if (result.Error is not null)
+            {
+                Log.Warn("Registry Editor find failed: " + result.Error.Message);
+                await ShowFindErrorAsync(Get("DialogFindSearchFailed"));
+                return;
+            }
+
+            if (result.Cancelled)
+            {
+                return;
+            }
+
+            hit = result.Hit;
+        }
+
         _findExhausted = hit is null;
         _lastFindHit = hit;
         PersistFindHit(query, hit);
 
         if (hit is null)
         {
-            await ShowFinishedMessageAsync();
-            return;
-        }
-
-        bool applied = await ApplyFindHitAsync(hit, CancellationToken.None);
-        if (!applied)
-        {
+            // The position the search finished from. F3 reports Finished only while the selection is still there.
+            _exhaustedFrom = CurrentPosition();
             await ShowFinishedMessageAsync();
         }
     }
@@ -275,6 +308,7 @@ internal sealed class FindController
         }
 
         _ = await dialogTask;
+        _context.FocusTreeAfterDialog();
         cancelled = cancelled || progress.Cancelled || !completed;
         return new FindProgressResult(hit, cancelled, error);
     }
@@ -594,9 +628,10 @@ internal sealed class FindController
         {
             window.Close();
         }
-        catch (Exception)
+        catch (InvalidOperationException ex)
         {
-            // The dialog was already closed or never shown. There is nothing else to release.
+            // The dialog was already closed or never shown. Its owner is restored by the close path.
+            Log.Warn("Registry Editor could not close the find progress dialog: " + ex.Message);
         }
     }
 

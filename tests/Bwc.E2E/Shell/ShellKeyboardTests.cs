@@ -421,6 +421,12 @@ public sealed class ShellKeyboardTests
         Keyboard.Type(VirtualKeyShort.RIGHT);
         Thread.Sleep(KeySettle);
         int beforeEnter = PaneWidth(session);
+        // A held Enter reads as a key repeat, and the splitter ignores it. The stuck key is released and recorded.
+        if (ControlTestSupport.ReleaseStuckKey(0x0D))
+        {
+            E2EResults.Note("shell.split.enter", "Enter was still held before the split Enter and was released.");
+        }
+
         Keyboard.Type(VirtualKeyShort.ENTER);
         bool enterFocus = WaitUntil(() => FocusedPane(automation) == "list", UiTimeout);
         int afterEnter = PaneWidth(session);

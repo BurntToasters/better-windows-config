@@ -226,3 +226,12 @@ and deletes that root in a `finally` block using `DeleteSubKeyTree` with
 inside its run root; deleting the root removes it. The sandbox parent may remain empty, and
 acceptance checks for child keys. A crash that skips `finally` leaves a key whose name contains
 the run id, which is easy to identify and remove by hand.
+
+## Odd-length REG_MULTI_SZ on save (regression)
+
+Failure mode: `DecodeMultiString` ignores an odd trailing byte, and the save path rebuilds the value
+from the decoded strings only. A REG_MULTI_SZ with an odd byte count therefore loses that byte on
+every save. `EncodeMultiString(values, original)` keeps the odd trailing byte of the original data
+after the encoded strings, so a value round-trips byte for byte when its strings are unchanged. The
+editor caller in `ValueCommands` must pass the original bytes to keep the byte on save. Test:
+`OddLengthMultiStringKeepsItsTrailingByteOnSave`.

@@ -28,6 +28,8 @@ internal sealed class UpdateDownloader : IDisposable
         {
             AllowAutoRedirect = false,
             ConnectTimeout = TimeSpan.FromSeconds(15),
+            // A proxy that asks for Windows credentials gets the signed-in user's, as the browser would send them.
+            DefaultProxyCredentials = CredentialCache.DefaultCredentials,
         };
         _client = new HttpClient(handler, disposeHandler: true) { Timeout = Timeout.InfiniteTimeSpan };
     }

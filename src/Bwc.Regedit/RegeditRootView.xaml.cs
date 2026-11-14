@@ -121,7 +121,22 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         // different key. Dialogs are separate windows, so their keys never reach this handler.
         AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(OnRootKeyDown), handledEventsToo: true);
         Unloaded += OnRegeditRootViewUnloaded;
+        DenseMetrics.Changed += OnDenseMetricsChanged;
+        ApplyFontStyle();
     }
+
+    /// <summary>
+    /// Face, weight, and italic are inherited by every row and label under this root. The size and the
+    /// row heights come from DenseMetrics directly.
+    /// </summary>
+    private void ApplyFontStyle()
+    {
+        FontFamily = DenseMetrics.FontFamily;
+        FontWeight = new Windows.UI.Text.FontWeight((ushort)DenseMetrics.Weight);
+        FontStyle = DenseMetrics.Italic ? Windows.UI.Text.FontStyle.Italic : Windows.UI.Text.FontStyle.Normal;
+    }
+
+    private void OnDenseMetricsChanged(object? sender, EventArgs e) => ApplyFontStyle();
 
     /// <summary>Raised when File > Exit is chosen. The window owns the actual close.</summary>
     public event EventHandler? ExitRequested;
@@ -275,7 +290,12 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         _context.DialogOpen = true;
         try
         {
-            choice = FontChooser.Show(_context.WindowHwnd, DenseMetrics.FontSize * 72.0 / 96.0);
+            var current = new FontChoice(
+                DenseMetrics.FontSize * 72.0 / 96.0,
+                DenseMetrics.FaceName,
+                DenseMetrics.Weight,
+                DenseMetrics.Italic);
+            choice = FontChooser.Show(_context.WindowHwnd, current);
         }
         finally
         {
@@ -288,8 +308,11 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         }
 
         double dip = AppearanceSettings.ValidFontSizeDip(AppearanceSettings.PointsToDip(picked.PointSize));
-        DenseMetrics.ApplyFont(dip);
+        DenseMetrics.ApplyFont(dip, picked.FaceName, picked.Weight, picked.Italic);
         _context.Settings.FontSize = dip;
+        _context.Settings.FontFaceName = DenseMetrics.FaceName;
+        _context.Settings.FontWeight = DenseMetrics.Weight;
+        _context.Settings.FontItalic = DenseMetrics.Italic;
         SettingsChanged?.Invoke(this, EventArgs.Empty);
         _context.FocusTreeAfterDialog();
     }

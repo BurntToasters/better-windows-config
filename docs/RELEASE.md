@@ -15,7 +15,7 @@ detail and the refusal reasons.
 
 ### 1. One-time VM setup
 
-1. Install Node 22.22.2 or newer (or 24.15+), the .NET SDK 10.0.403 or newer, NSIS 3.10 or newer
+1. Install Node 26.13.1 or newer (the `engines` value in `package.json`), the .NET SDK 10.0.403 or newer, NSIS 3.10 or newer
    (`makensis.exe` on PATH, or `NSIS_HOME` set), and GnuPG 2.4 or newer with the release signing
    key imported.
 2. Run `gh auth login` for the account that can create releases in `BurntToasters/better-windows-config`.
@@ -65,21 +65,40 @@ The preflight checks this, and a dirty tree is refused.
 npm run release:win
 ```
 
-This runs, in order: the stable policy (no beta overrides, no non-canonical GitHub target), the
-preflight, the quick quality gate (`test:all --quick`, which runs no GUI E2E on this VM), a release
-session that records the gate with E2E `skipped`, a clean `artifacts/release/<version>/` folder, and
-then `npm run release:win:continue`. The continuation builds both RIDs (ship flavor), builds the two
-signed setup EXEs, assembles and signs the bundle, adds GPG signatures, checks Authenticode, creates
-or reuses the single draft and uploads its assets, verifies the draft, and runs `release:finalize`.
+This runs, in order:
 
-`release:finalize` mirrors the release folder and then runs `git fetch origin && git reset --hard @{u}
-&& git clean -fd`. That discards local changes in this checkout, so run it only on this disposable
-release VM. The runner prints a warning before it starts. Artifacts under `artifacts/` are git-ignored
-and survive it.
+1. The stable policy (no beta overrides, no non-canonical GitHub target).
+2. `release:preflight --require-trusted-key`. Before anything is built, it checks the update key
+   (decrypts, and is embedded in `TrustedKeys.cs`), the GPG key (a probe file is signed in a temporary
+   folder), `AFTER_PACK_LOC` (exists, is writable, is outside the repository), the Azure variables and
+   SignTool, `makensis.exe`, the Node version, that HEAD is pushed to `origin/main`, `gh auth status`,
+   that no published release exists for the tag, and that the version is newer than the latest
+   published release. Every local failure is listed in one run. The reasons are RP1 to RP24 in
+   [failure-modes/release.md](failure-modes/release.md).
+3. The quick quality gate (`test:all --quick`, which runs no GUI E2E on this VM).
+4. A release session that records the gate with E2E `skipped`.
+5. A clean `artifacts/release/<version>/` folder, then `npm run release:win:continue`.
 
-If a step fails, fix the cause, then run `npm run release:win:resume`. It runs the policy and the
-preflight, then the continuation. A session older than 24 hours is refused, so start again with
-`npm run release:win` in that case.
+The continuation starts with the same gate (policy, preflight, session verify). It then builds both
+RIDs (ship flavor), builds the two signed setup EXEs, assembles and signs the bundle, adds GPG
+signatures, checks Authenticode, creates or reuses the single draft and uploads its assets, verifies
+the draft, and runs `release:mirror`, which copies the release folder to `AFTER_PACK_LOC`. **The automatic
+flow ends at the mirror. No step runs a git command.** Publishing and cleanup are separate steps
+(section 5).
+
+### Recovery: resume, do not re-sign
+
+Read the refusal reason, fix its cause, then resume from the failed step. Do not restart signing
+after a draft exists: re-signed bytes do not match the draft, and a stable draft is never replaced.
+
+| Failed after | Run | What it does |
+|--------------|-----|--------------|
+| Upload or draft verification, or the mirror | `npm run release:win:upload` | The gate, then `release:draft`, `release:verify:draft`, `release:mirror`. Keeps the signed files. |
+| Signing, or anything before the draft exists | `npm run release:win:continue -- --from <step>` | The gate, then the listed steps from `<step>`. Valid names: `release:policy`, `release:preflight`, `release:session:verify`, `build:win:x64`, `build:win:arm64`, `release:rehearse:client`, `installer:x64`, `installer:arm64`, `release:assemble`, `release:sign:gpg`, `release:authenticode`, `release:draft`, `release:verify:draft`, `release:mirror`. |
+| Gate, session, or policy, or the session is older than 24 hours | `npm run release:win` | Records a new gate, cleans `artifacts/release/<version>/`, and runs the whole flow. |
+
+A wrong `--from` step is refused with exit 2 and the valid names, before any step runs. `--from`
+without `--continue` is refused with exit 2.
 
 ### 4. Packaged-artifact QA
 
@@ -88,16 +107,30 @@ the update path, then uninstall. Check that each installed file is signed, that 
 finds the published feed, and that the shell integration registers and removes cleanly. Do not
 publish a draft that has not passed.
 
-### 5. Publish, then verify the live feed
+### 5. Publish, verify the live feed, then clean up
 
 ```powershell
 npm run release:publish
 npm run release:verify:published
+npm run release:cleanup
 ```
 
-`release:publish` runs the draft verification again against the downloaded assets before it flips
-the draft to published. `release:verify:published` then proves the live updater feed and the
-signatures for the published version.
+`release:publish` downloads the draft's assets, verifies them against the local signed files, and
+then flips the draft to published. If the release is already published and its assets match, a rerun
+exits 0 with "no-op" and rewrites `artifacts/release/<version>/<channel>/publish-result.json`.
+`release:verify:published` then proves the live updater feed and the signatures for the version. It also runs the built
+ship client (`publish/<rid>/BwcUpdate.exe`) with `--check` and `--download` against the feed. The continue flow runs
+`release:rehearse:client` after both builds and before any paid signing; it checks the latest published version.
+
+`release:cleanup` resets this checkout to its upstream (`git reset --hard` and `git clean -fd`). It is
+the only step that runs git reset, and it refuses (nothing is reset) when:
+
+- the working tree is dirty (git-ignored `artifacts/` does not count),
+- `publish-result.json` does not record v`<version>` as published,
+- the current branch has no upstream, or `git fetch` of its remote fails,
+- HEAD has commits that the upstream does not contain.
+
+Run it only after a successful publish, on this disposable release VM. Git-ignored `artifacts/` survives.
 
 ## Status
 
@@ -117,7 +150,7 @@ signatures for the published version.
 
 | Tool | Why |
 |------|-----|
-| Node 22.22.2, 24.15, or 26+ | All scripts. |
+| Node 26.13.1 or newer | All scripts (`package.json` `engines`). |
 | .NET SDK 10.0.403 or newer | Only a non-dry-run publish uses it. |
 | NSIS 3.10+ | A real setup EXE. The dry run does not need it. |
 | GnuPG 2.4+ | Detached signatures of the release folder (`scripts/gpg-sign.js`). Used on the release VM only. |
@@ -164,8 +197,8 @@ unchanged, because the variables BWC does not use are kept in `.env.example`. Th
 need it (`release:win`, `release:win:continue`, `release:win:resume`, `release:policy`,
 `release:preflight`, `release:session:*`, `release:assemble`, `release:sign`, `release:sign:gpg`,
 `release:mirror`, `release:draft`, `release:verify`, `release:verify:draft`, `release:publish`,
-`installer:*`, and `release:dry-run`) load it with `node --env-file-if-exists=.env`. That needs Node
-22.9 or newer, and it adds no dependency. Variables already set in the shell win over `.env`. The
+`release:win:upload`, `installer:*`, and `release:dry-run`) load it with `node --env-file-if-exists=.env`.
+`release:cleanup` reads no secret and does not load it. The flow needs Node 26.13.1 or newer. Variables already set in the shell win over `.env`. The
 PowerShell Authenticode step (`release:authenticode`) reads the environment of the run that loaded
 `.env`, so start it through `npm run release:win:continue`, or set the Azure variables in the shell.
 
@@ -420,7 +453,9 @@ The draft path is idempotent. If one draft exists, it is patched with the curren
 body. If two drafts exist for the tag, it refuses `duplicate-drafts`. If a published
 release exists, it refuses `already-published`. Assets are uploaded only when the name is
 absent; a same-size asset is skipped, and a same-name asset with another size refuses
-`asset-conflict` unless `--replace-assets` is given.
+`asset-conflict` unless `--replace-assets` is given. With `--replace-assets`, a same-name asset is
+deleted and uploaded again without downloading the old bytes. Each step of the release flow gets only
+the credentials it reads (`STEP_ENV` in `scripts/run-release.js`); a draft step gets none.
 
 ## 5. Verify (D7)
 
@@ -472,8 +507,10 @@ node scripts/release-publish.js --version 0.1.0-beta.1 --channel beta `
 
 `--apply` first runs `release-verify.js --apply` against the draft. Only if every
 downloaded asset matches the local signed artifact does it send the PATCH body
-`{"draft":false,"prerelease":true|false}`. If the release is already published with the
-expected prerelease flag, it prints a no-op and exits 0. It never creates a draft.
+`{"draft":false,"prerelease":true|false}`. If the release is already published, the target commit
+and prerelease flag must match HEAD and the channel, and the assets must match the local files
+(`release-verify.js --allow-published`). Then it prints a no-op, writes `publish-result.json`
+with `noop: true`, and exits 0. It never creates a draft.
 
 ## GitHub CLI commands
 
@@ -564,7 +601,20 @@ A dry run that finds a refusal still prints the plan and exits 1.
 | `key-missing`, `key-unreadable`, `key-malformed` | No key source, a key given as text on the command line, or an environment value that is neither minisign key text, a key path, nor base64 of one. The value is never printed. |
 | `stable-override` | A stable release set a beta override (`SKIP_WIN_CODESIGN`, `FORCE_UPLOAD`, `SKIP_RELEASE_MIRROR`, `ALLOW_ASSET_REPLACE`, `SKIP_E2E`) or a non-canonical GitHub target. Exit 1. |
 | `asset-replace-stable` | `--replace-assets` was given for a stable release. Exit 1. |
-| `gate-missing`, `gate-failed`, `gate-commit-mismatch` | `release-session.js create --require-gate` found no passing quality gate for HEAD. Exit 1, no session written. |
+| `gate-missing`, `gate-failed`, `gate-commit-mismatch`, `gate-dirty-tree` | `release-session.js create` found no passing quality gate for HEAD, or the gate ran on a dirty tree. The gate is required by default. Exit 1, no session written. |
+| `missing-quality-gate` | `release-session.js verify` (and the draft, verify, and publish checks) found a session with no recorded gate. Exit 1. |
+| `asset-incomplete` | A draft asset is not in the `uploaded` state. Pass `--replace-assets` to delete and re-upload it. Exit 1. |
+| `asset-url-malformed` | A manifest installer URL has a malformed percent escape. Exit 1. |
+| `key-missing`, `password-missing`, `malformed-secret-key`, `embedded-key-mismatch` | Readiness (RP1 to RP4): the update key is absent, encrypted without its password, malformed, or not embedded. |
+| `key-id-missing`, `key-id-invalid`, `passphrase-missing`, `gpg-missing`, `key-not-found`, `key-mismatch`, `sign-failed` | Readiness (RP5 to RP9): the GPG key, passphrase, or probe signature. The passphrase is never printed. |
+| `after-pack-loc-missing`, `after-pack-loc-invalid`, `after-pack-loc-unavailable`, `after-pack-loc-unwritable` | Readiness (RP10 to RP13): `AFTER_PACK_LOC` is unset, relative, a drive root, inside the repository, on an unmapped drive, or not writable. |
+| `signing-env-missing`, `signing-tools-missing`, `makensis-missing` | Readiness (RP14 to RP16). The message names variables, never their values. |
+| `node-version` | The running Node does not satisfy `package.json` `engines.node` (RP17). |
+| `head-not-pushed`, `remote-branch-missing` | HEAD is not in `origin/main` (stable) or `origin/experimental` (beta), or that ref is absent. Run `git fetch origin` first (RP18, RP19). |
+| `gh-missing`, `gh-auth-missing`, `release-published`, `version-not-newer`, `duplicate-drafts` | Readiness (RP20 to RP23): gh is absent or not logged in, the tag is already published, or the version is not newer than the latest published release. |
+| `after-pack-loc-invalid` (mirror) | `scripts/finalize-release-assets.js` refuses an unreachable `AFTER_PACK_LOC` with the same reason; it never throws. |
+| `dirty-tree`, `not-published`, `no-upstream`, `fetch-failed`, `head-not-upstream` | `release:cleanup` refusals (C1 to C5). Nothing is reset. |
+| `version-invalid` | `package.json` version is not SemVer (`release:cleanup`, exit 2). |
 
 ## Self-test
 
@@ -581,8 +631,13 @@ The release VM flow has its own self-test, with no network, no `gh`, and no buil
 node scripts/run-release-selftest.js
 ```
 
-It checks the stable policy refusals, the exact step lists of `release:win` and `release:win:continue`,
-the quality-gate proof, the trusted-key default, and the package.json entry points.
+It checks the stable policy refusals, the exact step lists of `release:win` and `release:win:continue`
+(the gate, the mirror as the last step, and no git step), `--from` resume and its refusals, the
+quality-gate proof, the trusted-key default, the package.json entry points, and `release:cleanup` in
+temporary git repositories (dirty, untracked, unpublished, unpushed, no-upstream, and fetch-failed trees
+are refused, and nothing is reset). The signing readiness checks (RP1 to RP24) run with injected fakes
+in `scripts/release-selftest.js`, which also covers the publish rerun decision and the
+`--require-trusted-key` CLI.
 
 Result: `artifacts/release/selftest/result.json`. It covers wrong key, bad hash, size
 mismatch, wrong channel, placeholder key, malformed JSON, wrong architecture, installer
@@ -669,11 +724,6 @@ Verify one file by hand: `powershell.exe -NoProfile -ExecutionPolicy Bypass -Fil
 - The real release key: the placeholder in `TrustedKeys.cs` must be replaced with the public key. Until
   then `npm run release:win` refuses before its first step. Nothing above can run a real release.
 - The first `0.1.0` stable run on the release VM (runbook above), with a real `gh` login and the real key.
-- `release:verify:published` (`scripts/validate-updater-live.js`) and `release:mirror`
-  (`scripts/finalize-release-assets.js`) and `release:sign:gpg` (`scripts/gpg-sign.js`) are called by
-  the flow but are not part of this change set. Each must exist before the flow reaches it.
-- `release:finalize` mirrors `artifacts/release/<version>/stable`, because its npm script names that
-  folder. A beta release on this VM would need its own finalize entry.
 - The stable manifest URL in `src/Bwc.Hub/Updates/UpdateSources.cs` points at the GitHub latest-release
   asset `bwc-stable.json`. The beta URL is empty. Until the real key replaces the placeholder, the
   Hub reports "not configured" and never fetches the manifest.

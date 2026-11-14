@@ -22,6 +22,7 @@ public sealed class AppSession : IDisposable
     private readonly UIA3Automation _automation;
     private bool _disposed;
     private bool _foregroundRecorded;
+    private readonly List<(string Name, Action Action)> _onDispose = new();
 
     public AppSession(
         E2EConfig config,
@@ -244,6 +245,13 @@ public sealed class AppSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// Registers work that runs after this session's own process has exited, in reverse order of registration.
+    /// Used to restore state the application wrote on exit. A failing action is recorded as a failed
+    /// <c>session.cleanup.&lt;name&gt;</c> check and does not stop the others.
+    /// </summary>
+    public void OnDispose(string name, Action action) => _onDispose.Add((name, action));
+
     public void Dispose()
     {
         if (_disposed)
@@ -265,6 +273,18 @@ public sealed class AppSession : IDisposable
         {
             _automation.Dispose();
             _process.Dispose();
+            for (int i = _onDispose.Count - 1; i >= 0; i--)
+            {
+                (string name, Action action) = _onDispose[i];
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    E2EResults.Record("session.cleanup." + name, false, ex.Message);
+                }
+            }
         }
     }
 

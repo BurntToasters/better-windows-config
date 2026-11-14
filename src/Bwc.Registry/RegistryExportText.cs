@@ -12,6 +12,8 @@ namespace Bwc.Registry;
 public static class RegistryTextExporter
 {
     private const int ErrorAccessDenied = 5;
+    private const int ErrorFileNotFound = 2;
+    private const int ErrorKeyDeleted = 1018;
     private const string Crlf = "\r\n";
     private const string ComputerPrefix = "Computer\\";
     private const string NoClass = "<NO CLASS>";
@@ -44,9 +46,10 @@ public static class RegistryTextExporter
         cancellationToken.ThrowIfCancellationRequested();
 
         var state = new TextExportState();
-        progress?.Report(Starting(startKey, state));
-        Walk(source, startKey, writer, isStart: true, cancellationToken, progress, state);
-        progress?.Report(Completed(startKey, state));
+        var gate = new ExportProgressGate(progress);
+        gate.Always(Starting(startKey, state));
+        Walk(source, startKey, writer, isStart: true, cancellationToken, gate, state);
+        gate.Always(Completed(startKey, state));
     }
 
     public static void ExportWholeRegistry(
@@ -71,15 +74,16 @@ public static class RegistryTextExporter
 
         var state = new TextExportState();
         IReadOnlyList<RegistryPath> roots = RegistryExportRoots.Classic;
-        progress?.Report(Starting(roots[0], state));
+        var gate = new ExportProgressGate(progress);
+        gate.Always(Starting(roots[0], state));
 
         foreach (RegistryPath root in roots)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Walk(source, root, writer, isStart: false, cancellationToken, progress, state);
+            Walk(source, root, writer, isStart: false, cancellationToken, gate, state);
         }
 
-        progress?.Report(Completed(roots[^1], state));
+        gate.Always(Completed(roots[^1], state));
     }
 
     private static void Walk(
@@ -88,7 +92,7 @@ public static class RegistryTextExporter
         TextWriter writer,
         bool isStart,
         CancellationToken cancellationToken,
-        IProgress<ExportProgress>? progress,
+        ExportProgressGate gate,
         TextExportState state)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -105,10 +109,10 @@ public static class RegistryTextExporter
             cancellationToken.ThrowIfCancellationRequested();
             subKeyNames = source.EnumerateSubKeyNames(path, cancellationToken);
         }
-        catch (RegistryOperationException ex) when (!isStart && ex.Win32Error == ErrorAccessDenied)
+        catch (RegistryOperationException ex) when (!isStart && IsSkippableKeyError(ex.Win32Error))
         {
             state.KeysSkipped += 1;
-            progress?.Report(new ExportProgress(
+            gate.Always(new ExportProgress(
                 ExportPhase.KeySkipped,
                 path,
                 null,
@@ -138,7 +142,7 @@ public static class RegistryTextExporter
             WriteLine(writer, string.Empty);
 
             state.ValuesExported += 1;
-            progress?.Report(new ExportProgress(
+            gate.Throttled(new ExportProgress(
                 ExportPhase.ValueExported,
                 path,
                 value.Name,
@@ -148,7 +152,7 @@ public static class RegistryTextExporter
         }
 
         state.KeysExported += 1;
-        progress?.Report(new ExportProgress(
+        gate.Throttled(new ExportProgress(
             ExportPhase.KeyExported,
             path,
             null,
@@ -159,9 +163,13 @@ public static class RegistryTextExporter
         foreach (string subKeyName in subKeyNames)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Walk(source, path.Append(subKeyName), writer, isStart: false, cancellationToken, progress, state);
+            Walk(source, path.AppendEnumeratedName(subKeyName), writer, isStart: false, cancellationToken, gate, state);
         }
     }
+
+    // The same skip set as the .reg exporter: a key that vanished or was deleted mid-walk is skipped.
+    private static bool IsSkippableKeyError(int win32Error) =>
+        win32Error is ErrorAccessDenied or ErrorFileNotFound or ErrorKeyDeleted;
 
     private static ExportProgress Starting(RegistryPath path, TextExportState state) =>
         new(ExportPhase.Starting, path, null, state.KeysExported, state.ValuesExported, state.KeysSkipped);

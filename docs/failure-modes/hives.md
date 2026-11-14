@@ -134,21 +134,40 @@ native handles are closed through safe handles before the method returns.
 
 ## 9. File > Load Hive
 
-The command is always enabled. The flow is:
+The command is enabled at the HKLM and HKU roots. The flow is:
 
+0. Check the privilege with `PrivilegeScope.IsAvailable` for `SeBackupPrivilege` and
+   `SeRestorePrivilege`, without enabling either. A process that lacks one shows the classic
+   `Cannot Load {0}: Insufficient privileges.` message (RT_STRING 182) and returns. No file dialog
+   and no name prompt open first, so the user is not asked for input that cannot succeed. The
+   check is refused by the message, not by the native call, and nothing is written.
 1. Show the owned `IFileOpenDialog` through `CommonFileDialogs.ShowOpen`.
 2. If the user cancels, return without prompting and without changing the registry.
 3. Show `TextPromptDialog` for the single key name under HKLM.
 4. Reject empty names, separators, NUL, `.`, `..`, names over 255 characters, and names that
    already exist under HKLM.
-5. Run `LoadHive(HKLM\<name>, file)` on the thread pool.
+5. Run `LoadHive(HKLM\<name>, file)` under the write gate (`RunRegistryWriteAsync`), so the window
+   cannot close while the native load runs.
 6. Refresh the tree, select `HKLM\<name>`, and leave focus in the tree.
-7. On failure show the standard registry error dialog and do not claim success.
+7. On failure show the classic Load Hive text (`MsgLoadHiveFailed` or the matching Load Hive text,
+   RT_STRING 183, 188, or 189) with the hive file path as the subject, not the key path. The Win32
+   detail is logged. A file that is missing or is not a hive file therefore names the file the user
+   chose. No separate missing-file string exists for Load Hive, so a missing file uses the same text.
+
+Failure modes of the early check: a process that holds the privilege (an elevated run) skips step 0 and
+behaves as before. An `IsAvailable` query that fails is treated as missing, which is the safe side: the
+command refuses rather than asking for a file it cannot load.
 
 The menu handler owns the modal gate for both dialogs, so a second Load Hive, another modal, or a
 context menu cannot run while the file dialog or the name prompt is open. If the window handle is
 not attached, the command logs and returns. The command does not retry a failed load and does not
 delete the selected file.
+
+Unload Hive runs its native call under the same write gate (section 10).
+
+Check: `Hives_LoadHiveRefusesWithoutPrivilegeBeforeAskingForFile` selects HKLM in a non-elevated run,
+invokes Load Hive, and checks that the privilege message appears and that no file dialog opens within
+three seconds. Nothing is loaded.
 
 ## 10. File > Unload Hive
 
@@ -159,7 +178,8 @@ disables the command. Connect Network Registry and Disconnect Network Registry r
 The flow is:
 
 1. Confirm with the standard owned confirmation dialog.
-2. Run `UnloadHive(selected)` on the thread pool.
+2. Run `UnloadHive(selected)` under the write gate (`RunRegistryWriteAsync`). Earlier builds ran it
+   as a plain read, so closing the window during an unload could exit the process mid-call.
 3. Refresh the tree, select the parent, and leave focus in the tree.
 4. On failure show the standard registry error dialog. The key remains selected and mounted.
 

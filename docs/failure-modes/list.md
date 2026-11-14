@@ -183,3 +183,12 @@ Every behavior above has an E2E check in `tests/Bwc.E2E/List/ListBehaviorTests.c
 the shipped Registry Editor with real keyboard and mouse input against a seeded HKCU sandbox. The
 checks write screenshots to `artifacts/e2e/visual/list/`. The one pure function (the comparer) is
 verified through the order check, not in isolation.
+
+## Rename commit on lost focus (regression)
+
+### Clicking another row cancels the rename
+
+Failure mode: the list rename box cancelled when it lost focus, so a user who typed a new name and
+clicked another row lost the typed text. The tree rename commits on focus loss, and classic regedit
+commits a value rename the same way, so the list now commits on lost focus. Escape still cancels, and
+Enter still commits. Test: `ListRenameFocus_ClickingAnotherRowCommitsTheRename`.

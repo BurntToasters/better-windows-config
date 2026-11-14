@@ -191,3 +191,25 @@ enumeration throws `OperationCanceledException` and returns no partial list.
 
 Remote connections use the same enumeration code through `_remote`. The rules above apply
 unchanged.
+
+## 17. Enumeration failure in the value list
+
+The value list opens the key, enumerates its values, and then builds the rows. The engine's value
+source turns an enumeration failure into an empty list, so the list alone could not tell an empty key
+from a key that could not be read. Earlier builds showed the empty list silently for every failure
+except access denied.
+
+Rule: the probe that runs before each list load opens the key and enumerates its values, both on the
+local reader and on a remote reader. A failure of either shows the classic `Cannot open key` message
+(`MsgOpenKeyFailed`, caption `MsgCaptionOpenKeyError`) with the Win32 text as details, and the list is
+empty. A failure with no Win32 code (any other exception in the load) shows the same message without
+details. Every case is logged with the key path. The value source's own catch remains only for a
+failure that happens between the probe and the read, which is logged.
+
+E2E builds only: the `BWC_E2E_FAIL_VALUE_ENUMERATION` environment variable names one display path
+(case-insensitive). When the probe runs for that path it reports `ERROR_NOT_ENOUGH_MEMORY` (8), so the
+enumeration failure can be driven with real input. The ship build never reads the variable.
+
+Check: `AppServices_ValueEnumerationFailureShowsClassicError` sets the variable to the run's sandbox key,
+navigates to it, and checks the `Error Opening Key` message with the key path and the system text, and
+an empty list. It writes nothing.

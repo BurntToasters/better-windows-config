@@ -26,7 +26,8 @@ public sealed record ReadyUpdate(string FolderPath, string InstallerPath, string
 /// its body, its expiry, the channel, and the version policy. It needs no staging folder.
 /// <see cref="DownloadAsync"/> runs the same manifest verification, then reuses an already verified
 /// staged installer for the same version and SHA-256, or downloads and verifies a new one. A new
-/// receipt is written only after every check passes, and then every other staging folder is pruned.
+/// receipt is written only after every check passes, and then every other staging folder older than
+/// 24 hours is pruned (a younger one may be another install's staged update).
 /// A failed attempt leaves no staging folder behind.
 /// </summary>
 public sealed class UpdateChecker
@@ -241,7 +242,18 @@ public sealed class UpdateChecker
         }
 
         var installer = verified.Installer;
-        foreach (var folder in Directory.EnumerateDirectories(request.StagingRoot).ToList())
+        List<string> folders;
+        try
+        {
+            folders = Directory.EnumerateDirectories(request.StagingRoot).ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Warn($"staging root cannot be listed for reuse: {ex.GetType().Name}");
+            return null;
+        }
+
+        foreach (var folder in folders)
         {
             if (!StagingCleanup.IsStagingFolderName(Path.GetFileName(folder)))
             {
@@ -279,7 +291,14 @@ public sealed class UpdateChecker
                 using var file = File.Open(installerPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 check = InstallerVerifier.Verify(file, expected, _options.TrustedPublicKeys);
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Held or unreadable right now: not reused, and not discarded, because nothing shows it was changed.
+                Log.Warn($"staged installer cannot be read for reuse: {ex.GetType().Name}");
+                continue;
+            }
+
+            if (check.Failure == UpdateFailure.Io)
             {
                 continue;
             }
@@ -336,12 +355,18 @@ public sealed class UpdateChecker
         }
 
         Outcome<string> check;
-        using (var file = File.Open(installerPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        try
         {
+            using var file = File.Open(installerPath, FileMode.Open, FileAccess.Read, FileShare.Read);
             check = InstallerVerifier.Verify(
                 file,
                 new InstallerExpectation(verified.Version, request.Architecture, installer.Size, installer.Sha256, installer.Signature),
                 _options.TrustedPublicKeys);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Discard(folder);
+            return Outcome<ReadyUpdate>.Fail(UpdateFailure.Io, $"cannot open the downloaded installer: {ex.GetType().Name}");
         }
 
         if (!check.Ok)
@@ -362,7 +387,7 @@ public sealed class UpdateChecker
         {
             UpdateReceipt.Write(receiptPath, receipt);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Discard(folder);
             return Outcome<ReadyUpdate>.Fail(UpdateFailure.Io, $"cannot write the receipt: {ex.GetType().Name}");

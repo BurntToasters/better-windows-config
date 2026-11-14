@@ -78,6 +78,30 @@ public sealed class RegistryPath : IEquatable<RegistryPath>
                 nameof(component));
         }
 
+        return Extend(component);
+    }
+
+    /// <summary>
+    /// Appends a key name the registry enumerated. The registry allows "." and ".." as key names, so
+    /// unlike <see cref="Append"/> this accepts them. Separators, NUL, and empty or overlong names are
+    /// still refused. User-typed paths must keep using <see cref="Append"/>.
+    /// </summary>
+    public RegistryPath AppendEnumeratedName(string component)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+
+        if (component is not ("." or "..") && !IsValidComponent(component))
+        {
+            throw new ArgumentException(
+                "A registry key name must be non-empty, at most 255 characters, and must not contain a separator or NUL.",
+                nameof(component));
+        }
+
+        return Extend(component);
+    }
+
+    private RegistryPath Extend(string component)
+    {
         string[] next = new string[_components.Length + 1];
         Array.Copy(_components, next, _components.Length);
         next[^1] = component;
