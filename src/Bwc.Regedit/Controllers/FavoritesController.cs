@@ -46,6 +46,13 @@ internal sealed class FavoritesController
             return;
         }
 
+        // Favorites store local key paths only. A remote key is refused with a classic-style message, not stored.
+        if (_context.TryGetSelectedLocation(out KeyLocation remoteLocation) && remoteLocation.IsRemote)
+        {
+            await _context.ShowMessageAsync(Get("DialogFavoriteRemote"));
+            return;
+        }
+
         if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
         {
             TreeNode? selected = _context.Shell.TreeContent.SelectedNode;

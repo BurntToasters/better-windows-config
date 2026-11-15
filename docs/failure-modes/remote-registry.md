@@ -3,9 +3,9 @@
 Scope: `RemoteRegistryConnection` in `src/Bwc.Registry`, the remote root routing in
 `RegistryReader`, the File > Connect Network Registry and File > Disconnect Network Registry
 commands, the remote computer nodes in the Registry Editor tree, and the remote write store (section 15).
-The Registry Editor UI stays read only for remote nodes until a later piece enables Modify, New, Delete,
-Rename, Permissions and Export. The engine can write a remote computer only through
-`RemoteRegistryConnection.CreateStore` and an explicit write policy.
+Section 16 covers the Registry Editor commands on a remote key (R2a). Import, Load Hive, and Unload Hive stay
+local-only until R2b. The engine can write a remote computer only through `RemoteRegistryConnection.CreateStore`
+and an explicit write policy.
 
 ## 1. Operation order
 
@@ -287,3 +287,51 @@ Not covered by automated tests:
 - Real RPC failures on write (section 15.1), other than a failed connect.
 - Connect to a second computer. The loopback paths use the same RPC code.
 - The timing of an in-flight Dispose. The measured child-handle result and the pin test cover the design.
+
+## 16. Registry Editor commands on a remote key (R2a)
+
+Scope: the key location of a remote tree node, the menus for remote nodes, Modify and the value editors, New,
+Delete, Rename, Copy Key Name, Find, Export of a branch, the address bar, Permissions targeting, and the
+Disconnect dialog. Import, Load Hive, Unload Hive, and Print stay local-only in this piece.
+
+Model:
+
+- A key location is a connection (or none for the local registry) and a `RegistryPath` in local form
+  (`HKEY_LOCAL_MACHINE\...`). The tree node keeps the display path `\\COMPUTER\HKEY_LOCAL_MACHINE\...`.
+- One `RegistryStore` per connection, made with `RemoteRegistryConnection.CreateStore` and the same
+  `RegeditWritePolicy` as the local store. It is created on first use and dropped on disconnect.
+- A display path that names a connected computer resolves to its location. A computer node has no key, so
+  key commands are disabled on it. An unknown computer name does not resolve, so the command is refused.
+- The Copy Key Name text is the display path, `\\COMPUTER\HKEY_...`, which is the classic form. Local copies
+  keep `HKEY_...`.
+
+Ways a remote command can fail, and the expected result:
+
+| Way it could fail | Expected result | Test |
+| --- | --- | --- |
+| Computer node selected; New Key, Delete, Rename, Modify, Export of a key | Disabled. Nothing reaches the store | `Remote_LoopbackConnectShowsRemoteRootsAndMenus` |
+| Remote hive root selected (`\\COMPUTER\HKEY_USERS`); Delete, Rename | Disabled, as on a local hive root | `Remote_LoopbackConnectShowsRemoteRootsAndMenus` |
+| Remote key menu (RT_MENU 104) on a remote hive child or key | Same items and enable rules as the local key menu | `Remote_LoopbackConnectShowsRemoteRootsAndMenus` |
+| New Key or a new value of each type under a remote key | Written under `HKU\<SID>\Software\BWC-E2E\<run>`. Read back with `reg query` | `Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox` |
+| New Binary value (zero-length data) under a remote key | Written. The empty write passes a spare byte and length 0, because a null data pointer fails the remote RPC stub with Win32 1780 | `Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox` |
+| New value whose name sorts before an existing value (registry order is creation order, the list is sorted) | The new row is selected and its inline editor opens. The selection uses the displayed position of the row | `Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox` |
+| Modify a String, DWORD, QWORD, Multi-String, or binary value on a remote key | Written with the value's type. The list shows the new data | `Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox` |
+| Rename a remote key (copy-then-delete fallback) and a remote value | One key or value at the new name, data kept | `Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox` |
+| Delete a remote value and a remote key | Removed. The local sandbox is untouched | `Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox` |
+| Remote write refused by the sandbox policy (non-loopback, outside the sandbox) | `RegistryOperationException` 5 shown with the classic message. Nothing written | Engine tests (`RemoteRegistryWriteTests`). The UI reaches only loopback under the sandbox |
+| Connection removed while a remote value is selected or being written | `ObjectDisposedException` is logged by the command boundary and the generic command failure is shown. The tree is not left with a stale node after the next refresh | Not automated. Reviewed in code |
+| Remote value read fails (RPC or access denied) | The classic "Cannot open key" message for the key, and an empty list. The node collapses | Not automated. Needs a second machine |
+| Copy Key Name on a remote key | Clipboard holds `\\127.0.0.1\HKEY_USERS\<SID>\Software\BWC-E2E\<run>` | `Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox` |
+| Find started on a remote key | Searches the remote subtree. A hit under the remote key selects the remote node | `Remote_FindLocatesRemoteValue` |
+| Export branch of a remote key | A local .reg file. Its key names are the remote names with `HKEY_USERS\<SID>` written as `HKEY_CURRENT_USER`, so the file matches a local export of the same key line for line | `Remote_ExportBranchMatchesLocalExport` |
+| Address bar `\\127.0.0.1\HKEY_USERS\<SID>\...` (connected) | Navigates to the remote node | `Remote_AddressBarNavigatesToRemotePath` |
+| Address bar with a remote path to a computer that is not connected | "The selected branch does not exist" (DialogAddressBarKeyNotFound). Nothing is connected | `Remote_AddressBarNavigatesToRemotePath` |
+| Permissions on a remote key | The dialog targets the remote key (the same store and path). Saving uses the remote store | Not automated here. Covered by S1 |
+| Add to Favorites on a remote key | Refused with the classic favorite error text. Favorites store only local paths, and no oracle measurement exists for a remote favorite | Not automated |
+| Disconnect dialog 107 with one computer selected | The computer leaves the tree and its connection is disposed. The local selection stays | `Remote_DisconnectDialogRemovesComputer` |
+| Disconnect dialog 107 with OK and no selection | Classic message, dialog stays open | `Remote_DisconnectDialogRemovesComputer` |
+| Connect to `127.0.0.1` in an E2E build | Accepted. The shipping rule for the local name is unchanged | `Remote_LoopbackConnectShowsRemoteRootsAndMenus` |
+
+Check status: the loopback E2E tests need the Remote Registry service to start on connect. A connect that fails
+records `not run: remote registry unavailable (Win32 <code>)` as Inconclusive and does not fail the run (the
+`ConnectOrSkip` rule of section 15).

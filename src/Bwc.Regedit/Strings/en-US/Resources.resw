@@ -245,6 +245,9 @@ Error code: {1} (0x{1:X8})
   <data name="DialogFavoriteComputer" xml:space="preserve">
     <value>Computer cannot be added to favorites. Select a key first.</value>
   </data>
+  <data name="DialogFavoriteRemote" xml:space="preserve">
+    <value>A key on a connected computer cannot be added to favorites yet. Select a key on this computer.</value>
+  </data>
   <data name="DialogFavoriteNone" xml:space="preserve">
     <value>There are no favorites to remove.</value>
   </data>
@@ -457,6 +460,12 @@ Error code: {1} (0x{1:X8})
   </data>
   <data name="DialogDisconnectLabel" xml:space="preserve">
     <value>Select a connected computer:</value>
+  </data>
+  <data name="DialogDisconnectComputerLabel" xml:space="preserve">
+    <value>Computer name:</value>
+  </data>
+  <data name="DialogExportRemoteFormat" xml:space="preserve">
+    <value>The registry of a connected computer exports as a Registration file. Choose Registration Files (.reg).</value>
   </data>
   <data name="DialogDisconnectEmpty" xml:space="preserve">
     <value>No remote computer is connected.</value>

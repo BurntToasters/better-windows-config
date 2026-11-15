@@ -299,6 +299,9 @@ public sealed partial class DetailsList : UserControl
     /// <summary>Starts the inline rename box for the focused or single selected row. F2 uses the same path.</summary>
     public void BeginRenameSelected() => BeginRename();
 
+    /// <summary>The position of a row as displayed (after sorting), or -1 when the row is not in the list.</summary>
+    public int DisplayIndexOf(DetailsRow row) => _rows.IndexOf(row);
+
     internal int IndexOfRow(DetailsRow row) => _rows.IndexOf(row);
 
     internal bool IsRowSelected(int index) => index >= 0 && _selected.Contains(index);

@@ -163,11 +163,14 @@ public sealed class RemoteRegistryTreeSource : ITreeNodeSource
         }
     }
 
-    private string ToRemoteDisplayPath(RegistryPath path)
+    private string ToRemoteDisplayPath(RegistryPath path) => DisplayPathOf(_prefix, path);
+
+    /// <summary>The remote display path of a key, with a prefix from <see cref="DisplayPrefix"/>.</summary>
+    public static string DisplayPathOf(string prefix, RegistryPath path)
     {
         string root = path.Root.DisplayName();
         return path.Components.Count == 0
-            ? _prefix + "\\" + root
-            : _prefix + "\\" + root + "\\" + string.Join('\\', path.Components);
+            ? prefix + "\\" + root
+            : prefix + "\\" + root + "\\" + string.Join('\\', path.Components);
     }
 }

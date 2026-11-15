@@ -160,7 +160,17 @@ internal sealed class ViewCommands
             return;
         }
 
-        if (!RegistryPath.TryParse(candidate, out RegistryPath? parsed) || parsed is null)
+        // A path that starts with \\ names a remote computer, \\COMPUTER\HKEY_...; the tree decides whether it is connected.
+        string displayPath;
+        if (candidate.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            displayPath = candidate;
+        }
+        else if (RegistryPath.TryParse(candidate, out RegistryPath? parsed) && parsed is not null)
+        {
+            displayPath = parsed.ToDisplayString();
+        }
+        else
         {
             await FailAddressNavigationAsync(generation, attempted, Get("DialogAddressBarInvalidPath"));
             return;
@@ -169,7 +179,7 @@ internal sealed class ViewCommands
         TreeNode? target;
         try
         {
-            target = await _context.TreeSource.FindPathAsync(parsed.ToDisplayString());
+            target = await _context.TreeSource.FindPathAsync(displayPath);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

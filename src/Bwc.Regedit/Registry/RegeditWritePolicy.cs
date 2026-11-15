@@ -9,7 +9,14 @@ namespace Bwc.Regedit.Registry;
 /// </summary>
 public static class RegeditWritePolicy
 {
-    public static RegistryStore CreateStore()
+    /// <summary>The local store. Remote stores take the same policy through <see cref="CreatePolicy"/>.</summary>
+    public static RegistryStore CreateStore() => new(CreatePolicy());
+
+    /// <summary>
+    /// The write policy for the local registry and for every remote computer. A remote write is checked
+    /// with the computer name, so the sandbox policy keeps it on loopback under the sandbox key.
+    /// </summary>
+    public static IRegistryWritePolicy CreatePolicy()
     {
         IRegistryWritePolicy policy;
         string description;
@@ -41,6 +48,6 @@ public static class RegeditWritePolicy
 #endif
 
         Log.Info("Registry Editor write policy: " + description);
-        return new RegistryStore(policy);
+        return policy;
     }
 }

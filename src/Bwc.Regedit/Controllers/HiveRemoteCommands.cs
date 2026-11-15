@@ -59,6 +59,7 @@ internal sealed class HiveRemoteCommands
         }
 
         _context.RemoteConnections.Clear();
+        _context.ForgetAllRemoteStores();
     }
 
     private async Task PermissionsAsync(TreeNode? node, bool targetIsList)
@@ -78,7 +79,7 @@ internal sealed class HiveRemoteCommands
             return;
         }
 
-        if (!TryGetNodeKeyPath(node, out RegistryPath path))
+        if (!_context.TryGetLocationForNode(node, out KeyLocation location))
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
@@ -91,9 +92,9 @@ internal sealed class HiveRemoteCommands
         {
             result = RegistryPermissionsDialog.Show(
                 _context.WindowHwnd,
-                _context.Store.Reader,
-                _context.Store,
-                path,
+                location.Reader,
+                location.Store,
+                location.Path,
                 out writeFailure);
         }
         finally
@@ -103,7 +104,7 @@ internal sealed class HiveRemoteCommands
 
         if (writeFailure is { } failure)
         {
-            Log.Warn($"Registry Editor could not save the permissions for '{path.ToDisplayString()}': Win32 {failure.Win32Error}.");
+            Log.Warn($"Registry Editor could not save the permissions for '{location.DisplayPath}': Win32 {failure.Win32Error}.");
             await _context.ShowErrorAsync(_context.Messages.ForSecuritySave(failure.Win32Error).ToErrorDialog());
             return;
         }
@@ -116,7 +117,7 @@ internal sealed class HiveRemoteCommands
         // The dialog reports an HRESULT. The Win32 code is its low word when the facility is Win32.
         uint hresult = (uint)result;
         int win32 = (hresult & 0xFFFF0000u) == 0x80070000u ? (int)(hresult & 0xFFFFu) : -1;
-        Log.Warn($"Registry Editor could not show the permissions for '{path.ToDisplayString()}': HRESULT 0x{hresult:X8}.");
+        Log.Warn($"Registry Editor could not show the permissions for '{location.DisplayPath}': HRESULT 0x{hresult:X8}.");
         await _context.ShowErrorAsync(_context.Messages.ForPermissions(win32).ToErrorDialog());
     }
 
@@ -395,34 +396,61 @@ internal sealed class HiveRemoteCommands
 
         var dialog = new RemoteComputerListDialog(
             Get("DialogDisconnectTitle"),
-            Get("DialogDisconnectLabel"),
+            Get("DialogDisconnectComputerLabel"),
             names,
             Get("DialogDisconnectNoSelection"),
             Get("DialogOk"),
             Get("DialogCancel"));
 
-        if (!await _context.ShowDialogAsync(dialog) || dialog.SelectedName is not { Length: > 0 } selected)
+        if (!await _context.ShowDialogAsync(dialog) || dialog.SelectedNames.Count == 0)
         {
             return;
         }
 
-        RemoteRegistryConnection? connection = null;
-        foreach (RemoteRegistryConnection candidate in _context.RemoteConnections)
+        // Every selected computer is disconnected, in list order. A name that is no longer connected is skipped.
+        foreach (string selected in dialog.SelectedNames)
         {
-            if (string.Equals(candidate.ComputerName, selected, StringComparison.OrdinalIgnoreCase))
+            RemoteRegistryConnection? connection = _context.RemoteConnections.FirstOrDefault(candidate =>
+                string.Equals(candidate.ComputerName, selected, StringComparison.OrdinalIgnoreCase));
+
+            if (connection is null)
             {
-                connection = candidate;
-                break;
+                Log.Warn($"Registry Editor could not find the selected remote computer '{selected}'.");
+                continue;
             }
+
+            await CloseConnectionAsync(connection);
         }
+    }
+
+    /// <summary>Disconnect on a connected computer node (RT_MENU 107, id 768). Closes that computer only.</summary>
+    public void DisconnectComputer(TreeNode node) => _context.StartCommand(() => DisconnectComputerAsync(node));
+
+    private async Task DisconnectComputerAsync(TreeNode node)
+    {
+        RemoteRegistryConnection? connection = _context.RemoteConnections.FirstOrDefault(candidate =>
+            string.Equals(
+                RemoteRegistryTreeSource.DisplayPrefix(candidate.ComputerName),
+                node.RegistryPath,
+                StringComparison.OrdinalIgnoreCase));
 
         if (connection is null)
         {
-            Log.Warn($"Registry Editor could not find the selected remote computer '{selected}'.");
+            Log.Warn($"Registry Editor could not find the connection for the tree node '{node.Name}'.");
             return;
         }
 
+        await CloseConnectionAsync(connection);
+    }
+
+    /// <summary>
+    /// Removes a connected computer from the tree, forgets its store, and disposes its connection. The
+    /// selection moves to the virtual Computer node. Writes nothing to the registry.
+    /// </summary>
+    private async Task CloseConnectionAsync(RemoteRegistryConnection connection)
+    {
         _context.RemoteConnections.Remove(connection);
+        _context.ForgetRemoteStore(connection);
         RemoveRemoteTreeNode();
         connection.Dispose();
         await _context.RefreshTreeAsync("Computer");

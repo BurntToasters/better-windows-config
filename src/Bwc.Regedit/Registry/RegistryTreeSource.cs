@@ -137,6 +137,11 @@ public sealed class RegistryTreeSource : ITreeNodeSource
             return Computer;
         }
 
+        if (displayPath.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return await FindRemotePathAsync(displayPath);
+        }
+
         if (!RegistryPath.TryParse(displayPath, out RegistryPath? path))
         {
             Log.Warn($"Registry tree could not restore '{displayPath}': the path is not valid.");
@@ -176,6 +181,48 @@ public sealed class RegistryTreeSource : ITreeNodeSource
             Log.Warn($"Registry tree could not restore '{displayPath}': {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Walks a remote display path, <c>\\COMPUTER\HKEY...\name</c>, from the connected computer's node. Null when
+    /// the computer is not connected or a name is missing. Each level is loaded on the way down.
+    /// </summary>
+    private async Task<TreeNode?> FindRemotePathAsync(string displayPath)
+    {
+        int separator = displayPath.IndexOf('\\', 2);
+        string computerName = separator < 0 ? displayPath : displayPath[..separator];
+        TreeNode? current = FindChild(Computer, computerName);
+        if (current is null)
+        {
+            Log.Warn($"Registry tree has no computer node '{computerName}' for '{displayPath}'.");
+            return null;
+        }
+
+        if (separator < 0)
+        {
+            return current;
+        }
+
+        foreach (string component in displayPath[(separator + 1)..].Split('\\', StringSplitOptions.RemoveEmptyEntries))
+        {
+            _ = await current.LoadChildrenAsync(CancellationToken.None).ConfigureAwait(true);
+            TreeNode? next = FindChild(current, component);
+            if (next is null)
+            {
+                Log.Warn($"Registry tree found no '{component}' under '{current.Name}' on the way to '{displayPath}'.");
+                return null;
+            }
+
+            current.IsExpanded = true;
+            current = next;
+        }
+
+        for (TreeNode? ancestor = current.Parent; ancestor is not null; ancestor = ancestor.Parent)
+        {
+            ancestor.IsExpanded = true;
+        }
+
+        return current;
     }
 
     private IReadOnlyList<TreeNode> LoadChildren(RegistryPath path, CancellationToken cancellationToken)
