@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture export-range",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26300",
+    "ubr": 9974,
+    "displayVersion": "26H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "controls": {
+    "all": 1280,
+    "selectedBranch": 1281,
+    "branchEdit": 1282,
+    "ok": 1
+  },
+  "typedKey": "HKEY_CURRENT_USER\\Software\\BWC-Oracle\\DoesNotExist",
+  "typedKeyReadBack": "HKEY_CURRENT_USER\\Software\\BWC-Oracle\\DoesNotExist",
+  "fileNameReadBack": "C:\\Users\\jsmith\\Documents\\GitHub\\better-windows-config\\artifacts\\oracle\\export-range\\missing-branch.reg",
+  "steps": [
+    {
+      "name": "initial",
+      "all": {
+        "present": true,
+        "checked": false
+      },
+      "selectedBranch": {
+        "present": true,
+        "checked": true
+      },
+      "branchEdit": {
+        "present": true,
+        "enabled": true,
+        "text": "HKEY_CURRENT_USER\\Software\\BWC-Oracle"
+      }
+    },
+    {
+      "name": "after-all",
+      "all": {
+        "present": true,
+        "checked": true
+      },
+      "selectedBranch": {
+        "present": true,
+        "checked": false
+      },
+      "branchEdit": {
+        "present": true,
+        "enabled": true,
+        "text": "HKEY_CURRENT_USER\\Software\\BWC-Oracle"
+      }
+    },
+    {
+      "name": "after-selected-branch",
+      "all": {
+        "present": true,
+        "checked": false
+      },
+      "selectedBranch": {
+        "present": true,
+        "checked": true
+      },
+      "branchEdit": {
+        "present": true,
+        "enabled": true,
+        "text": "HKEY_CURRENT_USER\\Software\\BWC-Oracle"
+      }
+    }
+  ],
+  "save": {
+    "okControlFound": true,
+    "saveMessage": "WM_COMMAND IDOK to the dialog",
+    "saveMessagePosted": true,
+    "savePathFolderExists": true
+  },
+  "missingKey": {
+    "messageBoxShown": true,
+    "fileWritten": false,
+    "dialogOpenAfterSave": true
+  },
+  "notes": "Classic Export is the old common dialog with a child template. Its controls are found by id under the dialog. Edit text is read with WM_GETTEXT. A missing-key box appears after Save; its caption is in local/export-range-text.json. Its text is not measured: the static text read returns empty (two runs), so the RT_STRING 148 text is not confirmed from classic."
+}

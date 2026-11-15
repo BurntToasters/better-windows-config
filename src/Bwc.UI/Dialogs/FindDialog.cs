@@ -104,6 +104,10 @@ public sealed class FindDialog : ClassicDialog
         _wholeString.IsChecked = initial.MatchWholeStringOnly;
         _subtree.IsChecked = initial.SearchInSubtree;
 
+        // Classic disables Find Next (control 1) while the search text is empty (oracle "find" capture), live.
+        UpdateFindNextEnabled();
+        _findText.TextChanged += (_, _) => UpdateFindNextEnabled();
+
         Activated += OnFindDialogActivated;
         ((FrameworkElement)Content).AddHandler(
             UIElement.KeyDownEvent,
@@ -150,6 +154,14 @@ public sealed class FindDialog : ClassicDialog
     {
         _ = _findText.Focus(FocusState.Programmatic);
         _findText.SelectAll();
+    }
+
+    private void UpdateFindNextEnabled()
+    {
+        if (FindControl<Control>("DialogPrimary") is { } findNext)
+        {
+            findNext.IsEnabled = !string.IsNullOrEmpty(_findText.Text);
+        }
     }
 
     private void OnFindKeyDown(object sender, KeyRoutedEventArgs e)

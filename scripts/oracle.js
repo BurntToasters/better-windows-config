@@ -51,6 +51,7 @@ const CAPTURES = [
   "security",
   "remote",
   "manifest",
+  "export-range",
 ];
 const ALL_STEPS = ["resources", ...CAPTURES];
 const RUN_RECORD = path.join(ROOT, "artifacts", "oracle", "last-run.json");

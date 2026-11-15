@@ -38,3 +38,4 @@ CreateDIBSection
 SelectObject
 DeleteDC
 DIB_USAGE
+GetActiveWindow

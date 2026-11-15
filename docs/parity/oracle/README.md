@@ -42,6 +42,7 @@ it runs. The failure modes are in `docs/failure-modes/oracle.md`.
 | `regedit-100dpi.png` | no | `metrics` | Main window screenshot (PrintWindow). The file name says 100 percent; the capture is at the desktop's scale, and `regedit-metrics.json` records the DPI. |
 | `regedit-metrics.json` | yes | `metrics` | Main window, menu bar, tree, list, status bar, and font metrics in device pixels relative to the window. |
 | `regedit-dialog-rects.json` | yes | `dialogs` | Per dialog: window and client sizes, and each control's id, class, enabled and visible flags, and rectangle relative to the client origin. Numbers only. |
+| `regedit-export-range.json` | yes | `export-range` | Classic Export range panel (control 1282 enable state and start text under each radio choice) and the state of the missing-key box. The box caption and text are not measured. Texts go to `local/export-range-text.json`. |
 | `dialogs/*.png` | no | `dialogs` | Screenshot per dialog (`edit-string`, `find`, `export`, `load-hive`, `permissions`, and the others in the rects file). Inline renames are screenshots of the main window. |
 | `local/dialog-text.json` | no | `dialogs` | Dialog titles and control text, the Microsoft strings behind the rectangles. |
 | `regedit-menu-metrics.json` | yes | `menus` | Popup metrics for File, Edit, View, Favorites, Help, the tree-key context menu and the list background context menu: item and separator heights, padding, text inset, check gutter, submenu arrow gutter. Measured from the open popup's pixels and its own menu handle. |

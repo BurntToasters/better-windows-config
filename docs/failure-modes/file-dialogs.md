@@ -216,3 +216,42 @@ and pattern comes from `Bwc.UI` resources, so the English text stays out of code
 | Save filters keep their old indices after the reorder | The index-to-writer map is one table, and the E2E test reads it back through the dialog |
 | The dialog cannot be shown while another modal is open | Unchanged: `FileDialogOpen` and `DialogOpen` refuse the request and log it |
 | E2E driver presses Down one time too many for a one-based filter index, so index 3 selects Win9x/NT4 | `SelectFileType` takes a one-based index (1 is the first filter) and presses Down index minus 1 times after Home; index below 1 is refused |
+
+## 17. Export title, filters, and default extension (K1b)
+
+The strings come from the oracle (`docs/parity/oracle/regedit-resources.json`, mui module):
+string 301 "Export Registry File" (Export title), string 302 (Import filters), string 303 "REG"
+(default extension), string 305 (Export filters), and string 180 "All Files#*.*#" (Load Hive).
+Test: `FileDialogs_TitleAndFiltersMatchClassicStrings` in `tests/Bwc.E2E/ImportExport/FileDialogStringTests.cs`.
+
+### Export dialog keeps the shell title
+
+Failure mode: the Export save dialog shows the shell default title ("Save As") instead of string 301.
+The dialog sets the title with `IFileDialog.SetTitle`, and the test reads the window caption.
+
+### Filter name or pattern drift
+
+Failure mode: a file-type name or pattern in the Import or Export dialog differs from the pieces of
+string 302 or 305. The pieces are split on `#` and compared with the entries that UI Automation reads
+from the file-type combo. The string 309 "Registration Entries" file type is not registered by BWC
+and is not checked.
+
+### Default extension name as the shell stores it
+
+Failure mode: the default extension is not applied, so a name typed without an extension is saved
+without one. The test types a name with no extension, waits for the export to finish, and checks
+that the saved file is named with the default extension, ignoring case. The stored case is a known
+gap: the shell appends the extension of the selected filter pattern (`*.reg`), so the file is
+`defext.reg` and not `defext.REG`. The result artifact records the stored name. The classic stored
+case is not measured.
+
+### Shell display of names without a pattern
+
+Failure mode: a file type name without a parenthesized pattern is compared with the name as given.
+The shell shows `All Files` with `*.*` as `All Files (*.*)`. The test compares the displayed entries
+with the oracle name, adding the pattern when the name has none, because the shell does the same for
+any dialog.
+
+### Load Hive filter drift
+
+Failure mode: the Load Hive dialog offers a filter other than string 180, "All Files" with `*.*`.

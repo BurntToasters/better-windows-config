@@ -242,6 +242,72 @@ internal sealed class SystemFileDialogDriver : IDisposable
         return ClickElement(dialog, radio);
     }
 
+    /// <summary>
+    /// The Export range branch path edit (classic control 1282). It is the edit under the dialog that is not the
+    /// file name box. Null when the shell hosts no such edit.
+    /// </summary>
+    internal AutomationElement? FindBranchEdit(IntPtr dialog)
+    {
+        AutomationElement? window = WindowElement(dialog);
+        if (window is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            // The branch edit sits under the Selected branch radio. The address bar and the file name box are above it.
+            AutomationElement? radio = FindRadio(dialog, "Selected branch");
+            if (radio is null)
+            {
+                return null;
+            }
+
+            double radioTop = TopOf(radio);
+            AutomationElement[] edits = window.FindAllDescendants(cf => cf.ByControlType(ControlType.Edit));
+            return edits
+                .Where(edit => !LooksLikeFileNameEdit(edit) && IsUsableEditOrDisabled(edit) && TopOf(edit) >= radioTop)
+                .OrderBy(TopOf)
+                .FirstOrDefault();
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Replaces the text of an edit with real input: click, select all, type. Returns the value read back, which
+    /// the caller compares. A disabled edit does not take the text.
+    /// </summary>
+    internal bool TrySetEditText(IntPtr dialog, AutomationElement edit, string text, out string readBack)
+    {
+        if (!ClickElement(dialog, edit) || !EnsureForeground(dialog))
+        {
+            readBack = "(edit could not be clicked)";
+            return false;
+        }
+
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
+        Keyboard.Type(text);
+        Thread.Sleep(200);
+        readBack = ReadValue(edit);
+        return string.Equals(readBack, text, StringComparison.Ordinal);
+    }
+
+    /// <summary>Reads the enabled state of an element, false when it cannot be read.</summary>
+    internal static bool IsEnabledElement(AutomationElement? element)
+    {
+        try
+        {
+            return element is not null && element.IsEnabled;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     /// <summary>Finds the file type combo by its label text ("Save as type:" or "File type:").</summary>
     internal AutomationElement? FindFileTypeCombo(IntPtr dialog)
     {
@@ -473,6 +539,18 @@ internal sealed class SystemFileDialogDriver : IDisposable
             return edit.IsEnabled
                 && !edit.Properties.IsOffscreen.ValueOrDefault
                 && edit.Patterns.Value.IsSupported;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsUsableEditOrDisabled(AutomationElement edit)
+    {
+        try
+        {
+            return !edit.Properties.IsOffscreen.ValueOrDefault && edit.Patterns.Value.IsSupported;
         }
         catch (Exception)
         {
