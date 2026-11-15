@@ -100,6 +100,7 @@ internal sealed class HiveRemoteCommands
                 location.Reader,
                 location.Store,
                 location.Path,
+                location.Connection?.ComputerName,
                 out writeFailure);
         }
         finally
@@ -110,7 +111,9 @@ internal sealed class HiveRemoteCommands
         if (writeFailure is { } failure)
         {
             Log.Warn($"Registry Editor could not save the permissions for '{location.DisplayPath}': Win32 {failure.Win32Error}.");
-            await _context.ShowErrorAsync(_context.Messages.ForSecuritySave(failure.Win32Error).ToErrorDialog());
+            await _context.ShowErrorAsync(
+                new ClassicMessage(Get("DialogErrorTitle"), Get(RegistryPermissionsDialog.SaveMessageKey(failure)))
+                    .ToErrorDialog());
             return;
         }
 

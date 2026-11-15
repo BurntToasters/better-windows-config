@@ -168,7 +168,7 @@ public sealed class PrivilegeScope : IDisposable
         }
     }
 
-    private static unsafe bool TryOpenToken(
+    internal static unsafe bool TryOpenToken(
         TOKEN_ACCESS_MASK access,
         out SafeFileHandle? token,
         out string? error)
@@ -188,7 +188,7 @@ public sealed class PrivilegeScope : IDisposable
         return true;
     }
 
-    private static bool TryLookupPrivilege(string privilegeName, out LUID luid, out string? error)
+    internal static bool TryLookupPrivilege(string privilegeName, out LUID luid, out string? error)
     {
         if (!PInvoke.LookupPrivilegeValue(null, privilegeName, out luid))
         {
@@ -201,7 +201,7 @@ public sealed class PrivilegeScope : IDisposable
         return true;
     }
 
-    private static unsafe bool TryReadTokenPrivileges(
+    internal static unsafe bool TryReadTokenPrivileges(
         SafeFileHandle token,
         out byte[] privileges,
         out string? error)
@@ -250,7 +250,7 @@ public sealed class PrivilegeScope : IDisposable
         return true;
     }
 
-    private static unsafe void FindPrivilege(
+    internal static unsafe void FindPrivilege(
         byte[] privileges,
         LUID luid,
         out bool present,
@@ -303,7 +303,7 @@ public sealed class PrivilegeScope : IDisposable
         }
     }
 
-    private static unsafe void DisablePrivilege(SafeFileHandle token, LUID luid)
+    internal static unsafe void DisablePrivilege(SafeFileHandle token, LUID luid)
     {
         byte[] stateBuffer = new byte[TOKEN_PRIVILEGES.SizeOf(1)];
         fixed (byte* statePointer = stateBuffer)

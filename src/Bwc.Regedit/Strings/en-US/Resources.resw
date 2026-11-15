@@ -747,27 +747,51 @@ Details: {1}</value>
   </data>
   <data name="MsgSecurityRetrieveDenied" xml:space="preserve">
     <!-- Oracle 7050 -->
-    <value>Registry Editor could not retrieve the security information.
+    <value>Registry Editor could not retrieve the security information. 
 The key currently selected does not give you access to retrieve such information.</value>
   </data>
   <data name="MsgSecurityRetrieveDeleted" xml:space="preserve">
     <!-- Oracle 7051 -->
-    <value>Registry Editor could not retrieve the security information.
+    <value>Registry Editor could not retrieve the security information. 
 The key currently selected is marked for deletion.</value>
   </data>
   <data name="MsgSecurityRetrieveFailed" xml:space="preserve">
     <!-- Oracle 7052 -->
-    <value>Registry Editor could not retrieve the security information.
+    <value>Registry Editor could not retrieve the security information. 
 The key currently selected is not accessible.</value>
   </data>
   <data name="MsgSecuritySaveDenied" xml:space="preserve">
-    <!-- Oracle 7070 (MSG-184) -->
-    <value>Registry Editor could not save the security information.
+    <!-- Oracle 7070 -->
+    <value>Registry Editor could not save the security information. 
 The key currently selected does not give you access to save such information.</value>
   </data>
+  <data name="MsgSecuritySaveDeleted" xml:space="preserve">
+    <!-- Oracle 7071 -->
+    <value>Registry Editor could not save the security information. 
+The key currently selected is marked for deletion.</value>
+  </data>
   <data name="MsgSecuritySetFailed" xml:space="preserve">
-    <!-- Oracle 7072 (MSG-186). The oracle text ends with a space. -->
+    <!-- Oracle 7072 -->
     <value>Registry Editor could not set security in the key currently selected, or some of its subkeys. </value>
+  </data>
+  <data name="MsgOwnerSetFailed" xml:space="preserve">
+    <!-- Oracle 7073 -->
+    <value>Registry Editor could not set owner on the key currently selected, or some of its subkeys. </value>
+  </data>
+  <data name="MsgSecuritySubkeysDenied" xml:space="preserve">
+    <!-- Oracle 7074 -->
+    <value>Registry Editor could not set security in the key currently selected, or some of its subkeys. 
+These keys do not give you access to change security information.</value>
+  </data>
+  <data name="MsgSecuritySubkeysDeleted" xml:space="preserve">
+    <!-- Oracle 7075 -->
+    <value>Registry Editor could not set security in all subkeys. 
+The key currently selected contains one or more subkeys marked for deletion.</value>
+  </data>
+  <data name="MsgSecuritySubkeysFailed" xml:space="preserve">
+    <!-- Oracle 7076 -->
+    <value>Registry Editor could not set security in all subkeys. 
+The key currently selected contains one or more inaccessible subkeys.</value>
   </data>
   <data name="MsgReplaceSubkeysConfirm" xml:space="preserve">
     <!-- Oracle 7017 (MSG-178). {0} is the key path. -->

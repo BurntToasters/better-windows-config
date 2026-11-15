@@ -1,3 +1,4 @@
+using Bwc.Registry.Privileges;
 using Microsoft.Win32.SafeHandles;
 using Windows.Win32;
 using Windows.Win32.Foundation;
@@ -18,6 +19,7 @@ public sealed partial class RegistryWriter
     private const uint ReadControlStandardRight = 0x00020000;
     private const uint WriteDacStandardRight = 0x00040000;
     private const uint WriteOwnerStandardRight = 0x00080000;
+    private const uint AccessSystemSecurityRight = 0x01000000;
     private const int ErrorAccessDenied = 5;
     private const int ErrorNotSupported = 50;
 
@@ -379,13 +381,48 @@ public sealed partial class RegistryWriter
 
         ValidateSecurityArguments(information, securityDescriptor);
 
-        uint access = WriteDacStandardRight | ReadControlStandardRight;
+        // aclui sends the explicit entries only. RegSetKeySecurity stores a descriptor as given, so the entries the key
+        // inherits are merged in here, or Apply would drop them (docs/failure-modes/permissions.md section 40).
+        byte[]? merged = null;
+        if (path.Parent is { } parentPath && RegistrySecurityInheritance.NeedsInheritedEntries(information, securityDescriptor))
+        {
+            merged = MergeParentEntries(path, parentPath, securityDescriptor, Operation);
+        }
+
+        // The open asks for exactly the right each part of the descriptor needs: WRITE_OWNER for the owner and the
+        // primary group, WRITE_DAC for the DACL and its protection, ACCESS_SYSTEM_SECURITY for the SACL. A key that
+        // grants only WRITE_OWNER must still take an owner change (permissions.md section 42, item D).
+        uint access = 0;
         if ((information & (RegistrySecurityInformation.Owner | RegistrySecurityInformation.Group)) != 0)
         {
-            // Owner and primary-group changes need WRITE_OWNER. DACL-only changes must not
-            // require it, or a non-owner who can still edit the DACL would be refused.
             access |= WriteOwnerStandardRight;
         }
+
+        if ((information & (RegistrySecurityInformation.Dacl
+                | RegistrySecurityInformation.ProtectedDacl
+                | RegistrySecurityInformation.UnprotectedDacl)) != 0)
+        {
+            access |= WriteDacStandardRight;
+        }
+
+        if ((information & RegistrySecurityInformation.Sacl) != 0)
+        {
+            access |= AccessSystemSecurityRight;
+        }
+
+        if (access == 0)
+        {
+            access = WriteDacStandardRight;
+        }
+
+        // A privilege the token already holds is enabled for this one call and put back. Nothing is elevated.
+        using OptionalPrivilegeScope privileges = OptionalPrivilegeScope.Enable(SecurityPrivilegesFor(information));
+
+        // The information bits choose the protected control bit of the stored descriptor, and a merged descriptor
+        // is stored with the auto-inherit bits (section 42, item H).
+        byte[] stored = RegistrySecurityInheritance.WithProtection(
+            information,
+            merged is null ? securityDescriptor : (ReadOnlySpan<byte>)merged);
 
         using SafeRegistryKeyHandle handle = OpenKey(
             path,
@@ -398,7 +435,7 @@ public sealed partial class RegistryWriter
 
         unsafe
         {
-            fixed (byte* pointer = securityDescriptor)
+            fixed (byte* pointer = stored)
             {
                 error = PInvoke.RegSetKeySecurity(
                     handle,
@@ -408,6 +445,23 @@ public sealed partial class RegistryWriter
         }
 
         ThrowIfFailed(error, Operation, path);
+    }
+
+    /// <summary>The optional privileges of a security write: SeSecurity for the SACL, SeTakeOwnership for the owner.</summary>
+    private static string[] SecurityPrivilegesFor(RegistrySecurityInformation information)
+    {
+        var names = new List<string>(2);
+        if ((information & RegistrySecurityInformation.Sacl) != 0)
+        {
+            names.Add(OptionalPrivilegeScope.SecurityPrivilege);
+        }
+
+        if ((information & RegistrySecurityInformation.Owner) != 0)
+        {
+            names.Add(OptionalPrivilegeScope.TakeOwnershipPrivilege);
+        }
+
+        return names.ToArray();
     }
 
     private SafeRegistryKeyHandle OpenKey(
