@@ -122,4 +122,28 @@
   <data name="FileDialogExportRangeSelectedBranch" xml:space="preserve">
     <value>S&amp;elected branch</value>
   </data>
+  <!-- Oracle menu 772 (system edit menu, regedit-context.json text-edit-address-bar). -->
+  <data name="TextEditUndo" xml:space="preserve">
+    <value>Undo</value>
+  </data>
+  <!-- Oracle menu 768 (system edit menu) and menu 24 (RT_MENU 108 "Cu&amp;t"). -->
+  <data name="TextEditCut" xml:space="preserve">
+    <value>Cut</value>
+  </data>
+  <!-- Oracle menu 769 (system edit menu) and menu 3 (RT_MENU 108 "&amp;Copy"). -->
+  <data name="TextEditCopy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <!-- Oracle menu 770 (system edit menu) and menu 22 (RT_MENU 108 "&amp;Paste"). -->
+  <data name="TextEditPaste" xml:space="preserve">
+    <value>Paste</value>
+  </data>
+  <!-- Oracle menu 771 (system edit menu) and menu 46 (RT_MENU 108 "&amp;Delete"). -->
+  <data name="TextEditDelete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <!-- Oracle menu 177 (system edit menu) and menu 1024 (RT_MENU 108 "Select &amp;All"). -->
+  <data name="TextEditSelectAll" xml:space="preserve">
+    <value>Select All</value>
+  </data>
 </root>

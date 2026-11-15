@@ -36,7 +36,6 @@ public sealed class ContextMenuTests
         "Export",
         "Permissions...",
         "Copy Key Name",
-        "Go to HKEY_LOCAL_MACHINE",
     ];
 
     private static readonly string[] ValueMenuNames =

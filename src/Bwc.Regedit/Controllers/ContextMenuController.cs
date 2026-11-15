@@ -20,7 +20,6 @@ internal sealed class ContextMenuController
     private readonly HiveRemoteCommands _hiveRemote;
     private readonly KeyCommands _keys;
     private readonly ValueCommands _values;
-    private readonly Action _goToRoot;
     private MenuFlyout? _contextFlyout;
 
     public ContextMenuController(
@@ -29,8 +28,7 @@ internal sealed class ContextMenuController
         ImportExportCommands importExport,
         HiveRemoteCommands hiveRemote,
         KeyCommands keys,
-        ValueCommands values,
-        Action goToRoot)
+        ValueCommands values)
     {
         _context = context;
         _editCommands = editCommands;
@@ -38,7 +36,6 @@ internal sealed class ContextMenuController
         _hiveRemote = hiveRemote;
         _keys = keys;
         _values = values;
-        _goToRoot = goToRoot;
     }
 
     private string Get(string key) => _context.Messages.Get(key);
@@ -85,11 +82,39 @@ internal sealed class ContextMenuController
     private static bool IsRemoteNode(TreeNode node) =>
         node.RegistryPath is { Length: > 0 } displayPath && displayPath.StartsWith(@"\\", StringComparison.Ordinal);
 
+    /// <summary>
+    /// The classic RT_MENU 107 menu for the Computer root: Expand (or Collapse), Export, and Disconnect. Export
+    /// is the whole-registry export. Disconnect is disabled, because the local computer has no connection to end.
+    /// </summary>
+    private MenuFlyout CreateComputerContextMenu(TreeNode node)
+    {
+        var items = new List<ClassicCommandItem>
+        {
+            node.IsExpanded
+                ? MenuCommand(915, "ContextCollapse", node.HasChildren, _context.Shell.TreeContent.CollapseSelected)
+                : MenuCommand(915, "ContextExpand", node.HasChildren, _context.Shell.TreeContent.ExpandSelected),
+            ClassicCommandItem.Separator,
+            MenuCommand(659, "ContextExport", isEnabled: true, _importExport.Export),
+            ClassicCommandItem.Separator,
+            MenuCommand(768, "ContextDisconnect", isEnabled: false),
+        };
+
+        return CreateContextFlyout(items);
+    }
+
+    /// <summary>
+    /// The classic RT_MENU 104 menu for a hive root or a key, as measured. Go to HKEY_LOCAL_MACHINE is not in
+    /// it; Ctrl+T still goes there.
+    /// </summary>
     private MenuFlyout CreateTreeContextMenu(TreeNode node)
     {
+        if (ReferenceEquals(node, _context.TreeSource.Computer))
+        {
+            return CreateComputerContextMenu(node);
+        }
+
         bool hasKey = _context.TryGetSelectedKeyPath(out RegistryPath key);
         bool mutableKey = hasKey && !key.IsRoot;
-        string goToResource = IsUnderLocalMachine(_context) ? "ContextGoToHkcu" : "ContextGoToHklm";
 
         // Expand (915) becomes Collapse (RT_STRING 25) while the node is expanded, and then collapses it.
         var items = new List<ClassicCommandItem>
@@ -103,12 +128,10 @@ internal sealed class ContextMenuController
             MenuCommand(913, "ContextDelete", mutableKey, _keys.DeleteKey),
             MenuCommand(914, "ContextRename", mutableKey, BeginTreeRenameFromMenu),
             ClassicCommandItem.Separator,
-            // Export at Computer is the whole-registry export, as on the main menu.
-            MenuCommand(659, "ContextExport", hasKey || _context.IsComputerSelected, _importExport.Export),
+            MenuCommand(659, "ContextExport", hasKey, _importExport.Export),
             MenuCommand(678, "ContextPermissions", hasKey, () => _hiveRemote.PermissionsForNode(node)),
             ClassicCommandItem.Separator,
             MenuCommand(675, "ContextCopyKeyName", hasKey, _keys.CopySelectedKeyName),
-            MenuCommand(918, goToResource, isEnabled: true, invoke: _goToRoot),
         };
 
         return CreateContextFlyout(items);

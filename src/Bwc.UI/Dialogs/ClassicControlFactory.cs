@@ -225,6 +225,8 @@ internal static class ClassicControlFactory
             ScrollViewer.SetVerticalScrollBarVisibility(box, ScrollBarVisibility.Auto);
         }
 
+        // Every edit of a classic dialog (values, Find what, rename) has the system edit menu.
+        Bwc.UI.Menu.TextEditMenu.Attach(box);
         return box;
     }
 

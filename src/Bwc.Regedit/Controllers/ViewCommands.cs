@@ -95,31 +95,6 @@ internal sealed class ViewCommands
     /// </summary>
     public void Refresh() => _context.StartCommand(_context.RefreshViewAsync);
 
-    public void GoToLocalMachine()
-    {
-        _context.StartCommand(async () =>
-        {
-            TreeNode? target;
-            try
-            {
-                target = await _context.TreeSource.FindPathAsync("Computer\\HKEY_LOCAL_MACHINE");
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                Log.Warn("Registry Editor could not resolve HKEY_LOCAL_MACHINE: " + ex.Message);
-                target = null;
-            }
-
-            if (target is null)
-            {
-                await _context.ShowMessageAsync(Get("DialogAddressBarKeyNotFound"));
-                return;
-            }
-
-            _context.ApplyNavigation(target);
-        });
-    }
-
     /// <summary>Walks to the saved last key. A key that no longer resolves leaves Computer selected.</summary>
     public async Task RestoreLastKeyAsync(string displayPath)
     {

@@ -21,7 +21,7 @@ namespace Bwc.UI.Hex;
 /// eight two digit hex cells, and eight ASCII cells. Only rows near the viewport are created; the data is
 /// stored once as a <see cref="ReadOnlyMemory{T}"/> and rows are addressed by index.
 /// </summary>
-public sealed class HexEditor : UserControl
+public sealed partial class HexEditor : UserControl
 {
     /// <summary>Bytes shown on one row. Classic Edit Binary Value shows eight, with offsets 0000, 0008, and so on.</summary>
     public const int BytesPerRow = 8;
@@ -105,6 +105,7 @@ public sealed class HexEditor : UserControl
 
         Content = _scroll;
         KeyDown += OnKeyDown;
+        RightTapped += OnHexRightTapped;
         CharacterReceived += OnCharacterReceived;
         ActualThemeChanged += OnActualThemeChanged;
     }
@@ -497,6 +498,11 @@ public sealed class HexEditor : UserControl
                 break;
             case VirtualKey.Space when !_editAscii:
                 MoveCaret((_caret < 0 ? 0 : _caret) + 1, shift);
+                e.Handled = true;
+                break;
+            case VirtualKey.Application:
+            case VirtualKey.F10 when shift:
+                ShowEditMenuAtCaret();
                 e.Handled = true;
                 break;
             case VirtualKey.A when control:

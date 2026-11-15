@@ -40,7 +40,6 @@ public sealed class PermissionsTests
         "Export",
         "Permissions...",
         "Copy Key Name",
-        "Go to HKEY_LOCAL_MACHINE",
     ];
 
     private static int _checkStart;
