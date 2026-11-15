@@ -618,7 +618,8 @@ internal sealed partial class RegeditContext
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 913, treeTarget ? mutableKey : SelectedRowCount() > 0);
         // Export on Computer is the classic whole-registry export; every other key is a branch.
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 659, hasKey || IsComputerSelected);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 660, localKey);
+        // Print is enabled at Computer, at a hive root, and at a key, local or remote (oracle regedit-print.json).
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 660, hasKey || IsComputerSelected);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 679, singleRealValue);
         // Permissions and Unload Hive act on the key of the pane with focus. A value selected in the list
         // blocks them only when the list is the target.

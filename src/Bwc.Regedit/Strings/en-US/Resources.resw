@@ -884,6 +884,13 @@ The key currently selected contains one or more inaccessible subkeys.</value>
   <data name="PrintNoDevice" xml:space="preserve">
     <value>The Windows print dialog returned no printer device.</value>
   </data>
+  <!-- Written for this product: the progress dialog for the print job (RT_DIALOG 105 caption and text). -->
+  <data name="PrintProgressTitle" xml:space="preserve">
+    <value>Print</value>
+  </data>
+  <data name="PrintProgressText" xml:space="preserve">
+    <value>Printing the registry...</value>
+  </data>
   <!-- Oracle 23 (New Key #%u). The index follows the prefix. -->
   <data name="NewKeyNamePrefix" xml:space="preserve">
     <value>New Key #</value>

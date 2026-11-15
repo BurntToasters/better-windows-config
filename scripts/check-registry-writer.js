@@ -114,6 +114,7 @@ const managedWriteAllowlist = new Map([
     "Writes only HKCU/Software/BWC-Oracle and the Applets/Regedit key, which OracleSession snapshots and restores.",
   ],
   ["tests/Bwc.E2E/Print/PrintTests.cs", "Seeds E2E run keys through the harness for print tests."],
+  ["tests/Bwc.E2E/Print/PrintTestSupport.cs", "Seeds E2E run keys through the harness for the print guard and PDF tests."],
 ]);
 
 // Seeds made through the E2E harness's SandboxRegistry, which accepts only paths under the run root.

@@ -5,7 +5,9 @@ the Print E2E suite. This batch implements the R14 subset of MENU-009 (id 660), 
 The parity inventory leaves much of the classic layout open in OQ-44, so this document records the
 decisions taken and the failure behavior. The report is the classic text layout of `export.md`,
 section 2, which the golden `docs/parity/oracle/exports/bwc-oracle-text.txt` pins, so print and
-File > Export write the same text. The E2E test cancels the dialog rather than producing paper.
+File > Export write the same text. The E2E tests never send a job to a physical printer. The E2E guard
+refuses every device except Microsoft Print to PDF, and the PDF test is the only test that produces output
+(see "E2E guard, progress window, and PDF test" below).
 
 ## Print range and report content
 
@@ -16,6 +18,12 @@ branch radio panel from DLG-016, and it does not offer a page range. The Windows
 therefore opened with `PD_NOSELECTION`, `PD_NOPAGENUMS`, `PD_RETURNDC`,
 `PD_USEDEVMODECOPIESANDCOLLATE`, and `PD_HIDEPRINTTOFILE`. The Print to File check box is hidden
 because the implementation prints through the device context that `PrintDlgW` returns.
+
+Open (not implemented): the template 108 range panel (DLG-016) with All and Selected branch. The plan was
+`PD_ENABLEPRINTTEMPLATEHANDLE`, but that flag replaces the whole dialog, and the standard printer controls would
+go with it. A hook-based child panel was not validated, so the dialog is unchanged. The progress window (template
+105) is implemented. The remote Key Name prefix (`\\127.0.0.1\HKEY_...`) and the remote print E2E test are also
+open; the remote report walks the connection's store, but its Key Name lines still use the local path form.
 
 ### Report shape: one source with text export
 
@@ -36,11 +44,11 @@ copies come from the printer's DEVMODE and the print dialog.
 
 A selected key with no values prints its `Key Name:`, `Class Name:`, and `Last Write Time:` lines and
 no `Value n` block. A key with no subkeys has no further key blocks. A predefined root may be
-selected and printed; it is a valid `RegistryPath`, so the command is enabled. Computer is virtual
-and is never printable in this batch: it has no `RegistryPath`, so the menu item is disabled and the
-keyboard path shows the standard no-selection message. The shared source accepts a null start key
-for the whole registry (`RegistryPrinter.WriteReport`), which P1b uses when Computer becomes
-printable.
+selected and printed; it is a valid `RegistryPath`, so the command is enabled. Computer has no
+`RegistryPath`, so it prints with a null start key: the whole registry, every root, through the same
+source (`RegistryPrinter.WriteReport`). Print is enabled at Computer, at a hive root, and at a key, local or
+remote, as the oracle records (`docs/parity/oracle/regedit-print.json`). A remote key reads through its
+connection's store, so the walk reads the remote computer.
 
 ## No printer installed
 
@@ -86,8 +94,9 @@ owned modal dialog.
 
 ## Ctrl+P and command state
 
-File > Print is enabled only when `TryGetSelectedKeyPath` resolves the tree selection to a real
-registry key. Computer disables it. The state is recomputed on every tree and list selection
+File > Print is enabled when the tree selection is Computer or resolves to a key, local or remote
+(`RegeditContext.UpdateCommandStates`). Ctrl+P is window-wide in the root key handler, so it also prints
+from the address bar. The state is recomputed on every tree and list selection
 change and after refreshes, like the other selection-dependent commands. Ctrl+P is handled in the
 existing root key handler and only when focus is inside the tree or the details list. Ctrl+F, F3,
 and F5 keep their existing order and behavior. Ctrl+P from the address bar or another editor does
@@ -205,6 +214,25 @@ last hex rows of the binary must be complete in both.
 device context, and the test rules forbid printing. The E2E checks cover the text that the page writer
 draws, not its page layout.
 
+## E2E guard, progress window, and PDF test
+
+The E2E guard (`src/Bwc.Regedit/Printing/PrintE2EGuard.cs`, E2E flavor only) runs before any GDI call in
+`RegistryPrinter.PrintJob`, and before CreateDC in `PrintNamedForE2E`. A job starts only when the device name is
+exactly "Microsoft Print to PDF" and the DOCINFO output is a file under `BWC_E2E_PRINT_ARTIFACTS_DIR`. Any other
+job logs "print refused by E2E guard" and returns a failure with no device context created. The probe seam
+(`BWC_E2E_PRINT_GUARD_PROBE`) runs the guarded path for the default printer and the physical printers and writes
+one line per name (`PrintGuardTests`). The probe checks `dcCreated=False`, so a refusal happens before CreateDC.
+
+The progress window (template 105, `PrintProgressDialog`) is owned by the main window and shown while the job runs.
+Cancel cancels the token. The spooler's abort proc (`SetAbortProc`, installed before StartDoc) returns FALSE when
+cancelled, and the walk stops at its next line. The job then calls AbortDoc and returns Cancelled. In E2E builds
+`BWC_E2E_PRINT_LINE_DELAY_MS` paces each line so a cancel test has time to press Cancel. Ship builds have no delay.
+
+The PDF test (`PrintPdfTests`) is the only test that produces output. It first checks that "Microsoft Print to PDF"
+exists with the "Microsoft Print To PDF" driver (EnumPrinters). If not, it records "not run" and passes. Otherwise
+it prints through the guarded path to `artifacts/e2e/print/<run-id>.pdf` and checks the `%PDF-` header. The cancel
+test uses the same printer and checks that no complete PDF (no `%%EOF`) and no spooler job remain.
+
 ## Parity package: classic report layout and Computer
 
 | Way it could fail | Expected behavior |
@@ -216,6 +244,6 @@ draws, not its page layout.
 | A registry error during the walk leaves a half-written job | The job is aborted with `AbortDoc` and the Win32 code is returned. No automated test (needs a printer device context) |
 | A start key that cannot be read still starts a job | It is checked with `GetKeyInfo` before `StartDocW`, and no job starts |
 | The layout differs from the classic text layout | The printed text is the text export, which is the golden layout in `export.md` section 2. Layouts not in the golden are open points there |
-| Print is disabled at Computer | Print is disabled at Computer in this batch (no printable root list yet). `RegistryPrinter.WriteReport` accepts null for the whole registry for P1b |
+| Print is disabled at Computer | Print is enabled at Computer, a hive root, and a key, local or remote. Computer prints with a null start key (the whole registry). E2E: `Print_OwnedDialogCancelsAndCommandStateFollowsSelection` |
 | The labels come from `Resources.resw` | The labels are the text export's constants (`export.md` section 2). Strings 8101 to 8110 in `Resources.resw` are no longer used for printing, and 8107 (`Data Size:`) contradicts the golden |
 | The E2E check sends a real job to the spooler | The E2E build writes the report through the shared source to an artifact file when `BWC_E2E_PRINT_REPORT_PATH` is set, and skips the spooler. Microsoft Print to PDF is not used |

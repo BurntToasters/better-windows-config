@@ -36,11 +36,12 @@ public sealed class PrintDevice : IDisposable
 {
     private bool _disposed;
 
-    internal PrintDevice(nint deviceContext, nint devMode, nint devNames)
+    internal PrintDevice(nint deviceContext, nint devMode, nint devNames, string deviceName)
     {
         DeviceContext = deviceContext;
         DevMode = devMode;
         DevNames = devNames;
+        DeviceName = deviceName;
     }
 
     internal nint DeviceContext { get; }
@@ -48,6 +49,9 @@ public sealed class PrintDevice : IDisposable
     private nint DevMode { get; }
 
     private nint DevNames { get; }
+
+    /// <summary>The printer name from the dialog or the CreateDC call. Empty when it is not known.</summary>
+    public string DeviceName { get; }
 
     public void Dispose()
     {
@@ -151,6 +155,42 @@ public static class RegistryPrinter
         new RegistryExportService(reader).ExportTextFile(startKey, writer, scope, cancellationToken, progress);
     }
 
+#if BWC_E2E
+    /// <summary>The outcome of a named-printer job, and whether a device context was created for it.</summary>
+    internal readonly record struct E2EPrintOutcome(PrintResult Result, bool DeviceContextCreated);
+
+    /// <summary>
+    /// E2E only. The guarded path for a named printer. The guard runs before CreateDC, so a refused name or output
+    /// never creates a device context. The PDF test uses this path, and the guard probe uses it with refused names.
+    /// </summary>
+    internal static E2EPrintOutcome PrintNamedForE2E(
+        string printerName,
+        string? outputFile,
+        RegistryReader reader,
+        RegistryPath? startKey,
+        CancellationToken cancellationToken)
+    {
+        if (!PrintE2EGuard.Allows(printerName, outputFile, out string refusal))
+        {
+            return new E2EPrintOutcome(PrintE2EGuard.Refuse(refusal), DeviceContextCreated: false);
+        }
+
+        nint deviceContext = PrintNativeMethods.CreateDCW("WINSPOOL", printerName, null, 0);
+        if (deviceContext == 0)
+        {
+            int win32Error = Marshal.GetLastWin32Error();
+            return new E2EPrintOutcome(
+                PrintResult.Failed(win32Error, FailedAt("CreateDC", win32Error).Message),
+                DeviceContextCreated: false);
+        }
+
+        using var device = new PrintDevice(deviceContext, 0, 0, printerName);
+        return new E2EPrintOutcome(
+            PrintJob(device, reader, startKey, cancellationToken, outputFile),
+            DeviceContextCreated: true);
+    }
+#endif
+
     /// <summary>
     /// Shows the owned modal print dialog. On success the caller owns the returned device and must
     /// dispose it after printing. Cancellation and dialog failures return false with the result.
@@ -207,9 +247,38 @@ public static class RegistryPrinter
             return false;
         }
 
-        device = new PrintDevice(dialog.deviceContext, dialog.devMode, dialog.devNames);
+        device = new PrintDevice(
+            dialog.deviceContext,
+            dialog.devMode,
+            dialog.devNames,
+            ReadDeviceName(dialog.devNames));
         result = PrintResult.Printed();
         return true;
+    }
+
+    /// <summary>The printer name from a DEVNAMES block. The offsets count characters, not bytes.</summary>
+    internal static string ReadDeviceName(nint devNames)
+    {
+        if (devNames == 0)
+        {
+            return string.Empty;
+        }
+
+        nint memory = PrintNativeMethods.GlobalLock(devNames);
+        if (memory == 0)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            int deviceOffset = Marshal.ReadInt16(memory, 2);
+            return Marshal.PtrToStringUni(memory + (deviceOffset * sizeof(char))) ?? string.Empty;
+        }
+        finally
+        {
+            _ = PrintNativeMethods.GlobalUnlock(devNames);
+        }
     }
 
     /// <summary>
@@ -220,11 +289,31 @@ public static class RegistryPrinter
     public static PrintResult PrintToDevice(
         PrintDevice device,
         RegistryReader reader,
-        RegistryPath startKey)
+        RegistryPath? startKey,
+        CancellationToken cancellationToken = default) =>
+        PrintJob(device, reader, startKey, cancellationToken, outputFile: null);
+
+    /// <summary>
+    /// The one print job. A null start key prints the whole registry (Computer). <paramref name="outputFile"/> is
+    /// the DOCINFO output file and is set only by the E2E seam; ship builds always pass null. In E2E builds the
+    /// guard runs first, so a refused job never reaches CreateDC use, font creation, or StartDoc.
+    /// </summary>
+    internal static PrintResult PrintJob(
+        PrintDevice device,
+        RegistryReader reader,
+        RegistryPath? startKey,
+        CancellationToken cancellationToken,
+        string? outputFile)
     {
         ArgumentNullException.ThrowIfNull(device);
         ArgumentNullException.ThrowIfNull(reader);
-        ArgumentNullException.ThrowIfNull(startKey);
+
+#if BWC_E2E
+        if (!PrintE2EGuard.Allows(device.DeviceName, outputFile, out string refusal))
+        {
+            return PrintE2EGuard.Refuse(refusal);
+        }
+#endif
 
         nint deviceContext = device.DeviceContext;
         int dpiX = PrintNativeMethods.GetDeviceCaps(deviceContext, LogPixelsX);
@@ -278,7 +367,7 @@ public static class RegistryPrinter
 
         try
         {
-            return PrintReport(deviceContext, reader, startKey, dpiX, dpiY);
+            return PrintReport(deviceContext, reader, startKey, dpiX, dpiY, cancellationToken, outputFile);
         }
         finally
         {
@@ -290,9 +379,11 @@ public static class RegistryPrinter
     private static PrintResult PrintReport(
         nint deviceContext,
         RegistryReader reader,
-        RegistryPath startKey,
+        RegistryPath? startKey,
         int dpiX,
-        int dpiY)
+        int dpiY,
+        CancellationToken cancellationToken,
+        string? outputFile)
     {
         int pageWidth = PrintNativeMethods.GetDeviceCaps(deviceContext, HorzRes);
         int pageHeight = PrintNativeMethods.GetDeviceCaps(deviceContext, VertRes);
@@ -327,26 +418,78 @@ public static class RegistryPrinter
 
         int columns = Math.Max(1, (right - left) / characterWidth);
 
-        // A start key that cannot be read ends here, before any job exists.
-        try
+        // A start key that cannot be read ends here, before any job exists. Null is the whole registry.
+        if (startKey is not null)
         {
-            _ = reader.GetKeyInfo(startKey);
-        }
-        catch (RegistryOperationException ex)
-        {
-            return PrintResult.Failed(ex.Win32Error, ex.Message);
+            try
+            {
+                _ = reader.GetKeyInfo(startKey);
+            }
+            catch (RegistryOperationException ex)
+            {
+                return PrintResult.Failed(ex.Win32Error, ex.Message);
+            }
         }
 
+        // The abort proc is installed before StartDoc, as the spooler requires. Cancel makes it return FALSE,
+        // which stops the job; the walk stops at its next line through the token.
+        AbortProcDelegate abortProc = (_, _) => cancellationToken.IsCancellationRequested ? 0 : 1;
+        if (PrintNativeMethods.SetAbortProc(deviceContext, abortProc) <= 0)
+        {
+            return FailedAt("SetAbortProc", Marshal.GetLastWin32Error());
+        }
+
+        nint outputPointer = string.IsNullOrEmpty(outputFile) ? 0 : Marshal.StringToHGlobalUni(outputFile);
+        try
+        {
+            return PrintDocument(
+                deviceContext,
+                reader,
+                startKey,
+                new PageGeometry(left, top, bottom, lineHeight, columns),
+                cancellationToken,
+                outputPointer,
+                abortProc);
+        }
+        finally
+        {
+            if (outputPointer != 0)
+            {
+                Marshal.FreeHGlobal(outputPointer);
+            }
+        }
+    }
+
+    private readonly record struct PageGeometry(int Left, int Top, int Bottom, int LineHeight, int Columns);
+
+    private static PrintResult PrintDocument(
+        nint deviceContext,
+        RegistryReader reader,
+        RegistryPath? startKey,
+        PageGeometry geometry,
+        CancellationToken cancellationToken,
+        nint outputPointer,
+        AbortProcDelegate abortProc)
+    {
         var document = new DOCINFOW
         {
             structSize = Marshal.SizeOf<DOCINFOW>(),
-            documentName = "Registry Editor - " + startKey.ToDisplayString(),
+            documentName = "Registry Editor - " + (startKey?.ToDisplayString() ?? "Computer"),
+            output = outputPointer,
         };
+
+        // Maps a failed GDI step to a cancel when the user asked for it, because cancel makes GDI fail.
+        PrintResult Failure(string stage, int win32Error) =>
+            cancellationToken.IsCancellationRequested ? PrintResult.Cancelled() : FailedAt(stage, win32Error);
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return PrintResult.Cancelled();
+        }
 
         if (PrintNativeMethods.StartDocW(deviceContext, ref document) <= 0)
         {
-            int win32Error = Marshal.GetLastWin32Error();
-            return FailedAt("StartDoc", win32Error);
+            return Failure("StartDoc", Marshal.GetLastWin32Error());
         }
 
         bool documentStarted = true;
@@ -354,45 +497,56 @@ public static class RegistryPrinter
         {
             if (PrintNativeMethods.StartPage(deviceContext) <= 0)
             {
-                return FailedAt("StartPage", Marshal.GetLastWin32Error());
+                return Failure("StartPage", Marshal.GetLastWin32Error());
             }
 
-            var page = new ReportPageWriter(deviceContext, left, top, bottom, lineHeight, columns);
-            WriteReport(reader, startKey, page);
+            var page = new ReportPageWriter(
+                deviceContext,
+                geometry.Left,
+                geometry.Top,
+                geometry.Bottom,
+                geometry.LineHeight,
+                geometry.Columns);
+            WriteReport(reader, startKey, page, cancellationToken);
             page.Finish();
 
             if (PrintNativeMethods.EndPage(deviceContext) <= 0)
             {
-                return FailedAt("EndPage", Marshal.GetLastWin32Error());
+                return Failure("EndPage", Marshal.GetLastWin32Error());
             }
 
             if (PrintNativeMethods.EndDoc(deviceContext) <= 0)
             {
-                return FailedAt("EndDoc", Marshal.GetLastWin32Error());
+                return Failure("EndDoc", Marshal.GetLastWin32Error());
             }
 
             documentStarted = false;
             return PrintResult.Printed();
         }
+        catch (OperationCanceledException)
+        {
+            return PrintResult.Cancelled();
+        }
         catch (RegistryOperationException ex)
         {
-            return PrintResult.Failed(ex.Win32Error, ex.Message);
+            return cancellationToken.IsCancellationRequested
+                ? PrintResult.Cancelled()
+                : PrintResult.Failed(ex.Win32Error, ex.Message);
         }
         catch (PrintStepException ex)
         {
-            return ex.Result;
+            return cancellationToken.IsCancellationRequested ? PrintResult.Cancelled() : ex.Result;
         }
         finally
         {
-            if (documentStarted)
+            if (documentStarted && PrintNativeMethods.AbortDoc(deviceContext) <= 0)
             {
-                if (PrintNativeMethods.AbortDoc(deviceContext) <= 0)
-                {
-                    Log.Warn(
-                        "Registry Editor could not abort the failed print job, Win32 error " +
-                        Marshal.GetLastWin32Error().ToString(CultureInfo.InvariantCulture) + ".");
-                }
+                Log.Warn(
+                    "Registry Editor could not abort the failed print job, Win32 error " +
+                    Marshal.GetLastWin32Error().ToString(CultureInfo.InvariantCulture) + ".");
             }
+
+            GC.KeepAlive(abortProc);
         }
     }
 
@@ -467,6 +621,10 @@ public static class RegistryPrinter
 
         private void EmitLine()
         {
+#if BWC_E2E
+            // The E2E cancel test needs a job long enough to cancel. The delay is set only by the test.
+            PrintE2EGuard.PaceLine();
+#endif
             string line = _line.ToString();
             _line.Clear();
             if (line.EndsWith('\r'))
@@ -617,10 +775,27 @@ internal struct SIZE
     public int cy;
 }
 
+/// <summary>The spooler's abort proc (wingdi.h AbortProc). Returns nonzero to continue and zero to abort the job.</summary>
+[UnmanagedFunctionPointer(CallingConvention.Winapi)]
+internal delegate int AbortProcDelegate(nint deviceContext, int code);
+
 #pragma warning disable SYSLIB1054 // The small, fixed print surface does not justify LibraryImport marshalling plumbing.
 internal static class PrintNativeMethods
 {
     internal const nint HgdiError = -1;
+
+    [DllImport("gdi32.dll", CharSet = CharSet.Unicode, EntryPoint = "CreateDCW", ExactSpelling = true, SetLastError = true)]
+    internal static extern nint CreateDCW(string driver, string device, string? port, nint devMode);
+
+    [DllImport("gdi32.dll", ExactSpelling = true, SetLastError = true)]
+    internal static extern int SetAbortProc(nint deviceContext, AbortProcDelegate abortProc);
+
+    [DllImport("kernel32.dll", ExactSpelling = true, SetLastError = true)]
+    internal static extern nint GlobalLock(nint memory);
+
+    [DllImport("kernel32.dll", ExactSpelling = true, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GlobalUnlock(nint memory);
 
     [DllImport("comdlg32.dll", CharSet = CharSet.Unicode, EntryPoint = "PrintDlgW", ExactSpelling = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

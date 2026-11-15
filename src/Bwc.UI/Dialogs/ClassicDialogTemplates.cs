@@ -139,6 +139,25 @@ public static class ClassicDialogTemplates
         };
 
     /// <summary>
+    /// Print progress (RT_DIALOG 105): the text "Printing the registry..." and a Cancel button, the default button.
+    /// 154 x 49 DLU. The dialog is shown during the job, and Cancel stops it through the abort proc.
+    /// </summary>
+    public static ClassicDialogDefinition PrintProgress(string caption, string printingText, string cancelText) =>
+        new(
+            caption,
+            "RT_DIALOG 105 (en-US regedit.exe.mui)",
+            154,
+            49,
+            [
+                Button("DialogSecondary", 2, cancelText, 51, 28, 50, 14, isDefault: true),
+                Label("PrintProgressText", printingText, 29, 10, 93, 8),
+            ])
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
+    /// <summary>
     /// Remove Favorites (RT_DIALOG 113): a multi-select, sorted list with OK and Cancel at the right.
     /// 194 x 103 DLU. The list label is the caller's text.
     /// </summary>
