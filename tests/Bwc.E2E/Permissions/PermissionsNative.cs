@@ -42,7 +42,20 @@ internal static class PermissionsNative
     [DllImport("user32.dll")]
     internal static extern IntPtr GetWindow(IntPtr hWnd, int command);
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc callback, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    internal static extern int GetDlgCtrlID(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    internal static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
 #pragma warning restore SYSLIB1054
+
+    /// <summary>TCM_GETITEMCOUNT: the number of tabs in a SysTabControl32.</summary>
+    internal const uint TcmGetItemCount = 0x1304;
 
     internal static string ClassOf(IntPtr hWnd)
     {

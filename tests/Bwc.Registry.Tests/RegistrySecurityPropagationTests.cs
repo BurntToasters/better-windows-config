@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using Bwc.Registry.Privileges;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Win32;
 
@@ -357,6 +358,578 @@ public sealed class RegistrySecurityPropagationTests
         new(Reader.GetKeySecurity(
             Hkcu(relativePath),
             RegistrySecurityInformation.Owner | RegistrySecurityInformation.Dacl), 0);
+
+    /// <summary>
+    /// The owner walk changes only the owner. A child that denies WRITE_OWNER to the current user fails, and the walk
+    /// still reaches the children below it and the sibling. The owner keeps WRITE_DAC, so the cleanup can restore the
+    /// child's DACL. See docs/failure-modes/permissions.md section 35.
+    /// </summary>
+    [TestMethod]
+    public void OwnerRecursionContinuesPastADeniedChild()
+    {
+        string runId = NewRunId();
+        string top = TopOf(runId);
+        string tree = top + @"\Tree";
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(tree));
+            setup.CreateKey(Hkcu(tree + @"\A"));
+            setup.CreateKey(Hkcu(tree + @"\A\B"));
+            setup.CreateKey(Hkcu(tree + @"\C"));
+            setup.SetKeySecurity(
+                Hkcu(tree + @"\A"),
+                RegistrySecurityInformation.Dacl,
+                UserDescriptor("D:(D;;WO;;;{0})(A;CI;KA;;;{0})"));
+
+            var reported = new List<string>();
+            var progress = new SynchronousProgress(reported);
+            RegistryWriter writer = WriterFor(top);
+            byte[] owner = UserDescriptor("O:{0}");
+
+            RegistrySecurityWalkException walk = Assert.ThrowsExactly<RegistrySecurityWalkException>(
+                () => writer.SetKeyOwnerTree(Hkcu(tree), owner, progress));
+
+            Assert.AreEqual(1, walk.Failures.Count, "Only the denied child fails.");
+            Assert.AreEqual(ErrorAccessDenied, walk.Failures[0].Win32Error);
+            Assert.AreEqual(
+                Hkcu(tree + @"\A").ToAbbreviatedString(),
+                walk.Failures[0].Path.ToAbbreviatedString());
+
+            // The walk continues past the failed child: its child and its sibling are still changed.
+            CollectionAssert.Contains(reported, Hkcu(tree + @"\A\B").ToAbbreviatedString());
+            CollectionAssert.Contains(reported, Hkcu(tree + @"\C").ToAbbreviatedString());
+            CollectionAssert.Contains(reported, Hkcu(tree).ToAbbreviatedString());
+        }
+        finally
+        {
+            CleanupRun(runId);
+        }
+    }
+
+    /// <summary>
+    /// The defect of docs/failure-modes/permissions.md section 40: aclui sends only the explicit entries with
+    /// SE_DACL_AUTO_INHERIT_REQ, and a raw write dropped every inherited entry. The stored DACL must be the explicit
+    /// entries followed by the entries the parent passes down, marked inherited, with the DACL unprotected.
+    /// </summary>
+    [TestMethod]
+    public void UnprotectedDaclWriteKeepsTheEntriesInheritedFromTheParent()
+    {
+        string runId = NewRunId();
+        string top = TopOf(runId);
+        string tree = top + @"\Tree";
+        string child = tree + @"\A";
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(tree));
+            setup.CreateKey(Hkcu(child));
+            setup.SetKeySecurity(
+                Hkcu(tree),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.ProtectedDacl,
+                UserDescriptor("D:P(A;CI;KA;;;{0})(A;CI;KR;;;BU)"));
+
+            // What aclui sends on Apply: explicit entries only, with the auto-inherit request bit.
+            RegistryWriter writer = WriterFor(top);
+            writer.SetKeySecurity(
+                Hkcu(child),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.UnprotectedDacl,
+                SddlBinary("D:AR(A;;KR;;;WD)"));
+
+            RawSecurityDescriptor stored = Read(child);
+            Assert.IsFalse((stored.ControlFlags & ControlFlags.DiscretionaryAclProtected) != 0, "The DACL stays unprotected.");
+            Assert.AreEqual(3, Dacl(stored).Count, "One explicit entry and the two entries inherited from the parent.");
+
+            var explicitAce = (CommonAce)Dacl(stored)[0];
+            Assert.IsFalse(explicitAce.AceFlags.HasFlag(AceFlags.Inherited), "The explicit entry comes first.");
+            Assert.AreEqual(new SecurityIdentifier(WellKnownSidType.WorldSid, null), explicitAce.SecurityIdentifier);
+
+            var inheritedUser = (CommonAce)Dacl(stored)[1];
+            Assert.IsTrue(inheritedUser.AceFlags.HasFlag(AceFlags.Inherited), "The user's entry is inherited.");
+            Assert.AreEqual(CurrentUser(), inheritedUser.SecurityIdentifier);
+            Assert.AreEqual(0x000F003Fu, (uint)inheritedUser.AccessMask & 0x000F003Fu);
+
+            var inheritedUsers = (CommonAce)Dacl(stored)[2];
+            Assert.IsTrue(inheritedUsers.AceFlags.HasFlag(AceFlags.Inherited));
+            Assert.AreEqual(new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null), inheritedUsers.SecurityIdentifier);
+        }
+        finally
+        {
+            CleanupRun(runId);
+        }
+    }
+
+    /// <summary>A protected DACL keeps only what the caller sent, and stays protected.</summary>
+    [TestMethod]
+    public void ProtectedDaclWriteStoresExactlyWhatWasSent()
+    {
+        string runId = NewRunId();
+        string top = TopOf(runId);
+        string tree = top + @"\Tree";
+        string child = tree + @"\A";
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(tree));
+            setup.CreateKey(Hkcu(child));
+            setup.SetKeySecurity(
+                Hkcu(tree),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.ProtectedDacl,
+                UserDescriptor("D:P(A;CI;KA;;;{0})(A;CI;KR;;;BU)"));
+
+            RegistryWriter writer = WriterFor(top);
+            writer.SetKeySecurity(
+                Hkcu(child),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.ProtectedDacl,
+                UserDescriptor("D:PAR(A;;KA;;;{0})(A;;KR;;;WD)"));
+
+            RawSecurityDescriptor stored = Read(child);
+            Assert.IsTrue((stored.ControlFlags & ControlFlags.DiscretionaryAclProtected) != 0, "The DACL stays protected.");
+            Assert.AreEqual(2, Dacl(stored).Count, "A protected DACL gets no inherited entry.");
+            foreach (GenericAce ace in Dacl(stored))
+            {
+                Assert.IsFalse(ace.AceFlags.HasFlag(AceFlags.Inherited), "No entry is marked inherited.");
+            }
+        }
+        finally
+        {
+            CleanupRun(runId);
+        }
+    }
+
+    /// <summary>
+    /// Entries marked inherited in the request are stale copies from the time the editor opened. They are dropped
+    /// and recomputed from the parent, so an entry the parent no longer passes down disappears and one it still
+    /// passes down is stored once.
+    /// </summary>
+    [TestMethod]
+    public void StaleInheritedEntriesInTheRequestAreRecomputedFromTheParent()
+    {
+        string runId = NewRunId();
+        string top = TopOf(runId);
+        string tree = top + @"\Tree";
+        string child = tree + @"\A";
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(tree));
+            setup.CreateKey(Hkcu(child));
+            setup.SetKeySecurity(
+                Hkcu(tree),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.ProtectedDacl,
+                UserDescriptor("D:P(A;CI;KA;;;{0})"));
+
+            // The request carries a stale entry for SYSTEM and a copy of the user's inherited entry.
+            RegistryWriter writer = WriterFor(top);
+            writer.SetKeySecurity(
+                Hkcu(child),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.UnprotectedDacl,
+                UserDescriptor("D:AR(A;;KR;;;WD)(A;CIID;KA;;;SY)(A;CIID;KA;;;{0})"));
+
+            RawSecurityDescriptor stored = Read(child);
+            Assert.AreEqual(2, Dacl(stored).Count, "The explicit entry and one inherited entry for the user.");
+            Assert.IsFalse(((CommonAce)Dacl(stored)[0]).AceFlags.HasFlag(AceFlags.Inherited));
+            var inherited = (CommonAce)Dacl(stored)[1];
+            Assert.IsTrue(inherited.AceFlags.HasFlag(AceFlags.Inherited));
+            Assert.AreEqual(CurrentUser(), inherited.SecurityIdentifier);
+        }
+        finally
+        {
+            CleanupRun(runId);
+        }
+    }
+
+    /// <summary>
+    /// A DACL write that asks for neither auto-inheritance nor an unprotected DACL is stored as given. The engine's own
+    /// setup and recovery writes rely on this, and a descriptor read from a key can be copied to another key.
+    /// </summary>
+    [TestMethod]
+    public void PlainDaclWriteIsStoredAsGiven()
+    {
+        string runId = NewRunId();
+        string top = TopOf(runId);
+        string tree = top + @"\Tree";
+        string child = tree + @"\A";
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(tree));
+            setup.CreateKey(Hkcu(child));
+            setup.SetKeySecurity(
+                Hkcu(tree),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.ProtectedDacl,
+                UserDescriptor("D:P(A;CI;KA;;;{0})"));
+
+            setup.SetKeySecurity(Hkcu(child), RegistrySecurityInformation.Dacl, UserDescriptor("D:(A;;KA;;;{0})"));
+
+            Assert.AreEqual(1, Dacl(Read(child)).Count, "A plain DACL write adds no inherited entry.");
+        }
+        finally
+        {
+            CleanupRun(runId);
+        }
+    }
+
+    /// <summary>
+    /// Elevated: a child owned by Administrators, with no entry for the current user, cannot take WRITE_DAC. The
+    /// propagation fails for that child with access denied, and the walk still changes its sibling. The owner is
+    /// restored under SeRestorePrivilege in the finally block, before the run tree is removed.
+    /// See docs/failure-modes/permissions.md sections 33 and 39.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Elevated")]
+    public void PropagationContinuesPastAChildOwnedByAdministrators()
+    {
+        if (!IsElevated())
+        {
+            Assert.Inconclusive("Not elevated: this test runs only through the elevated runner.");
+        }
+
+        if (!PrivilegeScope.TryEnable(out PrivilegeScope? privileges, out string? error) || privileges is null)
+        {
+            Assert.Inconclusive("The restore privilege is not held: " + error);
+        }
+
+        using PrivilegeScope restoreScope = privileges;
+        string runId = NewRunId();
+        string top = TopOf(runId);
+        string tree = top + @"\Tree";
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(tree));
+            setup.CreateKey(Hkcu(tree + @"\A"));
+            setup.CreateKey(Hkcu(tree + @"\C"));
+
+            setup.SetKeySecurity(Hkcu(tree + @"\A"), RegistrySecurityInformation.Owner, SddlBinary("O:BA"));
+            setup.SetKeySecurity(Hkcu(tree + @"\A"), RegistrySecurityInformation.Dacl, SddlBinary("D:"));
+
+            RegistryWriter writer = WriterFor(top);
+            byte[] parent = UserDescriptor("D:(A;CI;KA;;;{0})");
+            writer.SetKeySecurity(Hkcu(tree), RegistrySecurityInformation.Dacl | RegistrySecurityInformation.UnprotectedDacl, parent);
+
+            RegistrySecurityWalkException walk = Assert.ThrowsExactly<RegistrySecurityWalkException>(
+                () => writer.SetKeySecurity(Hkcu(tree), parent, RegistrySecurityInformation.Dacl, propagateToSubkeys: true));
+
+            Assert.AreEqual(1, walk.Failures.Count, "Only the Administrators-owned child fails.");
+            Assert.AreEqual(ErrorAccessDenied, walk.Failures[0].Win32Error);
+            Assert.AreEqual(1, Dacl(Read(tree + @"\C")).Count, "The sibling still receives its inherited entry.");
+        }
+        finally
+        {
+            try
+            {
+                // The restore privilege is still enabled here, so the owner can be set back to the current user.
+                WriterFor(top).SetKeySecurity(
+                    Hkcu(tree + @"\A"),
+                    RegistrySecurityInformation.Owner,
+                    UserDescriptor("O:{0}"));
+            }
+            finally
+            {
+                CleanupRun(runId);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Section 42 item A. The registry stores the entries of a new key without inherited marks. The editor gets them
+    /// marked, sends back the explicit entries only, and the stored DACL then holds each inherited entry once.
+    /// </summary>
+    [TestMethod]
+    public void ApplyOfThePresentedDescriptorStoresNoDuplicates()
+    {
+        string runId = NewRunId();
+        string top = TopOf(runId);
+        string tree = top + @"\Tree";
+        string child = tree + @"\A";
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(tree));
+            setup.SetKeySecurity(
+                Hkcu(tree),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.ProtectedDacl,
+                UserDescriptor("D:P(A;CI;KA;;;{0})(A;CI;KR;;;BU)"));
+            setup.CreateKey(Hkcu(child));
+
+            byte[] stored = Reader.GetKeySecurity(Hkcu(child), RegistrySecurityInformation.Dacl);
+            byte[] parent = Reader.GetKeySecurity(Hkcu(tree), RegistrySecurityInformation.Dacl);
+            Assert.IsFalse(
+                Dacl(new RawSecurityDescriptor(stored, 0)).Cast<GenericAce>().Any(a => a.AceFlags.HasFlag(AceFlags.Inherited)),
+                "The registry stores a new key's entries without inherited marks.");
+
+            var presented = new RawSecurityDescriptor(RegistrySecurityPresentation.MarkInheritedEntries(stored, parent), 0);
+            Assert.AreEqual(2, Dacl(presented).Count);
+            Assert.IsTrue(Dacl(presented).Cast<GenericAce>().All(a => a.AceFlags.HasFlag(AceFlags.Inherited)));
+            Assert.IsTrue(presented.ControlFlags.HasFlag(ControlFlags.DiscretionaryAclAutoInherited));
+
+            // What aclui sends back: the explicit entries only, plus the auto-inherit request.
+            RegistryWriter writer = WriterFor(top);
+            writer.SetKeySecurity(
+                Hkcu(child),
+                RegistrySecurityInformation.Dacl,
+                SddlBinary("D:AR(A;;KR;;;WD)"));
+
+            RawAcl after = Dacl(Read(child));
+            Assert.AreEqual(3, after.Count, "One explicit entry and the parent's two entries, each once.");
+            Assert.AreEqual(1, after.Cast<GenericAce>().Count(a => !a.AceFlags.HasFlag(AceFlags.Inherited)));
+            Assert.AreEqual(
+                1,
+                after.Cast<CommonAce>().Count(a => a.SecurityIdentifier.Equals(CurrentUser())),
+                "The user's entry exists once, as an inherited entry.");
+        }
+        finally
+        {
+            CleanupRun(runId);
+        }
+    }
+
+    /// <summary>
+    /// Section 42 item B. A CREATOR OWNER entry that the parent passes down becomes an effective entry for the child's
+    /// owner and an inherit-only copy for the grandchildren.
+    /// </summary>
+    [TestMethod]
+    public void InheritedEntriesReplaceCreatorOwner()
+    {
+        string runId = NewRunId();
+        string top = TopOf(runId);
+        string tree = top + @"\Tree";
+        string child = tree + @"\A";
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(tree));
+            setup.SetKeySecurity(
+                Hkcu(tree),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.ProtectedDacl,
+                UserDescriptor("D:P(A;CI;KA;;;{0})(A;CIIO;GR;;;CO)"));
+            setup.CreateKey(Hkcu(child));
+
+            WriterFor(top).SetKeySecurity(
+                Hkcu(child),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.UnprotectedDacl,
+                SddlBinary("D:AR(A;;KR;;;WD)"));
+
+            RawSecurityDescriptor stored = Read(child);
+            AssertCreatorOwnerEntries(stored);
+        }
+        finally
+        {
+            CleanupRun(runId);
+        }
+    }
+
+    /// <summary>Section 42 item B for "Replace all child object permission entries".</summary>
+    [TestMethod]
+    public void PropagationReplacesCreatorOwner()
+    {
+        string runId = NewRunId();
+        string top = TopOf(runId);
+        string tree = top + @"\Tree";
+        string child = tree + @"\A";
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(tree));
+            setup.CreateKey(Hkcu(child));
+
+            byte[] parent = UserDescriptor("D:P(A;CI;KA;;;{0})(A;CIIO;GR;;;CO)");
+            RegistryWriter writer = WriterFor(top);
+            writer.SetKeySecurity(Hkcu(tree), RegistrySecurityInformation.Dacl | RegistrySecurityInformation.ProtectedDacl, parent);
+            writer.SetKeySecurity(Hkcu(tree), parent, RegistrySecurityInformation.Dacl, propagateToSubkeys: true);
+
+            AssertCreatorOwnerEntries(Read(child));
+        }
+        finally
+        {
+            CleanupRun(runId);
+        }
+    }
+
+    private static void AssertCreatorOwnerEntries(RawSecurityDescriptor stored)
+    {
+        SecurityIdentifier owner = stored.Owner ?? throw new InvalidOperationException("The key has no owner.");
+        var creatorOwner = new SecurityIdentifier(WellKnownSidType.CreatorOwnerSid, null);
+        CommonAce[] aces = Dacl(stored).Cast<CommonAce>().ToArray();
+
+        CommonAce effective = aces.Single(a => a.SecurityIdentifier.Equals(owner) && a.AceFlags == AceFlags.Inherited && (uint)a.AccessMask == 0x00020019u);
+        Assert.AreEqual(0x00020019u, (uint)effective.AccessMask, "The effective entry maps GENERIC_READ to the key rights.");
+
+        CommonAce creator = aces.Single(a => a.SecurityIdentifier.Equals(creatorOwner));
+        Assert.AreEqual(
+            AceFlags.ContainerInherit | AceFlags.InheritOnly | AceFlags.Inherited,
+            creator.AceFlags,
+            "The creator entry stays inheritable and inherit-only for the grandchildren.");
+    }
+
+    /// <summary>
+    /// Section 42 item D. A key that grants the owner only WRITE_OWNER (an OWNER RIGHTS entry removes the implicit
+    /// WRITE_DAC) still takes an owner write, because the open asks for WRITE_OWNER and nothing else.
+    /// </summary>
+    [TestMethod]
+    public void OwnerChangeNeedsOnlyWriteOwner()
+    {
+        string runId = NewRunId();
+        string top = TopOf(runId);
+        string locked = top + @"\Locked";
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(locked));
+            setup.SetKeySecurity(
+                Hkcu(locked),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.ProtectedDacl,
+                UserDescriptor("D:P(A;;0xB0019;;;{0})(A;;RC;;;OW)"));
+
+            WriterFor(top).SetKeySecurity(
+                Hkcu(locked),
+                RegistrySecurityInformation.Owner,
+                SddlBinary("O:" + CurrentUser().Value));
+
+            Assert.AreEqual(CurrentUser(), Read(locked).Owner);
+        }
+        finally
+        {
+            // The key grants DELETE and read access but not WRITE_DAC, so the shared cleanup cannot restore it. Delete it first.
+            try
+            {
+                WriterFor(top).DeleteKey(Hkcu(locked), recursive: false);
+            }
+            catch (RegistryOperationException)
+            {
+                // Removed already or never created.
+            }
+
+            CleanupRun(runId);
+        }
+    }
+
+    /// <summary>Section 42 item H. A merged descriptor carries the auto-inherited bit.</summary>
+    [TestMethod]
+    public void MergeResultCarriesTheAutoInheritBits()
+    {
+        string runId = NewRunId();
+        string top = TopOf(runId);
+        string tree = top + @"\Tree";
+        string child = tree + @"\A";
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(tree));
+            setup.CreateKey(Hkcu(child));
+            setup.SetKeySecurity(
+                Hkcu(tree),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.ProtectedDacl,
+                UserDescriptor("D:P(A;CI;KA;;;{0})"));
+
+            WriterFor(top).SetKeySecurity(
+                Hkcu(child),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.UnprotectedDacl,
+                SddlBinary("D:(A;;KR;;;WD)"));
+
+            Assert.IsTrue(Read(child).ControlFlags.HasFlag(ControlFlags.DiscretionaryAclAutoInherited));
+        }
+        finally
+        {
+            CleanupRun(runId);
+        }
+    }
+
+    /// <summary>Section 42 item H. The information bit decides the protected control bit of the stored DACL.</summary>
+    [TestMethod]
+    public void UnprotectedInformationClearsTheProtectedBit()
+    {
+        string runId = NewRunId();
+        string top = TopOf(runId);
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(top + @"\A"));
+
+            // The descriptor says protected, the information says unprotected: the information wins.
+            setup.SetKeySecurity(
+                Hkcu(top + @"\A"),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.UnprotectedDacl,
+                UserDescriptor("D:P(A;;KA;;;{0})"));
+
+            Assert.IsFalse(Read(top + @"\A").ControlFlags.HasFlag(ControlFlags.DiscretionaryAclProtected));
+        }
+        finally
+        {
+            CleanupRun(runId);
+        }
+    }
+
+    /// <summary>Section 42 item H. ProtectedDacl in the information protects the stored DACL as given.</summary>
+    [TestMethod]
+    public void ProtectedInformationSetsTheProtectedBit()
+    {
+        string runId = NewRunId();
+        string top = TopOf(runId);
+
+        try
+        {
+            RegistryWriter setup = WriterFor(top);
+            setup.CreateKey(Hkcu(top));
+            setup.CreateKey(Hkcu(top + @"\A"));
+
+            setup.SetKeySecurity(
+                Hkcu(top + @"\A"),
+                RegistrySecurityInformation.Dacl | RegistrySecurityInformation.ProtectedDacl,
+                UserDescriptor("D:(A;;KA;;;{0})"));
+
+            RawSecurityDescriptor stored = Read(top + @"\A");
+            Assert.IsTrue(stored.ControlFlags.HasFlag(ControlFlags.DiscretionaryAclProtected));
+            Assert.AreEqual(1, Dacl(stored).Count);
+        }
+        finally
+        {
+            CleanupRun(runId);
+        }
+    }
+
+    private static bool IsElevated() =>
+        new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent())
+            .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+
+    private static byte[] SddlBinary(string sddl)
+    {
+        var descriptor = new RawSecurityDescriptor(sddl);
+        byte[] binary = new byte[descriptor.BinaryLength];
+        descriptor.GetBinaryForm(binary, 0);
+        return binary;
+    }
+
+    /// <summary>Records each reported key on the calling thread, so the test sees the walk order at once.</summary>
+    private sealed class SynchronousProgress(List<string> reported) : IProgress<KeySecurityProgress>
+    {
+        public void Report(KeySecurityProgress value) => reported.Add(value.Path.ToAbbreviatedString());
+    }
 
     private static byte[] UserDescriptor(string sddlTemplate)
     {
