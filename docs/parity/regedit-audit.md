@@ -27,19 +27,18 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | --- | --- | --- | --- |
 | MENU | 35 | 0 | 2 |
 | CTX | 37 | 0 | 4 |
-| DLG | 25 | 5 | 21 |
+| DLG | 36 | 5 | 10 |
 | ACC | 27 | 0 | 1 |
-| MSG | 143 | 44 | 89 |
+| MSG | 172 | 44 | 60 |
 | VIEW | 18 | 2 | 1 |
 | BEH | 37 | 5 | 7 |
 | EXP | 32 | 0 | 0 |
-| All (535) | 354 | 56 | 125 |
+| All (535) | 394 | 56 | 85 |
 
 ## Gaps by piece
 
 | Piece | Rows |
 | --- | --- |
-| D1 | DLG-033, DLG-034, DLG-037, DLG-038, DLG-039, DLG-040, DLG-041, DLG-042, DLG-043, DLG-046, DLG-047, MSG-194, MSG-195, MSG-196, MSG-197, MSG-198, MSG-199, MSG-200, MSG-201, MSG-202, MSG-203, MSG-204, MSG-205, MSG-206, MSG-207, MSG-208, MSG-209, MSG-210, MSG-211, MSG-212, MSG-213, MSG-214, MSG-215, MSG-216, MSG-217, MSG-218, MSG-219, MSG-220, MSG-221, MSG-222, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276 |
 | F2 | DLG-023, DLG-035, DLG-036, MSG-022, MSG-052, MSG-053, MSG-060, MSG-061, MSG-062, MSG-066, MSG-109, MSG-110, MSG-111, VIEW-009, BEH-009, BEH-043 |
 | P1 | MENU-009, DLG-009, DLG-015, DLG-016, ACC-011, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276, BEH-027 |
 | R2 | MENU-008, CTX-032, CTX-033, CTX-034, CTX-035, DLG-013, DLG-014, DLG-031, DLG-032, MSG-021, MSG-069, MSG-072, MSG-073, BEH-023, BEH-024, BEH-025 |
@@ -171,21 +170,21 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | DLG-030 | pass | ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates |  |
 | DLG-031 | gap | Remote import target picker (115) missing; strings 131 and 135 show classic imports to a chosen computer | R2 |
 | DLG-032 | gap | Remote import target picker (115) missing; strings 131 and 135 show classic imports to a chosen computer | R2 |
-| DLG-033 | gap | Resource Lists viewer missing; resource values open the hex viewer (ValueCommands.cs:141-144) | D1 |
-| DLG-034 | gap | Resource Lists viewer missing; resource values open the hex viewer (ValueCommands.cs:141-144) | D1 |
+| DLG-033 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests (regedit-resource-viewers.json: Enter opens the viewer; the Display... rule after a selection is not measured, a capture limit) |  |
+| DLG-034 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests (regedit-resource-viewers.json: Enter opens the viewer; the Display... rule after a selection is not measured, a capture limit) |  |
 | DLG-035 | gap | QWORD editor layout not asserted; overflow string 120 not in the source | F2 |
 | DLG-036 | gap | QWORD editor layout not asserted; overflow string 120 not in the source | F2 |
-| DLG-037 | gap | Resource and requirement viewers missing | D1 |
-| DLG-038 | gap | Resource and requirement viewers missing | D1 |
-| DLG-039 | gap | Resource and requirement viewers missing | D1 |
-| DLG-040 | gap | Resource and requirement viewers missing | D1 |
-| DLG-041 | gap | Resource and requirement viewers missing | D1 |
-| DLG-042 | gap | Resource and requirement viewers missing | D1 |
-| DLG-043 | gap | Resource and requirement viewers missing | D1 |
+| DLG-037 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests (Resources viewer measured on a real HKEY_LOCAL_MACHINE\HARDWARE value; Data... rule and cell formats inferred, docs/failure-modes/resource-values.md 7.11) |  |
+| DLG-038 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests (Resources viewer measured on a real HKEY_LOCAL_MACHINE\HARDWARE value; Data... rule and cell formats inferred, docs/failure-modes/resource-values.md 7.11) |  |
+| DLG-039 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
+| DLG-040 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
+| DLG-041 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
+| DLG-042 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
+| DLG-043 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
 | DLG-044 | declared-difference | Developer dialog with no menu item, accelerator or string that opens it (OQ-17); BWC does not implement it |  |
 | DLG-045 | declared-difference | Developer dialog with no menu item, accelerator or string that opens it (OQ-17); BWC does not implement it |  |
-| DLG-046 | gap | Interrupt and DMA requirement viewers missing | D1 |
-| DLG-047 | gap | Interrupt and DMA requirement viewers missing | D1 |
+| DLG-046 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1800 and 1900, not measured on classic (no sample) |  |
+| DLG-047 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1800 and 1900, not measured on classic (no sample) |  |
 | DLG-048 | declared-difference | Template 2020 is never opened by classic in this build: Display Binary Data opens variant B (2021) for every value type (regedit-binary.json). BWC does not implement variant A |  |
 | DLG-049 | declared-difference | Template 2020 is never opened by classic in this build: Display Binary Data opens variant B (2021) for every value type (regedit-binary.json). BWC does not implement variant A |  |
 | DLG-050 | pass | BinaryViewer_FollowsTheClassicLayoutAndFormats; HexViewer_ClassicBinaryDataFollowsTheFormats |  |
@@ -231,7 +230,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-001 | pass | String parity check: text equal (MsgCaptionRegistryEditor) |  |
 | MSG-002 | pass | String parity check: text equal (Bwc.Registry/RegFile/RegFileDocument.cs) |  |
 | MSG-003 | pass | String parity check: text equal (DialogFindData) |  |
-| MSG-004 | pass | String parity check: text equal (Bwc.Regedit/Controllers/FavoritesController.cs) |  |
+| MSG-004 | pass | String parity check: text equal (Bwc.Regedit/Controllers/AddressSuggestions.cs) |  |
 | MSG-005 | pass | String parity check: text equal (Bwc.Regedit/Controllers/MessageCatalog.cs) |  |
 | MSG-006 | pass | String parity check: text equal (ContextModifyBinary) |  |
 | MSG-007 | pass | String parity check: text equal (Bwc.Registry/RegistryExportText.cs) |  |
@@ -242,7 +241,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-012 | pass | String parity check: text equal (Bwc.Regedit/Controllers/MessageCatalog.cs) |  |
 | MSG-013 | pass | Format template; ValueDisplay_DwordDataColumnShowsOracleHexAndDecimal |  |
 | MSG-014 | pass | String parity check: text equal (Bwc.Registry/RegistryValueDisplay.cs) |  |
-| MSG-015 | pass | String parity check: text equal (Bwc.UI/List/DetailsList.xaml.cs) |  |
+| MSG-015 | pass | String parity check: text equal (Bwc.UI/Dialogs/ClassicDialogTemplates.cs) |  |
 | MSG-016 | pass | Format template; ValueDisplayTests (QWORD rows compared with classic) |  |
 | MSG-017 | pass | String parity check: text equal (Bwc.Registry/RegistryValueDisplay.cs) |  |
 | MSG-018 | declared-difference | Classic shows string 19 (Computer) as the root in this build (regedit-100dpi.png); 34 is never shown (OQ-40) |  |
@@ -395,7 +394,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-165 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
 | MSG-166 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
 | MSG-167 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
-| MSG-168 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
+| MSG-168 | pass | String parity check: text equal (TextEditDelete) |  |
 | MSG-169 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
 | MSG-170 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
 | MSG-171 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
@@ -421,35 +420,35 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-191 | pass | String parity check: text equal (PermissionsInheritThisKeyOnly) |  |
 | MSG-192 | pass | String parity check: text equal (PermissionsInheritThisKeyAndSubkeys) |  |
 | MSG-193 | pass | String parity check: text equal (PermissionsInheritSubkeysOnly) |  |
-| MSG-194 | gap | Resource viewer and resource print text | D1 |
-| MSG-195 | gap | Resource viewer and resource print text | D1 |
-| MSG-196 | gap | Resource viewer and resource print text | D1 |
-| MSG-197 | gap | Resource viewer and resource print text | D1 |
-| MSG-198 | gap | Resource viewer and resource print text | D1 |
-| MSG-199 | gap | Resource viewer and resource print text | D1 |
-| MSG-200 | gap | Resource viewer and resource print text | D1 |
-| MSG-201 | gap | Resource viewer and resource print text | D1 |
-| MSG-202 | gap | Resource viewer and resource print text | D1 |
-| MSG-203 | gap | Resource viewer and resource print text | D1 |
-| MSG-204 | gap | Resource viewer and resource print text | D1 |
-| MSG-205 | gap | Resource viewer and resource print text | D1 |
-| MSG-206 | gap | Resource viewer and resource print text | D1 |
-| MSG-207 | gap | Resource viewer and resource print text | D1 |
-| MSG-208 | gap | Resource viewer and resource print text | D1 |
-| MSG-209 | gap | Resource viewer and resource print text | D1 |
-| MSG-210 | gap | Resource viewer and resource print text | D1 |
-| MSG-211 | gap | Resource viewer and resource print text | D1 |
-| MSG-212 | gap | Resource viewer and resource print text | D1 |
-| MSG-213 | gap | Resource viewer and resource print text | D1 |
-| MSG-214 | gap | Resource viewer and resource print text | D1 |
-| MSG-215 | gap | Resource viewer and resource print text | D1 |
-| MSG-216 | gap | Resource viewer and resource print text | D1 |
-| MSG-217 | gap | Resource viewer and resource print text | D1 |
-| MSG-218 | gap | Resource viewer and resource print text | D1 |
-| MSG-219 | gap | Resource viewer and resource print text | D1 |
-| MSG-220 | gap | Resource viewer and resource print text | D1 |
-| MSG-221 | gap | Resource viewer and resource print text | D1 |
-| MSG-222 | gap | Resource viewer and resource print text | D1 |
+| MSG-194 | pass | String parity check: text equal (ResourceBusType0) |  |
+| MSG-195 | pass | String parity check: text equal (ResourceBusType1) |  |
+| MSG-196 | pass | String parity check: text equal (ResourceBusType2) |  |
+| MSG-197 | pass | String parity check: text equal (ResourceBusType3) |  |
+| MSG-198 | pass | String parity check: text equal (ResourceBusType4) |  |
+| MSG-199 | pass | String parity check: text equal (ResourceBusType5) |  |
+| MSG-200 | pass | String parity check: text equal (ResourceBusType6) |  |
+| MSG-201 | pass | String parity check: text equal (ResourceBusType7) |  |
+| MSG-202 | pass | String parity check: text equal (ResourceBusType8) |  |
+| MSG-203 | pass | String parity check: text equal (ResourceBusType9) |  |
+| MSG-204 | pass | String parity check: text equal (ResourceBusType10) |  |
+| MSG-205 | pass | String parity check: text equal (ResourceBusType11) |  |
+| MSG-206 | pass | String parity check: text equal (ResourceLevelSensitive) |  |
+| MSG-207 | pass | String parity check: text equal (ResourceLatched) |  |
+| MSG-208 | pass | String parity check: text equal (ResourceReadWrite) |  |
+| MSG-209 | pass | String parity check: text equal (ResourceReadOnly) |  |
+| MSG-210 | pass | String parity check: text equal (ResourceWriteOnly) |  |
+| MSG-211 | pass | String parity check: text equal (ResourceMemoryType) |  |
+| MSG-212 | pass | String parity check: text equal (ResourcePortType) |  |
+| MSG-213 | pass | String parity check: text equal (ResourceInvalid) |  |
+| MSG-214 | pass | String parity check: text equal (ResourcePortType) |  |
+| MSG-215 | pass | String parity check: text equal (ResourceInterrupt) |  |
+| MSG-216 | pass | String parity check: text equal (ResourceMemoryType) |  |
+| MSG-217 | pass | String parity check: text equal (ResourceDma) |  |
+| MSG-218 | pass | String parity check: text equal (ResourceDeviceSpecific) |  |
+| MSG-219 | pass | String parity check: text equal (ResourceUndetermined) |  |
+| MSG-220 | pass | String parity check: text equal (ResourceDeviceExclusive) |  |
+| MSG-221 | pass | String parity check: text equal (ResourceDriverExclusive) |  |
+| MSG-222 | pass | String parity check: text equal (ResourceShared) |  |
 | MSG-223 | pass | String parity check: text equal (Bwc.Registry/RegistryValueType.cs) |  |
 | MSG-224 | pass | String parity check: text equal (Bwc.Registry/RegistryValueType.cs) |  |
 | MSG-225 | pass | String parity check: text equal (Bwc.Registry/RegistryValueType.cs) |  |
@@ -461,7 +460,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-231 | pass | String parity check: text equal (Bwc.Registry/RegistryValueType.cs) |  |
 | MSG-232 | pass | String parity check: text equal (Bwc.Registry/RegistryValueType.cs) |  |
 | MSG-233 | pass | String parity check: text equal (Bwc.Registry/RegistryValueType.cs) |  |
-| MSG-234 | pass | String parity check: text equal (Bwc.Registry/RegistryValueType.cs) |  |
+| MSG-234 | pass | String parity check: text equal (Bwc.Regedit/Registry/RegistryValueSource.cs) |  |
 | MSG-235 | pass | String parity check: text equal (PrintKeyName) |  |
 | MSG-236 | pass | String parity check: text equal (PrintClassName) |  |
 | MSG-237 | pass | String parity check: text equal (PrintLastWriteTime) |  |
@@ -472,38 +471,38 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-242 | pass | String parity check: text equal (PrintValueData) |  |
 | MSG-243 | pass | String parity check: text equal (PrintNoName) |  |
 | MSG-244 | pass | String parity check: text equal (PrintNoClass) |  |
-| MSG-245 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-246 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-247 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-248 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-249 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-250 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-251 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-252 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-253 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-254 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-255 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-256 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-257 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-258 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-259 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-260 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-261 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-262 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-263 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-264 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-265 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-266 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-267 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-268 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-269 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-270 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-271 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-272 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-273 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-274 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-275 | gap | Resource viewer and resource print text | D1, P1 |
-| MSG-276 | gap | Resource viewer and resource print text | D1, P1 |
+| MSG-245 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-246 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-247 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-248 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-249 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-250 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-251 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-252 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-253 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-254 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-255 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-256 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-257 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-258 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-259 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-260 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-261 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-262 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-263 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-264 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-265 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-266 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-267 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-268 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-269 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-270 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-271 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-272 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-273 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-274 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-275 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-276 | gap | Resource print text (needs the classic text golden) | P1 |
 
 ### VIEW
 
@@ -644,7 +643,7 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-13 | ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates. |
 | OQ-14 | Classic opens variant B (2021) for every type, Byte format by default; variant A (2020) is never opened (regedit-binary.json). BWC matches (BinaryViewer_FollowsTheClassicLayoutAndFormats). |
 | OQ-15 | Export branch edit 1282: enabled for both radios and filled with the selected key (regedit-export-range.json). Runtime enable rules of template-disabled viewer controls: measured on classic with a resource value from HKEY_LOCAL_MACHINE\HARDWARE (readable unelevated); D1. |
-| OQ-16 | Viewer mapping per type: D1 (same measurement). |
+| OQ-16 | Enter on REG_RESOURCE_LIST opens Resource Lists (116), on REG_FULL_RESOURCE_DESCRIPTOR opens Resources (1305), on REG_RESOURCE_REQUIREMENTS_LIST opens Requirements List (1501); Modify Binary Data shows the hex editor (regedit-resource-viewers.json; the requirements list is from the templates, no sample here). |
 | OQ-17 | Not reachable in classic; not implemented (DLG-044, DLG-045 declared). |
 | OQ-18 | ImportProgress_ShowsClassicProgressWithoutCancel; ImportResult tests. |
 | OQ-19 | BWC shows its own export progress with Cancel and deletes the partial file (ExportProgress_CancelDeletesThePartialFileAndWritesNothing); declared, because a long export must be cancellable. |

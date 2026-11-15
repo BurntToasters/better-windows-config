@@ -22,6 +22,8 @@ internal static class Program
         "  remote    Connect Network Registry to 127.0.0.1, menus, Import picker, Disconnect (regedit-remote.json)\n" +
         "  manifest  embedded RT_MANIFEST requestedExecutionLevel of regedit.exe (regedit-manifest.json)\n" +
         "  export-range  classic Export range panel controls 1280 to 1282 and the missing-branch box (regedit-export-range.json)\n" +
+        "  export-text   classic File > Export, Text Files (*.txt), of BWC-Oracle; not measured (no file written), see regedit-export-text.json\n" +
+        "  resource-viewers  Modify and Display... on REG_RESOURCE_LIST, FULL and REQUIREMENTS values (regedit-resource-viewers.json)\n" +
         "  cleanup   delete HKCU\\Software\\BWC-Oracle\n" +
         "  --allow-dpi  record UI captures at a DPI other than 96 (the DPI is written into each output)";
 
@@ -134,6 +136,22 @@ internal static class Program
                 case "export-range":
                     OracleSession.Run("export-range", () => ExportRangeCapture.Run(paths, allowDpi));
                     return 0;
+
+                case "export-text":
+                    OracleSession.Run("export-text", () =>
+                    {
+                        SeedCommand.Run(paths);
+                        ExportTextCapture.Run(paths, allowDpi);
+                    });
+                    return 0;
+                case "resource-viewers":
+                    OracleSession.Run("resource-viewers", () =>
+                    {
+                        SeedCommand.Run(paths);
+                        ResourceViewersCapture.Run(paths, allowDpi);
+                    });
+                    return 0;
+
                 case "manifest":
                     // Reads the image resource only. regedit is not started, so no session or GUI lock is needed.
                     ManifestCapture.Run(paths);

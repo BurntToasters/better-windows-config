@@ -8,10 +8,10 @@
     "src/**/*.cs (excluding bin and obj)"
   ],
   "counts": {
-    "equal": 137,
+    "equal": 166,
     "differs": 7,
     "template": 4,
-    "absent": 130
+    "absent": 101
   },
   "strings": [
     {
@@ -788,119 +788,119 @@
     },
     {
       "id": 7500,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7501,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7502,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7503,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7504,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7505,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7506,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7507,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7508,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7509,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7510,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7511,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7520,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7521,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7530,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7531,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7532,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7540,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7541,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7542,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7560,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7561,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7562,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7563,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7564,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7580,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7581,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7582,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 7583,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 8000,

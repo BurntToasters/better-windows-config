@@ -5,6 +5,7 @@ using Bwc.Regedit.Registry;
 using Bwc.Registry;
 using Bwc.UI.Dialogs;
 using Bwc.Regedit.Dialogs;
+using WinRT.Interop;
 using Bwc.UI.List;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -141,6 +142,44 @@ internal sealed class ValueCommands
             or (uint)RegistryValueType.FullResourceDescriptor
             or (uint)RegistryValueType.ResourceRequirementsList;
 
+    /// <summary>Opens the Device Specific Data bytes (Data...) in the binary viewer, owned by the resource viewer.</summary>
+    private async Task ShowDeviceDataAsync(nint owner, byte[] data)
+    {
+        var viewer = new HexViewerDialog(Get("DialogHexTitle"));
+        viewer.SetValue("Device Specific Data", string.Empty, data, null);
+        _ = await viewer.ShowAsync(owner);
+    }
+
+    /// <summary>
+    /// Shows the classic viewer for a resource value. Malformed data opens the viewer with the rows that parsed (classic
+    /// crashes or opens nothing here), and the value error is then owned by that viewer. The viewer is read-only.
+    /// </summary>
+    private async Task ShowResourceViewerAsync(string rawName, RegistryValueInfo value)
+    {
+        ModalDialogWindow dialog = ResourceViewerFactory.Create(value.Type, value.Data, ShowDeviceDataAsync, out bool malformed);
+        if (!malformed)
+        {
+            _ = await _context.ShowDialogAsync(dialog);
+            return;
+        }
+
+        // The error waits for the viewer to become active, so no other app can take the foreground in between.
+        ErrorDialog error = ValueReadError(rawName, forEdit: false);
+        void OnFirstActivation(object sender, WindowActivatedEventArgs args)
+        {
+            if (args.WindowActivationState == WindowActivationState.Deactivated)
+            {
+                return;
+            }
+
+            dialog.Activated -= OnFirstActivation;
+            _ = dialog.DispatcherQueue.TryEnqueue(() => error.ShowAsync(WindowNative.GetWindowHandle(dialog)));
+        }
+
+        dialog.Activated += OnFirstActivation;
+        _ = await _context.ShowDialogAsync(dialog);
+    }
+
     /// <summary>
     /// Opens the hex editor for a value whose type has no typed editor, or for Modify Binary Data. The
     /// value is read on the thread pool and written back with its original type when the dialog accepts.
@@ -185,8 +224,8 @@ internal sealed class ValueCommands
 
         if (IsReadOnlyResourceType(value.Type))
         {
-            // Hardware resource data is shown read-only, so a typed edit cannot change device resources.
-            await ShowReadOnlyViewerAsync(activatedRow.Name, key, value);
+            // Hardware resource data opens its classic viewer read-only, so a typed edit cannot change device resources.
+            await ShowResourceViewerAsync(rawName, value);
             _ = _context.Shell.ListContent.Focus(FocusState.Programmatic);
             return;
         }
@@ -537,10 +576,13 @@ internal sealed class ValueCommands
     }
 
     /// <summary>Shows the classic read error for a value whose data cannot be read.</summary>
-    private Task ShowValueReadErrorAsync(string rawName, bool forEdit)
+    private Task ShowValueReadErrorAsync(string rawName, bool forEdit) =>
+        _context.ShowErrorAsync(ValueReadError(rawName, forEdit));
+
+    private ErrorDialog ValueReadError(string rawName, bool forEdit)
     {
         Log.Warn($"Registry Editor could not read the data of value '{ValueLabel(rawName)}'.");
-        return _context.ShowErrorAsync(_context.Messages.ForValueRead(ValueLabel(rawName), forEdit).ToErrorDialog());
+        return _context.Messages.ForValueRead(ValueLabel(rawName), forEdit).ToErrorDialog();
     }
 
     /// <summary>The name a value message names: the display name, or the default value label.</summary>
