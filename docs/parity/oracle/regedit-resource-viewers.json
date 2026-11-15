@@ -1,0 +1,809 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture resource-viewers",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26300",
+    "ubr": 9974,
+    "displayVersion": "26H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "note": "Modify opens the viewer. Child viewers open from Display... after the list row is selected. Text is in local/resource-viewers-text.json.",
+  "viewers": [
+    {
+      "name": "hklm-resource-list",
+      "valueType": "REG_RESOURCE_LIST",
+      "measured": true,
+      "modifyRoute": "enter",
+      "opened": true,
+      "dialogTemplate": 116,
+      "controlIds": [
+        1,
+        1203,
+        1205
+      ],
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010001",
+          "x": 111,
+          "y": 300,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 1203,
+          "class": "Button",
+          "visible": true,
+          "enabled": false,
+          "style": "0x58010000",
+          "x": 279,
+          "y": 300,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 1205,
+          "class": "ColumnListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010010",
+          "x": 30,
+          "y": 31,
+          "width": 450,
+          "height": 238
+        }
+      ],
+      "lists": [
+        {
+          "id": 1205,
+          "class": "ColumnListBox",
+          "rowCount": 0,
+          "uiaListItemCount": 1,
+          "columnCount": 0,
+          "rows": []
+        }
+      ],
+      "children": [
+        {
+          "trigger": 1203,
+          "enabledBeforeSelect": false,
+          "enabledAfterSelect": false,
+          "opened": false
+        }
+      ]
+    },
+    {
+      "name": "hklm-full-resource-descriptor",
+      "valueType": "REG_FULL_RESOURCE_DESCRIPTOR",
+      "measured": true,
+      "modifyRoute": "enter",
+      "opened": true,
+      "dialogTemplate": 1305,
+      "controlIds": [
+        1,
+        1204,
+        1300,
+        1301,
+        1302,
+        1303,
+        1304,
+        1306,
+        1307,
+        1308,
+        1309,
+        1310,
+        1311,
+        1312,
+        1313,
+        65535,
+        65535,
+        65535,
+        65535,
+        65535,
+        65535,
+        65535,
+        65535,
+        65535,
+        65535
+      ],
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010001",
+          "x": 276,
+          "y": 900,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 1204,
+          "class": "Button",
+          "visible": true,
+          "enabled": false,
+          "style": "0x58010000",
+          "x": 444,
+          "y": 900,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 1300,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 615,
+          "y": 797,
+          "width": 198,
+          "height": 25
+        },
+        {
+          "id": 1301,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 615,
+          "y": 828,
+          "width": 198,
+          "height": 25
+        },
+        {
+          "id": 1302,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 615,
+          "y": 859,
+          "width": 198,
+          "height": 25
+        },
+        {
+          "id": 1303,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 615,
+          "y": 766,
+          "width": 198,
+          "height": 25
+        },
+        {
+          "id": 1304,
+          "class": "ColumnListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010010",
+          "x": 30,
+          "y": 647,
+          "width": 783,
+          "height": 113
+        },
+        {
+          "id": 1306,
+          "class": "ColumnListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010010",
+          "x": 30,
+          "y": 47,
+          "width": 783,
+          "height": 113
+        },
+        {
+          "id": 1307,
+          "class": "ColumnListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010010",
+          "x": 30,
+          "y": 197,
+          "width": 783,
+          "height": 113
+        },
+        {
+          "id": 1308,
+          "class": "ColumnListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010010",
+          "x": 30,
+          "y": 347,
+          "width": 783,
+          "height": 113
+        },
+        {
+          "id": 1309,
+          "class": "ColumnListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010010",
+          "x": 30,
+          "y": 497,
+          "width": 783,
+          "height": 113
+        },
+        {
+          "id": 1310,
+          "class": "Static",
+          "visible": true,
+          "enabled": false,
+          "style": "0x58020000",
+          "x": 54,
+          "y": 797,
+          "width": 138,
+          "height": 25
+        },
+        {
+          "id": 1311,
+          "class": "Static",
+          "visible": true,
+          "enabled": false,
+          "style": "0x58020000",
+          "x": 54,
+          "y": 828,
+          "width": 72,
+          "height": 25
+        },
+        {
+          "id": 1312,
+          "class": "Static",
+          "visible": true,
+          "enabled": false,
+          "style": "0x58020000",
+          "x": 216,
+          "y": 797,
+          "width": 174,
+          "height": 25
+        },
+        {
+          "id": 1313,
+          "class": "Static",
+          "visible": true,
+          "enabled": false,
+          "style": "0x58020000",
+          "x": 216,
+          "y": 828,
+          "width": 162,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000007",
+          "x": 30,
+          "y": 763,
+          "width": 375,
+          "height": 122
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 30,
+          "y": 16,
+          "width": 60,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 30,
+          "y": 166,
+          "width": 105,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 30,
+          "y": 316,
+          "width": 84,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 30,
+          "y": 466,
+          "width": 51,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 30,
+          "y": 616,
+          "width": 222,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020002",
+          "x": 453,
+          "y": 766,
+          "width": 153,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020002",
+          "x": 453,
+          "y": 797,
+          "width": 153,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020002",
+          "x": 453,
+          "y": 828,
+          "width": 153,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020002",
+          "x": 453,
+          "y": 859,
+          "width": 153,
+          "height": 25
+        }
+      ],
+      "lists": [
+        {
+          "id": 1304,
+          "class": "ColumnListBox",
+          "rowCount": 0,
+          "uiaListItemCount": 1,
+          "columnCount": 0,
+          "rows": []
+        },
+        {
+          "id": 1306,
+          "class": "ColumnListBox",
+          "rowCount": 0,
+          "uiaListItemCount": 0,
+          "columnCount": 0,
+          "rows": []
+        },
+        {
+          "id": 1307,
+          "class": "ColumnListBox",
+          "rowCount": 0,
+          "uiaListItemCount": 0,
+          "columnCount": 0,
+          "rows": []
+        },
+        {
+          "id": 1308,
+          "class": "ColumnListBox",
+          "rowCount": 0,
+          "uiaListItemCount": 0,
+          "columnCount": 0,
+          "rows": []
+        },
+        {
+          "id": 1309,
+          "class": "ColumnListBox",
+          "rowCount": 0,
+          "uiaListItemCount": 0,
+          "columnCount": 0,
+          "rows": []
+        }
+      ]
+    },
+    {
+      "name": "seed-full-resource-descriptor",
+      "valueType": "REG_FULL_RESOURCE_DESCRIPTOR",
+      "measured": true,
+      "modifyRoute": "enter",
+      "opened": true,
+      "dialogTemplate": 1305,
+      "controlIds": [
+        1,
+        1204,
+        1300,
+        1301,
+        1302,
+        1303,
+        1304,
+        1306,
+        1307,
+        1308,
+        1309,
+        1310,
+        1311,
+        1312,
+        1313,
+        65535,
+        65535,
+        65535,
+        65535,
+        65535,
+        65535,
+        65535,
+        65535,
+        65535,
+        65535
+      ],
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010001",
+          "x": 276,
+          "y": 900,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 1204,
+          "class": "Button",
+          "visible": true,
+          "enabled": false,
+          "style": "0x58010000",
+          "x": 444,
+          "y": 900,
+          "width": 120,
+          "height": 44
+        },
+        {
+          "id": 1300,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 615,
+          "y": 797,
+          "width": 198,
+          "height": 25
+        },
+        {
+          "id": 1301,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 615,
+          "y": 828,
+          "width": 198,
+          "height": 25
+        },
+        {
+          "id": 1302,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 615,
+          "y": 859,
+          "width": 198,
+          "height": 25
+        },
+        {
+          "id": 1303,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 615,
+          "y": 766,
+          "width": 198,
+          "height": 25
+        },
+        {
+          "id": 1304,
+          "class": "ColumnListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010010",
+          "x": 30,
+          "y": 647,
+          "width": 783,
+          "height": 113
+        },
+        {
+          "id": 1306,
+          "class": "ColumnListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010010",
+          "x": 30,
+          "y": 47,
+          "width": 783,
+          "height": 113
+        },
+        {
+          "id": 1307,
+          "class": "ColumnListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010010",
+          "x": 30,
+          "y": 197,
+          "width": 783,
+          "height": 113
+        },
+        {
+          "id": 1308,
+          "class": "ColumnListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010010",
+          "x": 30,
+          "y": 347,
+          "width": 783,
+          "height": 113
+        },
+        {
+          "id": 1309,
+          "class": "ColumnListBox",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50010010",
+          "x": 30,
+          "y": 497,
+          "width": 783,
+          "height": 113
+        },
+        {
+          "id": 1310,
+          "class": "Static",
+          "visible": true,
+          "enabled": false,
+          "style": "0x58020000",
+          "x": 54,
+          "y": 797,
+          "width": 138,
+          "height": 25
+        },
+        {
+          "id": 1311,
+          "class": "Static",
+          "visible": true,
+          "enabled": false,
+          "style": "0x58020000",
+          "x": 54,
+          "y": 828,
+          "width": 72,
+          "height": 25
+        },
+        {
+          "id": 1312,
+          "class": "Static",
+          "visible": true,
+          "enabled": false,
+          "style": "0x58020000",
+          "x": 216,
+          "y": 797,
+          "width": 174,
+          "height": 25
+        },
+        {
+          "id": 1313,
+          "class": "Static",
+          "visible": true,
+          "enabled": false,
+          "style": "0x58020000",
+          "x": 216,
+          "y": 828,
+          "width": 162,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50000007",
+          "x": 30,
+          "y": 763,
+          "width": 375,
+          "height": 122
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 30,
+          "y": 16,
+          "width": 60,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 30,
+          "y": 166,
+          "width": 105,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 30,
+          "y": 316,
+          "width": 84,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 30,
+          "y": 466,
+          "width": 51,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020000",
+          "x": 30,
+          "y": 616,
+          "width": 222,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020002",
+          "x": 453,
+          "y": 766,
+          "width": 153,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020002",
+          "x": 453,
+          "y": 797,
+          "width": 153,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020002",
+          "x": 453,
+          "y": 828,
+          "width": 153,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "style": "0x50020002",
+          "x": 453,
+          "y": 859,
+          "width": 153,
+          "height": 25
+        }
+      ],
+      "lists": [
+        {
+          "id": 1304,
+          "class": "ColumnListBox",
+          "rowCount": 0,
+          "uiaListItemCount": 0,
+          "columnCount": 0,
+          "rows": []
+        },
+        {
+          "id": 1306,
+          "class": "ColumnListBox",
+          "rowCount": 0,
+          "uiaListItemCount": 0,
+          "columnCount": 0,
+          "rows": []
+        },
+        {
+          "id": 1307,
+          "class": "ColumnListBox",
+          "rowCount": 0,
+          "uiaListItemCount": 0,
+          "columnCount": 0,
+          "rows": []
+        },
+        {
+          "id": 1308,
+          "class": "ColumnListBox",
+          "rowCount": 0,
+          "uiaListItemCount": 0,
+          "columnCount": 0,
+          "rows": []
+        },
+        {
+          "id": 1309,
+          "class": "ColumnListBox",
+          "rowCount": 0,
+          "uiaListItemCount": 0,
+          "columnCount": 0,
+          "rows": []
+        }
+      ]
+    }
+  ],
+  "notMeasured": [
+    {
+      "name": "seed-resource-list",
+      "reason": "classic regedit exits with an access violation (0xC0000005) or opens no viewer on Modify; the outcome differs between runs"
+    },
+    {
+      "name": "seed-requirements-list",
+      "reason": "classic regedit exits with an access violation (0xC0000005) or opens no viewer on Modify; the outcome differs between runs"
+    }
+  ]
+}

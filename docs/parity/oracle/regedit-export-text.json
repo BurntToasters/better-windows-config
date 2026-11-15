@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture export-text",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26300",
+    "ubr": 9974,
+    "displayVersion": "26H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "measured": false,
+  "filter": {
+    "itemCount": 5,
+    "textItemIndex": 2,
+    "selectedBeforeOk": 2,
+    "pattern": "*.txt"
+  },
+  "panelBeforeOk": {
+    "selectedBranchChecked": true,
+    "allChecked": false,
+    "branchEdit": "HKEY_CURRENT_USER\\Software\\BWC-Oracle",
+    "fileNameReadBack": "<repo>\\artifacts\\oracle\\export-text\\bwc-oracle-text.txt"
+  },
+  "okPosted": true,
+  "waitSeconds": 120,
+  "newWindowClasses": [],
+  "mainWindowDisabledSeen": false,
+  "exportDialogOpenAfterWait": false,
+  "fileWritten": false,
+  "notes": "Not measured. Classic File > Export with the Text Files (*.txt) item selected, Selected branch on BWC-Oracle and a .txt name, wrote no file and showed no new window or message box within the wait. The same route with the Win9x/NT4 item (index 3) wrote REGEDIT4 at once in a diagnostic run, so the selection route is not the cause. The text writer's trigger is still unknown.",
+  "steps": [
+    {
+      "name": "initial",
+      "all": {
+        "present": true,
+        "checked": false
+      },
+      "selectedBranch": {
+        "present": true,
+        "checked": true
+      },
+      "branchEdit": {
+        "present": true,
+        "enabled": true
+      }
+    },
+    {
+      "name": "after-selected-branch",
+      "all": {
+        "present": true,
+        "checked": false
+      },
+      "selectedBranch": {
+        "present": true,
+        "checked": true
+      },
+      "branchEdit": {
+        "present": true,
+        "enabled": true
+      }
+    },
+    {
+      "name": "after-text-filter",
+      "all": {
+        "present": true,
+        "checked": false
+      },
+      "selectedBranch": {
+        "present": true,
+        "checked": true
+      },
+      "branchEdit": {
+        "present": true,
+        "enabled": true
+      }
+    }
+  ]
+}

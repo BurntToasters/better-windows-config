@@ -189,3 +189,10 @@ with an isolated `BWC_DATA_ROOT` and `BWC_E2E_SANDBOX_ROOT`, and disposes the pr
 finally block. It removes the run subtree and the scoped data root, and the shared assembly cleanup
 removes the empty `HKCU\Software\BWC-E2E` parent when possible. No test targets HKLM or another
 user hive.
+
+## Resource values
+
+REG_RESOURCE_LIST, REG_FULL_RESOURCE_DESCRIPTOR, and REG_RESOURCE_REQUIREMENTS_LIST no longer open in the hex viewer
+when they are activated (Enter, double-click, or Modify Binary Data). They open their classic viewers, which are described in
+`resource-values.md` section 7. View > Display Binary Data still opens this hex viewer for every type, including the three
+resource types, as the oracle measured in `regedit-binary.json`.

@@ -24,6 +24,9 @@ public enum ClassicControlKind
     /// <summary>Etched frame with a caption. Never a tab stop.</summary>
     GroupBox,
 
+    /// <summary>Column list (LVS_REPORT-style cells with a header row). Built as <see cref="ClassicColumnList"/>.</summary>
+    ColumnList,
+
     /// <summary>List box. Items are added by the dialog after construction.</summary>
     ListBox,
 
@@ -76,6 +79,9 @@ public sealed record ClassicControlDefinition(
 
     /// <summary>True for a list box that accepts several selections (LBS_MULTIPLESEL).</summary>
     public bool MultiSelect { get; init; }
+
+    /// <summary>Column titles of a <see cref="ClassicControlKind.ColumnList"/>, from the template's semicolon list.</summary>
+    public IReadOnlyList<string> Columns { get; init; } = [];
 }
 
 /// <summary>

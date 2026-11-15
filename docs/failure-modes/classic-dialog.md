@@ -286,6 +286,18 @@ dialog with no default button, or with Cancel marked default, would let Enter ca
 Guard: the default button comes from the definition. The E2E check tests Enter by its effect
 (the value is saved once), not by the button's visual style.
 
+### 3.10 Nested dialog closes and keys go to the main window
+
+A child dialog (Resources from Resource Lists, a detail viewer from Requirements List, or Binary Data from Resources)
+is opened by a dialog, not by the main window. When the child closes, keyboard focus must return to the element that
+had it in the parent dialog. Observed (see status): after a child closes, Escape does not close the owner dialog.
+
+Status: open, owned by X1. The attempted guard (the owner records its focused element before the child opens and
+restores it when the child closes) did not stop Escape from failing on the owner, and it was reverted. Evidence (the
+`resources.focus.*` notes of the ResourceViewers run): after the child closes, the owner is foreground and active and the
+keyboard focus is on the owner's XAML input site, yet Escape does not close the owner. Until the cause is fixed, the
+ResourceViewers test closes the nested owners with OK (UI Automation Invoke), not Escape.
+
 ## 4. Placement and sizing
 
 ### 4.1 Centered outside the work area

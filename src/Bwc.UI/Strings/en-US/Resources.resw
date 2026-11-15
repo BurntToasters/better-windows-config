@@ -158,4 +158,120 @@
   <data name="TextEditSelectAll" xml:space="preserve">
     <value>Select All</value>
   </data>
+  <!-- Oracle 7500. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceBusType0" xml:space="preserve">
+    <value>Internal</value>
+  </data>
+  <!-- Oracle 7501. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceBusType1" xml:space="preserve">
+    <value>Isa</value>
+  </data>
+  <!-- Oracle 7502. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceBusType2" xml:space="preserve">
+    <value>Eisa</value>
+  </data>
+  <!-- Oracle 7503. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceBusType3" xml:space="preserve">
+    <value>Micro Channel</value>
+  </data>
+  <!-- Oracle 7504. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceBusType4" xml:space="preserve">
+    <value>Turbo Channel</value>
+  </data>
+  <!-- Oracle 7505. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceBusType5" xml:space="preserve">
+    <value>PCI</value>
+  </data>
+  <!-- Oracle 7506. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceBusType6" xml:space="preserve">
+    <value>VME</value>
+  </data>
+  <!-- Oracle 7507. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceBusType7" xml:space="preserve">
+    <value>Nu</value>
+  </data>
+  <!-- Oracle 7508. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceBusType8" xml:space="preserve">
+    <value>PCMCIA</value>
+  </data>
+  <!-- Oracle 7509. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceBusType9" xml:space="preserve">
+    <value>C Bus</value>
+  </data>
+  <!-- Oracle 7510. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceBusType10" xml:space="preserve">
+    <value>MPI</value>
+  </data>
+  <!-- Oracle 7511. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceBusType11" xml:space="preserve">
+    <value>MPSA</value>
+  </data>
+  <!-- Oracle 7520. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceLevelSensitive" xml:space="preserve">
+    <value>Level Sensitive</value>
+  </data>
+  <!-- Oracle 7521. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceLatched" xml:space="preserve">
+    <value>Latched</value>
+  </data>
+  <!-- Oracle 7530. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceReadWrite" xml:space="preserve">
+    <value>Read / Write</value>
+  </data>
+  <!-- Oracle 7531. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceReadOnly" xml:space="preserve">
+    <value>Read Only</value>
+  </data>
+  <!-- Oracle 7532. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceWriteOnly" xml:space="preserve">
+    <value>Write Only</value>
+  </data>
+  <!-- Oracle 7540. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceMemoryType" xml:space="preserve">
+    <value>Memory</value>
+  </data>
+  <!-- Oracle 7541. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourcePortType" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <!-- Oracle 7542. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceInvalid" xml:space="preserve">
+    <value>Invalid</value>
+  </data>
+  <!-- Oracle 7560. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourcePortResource" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <!-- Oracle 7561. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceInterrupt" xml:space="preserve">
+    <value>Interrupt</value>
+  </data>
+  <!-- Oracle 7562. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceMemoryResource" xml:space="preserve">
+    <value>Memory</value>
+  </data>
+  <!-- Oracle 7563. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceDma" xml:space="preserve">
+    <value>DMA</value>
+  </data>
+  <!-- Oracle 7564. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceDeviceSpecific" xml:space="preserve">
+    <value>Device Specific</value>
+  </data>
+  <!-- Oracle 7580. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceUndetermined" xml:space="preserve">
+    <value>Undetermined</value>
+  </data>
+  <!-- Oracle 7581. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceDeviceExclusive" xml:space="preserve">
+    <value>Device Exclusive</value>
+  </data>
+  <!-- Oracle 7582. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceDriverExclusive" xml:space="preserve">
+    <value>Driver Exclusive</value>
+  </data>
+  <!-- Oracle 7583. Classic regedit RT_STRING text, verbatim. -->
+  <data name="ResourceShared" xml:space="preserve">
+    <value>Shared</value>
+  </data>
 </root>

@@ -33,7 +33,8 @@ public static class ClassicDialogTemplates
     /// <summary>Edit DWORD (32-bit) Value (RT_DIALOG 111): value data with the Base group. 219 x 103 DLU.</summary>
     public static ClassicDialogDefinition EditDword(string caption) => NumberTemplate(caption, "RT_DIALOG 111 (en-US regedit.exe.mui)");
 
-    /// <summary>Edit QWORD (64-bit) Value (RT_DIALOG 117): same geometry as the DWORD template. 219 x 103 DLU.</summary>
+    /// <summary>Edit QWORD (64-bit) Value (RT_DIALOG 117): same geometry as the DWORD template. 219 x 103
+    /// DLU.</summary>
     public static ClassicDialogDefinition EditQword(string caption) => NumberTemplate(caption, "RT_DIALOG 117 (en-US regedit.exe.mui)");
 
     /// <summary>Edit Multi-String (RT_DIALOG 114): one string per line, multi-line edit. 232 x 178 DLU.</summary>
@@ -227,6 +228,217 @@ public static class ClassicDialogTemplates
         {
             FontFace = TemplateFont,
             FontPointSize = 8,
+        };
+
+    /// <summary>Resource Lists (RT_DIALOG 116): one column list of full descriptors and Display... 170 x
+    /// 120 DLU.</summary>
+    public static ClassicDialogDefinition ResourceLists(string caption, string okText, string displayText) =>
+        new(
+            caption,
+            "RT_DIALOG 116 (en-US regedit.exe.mui)",
+            170,
+            120,
+            [
+                ColumnList("ResourceListColumns", 1205, 10, 10, 150, 76, "Bus Number", "Interface Type"),
+                Button("DialogPrimary", 1, okText, 37, 96, 40, 14),
+                Button("ResourceDisplay", 1203, displayText, 93, 96, 40, 14),
+            ])
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
+    /// <summary>
+    /// Resources (RT_DIALOG 1305): one full resource descriptor with five column lists (DMA, Interrupt, Memory, Port,
+    /// Device specific), the Share Disposition frame, and the Data... button. 281 x 308 DLU.
+    /// </summary>
+    public static ClassicDialogDefinition ResourceDescriptor(string caption, string okText, string dataText) =>
+        new(
+            caption,
+            "RT_DIALOG 1305 (en-US regedit.exe.mui)",
+            281,
+            308,
+            [
+                ColumnList("DmaColumns", 1306, 10, 15, 261, 36, "Channel", "Port"),
+                ColumnList("InterruptColumns", 1307, 10, 63, 261, 36, "Vector", "Level", "Affinity", "Type"),
+                ColumnList("MemoryColumns", 1308, 10, 111, 261, 36, "Physical Address", "Length", "Access"),
+                ColumnList("PortColumns", 1309, 10, 159, 261, 36, "Physical Address", "Length", "Type"),
+                ColumnList("DeviceSpecificColumns", 1304, 10, 207, 261, 36, "Reserved1", "Reserved2", "Data Size"),
+                StaticText("DmaLabel", 65535, "DMA:", 10, 5, 20, 8),
+                StaticText("InterruptLabel", 65535, "Interrupt:", 10, 53, 35, 8),
+                StaticText("MemoryLabel", 65535, "Memory:", 10, 101, 28, 8),
+                StaticText("PortLabel", 65535, "Port:", 10, 149, 17, 8),
+                StaticText("DeviceSpecificLabel", 65535, "Device Specific Data:", 10, 197, 74, 8),
+                Group("ShareDispositionGroup", "Share Disposition", 10, 244, 125, 39),
+                StaticText("ShareUndetermined", 1310, "Undetermined", 18, 255, 46, 8, disabled: true),
+                StaticText("ShareShared", 1311, "Shared", 18, 265, 24, 8, disabled: true),
+                StaticText("ShareDeviceExclusive", 1312, "Device Exclusive", 72, 255, 58, 8, disabled: true),
+                StaticText("ShareDriverExclusive", 1313, "Driver Exclusive", 72, 265, 54, 8, disabled: true),
+                StaticText("InterfaceTypeLabel", 65535, "Interface Type:", 151, 245, 51, 8),
+                StaticText("BusNumberLabel", 65535, "Bus Number:", 151, 255, 51, 8),
+                StaticText("VersionLabel", 65535, "Version:", 151, 265, 51, 8),
+                StaticText("RevisionLabel", 65535, "Revision:", 151, 275, 51, 8),
+                StaticText("InterfaceTypeValue", 1303, string.Empty, 205, 245, 66, 8),
+                StaticText("BusNumberValue", 1300, string.Empty, 205, 255, 66, 8),
+                StaticText("VersionValue", 1301, string.Empty, 205, 265, 66, 8),
+                StaticText("RevisionValue", 1302, string.Empty, 205, 275, 66, 8),
+                Button("DialogPrimary", 1, okText, 92, 288, 40, 14, isDefault: true),
+                Button("ResourceData", 1204, dataText, 148, 288, 40, 14),
+            ])
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
+    /// <summary>Requirements List (RT_DIALOG 1501): the requirement column list, the bus fields, and
+    /// Display... 220 x 135 DLU.</summary>
+    public static ClassicDialogDefinition ResourceRequirements(string caption, string okText, string displayText) =>
+        new(
+            caption,
+            "RT_DIALOG 1501 (en-US regedit.exe.mui)",
+            220,
+            135,
+            [
+                ColumnList("RequirementColumns", 1502, 10, 10, 200, 66, "Alternative List", "Resource List", "Descriptor", "Device Type"),
+                StaticText("InterfaceTypeLabel", 65535, "Interface Type:", 10, 80, 51, 8),
+                StaticText("BusNumberLabel", 65535, "Bus Number:", 10, 90, 51, 8),
+                StaticText("SlotNumberLabel", 65535, "Slot Number:", 10, 100, 51, 8),
+                StaticText("InterfaceTypeValue", 1503, string.Empty, 64, 80, 66, 8),
+                StaticText("BusNumberValue", 1504, string.Empty, 64, 90, 66, 8),
+                StaticText("SlotNumberValue", 1505, string.Empty, 64, 100, 66, 8),
+                Button("DialogPrimary", 1, okText, 62, 115, 40, 14),
+                Button("RequirementDisplay", 1506, displayText, 118, 115, 40, 14),
+            ])
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
+    /// <summary>
+    /// One requirement descriptor (RT_DIALOG 1601 Memory, 1700 Port, 1800 Interrupt, 1900 DMA). The field
+    /// set comes from the
+    /// kind. The Preferred and Alternative captions are template-disabled, so they are shown disabled. 158 x 135 DLU.
+    /// </summary>
+    public static ClassicDialogDefinition ResourceDetail(string caption, ResourceDetailKind kind, string okText) =>
+        new(
+            caption,
+            DetailSource(kind),
+            158,
+            135,
+            DetailControls(kind, okText))
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
+    private static string DetailSource(ResourceDetailKind kind) => kind switch
+    {
+        ResourceDetailKind.Memory => "RT_DIALOG 1601 (en-US regedit.exe.mui)",
+        ResourceDetailKind.Port => "RT_DIALOG 1700 (en-US regedit.exe.mui)",
+        ResourceDetailKind.Interrupt => "RT_DIALOG 1800 (en-US regedit.exe.mui)",
+        _ => "RT_DIALOG 1900 (en-US regedit.exe.mui)",
+    };
+
+    private static ClassicControlDefinition[] DetailControls(ResourceDetailKind kind, string okText)
+    {
+        var common = new List<ClassicControlDefinition>
+        {
+            Button("DialogPrimary", 1, okText, 58, 117, 40, 14, isDefault: true),
+            Group("OptionGroup", "Option", 10, 72, 83, 39),
+            StaticText("PreferredText", 2001, "Preferred", 34, 96, 37, 8, disabled: true),
+            StaticText("AlternativeText", 2002, "Alternative", 34, 86, 35, 8, disabled: true),
+        };
+        switch (kind)
+        {
+            case ResourceDetailKind.Memory:
+                common.AddRange(
+                [
+                    StaticText("AccessLabel", 65535, "Access:", 10, 10, 61, 8),
+                    StaticText("LengthLabel", 65535, "Length:", 10, 20, 61, 8),
+                    StaticText("AlignmentLabel", 65535, "Alignment:", 10, 30, 61, 8),
+                    StaticText("MinimumAddressLabel", 65535, "Minimum Address:", 10, 40, 61, 8),
+                    StaticText("MaximumAddressLabel", 65535, "Maximum Address:", 10, 50, 61, 8),
+                    StaticText("ShareDispositionLabel", 65535, "Share Disposition:", 10, 60, 61, 8),
+                    StaticText("AccessValue", 1602, string.Empty, 73, 10, 74, 8),
+                    StaticText("LengthValue", 1603, string.Empty, 73, 20, 74, 8),
+                    StaticText("AlignmentValue", 1606, string.Empty, 73, 30, 74, 8),
+                    StaticText("MinimumAddressValue", 1604, string.Empty, 73, 40, 74, 8),
+                    StaticText("MaximumAddressValue", 1605, string.Empty, 73, 50, 74, 8),
+                    StaticText("ShareDispositionValue", 2000, string.Empty, 73, 60, 74, 8),
+                ]);
+                break;
+            case ResourceDetailKind.Port:
+                common.AddRange(
+                [
+                    StaticText("TypeLabel", 65535, "Type:", 10, 10, 61, 8),
+                    StaticText("LengthLabel", 65535, "Length:", 10, 20, 61, 8),
+                    StaticText("AlignmentLabel", 65535, "Alignment:", 10, 30, 61, 8),
+                    StaticText("MinimumAddressLabel", 65535, "Minimum Address:", 10, 40, 61, 8),
+                    StaticText("MaximumAddressLabel", 65535, "Maximum Address:", 10, 50, 61, 8),
+                    StaticText("ShareDispositionLabel", 65535, "Share Disposition:", 10, 60, 61, 8),
+                    StaticText("TypeValue", 1701, string.Empty, 73, 10, 74, 8),
+                    StaticText("LengthValue", 1703, string.Empty, 73, 20, 74, 8),
+                    StaticText("AlignmentValue", 1706, string.Empty, 73, 30, 74, 8),
+                    StaticText("MinimumAddressValue", 1704, string.Empty, 73, 40, 74, 8),
+                    StaticText("MaximumAddressValue", 1705, string.Empty, 73, 50, 74, 8),
+                    StaticText("ShareDispositionValue", 2000, string.Empty, 73, 60, 74, 8),
+                ]);
+                break;
+            case ResourceDetailKind.Interrupt:
+                common.AddRange(
+                [
+                    StaticText("TypeLabel", 65535, "Type:", 10, 10, 61, 8),
+                    StaticText("MinimumVectorLabel", 65535, "Minimum Vector:", 10, 20, 61, 8),
+                    StaticText("MaximumVectorLabel", 65535, "Maximum Vector:", 10, 30, 61, 8),
+                    StaticText("ShareDispositionLabel", 65535, "Share Disposition:", 10, 40, 61, 8),
+                    StaticText("TypeValue", 1801, string.Empty, 73, 10, 74, 8),
+                    StaticText("MinimumVectorValue", 1803, string.Empty, 73, 20, 74, 8),
+                    StaticText("MaximumVectorValue", 1804, string.Empty, 73, 30, 74, 8),
+                    StaticText("ShareDispositionValue", 2000, string.Empty, 73, 40, 74, 8),
+                ]);
+                break;
+            default:
+                common.AddRange(
+                [
+                    StaticText("MinimumChannelLabel", 65535, "Minimum Channel:", 10, 10, 61, 8),
+                    StaticText("MaximumChannelLabel", 65535, "Maximum Channel:", 10, 20, 61, 8),
+                    StaticText("ShareDispositionLabel", 65535, "Share Disposition:", 10, 30, 61, 8),
+                    StaticText("MinimumChannelValue", 1902, string.Empty, 73, 10, 74, 8),
+                    StaticText("MaximumChannelValue", 1903, string.Empty, 73, 20, 74, 8),
+                    StaticText("ShareDispositionValue", 2000, string.Empty, 73, 30, 74, 8),
+                ]);
+                break;
+        }
+
+        return common.ToArray();
+    }
+
+    private static ClassicControlDefinition StaticText(
+        string automationId,
+        int id,
+        string text,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        bool disabled = false) =>
+        new(ClassicControlKind.Label, id, automationId, text, x, y, cx, cy)
+        {
+            Disabled = disabled,
+        };
+
+    private static ClassicControlDefinition ColumnList(
+        string automationId,
+        int id,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        params string[] columns) =>
+        new(ClassicControlKind.ColumnList, id, automationId, string.Empty, x, y, cx, cy)
+        {
+            TabStop = true,
+            Columns = columns,
         };
 
     private static ClassicControlDefinition MultiLineEdit(string automationId, int id, int x, int y, int cx, int cy) =>
