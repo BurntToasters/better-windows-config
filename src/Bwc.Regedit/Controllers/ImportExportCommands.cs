@@ -91,15 +91,12 @@ internal sealed class ImportExportCommands
         await ImportFileAsync(filePath);
     }
 
+    /// <summary>
+    /// File > Import. The file is chosen first. A .reg file asks dialog 115 for its computer when at least one computer
+    /// is connected. A binary hive restores locally, because hive operations are refused on a remote store.
+    /// </summary>
     private async Task ImportAsync()
     {
-        if (RegeditSelectionGuards.IsRemoteSelected(_context))
-        {
-            // Remote computers are read-only in this version, so an import never targets one.
-            await _context.ShowMessageAsync(Get("DialogRemoteReadOnly"));
-            return;
-        }
-
         ImportFileDialogResult? choice = RegeditFileDialogs.ShowImport(_context);
         if (choice is null)
         {
@@ -108,11 +105,69 @@ internal sealed class ImportExportCommands
 
         if (choice.Format == ImportFileFormat.Hive)
         {
+            if (RegeditSelectionGuards.IsRemoteSelected(_context))
+            {
+                // A hive restore runs onto a local key. The remote store refuses hive operations (section 15.4).
+                await _context.ShowMessageAsync(Get("DialogRemoteReadOnly"));
+                return;
+            }
+
             await RestoreHiveAsync(choice.FilePath);
             return;
         }
 
-        await ImportFileAsync(choice.FilePath);
+        RemoteRegistryConnection? target = null;
+        if (_context.RemoteConnections.Count > 0)
+        {
+            (bool chosen, RemoteRegistryConnection? connection) = await ChooseImportTargetAsync();
+            if (!chosen)
+            {
+                return;
+            }
+
+            target = connection;
+        }
+
+        await ImportFileAsync(choice.FilePath, target);
+    }
+
+    /// <summary>
+    /// Dialog 115: the computer a .reg file is imported into. The local computer is first and selected. Returns
+    /// chosen false when the user cancelled. The connection is null for the local computer.
+    /// </summary>
+    private async Task<(bool Chosen, RemoteRegistryConnection? Connection)> ChooseImportTargetAsync()
+    {
+        string localName = Environment.MachineName;
+        var names = new List<string> { localName };
+        names.AddRange(_context.RemoteConnections.Select(open => open.ComputerName));
+
+        var dialog = new ImportComputerDialog(
+            Get("MsgImportRegistryFileCaption"),
+            Get("ImportComputerLabel"),
+            names,
+            Get("DialogOk"),
+            Get("DialogCancel"));
+
+        if (!await _context.ShowDialogAsync(dialog))
+        {
+            return (false, null);
+        }
+
+        string selected = dialog.SelectedName;
+        if (string.Equals(selected, localName, StringComparison.OrdinalIgnoreCase))
+        {
+            return (true, null);
+        }
+
+        RemoteRegistryConnection? connection = _context.RemoteConnections.FirstOrDefault(candidate =>
+            string.Equals(candidate.ComputerName, selected, StringComparison.OrdinalIgnoreCase));
+        if (connection is null)
+        {
+            Log.Warn($"Registry Editor could not find the selected import target '{selected}'.");
+            return (false, null);
+        }
+
+        return (true, connection);
     }
 
     /// <summary>
@@ -170,12 +225,22 @@ internal sealed class ImportExportCommands
     /// Cancel button and no close box, so the import always runs to the end. The importer runs on the
     /// thread pool and reports sections to the window. A skipped line does not change the result. A
     /// refused file shows its own text, and a rejected write shows string 132. The import keeps going
-    /// after a rejected write, as classic regedit does.
+    /// after a rejected write, as classic regedit does. A remote target writes through its connection. A missing file
+    /// shows string 135, and a registry that cannot be read shows string 131, both with the computer name.
     /// </summary>
-    private async Task ImportFileAsync(string filePath)
+    private async Task ImportFileAsync(string filePath, RemoteRegistryConnection? target = null)
     {
         string caption = Get("MsgCaptionRegistryEditor");
         string? selectedPath = _context.Shell.TreeContent.SelectedNode?.RegistryPath;
+
+        if (target is not null && !File.Exists(filePath))
+        {
+            Log.Warn($"Registry Editor could not import '{filePath}' into '{target.ComputerName}': the file does not exist.");
+            await _context.ShowMessageAsync(
+                caption,
+                string.Format(CultureInfo.CurrentCulture, Get("MsgImportRemoteFileMissing"), filePath, target.ComputerName));
+            return;
+        }
 
         RegeditContext.Pane focusBefore = _context.FocusedPane();
         ImportProgressDialog? progress = OpenImportProgress(filePath);
@@ -184,12 +249,17 @@ internal sealed class ImportExportCommands
             new Progress<ImportProgress>(update => progress?.SetProgress(update.CompletedSections, update.TotalSections)));
 
         // The import runs under the write gate: the owner is disabled and a close request is held until it ends.
-        Task<RegFileImportResult> importTask = _context.RunRegistryWriteAsync(
-            () => RegFileImporter.ApplyFile(
-                RegeditWritePolicy.CreateStore(),
-                filePath,
-                CancellationToken.None,
-                progressSink));
+        RegistryStore store = target is null ? RegeditWritePolicy.CreateStore() : _context.StoreFor(target);
+        Task<RegFileImportResult> importTask = _context.RunRegistryWriteAsync(() =>
+        {
+            if (target is not null)
+            {
+                // Reading HKEY_USERS first makes a connection that cannot be read fail before any write (string 131).
+                _ = store.Reader.KeyExists(RegistryPath.Parse("HKEY_USERS"));
+            }
+
+            return RegFileImporter.ApplyFile(store, filePath, CancellationToken.None, progressSink);
+        });
 
         RegFileImportResult? result = null;
         Exception? error = null;
@@ -210,6 +280,15 @@ internal sealed class ImportExportCommands
 
         if (error is not null)
         {
+            if (target is not null && IsRemoteAccessFailure(error))
+            {
+                Log.Warn($"Registry Editor could not import '{filePath}' into '{target.ComputerName}': {error.GetType().Name}: {error.Message}");
+                await _context.ShowErrorAsync(new ClassicMessage(
+                    caption,
+                    string.Format(CultureInfo.CurrentCulture, Get("MsgImportRemoteAccess"), filePath, target.ComputerName)).ToErrorDialog());
+                return;
+            }
+
             if (IsFileOperationFailure(error))
             {
                 LogFileOperationFailure("import", filePath, error);
@@ -223,10 +302,20 @@ internal sealed class ImportExportCommands
 
         RegFileImportReport.LogOutcome(filePath, result!);
         await RefreshAfterImportAsync(selectedPath);
-        await _context.ShowMessageAsync(
-            caption,
-            string.Format(CultureInfo.CurrentCulture, Get(RegFileImportReport.MessageKey(result!)), filePath));
+
+        // A remote import that succeeded names the computer (string 128). Every other outcome uses the local text.
+        string message = target is not null && !RegFileImportReport.IsFailure(result!)
+            ? string.Format(CultureInfo.CurrentCulture, Get("MsgImportRemoteSucceeded"), filePath, target.ComputerName)
+            : string.Format(CultureInfo.CurrentCulture, Get(RegFileImportReport.MessageKey(result!)), filePath);
+        await _context.ShowMessageAsync(caption, message);
     }
+
+    /// <summary>
+    /// True when a remote import could not reach the registry: a failed read of the connection
+    /// (RegistryOperationException) or a disposed connection (ObjectDisposedException). Both come before any write.
+    /// </summary>
+    private static bool IsRemoteAccessFailure(Exception exception) =>
+        exception is RegistryOperationException or ObjectDisposedException;
 
     /// <summary>
     /// Shows the DLG-019 window and marks a dialog open, as ShowDialogAsync does for a modal dialog. When the

@@ -27,21 +27,20 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | --- | --- | --- | --- |
 | MENU | 36 | 0 | 1 |
 | CTX | 41 | 0 | 0 |
-| DLG | 38 | 5 | 8 |
+| DLG | 40 | 5 | 6 |
 | ACC | 27 | 0 | 1 |
-| MSG | 172 | 44 | 60 |
+| MSG | 174 | 45 | 57 |
 | VIEW | 18 | 2 | 1 |
-| BEH | 39 | 5 | 5 |
+| BEH | 40 | 5 | 4 |
 | EXP | 32 | 0 | 0 |
-| All (535) | 403 | 56 | 76 |
+| All (535) | 408 | 57 | 70 |
 
 ## Gaps by piece
 
 | Piece | Rows |
 | --- | --- |
-| F2 | DLG-023, DLG-035, DLG-036, MSG-022, MSG-052, MSG-053, MSG-060, MSG-061, MSG-062, MSG-066, MSG-109, MSG-110, MSG-111, VIEW-009, BEH-009, BEH-043 |
+| F2 | DLG-023, DLG-035, DLG-036, MSG-022, MSG-052, MSG-053, MSG-060, MSG-061, MSG-062, MSG-066, MSG-072, MSG-109, MSG-110, MSG-111, VIEW-009, BEH-009, BEH-043 |
 | P1 | MENU-009, DLG-009, DLG-015, DLG-016, ACC-011, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276, BEH-027 |
-| R2 | DLG-031, DLG-032, MSG-021, MSG-069, MSG-072, MSG-073, BEH-025 |
 | S1 | MSG-174, MSG-175, MSG-176, MSG-177, MSG-179, MSG-181, MSG-182, MSG-183, MSG-184, MSG-185, MSG-187, MSG-188, MSG-189, MSG-190, BEH-026 |
 
 ## Rows
@@ -168,8 +167,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | DLG-028 | pass | ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates |  |
 | DLG-029 | pass | ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates |  |
 | DLG-030 | pass | ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates |  |
-| DLG-031 | gap | Remote import target picker (115) missing; strings 131 and 135 show classic imports to a chosen computer | R2 |
-| DLG-032 | gap | Remote import target picker (115) missing; strings 131 and 135 show classic imports to a chosen computer | R2 |
+| DLG-031 | pass | Remote_ImportWritesThroughTheConnection; Remote_ImportCancelImportsNothing; Remote_ImportMixedRootsReportsStringOneThirtyTwo (dialog 115 picks the target computer after the file, only while a remote computer is connected) |  |
+| DLG-032 | pass | Remote_ImportWritesThroughTheConnection; Remote_ImportCancelImportsNothing; Remote_ImportMixedRootsReportsStringOneThirtyTwo (dialog 115 picks the target computer after the file, only while a remote computer is connected) |  |
 | DLG-033 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests (regedit-resource-viewers.json: Enter opens the viewer; the Display... rule after a selection is not measured, a capture limit) |  |
 | DLG-034 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests (regedit-resource-viewers.json: Enter opens the viewer; the Display... rule after a selection is not measured, a capture limit) |  |
 | DLG-035 | gap | QWORD editor layout not asserted; overflow string 120 not in the source | F2 |
@@ -247,7 +246,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-018 | declared-difference | Classic shows string 19 (Computer) as the root in this build (regedit-100dpi.png); 34 is never shown (OQ-40) |  |
 | MSG-019 | pass | String parity check: text equal (MsgRegistryEditingDisabled) |  |
 | MSG-020 | pass | String parity check: text equal (DialogFindFinished) |  |
-| MSG-021 | gap | Select Computer picker missing | R2 |
+| MSG-021 | declared-difference | BWC opens the system object picker (Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection), which shows its own prompt text; the classic hint string is not passed to it |  |
 | MSG-022 | gap | Text not found verbatim in the source; check and fix | F2 |
 | MSG-023 | pass | String parity check: text equal (MsgDeleteKeyConfirm) |  |
 | MSG-024 | pass | String parity check: text equal (MsgCaptionConfirmKeyDelete) |  |
@@ -295,11 +294,11 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-066 | gap | Text not found verbatim in the source; check and fix | F2 |
 | MSG-067 | pass | String parity check: text equal (MsgImportOpenFailed) |  |
 | MSG-068 | pass | String parity check: text equal (MsgImportReadFailed) |  |
-| MSG-069 | gap | Remote import messages missing | R2 |
+| MSG-069 | pass | String parity check: text equal (MsgImportRemoteAccess) |  |
 | MSG-070 | pass | String parity check: text equal (MsgImportPartial) |  |
 | MSG-071 | pass | String parity check: text equal (MsgImportNotRegistryFile) |  |
-| MSG-072 | gap | Remote import messages missing | R2 |
-| MSG-073 | gap | Remote import messages missing | R2 |
+| MSG-072 | gap | When classic shows 134 (a file not meant for this version) is not measured; BWC reports such files with 133 | F2 |
+| MSG-073 | pass | String parity check: text equal (MsgImportRemoteFileMissing) |  |
 | MSG-074 | pass | String parity check: text equal (MsgExportOpenFailed) |  |
 | MSG-075 | pass | String parity check: text equal (MsgExportWriteFailed) |  |
 | MSG-076 | pass | String parity check: text equal (MsgExportPrivileges) |  |
@@ -558,7 +557,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | BEH-022 | pass | AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
 | BEH-023 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus (only HKEY_LOCAL_MACHINE and HKEY_USERS); Remote_DisconnectDialogRemovesComputer; every command on remote keys: Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox, Remote_FindLocatesRemoteValue, Remote_ExportBranchMatchesLocalExport, Remote_AddressBarNavigatesToRemotePath |  |
 | BEH-024 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus (only HKEY_LOCAL_MACHINE and HKEY_USERS); Remote_DisconnectDialogRemovesComputer; every command on remote keys: Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox, Remote_FindLocatesRemoteValue, Remote_ExportBranchMatchesLocalExport, Remote_AddressBarNavigatesToRemotePath |  |
-| BEH-025 | gap | Own-computer refusal (153) and connect failures (154 to 156) have engine tests only; the connect UI tests come with the picker | R2 |
+| BEH-025 | pass | Remote_ConnectOwnComputerShowsStringOneFiftyThree; Remote_ConnectUnreachableShowsStringOneFiftyFour; 155 and 156 are reviewed in code, not automated (no way to reach half a computer from this machine) |  |
 | BEH-026 | gap | Cancel and replace-children tested; owner, auditing, effective access and prompts 7015 to 7018 missing | S1 |
 | BEH-027 | gap | Range panel, progress and print output missing (OQ-44) | P1 |
 | BEH-028 | pass | Tree_RightAndLeftArrowSemantics; Tree_NumpadKeysAndPageKeys |  |
@@ -628,7 +627,7 @@ open here until that measurement is in `docs/parity/oracle/`.
 
 | OQ | Answer or owner |
 | --- | --- |
-| OQ-01 | Dialog 107 is Disconnect Network Registry. Dialog 115 (caption Import Registry File) picks the target computer for an import while remote computers are connected; strings 131 and 135 name that computer. Confirm with a loopback connection (O1); built by R2. |
+| OQ-01 | Dialog 107 is Disconnect Network Registry. Dialog 115 (caption Import Registry File) picks the target computer for an import while remote computers are connected; strings 131 and 135 name that computer. The classic connect could not be automated (OQ-45), so this follows the resources; BWC is tested over a loopback connection (Remote_DisconnectDialogRemovesComputer, Remote_ImportWritesThroughTheConnection). |
 | OQ-02 | RT_MENU 108 is the context menu of the hex area in Edit Binary Value. The address bar, Find what and Edit String data boxes show the system edit menu (regedit-context.json). Built by K1. |
 | OQ-03 | The Computer root shows RT_MENU 107. Hive and key menus show RT_MENU 104 as measured. The value menu (105) is the same for every type (regedit-context.json). Remote menus: not measured (the connect could not be automated); R2 follows the resources. |
 | OQ-04 | 640 and 641 are Tab and Shift+Tab (Shell_TabCyclesTreeListAddressBar, Shell_ShiftTabReversesCycle). 672 focuses the address bar (Shell_CtrlLAndAltDFocusAddressBar). 642 (F4) focuses the address bar and opens its suggestions; 698 (Alt+Up) selects the parent key; 896 (Shift+F10) opens the context menu; 689 to 697 (Alt+1 to Alt+9) change nothing (regedit-keys.json). |
@@ -672,7 +671,7 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-42 | BWC uses the OS ACL editor (Permissions tests). Owner, auditing, effective access and the prompts for strings 7015 to 7018: S1. |
 | OQ-43 | Favorites_AddRemoveNavigateAndReportMissingPath (duplicate name refused, no confirmation on Remove). |
 | OQ-44 | Not measured: on this build classic opens the Windows print host, whose default view has no range controls, and the default printer is a physical printer, so nothing was printed (regedit-print.json). P1 follows templates 105 and 108. |
-| OQ-45 | Classic opens the system object picker (RichEdit name box); typing into it could not be automated, so the connect is not measured (regedit-remote.json). R2 follows the resources. |
+| OQ-45 | Classic opens the system object picker (RichEdit name box); typing into it could not be automated, so the connect is not measured (regedit-remote.json). BWC opens the same system picker (Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection) and falls back to a name prompt when the picker cannot run. |
 | OQ-46 | CommandLine_SilentImportExitCodesFollowTheResult; CommandLine_ExportsImportsAndRejectsOutsideSandbox. |
 | OQ-47 | The name box is read-only in every value editor (ClassicDialogs_EditStringAndDwordFollowTheTemplate). |
 | OQ-48 | Navigation_ShowsRootsAndRestoresLastKey; Basics_CopyKeyNameAndF5KeepTheView. |

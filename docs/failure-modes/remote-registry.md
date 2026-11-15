@@ -3,9 +3,9 @@
 Scope: `RemoteRegistryConnection` in `src/Bwc.Registry`, the remote root routing in
 `RegistryReader`, the File > Connect Network Registry and File > Disconnect Network Registry
 commands, the remote computer nodes in the Registry Editor tree, and the remote write store (section 15).
-Section 16 covers the Registry Editor commands on a remote key (R2a). Import, Load Hive, and Unload Hive stay
-local-only until R2b. The engine can write a remote computer only through `RemoteRegistryConnection.CreateStore`
-and an explicit write policy.
+Section 16 covers the Registry Editor commands on a remote key (R2a). Section 17 covers the Connect picker, the
+connect error text, and Import into a connected computer (R2b). Load Hive and Unload Hive stay local-only. The
+engine can write a remote computer only through `RemoteRegistryConnection.CreateStore` and an explicit write policy.
 
 ## 1. Operation order
 
@@ -104,7 +104,8 @@ disconnects it or closes the window, but its reads fail with the connection erro
 
 The command is always enabled. The flow is:
 
-1. Show an owned dialog with a computer name text box, OK, and Cancel.
+1. Show the computer picker, owned by the main window (section 17.1). Only when the picker cannot run, show an owned
+   dialog with a computer name text box, OK, and Cancel.
 2. If the user cancels, return without changing the tree.
 3. Reject an empty or invalid name in the dialog, without closing it.
 4. Reject the local computer with `MSG-083`.
@@ -134,8 +135,9 @@ and never touches a local key.
 ## 10. Menu and selection state
 
 `UpdateCommandStates` enables Connect Network Registry at all times. Disconnect Network Registry is
-enabled only when the connection list is non-empty. Edit, Delete, Rename, Import, Permissions,
-Print, and Export stay disabled for remote selections because `TryGetSelectedKeyPath` does not parse
+enabled only when the connection list is non-empty. File > Import is always enabled and asks for its computer
+(section 17.3). Edit, Delete, Rename, Permissions, Print, and Export stay disabled for remote selections because
+`TryGetSelectedKeyPath` does not parse
 a remote display path. Favorites may still be added for a remote path only if the path resolves;
 otherwise the normal "key not found" error is shown.
 
@@ -335,3 +337,73 @@ Ways a remote command can fail, and the expected result:
 Check status: the loopback E2E tests need the Remote Registry service to start on connect. A connect that fails
 records `not run: remote registry unavailable (Win32 <code>)` as Inconclusive and does not fail the run (the
 `ConnectOrSkip` rule of section 15).
+
+## 17. Connect picker, connect errors, and Import into a connected computer (R2b)
+
+Scope: File > Connect Network Registry (the computer picker that replaces the text prompt of section 8, and
+the connect error text), and File > Import of a .reg file into a connected computer. Load Hive, Unload Hive,
+and Print stay local. A binary hive file restores locally, as before.
+
+The E2E build reads `BWC_E2E_CONNECT_TARGET`. When it is set, Connect skips the picker and uses that name.
+A shipping build ignores the variable.
+
+### 17.1 Connect picker
+
+The picker is the system object picker (`IDsObjectPicker`, computers only, single select). It has three scopes:
+the target computer, the workgroup, and the joined domains. It is owned by the main window. Cancel leaves no
+connection. A picker that cannot be created or initialized falls back to the text prompt of section 8.
+
+Status (R2b): the picker opens with the caption `Select Computer`. The first failure was the struct layout:
+`DSOP_FILTER_FLAGS` puts the uplevel flags first (objsel.h), and the first build had the downlevel field first, so
+`Initialize` returned E_INVALIDARG (0x80070057). The picker uses two scopes, the downlevel scope (workgroup) and the
+uplevel scope, both with the computer filter. Any failure before or after the picker shows falls back to the text
+prompt, logged, with no error box. The struct sizes are asserted at startup in E2E builds (56 and 48).
+
+| Way it could fail | Expected result | Test |
+| --- | --- | --- |
+| File > Connect opens the picker | Caption `Select Computer`. Owned by the main window. Main window disabled while it is open | `Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection` |
+| Picker cancelled (`S_FALSE`) | No connection, no tree node, main window enabled, Disconnect still disabled | `Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection` |
+| Picker class not registered, or activation throws | The text prompt of section 8 opens. Connect continues as before | Not automated: needs an unregistered COM class. Reviewed in code (`ComputerPicker` returns Unavailable) |
+| `Initialize` fails | Same as the row above | Not automated. Reviewed in code |
+| Picker returns no selection (empty `DS_SELECTION_LIST`) | Treated as cancel | Not automated. Reviewed in code |
+| Picker returns a name that is already connected | `That computer is already connected.` No second connection | Not automated. Reviewed in code |
+| Picker returns a name with a backslash or slash | Refused by the connect name rules, shown as string 154 | Not automated. Reviewed in code |
+| `BWC_E2E_CONNECT_TARGET` set in a shipping build | Ignored. The variable is read only under `BWC_E2E` | Code review (`#if BWC_E2E` in `HiveRemoteCommands`) |
+
+### 17.2 Connect errors (classic text)
+
+Classic text: RT_STRING 152 is the caption, 153 to 156 are the text. The text prompt used to refuse the own
+computer inline (`DialogConnectLocal`). Now the name goes to `RemoteRegistryConnection.Connect`, which refuses it
+with `OwnComputer` before any native call, and the error box shows 153.
+
+| Way it could fail | Expected result | Test |
+| --- | --- | --- |
+| Own computer name (E2E target is `Environment.MachineName`) | Error box, caption string 152, text string 153. No tree node | `Remote_ConnectOwnComputerShowsStringOneFiftyThree` |
+| Unreachable name (reserved `.invalid` host) | Error box with string 154 naming the computer, within 60 s. The UI thread stays responsive during the wait (`IsHungAppWindow` is false on every probe) | `Remote_ConnectUnreachableShowsStringOneFiftyFour` |
+| `RegConnectRegistry` returns access denied (5) | String 156 naming the computer | Not automated: needs a host that refuses the caller. `MessageCatalog.ForConnect` maps it |
+| HKEY_LOCAL_MACHINE connects, HKEY_USERS fails | String 155 (no computer name). The HKLM handle is closed first (section 5) | Not automated: needs a host with one root refused. `MessageCatalog.ForConnect` maps it |
+| Any other Win32 code from `RegConnectRegistry` | String 154 | Same as the unreachable row |
+
+### 17.3 Import into a connected computer
+
+Flow: File > Import shows the file dialog first. A .reg file then asks dialog 115 (caption `Import Registry File`,
+label `Select Computer:`) when at least one computer is connected. The list has the local computer first, then
+each connected computer. The local computer is selected. OK imports into the chosen target. Cancel imports
+nothing. A remote target writes through that connection's store, with the same write policy as section 16.
+Without connections, no dialog 115 appears. The second-launch and command-line .reg import stays local.
+
+| Way it could fail | Expected result | Test |
+| --- | --- | --- |
+| File > Import with no remote connection | No dialog 115. Unchanged | Existing local import checks in `ImportExportTests` |
+| Dialog 115 with one remote connection | Caption and label as above. List: local name, then `127.0.0.1`. Local selected. OK and Cancel | `Remote_ImportWritesThroughTheConnection` |
+| Cancel on dialog 115 | Nothing imported. No progress window. Main window enabled | `Remote_ImportCancelImportsNothing` |
+| Remote target, every section under `HKEY_USERS\SID` | Values written through the connection. Result is string 128 with the computer name. Values read back through the connection | `Remote_ImportWritesThroughTheConnection` |
+| Remote target, a section under `HKEY_CURRENT_USER` | That section is not written: the remote store has no HKCU root (section 6), so its write fails with `ArgumentException`, which the importer records as a rejected write. Other sections are still written. Result is string 132 | `Remote_ImportMixedRootsReportsStringOneThirtyTwo` |
+| Remote target, the .reg file is gone before the import starts | String 135 with the computer name. Nothing written | Not automated: the file dialog lists existing files only. Reviewed in code |
+| Remote target, the connection cannot read `HKEY_USERS` before the first write (`RegistryOperationException`), or was disposed before the import started | String 131 with the computer name. Nothing written. The read runs inside the write gate, and Disconnect is ignored while the gate is held | Not automated: needs a broken connection. Reviewed in code |
+| Remote target, rejected write on one key (access denied) | String 132, as for a local import. The import keeps going | Not automated for remote. `ImportResultTests` covers the local case |
+| Binary hive file chosen with a remote computer connected | No dialog 115. Local restore onto the selected local key, as before. A remote selected key shows `DialogRemoteReadOnly` | Not automated. Reviewed in code. Deviation: hive operations are refused on a remote store (section 15.4) |
+
+String 134 is not used. Its full text is "The specified file is not intended for use with this version of
+Windows." It describes the file, not the root. A key under a root the remote store does not have is a rejected
+write, which string 132 reports.

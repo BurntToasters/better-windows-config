@@ -30,7 +30,7 @@ public sealed class RemoteCommandTests
     private const string DialogRootId = "DialogRoot";
     private const string DialogPrimaryId = "DialogPrimary";
     private const string DialogErrorTextId = "DialogErrorText";
-    private const string ConnectInputId = "DialogTextInput";
+    private const string ConnectTargetVariable = "BWC_E2E_CONNECT_TARGET";
     private const string RemoteListId = "RemoteComputerList";
     private const string RemoteLabelId = "RemoteComputerLabel";
     private const string TreeRenameBoxId = "TreeRenameBox";
@@ -694,17 +694,7 @@ public sealed class RemoteCommandTests
             return new ConnectResult(false, null, "File > Connect Network Registry did not open.");
         }
 
-        if (!driver.WaitForDialog(TimeSpan.FromSeconds(10)))
-        {
-            return new ConnectResult(false, null, "The Connect Network Registry prompt did not open.");
-        }
-
-        bool submitted = driver.SetText(ConnectInputId, LoopbackComputer) && driver.Invoke(DialogPrimaryId);
-        if (!submitted)
-        {
-            return new ConnectResult(false, null, "The computer name could not be submitted to the prompt.");
-        }
-
+        // StartApp sets BWC_E2E_CONNECT_TARGET, so Connect skips the picker and connects to the loopback name.
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
         while (DateTime.UtcNow < deadline)
         {
@@ -793,6 +783,7 @@ public sealed class RemoteCommandTests
         {
             [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
             ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+            [ConnectTargetVariable] = LoopbackComputer,
         };
         return new AppSession(config, config.RegeditExePath, environment: environment);
     }

@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-using System.Text;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Dialogs;
 using Bwc.E2E.Editing;
@@ -12,10 +10,10 @@ using Microsoft.Win32;
 namespace Bwc.E2E.Remote;
 
 /// <summary>
-/// Drives File > Connect Network Registry on a non-elevated run. The test only opens and cancels
-/// the owned name prompt and rejects the local computer name before any native call. A real remote
-/// connection, remote browsing, and the disconnect list need a second computer or VM snapshot and
-/// are manual checks.
+/// Drives File > Connect Network Registry on a non-elevated run. The test opens the computer picker (the system
+/// object picker, caption "Select Computer"), checks that it is owned by the main window, and cancels it. A real
+/// remote connection, remote browsing, and the disconnect list need a second computer or VM snapshot and are manual
+/// checks. The connect error text and the Import flow are in RemoteConnectImportTests.
 /// </summary>
 [TestClass]
 public sealed class RemoteRegistryTests
@@ -23,9 +21,9 @@ public sealed class RemoteRegistryTests
     private const int MenuFile = 512;
     private const int CommandConnectNetworkRegistry = 657;
     private const int CommandDisconnectNetworkRegistry = 768;
-    private const string ConnectDialogTitle = "Connect Network Registry";
+    private const string PickerTitle = "Select Computer";
+    private const string LoopbackNode = @"\\127.0.0.1";
     private const string SeedValueName = "RemoteSeed";
-    private const string LocalComputerMessage = "You cannot connect to your own computer.";
 
     private static int _checkStart;
 
@@ -68,6 +66,8 @@ public sealed class RemoteRegistryTests
             }
 
             dataRoot = CreateFreshDataRoot(config, "remote");
+
+            // No BWC_E2E_CONNECT_TARGET: File > Connect must open the picker.
             var environment = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
@@ -102,28 +102,21 @@ public sealed class RemoteRegistryTests
                 menuOpened && connectEnabled && disconnectDisabled,
                 $"menu={menuOpened}, connectPresent={connectItem is not null}, connectEnabled={connectEnabled}, disconnectPresent={disconnectItem is not null}, disconnectDisabled={disconnectDisabled}.");
 
-            bool invoked = menuOpened && driver.Invoke("MenuCommand_" + CommandConnectNetworkRegistry);
-            bool dialogShown = invoked && driver.WaitForDialog(TimeSpan.FromSeconds(10));
-            nint dialog = dialogShown ? WaitForOwnedDialog(session, TimeSpan.FromSeconds(8)) : 0;
-            bool owned = dialog != 0 &&
-                Win32.GetWindow(dialog, Win32.GvOwner) == session.MainHwnd;
-            bool mainDisabled = dialog != 0 && !Win32.IsWindowEnabled(session.MainHwnd);
-            // The classic prompt has no heading. Its window title is the caption, and PromptLabel holds the label.
-            AutomationElement? promptRoot = dialogShown ? driver.WaitForElement("DialogRoot") : null;
-            string heading = promptRoot is null ? string.Empty : ControlTestSupport.SafeName(ClassicDialogTests.WindowOf(promptRoot));
-            string label = dialogShown ? driver.TextOf("PromptLabel") : string.Empty;
+            // The command opens a modal picker, so Invoke can report false while it is up. The window is awaited anyway.
+            _ = menuOpened && driver.Invoke("MenuCommand_" + CommandConnectNetworkRegistry);
+            nint picker = menuOpened ? RemoteWindows.WaitForOwnedWindow(session, PickerTitle, TimeSpan.FromSeconds(15)) : 0;
+            bool owned = picker != 0 && Win32.GetWindow(picker, Win32.GvOwner) == session.MainHwnd;
+            bool mainDisabled = picker != 0 && !Win32.IsWindowEnabled(session.MainHwnd);
+            string title = picker != 0 ? RemoteWindows.TitleOf(picker) : string.Empty;
             E2EResults.Record(
                 "remote.connect.dialog",
-                dialogShown &&
-                    owned &&
-                    mainDisabled &&
-                    string.Equals(heading, "Connect Network Registry", StringComparison.Ordinal) &&
-                    string.Equals(label, "Computer name:", StringComparison.Ordinal),
-                $"dialog={dialogShown}, hwnd=0x{dialog:X}, owned={owned}, mainDisabled={mainDisabled}, title='{heading}', label='{label}'.");
+                picker != 0 && owned && mainDisabled && string.Equals(title, PickerTitle, StringComparison.Ordinal),
+                $"picker={picker != 0}, hwnd=0x{picker:X}, owned={owned}, mainDisabled={mainDisabled}, caption='{title}'. " +
+                $"windows titled '{PickerTitle}': {RemoteWindows.DescribeWindowsTitled(session, PickerTitle)}.");
 
-            bool cancelled = dialogShown &&
-                driver.Invoke("DialogSecondary") &&
-                driver.WaitForNoDialog();
+            bool cancelled = picker != 0 &&
+                RemoteWindows.Close(picker) &&
+                ControlTestSupport.WaitUntil(() => !RemoteWindows.Exists(picker), TimeSpan.FromSeconds(10));
             bool enabledAgain = cancelled && ControlTestSupport.WaitUntil(
                 () => Win32.IsWindowEnabled(session.MainHwnd),
                 TimeSpan.FromSeconds(8));
@@ -134,45 +127,18 @@ public sealed class RemoteRegistryTests
                 $"cancelled={cancelled}, enabledAgain={enabledAgain}, disconnectStillDisabled={disconnectStillDisabled}.");
 
             E2EGuards.RequireSandboxSelection(session, sandbox, "remote.sandbox.connect");
-            bool secondMenu = TryOpenMenu(driver, MenuFile);
-            bool secondInvoked = secondMenu && driver.Invoke("MenuCommand_" + CommandConnectNetworkRegistry);
-            bool secondDialog = secondInvoked && driver.WaitForDialog(TimeSpan.FromSeconds(10));
-            bool typed = secondDialog && driver.SetText("DialogTextInput", Environment.MachineName);
-            bool submitted = typed && driver.Invoke("DialogPrimary");
-            bool localMessageShown = submitted && ControlTestSupport.WaitUntil(
-                () => string.Equals(
-                    driver.TextOf("DialogErrorText"),
-                    LocalComputerMessage,
-                    StringComparison.Ordinal),
-                TimeSpan.FromSeconds(10));
-            string validation = localMessageShown ? driver.TextOf("DialogErrorText") : string.Empty;
-            // The error is its own message box with OK focused. Enter closes it, and the prompt stays open.
-            bool errorDismissed = localMessageShown && driver.DismissErrorBox();
-            bool dialogStayedOpen = errorDismissed && driver.WaitForDialog(TimeSpan.FromSeconds(2));
-            bool localCancelled = dialogStayedOpen &&
-                driver.Invoke("DialogSecondary") &&
-                driver.WaitForNoDialog();
-            E2EResults.Record(
-                "remote.connect.local-rejected",
-                secondDialog && typed && submitted && localMessageShown && dialogStayedOpen && localCancelled,
-                $"dialog={secondDialog}, typed={typed}, submitted={submitted}, message='{validation}', stayedOpen={dialogStayedOpen}, cancelled={localCancelled}.");
-
-            bool mainEnabledAgain = localCancelled && ControlTestSupport.WaitUntil(
-                () => Win32.IsWindowEnabled(session.MainHwnd),
-                TimeSpan.FromSeconds(8));
-            string remoteNodeName = @"\\" + Environment.MachineName;
-            AutomationElement? remoteNode = mainEnabledAgain
+            AutomationElement? loopbackNode = enabledAgain
                 ? ControlTestSupport.FindRowByName(
                     session,
                     ControlTestSupport.TreeControl,
                     ControlType.TreeItem,
-                    remoteNodeName)
+                    LoopbackNode)
                 : null;
-            bool disconnectStillOff = mainEnabledAgain && IsDisconnectDisabled(session, driver);
+            bool noNode = enabledAgain && loopbackNode is null && IsDisconnectDisabled(session, driver);
             E2EResults.Record(
                 "remote.connect.no-connection",
-                mainEnabledAgain && remoteNode is null && disconnectStillOff,
-                $"mainEnabled={mainEnabledAgain}, nodePresent={remoteNode is not null}, nodeName='{remoteNodeName}', disconnectStillDisabled={disconnectStillOff}.");
+                noNode,
+                $"enabledAgain={enabledAgain}, node '{LoopbackNode}' present={loopbackNode is not null}, disconnect disabled={noNode}.");
 
             E2EResults.Note(
                 "remote.manual-browse-note",
@@ -241,44 +207,6 @@ public sealed class RemoteRegistryTests
         }
     }
 
-    private static nint WaitForOwnedDialog(AppSession session, TimeSpan timeout)
-    {
-        nint found = 0;
-        _ = ControlTestSupport.WaitUntil(
-            () => (found = FindOwnedDialog(session)) != 0,
-            timeout);
-        return found;
-    }
-
-    private static nint FindOwnedDialog(AppSession session)
-    {
-        nint found = 0;
-        _ = EnumWindows(
-            (window, _) =>
-            {
-                GetWindowThreadProcessId(window, out uint windowProcessId);
-                if (windowProcessId != (uint)session.ProcessId ||
-                    !IsWindowVisible(window) ||
-                    Win32.GetWindow(window, Win32.GvOwner) != session.MainHwnd ||
-                    !string.Equals(TitleOf(window), ConnectDialogTitle, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-
-                found = window;
-                return false;
-            },
-            IntPtr.Zero);
-
-        return found;
-    }
-
-    private static string TitleOf(nint window)
-    {
-        var buffer = new StringBuilder(256);
-        return GetWindowText(window, buffer, buffer.Capacity) > 0 ? buffer.ToString() : string.Empty;
-    }
-
     private static string CreateFreshDataRoot(E2EConfig config, string scope)
     {
         string path = config.DataRootFor(scope);
@@ -319,22 +247,4 @@ public sealed class RemoteRegistryTests
             failures.Count,
             $"Remote registry checks failed:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
     }
-
-    private delegate bool EnumWindowsProc(nint window, nint lParam);
-
-#pragma warning disable SYSLIB1054 // The small window discovery surface does not justify LibraryImport plumbing.
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool EnumWindows(EnumWindowsProc callback, nint lParam);
-
-    [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(nint window, out uint processId);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool IsWindowVisible(nint window);
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int GetWindowText(nint window, StringBuilder text, int maxCount);
-#pragma warning restore SYSLIB1054
 }

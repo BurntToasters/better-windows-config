@@ -8,10 +8,10 @@
     "src/**/*.cs (excluding bin and obj)"
   ],
   "counts": {
-    "equal": 166,
+    "equal": 169,
     "differs": 7,
     "template": 4,
-    "absent": 101
+    "absent": 98
   },
   "strings": [
     {
@@ -276,7 +276,7 @@
     },
     {
       "id": 128,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 129,
@@ -288,7 +288,7 @@
     },
     {
       "id": 131,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 132,
@@ -304,7 +304,7 @@
     },
     {
       "id": 135,
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": 138,
