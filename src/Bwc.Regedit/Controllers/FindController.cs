@@ -1,3 +1,4 @@
+using System.Security.Principal;
 using Bwc.Core;
 using Bwc.Regedit.Registry;
 using Bwc.Registry;
@@ -38,6 +39,70 @@ internal sealed class FindController
     }
 
     private string Get(string key) => _context.Messages.Get(key);
+
+    /// <summary>
+    /// The connected computer the current search runs on, or null for the local registry. It is the computer of the
+    /// selected tree node, so a search started on a remote key searches that computer and never the local one.
+    /// </summary>
+    private RemoteRegistryConnection? _findConnection;
+
+    /// <summary>The engine for a search: the local finder, or a finder that reads one connected computer.</summary>
+    private RegistryFinder FinderFor(RemoteRegistryConnection? connection) =>
+        connection is null ? _context.Finder : new RegistryFinder(connection.CreateReader());
+
+    /// <summary>
+    /// The roots a search covers. Locally, the normal roots (the E2E sandbox narrows them). On a remote computer, the
+    /// remote twin of the E2E sandbox, or the whole computer (HKEY_LOCAL_MACHINE and HKEY_USERS) in a ship build.
+    /// </summary>
+    private IReadOnlyList<RegistryPath>? RootsFor(RemoteRegistryConnection? connection)
+    {
+        if (connection is null)
+        {
+            return _context.FindRoots;
+        }
+
+#if BWC_E2E
+        string? configured = Environment.GetEnvironmentVariable("BWC_E2E_SANDBOX_ROOT");
+        if (!string.IsNullOrWhiteSpace(configured) &&
+            RegistryPath.TryParse(configured.Trim(), out RegistryPath? local) &&
+            local is { Root: RegistryRoot.CurrentUser })
+        {
+            // The same key as the sandbox, under HKEY_USERS\<current SID>, which is the only remote sandbox.
+            using WindowsIdentity identity = WindowsIdentity.GetCurrent();
+            RegistryPath remote = RegistryPath.Parse(@"HKU\" + identity.User!.Value);
+            foreach (string component in local.Components)
+            {
+                remote = remote.Append(component);
+            }
+
+            return new[] { remote };
+        }
+#endif
+        return new[] { RegistryPath.Parse("HKLM"), RegistryPath.Parse("HKU") };
+    }
+
+    /// <summary>The connection of the selected tree node: a remote computer node, or a key under one. Null for local.</summary>
+    private RemoteRegistryConnection? FindConnectionForSelection()
+    {
+        string? displayPath = _context.Shell.TreeContent.SelectedNode?.RegistryPath;
+        if (displayPath is not { Length: > 0 } || !displayPath.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        int separator = displayPath.IndexOf('\\', 2);
+        string prefix = separator < 0 ? displayPath : displayPath[..separator];
+        return _context.RemoteConnections.FirstOrDefault(connection =>
+            string.Equals(RemoteRegistryTreeSource.DisplayPrefix(connection.ComputerName), prefix, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>The display path of a hit: local, or under the computer the search runs on.</summary>
+    private string DisplayOfHit(RegistryFindHit hit) =>
+        _findConnection is null
+            ? hit.KeyPath.ToDisplayString()
+            : RemoteRegistryTreeSource.DisplayPathOf(
+                RemoteRegistryTreeSource.DisplayPrefix(_findConnection.ComputerName),
+                hit.KeyPath);
 
     public void Find() => _context.StartCommand(ShowFindDialogAsync);
 
@@ -96,14 +161,14 @@ internal sealed class FindController
     /// <summary>The selected key and value name (null for a key selection), or null when no key is selected.</summary>
     private (string Key, string? Value)? CurrentPosition()
     {
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
+        if (!_context.TryGetSelectedLocation(out KeyLocation location))
         {
             return null;
         }
 
         IReadOnlyList<DetailsRow> rows = _context.Shell.ListContent.SelectedRows;
         string? value = rows.Count > 0 && _context.TryGetRawValueName(rows[0], out string rawName) ? rawName : null;
-        return (key.ToDisplayString(), value);
+        return (location.DisplayPath, value);
     }
 
     private async Task ShowFindDialogAsync()
@@ -172,6 +237,9 @@ internal sealed class FindController
     /// </summary>
     private async Task RunFindAsync(FindDialogOptions options)
     {
+        // The search covers the computer of the selection. Find Next on a hit keeps the hit's computer, because the
+        // selection stays on that hit.
+        _findConnection = FindConnectionForSelection();
         if (!TryBuildQuery(options, out RegistryFindQuery? query) || query is null)
         {
             await ShowFindErrorAsync(Get("DialogFindNoScope"));
@@ -270,7 +338,7 @@ internal sealed class FindController
 
         Task<bool> dialogTask = _context.ShowDialogAsync(progress);
         Task<RegistryFindHit?> searchTask = _context.RunRegistryAsync(
-            () => _context.Finder.Find(query, cursor, cancellation.Token),
+            () => FinderFor(_findConnection).Find(query, cursor, cancellation.Token),
             cancellation.Token);
 
         RegistryFindHit? hit = null;
@@ -320,7 +388,7 @@ internal sealed class FindController
     /// </summary>
     private async Task<bool> ApplyFindHitAsync(RegistryFindHit hit, CancellationToken cancellationToken)
     {
-        string displayPath = hit.KeyPath.ToDisplayString();
+        string displayPath = DisplayOfHit(hit);
         TreeNode? node;
 
         try
@@ -372,8 +440,8 @@ internal sealed class FindController
     /// </summary>
     private bool SelectionMovedSinceHit(RegistryFindHit hit)
     {
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath key) ||
-            !string.Equals(key.ToDisplayString(), hit.KeyPath.ToDisplayString(), StringComparison.OrdinalIgnoreCase))
+        if (!_context.TryGetSelectedLocation(out KeyLocation location) ||
+            !string.Equals(location.DisplayPath, DisplayOfHit(hit), StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
@@ -395,10 +463,12 @@ internal sealed class FindController
 
     private RegistryFindCursor? CreateSelectionCursor()
     {
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
+        if (!_context.TryGetSelectedLocation(out KeyLocation location))
         {
             return null;
         }
+
+        RegistryPath key = location.Path;
 
         IReadOnlyList<DetailsRow> rows = _context.Shell.ListContent.SelectedRows;
         if (rows.Count > 0 && _context.TryGetRawValueName(rows[0], out string rawName))
@@ -427,7 +497,7 @@ internal sealed class FindController
                 options.LookAtData,
                 options.MatchWholeStringOnly,
                 options.SearchInSubtree,
-                _context.FindRoots);
+                RootsFor(_findConnection));
             return true;
         }
         catch (ArgumentException)
@@ -602,7 +672,8 @@ internal sealed class FindController
             return;
         }
 
-        settings.FindLastHitKey = hit.KeyPath.ToDisplayString();
+        // A hit on a connected computer is not restored after a restart, so its key is not saved.
+        settings.FindLastHitKey = _findConnection is null ? hit.KeyPath.ToDisplayString() : null;
         settings.FindLastHitValue = hit.ValueName;
         settings.FindLastHitKind = (int)hit.Kind;
         settings.FindLastHitText = hit.MatchedText;

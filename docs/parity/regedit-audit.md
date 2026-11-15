@@ -25,15 +25,15 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 
 | Section | pass | declared-difference | gap |
 | --- | --- | --- | --- |
-| MENU | 35 | 0 | 2 |
-| CTX | 37 | 0 | 4 |
-| DLG | 36 | 5 | 10 |
+| MENU | 36 | 0 | 1 |
+| CTX | 41 | 0 | 0 |
+| DLG | 38 | 5 | 8 |
 | ACC | 27 | 0 | 1 |
 | MSG | 172 | 44 | 60 |
 | VIEW | 18 | 2 | 1 |
-| BEH | 37 | 5 | 7 |
+| BEH | 39 | 5 | 5 |
 | EXP | 32 | 0 | 0 |
-| All (535) | 394 | 56 | 85 |
+| All (535) | 403 | 56 | 76 |
 
 ## Gaps by piece
 
@@ -41,7 +41,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | --- | --- |
 | F2 | DLG-023, DLG-035, DLG-036, MSG-022, MSG-052, MSG-053, MSG-060, MSG-061, MSG-062, MSG-066, MSG-109, MSG-110, MSG-111, VIEW-009, BEH-009, BEH-043 |
 | P1 | MENU-009, DLG-009, DLG-015, DLG-016, ACC-011, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276, BEH-027 |
-| R2 | MENU-008, CTX-032, CTX-033, CTX-034, CTX-035, DLG-013, DLG-014, DLG-031, DLG-032, MSG-021, MSG-069, MSG-072, MSG-073, BEH-023, BEH-024, BEH-025 |
+| R2 | DLG-031, DLG-032, MSG-021, MSG-069, MSG-072, MSG-073, BEH-025 |
 | S1 | MSG-174, MSG-175, MSG-176, MSG-177, MSG-179, MSG-181, MSG-182, MSG-183, MSG-184, MSG-185, MSG-187, MSG-188, MSG-189, MSG-190, BEH-026 |
 
 ## Rows
@@ -57,7 +57,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MENU-005 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
 | MENU-006 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
 | MENU-007 | pass | Shell_MenuTableMatchesCommandStates; Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection (dialog content is DLG-031, R2) |  |
-| MENU-008 | gap | Item and state tested (Shell_MenuTableMatchesCommandStates); no test disconnects a real connection | R2 |
+| MENU-008 | pass | Remote_DisconnectDialogRemovesComputer (loopback connection to 127.0.0.1); Shell_MenuTableMatchesCommandStates |  |
 | MENU-009 | gap | Disabled at Computer; classic enables Print at Computer, a hive root and a key (regedit-print.json) | P1 |
 | MENU-010 | pass | Shell_MenuTableMatchesCommandStates; Shell_CloseLeavesNoTestProcess |  |
 | MENU-011 | pass | Shell_MenuTableMatchesCommandStates (New children); Editing_CreatesRenamesAndDeletesRegistryObjects |  |
@@ -123,10 +123,10 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | CTX-029 | pass | ContextMenus_OpenAndInvokeCommands (contextmenu.background.open); List_MouseSelectionAndEmptyArea |  |
 | CTX-030 | pass | ContextMenus_OpenAndInvokeCommands (contextmenu.background.open); List_MouseSelectionAndEmptyArea |  |
 | CTX-031 | pass | ContextMenus_OpenAndInvokeCommands (contextmenu.background.open); List_MouseSelectionAndEmptyArea |  |
-| CTX-032 | gap | Remote menu used for every remote node, Export always disabled (ContextMenuController.cs:85, 130); no test | R2 |
-| CTX-033 | gap | Remote menu used for every remote node, Export always disabled (ContextMenuController.cs:85, 130); no test | R2 |
-| CTX-034 | gap | Remote menu used for every remote node, Export always disabled (ContextMenuController.cs:85, 130); no test | R2 |
-| CTX-035 | gap | Remote menu used for every remote node, Export always disabled (ContextMenuController.cs:85, 130); no test | R2 |
+| CTX-032 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus: the remote computer node shows RT_MENU 107 (Export and Disconnect enabled), remote hives and keys show the key menu; the local Computer root shows the same RT_MENU 107 as measured (regedit-context.json) |  |
+| CTX-033 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus: the remote computer node shows RT_MENU 107 (Export and Disconnect enabled), remote hives and keys show the key menu; the local Computer root shows the same RT_MENU 107 as measured (regedit-context.json) |  |
+| CTX-034 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus: the remote computer node shows RT_MENU 107 (Export and Disconnect enabled), remote hives and keys show the key menu; the local Computer root shows the same RT_MENU 107 as measured (regedit-context.json) |  |
+| CTX-035 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus: the remote computer node shows RT_MENU 107 (Export and Disconnect enabled), remote hives and keys show the key menu; the local Computer root shows the same RT_MENU 107 as measured (regedit-context.json) |  |
 | CTX-036 | pass | HexContextMenu_HasTheRt108ItemsAndStates (hex area of Edit Binary Value, regedit-context.json); text boxes show the system edit menu (ContextMenus_AddressBarHasTheSystemEditMenu) |  |
 | CTX-037 | pass | HexContextMenu_HasTheRt108ItemsAndStates (hex area of Edit Binary Value, regedit-context.json); text boxes show the system edit menu (ContextMenus_AddressBarHasTheSystemEditMenu) |  |
 | CTX-038 | pass | HexContextMenu_HasTheRt108ItemsAndStates (hex area of Edit Binary Value, regedit-context.json); text boxes show the system edit menu (ContextMenus_AddressBarHasTheSystemEditMenu) |  |
@@ -150,8 +150,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | DLG-010 | pass | Find_FollowsTheClassicTwoDialogSequence; find-sequence.json |  |
 | DLG-011 | pass | Find_FollowsTheClassicTwoDialogSequence; find-sequence.json |  |
 | DLG-012 | pass | Find_FollowsTheClassicTwoDialogSequence; find-sequence.json |  |
-| DLG-013 | gap | Disconnect list dialog has no E2E with a real connection | R2 |
-| DLG-014 | gap | Disconnect list dialog has no E2E with a real connection | R2 |
+| DLG-013 | pass | Remote_DisconnectDialogRemovesComputer (dialog 107, multi-select list 1175 as in the template style) |  |
+| DLG-014 | pass | Remote_DisconnectDialogRemovesComputer (dialog 107, multi-select list 1175 as in the template style) |  |
 | DLG-015 | gap | Print uses plain PrintDlgW without template 108 (RegistryPrinter.cs:96-109) | P1 |
 | DLG-016 | gap | Print uses plain PrintDlgW without template 108 (RegistryPrinter.cs:96-109) | P1 |
 | DLG-017 | pass | Find_FollowsTheClassicTwoDialogSequence |  |
@@ -556,9 +556,9 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | BEH-020 | pass | RegFileReaderTests; RegistryExportTests; RegistryExportHiveTests; ExportDialogs_RangePanelWritesAllBranchTextAndRegedit4 |  |
 | BEH-021 | pass | ExportDialogs_BranchPathEditRefusesMissingKey (RT_STRING 148 in a box captioned Export Registry File, as measured in regedit-export-range.json; the dialog stays open) |  |
 | BEH-022 | pass | AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
-| BEH-023 | gap | Engine tests only (RemoteRegistryTests); no E2E with a real connection | R2 |
-| BEH-024 | gap | Engine tests only (RemoteRegistryTests); no E2E with a real connection | R2 |
-| BEH-025 | gap | Engine tests only (RemoteRegistryTests); no E2E with a real connection | R2 |
+| BEH-023 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus (only HKEY_LOCAL_MACHINE and HKEY_USERS); Remote_DisconnectDialogRemovesComputer; every command on remote keys: Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox, Remote_FindLocatesRemoteValue, Remote_ExportBranchMatchesLocalExport, Remote_AddressBarNavigatesToRemotePath |  |
+| BEH-024 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus (only HKEY_LOCAL_MACHINE and HKEY_USERS); Remote_DisconnectDialogRemovesComputer; every command on remote keys: Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox, Remote_FindLocatesRemoteValue, Remote_ExportBranchMatchesLocalExport, Remote_AddressBarNavigatesToRemotePath |  |
+| BEH-025 | gap | Own-computer refusal (153) and connect failures (154 to 156) have engine tests only; the connect UI tests come with the picker | R2 |
 | BEH-026 | gap | Cancel and replace-children tested; owner, auditing, effective access and prompts 7015 to 7018 missing | S1 |
 | BEH-027 | gap | Range panel, progress and print output missing (OQ-44) | P1 |
 | BEH-028 | pass | Tree_RightAndLeftArrowSemantics; Tree_NumpadKeysAndPageKeys |  |
@@ -665,7 +665,7 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-35 | See OQ-22 (F2). |
 | OQ-36 | Basics_EnterAndDoubleClickOpenTheEditorForEachType; Tree_DoubleClickTogglesExpansion. |
 | OQ-37 | Editing_CreatesRenamesAndDeletesRegistryObjects (new items enter rename with the name selected). |
-| OQ-38 | AddressBar_NavigatesParsesAndRejectsPaths. Remote paths in the address bar: R2. |
+| OQ-38 | AddressBar_NavigatesParsesAndRejectsPaths. Remote paths (\\COMPUTER\HKEY_...) both ways: Remote_AddressBarNavigatesToRemotePath. |
 | OQ-39 | Rename and Delete are off at Computer and the hive roots (Shell_MenuTableMatchesCommandStates); the Computer-root context menu: O1. |
 | OQ-40 | String 34 is not shown; the root is Computer (string 19). |
 | OQ-41 | Decision: BWC does not register a .reg file type or Merge verb. |

@@ -35,7 +35,7 @@
 | MENU-005 | &File > &Load Hive... | RT_MENU 103, id 680 | U3, R8 | pass |
 | MENU-006 | &File > &Unload Hive... | RT_MENU 103, id 681 | U3, R8 | pass |
 | MENU-007 | &File > &Connect Network Registry... | RT_MENU 103, id 657 | U3, R8 | pass |
-| MENU-008 | &File > &Disconnect Network Registry... | RT_MENU 103, id 768 | U3, R8 | gap |
+| MENU-008 | &File > &Disconnect Network Registry... | RT_MENU 103, id 768 | U3, R8 | pass |
 | MENU-009 | &File > &Print... (accelerator Ctrl+P) | RT_MENU 103, id 660 | U3, R14 | gap |
 | MENU-010 | &File > E&xit | RT_MENU 103, id 661 | U3, R1 | pass |
 | MENU-011 | &Edit | RT_MENU 103, id 513 | U3 | pass |
@@ -101,10 +101,10 @@
 | CTX-029 | &New > &QWORD (64-bit) Value | RT_MENU 106, id 688 | R12, R3 | pass |
 | CTX-030 | &New > &Multi-String Value | RT_MENU 106, id 676 | R12, R3 | pass |
 | CTX-031 | &New > &Expandable String Value | RT_MENU 106, id 677 | R12, R3 | pass |
-| CTX-032 | Layout: Remote computer root context menu, identified by its contents (Expand, Export, Disconnect); attachment to the remote root is inferred (OQ-03). Separators (2): in menu root, after 'Expand'; in menu root, after '&Export' (separator carries command id 673, no text). | RT_MENU 107 | R12 | gap |
-| CTX-033 | Expand | RT_MENU 107, id 915 | R12, U5 | gap |
-| CTX-034 | &Export | RT_MENU 107, id 659 | R12, R7 | gap |
-| CTX-035 | &Disconnect | RT_MENU 107, id 768 | R12, R8 | gap |
+| CTX-032 | Layout: Remote computer root context menu, identified by its contents (Expand, Export, Disconnect); attachment to the remote root is inferred (OQ-03). Separators (2): in menu root, after 'Expand'; in menu root, after '&Export' (separator carries command id 673, no text). | RT_MENU 107 | R12 | pass |
+| CTX-033 | Expand | RT_MENU 107, id 915 | R12, U5 | pass |
+| CTX-034 | &Export | RT_MENU 107, id 659 | R12, R7 | pass |
+| CTX-035 | &Disconnect | RT_MENU 107, id 768 | R12, R8 | pass |
 | CTX-036 | Layout: Text edit context menu, identified by its contents (Cut, Copy, Paste, Delete, Select All with standard edit command ids); the control it attaches to is not in the dump (OQ-02). Separators (1): in menu root, after '&Delete' (separator carries command id 673, no text). | RT_MENU 108 | R12 | pass |
 | CTX-037 | Cu&t | RT_MENU 108, id 24 | R12, R5 | pass |
 | CTX-038 | &Copy | RT_MENU 108, id 3 | R12, R5 | pass |
@@ -130,8 +130,8 @@ Layout rows give the template order, the default button, the tab stops and the r
 | DLG-010 | Layout: Find. Caption 'Find'. Template DIALOGEX, style 0x90C801C4, size 264 x 96 DLU at (32, 24). Controls in template order (10): no id Static 'Fi&nd what:'; 1150 Edit; 1152 Button '&Keys'; 1153 Button '&Values'; 1154 Button '&Data'; 1151 Button 'Match &whole string only'; 1161 Button 'Search in &subtree'; 1 Button '&Find Next'; 2 Button 'Cancel'; 1160 Button 'Look at'. Default button: 1 Button '&Find Next'. Tab stops in template order: 1150 Edit, 1152 Button '&Keys', 1153 Button '&Values', 1154 Button '&Data', 1151 Button 'Match &whole string only', 1161 Button 'Search in &subtree', 1 Button '&Find Next', 2 Button 'Cancel'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 106 | R9, U4 | pass |
 | DLG-011 | Look at group (1160) holds the Keys (1152), Values (1153) and Data (1154) checkboxes that choose what is matched. Match whole string only (1151) switches substring matching to whole-string equality. Tab stops in template order: Find what edit, Keys, Values, Data, Match whole string only, Search in subtree, Find Next (default), Cancel. | RT_DIALOG 106, controls 1150 to 1154, 1160 | R9, B7 | pass |
 | DLG-012 | Search in subtree checkbox (control 1161): default state and effect are not described in the dump (OQ-10). | RT_DIALOG 106, control 1161 | R9, B7 | pass |
-| DLG-013 | Layout: Disconnect Network Registry computer list. Caption 'Disconnect Network Registry'. Template DIALOGEX, style 0x90C801C4, size 250 x 111 DLU at (32, 24). Controls in template order (4): no id Static 'Computer name:'; 1175 SysListView32; 1 Button 'OK'; 2 Button 'Cancel'. Default button: 1 Button 'OK'. Tab stops in template order: 1175 SysListView32, 1 Button 'OK', 2 Button 'Cancel'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 107 | R8, U4 | gap |
-| DLG-014 | Computer list (control 1175, SysListView32, report view with no column header, style 0x50814041, 236 x 63 DLU) beside a Computer name label, with OK and Cancel. Which command opens this dialog is open (OQ-01). | RT_DIALOG 107, control 1175 | R8, B9 | gap |
+| DLG-013 | Layout: Disconnect Network Registry computer list. Caption 'Disconnect Network Registry'. Template DIALOGEX, style 0x90C801C4, size 250 x 111 DLU at (32, 24). Controls in template order (4): no id Static 'Computer name:'; 1175 SysListView32; 1 Button 'OK'; 2 Button 'Cancel'. Default button: 1 Button 'OK'. Tab stops in template order: 1175 SysListView32, 1 Button 'OK', 2 Button 'Cancel'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 107 | R8, U4 | pass |
+| DLG-014 | Computer list (control 1175, SysListView32, report view with no column header, style 0x50814041, 236 x 63 DLU) beside a Computer name label, with OK and Cancel. Which command opens this dialog is open (OQ-01). | RT_DIALOG 107, control 1175 | R8, B9 | pass |
 | DLG-015 | Layout: Print range panel (child template; intended for the Print dialog, inferred). Child template (WS_CHILD), no caption. Template DIALOGEX, style 0x50000440, size 288 x 178 DLU at (0, 0). Controls in template order (5): 1072 Button 'Print range'; 1280 Button 'A&ll'; 1281 Button 'S&elected branch'; no id Static 'Selected branch'; 1282 Edit. Default button: none. Tab stops in template order: 1280 Button 'A&ll', 1282 Edit. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 108 | R14, U4 | gap |
 | DLG-016 | Print range panel (child template, no caption): All (1280) and Selected branch (1281) radios with a branch path edit (1282). Print behavior is open (OQ-44). | RT_DIALOG 108, controls 1280 to 1282 | R14 | gap |
 | DLG-017 | Layout: Find progress. Caption 'Find'. Template DIALOGEX, style 0x90C801C4, size 170 x 64 DLU at (32, 24). Controls in template order (3): 2 Button 'Cancel'; no id Static 'Searching the registry...'; no id Static 'ordinal 0x0066'. Default button: 2 Button 'Cancel'. Tab stops in template order: 2 Button 'Cancel'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 109 | R9, U4 | pass |
@@ -538,8 +538,8 @@ Skipped (format fragments with no user text): 8100 (" : " joiner) and 8111 (a 19
 | BEH-020 | Export offers v5 Unicode .reg; REGEDIT4 ANSI .reg (filter RT_STRING 305, Win9x/NT4 Registration Files); a hive file (save subtree, RT_STRING 212 to 215); and a text file (filter Text Files; labels RT_STRING 8101 to 8110). Only the v5 and REGEDIT4 formats have goldens (OQ-34). | RT_STRING 212 to 215, 305, 8101 to 8110; exports/ | R7, B5, B11 | pass |
 | BEH-021 | Export range: All or Selected branch (dialog 100). A selected branch path that does not exist is refused with RT_STRING 148. | RT_DIALOG 100; RT_STRING 148 | R7, B5 | pass |
 | BEH-022 | Load Hive and Unload Hive act only under HKEY_LOCAL_MACHINE and HKEY_USERS (brief). | Brief; RT_MENU 103 (File > Load Hive, Unload Hive) | R8, B8 | pass |
-| BEH-023 | Remote registry roots: a connected remote computer shows only HKEY_LOCAL_MACHINE and HKEY_USERS (brief). | Brief | R8, B9 | gap |
-| BEH-024 | Disconnect removes a connected remote computer from the tree (File > Disconnect Network Registry, RT_MENU 103 id 768; RT_MENU 107 id 768 on the remote root). | RT_MENU 103, 107 | R8, B9 | gap |
+| BEH-023 | Remote registry roots: a connected remote computer shows only HKEY_LOCAL_MACHINE and HKEY_USERS (brief). | Brief | R8, B9 | pass |
+| BEH-024 | Disconnect removes a connected remote computer from the tree (File > Disconnect Network Registry, RT_MENU 103 id 768; RT_MENU 107 id 768 on the remote root). | RT_MENU 103, 107 | R8, B9 | pass |
 | BEH-025 | Connecting to your own computer is refused (RT_STRING 153). Connection failures use RT_STRING 154 to 156; a connect that cannot reach all roots reports RT_STRING 155. | RT_STRING 153 to 156 | R8, B9 | gap |
 | BEH-026 | Permissions (Edit > Permissions, RT_MENU 103 id 678; context item 678) opens the standard ACL editor for the selected key, with Advanced for special permissions (brief). The ACL UI is an OS component; the dump has only its strings (RT_STRING 7001 to 7092). Behavior is open (OQ-42). | Brief; RT_MENU 103, 104; RT_STRING 7001 to 7092 | R11, B10 | gap |
 | BEH-027 | Print of the selected branch (or all): a progress dialog with Cancel (dialog 105) and a print range panel (dialog 108). Printed text uses labels RT_STRING 8101 to 8192 (inferred from the text; no print golden exists; OQ-44). | Brief; RT_DIALOG 105, 108; RT_STRING 8101 to 8192 | R14, B11 | gap |

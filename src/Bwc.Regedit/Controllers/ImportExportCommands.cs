@@ -295,18 +295,33 @@ internal sealed class ImportExportCommands
         await _context.RefreshValuesAsync(selectRawName: null);
     }
 
-    private async Task ExportAsync()
+    /// <summary>The connection of a selected connected-computer node, <c>\\COMPUTER</c>. Null for any other node.</summary>
+    private RemoteRegistryConnection? ConnectionOfSelectedComputerNode()
     {
-        if (RegeditSelectionGuards.IsRemoteSelected(_context))
+        string? displayPath = _context.Shell.TreeContent.SelectedNode?.RegistryPath;
+        if (displayPath is not { Length: > 0 } || !displayPath.StartsWith(@"\\", StringComparison.Ordinal))
         {
-            // Remote export is not in this version. The menu keeps Export disabled for a remote node.
-            await _context.ShowMessageAsync(Get("DialogExportNoSelection"));
-            return;
+            return null;
         }
 
-        bool hasSelectedKey = _context.TryGetSelectedKeyPath(out RegistryPath selectedPath);
+        return _context.RemoteConnections.FirstOrDefault(connection =>
+            string.Equals(
+                RemoteRegistryTreeSource.DisplayPrefix(connection.ComputerName),
+                displayPath,
+                StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task ExportAsync()
+    {
+        bool hasSelectedKey = _context.TryGetSelectedLocation(out KeyLocation location);
+        RegistryPath selectedPath = hasSelectedKey ? location.Path : null!;
+
+        // A key or a computer node on a connected computer exports from that computer. Null for the local registry.
+        RemoteRegistryConnection? remote = hasSelectedKey ? location.Connection : ConnectionOfSelectedComputerNode();
+        RegistryStore store = hasSelectedKey ? location.Store : _context.StoreFor(remote);
+        RegistryReader reader = store.Reader;
         bool computerSelected = _context.IsComputerSelected;
-        if (!hasSelectedKey && !computerSelected)
+        if (!hasSelectedKey && !computerSelected && remote is null)
         {
             await _context.ShowMessageAsync(Get("DialogExportNoSelection"));
             return;
@@ -315,7 +330,7 @@ internal sealed class ImportExportCommands
         string defaultFileName = hasSelectedKey
             ? BuildDefaultExportFileName(selectedPath)
             : BuildDefaultExportFileName("Computer");
-        ExportBranchRules branch = BranchRules(hasSelectedKey ? selectedPath : null);
+        ExportBranchRules branch = BranchRules(hasSelectedKey ? selectedPath : null, reader);
         ExportFileDialogResult? choice = RegeditFileDialogs.Run(
             _context,
             () => CommonFileDialogs.ShowExportSave(_context.WindowHwnd, defaultFileName, hasSelectedKey, branch));
@@ -327,6 +342,15 @@ internal sealed class ImportExportCommands
         // A hive file is one key saved with RegSaveKey, so the hive format needs a selected key, and
         // the whole registry from Computer is only available through the .reg and text writers.
         bool hive = choice.Format == ExportFileFormat.Hive;
+
+        // The whole registry of a connected computer is HKEY_LOCAL_MACHINE and HKEY_USERS in one .reg document.
+        RemoteRegistryConnection? wholeRemote =
+            remote is not null && choice.Range == ExportFileRange.WholeRegistry ? remote : null;
+        if (wholeRemote is not null && choice.Format is ExportFileFormat.Hive or ExportFileFormat.Text)
+        {
+            await _context.ShowMessageAsync(Get("DialogExportRemoteFormat"));
+            return;
+        }
         if ((choice.Range == ExportFileRange.SelectedBranch || hive) && !hasSelectedKey)
         {
             await _context.ShowMessageAsync(Get("DialogExportNoSelection"));
@@ -366,7 +390,7 @@ internal sealed class ImportExportCommands
 
         Task<bool> dialogTask = _context.ShowDialogAsync(progress);
         Task exportTask = _context.RunRegistryAsync(
-            () => ExportToFile(choice, startKey, scope, cancellation.Token, progressSink),
+            () => ExportToFile(choice, startKey, scope, store, reader, wholeRemote, cancellation.Token, progressSink),
             cancellation.Token);
 
         Exception? error = null;
@@ -426,9 +450,9 @@ internal sealed class ImportExportCommands
     }
 
     /// <summary>The branch edit's rules: the selected key in classic form, the key check, and the missing-key box.</summary>
-    private ExportBranchRules BranchRules(RegistryPath? selectedKey) => new(
+    private ExportBranchRules BranchRules(RegistryPath? selectedKey, RegistryReader reader) => new(
         selectedKey is null ? string.Empty : ClassicPath(selectedKey),
-        BranchKeyExists,
+        text => BranchKeyExists(text, reader),
         Get("DialogExportBranchCaption"),
         Get("DialogAddressBarKeyNotFound"));
 
@@ -467,8 +491,8 @@ internal sealed class ImportExportCommands
     }
 
     /// <summary>Whether a typed branch path names an existing key. Runs on the UI thread from the dialog's OK.</summary>
-    private bool BranchKeyExists(string text) =>
-        TryParseBranch(text, out RegistryPath? key) && key is not null && _context.Store.Reader.KeyExists(key);
+    private bool BranchKeyExists(string text, RegistryReader reader) =>
+        TryParseBranch(text, out RegistryPath? key) && key is not null && reader.KeyExists(key);
 
     /// <summary>
     /// Writes the export to a temporary file in the destination folder and moves it into place only
@@ -480,6 +504,9 @@ internal sealed class ImportExportCommands
         ExportFileDialogResult choice,
         RegistryPath? startKey,
         RegistryExportScope scope,
+        RegistryStore store,
+        RegistryReader reader,
+        RemoteRegistryConnection? wholeRemote,
         CancellationToken cancellationToken,
         IProgress<ExportProgress> progress)
     {
@@ -492,14 +519,48 @@ internal sealed class ImportExportCommands
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 progress.Report(new ExportProgress(ExportPhase.Starting, startKey!, null, 0, 0, 0));
-                _context.Store.SaveKey(startKey!, tempPath);
+                store.SaveKey(startKey!, tempPath);
                 cancellationToken.ThrowIfCancellationRequested();
                 File.Move(tempPath, choice.FilePath, overwrite: true);
                 moved = true;
                 return;
             }
 
-            RegistryExportService service = CreateExportService(choice.Range);
+            if (wholeRemote is not null)
+            {
+                // HKEY_LOCAL_MACHINE and HKEY_USERS of the connected computer, merged into one document with one header.
+                RegFileFormat remoteFormat = choice.Format == ExportFileFormat.RegistrationRegedit4
+                    ? RegFileFormat.Regedit4
+                    : RegFileFormat.V5;
+                var remoteService = new RegistryExportService(reader);
+                var keys = new List<RegFileKey>();
+                foreach (RegistryRoot root in new[] { RegistryRoot.LocalMachine, RegistryRoot.Users })
+                {
+                    RegistryPath rootPath = RegistryPath.Parse(root.DisplayName());
+                    keys.AddRange(remoteService
+                        .ExportRegFile(rootPath, remoteFormat, RegistryExportScope.Selection, cancellationToken, progress)
+                        .Keys);
+                }
+
+                using (var remoteStream = new FileStream(
+                    tempPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: 64 * 1024,
+                    FileOptions.SequentialScan))
+                {
+                    RegFileWriter.Write(new RegFileDocument(remoteFormat, keys), remoteStream);
+                    remoteStream.Flush(flushToDisk: true);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                File.Move(tempPath, choice.FilePath, overwrite: true);
+                moved = true;
+                return;
+            }
+
+            RegistryExportService service = CreateExportService(choice.Range, reader);
             using (var stream = new FileStream(
                 tempPath,
                 FileMode.CreateNew,
@@ -539,7 +600,7 @@ internal sealed class ImportExportCommands
         }
     }
 
-    private RegistryExportService CreateExportService(ExportFileRange range)
+    private RegistryExportService CreateExportService(ExportFileRange range, RegistryReader reader)
     {
 #if BWC_E2E
         IRegistryExportSource? source = null;
@@ -550,13 +611,13 @@ internal sealed class ImportExportCommands
             // roots are still exported through RegFileExporter.ExportWholeRegistry, but HKCU is
             // mapped to the run sandbox and the other roots are empty. The ship build uses the live
             // reader.
-            source = new SandboxWholeRegistrySource(_context.Store.Reader, sandboxRoot);
+            source = new SandboxWholeRegistrySource(reader, sandboxRoot);
         }
 
         int pauseMs = E2EPauseMs(SlowExportVariable);
         if (pauseMs > 0)
         {
-            source = new PacedExportSource(source ?? new ReaderExportSource(_context.Store.Reader), pauseMs);
+            source = new PacedExportSource(source ?? new ReaderExportSource(reader), pauseMs);
         }
 
         if (source is not null)
@@ -565,7 +626,7 @@ internal sealed class ImportExportCommands
         }
 #endif
 
-        return new RegistryExportService(_context.Store.Reader);
+        return new RegistryExportService(reader);
     }
 
 #if BWC_E2E

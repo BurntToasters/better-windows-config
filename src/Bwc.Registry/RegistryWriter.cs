@@ -112,8 +112,31 @@ public sealed partial class RegistryWriter
             Operation,
             key);
 
-        WIN32_ERROR error = PInvoke.RegSetValueEx(handle, valueName, (REG_VALUE_TYPE)type, data);
+        WIN32_ERROR error = SetValueData(handle, valueName, type, data);
         ThrowIfFailed(error, Operation, key);
+    }
+
+    /// <summary>
+    /// Writes the data. An empty span would pass a null data pointer, which a remote key's RPC stub rejects with
+    /// error 1780, so a zero-length value passes a pointer to a spare byte and a length of zero.
+    /// </summary>
+    private static unsafe WIN32_ERROR SetValueData(
+        SafeRegistryKeyHandle handle,
+        string valueName,
+        uint type,
+        ReadOnlySpan<byte> data)
+    {
+        if (!data.IsEmpty)
+        {
+            return PInvoke.RegSetValueEx(handle, valueName, (REG_VALUE_TYPE)type, data);
+        }
+
+        byte spare = 0;
+        var key = new HKEY(handle.DangerousGetHandle());
+        fixed (char* name = valueName)
+        {
+            return PInvoke.RegSetValueEx(key, name, 0, (REG_VALUE_TYPE)type, &spare, 0);
+        }
     }
 
     public void DeleteValue(RegistryPath path, string valueName)
