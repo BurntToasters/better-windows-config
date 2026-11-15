@@ -80,7 +80,7 @@ internal sealed class PrintController
                     try
                     {
                         result = await _context.RunRegistryAsync(
-                            () => RegistryPrinter.PrintToDevice(device, _context.Store.Reader, key, ReportLabels()));
+                            () => RegistryPrinter.PrintToDevice(device, _context.Store.Reader, key));
                     }
                     catch (Exception ex)
                     {
@@ -122,30 +122,15 @@ internal sealed class PrintController
             Get("MsgPrintFailed")).ToErrorDialog());
     }
 
-    /// <summary>The classic report labels (oracle 8101 to 8110), read from the resources.</summary>
-    private RegistryPrinter.PrintReportLabels ReportLabels() => new(
-        Get("PrintKeyName"),
-        Get("PrintClassName"),
-        Get("PrintLastWriteTime"),
-        Get("PrintValueHeading"),
-        Get("PrintValueName"),
-        Get("PrintValueType"),
-        Get("PrintValueDataSize"),
-        Get("PrintValueData"),
-        Get("PrintNoName"),
-        Get("PrintNoClass"));
-
 #if BWC_E2E
+    // The report comes from the same text export source as File > Export. UTF-8 without a byte-order mark.
     private PrintResult WriteReportForE2E(string reportPath, RegistryPath key)
     {
         try
         {
-            string report = RegistryPrinter.FormatReport(
-                _context.Store.Reader,
-                key,
-                RegistryPrinter.DefaultMaxChars,
-                ReportLabels());
-            File.WriteAllText(reportPath, report, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            using var text = new StringWriter();
+            RegistryPrinter.WriteReport(_context.Store.Reader, key, text);
+            File.WriteAllText(reportPath, text.ToString(), new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             return PrintResult.Printed();
         }
         catch (Exception ex)

@@ -25,7 +25,7 @@ public sealed class ExportRangeTests
 {
     private const int MenuFile = 512;
     private const int MenuFileImport = 658;
-    private const int MenuFileExport = 659;
+    internal const int MenuFileExport = 659;
     private const string ExportValueName = "ExportString";
     private const string ExportValueData = "exported";
     private const string ImportCaption = "Import Registry File";
@@ -866,7 +866,7 @@ public sealed class ExportRangeTests
         _ = WaitForExportIdle(session, automation, TimeSpan.FromSeconds(20));
     }
 
-    private static bool OpenDialog(
+    internal static bool OpenDialog(
         EditingDriver driver,
         SystemFileDialogDriver dialogs,
         int commandId,
@@ -979,7 +979,7 @@ public sealed class ExportRangeTests
             timeout);
     }
 
-    private static bool WaitForExportIdle(
+    internal static bool WaitForExportIdle(
         AppSession session,
         UIA3Automation automation,
         TimeSpan timeout)
@@ -991,7 +991,7 @@ public sealed class ExportRangeTests
             timeout);
     }
 
-    private static byte[]? WaitForStableFile(string path, TimeSpan timeout)
+    internal static byte[]? WaitForStableFile(string path, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         long lastLength = -1;
@@ -1021,7 +1021,7 @@ public sealed class ExportRangeTests
         return null;
     }
 
-    private static string DecodeV5(byte[]? bytes)
+    internal static string DecodeV5(byte[]? bytes)
     {
         if (bytes is null || bytes.Length < 2)
         {

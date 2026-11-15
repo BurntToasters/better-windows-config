@@ -363,3 +363,25 @@ reference to a sink that runs after the owner is gone. The sink is unadvised in 
 Failure mode: a typed path with a trailing backslash, in another case, or a predefined root alone
 (HKEY_CURRENT_USER) is not found. The leading `Computer\` prefix and the trailing backslashes are removed, and the rest is parsed
 with `RegistryPath.TryParse`. The comparison ignores case, as the tree does.
+
+## 18. Text export format (Text Files *.txt) and print
+
+`RegistryTextExporter` writes the text format for File > Export with the *Text Files (\*.txt)* filter, and
+print writes the same text (`print.md`, "Report shape"). The layout is `export.md` section 2, pinned by the
+golden `docs/parity/oracle/exports/bwc-oracle-text.txt`. The table lists how the format can fail.
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| The file differs from classic regedit's Text Files output | `RegistryTextGoldenTests` compares the bytes, with the BOM and CRLF, after masking `Last Write Time:` and rewriting the sandbox path. A mismatch names the first differing line and both lines |
+| A `Data Size:` line is written | Not written. The golden has none. String 8107 in `Resources.resw` still reads `Data Size:`, but the text format does not use it |
+| A long string or binary value is cut or wrapped | Not cut. A string is one line, and a binary value is complete hex rows. A 5000-character REG_SZ and a 4 KB REG_BINARY are complete in the file and in the print report |
+| The export has a size cap | No cap. Text is streamed key by key to the TextWriter, with the cancellation token checked before each key, value, and subkey |
+| A backslash, tab, or NUL in a name or string is escaped | Not escaped. The golden writes names and strings as stored |
+| A REG_MULTI_SZ shows its terminators or loses empty items | Trailing empty strings are dropped. An empty middle string is a line of 19 spaces (golden) |
+| A REG_DWORD prints as `0x00001388 (5000)` or a DWORD as a number with a unit | `0x1388` in C `%#x` form, `0` for zero (golden). A short DWORD is zero-extended (golden: `01 02 03` is `0x30201`) |
+| A REG_QWORD, REG_LINK, REG_NONE, REG_BINARY, or REG_DWORD_BIG_ENDIAN prints as a number or a comma list | A hex dump with the classic row layout (golden). Type 5 prints as `REG_UNKNOWN` (golden) |
+| A resource value does not parse | The whole value prints as a hex dump. Not measured (`export.md` section 2, open point 4) |
+| The Last Write Time is UTC or ISO format | Local time as the short date, ` - `, and the short time of the current culture (en-US `11/14/2026 - 7:25 PM`). Not measured outside en-US (`export.md` section 2, open point 1) |
+| An unreadable subkey stops the file | It is skipped with its subtree, as in section 2. The file has no marker line for it |
+| The file is written as UTF-8 or with a different line ending | UTF-16LE with a BOM and CRLF through `RegistryExportService.ExportTextFile(Stream)`, as the golden is. Print writes the same text as UTF-8 without a BOM, and the E2E check compares them after that normalization |
+| Labels follow the Windows UI language | The labels are text constants with the en-US wording of the golden. The text format is not localized |
