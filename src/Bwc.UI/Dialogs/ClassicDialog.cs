@@ -614,6 +614,12 @@ public class ClassicDialog : ModalDialogWindow
                 return;
 
             case ClassicControlKind.Button:
+                // A disabled button does not take its mnemonic (Find Next while the search text is empty).
+                if (hosted.Element is Control { IsEnabled: false })
+                {
+                    return;
+                }
+
                 _ = hosted.Element.Focus(FocusState.Keyboard);
                 OnCommand(hosted.Definition.Id, hosted.Definition.AutomationId);
                 return;

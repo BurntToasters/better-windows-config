@@ -110,6 +110,18 @@
   <data name="FileDialogAllFiles" xml:space="preserve">
     <value>All Files</value>
   </data>
+  <!-- Oracle 300. Title of the Import open dialog. -->
+  <data name="FileDialogImportTitle" xml:space="preserve">
+    <value>Import Registry File</value>
+  </data>
+  <!-- Oracle 301. Title of the Export save dialog. -->
+  <data name="FileDialogExportTitle" xml:space="preserve">
+    <value>Export Registry File</value>
+  </data>
+  <!-- Oracle 303. Extension added to a name typed without one. Written as the oracle writes it. -->
+  <data name="FileDialogDefaultExtension" xml:space="preserve">
+    <value>REG</value>
+  </data>
   <!-- Written for this product: the classic Export range group label (DLG-001). -->
   <data name="FileDialogExportRangeGroup" xml:space="preserve">
     <value>Export range</value>

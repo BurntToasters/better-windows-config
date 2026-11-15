@@ -333,6 +333,10 @@ Error code: {1} (0x{1:X8})
   <data name="DialogAddressBarKeyNotFound" xml:space="preserve">
     <value>The selected branch does not exist. Make sure that the correct path is given.</value>
   </data>
+  <!-- Caption of the Export message box for a missing branch. Oracle 301 until the measured caption of 148 is known (OQ-15). -->
+  <data name="DialogExportBranchCaption" xml:space="preserve">
+    <value>Export Registry File</value>
+  </data>
   <data name="DialogFindTitle" xml:space="preserve">
     <value>Find</value>
   </data>
@@ -384,8 +388,9 @@ Error code: {1} (0x{1:X8})
   <data name="DialogHexTitle" xml:space="preserve">
     <value>Binary Data</value>
   </data>
+  <!-- Oracle DLG-005 (RT_DIALOG 103 caption). The Edit Binary dialog shows this caption. -->
   <data name="DialogHexEditTitle" xml:space="preserve">
-    <value>Edit Binary Data</value>
+    <value>Edit Binary Value</value>
   </data>
   <data name="DialogHexClose" xml:space="preserve">
     <value>Close</value>

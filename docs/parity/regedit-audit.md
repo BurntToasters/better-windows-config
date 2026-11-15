@@ -27,13 +27,13 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | --- | --- | --- | --- |
 | MENU | 35 | 0 | 2 |
 | CTX | 37 | 0 | 4 |
-| DLG | 21 | 4 | 26 |
+| DLG | 25 | 5 | 21 |
 | ACC | 27 | 0 | 1 |
-| MSG | 138 | 43 | 95 |
-| VIEW | 17 | 2 | 2 |
-| BEH | 36 | 5 | 8 |
+| MSG | 143 | 44 | 89 |
+| VIEW | 18 | 2 | 1 |
+| BEH | 37 | 5 | 7 |
 | EXP | 32 | 0 | 0 |
-| All (535) | 343 | 54 | 138 |
+| All (535) | 354 | 56 | 125 |
 
 ## Gaps by piece
 
@@ -41,7 +41,6 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | --- | --- |
 | D1 | DLG-033, DLG-034, DLG-037, DLG-038, DLG-039, DLG-040, DLG-041, DLG-042, DLG-043, DLG-046, DLG-047, MSG-194, MSG-195, MSG-196, MSG-197, MSG-198, MSG-199, MSG-200, MSG-201, MSG-202, MSG-203, MSG-204, MSG-205, MSG-206, MSG-207, MSG-208, MSG-209, MSG-210, MSG-211, MSG-212, MSG-213, MSG-214, MSG-215, MSG-216, MSG-217, MSG-218, MSG-219, MSG-220, MSG-221, MSG-222, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276 |
 | F2 | DLG-023, DLG-035, DLG-036, MSG-022, MSG-052, MSG-053, MSG-060, MSG-061, MSG-062, MSG-066, MSG-109, MSG-110, MSG-111, VIEW-009, BEH-009, BEH-043 |
-| K1 | DLG-001, DLG-002, DLG-005, DLG-024, DLG-025, MSG-098, MSG-116, MSG-117, MSG-118, MSG-120, MSG-122, VIEW-019, BEH-021 |
 | P1 | MENU-009, DLG-009, DLG-015, DLG-016, ACC-011, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276, BEH-027 |
 | R2 | MENU-008, CTX-032, CTX-033, CTX-034, CTX-035, DLG-013, DLG-014, DLG-031, DLG-032, MSG-021, MSG-069, MSG-072, MSG-073, BEH-023, BEH-024, BEH-025 |
 | S1 | MSG-174, MSG-175, MSG-176, MSG-177, MSG-179, MSG-181, MSG-182, MSG-183, MSG-184, MSG-185, MSG-187, MSG-188, MSG-189, MSG-190, BEH-026 |
@@ -140,11 +139,11 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 
 | ID | Status | Evidence or reason | Piece |
 | --- | --- | --- | --- |
-| DLG-001 | gap | Range radios tested (ExportDialogs_RangePanelWritesAllBranchTextAndRegedit4); branch path edit 1282 missing | K1 |
-| DLG-002 | gap | Range radios tested (ExportDialogs_RangePanelWritesAllBranchTextAndRegedit4); branch path edit 1282 missing | K1 |
+| DLG-001 | declared-difference | BWC hosts the Export range group in the system item dialog (IFileDialogCustomize) instead of the old common dialog child template, with the same controls: All, Selected branch and the branch edit 1282 (ExportDialogs_RangePanelWritesAllBranchTextAndRegedit4) |  |
+| DLG-002 | pass | ExportDialogs_BranchPathEditRefusesMissingKey; ExportDialogs_BranchPathEditExportsTheTypedKey (regedit-export-range.json: 1282 stays enabled for both radios and starts with the selected key) |  |
 | DLG-003 | pass | ClassicDialogs_EditStringAndDwordFollowTheTemplate; ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates |  |
 | DLG-004 | pass | ClassicDialogs_EditStringAndDwordFollowTheTemplate; ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates |  |
-| DLG-005 | gap | Caption 'Edit Binary Data' (Resources.resw) differs from template 'Edit Binary Value' | K1 |
+| DLG-005 | pass | ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates (caption Edit Binary Value); HexContextMenu_HasTheRt108ItemsAndStates |  |
 | DLG-006 | pass | HexEditing_EditsCancelsAndCopies; HexEditingFixes_TypeBackspaceAndPasteUseRealKeys |  |
 | DLG-007 | pass | Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
 | DLG-008 | pass | Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
@@ -163,8 +162,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | DLG-021 | pass | ClassicDialogs_EditStringAndDwordFollowTheTemplate |  |
 | DLG-022 | pass | ClassicDialogs_EditStringAndDwordFollowTheTemplate |  |
 | DLG-023 | gap | Overflow prompt strings 110, 111, 119 are not in the source | F2 |
-| DLG-024 | gap | Add to Favorites reuses the Load Hive 104 layout (FavoritesController.cs:64) | K1 |
-| DLG-025 | gap | Add to Favorites reuses the Load Hive 104 layout (FavoritesController.cs:64) | K1 |
+| DLG-024 | pass | AddFavoriteDialog_ClassicLayoutTabOrderAndDuplicateError; SmallDialogs_RectsMatchClassicMeasurements |  |
+| DLG-025 | pass | AddFavoriteDialog_ClassicLayoutTabOrderAndDuplicateError; SmallDialogs_RectsMatchClassicMeasurements |  |
 | DLG-026 | pass | Favorites_AddRemoveNavigateAndReportMissingPath |  |
 | DLG-027 | pass | Favorites_AddRemoveNavigateAndReportMissingPath |  |
 | DLG-028 | pass | ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates |  |
@@ -326,7 +325,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-095 | pass | String parity check: text equal (DialogFavoriteDuplicate) |  |
 | MSG-096 | pass | String parity check: text equal (DialogErrorAddingFavorite) |  |
 | MSG-097 | pass | String parity check: text equal (DialogFavoriteCaption) |  |
-| MSG-098 | gap | File dialog caption or filter text not found verbatim; check against classic | K1 |
+| MSG-098 | pass | FileDialogs_TitleAndFiltersMatchClassicStrings; FileDialogs_ExportDefaultExtensionIsREG (title, filter pieces and default extension compared with regedit-resources.json) |  |
 | MSG-099 | pass | String parity check: text equal (DialogLoadHiveTitle) |  |
 | MSG-100 | pass | String parity check: text equal (MsgLoadHivePrivileges) |  |
 | MSG-101 | pass | String parity check: text equal (MsgLoadHiveFailed) |  |
@@ -344,13 +343,13 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-113 | pass | String parity check: text equal (MsgImportRegistryAccess) |  |
 | MSG-114 | pass | String parity check: text equal (MsgImportFileMissing) |  |
 | MSG-115 | pass | String parity check: text equal (MsgImportRegistryFileCaption) |  |
-| MSG-116 | gap | File dialog caption or filter text not found verbatim; check against classic | K1 |
-| MSG-117 | gap | File dialog caption or filter text not found verbatim; check against classic | K1 |
-| MSG-118 | gap | File dialog caption or filter text not found verbatim; check against classic | K1 |
+| MSG-116 | pass | FileDialogs_TitleAndFiltersMatchClassicStrings; FileDialogs_ExportDefaultExtensionIsREG (title, filter pieces and default extension compared with regedit-resources.json) |  |
+| MSG-117 | pass | FileDialogs_TitleAndFiltersMatchClassicStrings; FileDialogs_ExportDefaultExtensionIsREG (title, filter pieces and default extension compared with regedit-resources.json) |  |
+| MSG-118 | pass | FileDialogs_TitleAndFiltersMatchClassicStrings; FileDialogs_ExportDefaultExtensionIsREG (title, filter pieces and default extension compared with regedit-resources.json) |  |
 | MSG-119 | pass | String parity check: text equal (MsgImportConfirm) |  |
-| MSG-120 | gap | File dialog caption or filter text not found verbatim; check against classic | K1 |
+| MSG-120 | pass | FileDialogs_TitleAndFiltersMatchClassicStrings; FileDialogs_ExportDefaultExtensionIsREG (title, filter pieces and default extension compared with regedit-resources.json) |  |
 | MSG-121 | declared-difference | Out-of-memory message: the managed runtime ends the process with a crash report instead |  |
-| MSG-122 | gap | File dialog caption or filter text not found verbatim; check against classic | K1 |
+| MSG-122 | declared-difference | File type name for a .reg registration; BWC does not register a .reg file type (OQ-41) |  |
 | MSG-123 | declared-difference | BWC does not register a .reg Merge verb; Windows keeps its own (OQ-41) |  |
 | MSG-124 | pass | String parity check: text equal (ContextGoToHkcu) |  |
 | MSG-125 | declared-difference | Menu help text; classic has no status bar in this build (VIEW-018), so it is never shown (OQ-09) |  |
@@ -528,7 +527,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | VIEW-016 | pass | ValueDisplayTests: every type compared row by row with classic (artifacts/e2e/value-display/classic-compare-*.json). REG_LINK is measured once only: the sandbox write policy refuses link values, so no repeatable seed exists |  |
 | VIEW-017 | pass | Theme_E2EOnly_LightOverride_UsesSystemColorTable; regedit-selection-colors.json |  |
 | VIEW-018 | pass | Shell_LaunchShowsClassicStructure |  |
-| VIEW-019 | gap | Dialog rectangles are not compared with regedit-dialog-rects.json | K1 |
+| VIEW-019 | pass | SmallDialogs_RectsMatchClassicMeasurements: Add to Favorites, Remove Favorite and Find controls within 4 px of regedit-dialog-rects.json at 192 DPI |  |
 | VIEW-020 | pass | Informational row (capture environment); test-all --rid all also runs the x64 build |  |
 | VIEW-021 | declared-difference | View > Theme is a user-requested addition (AppServices_ThemeSubmenuSwitchesPaletteAndPersists) |  |
 
@@ -556,7 +555,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | BEH-018 | pass | AppServices_RegFileArgumentAsksBeforeImport_AnsweredNo; AppServices_RegFileArgumentAsksBeforeImport_AnsweredYes |  |
 | BEH-019 | pass | RegFileReaderTests; RegistryExportTests; RegistryExportHiveTests; ExportDialogs_RangePanelWritesAllBranchTextAndRegedit4 |  |
 | BEH-020 | pass | RegFileReaderTests; RegistryExportTests; RegistryExportHiveTests; ExportDialogs_RangePanelWritesAllBranchTextAndRegedit4 |  |
-| BEH-021 | gap | Branch path edit missing (DLG-001) | K1 |
+| BEH-021 | pass | ExportDialogs_BranchPathEditRefusesMissingKey (RT_STRING 148 in a box captioned Export Registry File, as measured in regedit-export-range.json; the dialog stays open) |  |
 | BEH-022 | pass | AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
 | BEH-023 | gap | Engine tests only (RemoteRegistryTests); no E2E with a real connection | R2 |
 | BEH-024 | gap | Engine tests only (RemoteRegistryTests); no E2E with a real connection | R2 |
@@ -644,7 +643,7 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-12 | Hexadecimal is the default base (ClassicDialogs_EditStringAndDwordFollowTheTemplate). Overflow prompts: F2. |
 | OQ-13 | ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates. |
 | OQ-14 | Classic opens variant B (2021) for every type, Byte format by default; variant A (2020) is never opened (regedit-binary.json). BWC matches (BinaryViewer_FollowsTheClassicLayoutAndFormats). |
-| OQ-15 | Runtime enable rules of template-disabled viewer controls: measured on classic with a resource value from HKEY_LOCAL_MACHINE\HARDWARE (readable unelevated); D1. |
+| OQ-15 | Export branch edit 1282: enabled for both radios and filled with the selected key (regedit-export-range.json). Runtime enable rules of template-disabled viewer controls: measured on classic with a resource value from HKEY_LOCAL_MACHINE\HARDWARE (readable unelevated); D1. |
 | OQ-16 | Viewer mapping per type: D1 (same measurement). |
 | OQ-17 | Not reachable in classic; not implemented (DLG-044, DLG-045 declared). |
 | OQ-18 | ImportProgress_ShowsClassicProgressWithoutCancel; ImportResult tests. |
@@ -657,7 +656,7 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-25 | Value order: List_OrderTypeAheadAndHeaderClick. Tree order for non-ASCII and symbol names: F2. Export order follows the golden (RegistryExportTests). |
 | OQ-26 | sort-order.json and List_OrderTypeAheadAndHeaderClick; non-ASCII value names: V1. |
 | OQ-27 | Selection colors: regedit-selection-colors.json (Theme tests). Icon sizes: Icons_TreeAndListRowsMatchClassicLayout. |
-| OQ-28 | Dialog rectangles against regedit-dialog-rects.json: K1. |
+| OQ-28 | SmallDialogs_RectsMatchClassicMeasurements compares Add to Favorites, Remove Favorite and Find with regedit-dialog-rects.json (4 px at 192 DPI). The file dialogs are system dialogs and are not compared. |
 | OQ-29 | Not measured: a 100 percent scale capture needs a session at that scale on a real desktop. Owed to a later release unless the user runs one. |
 | OQ-30 | `test-all --rid all` runs the x64 build (emulated on this Arm64 machine). A real x64 desktop run is owed. |
 | OQ-31 | The writer matches the golden (truncates at the first NUL), as classic does. |

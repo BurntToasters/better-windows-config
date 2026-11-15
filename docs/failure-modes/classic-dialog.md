@@ -636,3 +636,35 @@ work area. These are listed in the report, not claimed as covered.
   twice with no pause on a string value. It counts the visible "Edit String" windows of the app process (at most
   one), cancels the editor, and checks the owner is enabled and foreground. The log hook has no E2E trigger: a
   failed dialog show cannot be forced with real input, so it is checked by build and by the no-Bwc.Core rule only.
+
+## 12. Small dialogs: Add to Favorites, Remove Favorites, Find (K1b)
+
+### 12.1 Dialog rectangles drift from the classic measurement (VIEW-019)
+
+Failure mode: a control rectangle in Add to Favorites, Remove Favorites, or Find differs from the
+measured classic rectangle in `docs/parity/oracle/regedit-dialog-rects.json`. The expected value is the
+measured device pixel rectangle at 192 DPI, scaled by the BWC window DPI divided by 192, with a
+tolerance of 4 device pixels at 192 DPI per edge, scaled the same way. The fix is in the layout, never
+in the tolerance. A mismatch that cannot be fixed is written to the result artifact as a known gap.
+Test: `SmallDialogs_RectsMatchClassicMeasurements`.
+
+### 12.2 Dialog units converted with the wrong base units
+
+Failure mode: the DLU of a template is converted with a base unit measured at 96 DPI while the window
+is at 192 DPI, so every rectangle is half the classic size. The measured base units at 192 DPI are
+3 device pixels per horizontal DLU and 25/8 per vertical DLU for MS Shell Dlg 8 pt, which is the
+conversion `ClassicDialogMetrics` already uses.
+
+### 12.3 Binary editor caption from an unused resource (DLG-005)
+
+Failure mode: the resource passed as the Edit Binary title (`DialogHexEditTitle`) reads "Edit Binary
+Data" while the dialog shows "Edit Binary Value". The resource value must match the classic caption,
+"Edit Binary Value". The existing caption check in `ClassicValueEditorTests` covers the shown text.
+
+### 12.4 Find Next enabled while the search text is empty
+
+Failure mode: Find Next (id 1) is enabled while Find what is empty. Classic disables it (oracle "find"
+capture: control 1 enabled=false with no text typed). BWC disables the button while the text is empty and
+enables it as the text changes; Alt+N does nothing while it is disabled. Enter and F3 with an empty text
+still show the empty-text message. Test: `SmallDialogs_RectsMatchClassicMeasurements` checks the state
+at open and the live change (`rects.find.next-enabled`, `rects.find.next-live`).

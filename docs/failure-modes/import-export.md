@@ -307,3 +307,59 @@ value is in the sandbox. The file is inside the run's artifact folder and writes
 | E2E import test checks the cancel controls | Replaced: the test checks the classic window (caption `Import Registry File`; no push button in the body; Alt+F4 refused with the main window still disabled; progress bar read at least twice with a strict increase while the window is open; main window disabled while it runs; completion message; imported keys; the native class, size, and style). The caption Close box and `GWL_STYLE` are plain checks, not known gaps |
 | E2E progress check passes on the first partial value | The bar is read until two readings in the range 0 to maximum show an increase, so one reading at 1 of 1000 is not enough. The E2E pause is 10 ms per section, so the 1000-section import runs for about 10 s and stays open long enough to read |
 | Yes is pressed on the confirmation before it is under the pointer | The E2E harness presses only when the confirmation is foreground, its button is enabled and stable, and the window at the pointer is the confirmation; see `classic-dialog.md` 1.10 |
+
+## 17. Export range branch path (DLG-001, DLG-002, BEH-021, K1b)
+
+The Export save dialog has an edit (classic control 1282) under the "Export range" group that holds
+the branch path. It is added with `IFileDialogCustomize.AddEditBox`. Tests: `ExportDialogs_BranchPathEditRefusesMissingKey`
+and `ExportDialogs_BranchPathEditExportsTheTypedKey` in `tests/Bwc.E2E/ImportExport/ExportBranchPathTests.cs`.
+
+### Branch edit prefilled with the long display form
+
+Failure mode: the edit shows `ComputerHKEY_CURRENT_USERSoftware`. Classic starts the edit with the selected
+key in the classic form, `HKEY_CURRENT_USERSoftware` (oracle export-range, initial text, read with WM_GETTEXT).
+BWC prefills the same form, so the prefill is not the long display form.
+
+### Branch edit filled at Computer
+
+Failure mode: at the Computer node the edit holds text. The edit is empty at Computer, because
+Computer has no branch path, and All is selected.
+
+### Branch edit enabled while All is selected (measured)
+
+Measured on classic regedit (oracle capture `export-range`, `docs/parity/oracle/regedit-export-range.json`, runs
+with identical output): control 1282 is enabled with Selected branch chosen, stays enabled after All is chosen, and
+is enabled again after Selected branch is chosen. BWC does the same: the edit is enabled whatever radio is chosen
+when a key is selected. At Computer, where there is no branch, BWC keeps the edit disabled. Classic at Computer is
+not measured.
+
+### Missing branch path accepted
+
+Failure mode: OK with Selected branch and a path that does not exist closes the dialog and exports
+the tree selection, or nothing. Classic shows RT_STRING 148, "The selected branch does not exist.
+Make sure that the correct path is given.", and keeps the dialog open. The dialog stays open through
+`IFileDialogEvents.OnFileOk` returning S_FALSE. The message box caption is RT_STRING 301
+("Export Registry File"). The classic caption is measured as the same text (oracle export-range, local text file). Its text is not measured: the static text read returns empty, so the 148 text is the brief's, not confirmed from classic.
+
+### Typed path ignored in favor of the tree selection
+
+Failure mode: the export writes the key selected in the tree, not the key typed in the edit. The
+typed key is the one exported. A typed key that exists is exported with `RegistryExportScope.Selection`
+rooted at that key.
+
+### Empty branch path with Selected branch
+
+Failure mode: an empty path with Selected branch exports the tree selection. An empty path is a
+path that does not exist, so it gets the same message and the dialog stays open. This is a
+declared choice. Classic's behavior for an empty edit is not in the oracle.
+
+### Event sink leaked after the dialog closes
+
+Failure mode: the `IFileDialogEvents` sink is not unadvised after Show, so the dialog keeps a
+reference to a sink that runs after the owner is gone. The sink is unadvised in a `finally`.
+
+### Path parsing and case
+
+Failure mode: a typed path with a trailing backslash, in another case, or a predefined root alone
+(HKEY_CURRENT_USER) is not found. The leading `Computer\` prefix and the trailing backslashes are removed, and the rest is parsed
+with `RegistryPath.TryParse`. The comparison ignores case, as the tree does.

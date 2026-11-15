@@ -315,7 +315,10 @@ internal sealed class ImportExportCommands
         string defaultFileName = hasSelectedKey
             ? BuildDefaultExportFileName(selectedPath)
             : BuildDefaultExportFileName("Computer");
-        ExportFileDialogResult? choice = RegeditFileDialogs.ShowExport(_context, defaultFileName, hasSelectedKey);
+        ExportBranchRules branch = BranchRules(hasSelectedKey ? selectedPath : null);
+        ExportFileDialogResult? choice = RegeditFileDialogs.Run(
+            _context,
+            () => CommonFileDialogs.ShowExportSave(_context.WindowHwnd, defaultFileName, hasSelectedKey, branch));
         if (choice is null)
         {
             return;
@@ -330,7 +333,22 @@ internal sealed class ImportExportCommands
             return;
         }
 
-        RegistryPath? startKey = choice.Range == ExportFileRange.SelectedBranch || hive ? selectedPath : null;
+        // Selected branch exports the key typed in the branch edit. OK already checked that it exists, so the
+        // tree selection is not used. A hive export of All still saves the selected key.
+        RegistryPath? startKey = null;
+        if (choice.Range == ExportFileRange.SelectedBranch)
+        {
+            if (!TryParseBranch(choice.BranchText, out startKey))
+            {
+                await _context.ShowMessageAsync(Get("DialogExportBranchCaption"), Get("DialogAddressBarKeyNotFound"));
+                return;
+            }
+        }
+        else if (hive)
+        {
+            startKey = selectedPath;
+        }
+
         RegistryExportScope scope = choice.Range == ExportFileRange.WholeRegistry
             ? RegistryExportScope.WholeRegistry
             : RegistryExportScope.Selection;
@@ -406,6 +424,51 @@ internal sealed class ImportExportCommands
         // export success string. The command ends silently.
         Log.Info($"Registry Editor export of '{choice.FilePath}' completed.");
     }
+
+    /// <summary>The branch edit's rules: the selected key in classic form, the key check, and the missing-key box.</summary>
+    private ExportBranchRules BranchRules(RegistryPath? selectedKey) => new(
+        selectedKey is null ? string.Empty : ClassicPath(selectedKey),
+        BranchKeyExists,
+        Get("DialogExportBranchCaption"),
+        Get("DialogAddressBarKeyNotFound"));
+
+    /// <summary>A key in the classic form the branch edit shows: no Computer prefix.</summary>
+    private static string ClassicPath(RegistryPath key)
+    {
+        string display = key.ToDisplayString();
+        return display.StartsWith(ComputerPrefix, StringComparison.OrdinalIgnoreCase)
+            ? display[ComputerPrefix.Length..]
+            : display;
+    }
+
+    private const string ComputerPrefix = @"Computer\";
+
+    /// <summary>
+    /// Parses a typed branch path. The Computer prefix and trailing backslashes are removed, and the path is
+    /// parsed as a registry path, which compares names without regard to case.
+    /// </summary>
+    private static bool TryParseBranch(string text, out RegistryPath? key)
+    {
+        string trimmed = text.Trim();
+        if (trimmed.StartsWith(ComputerPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = trimmed[ComputerPrefix.Length..];
+        }
+
+        trimmed = trimmed.TrimEnd('\\');
+        if (trimmed.Length > 0 && RegistryPath.TryParse(trimmed, out RegistryPath? parsed) && parsed is not null)
+        {
+            key = parsed;
+            return true;
+        }
+
+        key = null;
+        return false;
+    }
+
+    /// <summary>Whether a typed branch path names an existing key. Runs on the UI thread from the dialog's OK.</summary>
+    private bool BranchKeyExists(string text) =>
+        TryParseBranch(text, out RegistryPath? key) && key is not null && _context.Store.Reader.KeyExists(key);
 
     /// <summary>
     /// Writes the export to a temporary file in the destination folder and moves it into place only

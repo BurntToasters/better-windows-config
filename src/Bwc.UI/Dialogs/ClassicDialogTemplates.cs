@@ -159,6 +159,28 @@ public static class ClassicDialogTemplates
         };
 
     /// <summary>
+    /// Add to Favorites (RT_DIALOG 112, DLG-024): one static label, the name edit, OK, and Cancel. 191 x 65 DLU.
+    /// Positions are the measured classic rectangles at 192 DPI, converted to DLU (3 device pixels per x DLU, 25/8
+    /// per y DLU). The caption and label are the caller's text.
+    /// </summary>
+    public static ClassicDialogDefinition AddFavorite(string caption, string label) =>
+        new(
+            caption,
+            "RT_DIALOG 112 (en-US regedit.exe.mui)",
+            191,
+            65,
+            [
+                Label("FavoriteNameLabel", label, 7, 15, 75, 8),
+                Edit("DialogTextInput", 1190, 7, 27, 120, 12),
+                Button("DialogPrimary", 1, "OK", 133, 7, 50, 14, isDefault: true),
+                Button("DialogSecondary", 2, "Cancel", 133, 24, 50, 14),
+            ])
+        {
+            FontFace = TemplateFont,
+            FontPointSize = 8,
+        };
+
+    /// <summary>
     /// The one-line prompt for a key or value name (RT_DIALOG 104, Load Hive). 252 x 53 DLU. The
     /// label and the caption are the caller's text.
     /// </summary>

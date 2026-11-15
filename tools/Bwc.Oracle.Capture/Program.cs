@@ -21,6 +21,7 @@ internal static class Program
         "  security  Edit > Permissions sheet and Advanced Security Settings windows (regedit-security.json)\n" +
         "  remote    Connect Network Registry to 127.0.0.1, menus, Import picker, Disconnect (regedit-remote.json)\n" +
         "  manifest  embedded RT_MANIFEST requestedExecutionLevel of regedit.exe (regedit-manifest.json)\n" +
+        "  export-range  classic Export range panel controls 1280 to 1282 and the missing-branch box (regedit-export-range.json)\n" +
         "  cleanup   delete HKCU\\Software\\BWC-Oracle\n" +
         "  --allow-dpi  record UI captures at a DPI other than 96 (the DPI is written into each output)";
 
@@ -130,6 +131,9 @@ internal static class Program
                     });
                     return 0;
 
+                case "export-range":
+                    OracleSession.Run("export-range", () => ExportRangeCapture.Run(paths, allowDpi));
+                    return 0;
                 case "manifest":
                     // Reads the image resource only. regedit is not started, so no session or GUI lock is needed.
                     ManifestCapture.Run(paths);
