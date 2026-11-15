@@ -105,12 +105,12 @@
 | CTX-033 | Expand | RT_MENU 107, id 915 | R12, U5 | gap |
 | CTX-034 | &Export | RT_MENU 107, id 659 | R12, R7 | gap |
 | CTX-035 | &Disconnect | RT_MENU 107, id 768 | R12, R8 | gap |
-| CTX-036 | Layout: Text edit context menu, identified by its contents (Cut, Copy, Paste, Delete, Select All with standard edit command ids); the control it attaches to is not in the dump (OQ-02). Separators (1): in menu root, after '&Delete' (separator carries command id 673, no text). | RT_MENU 108 | R12 | gap |
-| CTX-037 | Cu&t | RT_MENU 108, id 24 | R12, R5 | gap |
-| CTX-038 | &Copy | RT_MENU 108, id 3 | R12, R5 | gap |
-| CTX-039 | &Paste | RT_MENU 108, id 22 | R12, R5 | gap |
-| CTX-040 | &Delete | RT_MENU 108, id 46 | R12, R5 | gap |
-| CTX-041 | Select &All | RT_MENU 108, id 1024 | R12, R5 | gap |
+| CTX-036 | Layout: Text edit context menu, identified by its contents (Cut, Copy, Paste, Delete, Select All with standard edit command ids); the control it attaches to is not in the dump (OQ-02). Separators (1): in menu root, after '&Delete' (separator carries command id 673, no text). | RT_MENU 108 | R12 | pass |
+| CTX-037 | Cu&t | RT_MENU 108, id 24 | R12, R5 | pass |
+| CTX-038 | &Copy | RT_MENU 108, id 3 | R12, R5 | pass |
+| CTX-039 | &Paste | RT_MENU 108, id 22 | R12, R5 | pass |
+| CTX-040 | &Delete | RT_MENU 108, id 46 | R12, R5 | pass |
+| CTX-041 | Select &All | RT_MENU 108, id 1024 | R12, R5 | pass |
 
 ### 2.3 DLG: dialogs (RT_DIALOG)
 
@@ -178,27 +178,27 @@ Layout rows give the template order, the default button, the tab stops and the r
 | ACC-002 | Shift+Tab: reverse pane switch (command 641; no menu item or string in the dump; expected reverse of Tab, verify; OQ-04). | RT_ACCELERATOR 100, entry 2 (key VK_TAB, flags 0x0007, command 641) | R12, U5 | pass |
 | ACC-003 | F2: Rename the selected key or value (command 914; Edit > Rename). | RT_ACCELERATOR 100, entry 3 (key VK_F2, flags 0x0003, command 914) | R12, R4 | pass |
 | ACC-004 | F3: Find Next (command 671; Edit > Find Next). | RT_ACCELERATOR 100, entry 4 (key VK_F3, flags 0x0003, command 671) | R12, R9 | pass |
-| ACC-005 | F4: command 642; no menu item or string in the dump (OQ-04). | RT_ACCELERATOR 100, entry 5 (key VK_F4, flags 0x0003, command 642) | R12 | gap |
+| ACC-005 | F4: command 642; no menu item or string in the dump (OQ-04). | RT_ACCELERATOR 100, entry 5 (key VK_F4, flags 0x0003, command 642) | R12 | pass |
 | ACC-006 | F5: Refresh the view (command 648; View > Refresh); the only refresh trigger (BEH-007). | RT_ACCELERATOR 100, entry 6 (key VK_F5, flags 0x0003, command 648) | R12, R2 | pass |
 | ACC-007 | F6: same command as Tab (640); pane switch (verify; OQ-04). | RT_ACCELERATOR 100, entry 7 (key VK_F6, flags 0x0003, command 640) | R12, U5 | pass |
-| ACC-008 | Shift+F10: command 896; no menu item or string in the dump; purpose not confirmed (OQ-04). | RT_ACCELERATOR 100, entry 8 (key VK_F10, flags 0x0007, command 896) | R12 | gap |
+| ACC-008 | Shift+F10: command 896; no menu item or string in the dump; purpose not confirmed (OQ-04). | RT_ACCELERATOR 100, entry 8 (key VK_F10, flags 0x0007, command 896) | R12 | pass |
 | ACC-009 | Delete: Delete the selection (command 913; Edit > Delete). | RT_ACCELERATOR 100, entry 9 (key VK_DELETE, flags 0x0003, command 913) | R12, R4 | pass |
 | ACC-010 | Ctrl+F: Find (command 662; Edit > Find). | RT_ACCELERATOR 100, entry 10 (key ASCII 0x06 (Ctrl+F), flags 0x0002, command 662) | R12, R9 | pass |
 | ACC-011 | Ctrl+P: Print (command 660; File > Print). | RT_ACCELERATOR 100, entry 11 (key ASCII 0x10 (Ctrl+P), flags 0x0002, command 660) | R12, R14 | gap |
 | ACC-012 | Ctrl+T: Go to HKEY_LOCAL_MACHINE (command 918; the tree key menu item 918, which is not on the main menu). | RT_ACCELERATOR 100, entry 12 (key ASCII 0x14 (Ctrl+T), flags 0x0002, command 918) | R12, R2 | pass |
 | ACC-013 | Alt+D: command 672; no menu item or string in the dump; expected address bar focus (not verified; OQ-04). | RT_ACCELERATOR 100, entry 13 (key 'D', flags 0x0011, command 672) | R12 | pass |
 | ACC-014 | Ctrl+L: command 672, same as Alt+D (not verified; OQ-04). | RT_ACCELERATOR 100, entry 14 (key ASCII 0x0C (Ctrl+L), flags 0x0002, command 672) | R12 | pass |
-| ACC-015 | Alt+1: command 689; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 15 (key '1', flags 0x0011, command 689) | R12 | gap |
-| ACC-016 | Alt+2: command 690; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 16 (key '2', flags 0x0011, command 690) | R12 | gap |
-| ACC-017 | Alt+3: command 691; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 17 (key '3', flags 0x0011, command 691) | R12 | gap |
-| ACC-018 | Alt+4: command 692; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 18 (key '4', flags 0x0011, command 692) | R12 | gap |
-| ACC-019 | Alt+5: command 693; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 19 (key '5', flags 0x0011, command 693) | R12 | gap |
-| ACC-020 | Alt+6: command 694; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 20 (key '6', flags 0x0011, command 694) | R12 | gap |
-| ACC-021 | Alt+7: command 695; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 21 (key '7', flags 0x0011, command 695) | R12 | gap |
-| ACC-022 | Alt+8: command 696; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 22 (key '8', flags 0x0011, command 696) | R12 | gap |
-| ACC-023 | Alt+9: command 697; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 23 (key '9', flags 0x0011, command 697) | R12 | gap |
-| ACC-024 | Alt+Up: command 698; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 24 (key VK_UP, flags 0x0091, command 698) | R12 | gap |
-| ACC-025 | Backspace: move the selection to the parent key (brief; not an accelerator table entry). | Brief (not in the accelerator table) | R12, U5 | gap |
+| ACC-015 | Alt+1: command 689; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 15 (key '1', flags 0x0011, command 689) | R12 | pass |
+| ACC-016 | Alt+2: command 690; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 16 (key '2', flags 0x0011, command 690) | R12 | pass |
+| ACC-017 | Alt+3: command 691; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 17 (key '3', flags 0x0011, command 691) | R12 | pass |
+| ACC-018 | Alt+4: command 692; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 18 (key '4', flags 0x0011, command 692) | R12 | pass |
+| ACC-019 | Alt+5: command 693; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 19 (key '5', flags 0x0011, command 693) | R12 | pass |
+| ACC-020 | Alt+6: command 694; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 20 (key '6', flags 0x0011, command 694) | R12 | pass |
+| ACC-021 | Alt+7: command 695; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 21 (key '7', flags 0x0011, command 695) | R12 | pass |
+| ACC-022 | Alt+8: command 696; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 22 (key '8', flags 0x0011, command 696) | R12 | pass |
+| ACC-023 | Alt+9: command 697; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 23 (key '9', flags 0x0011, command 697) | R12 | pass |
+| ACC-024 | Alt+Up: command 698; no menu item or string in the dump; purpose unknown (OQ-04). | RT_ACCELERATOR 100, entry 24 (key VK_UP, flags 0x0091, command 698) | R12 | pass |
+| ACC-025 | Backspace: move the selection to the parent key (brief; not an accelerator table entry). | Brief (not in the accelerator table) | R12, U5 | pass |
 | ACC-026 | Numpad * (multiply): expand all descendants of the selected key (brief; not an accelerator table entry). | Brief (not in the accelerator table) | U5, R12 | pass |
 | ACC-027 | Type-ahead in the tree: typing selects the next key whose name starts with the typed text (brief; exact timing and wrap rules are verify items). | Brief (not in the accelerator table) | U5 | pass |
 | ACC-028 | Type-ahead in the value list: typing selects the next value whose name starts with the typed text (brief; exact rules are verify items). | Brief (not in the accelerator table) | U7 | pass |
@@ -525,7 +525,7 @@ Skipped (format fragments with no user text): 8100 (" : " joiner) and 8111 (a 19
 | BEH-007 | No live refresh: the tree and value list are snapshots. Only F5 (Refresh; accelerator 648; View > Refresh) re-reads the registry. The engine does not watch for changes. | registry-engine.md (Threading); RT_ACCELERATOR 100 (648); RT_MENU 103 (View > Refresh) | R2, B2 | pass |
 | BEH-008 | No undo: no Undo command or accelerator appears in any menu or in the accelerator table. Deletes, renames and edits take effect immediately. | RT_MENU 103 to 108 (absence); RT_ACCELERATOR 100 (absence) | U3, R4 | pass |
 | BEH-009 | No drag-and-drop: keys and values cannot be dragged between keys, panes or other windows. No drag-related menu item or string exists in the dump. | Brief; RT_MENU and RT_STRING (absence) | U5, U7 | gap |
-| BEH-010 | Inline rename of keys and values, started by F2 (accelerator 914) or by a slow second click on the selected item (brief). Name errors use RT_STRING 66 to 70 (keys) and 73 to 75 (values). | Brief; RT_ACCELERATOR 100 (914); RT_STRING 66 to 75 | R4, U5 | gap |
+| BEH-010 | Inline rename of keys and values, started by F2 (accelerator 914) or by a slow second click on the selected item (brief). Name errors use RT_STRING 66 to 70 (keys) and 73 to 75 (values). | Brief; RT_ACCELERATOR 100 (914); RT_STRING 66 to 75 | R4, U5 | pass |
 | BEH-011 | Default new names: New Key #1 and New Value #1 (RT_STRING 23 and 24, with a counter that starts at 1). The counter rule (first unused number) is verify. | RT_STRING 23, 24; brief | R3 | pass |
 | BEH-012 | Value rename is copy then delete (there is no native value rename). If the delete fails, the copy is removed. Errors: RT_STRING 72 to 75. | registry-engine.md (Writes); RT_STRING 72 to 75 | R4, B3 | pass |
 | BEH-013 | Delete confirmations: deleting a key asks RT_STRING 48 (caption RT_STRING 49). Deleting one value asks RT_STRING 52 (caption RT_STRING 51). Deleting several values asks RT_STRING 50 (caption RT_STRING 51). A partial failure reports RT_STRING 89 (caption RT_STRING 88). | RT_STRING 48 to 52, 88, 89 | R4, B3 | pass |

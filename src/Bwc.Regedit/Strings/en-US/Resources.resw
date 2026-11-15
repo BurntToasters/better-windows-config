@@ -905,5 +905,9 @@ Do you want to continue the operation?</value>
   <data name="PrintNoClass" xml:space="preserve">
     <value>&lt;NO CLASS&gt;</value>
   </data>
+  <!-- Oracle menu 768 (RT_MENU 107, "&amp;Disconnect"). Used by the Computer root and remote menus. -->
+  <data name="ContextDisconnect" xml:space="preserve">
+    <value>&amp;Disconnect</value>
+  </data>
 </root>
 

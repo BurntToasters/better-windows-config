@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Bwc.UI.Theme;
 using Bwc.UI.Tree;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 #if BWC_E2E
@@ -99,6 +100,14 @@ public sealed partial class DetailsList : UserControl
     private int _focus = -1;
     private int _renameIndex = -1;
     private bool _renaming;
+
+    // When the selection last changed to a single row, in ClickTiming ticks. A slow second click is measured from it.
+    private long _selectedAtTick;
+
+    // A slow click starts the rename after the double-click time, unless other input comes first (BEH-010).
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _renameTimer;
+    private int _pendingRenameIndex = -1;
+    private long _lastPressAt;
     private bool _listFocused;
     private int _sortVersion;
     private long _typeAheadTick;
@@ -165,6 +174,8 @@ public sealed partial class DetailsList : UserControl
         ActualThemeChanged += OnActualThemeChanged;
         RenameBox.KeyDown += OnRenameKeyDown;
         RenameBox.LostFocus += OnRenameLostFocus;
+        Bwc.UI.Menu.TextEditMenu.Attach(RenameBox);
+        LostFocus += (_, _) => CancelPendingRename();
 
         ApplyMetrics();
         UpdateHelpText();
@@ -481,6 +492,12 @@ public sealed partial class DetailsList : UserControl
     /// </summary>
     internal void RowPressed(DetailsRowElement row, PointerRoutedEventArgs e)
     {
+        // The focus is read before this press moves it. A slow click needs the list to have had the focus.
+        bool hadFocus = ClickTiming.HasFocusWithin(this);
+        CancelPendingRename();
+        long now = ClickTiming.Now();
+        bool quiet = now - _lastPressAt >= ClickTiming.DoubleClickMilliseconds();
+        _lastPressAt = now;
         _ = Focus(FocusState.Pointer);
         e.Handled = true;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
@@ -497,6 +514,10 @@ public sealed partial class DetailsList : UserControl
 
         bool shift = IsShiftDown();
         bool control = IsKeyDown(VirtualKey.Control);
+
+        // BEH-010: a click on the only selected row that had the focus starts the rename after the double-click time.
+        bool slow = quiet && hadFocus && !shift && !control && _selected.Count == 1 && _selected.Contains(index) &&
+            ClickTiming.IsSlowSecondClick(_selectedAtTick);
         if (shift && _anchor >= 0)
         {
             SelectRange(_anchor, index, add: control);
@@ -512,6 +533,45 @@ public sealed partial class DetailsList : UserControl
 
         _focus = index;
         RefreshRealizedRows();
+        if (slow)
+        {
+            ArmRename(index);
+        }
+    }
+
+    /// <summary>Starts the inline rename of this row when the double-click time passes with no other input.</summary>
+    private void ArmRename(int index)
+    {
+        _pendingRenameIndex = index;
+        _renameTimer ??= CreateRenameTimer();
+        _renameTimer.Interval = TimeSpan.FromMilliseconds(ClickTiming.DoubleClickMilliseconds());
+        _renameTimer.Start();
+    }
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer CreateRenameTimer()
+    {
+        Microsoft.UI.Dispatching.DispatcherQueueTimer timer = DispatcherQueue.CreateTimer();
+        timer.IsRepeating = false;
+        timer.Tick += OnRenameTimerTick;
+        return timer;
+    }
+
+    private void CancelPendingRename()
+    {
+        _pendingRenameIndex = -1;
+        _renameTimer?.Stop();
+    }
+
+    private void OnRenameTimerTick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
+    {
+        sender.Stop();
+        int pending = _pendingRenameIndex;
+        _pendingRenameIndex = -1;
+        if (pending >= 0 && !_renaming && pending == _focus && _selected.Count == 1 && _selected.Contains(pending) &&
+            ClickTiming.HasFocusWithin(this))
+        {
+            BeginRename();
+        }
     }
 
     /// <summary>
@@ -545,6 +605,7 @@ public sealed partial class DetailsList : UserControl
     /// </summary>
     internal void RowDoubleTapped(DetailsRowElement row, DoubleTappedRoutedEventArgs e)
     {
+        CancelPendingRename();
         int index = row.Index;
         if (_renaming || index < 0 || index >= _rows.Count)
         {
@@ -610,7 +671,14 @@ public sealed partial class DetailsList : UserControl
 
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        CancelPendingRename();
         if (_renaming)
+        {
+            return;
+        }
+
+        // Alt+Up selects the parent key from either pane, so the window handles it (command 698).
+        if (e.Key == VirtualKey.Up && IsKeyDown(VirtualKey.Menu))
         {
             return;
         }
@@ -779,6 +847,10 @@ public sealed partial class DetailsList : UserControl
 
         if (index < 0 || index >= _rows.Count)
         {
+            // Nothing is selected, so the menu is the list background menu (measured for Shift+F10).
+            ContextRequested?.Invoke(
+                this,
+                new DetailsRowContextRequestedEventArgs(null, this, new Point(24, DenseMetrics.HeaderHeight + 4)));
             return;
         }
 
@@ -893,6 +965,12 @@ public sealed partial class DetailsList : UserControl
         _selected.Clear();
         _selected.Add(index);
         _anchor = index;
+        if (changed)
+        {
+            CancelPendingRename();
+            _selectedAtTick = ClickTiming.Now();
+        }
+
         RefreshRealizedRows();
         if (changed)
         {

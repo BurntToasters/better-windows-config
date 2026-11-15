@@ -26,14 +26,14 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | Section | pass | declared-difference | gap |
 | --- | --- | --- | --- |
 | MENU | 35 | 0 | 2 |
-| CTX | 31 | 0 | 10 |
+| CTX | 37 | 0 | 4 |
 | DLG | 21 | 4 | 26 |
-| ACC | 14 | 0 | 14 |
+| ACC | 27 | 0 | 1 |
 | MSG | 138 | 43 | 95 |
 | VIEW | 17 | 2 | 2 |
-| BEH | 35 | 5 | 9 |
+| BEH | 36 | 5 | 8 |
 | EXP | 32 | 0 | 0 |
-| All (535) | 323 | 54 | 158 |
+| All (535) | 343 | 54 | 138 |
 
 ## Gaps by piece
 
@@ -41,8 +41,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | --- | --- |
 | D1 | DLG-033, DLG-034, DLG-037, DLG-038, DLG-039, DLG-040, DLG-041, DLG-042, DLG-043, DLG-046, DLG-047, MSG-194, MSG-195, MSG-196, MSG-197, MSG-198, MSG-199, MSG-200, MSG-201, MSG-202, MSG-203, MSG-204, MSG-205, MSG-206, MSG-207, MSG-208, MSG-209, MSG-210, MSG-211, MSG-212, MSG-213, MSG-214, MSG-215, MSG-216, MSG-217, MSG-218, MSG-219, MSG-220, MSG-221, MSG-222, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276 |
 | F2 | DLG-023, DLG-035, DLG-036, MSG-022, MSG-052, MSG-053, MSG-060, MSG-061, MSG-062, MSG-066, MSG-109, MSG-110, MSG-111, VIEW-009, BEH-009, BEH-043 |
-| K1 | CTX-036, CTX-037, CTX-038, CTX-039, CTX-040, CTX-041, DLG-001, DLG-002, DLG-005, DLG-024, DLG-025, ACC-005, ACC-008, ACC-011, ACC-015, ACC-016, ACC-017, ACC-018, ACC-019, ACC-020, ACC-021, ACC-022, ACC-023, ACC-024, ACC-025, MSG-098, MSG-116, MSG-117, MSG-118, MSG-120, MSG-122, VIEW-019, BEH-010, BEH-021 |
-| P1 | MENU-009, DLG-009, DLG-015, DLG-016, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276, BEH-027 |
+| K1 | DLG-001, DLG-002, DLG-005, DLG-024, DLG-025, MSG-098, MSG-116, MSG-117, MSG-118, MSG-120, MSG-122, VIEW-019, BEH-021 |
+| P1 | MENU-009, DLG-009, DLG-015, DLG-016, ACC-011, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276, BEH-027 |
 | R2 | MENU-008, CTX-032, CTX-033, CTX-034, CTX-035, DLG-013, DLG-014, DLG-031, DLG-032, MSG-021, MSG-069, MSG-072, MSG-073, BEH-023, BEH-024, BEH-025 |
 | S1 | MSG-174, MSG-175, MSG-176, MSG-177, MSG-179, MSG-181, MSG-182, MSG-183, MSG-184, MSG-185, MSG-187, MSG-188, MSG-189, MSG-190, BEH-026 |
 
@@ -110,7 +110,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | CTX-014 | pass | ContextMenus_OpenAndInvokeCommands; Robustness_ExpandedKeyMenuShowsCollapse; Permissions_TreeContextMenuShowsEnabledPermissions (Computer-root menu measured by O1) |  |
 | CTX-015 | pass | ContextMenus_OpenAndInvokeCommands; Robustness_ExpandedKeyMenuShowsCollapse; Permissions_TreeContextMenuShowsEnabledPermissions (Computer-root menu measured by O1) |  |
 | CTX-016 | pass | ContextMenus_OpenAndInvokeCommands; Robustness_ExpandedKeyMenuShowsCollapse; Permissions_TreeContextMenuShowsEnabledPermissions (Computer-root menu measured by O1) |  |
-| CTX-017 | pass | Parity_CtrlT_TogglesBetweenLocalMachineAndCurrentUser; ContextMenus_OpenAndInvokeCommands |  |
+| CTX-017 | pass | Classic removes item 918 from the shown hive and key menus (regedit-context.json); BWC matches (ContextMenus_KeyMenuHasNoGoToAndDeleteRenameDisabledOnHive). Ctrl+T still navigates (Parity_CtrlT_TogglesBetweenLocalMachineAndCurrentUser) |  |
 | CTX-018 | pass | ContextMenus_OpenAndInvokeCommands; Robustness_ValueMenuDeleteRemovesOnlyTheValue; Basics_EditMenuModifyItemsFollowTheValueSelection |  |
 | CTX-019 | pass | ContextMenus_OpenAndInvokeCommands; Robustness_ValueMenuDeleteRemovesOnlyTheValue; Basics_EditMenuModifyItemsFollowTheValueSelection |  |
 | CTX-020 | pass | ContextMenus_OpenAndInvokeCommands; Robustness_ValueMenuDeleteRemovesOnlyTheValue; Basics_EditMenuModifyItemsFollowTheValueSelection |  |
@@ -129,12 +129,12 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | CTX-033 | gap | Remote menu used for every remote node, Export always disabled (ContextMenuController.cs:85, 130); no test | R2 |
 | CTX-034 | gap | Remote menu used for every remote node, Export always disabled (ContextMenuController.cs:85, 130); no test | R2 |
 | CTX-035 | gap | Remote menu used for every remote node, Export always disabled (ContextMenuController.cs:85, 130); no test | R2 |
-| CTX-036 | gap | RT_MENU 108 not implemented; attachment measured by O1 | K1 |
-| CTX-037 | gap | RT_MENU 108 not implemented; attachment measured by O1 | K1 |
-| CTX-038 | gap | RT_MENU 108 not implemented; attachment measured by O1 | K1 |
-| CTX-039 | gap | RT_MENU 108 not implemented; attachment measured by O1 | K1 |
-| CTX-040 | gap | RT_MENU 108 not implemented; attachment measured by O1 | K1 |
-| CTX-041 | gap | RT_MENU 108 not implemented; attachment measured by O1 | K1 |
+| CTX-036 | pass | HexContextMenu_HasTheRt108ItemsAndStates (hex area of Edit Binary Value, regedit-context.json); text boxes show the system edit menu (ContextMenus_AddressBarHasTheSystemEditMenu) |  |
+| CTX-037 | pass | HexContextMenu_HasTheRt108ItemsAndStates (hex area of Edit Binary Value, regedit-context.json); text boxes show the system edit menu (ContextMenus_AddressBarHasTheSystemEditMenu) |  |
+| CTX-038 | pass | HexContextMenu_HasTheRt108ItemsAndStates (hex area of Edit Binary Value, regedit-context.json); text boxes show the system edit menu (ContextMenus_AddressBarHasTheSystemEditMenu) |  |
+| CTX-039 | pass | HexContextMenu_HasTheRt108ItemsAndStates (hex area of Edit Binary Value, regedit-context.json); text boxes show the system edit menu (ContextMenus_AddressBarHasTheSystemEditMenu) |  |
+| CTX-040 | pass | HexContextMenu_HasTheRt108ItemsAndStates (hex area of Edit Binary Value, regedit-context.json); text boxes show the system edit menu (ContextMenus_AddressBarHasTheSystemEditMenu) |  |
+| CTX-041 | pass | HexContextMenu_HasTheRt108ItemsAndStates (hex area of Edit Binary Value, regedit-context.json); text boxes show the system edit menu (ContextMenus_AddressBarHasTheSystemEditMenu) |  |
 
 ### DLG
 
@@ -200,27 +200,27 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | ACC-002 | pass | Shell_TabCyclesTreeListAddressBar; Shell_ShiftTabReversesCycle |  |
 | ACC-003 | pass | Tree_RenameCommitsOnEnterAndFocusLossAndCancelsOnEscape |  |
 | ACC-004 | pass | Find_FollowsTheClassicTwoDialogSequence |  |
-| ACC-005 | gap | F4 (642) not handled; meaning measured by O1 | K1 |
+| ACC-005 | pass | Keyboard_F4FocusesAddressBarAndOpensSuggestions; Keyboard_TypingShowsSubkeySuggestionsAndEnterNavigates (regedit-keys.json) |  |
 | ACC-006 | pass | Basics_CopyKeyNameAndF5KeepTheView |  |
 | ACC-007 | pass | Shell_F6CyclesPanesLikeTab |  |
-| ACC-008 | gap | Shift+F10 (896) meaning measured by O1; no test | K1 |
+| ACC-008 | pass | ContextMenus_ShiftF10OnListBackgroundAndComputerRoot (regedit-keys.json) |  |
 | ACC-009 | pass | Basics_DeleteWithTreeFocusDeletesTheKey |  |
 | ACC-010 | pass | Find_EditMenuFindRunsFromTheKeyboard |  |
-| ACC-011 | gap | Ctrl+P fires only with tree or list focus (RegeditRootView.xaml.cs:441) | K1 |
+| ACC-011 | gap | Ctrl+P is window-wide in code; no E2E from the address bar yet (P1 tests it with the Print dialog) | P1 |
 | ACC-012 | pass | Parity_CtrlT_TogglesBetweenLocalMachineAndCurrentUser |  |
 | ACC-013 | pass | Shell_CtrlLAndAltDFocusAddressBar |  |
 | ACC-014 | pass | Shell_CtrlLAndAltDFocusAddressBar |  |
-| ACC-015 | gap | Alt+1 to Alt+9 and Alt+Up not handled; meaning measured by O1 | K1 |
-| ACC-016 | gap | Alt+1 to Alt+9 and Alt+Up not handled; meaning measured by O1 | K1 |
-| ACC-017 | gap | Alt+1 to Alt+9 and Alt+Up not handled; meaning measured by O1 | K1 |
-| ACC-018 | gap | Alt+1 to Alt+9 and Alt+Up not handled; meaning measured by O1 | K1 |
-| ACC-019 | gap | Alt+1 to Alt+9 and Alt+Up not handled; meaning measured by O1 | K1 |
-| ACC-020 | gap | Alt+1 to Alt+9 and Alt+Up not handled; meaning measured by O1 | K1 |
-| ACC-021 | gap | Alt+1 to Alt+9 and Alt+Up not handled; meaning measured by O1 | K1 |
-| ACC-022 | gap | Alt+1 to Alt+9 and Alt+Up not handled; meaning measured by O1 | K1 |
-| ACC-023 | gap | Alt+1 to Alt+9 and Alt+Up not handled; meaning measured by O1 | K1 |
-| ACC-024 | gap | Alt+1 to Alt+9 and Alt+Up not handled; meaning measured by O1 | K1 |
-| ACC-025 | gap | Backspace to parent has no test | K1 |
+| ACC-015 | pass | Keyboard_Alt1ToAlt9DoNothing (classic changes nothing, regedit-keys.json) |  |
+| ACC-016 | pass | Keyboard_Alt1ToAlt9DoNothing (classic changes nothing, regedit-keys.json) |  |
+| ACC-017 | pass | Keyboard_Alt1ToAlt9DoNothing (classic changes nothing, regedit-keys.json) |  |
+| ACC-018 | pass | Keyboard_Alt1ToAlt9DoNothing (classic changes nothing, regedit-keys.json) |  |
+| ACC-019 | pass | Keyboard_Alt1ToAlt9DoNothing (classic changes nothing, regedit-keys.json) |  |
+| ACC-020 | pass | Keyboard_Alt1ToAlt9DoNothing (classic changes nothing, regedit-keys.json) |  |
+| ACC-021 | pass | Keyboard_Alt1ToAlt9DoNothing (classic changes nothing, regedit-keys.json) |  |
+| ACC-022 | pass | Keyboard_Alt1ToAlt9DoNothing (classic changes nothing, regedit-keys.json) |  |
+| ACC-023 | pass | Keyboard_Alt1ToAlt9DoNothing (classic changes nothing, regedit-keys.json) |  |
+| ACC-024 | pass | Keyboard_AltUpSelectsParentFromTreeListAndAddress (regedit-keys.json) |  |
+| ACC-025 | pass | Keyboard_BackspaceSelectsParentOnlyWithTreeFocus (regedit-keys.json) |  |
 | ACC-026 | pass | Tree_NumpadKeysAndPageKeys |  |
 | ACC-027 | pass | Tree_TypeAheadExtendsPrefixCyclesAndRestarts |  |
 | ACC-028 | pass | List_OrderTypeAheadAndHeaderClick |  |
@@ -545,7 +545,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | BEH-007 | pass | Basics_CopyKeyNameAndF5KeepTheView |  |
 | BEH-008 | pass | Shell_MenuTableMatchesCommandStates (no Undo item) |  |
 | BEH-009 | gap | No negative drag-and-drop test | F2 |
-| BEH-010 | gap | F2 rename tested; slow second click not tested | K1 |
+| BEH-010 | pass | Tree_RenameCommitsOnEnterAndFocusLossAndCancelsOnEscape; Keyboard_SlowSecondClickStartsRename; Keyboard_DoubleClickOnSelectedValueOpensEditorWithoutRename; Keyboard_DoubleClickOnSelectedKeyTogglesWithoutRename; Keyboard_ClickOnSelectedListRowFromTreeFocusDoesNotRename |  |
 | BEH-011 | pass | Editing_CreatesRenamesAndDeletesRegistryObjects; Bwc.Registry.Tests (rename) |  |
 | BEH-012 | pass | Editing_CreatesRenamesAndDeletesRegistryObjects; Bwc.Registry.Tests (rename) |  |
 | BEH-013 | pass | Messages_ClassicCaptionsTextsAndButtonsAreShown; Basics_MultiDeleteTextAndDefaultRow |  |

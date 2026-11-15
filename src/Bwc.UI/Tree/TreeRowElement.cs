@@ -405,12 +405,21 @@ public sealed class TreeRowElement : Panel
     /// </summary>
     private void OnRowPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (e.Handled || !e.GetCurrentPoint(this).Properties.IsRightButtonPressed)
+        if (e.Handled)
         {
             return;
         }
 
-        Owner?.RowRightPressed(this);
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            Owner?.RowLeftPressed(this);
+            return;
+        }
+
+        if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed)
+        {
+            Owner?.RowRightPressed(this);
+        }
     }
 
     private void OnRowRightTapped(object sender, RightTappedRoutedEventArgs e)
