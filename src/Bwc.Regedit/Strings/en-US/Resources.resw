@@ -455,6 +455,9 @@ Error code: {1} (0x{1:X8})
   <data name="DialogConnectFailedTitle" xml:space="preserve">
     <value>Error Connecting Network Registry</value>
   </data>
+  <data name="ImportComputerLabel" xml:space="preserve">
+    <value>Select Computer:</value>
+  </data>
   <data name="DialogDisconnectTitle" xml:space="preserve">
     <value>Disconnect Network Registry</value>
   </data>
@@ -637,6 +640,18 @@ Details: {1}</value>
   <data name="MsgImportFileMissing" xml:space="preserve">
     <!-- Oracle 235 -->
     <value>Cannot import {0}: The file specified does not exist.</value>
+  </data>
+  <data name="MsgImportRemoteAccess" xml:space="preserve">
+    <!-- Oracle 131 -->
+    <value>Cannot import {0}: Error accessing the registry on {1}.</value>
+  </data>
+  <data name="MsgImportRemoteFileMissing" xml:space="preserve">
+    <!-- Oracle 135 -->
+    <value>Cannot import {0}: The file specified does not exist on {1}.</value>
+  </data>
+  <data name="MsgImportRemoteSucceeded" xml:space="preserve">
+    <!-- Oracle 128 -->
+    <value>The keys and values contained in {0} have been successfully added to the registry on {1}.</value>
   </data>
   <data name="MsgExportOpenFailed" xml:space="preserve">
     <!-- Oracle 138 -->

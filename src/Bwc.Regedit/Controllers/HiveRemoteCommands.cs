@@ -12,6 +12,11 @@ namespace Bwc.Regedit.Controllers;
 /// <summary>Load and Unload Hive, Connect and Disconnect Network Registry, and Permissions.</summary>
 internal sealed class HiveRemoteCommands
 {
+#if BWC_E2E
+    /// <summary>E2E only: the computer File > Connect uses instead of the picker. Shipping never reads it.</summary>
+    private const string ConnectTargetVariable = "BWC_E2E_CONNECT_TARGET";
+#endif
+
     private readonly RegeditContext _context;
     private bool _remoteConnectionsDisposed;
 
@@ -275,18 +280,20 @@ internal sealed class HiveRemoteCommands
             return;
         }
 
-        var dialog = new TextPromptDialog(
-            Get("DialogConnectTitle"),
-            Get("DialogConnectLabel"),
-            string.Empty,
-            ValidateRemoteComputerName);
-
-        if (!await _context.ShowDialogAsync(dialog))
+        string? picked = await ChooseComputerAsync();
+        if (picked is null)
         {
             return;
         }
 
-        string computerName = dialog.Value.Trim();
+        string computerName = picked;
+        if (_context.RemoteConnections.Any(existing =>
+                string.Equals(existing.ComputerName, computerName, StringComparison.OrdinalIgnoreCase)))
+        {
+            // The picker can return a computer that is already connected. That computer keeps its one connection.
+            await _context.ShowMessageAsync(Get("DialogConnectTitle"), Get("DialogConnectDuplicate"));
+            return;
+        }
 
         RemoteRegistryConnection connection;
         try
@@ -342,17 +349,66 @@ internal sealed class HiveRemoteCommands
         Log.Info($"Registry Editor connected to the remote computer '{connection.ComputerName}'.");
     }
 
+    /// <summary>
+    /// The computer to connect to, or null when the user cancelled. The picker is the File > Connect choice. The text
+    /// prompt is the fallback when the picker cannot run. E2E builds may name the computer in BWC_E2E_CONNECT_TARGET.
+    /// </summary>
+    private async Task<string?> ChooseComputerAsync()
+    {
+#if BWC_E2E
+        string? target = Environment.GetEnvironmentVariable(ConnectTargetVariable);
+        if (!string.IsNullOrWhiteSpace(target))
+        {
+            Log.Info("Registry Editor connects to the E2E target from BWC_E2E_CONNECT_TARGET, without the picker.");
+            return target.Trim();
+        }
+#endif
+
+        ComputerPicker.Outcome outcome = ShowPicker(out string? picked);
+        if (outcome == ComputerPicker.Outcome.Selected)
+        {
+            return picked;
+        }
+
+        if (outcome == ComputerPicker.Outcome.Cancelled)
+        {
+            return null;
+        }
+
+        var prompt = new TextPromptDialog(
+            Get("DialogConnectTitle"),
+            Get("DialogConnectLabel"),
+            string.Empty,
+            ValidateRemoteComputerName);
+
+        if (!await _context.ShowDialogAsync(prompt))
+        {
+            return null;
+        }
+
+        return prompt.Value.Trim();
+    }
+
+    /// <summary>Runs the picker as a modal of the main window. The modal flag is held while it is open.</summary>
+    private ComputerPicker.Outcome ShowPicker(out string? computerName)
+    {
+        _context.DialogOpen = true;
+        try
+        {
+            return ComputerPicker.Show(_context.WindowHwnd, out computerName);
+        }
+        finally
+        {
+            _context.DialogOpen = false;
+        }
+    }
+
     private string? ValidateRemoteComputerName(string name)
     {
         string candidate = name.Trim();
         if (candidate.Length == 0)
         {
             return Get("DialogConnectEmpty");
-        }
-
-        if (RemoteRegistryConnection.IsLocalComputer(candidate))
-        {
-            return Get("DialogConnectLocal");
         }
 
         if (candidate.Length > 255 ||
