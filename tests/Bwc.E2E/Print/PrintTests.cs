@@ -88,7 +88,8 @@ public sealed class PrintTests
             using var session = new AppSession(config, config.RegeditExePath, environment: environment);
             using var driver = new EditingDriver(session);
 
-            CheckComputerDisablesPrint(session, driver);
+            CheckPrintEnabledAtNode(session, driver, "Computer", "print.menu.computer-enabled");
+            CheckPrintEnabledAtNode(session, driver, "HKEY_CURRENT_USER", "print.menu.hive-enabled");
 
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
             bool seeded = ControlTestSupport.WaitUntil(
@@ -130,17 +131,27 @@ public sealed class PrintTests
         }
     }
 
-    private static void CheckComputerDisablesPrint(AppSession session, EditingDriver driver)
+    // Print is enabled at Computer, a hive root, and a key (oracle regedit-print.json). Selects the node, then reads
+    // the File menu item.
+    private static void CheckPrintEnabledAtNode(AppSession session, EditingDriver driver, string nodeName, string checkId)
     {
         _ = ControlTestSupport.EnsureForeground(session);
+        AutomationElement? row = ControlTestSupport.FindRowByName(
+            session,
+            ControlTestSupport.TreeControl,
+            ControlType.TreeItem,
+            nodeName);
+        ControlTestSupport.Select(row);
+        bool selected = ControlTestSupport.WaitUntil(() => ControlTestSupport.IsSelected(row), TimeSpan.FromSeconds(5));
+
         bool opened = TryOpenFileMenu(driver);
         AutomationElement? item = opened ? driver.WaitForElement("MenuCommand_" + CommandPrint, TimeSpan.FromSeconds(5)) : null;
         bool enabled = SafeIsEnabled(item);
 
         E2EResults.Record(
-            "print.menu.computer-disabled",
-            opened && item is not null && !enabled,
-            $"fileMenu={opened}, itemPresent={item is not null}, enabled={enabled}.");
+            checkId,
+            selected && opened && item is not null && enabled,
+            $"node={nodeName}, selected={selected}, fileMenu={opened}, itemPresent={item is not null}, enabled={enabled}.");
 
         CloseMenu(session);
     }
