@@ -2,7 +2,7 @@
 
 | <img height="20" src="https://raw.githubusercontent.com/BurntToasters/bcls/main/media/windows.png" /> Windows | <img height="20" src="https://raw.githubusercontent.com/BurntToasters/bcls/main/media/mac.png" /> macOS | <img height="20" src="https://raw.githubusercontent.com/BurntToasters/bcls/main/media/linux.png" /> Linux |
 | :--- | :--- | :--- |
-| **Setup EXE:** [x64](https://github.com/BurntToasters/better-windows-config/releases/download/v0.1.1/BetterWindowsConfig-0.1.1-win-x64-setup.exe) / [arm64](https://github.com/BurntToasters/better-windows-config/releases/download/v0.1.1/BetterWindowsConfig-0.1.1-win-arm64-setup.exe) | | |
+| **Setup EXE:** [x64](https://github.com/BurntToasters/better-windows-config/releases/download/v0.1.2/BetterWindowsConfig-0.1.2-win-x64-setup.exe) / [arm64](https://github.com/BurntToasters/better-windows-config/releases/download/v0.1.2/BetterWindowsConfig-0.1.2-win-arm64-setup.exe) | | |
 
 > Better Windows Config is Windows only. It needs Windows 10 version 2004 (build 19041) or later, or Windows 11.
 
@@ -16,6 +16,34 @@
 ### ℹ️ Enjoying Better Windows Config? Consider [❤️ Supporting Me! ❤️](https://rosie.run/support)
 
 Better Windows Config! Faithful, modern re-implementations of the classic Windows tools, starting with the Registry Editor.
+
+## Changes in `v0.1.2:`
+
+> [!IMPORTANT]
+> **Coming from 0.1.1?** Download the 0.1.2 setup EXE above and run it. 0.1.2 installs for all users in Program Files and asks for administrator permission.
+> 0.1.1 won't offer this update in the app.
+> Your settings are kept, and the old per-user copy and its shortcuts are removed the first time the new Hub starts.
+> From 0.1.2 on, in-app updates ask Windows for permission once per update.
+
+- **Installer and updater:** Installs for all users in Program Files, with Start menu shortcuts for everyone.
+  - Updates are checked and verified before Windows asks for administrator permission, then install from a protected copy.
+  - After an update, the Hub reopens at normal rights, not as administrator.
+  - Installing and updating need administrator rights. If Better Windows Config is running in another Windows session, the update stops and says so.
+  - The update dialog says when Windows will ask for permission.
+- **Registry Editor:**
+  - Remote registry editing: Connect Network Registry opens the Select Computer picker, and every command works on a connected computer.
+  - Permissions: owner, auditing, and effective access. Apply keeps inherited entries.
+  - Print shows progress with a Cancel button. Text export matches classic regedit byte for byte.
+  - Resource values open in the classic viewers: resource lists, full resource descriptors, and requirements lists.
+  - Keyboard and menus match classic: F4 for the address bar, Alt+Up for the parent key, Shift+F10 for the context menu, and a slow second click to rename. Add to Favorites and the Export branch box match the classic dialogs.
+  - Screen readers announce list cells, hex bytes, and dialog controls by their classic labels. Dialogs follow high contrast themes.
+  - A number too large for a DWORD or QWORD asks the classic truncation question instead of refusing.
+  - Sibling keys sort in classic order.
+- **Fixes:**
+  - Delete, Modify, and rename act on the key the list shows, so they can't hit a value of the same name in another key.
+  - A value named `(Default)` is shown separately from the key's default value.
+  - A failed key delete refreshes the tree, so subkeys that were already removed no longer stay listed.
+  - Keys named `.` or `..` show and work in the tree, Find, Permissions, and export.
 
 ## Changes in `v0.1.1:`
 
