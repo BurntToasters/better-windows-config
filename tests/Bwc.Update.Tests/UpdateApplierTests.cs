@@ -67,6 +67,7 @@ public sealed class UpdateApplierTests
         {
             TrustedPublicKeys = [Key.PublicKeyText],
             ProgramFilesRoot = null,
+            ProtectedAcl = ProtectedAcl.ForCurrentUser(),
         };
 
         public UpdateApplier Applier => new(Options, Host);
@@ -87,8 +88,8 @@ public sealed class UpdateApplierTests
         public ElevatedApplyRequest ElevatedRequest(string ownVersion = "0.1.0", string? architecture = null, string? stagingFolder = null) =>
             new(stagingFolder ?? Folder, Root, InstallDir, ownVersion, architecture ?? Architecture);
 
-        public static string Comment(string version, string architecture) =>
-            $"timestamp:1794102823\tfile:installer.exe\tversion:{version}\tarch:{architecture}";
+        public static string Comment(string version, string architecture, string channel = "beta") =>
+            $"timestamp:1794102823\tfile:installer.exe\tversion:{version}\tarch:{architecture}\tproduct:bwc\tchannel:{channel}";
 
         public JsonObject ReceiptJson() => new()
         {

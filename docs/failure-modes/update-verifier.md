@@ -123,6 +123,8 @@ Terms:
 | IN5 | Valid signature for the `win-x64` build, served for `win-arm64` | Cross-architecture install | Reject `InstallerCommentMismatch` (comment `arch:` is signed) | `Installer_Arch_Mismatch_Rejected` |
 | IN6 | Signed `version:` differs from the entry version | Replay of another release | Reject `InstallerCommentMismatch` | `Installer_Version_Mismatch_Rejected` |
 | IN7 | Signed comment lacks `version:` or `arch:` | WA if missing fields pass | Reject `InstallerCommentMismatch` | `Installer_Comment_Missing_Field_Rejected` |
+| IN7b | Signed comment lacks `product:bwc`, or names another product (0.1.2) | A signed installer of another product accepted | Reject `InstallerCommentMismatch` | `Installer_Product_Missing_Rejected`, `Installer_Product_Wrong_Rejected` |
+| IN7c | Signed `channel:` is missing, or is not the channel of the manifest and receipt (0.1.2) | A beta installer replayed on stable | Reject `InstallerCommentMismatch` | `Installer_Channel_Missing_Rejected`, `Installer_Channel_Mismatch_Rejected` |
 | IN8 | Signed `file:` value has a separator, `..`, or a colon | Traversal through a caller that uses the name | Reject | `Installer_Comment_File_Traversal_Rejected` |
 | IN9 | Connection closed before `Content-Length` bytes arrive | Partial file reported as complete | Reject `InstallerDownloadInterrupted`, partial file deleted | `Interrupted_Download_Rejected` |
 | IN10 | No bytes for longer than the stall timeout | Hang | Reject `Timeout` (stalled) | `Stalled_Download_Times_Out` |

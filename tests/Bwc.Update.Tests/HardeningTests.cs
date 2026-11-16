@@ -43,7 +43,7 @@ public sealed class HardeningTests
     [TestMethod]
     public void Verify_Read_Failure_Refused()
     {
-        var expected = new InstallerExpectation("0.2.0", Architectures.X64, 4096, new string('0', 64), "sig");
+        var expected = new InstallerExpectation("0.2.0", Architectures.X64, 4096, new string('0', 64), "sig", "stable");
 
         var outcome = InstallerVerifier.Verify(new FailingStream(4096), expected, ["RWQ"]);
 

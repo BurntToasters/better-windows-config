@@ -29,7 +29,39 @@ public static class ProcessCommands
     /// <see cref="OtherSessionExitCode"/>: each one is printed as <c>RunningInOtherSession session=n name pid=n</c>.
     /// </summary>
     public static int CloseRunning(string installDir, IReadOnlyList<int> excluded, int timeoutSeconds, TextWriter output) =>
-        CloseRunning(installDir, excluded, timeoutSeconds, output, new SystemProcessSource(), ProcessScan.CurrentSessionId(), PostCloseToWindows);
+        CloseRunningScoped(
+            installDir,
+            excluded,
+            timeoutSeconds,
+            output,
+            new SystemProcessSource(),
+            ProcessScan.CurrentSessionId(),
+            PostCloseToWindows,
+            ProcessIdentity.IsElevatedOrHighIntegrity,
+            () => PrivilegeScope.TryEnable(PrivilegeScope.DebugPrivilege));
+
+    /// <summary>
+    /// The command with <c>SeDebugPrivilege</c> enabled around the whole scan and close when the process is elevated and the
+    /// token holds it, so the image of a process that belongs to another user can be read (update-elevation.md, HC1). The
+    /// privilege goes back to its earlier state when the command ends or throws. A token without it, and a process that is
+    /// not elevated, run the command as before (HC2, HC4). Tests give the elevation check and the privilege step.
+    /// </summary>
+    internal static int CloseRunningScoped(
+        string installDir,
+        IReadOnlyList<int> excluded,
+        int timeoutSeconds,
+        TextWriter output,
+        IProcessSource source,
+        int currentSession,
+        Action<int> postClose,
+        Func<bool> isElevated,
+        Func<IDisposable?> enableDebugPrivilege)
+    {
+        ArgumentNullException.ThrowIfNull(isElevated);
+        ArgumentNullException.ThrowIfNull(enableDebugPrivilege);
+        using var privilege = isElevated() ? enableDebugPrivilege() : null;
+        return CloseRunning(installDir, excluded, timeoutSeconds, output, source, currentSession, postClose);
+    }
 
     /// <summary>
     /// The same command with the process list, the current session, and the "ask this process to close" step given by the

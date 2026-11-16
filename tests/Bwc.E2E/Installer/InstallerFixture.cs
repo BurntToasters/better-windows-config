@@ -75,7 +75,7 @@ internal sealed class InstallerFixture : IDisposable
                 installerPath,
                 keyDir,
                 "--trusted-comment",
-                "timestamp:" + TrustedCommentTimestamp + " version:" + version + " arch:" + rid);
+                "timestamp:" + TrustedCommentTimestamp + " version:" + version + " arch:" + rid + " product:bwc channel:stable");
             string envelope = File.ReadAllText(installerPath + ".sig").Trim();
 
             return new InstallerFixture(

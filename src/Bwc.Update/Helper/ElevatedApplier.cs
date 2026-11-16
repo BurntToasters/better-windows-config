@@ -1,19 +1,24 @@
 using System.ComponentModel;
+using System.Security.Cryptography;
 using Bwc.Core;
 
 namespace Bwc.Update;
 
 /// <summary>
-/// <c>--apply-elevated &lt;staging folder&gt;</c>: the elevated half of an update. The medium helper
+/// <c>--apply-elevated &lt;staging folder&gt;</c>: the elevated half of an update. The medium helper
 /// (<see cref="UpdateApplier"/>)
 /// verified the installer and asked for elevation. This process does not trust that: the staging folder is under a folder
 /// that medium-integrity processes can write. So it copies the installer into a protected folder next to the install dir
-/// (<see cref="ProtectedStore"/>), verifies the copy, and starts the copy. Everything else is its own: the install dir is
-/// own folder, the current version is its own version, and no switch comes from the caller.
+/// (<see cref="ProtectedStore"/>, explicit DACL), verifies the copy, and starts the copy with a protected temp folder as
+/// its TEMP and TMP. Everything else is its own: the install dir is its own folder, the current version is its own
+/// version, and no switch comes from the caller.
 ///
-/// Order: elevated token, own folder and version, staging folder shape and links, receipt, version order, protected root,
-/// stale folders, bounded copy, verification of the copy, start. A refusal removes the new copy and starts the Hub again at
-/// the shell's integrity level with the failure code. It writes no file log (<see cref="UpdateLogging"/>).
+/// Order: elevated token, own folder and version, staging folder shape and links, receipt, version order, protected root
+/// (created, or an existing one with a trusted owner and DACL), stale folders, bounded copy, verification of the copy,
+/// start. The copy is held by one handle or another from the first write to the start
+/// (see <see cref="CopyVerifyAndStart"/>).
+/// A refusal removes the new copy and starts the Hub again at the shell's integrity level with the failure code. It writes
+/// no file log (<see cref="UpdateLogging"/>).
 /// </summary>
 public sealed class ElevatedApplier
 {
@@ -27,6 +32,15 @@ public sealed class ElevatedApplier
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _host = host ?? throw new ArgumentNullException(nameof(host));
     }
+
+    /// <summary>
+    /// Test seam: runs after the copy was verified through the first reader and before the second reader is opened, with
+    /// the copy's path. A test changes the file here to show that the change is caught.
+    /// </summary>
+    internal Action<string>? BetweenHandles { get; set; }
+
+    /// <summary>Test seam: runs with the new copy folder's path right after it is created, before its temp folder is.</summary>
+    internal Action<string>? AfterCopyFolder { get; set; }
 
     public ApplyOutcome Apply(ElevatedApplyRequest request)
     {
@@ -51,8 +65,10 @@ public sealed class ElevatedApplier
     {
         ChildEnvironment.RemoveCompatibilityLayer();
 
-        // A root override is the E2E flavor's. A bad one is refused, and a good one stands in for the elevated token.
         string? overrideRoot = null;
+#if BWC_E2E
+        // A root override is the E2E flavor's. A bad one is refused, and a good one stands in for the elevated token.
+        // This branch is not compiled into the ship build (HB1).
         if (request.E2EProtectedRoot is not null)
         {
             var tempRoot = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(request.StagingRoot));
@@ -63,6 +79,9 @@ public sealed class ElevatedApplier
         }
 
         if (overrideRoot is null && !_host.IsElevated())
+#else
+        if (!_host.IsElevated())
+#endif
         {
             return Plain(UpdateFailure.NotElevated, "--apply-elevated needs an elevated token; nothing was done");
         }
@@ -138,14 +157,15 @@ public sealed class ElevatedApplier
             return Refuse(request, UpdateFailure.InstallerTooLarge, "the receipt size is over the limit");
         }
 
-        var root = ProtectedStore.EnsureRoot(overrideRoot ?? ProtectedStore.RootFor(ownDirectory));
+        var acl = _options.ProtectedAcl ?? ProtectedAcl.Ship();
+        var root = ProtectedStore.EnsureRoot(overrideRoot ?? ProtectedStore.RootFor(ownDirectory), acl);
         if (!root.Ok)
         {
             return Refuse(request, root.Failure, root.Detail);
         }
 
         _ = ProtectedStore.RemoveStale(root.Value!);
-        var started = CopyVerifyAndStart(offered, stagingFolder, ownDirectory, root.Value!);
+        var started = CopyVerifyAndStart(offered, stagingFolder, ownDirectory, root.Value!, acl);
         return started.Ok
             ? new ApplyOutcome(UpdateFailure.None, "installer started", InstallerStarted: true, HubLaunched: false)
             : Refuse(request, started.Failure, started.Detail);
@@ -154,19 +174,51 @@ public sealed class ElevatedApplier
     /// <summary>
     /// Copies the installer, verifies the copy, and starts it. Success means the installer started. A failure is returned
     /// without cleanup: the caller removes the copy folder once the file handles opened here are closed.
+    ///
+    /// Handles on the copy (HP7): the writer (FileShare.Read) writes and flushes; a first reader (FileShare.ReadWrite, so
+    /// it can coexist with the writer) is opened while the writer is open, and the whole verification runs through it; the
+    /// writer is closed; a second reader (FileShare.Read) is opened while the first is open, and its size and SHA-256 must
+    /// be the verified ones; then the first is closed. The second stays open through the start, so the bytes started are
+    /// the bytes verified, and there is never a moment when another process could open the file with no sharing.
     /// </summary>
-    private Outcome<string> CopyVerifyAndStart(UpdateReceipt offered, string stagingFolder, string ownDirectory, string root)
+    private Outcome<string> CopyVerifyAndStart(
+        UpdateReceipt offered,
+        string stagingFolder,
+        string ownDirectory,
+        string root,
+        ProtectedAcl acl)
     {
-        var expected = new InstallerExpectation(offered.Version, offered.Architecture, offered.Size, offered.Sha256, offered.Signature);
+        var expected = new InstallerExpectation(
+            offered.Version,
+            offered.Architecture,
+            offered.Size,
+            offered.Sha256,
+            offered.Signature,
+            UpdateChannelNames.ToText(offered.Channel));
         var sourcePath = Path.Combine(stagingFolder, InstallerPaths.InstallerName);
+
+        var folder = ProtectedStore.NewCopyFolder(root, acl);
+        if (!folder.Ok)
+        {
+            return Outcome<string>.Fail(folder.Failure, folder.Detail);
+        }
+
+        _copyFolder = folder.Value!;
+        AfterCopyFolder?.Invoke(_copyFolder);
+        var temp = ProtectedStore.NewTempFolder(_copyFolder, acl);
+        if (!temp.Ok)
+        {
+            return Outcome<string>.Fail(UpdateFailure.InstallerFailed, "the protected temp folder cannot be created: " + temp.Detail);
+        }
+
+        var copyPath = Path.Combine(_copyFolder, InstallerPaths.InstallerName);
+        FileStream? first;
 
         // The source stays open with FileShare.Read only while it is copied, so no writer can change it meanwhile.
         // Its final path must be installer.exe in the folder that was checked and is held open.
-        _copyFolder = ProtectedStore.NewCopyFolder(root);
-        var copyPath = Path.Combine(_copyFolder, InstallerPaths.InstallerName);
-        using (var folder = InstallerPaths.OpenFolder(stagingFolder))
+        using (var stagingHandle = InstallerPaths.OpenFolder(stagingFolder))
         {
-            if (folder is null)
+            if (stagingHandle is null)
             {
                 return Outcome<string>.Fail(UpdateFailure.PathRejected, "staging folder cannot be opened");
             }
@@ -178,7 +230,7 @@ public sealed class ElevatedApplier
             }
 
             var finalPath = InstallerPaths.FinalPathOf(source.SafeFileHandle);
-            if (finalPath is null || !InstallerPaths.InFolder(folder, finalPath))
+            if (finalPath is null || !InstallerPaths.InFolder(stagingHandle, finalPath))
             {
                 return Outcome<string>.Fail(UpdateFailure.PathRejected, "installer is not in the folder that was checked");
             }
@@ -188,21 +240,40 @@ public sealed class ElevatedApplier
             {
                 return Outcome<string>.Fail(copied.Failure, copied.Detail);
             }
+
+            first = copied.Value!;
         }
 
-        // The copy is what gets verified and started. It stays open with FileShare.Read until the start.
-        using var copy = OpenForRead(copyPath);
-        if (copy is null)
+        using (first)
         {
-            return Outcome<string>.Fail(UpdateFailure.PathRejected, "the copy cannot be opened for verification");
-        }
+            var verified = InstallerVerifier.Verify(first, expected, _options.TrustedPublicKeys);
+            if (!verified.Ok)
+            {
+                return Outcome<string>.Fail(verified.Failure, verified.Detail);
+            }
 
-        var verified = InstallerVerifier.Verify(copy, expected, _options.TrustedPublicKeys);
-        if (!verified.Ok)
-        {
-            return Outcome<string>.Fail(verified.Failure, verified.Detail);
-        }
+            BetweenHandles?.Invoke(copyPath);
 
+            // The second reader is opened while the first is held, then compared with what was verified. A change made
+            // between the handles is caught here, and the held file is the one that is started.
+            using var held = OpenForRead(copyPath);
+            if (held is null)
+            {
+                return Outcome<string>.Fail(UpdateFailure.PathRejected, "the copy cannot be locked for the start");
+            }
+
+            if (held.Length != offered.Size || !string.Equals(Sha256Of(held), offered.Sha256, StringComparison.Ordinal))
+            {
+                return Outcome<string>.Fail(UpdateFailure.InstallerHashMismatch, "the copy changed after it was verified");
+            }
+
+            first.Dispose();
+            return Start(copyPath, ownDirectory, temp.Value!);
+        }
+    }
+
+    private Outcome<string> Start(string copyPath, string ownDirectory, string tempFolder)
+    {
         var arguments = InstallerArguments.Build(ownDirectory, [], Environment.ProcessId);
         if (!arguments.Ok)
         {
@@ -211,7 +282,7 @@ public sealed class ElevatedApplier
 
         try
         {
-            if (!_host.StartInstaller(copyPath, arguments.Value!))
+            if (!_host.StartInstaller(copyPath, arguments.Value!, tempFolder))
             {
                 return Outcome<string>.Fail(UpdateFailure.InstallerFailed, "installer did not start");
             }
@@ -224,6 +295,12 @@ public sealed class ElevatedApplier
         }
 
         return Outcome<string>.Success(copyPath);
+    }
+
+    private static string Sha256Of(Stream stream)
+    {
+        stream.Position = 0;
+        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
 
     /// <summary>A failure that does nothing else: no copy is removed and the Hub is not started.</summary>

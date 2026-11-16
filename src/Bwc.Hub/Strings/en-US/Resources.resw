@@ -211,6 +211,9 @@ Download and Install checks the update again, closes the Hub, and replaces the i
   <data name="UpdateFailUnexpected" xml:space="preserve">
     <value>The update could not be completed because of an unexpected error, so it was not installed. Your installed tools have not been changed. Try again later.</value>
   </data>
+  <data name="UpdateFailElevated" xml:space="preserve">
+    <value>Updates are not checked while Better Windows Config runs with administrator rights. Close it, open it again without administrator rights, and check for updates there. Your installed tools have not been changed.</value>
+  </data>
   <data name="UpdateFailGeneric" xml:space="preserve">
     <value>The update could not be verified, so it was not installed. Your installed tools have not been changed. Try again later.</value>
   </data>

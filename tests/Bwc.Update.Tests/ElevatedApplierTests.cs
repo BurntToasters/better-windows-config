@@ -602,6 +602,25 @@ public sealed class ElevatedApplierTests
         Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
     }
 
+#if !BWC_E2E
+    // HB1: in the ship build the E2E root and the non-elevated branch are not compiled, so a request that carries a root is
+    // a plain NotElevated.
+    [TestMethod]
+    public void E2E_Root_Ignored_In_Ship()
+    {
+        using var h = new UpdateApplierTests.Harness();
+        h.Host.Elevated = false;
+        var e2eRoot = Path.Combine(h.Dir.Root, "BWC-Protected");
+        var request = h.ElevatedRequest() with { E2EProtectedRoot = e2eRoot };
+
+        var outcome = new ElevatedApplier(h.Options, h.Host).Apply(request);
+
+        Assert.AreEqual(UpdateFailure.NotElevated, outcome.Failure, outcome.Detail);
+        Assert.AreEqual(0, h.Host.Launched);
+        Assert.IsFalse(Directory.Exists(e2eRoot), "the root is not created");
+        Assert.IsFalse(Directory.Exists(h.ProtectedRoot));
+    }
+#else
     // EE1
     [TestMethod]
     public void Non_Elevated_With_E2E_Root_Proceeds()
@@ -647,6 +666,7 @@ public sealed class ElevatedApplierTests
         Assert.AreEqual(UpdateFailure.InvalidOptions, outcome.Failure, outcome.Detail);
         Assert.AreEqual(0, h.Host.Launched);
     }
+#endif
 
     [TestMethod]
     [DataRow(@"C:\T\run\x", @"C:\T\run", @"C:\T\run\BWC-Update", true)]

@@ -1,11 +1,14 @@
+using System.Security.AccessControl;
 using System.Text.RegularExpressions;
 
 namespace Bwc.Update;
 
 /// <summary>
 /// The folder where the elevated helper puts its copy of the installer: <c>&lt;install dir&gt;.upd</c>, a sibling of the
-/// install folder, created under Program Files so it inherits admin-only access. Each run uses a new 32-hex folder name.
-/// Older folders of that shape are removed at the start of the next run, and never through a link.
+/// install folder. It is created with an explicit protected DACL (<see cref="ProtectedAcl"/>: SYSTEM and
+/// Administrators only,
+/// no inheritance), and an existing one is used only when its owner and DACL pass the same rule. Each run uses a new 32-hex
+/// folder name. Older folders of that shape are removed at the start of the next run, and never through a link.
 /// </summary>
 public static partial class ProtectedStore
 {
@@ -20,11 +23,14 @@ public static partial class ProtectedStore
     public static string RootFor(string installDir) => Path.TrimEndingDirectorySeparator(installDir) + FolderSuffix;
 
     /// <summary>
-    /// Makes sure the root is a real folder: it is created when missing (its parent must exist), and refused when it is a
-    /// file, a link, or a junction, or cannot be inspected.
+    /// Makes sure the root is a real, protected folder. It is created when missing (its parent must exist) with the explicit
+    /// DACL of <paramref name="acl"/>. An existing root is refused when it is a file, a link, or a junction, when its owner is
+    /// not an owner of <paramref name="acl"/>, or when its DACL grants write to anyone else (HP2, HP3, HP5). The new or
+    /// existing folder is inspected after the create, so a folder made by someone else in the gap is refused too.
     /// </summary>
-    public static Outcome<string> EnsureRoot(string root)
+    public static Outcome<string> EnsureRoot(string root, ProtectedAcl acl)
     {
+        ArgumentNullException.ThrowIfNull(acl);
         try
         {
             var parent = Path.GetDirectoryName(root);
@@ -41,17 +47,65 @@ public static partial class ProtectedStore
                     return Outcome<string>.Fail(UpdateFailure.PathRejected, "the protected folder is a link or a file");
                 }
 
-                return Outcome<string>.Success(root);
+                return Inspected(root, acl);
             }
 
-            _ = Directory.CreateDirectory(root);
-            return Outcome<string>.Success(root);
+            new DirectoryInfo(root).Create(acl.NewSecurity());
+            return Inspected(root, acl);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        catch (Exception ex) when (IsAclFailure(ex))
         {
-            return Outcome<string>.Fail(UpdateFailure.Io, "the protected folder cannot be prepared: " + ex.GetType().Name);
+            return AclFailure(ex, "the protected folder cannot be prepared");
         }
     }
+
+    /// <summary>
+    /// Creates one new folder with the explicit protected DACL of <paramref name="acl"/> and checks the result: not a link,
+    /// owner and DACL as the rule says. The folder must not exist. Used for the copy folder and its temp folder.
+    /// </summary>
+    public static Outcome<string> NewProtectedFolder(string path, ProtectedAcl acl)
+    {
+        ArgumentNullException.ThrowIfNull(acl);
+        try
+        {
+            if (Directory.Exists(path) || File.Exists(path))
+            {
+                return Outcome<string>.Fail(UpdateFailure.PathRejected, "the folder to create already exists");
+            }
+
+            new DirectoryInfo(path).Create(acl.NewSecurity());
+            var attributes = File.GetAttributes(path);
+            if ((attributes & FileAttributes.ReparsePoint) != 0 || (attributes & FileAttributes.Directory) == 0)
+            {
+                return Outcome<string>.Fail(UpdateFailure.PathRejected, "the new folder is a link or a file");
+            }
+
+            return Inspected(path, acl);
+        }
+        catch (Exception ex) when (IsAclFailure(ex))
+        {
+            return AclFailure(ex, "the folder cannot be created with a protected access list");
+        }
+    }
+
+    private static Outcome<string> Inspected(string folder, ProtectedAcl acl)
+    {
+        var reason = acl.Inspect(new DirectoryInfo(folder).GetAccessControl());
+        return reason is null
+            ? Outcome<string>.Success(folder)
+            : Outcome<string>.Fail(UpdateFailure.PathRejected, "the protected folder is not trusted: " + reason);
+    }
+
+    private static bool IsAclFailure(Exception ex) =>
+        ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException
+            or PrivilegeNotHeldException or ArgumentException;
+
+    // An IO error is Io. A refusal by the access control (no right, no privilege, an access list that cannot be set) is
+    // PathRejected: there is no fallback to an unprotected folder.
+    private static Outcome<string> AclFailure(Exception ex, string text) =>
+        ex is IOException
+            ? Outcome<string>.Fail(UpdateFailure.Io, text + ": " + ex.GetType().Name)
+            : Outcome<string>.Fail(UpdateFailure.PathRejected, text + ": " + ex.GetType().Name);
 
     /// <summary>
     /// Removes the earlier copy folders under the root: only folders whose name is 32 lowercase hex digits, and never one
@@ -87,52 +141,64 @@ public static partial class ProtectedStore
         return removed;
     }
 
-    /// <summary>Creates a new copy folder under the root and returns its path. The name is a new 32-hex id.</summary>
-    public static string NewCopyFolder(string root)
-    {
-        var folder = Path.Combine(root, Guid.NewGuid().ToString("N"));
-        _ = Directory.CreateDirectory(folder);
-        return folder;
-    }
+    /// <summary>Name of the temp folder inside a copy folder. The installer's TEMP and TMP name it (HT1).</summary>
+    public const string TempFolderName = "tmp";
+
+    /// <summary>Creates a new protected copy folder under the root. The name is a new 32-hex id.</summary>
+    public static Outcome<string> NewCopyFolder(string root, ProtectedAcl acl) =>
+        NewProtectedFolder(Path.Combine(root, Guid.NewGuid().ToString("N")), acl);
+
+    /// <summary>Creates the protected temp folder inside a copy folder, for the installer's TEMP and TMP.</summary>
+    public static Outcome<string> NewTempFolder(string copyFolder, ProtectedAcl acl) =>
+        NewProtectedFolder(Path.Combine(copyFolder, TempFolderName), acl);
 
     /// <summary>
     /// Copies up to <paramref name="expectedSize"/> bytes of <paramref name="source"/> (from its start) into
     /// <paramref name="destination"/>, which must not exist. A source with more bytes than expected stops the copy at one
-    /// byte over and fails <see cref="UpdateFailure.InstallerTooLarge"/>. The caller verifies the copy afterwards.
+    /// byte over and fails <see cref="UpdateFailure.InstallerTooLarge"/>. The writer (FileShare.Read) writes and flushes
+    /// to disk, and a reader is opened while the writer is still open, so there is no moment when nothing of ours holds the
+    /// file (HP7). The writer is then closed and the reader returned: the caller verifies through it and opens the next
+    /// reader before closing this one. The reader shares read and write, because the writer was open when it was opened.
     /// </summary>
-    public static Outcome<long> CopyBounded(Stream source, string destination, long expectedSize)
+    public static Outcome<FileStream> CopyBounded(Stream source, string destination, long expectedSize)
     {
         ArgumentNullException.ThrowIfNull(source);
+        FileStream? reader = null;
         try
         {
             source.Position = 0;
-            using var target = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            var buffer = new byte[CopyBufferBytes];
-            long total = 0;
-            while (true)
+            using (var target = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
             {
-                var wanted = (int)Math.Min(buffer.Length, expectedSize + 1 - total);
-                var read = source.Read(buffer, 0, wanted);
-                if (read == 0)
+                var buffer = new byte[CopyBufferBytes];
+                long total = 0;
+                while (true)
                 {
-                    break;
+                    var wanted = (int)Math.Min(buffer.Length, expectedSize + 1 - total);
+                    var read = source.Read(buffer, 0, wanted);
+                    if (read == 0)
+                    {
+                        break;
+                    }
+
+                    total += read;
+                    if (total > expectedSize)
+                    {
+                        return Outcome<FileStream>.Fail(UpdateFailure.InstallerTooLarge, "installer is larger than the receipt says");
+                    }
+
+                    target.Write(buffer, 0, read);
                 }
 
-                total += read;
-                if (total > expectedSize)
-                {
-                    return Outcome<long>.Fail(UpdateFailure.InstallerTooLarge, "installer is larger than the receipt says");
-                }
-
-                target.Write(buffer, 0, read);
+                target.Flush(flushToDisk: true);
+                reader = new FileStream(destination, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             }
 
-            target.Flush(flushToDisk: true);
-            return Outcome<long>.Success(total);
+            return Outcome<FileStream>.Success(reader);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return Outcome<long>.Fail(UpdateFailure.Io, "installer cannot be copied: " + ex.GetType().Name);
+            reader?.Dispose();
+            return Outcome<FileStream>.Fail(UpdateFailure.Io, "installer cannot be copied: " + ex.GetType().Name);
         }
     }
 

@@ -8,17 +8,46 @@ namespace Bwc.Update;
 /// </summary>
 public static class ProgramFilesRule
 {
-    /// <summary>True when <paramref name="dir"/> is inside <paramref name="programFiles"/> (any depth). Fails closed.</summary>
+    /// <summary>
+    /// True when <paramref name="dir"/> is inside <paramref name="programFiles"/> (any depth). It normalizes both paths
+    /// itself and returns false on any exception. The shared running-process rule counts a path it cannot normalize as
+    /// inside, which is right for "is something running from here" and wrong for "may this run elevated" (HR1).
+    /// </summary>
     public static bool IsUnder(string? dir, string? programFiles)
     {
-        if (string.IsNullOrWhiteSpace(dir) || string.IsNullOrWhiteSpace(programFiles)
-            || !Path.IsPathFullyQualified(dir) || !Path.IsPathFullyQualified(programFiles))
+        if (string.IsNullOrWhiteSpace(dir) || string.IsNullOrWhiteSpace(programFiles))
         {
             return false;
         }
 
-        return RunningImageRule.IsUnderDirectory(dir, programFiles);
+        try
+        {
+            if (!Path.IsPathFullyQualified(dir) || !Path.IsPathFullyQualified(programFiles))
+            {
+                return false;
+            }
+
+            var folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(programFiles)) + Path.DirectorySeparatorChar;
+            return Path.GetFullPath(dir).StartsWith(folder, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
+}
+
+/// <summary>Which helper modes never run with an elevated token. A listed mode refuses with RunningElevated.</summary>
+public static class ElevationPolicy
+{
+    public const string RefusalDetail = "the update helper runs elevated, so nothing was fetched or written";
+
+    /// <summary>
+    /// True for the modes that talk to the network and write the user-writable staging root: <c>--check</c> and
+    /// <c>--download</c>. <c>--apply</c> refuses elevated inside the applier (it relaunches the Hub with the code), and the
+    /// process modes of the installer are meant to run elevated.
+    /// </summary>
+    public static bool RefusesElevated(UpdateMode mode) => mode is UpdateMode.Check or UpdateMode.Download;
 }
 
 /// <summary>Compares two folder paths. Used to check that a caller's install dir is the helper's own folder.</summary>

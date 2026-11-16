@@ -91,9 +91,11 @@ public interface IUpdateProcessHost
     /// <summary>
     /// Starts the installer with a raw command line (never re-quoted) and returns without waiting for it.
     /// Returns false when it did not start. The installer is never killed by the helper. Only the elevated helper
-    /// calls this, and it is already elevated, so there is no verb.
+    /// calls this, and it is already elevated, so there is no verb. The installer's TEMP and TMP are
+    /// <paramref name="tempFolder"/> (a protected folder), and its environment has no .NET runtime variables
+    /// (<see cref="ChildEnvironment.ForInstaller"/>).
     /// </summary>
-    bool StartInstaller(string installerPath, string arguments);
+    bool StartInstaller(string installerPath, string arguments, string tempFolder);
 
     /// <summary>Starts an executable without waiting. Returns false when the file does not exist.</summary>
     bool StartDetached(string exePath, IReadOnlyList<string> arguments, string workingDirectory);

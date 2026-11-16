@@ -344,6 +344,10 @@ internal sealed class UpdateService
         "InstallerDownload" or "InstallerDownloadInterrupted" or "DownloadFailed" or "ManifestSignatureDownload" or "Timeout"
             => "UpdateFailDownload",
         "Unexpected" => "UpdateFailUnexpected",
+
+        // The helper refuses --check and --download with an elevated token. An elevated Hub cannot update: it says so
+        // plainly. (--apply with an elevated token relaunches the Hub with RunningElevated, which has its own text.)
+        "RunningElevated" => "UpdateFailElevated",
         _ => "UpdateFailGeneric",
     };
 

@@ -6,7 +6,7 @@ namespace Bwc.Update.Tests;
 [TestClass]
 public sealed class InstallerVerifierTests
 {
-    private const string GoodComment = "timestamp:1794102823\tfile:installer.exe\tversion:0.2.0\tarch:win-x64";
+    private const string GoodComment = "timestamp:1794102823\tfile:installer.exe\tversion:0.2.0\tarch:win-x64\tproduct:bwc\tchannel:stable";
 
     private TempDir _dir = null!;
     private SigningKey _key = null!;
@@ -33,8 +33,9 @@ public sealed class InstallerVerifierTests
         byte[] bytes,
         SignedFile signed,
         string version = "0.2.0",
-        string architecture = Architectures.X64) =>
-        new(version, architecture, bytes.Length, Payloads.Sha256Hex(bytes), Sig.Envelope(signed.Raw));
+        string architecture = Architectures.X64,
+        string channel = "stable") =>
+        new(version, architecture, bytes.Length, Payloads.Sha256Hex(bytes), Sig.Envelope(signed.Raw), channel);
 
     private Outcome<string> Verify(string path, InstallerExpectation expected) =>
         Verify(path, expected, [_key.PublicKeyText]);
@@ -73,7 +74,7 @@ public sealed class InstallerVerifierTests
     {
         var (path, bytes, _) = SignInstaller(name: "served.bin");
         var (_, _, otherSigned) = SignInstaller(name: "other.bin", bytes: Payloads.Pattern(4096, seed: 9));
-        var expected = new InstallerExpectation("0.2.0", Architectures.X64, bytes.Length, Payloads.Sha256Hex(bytes), Sig.Envelope(otherSigned.Raw));
+        var expected = new InstallerExpectation("0.2.0", Architectures.X64, bytes.Length, Payloads.Sha256Hex(bytes), Sig.Envelope(otherSigned.Raw), "stable");
 
         Expect.Fails(Verify(path, expected), UpdateFailure.InstallerSignatureInvalid);
     }
@@ -100,6 +101,8 @@ public sealed class InstallerVerifierTests
     [DataRow("version:0.2.0")]
     [DataRow("arch:win-x64")]
     [DataRow("file:installer.exe")]
+    [DataRow("version:0.2.0\tarch:win-x64\tchannel:stable")]
+    [DataRow("version:0.2.0\tarch:win-x64\tproduct:bwc")]
     public void Installer_Comment_Missing_Field_Rejected(string comment)
     {
         var (path, bytes, signed) = SignInstaller(comment: comment);
@@ -115,16 +118,56 @@ public sealed class InstallerVerifierTests
     [DataRow("file:..")]
     public void Installer_Comment_File_Traversal_Rejected(string fileField)
     {
-        var comment = $"{fileField}\tversion:0.2.0\tarch:win-x64";
+        var comment = $"{fileField}\tversion:0.2.0\tarch:win-x64\tproduct:bwc\tchannel:stable";
         var (path, bytes, signed) = SignInstaller(comment: comment);
 
         Expect.Fails(Verify(path, ExpectationFor(bytes, signed)), UpdateFailure.InstallerCommentMismatch);
     }
 
+    // HI1
+    [TestMethod]
+    public void Installer_Product_Missing_Rejected()
+    {
+        var (path, bytes, signed) = SignInstaller(comment: "version:0.2.0\tarch:win-x64\tchannel:stable");
+
+        Expect.Fails(Verify(path, ExpectationFor(bytes, signed)), UpdateFailure.InstallerCommentMismatch);
+    }
+
+    [TestMethod]
+    [DataRow("other")]
+    [DataRow("BWC")]
+    [DataRow("bwcx")]
+    public void Installer_Product_Wrong_Rejected(string product)
+    {
+        var (path, bytes, signed) = SignInstaller(comment: $"version:0.2.0\tarch:win-x64\tproduct:{product}\tchannel:stable");
+
+        Expect.Fails(Verify(path, ExpectationFor(bytes, signed)), UpdateFailure.InstallerCommentMismatch);
+    }
+
+    // HI2
+    [TestMethod]
+    public void Installer_Channel_Missing_Rejected()
+    {
+        var (path, bytes, signed) = SignInstaller(comment: "version:0.2.0\tarch:win-x64\tproduct:bwc");
+
+        Expect.Fails(Verify(path, ExpectationFor(bytes, signed)), UpdateFailure.InstallerCommentMismatch);
+    }
+
+    [TestMethod]
+    [DataRow("stable", "beta")]
+    [DataRow("beta", "stable")]
+    [DataRow("nightly", "stable")]
+    public void Installer_Channel_Mismatch_Rejected(string signedChannel, string expectedChannel)
+    {
+        var (path, bytes, signed) = SignInstaller(comment: $"version:0.2.0\tarch:win-x64\tproduct:bwc\tchannel:{signedChannel}");
+
+        Expect.Fails(Verify(path, ExpectationFor(bytes, signed, channel: expectedChannel)), UpdateFailure.InstallerCommentMismatch);
+    }
+
     [TestMethod]
     public void Installer_Comment_Duplicate_Field_Rejected()
     {
-        var (path, bytes, signed) = SignInstaller(comment: "version:0.2.0\tversion:0.3.0\tarch:win-x64");
+        var (path, bytes, signed) = SignInstaller(comment: "version:0.2.0\tversion:0.3.0\tarch:win-x64\tproduct:bwc\tchannel:stable");
 
         Expect.Fails(Verify(path, ExpectationFor(bytes, signed)), UpdateFailure.InstallerCommentMismatch);
     }

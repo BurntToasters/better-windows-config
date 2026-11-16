@@ -22,6 +22,7 @@ the Hub, in `--update-result <code>`.
 | `ElevationDeclined` | The user declined the consent prompt (Win32 error 1223, `ERROR_CANCELLED`) that the shell showed for `--apply-elevated`. Nothing was installed. |
 | `NotElevated` | `--apply-elevated` ran without an elevated token. It did nothing. |
 | `RunningInOtherSession` | A BWC process from the install folder runs in another session (`--close-running`). Nothing was changed. |
+| `RunningElevated` | `--check`, `--download`, or `--apply` ran with an elevated token. `--check` and `--download` print it in their own JSON shape with exit code `1` and fetch and write nothing (an elevated Hub cannot update: the download must run unelevated, so nothing could be handed to `--apply-elevated`). |
 | `DeElevationFailed` | `--launch-hub` is elevated and cannot start the Hub through the desktop shell. Nothing was started. |
 
 ## `--close-running`
@@ -158,17 +159,24 @@ option is a usage error (exit `2`). It writes no log file; results are one JSON 
 4. The staging folder must be `%TEMP%\BWC-Update\<32 lowercase hex>` (the shape `UpdatePaths` and `InstallerPaths` use), with no
    link or junction on the way, and no link inside it. The receipt is read and validated as in `--apply`.
 5. The protected root is `<install dir>.upd`, a sibling of the install dir (for example
-   `C:\Program Files\Better Windows Config.upd`). It is created under Program Files and inherits its admin-only access.
-   It must not be a link or a file. Older folders `<protected root>\<32 lowercase hex>` are removed first: only folders
+   `C:\Program Files\Better Windows Config.upd`). It is created with an explicit protected DACL (SYSTEM and Administrators
+   full control, no inheritance, owner Administrators), not by inheriting one. An existing root must not be a link or a file,
+   must be owned by SYSTEM, Administrators, or TrustedInstaller, and its DACL must grant write to no one else, or the failure
+   is `PathRejected`. Older folders `<protected root>\<32 lowercase hex>` are removed first: only folders
    with such a name, never through a link (a link is not followed, and one inside a folder is removed as a link only), and
    a folder with a file in use is skipped.
-6. `installer.exe` is copied into `<protected root>\<new 32 hex>\installer.exe`. The source is opened with
+6. `installer.exe` is copied into `<protected root>\<new 32 hex>\installer.exe`; the copy folder and its `tmp` folder
+   have the same protected DACL. The source is opened with
    `FileShare.Read`; its final path must be the installer inside the checked folder; the copy stops one byte past the receipt
    size (`InstallerTooLarge`).
 7. The copy (not the source) is verified: size, SHA-256, minisign signature, and the signed trusted comment `version:`
-   (the receipt version, which is newer than this helper's) and `arch:`. The copy stays open with `FileShare.Read` until it starts.
+   (the receipt version, which is newer than this helper's) `arch:`, `product:bwc`, and `channel:` (the manifest's channel). The copy is held by one handle or another from the
+   first write until the installer starts: a reader is opened while the writer is open, the verification runs through it, and
+   a second reader (`FileShare.Read`) is opened and compared (size and SHA-256) before the first is closed.
 8. The copy is started with the raw command line `/S /RELAUNCH /PARENTPID=<this pid> /D=<install dir>` (`/D=` last and
-   unquoted), working directory the system folder. There is no verb: the helper is already elevated. The helper then exits.
+   unquoted), working directory the system folder. The installer's `TEMP` and `TMP` are `<copy folder>\tmp`, and its
+   environment has no .NET runtime variable (`DOTNET_*`, `COREHOST_*`, `CORECLR_*`, `COMPlus_*`) and no `__COMPAT_LAYER`.
+   There is no verb: the helper is already elevated. The helper then exits.
    `/PARENTPID` is the elevated helper, so the installer waits for the helper that holds the lock.
 9. Every refusal removes the new copy and starts the Hub at the shell's integrity level (see `--launch-hub`) with
    `--update-result <code>`. When that is not possible (`DeElevationFailed`), nothing is started and the failure is `HubMissing`.

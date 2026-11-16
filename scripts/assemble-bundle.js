@@ -28,6 +28,7 @@ import { channelForVersion } from "./lib/semver.js";
 import {
   buildManifest,
   manifestFileName,
+  installerTrustedComment,
   manifestTrustedComment,
   serializeManifest,
   validateManifestBuffer,
@@ -221,7 +222,7 @@ export async function assembleBundle(options) {
     if (path.resolve(target) !== resolved) {
       fs.copyFileSync(resolved, target);
     }
-    const signatureText = await signFile(target, keyText, `version:${version} arch:${architecture}`, {
+    const signatureText = await signFile(target, keyText, installerTrustedComment({ version, architecture, channel }), {
       password: options.password,
     });
     fs.writeFileSync(`${target}.minisig`, signatureText, "utf8");

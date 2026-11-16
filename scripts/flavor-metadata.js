@@ -45,11 +45,66 @@ const EXE_HEADS = [
   { name: "BetterWindowsConfig.exe", sourceManifest: "src/Bwc.Hub/app.manifest" },
   { name: "BwcUpdate.exe", sourceManifest: "src/Bwc.Update/app.manifest" },
 ];
+// The updater files that must not carry the E2E seam names in a ship folder (BwcUpdate.dll holds the managed code, the
+// exe is its apphost). A seam name in either means a ship helper can be steered by an environment variable.
+const SHIP_SEAM_FILES = ["BwcUpdate.dll", "BwcUpdate.exe"];
+const SEAM_PREFIX = "BWC_E2E_UPDATE_";
+const RUNTIME_CONFIG_NAME = "BwcUpdate.runtimeconfig.json";
+const STARTUP_HOOK_SWITCH = "System.StartupHookProvider.IsSupported";
 const E2E_EXECUTION_LEVEL = "asInvoker";
 const REQUESTED_LEVEL_NAME = "requestedExecutionLevel";
 const LEVEL_ATTRIBUTE = /\blevel\s*=\s*["']([A-Za-z]+)["']/;
 
 export const FLAVORS = [...FLAVOR_VALUES.keys()];
+
+/** True when the bytes contain the E2E seam prefix as UTF-8 or as UTF-16LE (a .NET string literal is UTF-16). */
+export function containsSeamName(bytes) {
+  return bytes.includes(Buffer.from(SEAM_PREFIX, "utf8")) || bytes.includes(Buffer.from(SEAM_PREFIX, "utf16le"));
+}
+
+/**
+ * The startup hook check for a published runtimeconfig.json text: the host must set System.StartupHookProvider.IsSupported
+ * to false, so DOTNET_STARTUP_HOOKS cannot load code into the elevated helper. Returns a problem text, or null.
+ */
+export function startupHookProblem(runtimeConfigText) {
+  let parsed;
+  try {
+    parsed = JSON.parse(runtimeConfigText);
+  } catch (error) {
+    return `${RUNTIME_CONFIG_NAME} is not valid JSON (${error.message})`;
+  }
+  const value = parsed?.runtimeOptions?.configProperties?.[STARTUP_HOOK_SWITCH];
+  return value === false ? null : `${RUNTIME_CONFIG_NAME} does not set ${STARTUP_HOOK_SWITCH} to false`;
+}
+
+// BwcUpdate hardening checks on a publish folder (update-elevation.md, HB2 and HE1). The seam names are an E2E-flavor
+// feature, so a ship folder must not contain them. Both flavors must switch off startup hooks.
+function checkUpdateHelper(dir, flavor, report) {
+  if (flavor === "ship") {
+    for (const name of SHIP_SEAM_FILES) {
+      let bytes;
+      try {
+        bytes = fs.readFileSync(path.join(dir, name));
+      } catch {
+        continue; // A missing file is reported by the required-assembly check.
+      }
+      if (containsSeamName(bytes)) {
+        report.problems.push(`${name}: a ship build contains "${SEAM_PREFIX}" (an E2E seam is compiled in)`);
+      }
+    }
+  }
+  let text;
+  try {
+    text = fs.readFileSync(path.join(dir, RUNTIME_CONFIG_NAME), "utf8");
+  } catch {
+    report.problems.push(`${RUNTIME_CONFIG_NAME}: missing from ${report.folder}`);
+    return;
+  }
+  const problem = startupHookProblem(text);
+  if (problem !== null) {
+    report.problems.push(problem);
+  }
+}
 
 export function publishFolderName(rid, flavor) {
   return flavor === "e2e" ? `${rid}-e2e` : rid;
@@ -298,6 +353,7 @@ export function checkPublishFlavor(dir, flavor) {
     }
   }
   checkExeManifests(dir, flavor, names, report);
+  checkUpdateHelper(dir, flavor, report);
   if (report.checked.length === 0 && report.problems.length === 0) {
     report.problems.push(
       `no managed ${PROJECT_PREFIXES.join(" or ")} assemblies found in ${report.folder}`,

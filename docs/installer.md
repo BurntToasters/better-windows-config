@@ -115,7 +115,11 @@ or a build first.
   `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\BetterWindowsConfig` (64-bit view), with
   `DisplayName`, `DisplayVersion`, `Publisher`, `DisplayIcon`, `InstallLocation`,
   `UninstallString`, `QuietUninstallString`, `EstimatedSize`, `NoModify`, and `NoRepair`. There is no
-  `ShortcutDir` in ship: the uninstaller knows the all-users folder.
+  `ShortcutDir` in ship: the uninstaller knows the all-users folder. `UninstallString` is
+  `"<install folder>\Uninstall.exe" _?=<install folder>` and `QuietUninstallString` adds `/S`, so the uninstaller runs in
+  place from the admin-only install folder and not from a copy in `%TEMP%`. A uninstaller that runs in place cannot delete
+  itself or its folder, so it asks Windows to remove them at the next restart (`/REBOOTOK`) when it cannot do so itself.
+  The NSIS plugins folder of any setup or uninstaller still unpacks into `%TEMP%` (open risk, installer.md M39).
 - Refuses an ARM64 installer on a non-ARM64 PC, and any PC older than Windows 10 build 19041 (or
   one whose build number cannot be read). It also refuses a token that is not elevated (for example
   `__COMPAT_LAYER=RunAsInvoker`), before any change.

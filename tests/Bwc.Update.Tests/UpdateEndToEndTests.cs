@@ -31,7 +31,7 @@ public sealed class UpdateEndToEndTests
 
         var host = new FakeHost { HelperDirectory = s.Dir.Sub("install") };
         var installDir = host.HelperDirectory;
-        var options = s.Options() with { ProgramFilesRoot = null };
+        var options = s.Options() with { ProgramFilesRoot = null, ProtectedAcl = ProtectedAcl.ForCurrentUser() };
         var request = new ApplyRequest(
             download.Value!.InstallerPath,
             download.Value.ReceiptPath,

@@ -9,6 +9,11 @@ namespace Bwc.Update;
 /// </summary>
 public static class ProcessIdentity
 {
+#if BWC_E2E
+    /// <summary>"1" makes the E2E helper behave as elevated. Compiled only into the E2E flavor.</summary>
+    public const string ForceElevatedVariable = "BWC_E2E_UPDATE_FORCE_ELEVATED";
+
+#endif
     private const uint TokenQuery = 0x0008;
     private const int TokenElevationClass = 20;
     private const int TokenIntegrityLevelClass = 25;
@@ -16,6 +21,14 @@ public static class ProcessIdentity
 
     public static bool IsElevatedOrHighIntegrity()
     {
+#if BWC_E2E
+        // E2E flavor only: lets a test drive the elevated refusals of the real helper without a real elevated token. It
+        // changes what the helper believes, never what it can do (HB4).
+        if (Environment.GetEnvironmentVariable(ForceElevatedVariable) == "1")
+        {
+            return true;
+        }
+#endif
         if (!OpenProcessToken(GetCurrentProcess(), TokenQuery, out var token))
         {
             return true;

@@ -8,6 +8,9 @@
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <SelfContained>true</SelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- The elevated helper never loads a DOTNET_STARTUP_HOOKS assembly: this writes
+         System.StartupHookProvider.IsSupported=false into BwcUpdate.runtimeconfig.json (update-elevation.md, HE1). -->
+    <StartupHookSupport>false</StartupHookSupport>
   </PropertyGroup>
 
   <!-- The E2E flavor never elevates. Ship keeps app.manifest, which is also asInvoker: the updater never asks for elevation. -->

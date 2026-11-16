@@ -704,8 +704,8 @@ async function runLiveCases(temp, cases) {
     const arm64Path = path.join(stage, SETUP_ARM64);
     write(x64Path, x64Bytes);
     write(arm64Path, arm64Bytes);
-    const x64Sig = envelope(await signFile(x64Path, keyA.secretKeyText, `version:${VERSION} arch:win-x64`));
-    const arm64Sig = envelope(await signFile(arm64Path, keyA.secretKeyText, `version:${VERSION} arch:win-arm64`));
+    const x64Sig = envelope(await signFile(x64Path, keyA.secretKeyText, `version:${VERSION} arch:win-x64 product:bwc channel:stable`));
+    const arm64Sig = envelope(await signFile(arm64Path, keyA.secretKeyText, `version:${VERSION} arch:win-arm64 product:bwc channel:stable`));
 
     const installer = (name, bytes, sig, arch) => ({
       url: `${download}/${encodeURIComponent(name)}`,

@@ -9,6 +9,7 @@ import {
   checkPublishFlavor,
   formatFlavorReport,
 } from "./flavor-metadata.js";
+import { buildEnvironment } from "./lib/build-environment.js";
 
 const SCRIPT = "scripts/dotnet-build.js";
 const REPO_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -204,7 +205,7 @@ function invokeDotnet(args) {
     // spawnSync waits for the pipe to close, so node reuse turns a finished publish into a
     // hung build step.
     env: {
-      ...process.env,
+      ...buildEnvironment(process.env),
       MSBUILDDISABLENODEREUSE: "1",
       DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: "1",
     },
