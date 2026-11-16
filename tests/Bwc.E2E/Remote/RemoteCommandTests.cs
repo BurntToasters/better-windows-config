@@ -38,7 +38,6 @@ public sealed class RemoteCommandTests
     private const string TreeRenameBoxId = "TreeRenameBox";
     private const string ListRenameBoxId = "ListRenameBox";
     private const string ValueInputId = "ValueEditorInput";
-    private const string DecimalBaseId = "BaseDec";
     private const string FindTextId = "FindText";
     private const string FindKeysId = "FindKeys";
     private const string FindValuesId = "FindValues";
@@ -292,14 +291,19 @@ public sealed class RemoteCommandTests
             AutomationElement? dwordRow = FindListRow(session, DwordValueName);
             bool dwordEdited = dwordSelected && dwordRow is not null &&
                 ClassicDialogTests.OpenEditor(session, driver, dwordRow, "remote.modify.dword.open") &&
-                driver.Invoke(DecimalBaseId) &&
-                driver.SetText(ValueInputId, EditedDword.ToString(System.Globalization.CultureInfo.InvariantCulture)) &&
+                // Typed in hex, the editor's default base: a base switch converts the current text asynchronously and
+                // raced the typed value under load (42 was stored as 0x42).
+                driver.SetText(ValueInputId, EditedDword.ToString("x", System.Globalization.CultureInfo.InvariantCulture)) &&
                 driver.Invoke(DialogPrimaryId) &&
                 driver.WaitForNoDialog();
             bool dwordWritten = dwordEdited && ControlTestSupport.WaitUntil(
                 () => remote.ValueOf(ChildKeyName, DwordValueName) is int stored && stored == EditedDword,
-                TimeSpan.FromSeconds(10));
-            E2EResults.Record("remote.modify.dword", dwordWritten, $"edited={dwordEdited}, written={dwordWritten}.");
+                TimeSpan.FromSeconds(30));
+            object? dwordStored = remote.ValueOf(ChildKeyName, DwordValueName);
+            E2EResults.Record(
+                "remote.modify.dword",
+                dwordWritten,
+                $"edited={dwordEdited}, written={dwordWritten}, stored={dwordStored ?? "null"}, expected={EditedDword}.");
 
             // Rename the key, then one value under it.
             bool keyRenamed = RenameThrough(
