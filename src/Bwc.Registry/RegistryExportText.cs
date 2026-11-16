@@ -35,19 +35,25 @@ public static class RegistryTextExporter
         Export(new RegistryReaderExportSource(reader), startKey, writer, cancellationToken, progress);
     }
 
+    /// <summary>
+    /// Writes the text layout for one branch. <paramref name="keyDisplay"/> names each key in its Key Name line. Null
+    /// is the local form (<see cref="RegistryPath.ToDisplayString"/>); a remote key passes its classic
+    /// \\computer\HKEY_... form.
+    /// </summary>
     public static void Export(
         IRegistryExportSource source,
         RegistryPath startKey,
         TextWriter writer,
         CancellationToken cancellationToken = default,
-        IProgress<ExportProgress>? progress = null)
+        IProgress<ExportProgress>? progress = null,
+        Func<RegistryPath, string>? keyDisplay = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(startKey);
         ArgumentNullException.ThrowIfNull(writer);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var state = new TextExportState();
+        var state = new TextExportState { KeyDisplay = keyDisplay };
         var gate = new ExportProgressGate(progress);
         gate.Always(Starting(startKey, state));
         Walk(source, startKey, writer, isStart: true, cancellationToken, gate, state);
@@ -124,7 +130,8 @@ public static class RegistryTextExporter
             return;
         }
 
-        WriteLine(writer, "Key Name:          " + WithoutComputerPrefix(path.ToDisplayString()));
+        string keyName = state.KeyDisplay?.Invoke(path) ?? path.ToDisplayString();
+        WriteLine(writer, "Key Name:          " + WithoutComputerPrefix(keyName));
         WriteLine(writer, "Class Name:        " + (info.ClassName.Length == 0 ? NoClass : info.ClassName));
         WriteLine(writer, "Last Write Time:   " + FormatLastWrite(info.LastWriteTimeUtc));
 
@@ -335,6 +342,9 @@ public static class RegistryTextExporter
 
     private sealed class TextExportState
     {
+        /// <summary>Names a key in its Key Name line. Null for the local form.</summary>
+        public Func<RegistryPath, string>? KeyDisplay { get; set; }
+
         public int KeysExported { get; set; }
 
         public int ValuesExported { get; set; }

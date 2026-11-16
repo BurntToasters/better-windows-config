@@ -5,6 +5,7 @@ using Bwc.E2E.Dialogs;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
 using Bwc.E2E.ImportExport;
+using Bwc.E2E.Print;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
@@ -647,6 +648,100 @@ public sealed class RemoteCommandTests
         {
             ControlTestSupport.CleanupRegistry(config);
             DeleteDataRoot(config, "remote-disconnect");
+        }
+    }
+
+    /// <summary>
+    /// Print on a remote key reads the connection's store and writes the classic remote Key Name form,
+    /// \\127.0.0.1\HKEY_USERS\SID\... The report seam writes the file, and no print dialog opens. When the loopback
+    /// connection fails because RemoteRegistry is stopped, the check records "not run" and passes. The service is not
+    /// started or stopped here.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Print")]
+    [TestCategory("Remote")]
+    [TestCategory("Mutating")]
+    public void Print_RemoteReportUsesClassicRemoteKeyName()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+        EnsurePublished(config);
+
+        const string remoteChild = "PrintRemoteChild";
+        var sandbox = new SandboxRegistry(config);
+        var remote = new RemoteRun(CurrentSid(), config);
+        string reportPath = Path.Combine(PrintTestSupport.ArtifactDir(config), $"remote-{config.RunId}.txt");
+        string? dataRoot = null;
+        try
+        {
+            sandbox.Cleanup();
+            remote.Cleanup();
+            PrintTestSupport.DeleteIfExists(reportPath);
+            remote.Seed(string.Empty, "PrintRemote", "remote", RegistryValueKind.String);
+            remote.Seed(remoteChild, "ChildValue", "child", RegistryValueKind.String);
+            dataRoot = CreateFreshDataRoot(config, "remote-print");
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+                [ConnectTargetVariable] = LoopbackComputer,
+                [PrintTestSupport.ReportPathVariable] = reportPath,
+            };
+
+            using AppSession session = new(config, config.RegeditExePath, environment: environment);
+            using var driver = new EditingDriver(session);
+            ConnectResult connection = ConnectLoopback(session, driver);
+            if (!connection.Connected && connection.RemoteError is not null)
+            {
+                E2EResults.Record(
+                    "print.remote.not-run",
+                    true,
+                    $"not run: remote registry unavailable ({connection.RemoteError}).");
+                return;
+            }
+
+            E2EResults.Record("print.remote.connect", connection.Connected, connection.Detail);
+            if (!connection.Connected)
+            {
+                FailIfNeeded();
+                return;
+            }
+
+            bool navigated = NavigateAddress(session, remote.DisplayRoot, remote.RunId);
+            ControlTestSupport.SendKeys(session, "CONTROL+KEY_P");
+            bool written = ControlTestSupport.WaitUntil(() => File.Exists(reportPath), TimeSpan.FromSeconds(30));
+            string report = written ? File.ReadAllText(reportPath) : string.Empty;
+
+            string keyLabel = "Key Name:          ";
+            string[] keyNames = report.Split('\n')
+                .Select(line => line.TrimEnd('\r'))
+                .Where(line => line.StartsWith("Key Name:", StringComparison.Ordinal))
+                .ToArray();
+            string rootName = keyLabel + $@"\\{LoopbackComputer}\HKEY_USERS\{remote.Sid}\Software\BWC-E2E\{remote.RunId}";
+            bool rootLine = keyNames.Contains(rootName, StringComparer.Ordinal);
+            bool childLine = keyNames.Contains(rootName + @"\" + remoteChild, StringComparer.Ordinal);
+            bool allRemote = keyNames.Length >= 2 &&
+                keyNames.All(line => line.StartsWith(keyLabel + $@"\\{LoopbackComputer}\HKEY_USERS\", StringComparison.Ordinal));
+            E2EResults.Record(
+                "print.remote.key-name",
+                navigated && written && rootLine && childLine && allRemote,
+                $"navigated={navigated}, report written={written}, root line={rootLine}, child line={childLine}, " +
+                $"every Key Name is the remote form={allRemote}, names={keyNames.Length}.");
+
+            bool dataFromStore = report.Contains("PrintRemote", StringComparison.Ordinal) &&
+                report.Contains("child", StringComparison.Ordinal);
+            E2EResults.Record(
+                "print.remote.data",
+                dataFromStore,
+                $"the report holds the remote values from the loopback store: {dataFromStore}.");
+
+            FailIfNeeded();
+        }
+        finally
+        {
+            ControlTestSupport.CleanupRegistry(config);
+            DeleteDataRoot(config, "remote-print");
         }
     }
 

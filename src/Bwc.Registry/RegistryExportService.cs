@@ -96,12 +96,17 @@ public sealed class RegistryExportService
         writer.Finish();
     }
 
+    /// <summary>
+    /// Writes the text layout. <paramref name="keyDisplay"/> names each key in its Key Name line; null is the local form.
+    /// The whole-registry scope always uses the local form.
+    /// </summary>
     public void ExportTextFile(
         RegistryPath? startKey,
         TextWriter writer,
         RegistryExportScope scope = RegistryExportScope.Selection,
         CancellationToken cancellationToken = default,
-        IProgress<ExportProgress>? progress = null)
+        IProgress<ExportProgress>? progress = null,
+        Func<RegistryPath, string>? keyDisplay = null)
     {
         ArgumentNullException.ThrowIfNull(writer);
 
@@ -116,7 +121,8 @@ public sealed class RegistryExportService
             RequireStartKey(startKey),
             writer,
             cancellationToken,
-            progress);
+            progress,
+            keyDisplay);
     }
 
     /// <summary>
