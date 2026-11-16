@@ -104,8 +104,8 @@ internal static class ResourceViewerFactory
                     d.Maximum,
                     d.MinimumVector,
                     d.MaximumVector,
-                    d.MinimumVector,
-                    d.MaximumVector));
+                    d.MinimumChannel,
+                    d.MaximumChannel));
             }
         }
 

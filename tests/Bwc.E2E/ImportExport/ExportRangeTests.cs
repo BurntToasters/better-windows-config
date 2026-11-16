@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using Bwc.E2E.AppServices;
 using Bwc.E2E.Controls;
+using Bwc.E2E.Dialogs;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
 using Bwc.E2E.List;
@@ -11,6 +13,7 @@ using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
 using FlaUI.UIA3;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using static Bwc.E2E.Dialogs.ResourceSeeds;
 
 namespace Bwc.E2E.ImportExport;
 
@@ -105,6 +108,59 @@ public sealed class ExportRangeTests
             CheckTextExport(session, driver, dialogs, automation, sandbox, textFile);
             CheckRegedit4Export(session, driver, dialogs, automation, sandbox, regedit4File);
             CheckWholeRegistryExport(session, driver, dialogs, automation, sandbox, allFile, visualDir);
+
+            FailIfNeeded(checkStart);
+        }
+        finally
+        {
+            sandbox.Cleanup();
+        }
+    }
+
+    /// <summary>
+    /// Seeds a REG_FULL_RESOURCE_DESCRIPTOR with a DMA partial and two device specific partials, and a
+    /// REG_RESOURCE_REQUIREMENTS_LIST with a DMA descriptor, then exports the run root as Text Files. The labels of the
+    /// blocks must be the classic RT_STRING texts (8160 to 8192 in regedit-resources.json), and the blocks must match the
+    /// layout line by line. The layout is BWC's own: no classic text export holds these descriptors (export.md 2.1).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("ImportExport")]
+    [TestCategory("Mutating")]
+    public void ExportDialogs_ResourceLabelsWriteClassicTextLabels()
+    {
+        int checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+        RequireExecutables(config);
+
+        var sandbox = new SandboxRegistry(config);
+        string tempDir = Path.Combine(config.ArtifactsDir, "import-export", config.RunId, "resource-text");
+        string textFile = Path.Combine(tempDir, "resources.txt");
+
+        try
+        {
+            sandbox.Cleanup();
+            Directory.CreateDirectory(tempDir);
+            _ = RegFileSeed.Import(config, sandbox, ResourceExportKey, "resource-export.reg", ResourceExportValues());
+
+            string dataRoot = CreateFreshDataRoot(config, "importexport-resource-text");
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+            };
+
+            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
+            using var driver = new EditingDriver(session);
+            using var dialogs = new SystemFileDialogDriver(session);
+            using var automation = new UIA3Automation();
+
+            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "resourcetext.navigate");
+            E2EGuards.RequireSandboxSelection(session, sandbox, "resourcetext.sandbox.export");
+
+            string text = ExportTextFile(session, driver, dialogs, automation, textFile);
+            CheckResourceBlocks(config, text);
 
             FailIfNeeded(checkStart);
         }
@@ -671,6 +727,236 @@ public sealed class ExportRangeTests
             "range.success-message",
             idle && noSuccessMessage,
             $"idle={idle}, noSuccessMessage={noSuccessMessage} (classic regedit has no export success text).");
+    }
+
+    private const string ResourceExportKey = "ResourceTextExport";
+
+    private static IReadOnlyList<RegFileSeed.SeedValue> ResourceExportValues() =>
+    [
+        new RegFileSeed.SeedValue("DmaAndDevice", 9, DmaAndDeviceBytes()),
+        new RegFileSeed.SeedValue("DmaRequirement", 10, DmaRequirementBytes()),
+    ];
+
+    // A full descriptor: a DMA partial (channel 3, port 1), then two device specific partials. The first has four data
+    // bytes and the second has none, so the bare Data: label is checked too.
+    private static byte[] DmaAndDeviceBytes() => Bytes()
+        .U32(5).U32(0).U16(1).U16(2).U32(3)
+        .Partial(4, 1, 0, Dma(3u, 1u, 0u))
+        .Partial(5, 0, 0, Union(4u, 0x11u, 0x22u))
+        .Partial(5, 0, 0, Union(0u, 0u, 0u))
+        .Raw([0x01, 0x02, 0x03, 0x04])
+        .ToArray();
+
+    // One alternative list with one DMA descriptor: channels 3 to 5, share Driver Exclusive.
+    private static byte[] DmaRequirementBytes()
+    {
+        byte[] dma = Requirement(0, 4, 2, 0, Bytes().U32(3).U32(5).Zeros(16));
+        byte[] list = Bytes().U16(1).U16(1).U32(1).Raw(dma).ToArray();
+        int size = 32 + list.Length;
+        return Bytes()
+            .U32((uint)size).U32(5).U32(0).U32(0).U32(0).U32(0).U32(0).U32(1)
+            .Raw(list)
+            .ToArray();
+    }
+
+    // Exports the selected key as Text Files through the Export dialog, and returns the decoded text.
+    private static string ExportTextFile(
+        AppSession session,
+        EditingDriver driver,
+        SystemFileDialogDriver dialogs,
+        UIA3Automation automation,
+        string exportFile)
+    {
+        if (!OpenDialog(driver, dialogs, MenuFileExport, "resourceexport.export", out IntPtr dialog))
+        {
+            return string.Empty;
+        }
+
+        bool selected = dialogs.SelectFileType(dialog, index: 3, "Text Files", out string typeNotes);
+        E2EResults.Record("resourceexport.file-type", selected, typeNotes);
+
+        bool typed = dialogs.TrySetFileName(dialog, exportFile, out string notes);
+        string acceptNotes = "not attempted";
+        bool accepted = typed && dialogs.TryAccept(dialog, "Save", out acceptNotes);
+        bool closed = accepted && dialogs.WaitGone(dialog, TimeSpan.FromSeconds(10));
+        E2EResults.Record("resourceexport.save", typed && accepted && closed, $"{notes} {acceptNotes} closed={closed}.");
+        if (!closed)
+        {
+            _ = dialogs.TryCancel(dialog);
+        }
+
+        byte[]? bytes = WaitForStableFile(exportFile, TimeSpan.FromSeconds(20));
+        _ = WaitForExportIdle(session, automation, TimeSpan.FromSeconds(15));
+        return DecodeV5(bytes);
+    }
+
+    // The classic RT_STRING texts of the dump, by id.
+    private static Dictionary<int, string> ClassicStrings(E2EConfig config)
+    {
+        string path = Path.Combine(config.RepoRoot, "docs", "parity", "oracle", "regedit-resources.json");
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+        var strings = new Dictionary<int, string>();
+        foreach (JsonElement table in document.RootElement.GetProperty("modules")[0].GetProperty("stringTables").EnumerateArray())
+        {
+            foreach (JsonElement entry in table.GetProperty("strings").EnumerateArray())
+            {
+                strings[entry.GetProperty("id").GetInt32()] = entry.GetProperty("text").GetString() ?? string.Empty;
+            }
+        }
+
+        return strings;
+    }
+
+    // The lines of one value block, from its Name line to the next value or key. Trailing blank lines are dropped.
+    private static List<string> ValueBlock(IReadOnlyList<string> lines, string name)
+    {
+        string nameLine = ("  Name:").PadRight(19) + name;
+        int start = -1;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            if (lines[i] == nameLine)
+            {
+                start = i;
+                break;
+            }
+        }
+
+        var block = new List<string>();
+        if (start < 0)
+        {
+            return block;
+        }
+
+        for (int i = start; i < lines.Count; i++)
+        {
+            string line = lines[i];
+            if (i > start && (line.StartsWith("Value ", StringComparison.Ordinal) ||
+                line.StartsWith("Key Name:", StringComparison.Ordinal) ||
+                line.StartsWith("  Name:", StringComparison.Ordinal)))
+            {
+                break;
+            }
+
+            block.Add(line);
+        }
+
+        while (block.Count > 0 && block[^1].Length == 0)
+        {
+            block.RemoveAt(block.Count - 1);
+        }
+
+        return block;
+    }
+
+    // Compares two line lists exactly, after dropping trailing blank lines from both. The first difference is recorded.
+    private static void CheckLines(string checkId, IReadOnlyList<string> actual, IReadOnlyList<string> expected)
+    {
+        var a = actual.ToList();
+        var e = expected.ToList();
+        while (a.Count > 0 && a[^1].Length == 0)
+        {
+            a.RemoveAt(a.Count - 1);
+        }
+
+        while (e.Count > 0 && e[^1].Length == 0)
+        {
+            e.RemoveAt(e.Count - 1);
+        }
+
+        int firstDifference = -1;
+        for (int i = 0; i < Math.Max(a.Count, e.Count); i++)
+        {
+            if (i >= a.Count || i >= e.Count || a[i] != e[i])
+            {
+                firstDifference = i;
+                break;
+            }
+        }
+
+        string detail = firstDifference < 0
+            ? $"{a.Count} lines match."
+            : $"line {firstDifference}: actual '{(firstDifference < a.Count ? a[firstDifference] : "<none>")}' " +
+              $"expected '{(firstDifference < e.Count ? e[firstDifference] : "<none>")}'.";
+        E2EResults.Record(checkId, firstDifference < 0, detail);
+    }
+
+    // Checks the DMA, device specific, and DMA requirement blocks line by line. Every label is the classic string text
+    // (regedit-resources.json 8160 to 8192, leading indentation removed); the layout around it is BWC's own.
+    private static void CheckResourceBlocks(E2EConfig config, string text)
+    {
+        List<string> lines = text.Split('\n').Select(line => line.TrimEnd('\r')).ToList();
+        Dictionary<int, string> classic = ClassicStrings(config);
+        string Label(int id) => classic[id].TrimStart(' ');
+        static string Indent(int count) => new(' ', count);
+
+        List<string> block = ValueBlock(lines, "DmaAndDevice");
+        int dmaStart = block.IndexOf(Indent(21) + "Partial Descriptor 0");
+        int deviceStart = block.IndexOf(Indent(21) + "Partial Descriptor 1");
+        if (dmaStart < 0 || deviceStart < 0)
+        {
+            E2EResults.Record("resourceexport.dma.labels", false, $"DmaAndDevice has {block.Count} lines and no partial 0 or 1.");
+            E2EResults.Record("resourceexport.device.labels", false, "the device specific partials were not found.");
+        }
+        else
+        {
+            CheckLines("resourceexport.header", block.GetRange(0, dmaStart), new[]
+            {
+                ("  Name:").PadRight(19) + "DmaAndDevice",
+                ("  Type:").PadRight(19) + "REG_FULL_RESOURCE_DESCRIPTOR",
+                ("  Data:").PadRight(19),
+                Indent(21) + "Interface Type:".PadRight(19) + "PCI",
+                Indent(21) + "Bus Number:".PadRight(19) + "0",
+                Indent(21) + "Version:".PadRight(19) + "1",
+                Indent(21) + "Revision:".PadRight(19) + "2",
+            });
+
+            CheckLines("resourceexport.dma.labels", block.GetRange(dmaStart, deviceStart - dmaStart), new[]
+            {
+                Indent(21) + "Partial Descriptor 0",
+                Indent(23) + Label(8160) + "DMA",
+                Indent(23) + Label(8161) + "Device Exclusive",
+                Indent(23) + Label(8168) + "3",
+                Indent(23) + Label(8169) + "1",
+                string.Empty,
+            });
+
+            List<string> device = block.GetRange(deviceStart, block.Count - deviceStart);
+            CheckLines("resourceexport.device.labels", device, new[]
+            {
+                Indent(21) + "Partial Descriptor 1",
+                Indent(23) + Label(8160) + "Device Specific",
+                Indent(23) + Label(8161) + "Undetermined",
+                Indent(23) + Label(8170) + "17",
+                Indent(23) + Label(8171) + "34",
+                Indent(23) + Label(8172) + " 01 02 03 04",
+                string.Empty,
+                Indent(21) + "Partial Descriptor 2",
+                Indent(23) + Label(8160) + "Device Specific",
+                Indent(23) + Label(8161) + "Undetermined",
+                Indent(23) + Label(8170) + "0",
+                Indent(23) + Label(8171) + "0",
+                Indent(23) + Label(8172),
+            });
+            bool noDataSize = !device.Any(line => line.Contains("Data Size", StringComparison.Ordinal));
+            E2EResults.Record("resourceexport.device.no-data-size", noDataSize, "no 'Data Size' label in the device specific block.");
+        }
+
+        CheckLines("resourceexport.requirement.dma", ValueBlock(lines, "DmaRequirement"), new[]
+        {
+            ("  Name:").PadRight(19) + "DmaRequirement",
+            ("  Type:").PadRight(19) + "REG_RESOURCE_REQUIREMENTS_LIST",
+            ("  Data:").PadRight(19),
+            Indent(19) + Label(8180) + "PCI",
+            Indent(19) + Label(8181) + "0",
+            Indent(19) + Label(8182) + "0",
+            Indent(19) + "List 0",
+            Indent(21) + "Descriptor 0",
+            Indent(23) + Label(8160) + "DMA",
+            Indent(23) + Label(8185) + "0x00000000",
+            Indent(23) + Label(8161) + "Driver Exclusive",
+            Indent(23) + Label(8191) + "3",
+            Indent(23) + Label(8192) + "5",
+        });
     }
 
     private static void CheckTextExport(

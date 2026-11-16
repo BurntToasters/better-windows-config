@@ -114,6 +114,12 @@ public sealed record IoResourceDescriptor(byte Option, byte Type, byte ShareDisp
     public uint MinimumBus => BinaryPrimitives.ReadUInt32LittleEndian(Union.AsSpan(4));
 
     public uint MaximumBus => BinaryPrimitives.ReadUInt32LittleEndian(Union.AsSpan(8));
+
+    /// <summary>DMA: the first channel of the range (union offset 0).</summary>
+    public uint MinimumChannel => BinaryPrimitives.ReadUInt32LittleEndian(Union.AsSpan(0));
+
+    /// <summary>DMA: the last channel of the range (union offset 4).</summary>
+    public uint MaximumChannel => BinaryPrimitives.ReadUInt32LittleEndian(Union.AsSpan(4));
 }
 
 /// <summary>Partial descriptor type numbers (CmResourceType*) that the parser understands.</summary>

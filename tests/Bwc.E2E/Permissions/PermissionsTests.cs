@@ -17,9 +17,11 @@ using Microsoft.Win32;
 namespace Bwc.E2E.Permissions;
 
 /// <summary>
-/// Opens the aclui security editor from Edit > Permissions and from the tree context menu. Most tests cancel the
-/// dialog. Tests that change security (Allow box, owner recursion, remote Apply) press OK or Apply on sandbox keys
-/// under the run root and read the result back. The registry engine tests cover the ACL logic itself.
+/// Opens the aclui security editor from Edit > Permissions and from the tree context menu, and the Advanced and Owner
+/// sheets from it. Read-only checks cancel the editor or the sheet. Tests that change security press OK, Apply, or the
+/// Advanced sheet's OK on sandbox keys under the run root, then read the DACL or the owner back: the Allow box (Apply,
+/// then restore), owner recursion (OK), the replace of child entries (OK), and the remote key Apply. The Elevated tests
+/// add audit entries and change the owner through the elevated runner. The registry engine tests cover the ACL logic.
 /// </summary>
 [TestClass]
 public sealed class PermissionsTests

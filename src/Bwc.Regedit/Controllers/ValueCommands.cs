@@ -161,7 +161,7 @@ internal sealed class ValueCommands
     private async Task ShowDeviceDataAsync(nint owner, byte[] data)
     {
         var viewer = new HexViewerDialog(Get("DialogHexTitle"));
-        viewer.SetValue("Device Specific Data", string.Empty, data, null);
+        viewer.SetValue(Get("DialogDeviceSpecificData"), string.Empty, data, null);
         _ = await viewer.ShowAsync(owner);
     }
 
