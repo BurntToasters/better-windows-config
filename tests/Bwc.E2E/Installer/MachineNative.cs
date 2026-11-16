@@ -21,6 +21,7 @@ internal static class MachineNative
 
     private const uint ProcessQueryLimitedInformation = 0x1000;
     private const uint TokenQuery = 0x0008;
+    private const uint TokenAdjustPrivileges = 0x0020;
     private const int TokenPrivilegesClass = 3;
     private const int TokenIntegrityLevelClass = 25;
     private const uint SePrivilegeEnabled = 0x2;
@@ -131,6 +132,34 @@ internal static class MachineNative
     /// The state of one privilege in another process's token: held, and enabled. False and false when the process or the
     /// privilege cannot be read.
     /// </summary>
+    /// <summary>
+    /// Enables or disables <paramref name="name"/> on this process's own token. Returns false when the token does not
+    /// hold it or the call fails. A child started afterwards inherits the new state.
+    /// </summary>
+    public static bool SetOwnPrivilege(string name, bool enable)
+    {
+        if (!LookupPrivilegeValueW(null, name, out Luid luid))
+        {
+            return false;
+        }
+
+        if (!OpenProcessToken(GetCurrentProcess(), TokenAdjustPrivileges | TokenQuery, out nint token))
+        {
+            return false;
+        }
+
+        try
+        {
+            var state = new TokenPrivilege1 { Count = 1, Luid = luid, Attributes = enable ? SePrivilegeEnabled : 0 };
+            bool adjusted = AdjustTokenPrivileges(token, false, ref state, 0, nint.Zero, nint.Zero);
+            return adjusted && Marshal.GetLastWin32Error() == 0;
+        }
+        finally
+        {
+            _ = CloseHandle(token);
+        }
+    }
+
     public static (bool Held, bool Enabled) PrivilegeState(int processId, string name)
     {
         nint process = OpenProcess(ProcessQueryLimitedInformation, false, processId);
@@ -420,6 +449,15 @@ internal static class MachineNative
         public int HighPart;
     }
 
+    /// <summary>TOKEN_PRIVILEGES with one entry. Every field is 4-byte aligned, so it matches Windows.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TokenPrivilege1
+    {
+        public uint Count;
+        public Luid Luid;
+        public uint Attributes;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct PropertyKey
     {
@@ -460,6 +498,9 @@ internal static class MachineNative
     }
 
 #pragma warning disable SYSLIB1054 // A few read-only calls do not justify LibraryImport plumbing.
+    [DllImport("kernel32.dll")]
+    private static extern nint GetCurrentProcess();
+
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern nint OpenProcess(uint desiredAccess, [MarshalAs(UnmanagedType.Bool)] bool inheritHandle, int processId);
 
@@ -470,6 +511,16 @@ internal static class MachineNative
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool OpenProcessToken(nint processHandle, uint desiredAccess, out nint tokenHandle);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AdjustTokenPrivileges(
+        nint tokenHandle,
+        [MarshalAs(UnmanagedType.Bool)] bool disableAllPrivileges,
+        ref TokenPrivilege1 newState,
+        int bufferLength,
+        nint previousState,
+        nint returnLength);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

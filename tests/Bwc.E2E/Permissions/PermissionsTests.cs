@@ -2028,14 +2028,16 @@ public sealed class PermissionsTests
             _ = CloseHandle(_token);
         }
 
-        [StructLayout(LayoutKind.Sequential)]
+        // LUID is two 32-bit fields in Windows, so these structs are packed at 4 bytes: the LUID sits at offset 4 of
+        // TOKEN_PRIVILEGES. A plain long would be aligned to 8 and Windows would read a LUID that names no privilege.
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
         private struct LuidAndAttributes
         {
             public long Luid;
             public uint Attributes;
         }
 
-        [StructLayout(LayoutKind.Sequential)]
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
         private struct TokenPrivilegeState
         {
             public uint PrivilegeCount;

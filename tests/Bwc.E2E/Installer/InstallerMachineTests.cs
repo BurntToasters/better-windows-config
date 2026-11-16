@@ -720,12 +720,17 @@ public sealed class InstallerMachineTests
         MachineChecks.Record("close.regedit.closed", regedit.WaitForExit(TimeSpan.FromSeconds(10)), "The elevated Registry Editor was closed by the helper.");
 
         // SeDebugPrivilege. The helper prints nothing about it, so its own token is read while it waits for a process that
-        // never closes (a stand-in named BwcRegedit.exe in a sub folder). This process never enables the privilege itself.
-        (bool testHolds, bool testEnabled) = MachineNative.PrivilegeState(Environment.ProcessId, MachineNative.DebugPrivilege);
+        // never closes (a stand-in named BwcRegedit.exe in a sub folder). .NET's Process class enables the privilege in
+        // an elevated process when it first loads, so this process turns it off before the helper starts: a child
+        // inherits the parent's enabled state, and only an off state here proves the helper enabled it itself.
+        (bool testHolds, bool wasEnabled) = MachineNative.PrivilegeState(Environment.ProcessId, MachineNative.DebugPrivilege);
+        bool turnedOff = testHolds && wasEnabled && MachineNative.SetOwnPrivilege(MachineNative.DebugPrivilege, enable: false);
+        (_, bool testEnabled) = MachineNative.PrivilegeState(Environment.ProcessId, MachineNative.DebugPrivilege);
         MachineChecks.Record(
             "close.debugPrivilege.testToken",
             !testEnabled,
-            $"This token holds {MachineNative.DebugPrivilege}: {testHolds}; enabled in this process: {testEnabled} (it must be off, so a child inherits it off).");
+            $"This token holds {MachineNative.DebugPrivilege}: {testHolds}; enabled before={wasEnabled}, turned off here={turnedOff}, " +
+            $"enabled now={testEnabled} (it must be off, so a child inherits it off).");
         string keepDir = Path.Combine(run.InstallDir, "keepopen");
         Directory.CreateDirectory(keepDir);
         string keepExe = Path.Combine(keepDir, InstallerRun.RegeditExeName);
@@ -766,6 +771,10 @@ public sealed class InstallerMachineTests
             $"The helper exited {waited.ExitCode} (3 expected: the stand-in never closes) and named it: {waited.Stdout.Trim()}");
         keep.Kill();
         _ = keep.WaitForExit(TimeSpan.FromSeconds(10));
+        if (turnedOff)
+        {
+            _ = MachineNative.SetOwnPrivilege(MachineNative.DebugPrivilege, enable: true);
+        }
     }
 
     // ------------------------------------------------------------------------------------------------------------------
@@ -816,7 +825,13 @@ public sealed class InstallerMachineTests
             remaining.Length == 0 ? "The install folder holds nothing." : "Left in the install folder: " + string.Join(", ", remaining) + " (only Uninstall.exe is documented).");
 
         string[] added = NewEntries(pendingBefore, ReadPendingRenames());
-        string[] undocumented = added.Where(entry => entry.Length > 0 && !entry.Contains(run.InstallDir, StringComparison.OrdinalIgnoreCase)).ToArray();
+        // NSIS removes its plugins folder (%TEMP%\ns<letter><hex>.tmp, M39) at exit; when System.dll is held, NSIS
+        // queues the folder for the restart instead. Only that folder and the files directly in it are documented.
+        string[] pluginEntries = added.Where(IsNsisPluginsEntry).ToArray();
+        MachineChecks.AddEvidence("unin.pluginsDirQueued", pluginEntries.Length == 0 ? "(none)" : string.Join("\n", pluginEntries));
+        string[] undocumented = added
+            .Where(entry => entry.Length > 0 && !entry.Contains(run.InstallDir, StringComparison.OrdinalIgnoreCase) && !IsNsisPluginsEntry(entry))
+            .ToArray();
         bool queued = added.Any(entry => entry.Contains(InstallerRun.UninstallerName, StringComparison.OrdinalIgnoreCase));
         bool uninstallerLeft = remaining.Any(name => string.Equals(name, InstallerRun.UninstallerName, StringComparison.OrdinalIgnoreCase));
         MachineChecks.AddEvidence("unin.pendingRenames", added.Length == 0 ? "(no new entries)" : string.Join("\n", added));
@@ -827,9 +842,36 @@ public sealed class InstallerMachineTests
                 ? "Undocumented reboot-pending entries: " + string.Join(", ", undocumented)
                 : uninstallerLeft && !queued
                     ? "Uninstall.exe is left and is not queued for deletion at the restart."
-                    : $"New PendingFileRenameOperations entries: {added.Count(entry => entry.Length > 0)} (all name this run's folder; documented, installer.md M38).");
+                    : $"New PendingFileRenameOperations entries: {added.Count(entry => entry.Length > 0)} (this run's folder, M38; " +
+                      $"NSIS plugins folder in %TEMP%: {pluginEntries.Length}, M39).");
 
         CheckReinstallWhilePending(run, setup);
+    }
+
+    /// <summary>
+    /// True for a restart-queue entry naming NSIS's plugins folder in this process's %TEMP% (the uninstaller inherits
+    /// it), or a file directly in it: <c>\??\&lt;temp&gt;\ns&lt;letter&gt;&lt;hex&gt;.tmp[\file]</c>, optionally after
+    /// a <c>*1</c> marker. installer.md M39.
+    /// </summary>
+    private static bool IsNsisPluginsEntry(string entry)
+    {
+        int prefix = entry.IndexOf(@"\??\", StringComparison.Ordinal);
+        if (prefix < 0)
+        {
+            return false;
+        }
+
+        string path = entry[(prefix + 4)..];
+        string temp = Path.GetTempPath();
+        if (!path.StartsWith(temp, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string[] parts = path[temp.Length..].Split('\\');
+        return parts.Length is 1 or 2 &&
+            System.Text.RegularExpressions.Regex.IsMatch(parts[0], @"^ns[a-z][0-9a-f]{1,8}\.tmp$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) &&
+            parts.All(part => part.Length > 0 && part != "..");
     }
 
     /// <summary>
