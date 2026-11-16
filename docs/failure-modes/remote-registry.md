@@ -143,18 +143,26 @@ otherwise the normal "key not found" error is shown.
 
 ## 11. E2E and manual coverage
 
-The non-elevated E2E suite covers:
+The non-elevated E2E suite drives the remote path on loopback. An E2E build accepts a connect to
+`127.0.0.1`, so the remote commands run through the real remote registry RPC path on this machine:
 
 - File > Connect Network Registry opens an owned modal, disables the owner, and cancels cleanly.
-- The local computer name is rejected with the own-computer message and no tree node appears.
+- The local computer name is rejected with the own-computer message (string 153) and no tree node appears.
 - Empty, NUL, separator, and overlong names are covered by the registry unit tests; the E2E test
   exercises the local-computer validation because it needs no network.
+- An unreachable connect shows string 154 and leaves no node (`Remote_ConnectUnreachableShowsStringOneFiftyFour`).
+- A loopback connection shows the remote roots and menus, runs the key and value commands, Find, Export, the
+  address bar and Disconnect (section 16), and runs Import and Permissions apply through the connection
+  (`Remote_ImportWritesThroughTheConnection`, `Permissions_RemoteKeyApplyChangesTheDaclThroughTheConnection`).
+- Print of a remote key writes the classic remote key name (`Print_RemoteReportUsesClassicRemoteKeyName`).
 - File > Disconnect Network Registry is disabled while no computer is connected.
 - The main window is enabled again after cancel and no connection is left behind.
 
-A real remote connection, remote browsing, and the disconnect list require a second computer or a
-VM snapshot with the Remote Registry service and network permissions. Those checks are manual and
-must run only on an isolated network. The test never writes to a remote computer.
+Still manual: a connect to a different computer, and RPC failures during a write or a value read
+(sections 15.1 and 16). Those need a second computer or a VM with the Remote Registry service and network
+permissions, and must run only on an isolated network. The loopback tests need the Remote Registry service
+to start on connect. If it cannot start, they record "not run" and do not fail the run. Every remote write
+goes to loopback under `HKU\<SID>\Software\BWC-E2E\<run>`, the same sandbox as the local tests.
 
 ## 12. Native calls and process lifetime
 
@@ -196,10 +204,10 @@ path is the same code as the local expand failure that the value-list probe cove
 - The menu enable state is set in `RegeditContext.UpdateCommandStates` (Modify, Modify Binary Data, and Display
   Binary Data are disabled when `RegeditSelectionGuards.IsRemoteSelected`). The context menu disables them in
   `ContextMenuController.CreateValueContextMenu`. Enter and double-click reach `ValueCommands`, which returns early.
-- **E2E status: not driven.** A remote key exists only after File > Connect Network Registry reaches another
-  computer. The connect path refuses the local computer name, and no second computer or VM is available to the
-  E2E run, so no test can make a remote value selected. The gating is covered by code review and by the
-  unchanged disconnect and connect tests. A manual check on a second machine is needed before release.
+- **E2E status: driven on loopback.** The rules above are the R1-era state and section 16 (R2a) supersedes
+  them: Modify now writes a remote value. `Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox` modifies String
+  and DWORD values under a remote key through the connection, and `Remote_LoopbackConnectShowsRemoteRootsAndMenus`
+  checks the remote menu states. A connect to a second computer is still manual (section 11).
 
 ## 15. Remote writes (R1 engine)
 
@@ -294,7 +302,8 @@ Not covered by automated tests:
 
 Scope: the key location of a remote tree node, the menus for remote nodes, Modify and the value editors, New,
 Delete, Rename, Copy Key Name, Find, Export of a branch, the address bar, Permissions targeting, and the
-Disconnect dialog. Import, Load Hive, Unload Hive, and Print stay local-only in this piece.
+Disconnect dialog. Import (R2b, section 17.3) and Print also work on a connected computer, and their loopback
+tests are listed in section 11. Load Hive and Unload Hive are not covered for remote keys.
 
 Model:
 
@@ -328,7 +337,7 @@ Ways a remote command can fail, and the expected result:
 | Export branch of a remote key | A local .reg file. Its key names are the remote names with `HKEY_USERS\<SID>` written as `HKEY_CURRENT_USER`, so the file matches a local export of the same key line for line | `Remote_ExportBranchMatchesLocalExport` |
 | Address bar `\\127.0.0.1\HKEY_USERS\<SID>\...` (connected) | Navigates to the remote node | `Remote_AddressBarNavigatesToRemotePath` |
 | Address bar with a remote path to a computer that is not connected | "The selected branch does not exist" (DialogAddressBarKeyNotFound). Nothing is connected | `Remote_AddressBarNavigatesToRemotePath` |
-| Permissions on a remote key | The dialog targets the remote key (the same store and path). Saving uses the remote store | Not automated here. Covered by S1 |
+| Permissions on a remote key | The dialog targets the remote key (the same store and path). Apply writes through the connection | `Permissions_RemoteKeyApplyChangesTheDaclThroughTheConnection` (loopback: Everyone Read is removed, the user's entries are kept, the original DACL is restored) |
 | Add to Favorites on a remote key | Refused with the classic favorite error text. Favorites store only local paths, and no oracle measurement exists for a remote favorite | Not automated |
 | Disconnect dialog 107 with one computer selected | The computer leaves the tree and its connection is disposed. The local selection stays | `Remote_DisconnectDialogRemovesComputer` |
 | Disconnect dialog 107 with OK and no selection | Classic message, dialog stays open | `Remote_DisconnectDialogRemovesComputer` |

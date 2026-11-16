@@ -32,11 +32,11 @@
 | MENU-002 | &File | RT_MENU 103, id 512 | U3 | pass |
 | MENU-003 | &File > &Import... | RT_MENU 103, id 658 | U3, R7 | pass |
 | MENU-004 | &File > &Export... | RT_MENU 103, id 659 | U3, R7 | pass |
-| MENU-005 | &File > &Load Hive... | RT_MENU 103, id 680 | U3, R8 | pass |
-| MENU-006 | &File > &Unload Hive... | RT_MENU 103, id 681 | U3, R8 | pass |
+| MENU-005 | &File > &Load Hive... | RT_MENU 103, id 680 | U3, R8 | gap |
+| MENU-006 | &File > &Unload Hive... | RT_MENU 103, id 681 | U3, R8 | gap |
 | MENU-007 | &File > &Connect Network Registry... | RT_MENU 103, id 657 | U3, R8 | pass |
 | MENU-008 | &File > &Disconnect Network Registry... | RT_MENU 103, id 768 | U3, R8 | pass |
-| MENU-009 | &File > &Print... (accelerator Ctrl+P) | RT_MENU 103, id 660 | U3, R14 | gap |
+| MENU-009 | &File > &Print... (accelerator Ctrl+P) | RT_MENU 103, id 660 | U3, R14 | pass |
 | MENU-010 | &File > E&xit | RT_MENU 103, id 661 | U3, R1 | pass |
 | MENU-011 | &Edit | RT_MENU 103, id 513 | U3 | pass |
 | MENU-012 | &Edit > &New | RT_MENU 103, id 516 | U3, R3 | pass |
@@ -124,16 +124,16 @@ Layout rows give the template order, the default button, the tab stops and the r
 | DLG-004 | Value name edit (control 1000) is read-only (ES_READONLY, style 0x50810880) in dialogs 102, 103, 111, 114 and 117. Only the value data edit (1001) accepts input; names change only through Rename (OQ-47). | RT_DIALOG 102, 103, 111, 114, 117 (control 1000) | R5, R4 | pass |
 | DLG-005 | Layout: Edit Binary Value. Caption 'Edit Binary Value'. Template DIALOGEX, style 0x90C801C4, size 232 x 178 DLU at (32, 24). Controls in template order (6): no id Static '&Value data:'; 1001 HEX; 1 Button 'OK'; 2 Button 'Cancel'; no id Static 'Value &name:'; 1000 Edit. Default button: 1 Button 'OK'. Tab stops in template order: 1001 HEX, 1 Button 'OK', 2 Button 'Cancel', 1000 Edit. Read-only edits: 1000 Edit. Template-disabled controls: none. | RT_DIALOG 103 | R6, U4 | pass |
 | DLG-006 | Hex editor: control 1001 is class HEX (220 x 110 DLU, client edge, border, vertical scroll bar, tab stop). OK saves and Cancel discards. Byte editing behavior is covered by the U9 and U10 packages. | RT_DIALOG 103, control 1001 | U9, U10 | pass |
-| DLG-007 | Layout: Load Hive. Caption 'Load Hive'. Template DIALOGEX, style 0x90C801C4, size 252 x 53 DLU at (32, 24). Controls in template order (4): no id Static '&Key Name:'; 1001 Edit; 1 Button 'OK'; 2 Button 'Cancel'. Default button: 1 Button 'OK'. Tab stops in template order: 1001 Edit, 1 Button 'OK', 2 Button 'Cancel'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 104 | R8, U4 | pass |
-| DLG-008 | Key Name prompt: control 1001 takes the name of the key that receives the hive. Duplicate names, empty names and validation are not in the dump (OQ-20). The hive commands act only under HKEY_LOCAL_MACHINE and HKEY_USERS (BEH-022). | RT_DIALOG 104, control 1001 | R8, B8 | pass |
-| DLG-009 | Layout: Print progress. Caption 'Print'. Template DIALOGEX, style 0x90C801C4, size 154 x 49 DLU at (32, 24). Controls in template order (2): 2 Button 'Cancel'; no id Static 'Printing the registry...'. Default button: 2 Button 'Cancel'. Tab stops in template order: 2 Button 'Cancel'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 105 | R14, U4 | gap |
+| DLG-007 | Layout: Load Hive. Caption 'Load Hive'. Template DIALOGEX, style 0x90C801C4, size 252 x 53 DLU at (32, 24). Controls in template order (4): no id Static '&Key Name:'; 1001 Edit; 1 Button 'OK'; 2 Button 'Cancel'. Default button: 1 Button 'OK'. Tab stops in template order: 1001 Edit, 1 Button 'OK', 2 Button 'Cancel'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 104 | R8, U4 | gap |
+| DLG-008 | Key Name prompt: control 1001 takes the name of the key that receives the hive. Duplicate names, empty names and validation are not in the dump (OQ-20). The hive commands act only under HKEY_LOCAL_MACHINE and HKEY_USERS (BEH-022). | RT_DIALOG 104, control 1001 | R8, B8 | gap |
+| DLG-009 | Layout: Print progress. Caption 'Print'. Template DIALOGEX, style 0x90C801C4, size 154 x 49 DLU at (32, 24). Controls in template order (2): 2 Button 'Cancel'; no id Static 'Printing the registry...'. Default button: 2 Button 'Cancel'. Tab stops in template order: 2 Button 'Cancel'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 105 | R14, U4 | pass |
 | DLG-010 | Layout: Find. Caption 'Find'. Template DIALOGEX, style 0x90C801C4, size 264 x 96 DLU at (32, 24). Controls in template order (10): no id Static 'Fi&nd what:'; 1150 Edit; 1152 Button '&Keys'; 1153 Button '&Values'; 1154 Button '&Data'; 1151 Button 'Match &whole string only'; 1161 Button 'Search in &subtree'; 1 Button '&Find Next'; 2 Button 'Cancel'; 1160 Button 'Look at'. Default button: 1 Button '&Find Next'. Tab stops in template order: 1150 Edit, 1152 Button '&Keys', 1153 Button '&Values', 1154 Button '&Data', 1151 Button 'Match &whole string only', 1161 Button 'Search in &subtree', 1 Button '&Find Next', 2 Button 'Cancel'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 106 | R9, U4 | pass |
 | DLG-011 | Look at group (1160) holds the Keys (1152), Values (1153) and Data (1154) checkboxes that choose what is matched. Match whole string only (1151) switches substring matching to whole-string equality. Tab stops in template order: Find what edit, Keys, Values, Data, Match whole string only, Search in subtree, Find Next (default), Cancel. | RT_DIALOG 106, controls 1150 to 1154, 1160 | R9, B7 | pass |
 | DLG-012 | Search in subtree checkbox (control 1161): default state and effect are not described in the dump (OQ-10). | RT_DIALOG 106, control 1161 | R9, B7 | pass |
 | DLG-013 | Layout: Disconnect Network Registry computer list. Caption 'Disconnect Network Registry'. Template DIALOGEX, style 0x90C801C4, size 250 x 111 DLU at (32, 24). Controls in template order (4): no id Static 'Computer name:'; 1175 SysListView32; 1 Button 'OK'; 2 Button 'Cancel'. Default button: 1 Button 'OK'. Tab stops in template order: 1175 SysListView32, 1 Button 'OK', 2 Button 'Cancel'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 107 | R8, U4 | pass |
 | DLG-014 | Computer list (control 1175, SysListView32, report view with no column header, style 0x50814041, 236 x 63 DLU) beside a Computer name label, with OK and Cancel. Which command opens this dialog is open (OQ-01). | RT_DIALOG 107, control 1175 | R8, B9 | pass |
-| DLG-015 | Layout: Print range panel (child template; intended for the Print dialog, inferred). Child template (WS_CHILD), no caption. Template DIALOGEX, style 0x50000440, size 288 x 178 DLU at (0, 0). Controls in template order (5): 1072 Button 'Print range'; 1280 Button 'A&ll'; 1281 Button 'S&elected branch'; no id Static 'Selected branch'; 1282 Edit. Default button: none. Tab stops in template order: 1280 Button 'A&ll', 1282 Edit. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 108 | R14, U4 | gap |
-| DLG-016 | Print range panel (child template, no caption): All (1280) and Selected branch (1281) radios with a branch path edit (1282). Print behavior is open (OQ-44). | RT_DIALOG 108, controls 1280 to 1282 | R14 | gap |
+| DLG-015 | Layout: Print range panel (child template; intended for the Print dialog, inferred). Child template (WS_CHILD), no caption. Template DIALOGEX, style 0x50000440, size 288 x 178 DLU at (0, 0). Controls in template order (5): 1072 Button 'Print range'; 1280 Button 'A&ll'; 1281 Button 'S&elected branch'; no id Static 'Selected branch'; 1282 Edit. Default button: none. Tab stops in template order: 1280 Button 'A&ll', 1282 Edit. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 108 | R14, U4 | declared-difference |
+| DLG-016 | Print range panel (child template, no caption): All (1280) and Selected branch (1281) radios with a branch path edit (1282). Print behavior is open (OQ-44). | RT_DIALOG 108, controls 1280 to 1282 | R14 | declared-difference |
 | DLG-017 | Layout: Find progress. Caption 'Find'. Template DIALOGEX, style 0x90C801C4, size 170 x 64 DLU at (32, 24). Controls in template order (3): 2 Button 'Cancel'; no id Static 'Searching the registry...'; no id Static 'ordinal 0x0066'. Default button: 2 Button 'Cancel'. Tab stops in template order: 2 Button 'Cancel'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 109 | R9, U4 | pass |
 | DLG-018 | Find progress: Cancel (2) is the default button. Static icon (ordinal 0x66, SS_ICON style) with the text Searching the registry. Cancel stops the background search (registry-engine contract). | RT_DIALOG 109, controls 2 and the icon static | R9, B7 | pass |
 | DLG-019 | Layout: Import Registry File progress. Caption 'Import Registry File'. Template DIALOGEX, style 0x90C001C4, size 240 x 59 DLU at (32, 24). Controls in template order (3): 101 msctls_progress32; 100 Static; no id Static 'File:'. Default button: none. Tab stops in template order: none. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 110 | R7, U4 | pass |
@@ -159,12 +159,12 @@ Layout rows give the template order, the default button, the tab stops and the r
 | DLG-039 | Layout: Requirements List viewer. Caption 'Requirements List'. Template DIALOGEX, style 0x90C801C4, size 220 x 135 DLU at (13, 15). Controls in template order (9): 1 Button 'OK'; 1506 Button 'Display...'; 1502 ColumnListBox 'Alternative List;Resource List;Descriptor;Device Type'; no id Static 'Interface Type:'; no id Static 'Bus Number:'; no id Static 'Slot Number:'; 1503 Static; 1504 Static; 1505 Static. Default button: none. Tab stops in template order: 1 Button 'OK', 1506 Button 'Display...', 1502 ColumnListBox 'Alternative List;Resource List;Descriptor;Device Type'. Read-only edits: none. Template-disabled controls: 1506 Button 'Display...'. | RT_DIALOG 1501 | R6, U4 | pass |
 | DLG-040 | Requirements list viewer: column list box 1502 with four columns, and the Interface Type, Bus Number and Slot Number fields. Display... (1506) is template-disabled. Runtime rule is open (OQ-15). | RT_DIALOG 1501, controls 1502, 1506 | R6 | pass |
 | DLG-041 | Layout: Memory requirement detail viewer. Caption 'Memory'. Template DIALOGEX, style 0x90C801C4, size 158 x 135 DLU at (6, 18). Controls in template order (16): 1 Button 'OK'; no id Button 'Option'; 2001 Static 'Preferred'; 2002 Static 'Alternative'; no id Static 'Minimum Address:'; no id Static 'Maximum Address:'; no id Static 'Share Disposition:'; no id Static 'Access:'; 1605 Static; no id Static 'Length:'; no id Static 'Alignment:'; 1602 Static; 1603 Static; 1606 Static; 1604 Static; 2000 Static. Default button: 1 Button 'OK'. Tab stops in template order: 1 Button 'OK'. Read-only edits: none. Template-disabled controls: 2001 Static 'Preferred', 2002 Static 'Alternative'. | RT_DIALOG 1601 | R6, U4 | pass |
-| DLG-042 | Requirement detail viewers (Memory 1601, Port 1700, Interrupt 1800, DMA 1900): static text fields only, so the dialogs are read-only. The Preferred (2001) and Alternative (2002) captions are template-disabled; the runtime rule is open (OQ-15) and the mapping to requirement types is open (OQ-16). | RT_DIALOG 1601, 1700, 1800, 1900 (controls 2001, 2002) | R6 | pass |
-| DLG-043 | Layout: Port requirement detail viewer. Caption 'Port'. Template DIALOGEX, style 0x90C801C4, size 158 x 135 DLU at (6, 18). Controls in template order (16): 1 Button 'OK'; no id Button 'Option'; 2001 Static 'Preferred'; 2002 Static 'Alternative'; no id Static 'Minimum Address:'; no id Static 'Maximum Address:'; no id Static 'Share Disposition:'; no id Static 'Type:'; 1705 Static; no id Static 'Length:'; no id Static 'Alignment:'; 1701 Static; 1703 Static; 1706 Static; 1704 Static; 2000 Static. Default button: 1 Button 'OK'. Tab stops in template order: 1 Button 'OK'. Read-only edits: none. Template-disabled controls: 2001 Static 'Preferred', 2002 Static 'Alternative'. | RT_DIALOG 1700 | R6, U4 | pass |
+| DLG-042 | Requirement detail viewers (Memory 1601, Port 1700, Interrupt 1800, DMA 1900): static text fields only, so the dialogs are read-only. The Preferred (2001) and Alternative (2002) captions are template-disabled; the runtime rule is open (OQ-15) and the mapping to requirement types is open (OQ-16). | RT_DIALOG 1601, 1700, 1800, 1900 (controls 2001, 2002) | R6 | gap |
+| DLG-043 | Layout: Port requirement detail viewer. Caption 'Port'. Template DIALOGEX, style 0x90C801C4, size 158 x 135 DLU at (6, 18). Controls in template order (16): 1 Button 'OK'; no id Button 'Option'; 2001 Static 'Preferred'; 2002 Static 'Alternative'; no id Static 'Minimum Address:'; no id Static 'Maximum Address:'; no id Static 'Share Disposition:'; no id Static 'Type:'; 1705 Static; no id Static 'Length:'; no id Static 'Alignment:'; 1701 Static; 1703 Static; 1706 Static; 1704 Static; 2000 Static. Default button: 1 Button 'OK'. Tab stops in template order: 1 Button 'OK'. Read-only edits: none. Template-disabled controls: 2001 Static 'Preferred', 2002 Static 'Alternative'. | RT_DIALOG 1700 | R6, U4 | gap |
 | DLG-044 | Layout: Column List Box Styles (developer dialog). Caption 'Column List Box Styles'. Template DIALOGEX, style 0x90C800C0, size 170 x 145 DLU at (141, 63). Controls in template order (18): no id Button 'Column List Box Styles'; 1760 Button '&Standard'; 1763 Button '&Border'; 1755 Button 'S&ort'; 1756 Button 'Notif&y'; 1757 Button 'V&ert. Scroll Bar'; no id Button '&Multiple Selection'; no id Button 'E&xtended Selection'; 1764 Button '&Popout Headings'; 1765 Button '&Springy Columns'; no id Button 'Basic Styles'; 1751 Button '&Visible'; 1752 Button '&Disabled'; 1753 Button '&Group'; 1754 Button '&Tab Stop'; 1 Button 'OK'; 2 Button 'Cancel'; 1758 Button '&Disable No-Scroll'. Default button: 1 Button 'OK'. Tab stops in template order: 1760 Button '&Standard', 1763 Button '&Border', 1755 Button 'S&ort', 1756 Button 'Notif&y', 1757 Button 'V&ert. Scroll Bar', no id Button '&Multiple Selection', no id Button 'E&xtended Selection', 1764 Button '&Popout Headings', 1765 Button '&Springy Columns', 1751 Button '&Visible', 1752 Button '&Disabled', 1753 Button '&Group', 1754 Button '&Tab Stop', 1 Button 'OK', 2 Button 'Cancel', 1758 Button '&Disable No-Scroll'. Read-only edits: none. Template-disabled controls: no id Button '&Multiple Selection', no id Button 'E&xtended Selection'. | RT_DIALOG 1750 | U7, U4 | declared-difference |
 | DLG-045 | Developer dialog: checkboxes for list box style bits (Standard, Border, Sort, Notify, Vert. Scroll Bar, Popout Headings, Springy Columns, Visible, Disabled, Group, Tab Stop, Disable No-Scroll). The Multiple Selection and Extended Selection captions are template-disabled. Reachability is open (OQ-17). | RT_DIALOG 1750 | U7, U8 | declared-difference |
-| DLG-046 | Layout: Interrupt requirement detail viewer. Caption 'Interrupt'. Template DIALOGEX, style 0x90C801C4, size 158 x 135 DLU at (6, 18). Controls in template order (12): 1 Button 'OK'; no id Button 'Option'; 2001 Static 'Preferred'; 2002 Static 'Alternative'; no id Static 'Maximum Vector:'; no id Static 'Share Disposition:'; no id Static 'Type:'; no id Static 'Minimum Vector:'; 1801 Static; 1803 Static; 1804 Static; 2000 Static. Default button: 1 Button 'OK'. Tab stops in template order: 1 Button 'OK'. Read-only edits: none. Template-disabled controls: 2001 Static 'Preferred', 2002 Static 'Alternative'. | RT_DIALOG 1800 | R6, U4 | pass |
-| DLG-047 | Layout: DMA requirement detail viewer. Caption 'DMA'. Template DIALOGEX, style 0x90C801C4, size 158 x 135 DLU at (6, 18). Controls in template order (10): 1 Button 'OK'; no id Button 'Option'; 2001 Static 'Preferred'; 2002 Static 'Alternative'; no id Static 'Minimum Channel:'; no id Static 'Share Disposition:'; no id Static 'Maximum Channel:'; 1902 Static; 1903 Static; 2000 Static. Default button: 1 Button 'OK'. Tab stops in template order: 1 Button 'OK'. Read-only edits: none. Template-disabled controls: 2001 Static 'Preferred', 2002 Static 'Alternative'. | RT_DIALOG 1900 | R6, U4 | pass |
+| DLG-046 | Layout: Interrupt requirement detail viewer. Caption 'Interrupt'. Template DIALOGEX, style 0x90C801C4, size 158 x 135 DLU at (6, 18). Controls in template order (12): 1 Button 'OK'; no id Button 'Option'; 2001 Static 'Preferred'; 2002 Static 'Alternative'; no id Static 'Maximum Vector:'; no id Static 'Share Disposition:'; no id Static 'Type:'; no id Static 'Minimum Vector:'; 1801 Static; 1803 Static; 1804 Static; 2000 Static. Default button: 1 Button 'OK'. Tab stops in template order: 1 Button 'OK'. Read-only edits: none. Template-disabled controls: 2001 Static 'Preferred', 2002 Static 'Alternative'. | RT_DIALOG 1800 | R6, U4 | gap |
+| DLG-047 | Layout: DMA requirement detail viewer. Caption 'DMA'. Template DIALOGEX, style 0x90C801C4, size 158 x 135 DLU at (6, 18). Controls in template order (10): 1 Button 'OK'; no id Button 'Option'; 2001 Static 'Preferred'; 2002 Static 'Alternative'; no id Static 'Minimum Channel:'; no id Static 'Share Disposition:'; no id Static 'Maximum Channel:'; 1902 Static; 1903 Static; 2000 Static. Default button: 1 Button 'OK'. Tab stops in template order: 1 Button 'OK'. Read-only edits: none. Template-disabled controls: 2001 Static 'Preferred', 2002 Static 'Alternative'. | RT_DIALOG 1900 | R6, U4 | gap |
 | DLG-048 | Layout: Binary Data viewer (variant A). Caption 'Binary Data'. Template DIALOGEX, style 0x90C801C4, size 440 x 161 DLU at (5, 18). Controls in template order (8): 502 Static 'D&ata:'; 2022 ListBox; 503 Button 'Format'; 2023 Button '&Byte'; 2024 Button '&Word'; 2025 Button '&Dword'; 2027 Button '&Qword'; 1 Button 'OK'. Default button: 1 Button 'OK'. Tab stops in template order: 2022 ListBox, 1 Button 'OK'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 2020 | R6, U4 | declared-difference |
 | DLG-049 | Format radios Byte (2023), Word (2024), Dword (2025) and Qword (2027) set the unit shown in list box 2022 (single selection, notify, not sorted; style 0x50A10001). The default unit and the list text per unit are not in the dump (OQ-14). | RT_DIALOG 2020, controls 2022, 2023 to 2027 | R6, B4 | declared-difference |
 | DLG-050 | Layout: Binary Data viewer (variant B, with Value Type). Caption 'Binary Data'. Template DIALOGEX, style 0x90C801C4, size 440 x 161 DLU at (5, 18). Controls in template order (10): 502 Static 'D&ata:'; 2022 ListBox; 503 Button 'Format'; 2023 Button '&Byte'; 2024 Button '&Word'; 2025 Button '&Dword'; 2027 Button '&Qword'; 1 Button 'OK'; no id Static 'Value Type:'; 2026 Static. Default button: 1 Button 'OK'. Tab stops in template order: 2022 ListBox, 1 Button 'OK'. Read-only edits: none. Template-disabled controls: none. | RT_DIALOG 2021 | R6, U4 | pass |
@@ -184,7 +184,7 @@ Layout rows give the template order, the default button, the tab stops and the r
 | ACC-008 | Shift+F10: command 896; no menu item or string in the dump; purpose not confirmed (OQ-04). | RT_ACCELERATOR 100, entry 8 (key VK_F10, flags 0x0007, command 896) | R12 | pass |
 | ACC-009 | Delete: Delete the selection (command 913; Edit > Delete). | RT_ACCELERATOR 100, entry 9 (key VK_DELETE, flags 0x0003, command 913) | R12, R4 | pass |
 | ACC-010 | Ctrl+F: Find (command 662; Edit > Find). | RT_ACCELERATOR 100, entry 10 (key ASCII 0x06 (Ctrl+F), flags 0x0002, command 662) | R12, R9 | pass |
-| ACC-011 | Ctrl+P: Print (command 660; File > Print). | RT_ACCELERATOR 100, entry 11 (key ASCII 0x10 (Ctrl+P), flags 0x0002, command 660) | R12, R14 | gap |
+| ACC-011 | Ctrl+P: Print (command 660; File > Print). | RT_ACCELERATOR 100, entry 11 (key ASCII 0x10 (Ctrl+P), flags 0x0002, command 660) | R12, R14 | pass |
 | ACC-012 | Ctrl+T: Go to HKEY_LOCAL_MACHINE (command 918; the tree key menu item 918, which is not on the main menu). | RT_ACCELERATOR 100, entry 12 (key ASCII 0x14 (Ctrl+T), flags 0x0002, command 918) | R12, R2 | pass |
 | ACC-013 | Alt+D: command 672; no menu item or string in the dump; expected address bar focus (not verified; OQ-04). | RT_ACCELERATOR 100, entry 13 (key 'D', flags 0x0011, command 672) | R12 | pass |
 | ACC-014 | Ctrl+L: command 672, same as Alt+D (not verified; OQ-04). | RT_ACCELERATOR 100, entry 14 (key ASCII 0x0C (Ctrl+L), flags 0x0002, command 672) | R12 | pass |
@@ -274,7 +274,7 @@ Skipped (format fragments with no user text): 8100 (" : " joiner) and 8111 (a 19
 | MSG-063 | Segoe UI | RT_STRING 124 | U1 | pass |
 | MSG-064 | Cannot import %1: The key selected is invalid. | RT_STRING 125 | R7, B6 | pass |
 | MSG-065 | Cannot import %1: Insufficient privileges. | RT_STRING 126 | R7, B8 | pass |
-| MSG-066 | The keys and values contained in %1 have been successfully added to the registry on %2. | RT_STRING 128 | R7, B6 | gap |
+| MSG-066 | The keys and values contained in %1 have been successfully added to the registry on %2. | RT_STRING 128 | R7, B6 | pass |
 | MSG-067 | Cannot import %1: Error opening the file. There may be a disk or file system error. | RT_STRING 129 | R7, B6 | pass |
 | MSG-068 | Cannot import %1: Error reading the file. There may be a disk error or the file may be corrupt. | RT_STRING 130 | R7, B6 | pass |
 | MSG-069 | Cannot import %1: Error accessing the registry on %2. | RT_STRING 131 | R7, B9 | pass |
@@ -389,16 +389,16 @@ Skipped (format fragments with no user text): 8100 (" : " joiner) and 8111 (a 19
 | MSG-178 | Do you want to replace the permission on all existing subkeys within %1? | RT_STRING 7017 | R11, B10 | pass |
 | MSG-179 | Do you want to audit all existing subkeys within %1? | RT_STRING 7018 | R11, B10 | gap |
 | MSG-180 | Read | RT_STRING 7019 | R11, B10 | pass |
-| MSG-181 | Registry Editor could not retrieve the security information. \nThe key currently selected does not give you access to retrieve such information. | RT_STRING 7050 | R11, B10 | gap |
-| MSG-182 | Registry Editor could not retrieve the security information. \nThe key currently selected is marked for deletion. | RT_STRING 7051 | R11, B10 | gap |
-| MSG-183 | Registry Editor could not retrieve the security information. \nThe key currently selected is not accessible. | RT_STRING 7052 | R11, B10 | gap |
-| MSG-184 | Registry Editor could not save the security information. \nThe key currently selected does not give you access to save such information. | RT_STRING 7070 | R11, B10 | gap |
-| MSG-185 | Registry Editor could not save the security information. \nThe key currently selected is marked for deletion. | RT_STRING 7071 | R11, B10 | gap |
+| MSG-181 | Registry Editor could not retrieve the security information. \nThe key currently selected does not give you access to retrieve such information. | RT_STRING 7050 | R11, B10 | pass |
+| MSG-182 | Registry Editor could not retrieve the security information. \nThe key currently selected is marked for deletion. | RT_STRING 7051 | R11, B10 | pass |
+| MSG-183 | Registry Editor could not retrieve the security information. \nThe key currently selected is not accessible. | RT_STRING 7052 | R11, B10 | pass |
+| MSG-184 | Registry Editor could not save the security information. \nThe key currently selected does not give you access to save such information. | RT_STRING 7070 | R11, B10 | pass |
+| MSG-185 | Registry Editor could not save the security information. \nThe key currently selected is marked for deletion. | RT_STRING 7071 | R11, B10 | pass |
 | MSG-186 | Registry Editor could not set security in the key currently selected, or some of its subkeys.  | RT_STRING 7072 | R11, B10 | pass |
-| MSG-187 | Registry Editor could not set owner on the key currently selected, or some of its subkeys.  | RT_STRING 7073 | R11, B10 | gap |
-| MSG-188 | Registry Editor could not set security in the key currently selected, or some of its subkeys. \nThese keys do not give you access to change security information. | RT_STRING 7074 | R11, B10 | gap |
-| MSG-189 | Registry Editor could not set security in all subkeys. \nThe key currently selected contains one or more subkeys marked for deletion. | RT_STRING 7075 | R11, B10 | gap |
-| MSG-190 | Registry Editor could not set security in all subkeys. \nThe key currently selected contains one or more inaccessible subkeys. | RT_STRING 7076 | R11, B10 | gap |
+| MSG-187 | Registry Editor could not set owner on the key currently selected, or some of its subkeys.  | RT_STRING 7073 | R11, B10 | pass |
+| MSG-188 | Registry Editor could not set security in the key currently selected, or some of its subkeys. \nThese keys do not give you access to change security information. | RT_STRING 7074 | R11, B10 | pass |
+| MSG-189 | Registry Editor could not set security in all subkeys. \nThe key currently selected contains one or more subkeys marked for deletion. | RT_STRING 7075 | R11, B10 | pass |
+| MSG-190 | Registry Editor could not set security in all subkeys. \nThe key currently selected contains one or more inaccessible subkeys. | RT_STRING 7076 | R11, B10 | pass |
 | MSG-191 | This key only | RT_STRING 7090 | R11, B10 | pass |
 | MSG-192 | This key and subkeys | RT_STRING 7091 | R11, B10 | pass |
 | MSG-193 | Subkeys only | RT_STRING 7092 | R11, B10 | pass |
@@ -453,36 +453,36 @@ Skipped (format fragments with no user text): 8100 (" : " joiner) and 8111 (a 19
 | MSG-242 |   Data:             | RT_STRING 8108 | B11 | pass |
 | MSG-243 | <NO NAME> | RT_STRING 8109 | B11 | pass |
 | MSG-244 | <NO CLASS> | RT_STRING 8110 | B11 | pass |
-| MSG-245 | Full Resource Descriptor  | RT_STRING 8150 | R6, B11 | gap |
-| MSG-246 |   Partial Descriptor  | RT_STRING 8151 | R6, B11 | gap |
-| MSG-247 |   Interface Type:     | RT_STRING 8152 | R6, B11 | gap |
-| MSG-248 |   Bus Number:         | RT_STRING 8153 | R6, B11 | gap |
-| MSG-249 |   Version:            | RT_STRING 8154 | R6, B11 | gap |
-| MSG-250 |   Revision:           | RT_STRING 8155 | R6, B11 | gap |
-| MSG-251 |     Resource:         | RT_STRING 8160 | R6, B11 | gap |
-| MSG-252 |     Disposition:      | RT_STRING 8161 | R6, B11 | gap |
-| MSG-253 |     Type:             | RT_STRING 8162 | R6, B11 | gap |
-| MSG-254 |     Start:            | RT_STRING 8163 | R6, B11 | gap |
-| MSG-255 |     Length:           | RT_STRING 8164 | R6, B11 | gap |
-| MSG-256 |     Level:            | RT_STRING 8165 | R6, B11 | gap |
-| MSG-257 |     Vector:           | RT_STRING 8166 | R6, B11 | gap |
-| MSG-258 |     Affinity:         | RT_STRING 8167 | R6, B11 | gap |
+| MSG-245 | Full Resource Descriptor  | RT_STRING 8150 | R6, B11 | pass |
+| MSG-246 |   Partial Descriptor  | RT_STRING 8151 | R6, B11 | pass |
+| MSG-247 |   Interface Type:     | RT_STRING 8152 | R6, B11 | pass |
+| MSG-248 |   Bus Number:         | RT_STRING 8153 | R6, B11 | pass |
+| MSG-249 |   Version:            | RT_STRING 8154 | R6, B11 | pass |
+| MSG-250 |   Revision:           | RT_STRING 8155 | R6, B11 | pass |
+| MSG-251 |     Resource:         | RT_STRING 8160 | R6, B11 | pass |
+| MSG-252 |     Disposition:      | RT_STRING 8161 | R6, B11 | pass |
+| MSG-253 |     Type:             | RT_STRING 8162 | R6, B11 | pass |
+| MSG-254 |     Start:            | RT_STRING 8163 | R6, B11 | pass |
+| MSG-255 |     Length:           | RT_STRING 8164 | R6, B11 | pass |
+| MSG-256 |     Level:            | RT_STRING 8165 | R6, B11 | pass |
+| MSG-257 |     Vector:           | RT_STRING 8166 | R6, B11 | pass |
+| MSG-258 |     Affinity:         | RT_STRING 8167 | R6, B11 | pass |
 | MSG-259 |     Channel:          | RT_STRING 8168 | R6, B11 | gap |
 | MSG-260 |     Port:             | RT_STRING 8169 | R6, B11 | gap |
 | MSG-261 |     Reserved1:        | RT_STRING 8170 | R6, B11 | gap |
 | MSG-262 |     Reserved2:        | RT_STRING 8171 | R6, B11 | gap |
 | MSG-263 |     Data: | RT_STRING 8172 | R6, B11 | gap |
-| MSG-264 | Interface Type:       | RT_STRING 8180 | R6, B11 | gap |
-| MSG-265 | Bus Number:           | RT_STRING 8181 | R6, B11 | gap |
-| MSG-266 | Slot Number:          | RT_STRING 8182 | R6, B11 | gap |
-| MSG-267 | List  | RT_STRING 8183 | R6, B11 | gap |
-| MSG-268 |   Descriptor  | RT_STRING 8184 | R6, B11 | gap |
-| MSG-269 |     Option:           | RT_STRING 8185 | R6, B11 | gap |
-| MSG-270 |     Alignment:        | RT_STRING 8186 | R6, B11 | gap |
-| MSG-271 |     Minimum Address:  | RT_STRING 8187 | R6, B11 | gap |
-| MSG-272 |     Maximum Address:  | RT_STRING 8188 | R6, B11 | gap |
-| MSG-273 |     Minimum Vector:   | RT_STRING 8189 | R6, B11 | gap |
-| MSG-274 |     Maximum Vector:   | RT_STRING 8190 | R6, B11 | gap |
+| MSG-264 | Interface Type:       | RT_STRING 8180 | R6, B11 | pass |
+| MSG-265 | Bus Number:           | RT_STRING 8181 | R6, B11 | pass |
+| MSG-266 | Slot Number:          | RT_STRING 8182 | R6, B11 | pass |
+| MSG-267 | List  | RT_STRING 8183 | R6, B11 | pass |
+| MSG-268 |   Descriptor  | RT_STRING 8184 | R6, B11 | pass |
+| MSG-269 |     Option:           | RT_STRING 8185 | R6, B11 | pass |
+| MSG-270 |     Alignment:        | RT_STRING 8186 | R6, B11 | pass |
+| MSG-271 |     Minimum Address:  | RT_STRING 8187 | R6, B11 | pass |
+| MSG-272 |     Maximum Address:  | RT_STRING 8188 | R6, B11 | pass |
+| MSG-273 |     Minimum Vector:   | RT_STRING 8189 | R6, B11 | pass |
+| MSG-274 |     Maximum Vector:   | RT_STRING 8190 | R6, B11 | pass |
 | MSG-275 |     Minimum Channel:  | RT_STRING 8191 | R6, B11 | gap |
 | MSG-276 |     Maximum Channel:  | RT_STRING 8192 | R6, B11 | gap |
 
@@ -522,7 +522,7 @@ Skipped (format fragments with no user text): 8100 (" : " joiner) and 8111 (a 19
 | BEH-004 | Window position and size are persisted across launches. Storage location and format: open (OQ-49). | Brief | R1, U2 | declared-difference |
 | BEH-005 | Splitter position is persisted across launches (default gap 8 px at 192 DPI). Storage: open (OQ-49). | Brief; regedit-metrics.json (splitter) | U2, R2 | declared-difference |
 | BEH-006 | Value list column widths are persisted across launches (defaults 240, 240, 576 device px). Storage: open (OQ-49). | Brief; regedit-metrics.json (list.header) | U7, R2 | declared-difference |
-| BEH-007 | No live refresh: the tree and value list are snapshots. Only F5 (Refresh; accelerator 648; View > Refresh) re-reads the registry. The engine does not watch for changes. | registry-engine.md (Threading); RT_ACCELERATOR 100 (648); RT_MENU 103 (View > Refresh) | R2, B2 | pass |
+| BEH-007 | No live refresh: the tree and value list are snapshots. Only F5 (Refresh; accelerator 648; View > Refresh) re-reads the registry. The engine does not watch for changes. | registry-engine.md (Threading); RT_ACCELERATOR 100 (648); RT_MENU 103 (View > Refresh) | R2, B2 | gap |
 | BEH-008 | No undo: no Undo command or accelerator appears in any menu or in the accelerator table. Deletes, renames and edits take effect immediately. | RT_MENU 103 to 108 (absence); RT_ACCELERATOR 100 (absence) | U3, R4 | pass |
 | BEH-009 | No drag-and-drop: keys and values cannot be dragged between keys, panes or other windows. No drag-related menu item or string exists in the dump. | Brief; RT_MENU and RT_STRING (absence) | U5, U7 | gap |
 | BEH-010 | Inline rename of keys and values, started by F2 (accelerator 914) or by a slow second click on the selected item (brief). Name errors use RT_STRING 66 to 70 (keys) and 73 to 75 (values). | Brief; RT_ACCELERATOR 100 (914); RT_STRING 66 to 75 | R4, U5 | pass |
@@ -558,7 +558,7 @@ Skipped (format fragments with no user text): 8100 (" : " joiner) and 8111 (a 19
 | BEH-040 | Find check order: per key, the key name (if Keys), then each value name (if Values), then its data (if Data), in display order. Matching is case-insensitive substring, or whole-string equality when Match whole string only is checked. | registry-engine.md (Find); RT_DIALOG 106 | B7 | pass |
 | BEH-041 | Which data types the Data check searches, and how REG_MULTI_SZ and binary data match: verify against the oracle (OQ-11). | registry-engine.md (Find) | B7 | pass |
 | BEH-042 | F3 (Find Next) repeats the last search from the current hit. The search runs on a background thread with the progress dialog (dialog 109) and its Cancel button. | registry-engine.md (Find); RT_ACCELERATOR 100 (671); RT_DIALOG 109 | R9, B7 | pass |
-| BEH-043 | Elevation: the brief says regedit uses highestAvailable, and a standard user runs with limited access and gets access-denied messages (RT_STRING 126, 142, 182, 189). The manifest level of regedit.exe is not in the inputs (OQ-24). | Brief; RT_STRING 126, 142, 182, 189 | B8, R1 | gap |
+| BEH-043 | Elevation: the brief says regedit uses highestAvailable, and a standard user runs with limited access and gets access-denied messages (RT_STRING 126, 142, 182, 189). The manifest level of regedit.exe is not in the inputs (OQ-24). | Brief; RT_STRING 126, 142, 182, 189 | B8, R1 | pass |
 | BEH-044 | Load Hive and Unload Hive report insufficient privileges (RT_STRING 182, 184) and access denied (RT_STRING 187, 189). The privilege enable step is not in the dump (OQ-20, OQ-21). | RT_STRING 182 to 189 | R8, B8 | pass |
 | BEH-045 | Policy lockout: when registry editing is disabled by the administrator, RT_STRING 40 is the message. Behavior when set is open (OQ-23). | RT_STRING 40 | R1, B8 | pass |
 | BEH-046 | Edit dispatch: Modify (id 912) opens the editor for the value type. Probable mapping: REG_SZ and REG_EXPAND_SZ to Edit String (dialog 102), REG_DWORD to dialog 111, REG_QWORD to dialog 117, REG_MULTI_SZ to dialog 114. Modify Binary Data (id 917) opens the hex editor (dialog 103). The mapping is inferred from the dialog captions; verify, including which types Modify Binary Data applies to (OQ-03). | RT_MENU 105 (ids 912, 917); RT_DIALOG 102, 103, 111, 114, 117 (inferred mapping) | R5, R6 | pass |
