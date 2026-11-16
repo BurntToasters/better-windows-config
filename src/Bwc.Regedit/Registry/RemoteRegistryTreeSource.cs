@@ -11,7 +11,8 @@ namespace Bwc.Regedit.Registry;
 /// </summary>
 public sealed class RemoteRegistryTreeSource : ITreeNodeSource
 {
-    private static readonly StringComparer NameComparer = StringComparer.CurrentCultureIgnoreCase;
+    // The classic display order (NLS, case ignored). See RegistryNameOrder and VIEW-009.
+    private static readonly IComparer<string> NameComparer = RegistryNameOrder.Comparer;
     private static readonly IReadOnlyList<TreeNode> NoChildren = Array.Empty<TreeNode>();
 
     private readonly RegistryReader _reader;

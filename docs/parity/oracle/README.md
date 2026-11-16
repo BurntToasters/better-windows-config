@@ -19,7 +19,7 @@ npm run oracle -- --list                # step names
 npm run oracle -- --skip-build          # reuse built tool binaries
 ```
 
-Steps: `resources`, `export`, `metrics`, `dialogs`, `menus`, `import`, `find`, `sort`, `permissions`, `keys`, `context`,
+Steps: `resources`, `export`, `metrics`, `dialogs`, `menus`, `import`, `find`, `sort`, `tree-order`, `permissions`, `keys`, `context`,
 `binary`, `print`, `security`, `remote`, `manifest`. `node scripts/check-regedit-strings.js` (run by `npm run validate`)
 compares the resource strings with BWC's. `scripts/oracle.js`
 builds both tools (Release, host platform), runs them, then deletes `HKCU\Software\BWC-Oracle`. Its run
@@ -54,6 +54,7 @@ it runs. The failure modes are in `docs/failure-modes/oracle.md`.
 | `import-behavior.json` | yes | `import` | Classic `regedit /s` on 30 malformed or unusual `.reg` files. Each record has the file's lines, its encoding, the exit code, and the BWC-Oracle subtree after the import. Files whose headers fall outside BWC-Oracle are recorded as refused and never run. |
 | `find-sequence.json` | yes | `find` | Hits from classic Find for six option sets over a seeded tree with the needle `ab`: key path and value name per hit, and why the sequence ended. |
 | `sort-order.json` | yes | `sort` | The order classic regedit lists seeded value names in, and whether clicking the Name and Type column headers reorders them. |
+| `tree-order.json` | yes | `tree-order` | The order classic regedit lists the children of a selected key in its tree, for eleven sibling names with case variants, symbols and non-ASCII letters (VIEW-009, OQ-25). Numbers and names only. |
 | `regedit-keys.json` | yes | `keys` | Each navigation key and accelerator command, with focus in the tree and in the list: what changed, and the windows it opened (ids, classes, template matches). |
 | `regedit-context.json` | yes | `context` | Context menus (tree, value by type, list background, text edit controls): item ids, enabled flags, RT_MENU template matched, and every method tried. |
 | `regedit-binary.json` | yes | `binary` | View > Display Binary Data per value type (variant, default radio, Format radios) and the Modify Binary Data dialog (template). |
@@ -80,6 +81,9 @@ The import working files are in `artifacts/oracle/import` (git-ignored). The run
   string data.
 - Sort (`sort-order.json`): value names are listed with `(Default)` first, then case-insensitively,
   with digit runs compared as text (`1`, `10`, `2`, not natural order). Clicking the Name or Type
+- Tree order (`tree-order.json`): the tree lists sibling keys in classic's linguistic order, not the registry enumeration
+  order. For the seeded names, classic lists `_x, ~x, 1, 10, 2, a, ä, B, é, -x, Z`: hyphens and underscores are ignored
+  in the sort key, so `-x` falls between `é` and `Z`.
   column header does not reorder the list.
 
 ## Findings from the 0.1.2 captures

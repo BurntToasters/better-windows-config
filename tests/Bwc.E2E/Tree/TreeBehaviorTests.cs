@@ -275,9 +275,15 @@ public sealed class TreeBehaviorTests
             bool prefixOk = first >= 0 && WaitForSelected(session, names[first]);
             E2EResults.Record("tree.typeahead.prefix", prefixOk, $"'pre' selected '{(first >= 0 ? names[first] : "none")}'={prefixOk}.");
 
-            // A longer prefix typed quickly extends the match instead of restarting from the top.
+            // After the pause the first "p" moves to the next "p" row; the rest of "prefix", typed quickly, extends the
+            // match from that row instead of restarting from the top.
             TypeAhead(session, "prefix");
-            int extended = FirstMatchFrom(names, first, name => name.StartsWith("prefix", StringComparison.OrdinalIgnoreCase));
+            int afterP = first >= 0
+                ? FirstMatchFrom(names, first + 1, name => name.StartsWith("p", StringComparison.OrdinalIgnoreCase))
+                : -1;
+            int extended = afterP >= 0
+                ? FirstMatchFrom(names, afterP, name => name.StartsWith("prefix", StringComparison.OrdinalIgnoreCase))
+                : -1;
             bool extendOk = extended >= 0 && WaitForSelected(session, names[extended]);
             E2EResults.Record("tree.typeahead.extend", extendOk, $"'prefix' extended the match to '{(extended >= 0 ? names[extended] : "none")}'={extendOk}.");
 

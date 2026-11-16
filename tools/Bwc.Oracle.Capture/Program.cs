@@ -13,6 +13,7 @@ internal static class Program
         "  import    malformed .reg import behavior under BWC-Oracle (import-behavior.json)\n" +
         "  find      Find hit sequence under BWC-Oracle (find-sequence.json)\n" +
         "  sort      value list order and header click behavior (sort-order.json)\n" +
+        "  tree-order  classic tree order of sibling keys, symbol and non-ASCII names (tree-order.json)\n" +
         "  permissions  Advanced Security Settings entry list and Applies-to choices (permissions-inherit.json)\n" +
         "  keys      navigation keys and accelerator commands, tree and list focus (regedit-keys.json)\n" +
         "  context   tree, value, list background and text edit context menus (regedit-context.json)\n" +
@@ -79,6 +80,10 @@ internal static class Program
 
                 case "sort":
                     OracleSession.Run("sort", () => SortCapture.Run(paths, allowDpi));
+                    return 0;
+
+                case "tree-order":
+                    OracleSession.Run("tree-order", () => TreeOrderCapture.Run(paths, allowDpi));
                     return 0;
 
                 case "permissions":

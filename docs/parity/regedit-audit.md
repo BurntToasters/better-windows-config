@@ -27,19 +27,18 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | --- | --- | --- | --- |
 | MENU | 35 | 0 | 2 |
 | CTX | 41 | 0 | 0 |
-| DLG | 35 | 7 | 9 |
+| DLG | 38 | 7 | 6 |
 | ACC | 28 | 0 | 0 |
-| MSG | 209 | 45 | 22 |
-| VIEW | 18 | 2 | 1 |
-| BEH | 40 | 5 | 4 |
+| MSG | 214 | 50 | 12 |
+| VIEW | 19 | 2 | 0 |
+| BEH | 42 | 5 | 2 |
 | EXP | 32 | 0 | 0 |
-| All (535) | 438 | 59 | 38 |
+| All (535) | 449 | 64 | 22 |
 
 ## Gaps by piece
 
 | Piece | Rows |
 | --- | --- |
-| F2 | DLG-023, DLG-035, DLG-036, MSG-022, MSG-052, MSG-053, MSG-060, MSG-061, MSG-062, MSG-072, MSG-109, MSG-110, MSG-111, VIEW-009, BEH-007, BEH-009 |
 | P1 | MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-275, MSG-276, BEH-027 |
 | D1 | DLG-042, DLG-043, DLG-046, DLG-047 |
 | S1b | MSG-174, MSG-175, MSG-176, MSG-177, MSG-179, BEH-026 |
@@ -161,7 +160,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | DLG-020 | pass | ImportProgress_ShowsClassicProgressWithoutCancel; ImportProgress_DarkPaletteCaptionAndFace |  |
 | DLG-021 | pass | ClassicDialogs_EditStringAndDwordFollowTheTemplate |  |
 | DLG-022 | pass | ClassicDialogs_EditStringAndDwordFollowTheTemplate |  |
-| DLG-023 | gap | Overflow prompt strings 110, 111, 119 are not in the source | F2 |
+| DLG-023 | pass | NumberOverflow_DwordDecimalAnswers (prompt text of string 119, caption Overflow, No keeps the editor, Yes stores 4294967295); NumberOverflow_HexadecimalKeepsInputError. Caption and truncation rule are the spec from the text (classic-dialog.md 13) |  |
 | DLG-024 | pass | AddFavoriteDialog_ClassicLayoutTabOrderAndDuplicateError; SmallDialogs_RectsMatchClassicMeasurements |  |
 | DLG-025 | pass | AddFavoriteDialog_ClassicLayoutTabOrderAndDuplicateError; SmallDialogs_RectsMatchClassicMeasurements |  |
 | DLG-026 | pass | Favorites_AddRemoveNavigateAndReportMissingPath |  |
@@ -173,8 +172,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | DLG-032 | pass | Remote_ImportWritesThroughTheConnection; Remote_ImportCancelImportsNothing; Remote_ImportMixedRootsReportsStringOneThirtyTwo (dialog 115 picks the target computer after the file, only while a remote computer is connected) |  |
 | DLG-033 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests (regedit-resource-viewers.json: Enter opens the viewer; the Display... rule after a selection is not measured, a capture limit) |  |
 | DLG-034 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests (regedit-resource-viewers.json: Enter opens the viewer; the Display... rule after a selection is not measured, a capture limit) |  |
-| DLG-035 | gap | QWORD editor layout not asserted; overflow string 120 not in the source | F2 |
-| DLG-036 | gap | QWORD editor layout not asserted; overflow string 120 not in the source | F2 |
+| DLG-035 | pass | NumberOverflow_QwordLayout (RT_DIALOG 117 rectangles via MapDialogRect, caption, tab order, read-only value name, hexadecimal default) |  |
+| DLG-036 | pass | NumberOverflow_QwordDecimalAnswers (prompt text of string 120, Yes stores 18446744073709551615); NumberOverflow_QwordLayout (base switch at the QWORD maximum) |  |
 | DLG-037 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests (Resources viewer measured on a real HKEY_LOCAL_MACHINE\HARDWARE value; Data... rule and cell formats inferred, docs/failure-modes/resource-values.md 7.11) |  |
 | DLG-038 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests (Resources viewer measured on a real HKEY_LOCAL_MACHINE\HARDWARE value; Data... rule and cell formats inferred, docs/failure-modes/resource-values.md 7.11) |  |
 | DLG-039 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
@@ -249,7 +248,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-019 | pass | String parity check: text equal (MsgRegistryEditingDisabled) |  |
 | MSG-020 | pass | String parity check: text equal (DialogFindFinished) |  |
 | MSG-021 | declared-difference | BWC opens the system object picker (Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection), which shows its own prompt text; the classic hint string is not passed to it |  |
-| MSG-022 | gap | Text not found verbatim in the source; check and fix | F2 |
+| MSG-022 | pass | CommandLine_SwitchWithoutFilenameReportsStringFortyThree (/s, /e and /a alone: stderr line with string 43 and exit 2) |  |
 | MSG-023 | pass | String parity check: text equal (MsgDeleteKeyConfirm) |  |
 | MSG-024 | pass | String parity check: text equal (MsgCaptionConfirmKeyDelete) |  |
 | MSG-025 | pass | String parity check: text equal (MsgDeleteValuesConfirm) |  |
@@ -279,17 +278,17 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-049 | pass | String parity check: text equal (MsgCaptionDisplayValueError) |  |
 | MSG-050 | pass | String parity check: text equal (MsgDisplayValueFailed) |  |
 | MSG-051 | declared-difference | Out-of-memory message: the managed runtime ends the process with a crash report instead |  |
-| MSG-052 | gap | Overflow prompt missing | F2 |
-| MSG-053 | gap | Overflow prompt missing | F2 |
+| MSG-052 | pass | NumberOverflow_DwordDecimalAnswers (caption Overflow). Choice of 110 over 111 is inferred from the text; see MSG-053 |  |
+| MSG-053 | declared-difference | Not used by BWC. The dump does not say whether 110 or 111 is the overflow caption, and no classic prompt is identified as using 111 (Warning). Not measured: the oracle does not drive the overflow prompt |  |
 | MSG-054 | pass | String parity check: text equal (MsgCaptionEditValueError) |  |
 | MSG-055 | pass | String parity check: text equal (MsgEditValueReadFailed) |  |
 | MSG-056 | pass | String parity check: text equal (MsgEditValueWriteFailed) |  |
 | MSG-057 | pass | String parity check: text equal (MultiStringEmptyOne) |  |
 | MSG-058 | pass | String parity check: text equal (MultiStringEmptyMany) |  |
 | MSG-059 | declared-difference | Out-of-memory message: the managed runtime ends the process with a crash report instead |  |
-| MSG-060 | gap | Overflow prompt missing | F2 |
-| MSG-061 | gap | Overflow prompt missing | F2 |
-| MSG-062 | gap | Text not found verbatim in the source; check and fix | F2 |
+| MSG-060 | pass | NumberOverflow_DwordDecimalAnswers (text of string 119 compared with line ends normalized) |  |
+| MSG-061 | pass | NumberOverflow_QwordDecimalAnswers (text of string 120 compared with line ends normalized) |  |
+| MSG-062 | pass | CommandLine_BinaryHiveRefusedWithStringOneTwentyThree (/s on a regf file: stderr text of string 123, exit 1, nothing written). Silent import route only; the window import route is not driven |  |
 | MSG-063 | pass | String parity check: text equal (Bwc.Hub/MainWindow.xaml) |  |
 | MSG-064 | pass | String parity check: text equal (MsgImportInvalidKey) |  |
 | MSG-065 | pass | String parity check: text equal (MsgImportPrivileges) |  |
@@ -299,7 +298,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-069 | pass | String parity check: text equal (MsgImportRemoteAccess) |  |
 | MSG-070 | pass | String parity check: text equal (MsgImportPartial) |  |
 | MSG-071 | pass | String parity check: text equal (MsgImportNotRegistryFile) |  |
-| MSG-072 | gap | When classic shows 134 (a file not meant for this version) is not measured; BWC reports such files with 133 | F2 |
+| MSG-072 | declared-difference | BWC reports every unrecognized header with 133 (MSG-071). Classic's trigger for 134 is not in the dump, and regedit /s (the oracle import route) prints no message, so the case cannot be measured |  |
 | MSG-073 | pass | String parity check: text equal (MsgImportRemoteFileMissing) |  |
 | MSG-074 | pass | String parity check: text equal (MsgExportOpenFailed) |  |
 | MSG-075 | pass | String parity check: text equal (MsgExportWriteFailed) |  |
@@ -336,9 +335,9 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-106 | pass | String parity check: text equal (MsgLoadHiveInUse) |  |
 | MSG-107 | pass | String parity check: text equal (MsgLoadHiveAccessDenied) |  |
 | MSG-108 | declared-difference | Out-of-memory message: the managed runtime ends the process with a crash report instead |  |
-| MSG-109 | gap | Text not found verbatim in the source; check and fix | F2 |
-| MSG-110 | gap | Text not found verbatim in the source; check and fix | F2 |
-| MSG-111 | gap | Text not found verbatim in the source; check and fix | F2 |
+| MSG-109 | declared-difference | BWC shows the .reg export text (138 or 141) for hive save failures. Not built. The hive save needs SeBackupPrivilege, which the unelevated run does not hold, so string 213 cannot be driven unelevated or safely (import-export.md 20) |  |
+| MSG-110 | declared-difference | BWC shows the .reg export text (138 or 141) for hive save failures. Not built. A write error during a hive save needs the privilege held (import-export.md 20), so string 214 cannot be driven unelevated or safely |  |
+| MSG-111 | declared-difference | BWC shows the .reg export text (138 or 141) for hive save failures. Not built. A locked or unopenable destination is reached only after the privilege is held (import-export.md 20), so string 215 cannot be driven unelevated or safely |  |
 | MSG-112 | pass | String parity check: text equal (MsgImportSucceeded) |  |
 | MSG-113 | pass | String parity check: text equal (MsgImportRegistryAccess) |  |
 | MSG-114 | pass | String parity check: text equal (MsgImportFileMissing) |  |
@@ -517,7 +516,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | VIEW-006 | pass | Shell_ClassicMetricsMatchOracleAtWindowScale |  |
 | VIEW-007 | pass | Icons_TreeAndListRowsMatchClassicLayout; Icons_ClassicRegeditCaptures |  |
 | VIEW-008 | pass | Icons_TreeAndListRowsMatchClassicLayout; Icons_ClassicRegeditCaptures |  |
-| VIEW-009 | gap | No test of tree sibling order for non-ASCII and symbol names against classic (OQ-25) | F2 |
+| VIEW-009 | pass | Navigation_TreeSiblingOrderMatchesClassic against docs/parity/oracle/tree-order.json (oracle capture tree-order). The tree sorts with RegistryNameOrder (CompareStringEx, NORM_IGNORECASE) |  |
 | VIEW-010 | pass | Theme_SystemPalette_FollowsWindowsAppMode; regedit-selection-colors.json |  |
 | VIEW-011 | declared-difference | WinUI controls replace SysTreeView32 and SysListView32; UI Automation exposes Tree, DataGrid and Header patterns instead (X1 asserts them) |  |
 | VIEW-012 | pass | Shell_ClassicMetricsMatchOracleAtWindowScale; Icons_TreeAndListRowsMatchClassicLayout |  |
@@ -541,9 +540,9 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | BEH-004 | declared-difference | BWC keeps LastKey, Find flags, placement, splitter and column widths in its own settings so it never writes classic's Applets key except Favorites; it reads classic LastKey on first start (Navigation_ShowsRootsAndRestoresLastKey; AppServices_PlacementSplitAndColumnsPersistAcrossRestart) |  |
 | BEH-005 | declared-difference | BWC keeps LastKey, Find flags, placement, splitter and column widths in its own settings so it never writes classic's Applets key except Favorites; it reads classic LastKey on first start (Navigation_ShowsRootsAndRestoresLastKey; AppServices_PlacementSplitAndColumnsPersistAcrossRestart) |  |
 | BEH-006 | declared-difference | BWC keeps LastKey, Find flags, placement, splitter and column widths in its own settings so it never writes classic's Applets key except Favorites; it reads classic LastKey on first start (Navigation_ShowsRootsAndRestoresLastKey; AppServices_PlacementSplitAndColumnsPersistAcrossRestart) |  |
-| BEH-007 | gap | No test asserts absence before F5: Basics_CopyKeyNameAndF5KeepTheView adds the value and presses F5 in one step. Test must assert absence before F5 | F2 |
+| BEH-007 | pass | Navigation_RefreshShowsValueAddedOutside (value written outside is absent before F5, listed after F5, run key still selected) |  |
 | BEH-008 | pass | Shell_MenuTableMatchesCommandStates (no Undo item) |  |
-| BEH-009 | gap | No negative drag-and-drop test | F2 |
+| BEH-009 | pass | Editing_DragAndDropDoesNothing (key onto key, value onto key and key onto the list; registry read after each drag) |  |
 | BEH-010 | pass | Tree_RenameCommitsOnEnterAndFocusLossAndCancelsOnEscape; Keyboard_SlowSecondClickStartsRename; Keyboard_DoubleClickOnSelectedValueOpensEditorWithoutRename; Keyboard_DoubleClickOnSelectedKeyTogglesWithoutRename; Keyboard_ClickOnSelectedListRowFromTreeFocusDoesNotRename |  |
 | BEH-011 | pass | Editing_CreatesRenamesAndDeletesRegistryObjects; Bwc.Registry.Tests (rename) |  |
 | BEH-012 | pass | Editing_CreatesRenamesAndDeletesRegistryObjects; Bwc.Registry.Tests (rename) |  |

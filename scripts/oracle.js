@@ -54,6 +54,7 @@ const CAPTURES = [
   "export-range",
   "export-text",
   "resource-viewers",
+  "tree-order",
 ];
 const ALL_STEPS = ["resources", ...CAPTURES];
 const RUN_RECORD = path.join(ROOT, "artifacts", "oracle", "last-run.json");

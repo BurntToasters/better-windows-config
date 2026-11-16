@@ -71,6 +71,20 @@
   <data name="NumberErrorDecimal" xml:space="preserve">
     <value>Enter a decimal number from 0 to {0}.</value>
   </data>
+  <data name="NumberOverflowCaption" xml:space="preserve">
+    <!-- Oracle 110 -->
+    <value>Overflow</value>
+  </data>
+  <data name="NumberOverflowDword" xml:space="preserve">
+    <!-- Oracle 119. The truncation prompt for a decimal DWORD value above 4294967295. -->
+    <value>The decimal value entered is greater than the maximum value of a DWORD (32-bit number).
+Should the value be truncated in order to continue?</value>
+  </data>
+  <data name="NumberOverflowQword" xml:space="preserve">
+    <!-- Oracle 120. The truncation prompt for a decimal QWORD value above 18446744073709551615. -->
+    <value>The decimal value entered is greater than the maximum value of a QWORD (64-bit number).
+Should the value be truncated in order to continue?</value>
+  </data>
   <data name="MultiStringEmptyOne" xml:space="preserve">
     <value>Data of type REG_MULTI_SZ cannot contain empty strings.&#13;&#10;Registry Editor will remove the empty string found.</value>
   </data>
