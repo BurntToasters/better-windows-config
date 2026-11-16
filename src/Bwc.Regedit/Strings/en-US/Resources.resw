@@ -425,7 +425,8 @@ Error code: {1} (0x{1:X8})
     <value>Load Hive</value>
   </data>
   <data name="DialogLoadHiveNameLabel" xml:space="preserve">
-    <value>Key name under HKEY_LOCAL_MACHINE:</value>
+    <!-- RT_DIALOG 104 control 65535 (oracle). The hive loads under the selected root (HKLM or HKU). -->
+    <value>&amp;Key Name:</value>
   </data>
   <data name="DialogLoadHiveNameInvalid" xml:space="preserve">
     <value>Enter a single key name without separators. The name cannot be empty, cannot be "." or "..", cannot contain NUL characters, and cannot be longer than 255 characters.</value>

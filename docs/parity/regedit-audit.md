@@ -29,17 +29,17 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | CTX | 41 | 0 | 0 |
 | DLG | 42 | 7 | 2 |
 | ACC | 28 | 0 | 0 |
-| MSG | 221 | 50 | 5 |
+| MSG | 221 | 54 | 1 |
 | VIEW | 19 | 2 | 0 |
-| BEH | 42 | 6 | 1 |
+| BEH | 43 | 6 | 0 |
 | EXP | 32 | 0 | 0 |
-| All (535) | 460 | 65 | 10 |
+| All (535) | 461 | 69 | 5 |
 
 ## Gaps by piece
 
 | Piece | Rows |
 | --- | --- |
-| S1b | MSG-174, MSG-175, MSG-176, MSG-177, MSG-179, BEH-026 |
+| S1b | MSG-175 |
 | Elevated | MENU-005, MENU-006, DLG-007, DLG-008 |
 
 ## Rows
@@ -52,8 +52,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MENU-002 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
 | MENU-003 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
 | MENU-004 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
-| MENU-005 | gap | Owned Load Hive file dialog opens only with SeRestorePrivilege. Load is enabled only at HKLM and HKU (AppServices_HiveRulesEnableLoadAndUnloadByRoot); Hives_LoadHiveRefusesWithoutPrivilegeBeforeAskingForFile shows the refusal. Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey runs at HKCU, where Load is disabled, so it never opens the dialog | Elevated |
-| MENU-006 | gap | Unload Hive is never invoked by a test. Only its enable rule is proven (AppServices_HiveRulesEnableLoadAndUnloadByRoot); unloading needs SeRestorePrivilege | Elevated |
+| MENU-005 | gap | Owned Load Hive file dialog opens only with SeRestorePrivilege. Load is enabled only at HKLM and HKU (AppServices_HiveRulesEnableLoadAndUnloadByRoot); Hives_LoadHiveRefusesWithoutPrivilegeBeforeAskingForFile shows the refusal. Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu opens it at HKEY_USERS. Elevated, pending the user's elevated run (not run here) | Elevated |
+| MENU-006 | gap | Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu invokes Unload Hive on the mount and confirms it (hives.md section 14). Enable rule: AppServices_HiveRulesEnableLoadAndUnloadByRoot. Elevated, pending the user's elevated run (not run here) | Elevated |
 | MENU-007 | pass | Shell_MenuTableMatchesCommandStates; Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection (dialog content is DLG-031, R2) |  |
 | MENU-008 | pass | Remote_DisconnectDialogRemovesComputer (loopback connection to 127.0.0.1); Shell_MenuTableMatchesCommandStates |  |
 | MENU-009 | pass | Print_OwnedDialogCancelsAndCommandStateFollowsSelection (Print enabled at Computer, a hive and a key) |  |
@@ -142,8 +142,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | DLG-004 | pass | ClassicDialogs_EditStringAndDwordFollowTheTemplate; ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates |  |
 | DLG-005 | pass | ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates (caption Edit Binary Value); HexContextMenu_HasTheRt108ItemsAndStates |  |
 | DLG-006 | pass | HexEditing_EditsCancelsAndCopies; HexEditingFixes_TypeBackspaceAndPasteUseRealKeys |  |
-| DLG-007 | gap | Key Name prompt (template 104) opens only after a file is chosen, which needs SeRestorePrivilege. No test reaches it, so its layout is not asserted | Elevated |
-| DLG-008 | gap | Control 1001 takes the key name in the prompt of DLG-007. No test reaches it (needs an elevated hive load) | Elevated |
+| DLG-007 | gap | Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu checks caption, label, tab order and the 252 x 53 DLU geometry against RT_DIALOG 104. The label was 'Key name under HKEY_LOCAL_MACHINE:' and is now the classic '&Key Name:'. Elevated, pending the user's elevated run (not run here) | Elevated |
+| DLG-008 | gap | Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu types the key name into control 1001, reads it back, and OK loads the hive under HKEY_USERS. Elevated, pending the user's elevated run (not run here) | Elevated |
 | DLG-009 | pass | Print_ProgressCancelStopsJobAndLeavesNoOutput (progress text, Cancel, main window disabled while it runs; records not run without Microsoft Print to PDF); built from template 105 (ClassicDialogTemplates.cs) |  |
 | DLG-010 | pass | Find_FollowsTheClassicTwoDialogSequence; find-sequence.json |  |
 | DLG-011 | pass | Find_FollowsTheClassicTwoDialogSequence; find-sequence.json |  |
@@ -398,12 +398,12 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-171 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
 | MSG-172 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
 | MSG-173 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
-| MSG-174 | gap | Text not in the source (string 7013, Special Access...) | S1b |
-| MSG-175 | gap | Text not in the source (string 7014). Not named in S1b; S1b decides whether BWC shows it | S1b |
-| MSG-176 | gap | Text not in the source (string 7015) | S1b |
-| MSG-177 | gap | Text not in the source (string 7016) | S1b |
+| MSG-174 | declared-difference | Not shown. No measured classic control has this text: the sheet and Advanced window show aclui's 'Special permissions' (oracle local/security-text.json). permissions.md section 43 |  |
+| MSG-175 | gap | Text not in the source (string 7014, Registry &Key). It is the apply-to name of the Permission Entry page, which the oracle does not capture. Open: permissions.md sections 42 and 43 | S1b |
+| MSG-176 | declared-difference | Not shown. Classic's measured check box text is aclui's 'Replace all child object permission entries...', and BWC shows that same control (permissions.md sections 16 and 43) |  |
+| MSG-177 | declared-difference | Not shown. The audit replace check box needs SI_RESET_SACL_TREE, which BWC does not set, because the engine refuses SACL propagation (permissions.md sections 22 and 43) |  |
 | MSG-178 | pass | String parity check: text equal (MsgReplaceSubkeysConfirm) |  |
-| MSG-179 | gap | Text not in the source (string 7018) | S1b |
+| MSG-179 | declared-difference | Not shown. The audit replace question belongs to the check box of MSG-177, which BWC does not offer (permissions.md section 43) |  |
 | MSG-180 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
 | MSG-181 | pass | String parity check: text equal (MsgSecurityRetrieveDenied) |  |
 | MSG-182 | pass | String parity check: text equal (MsgSecurityRetrieveDeleted) |  |
@@ -557,7 +557,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | BEH-023 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus (only HKEY_LOCAL_MACHINE and HKEY_USERS); Remote_DisconnectDialogRemovesComputer; every command on remote keys: Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox, Remote_FindLocatesRemoteValue, Remote_ExportBranchMatchesLocalExport, Remote_AddressBarNavigatesToRemotePath |  |
 | BEH-024 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus (only HKEY_LOCAL_MACHINE and HKEY_USERS); Remote_DisconnectDialogRemovesComputer; every command on remote keys: Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox, Remote_FindLocatesRemoteValue, Remote_ExportBranchMatchesLocalExport, Remote_AddressBarNavigatesToRemotePath |  |
 | BEH-025 | pass | Remote_ConnectOwnComputerShowsStringOneFiftyThree; Remote_ConnectUnreachableShowsStringOneFiftyFour; 155 and 156 are reviewed in code, not automated (no way to reach half a computer from this machine) |  |
-| BEH-026 | gap | Owner recursion and the audit tab are tested (Permissions_OwnerRecursionSetsTheOwnerOfEverySubkey, Permissions_AuditingTabWithoutSecurityPrivilegeShowsTheSystemState). Effective access is not tested. Prompts 7013, 7015, 7016 and 7018 are absent from the source | S1b |
+| BEH-026 | pass | Permissions_EffectiveAccessShowsResultsForTheCurrentUser: Effective Access tab, user picked with Select a user, user named in the User/ Group field, at least one Allowed row. Owner recursion and the audit tab: Permissions_OwnerRecursionSetsTheOwnerOfEverySubkey, Permissions_AuditingTabWithoutSecurityPrivilegeShowsTheSystemState |  |
 | BEH-027 | declared-difference | Range panel: declared (DLG-016). Progress: pass (DLG-009). Report labels: pass (MSG-245 to MSG-276). Printed page layout (margins, font, wrapping) has no classic print output golden (OQ-44); regedit-print.json records no printed output and no PDF export, so the layout is BWC's own and is not compared |  |
 | BEH-028 | pass | Tree_RightAndLeftArrowSemantics; Tree_NumpadKeysAndPageKeys |  |
 | BEH-029 | pass | Basics_MultiDeleteTextAndDefaultRow; List_KeyboardSelectionAndFocus |  |
@@ -667,7 +667,7 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-39 | Rename and Delete are off at Computer and the hive roots (Shell_MenuTableMatchesCommandStates); the Computer-root context menu: O1. |
 | OQ-40 | String 34 is not shown; the root is Computer (string 19). |
 | OQ-41 | Decision: BWC does not register a .reg file type or Merge verb. |
-| OQ-42 | BWC uses the OS ACL editor (Permissions tests). Owner recursion and the audit tab: Permissions_OwnerRecursionSetsTheOwnerOfEverySubkey, Permissions_AuditingTabWithoutSecurityPrivilegeShowsTheSystemState. Remote apply: Permissions_RemoteKeyApplyChangesTheDaclThroughTheConnection. Effective access is not tested. Prompts 7013, 7014, 7015, 7016 and 7018 are absent from the source: S1b (BEH-026, MSG-174 to MSG-179). |
+| OQ-42 | BWC uses the OS ACL editor (Permissions tests). Owner recursion and the audit tab: Permissions_OwnerRecursionSetsTheOwnerOfEverySubkey, Permissions_AuditingTabWithoutSecurityPrivilegeShowsTheSystemState. Remote apply: Permissions_RemoteKeyApplyChangesTheDaclThroughTheConnection. Effective access: Permissions_EffectiveAccessShowsResultsForTheCurrentUser. Prompts 7013, 7015, 7016 and 7018 are declared (permissions.md section 43); 7014 is open (MSG-175). |
 | OQ-43 | Favorites_AddRemoveNavigateAndReportMissingPath (duplicate name refused, no confirmation on Remove). |
 | OQ-44 | Classic opens the Windows print host, whose default view has no range controls, and the default printer is a physical printer, so nothing was printed (regedit-print.json). BWC uses PrintDlgExW with no range panel (DLG-015 and DLG-016 declared). Progress window with Cancel: DLG-009. Report text: the classic text golden (MSG-245 to MSG-258, MSG-264 to MSG-274). Printed page layout: declared difference (BEH-027). The DMA and device-specific labels (MSG-259 to MSG-263, MSG-275, MSG-276) are checked by ExportDialogs_ResourceLabelsWriteClassicTextLabels. |
 | OQ-45 | Classic opens the system object picker (RichEdit name box); typing into it could not be automated, so the connect is not measured (regedit-remote.json). BWC opens the same system picker (Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection) and falls back to a name prompt when the picker cannot run. |

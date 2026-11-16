@@ -77,6 +77,10 @@ const nativeWriteAllowlist = new Map([
     "Writes only HKCU/Software/BWC-Oracle and the Applets/Regedit key, through the guarded native call.",
   ],
   [
+    "tests/Bwc.E2E/Hives/HiveMountNative.cs",
+    "Calls RegUnLoadKey once, from the finally block of the elevated hive test, on the mount plus run id under HKEY_USERS. The managed handles of the test are closed first.",
+  ],
+  [
     "tools/Bwc.Oracle.Capture/RegistryNative.cs",
     "Reads raw values with RegQueryValueEx and restores them only under BWC-Oracle and the Applets/Regedit key.",
   ],
@@ -110,6 +114,10 @@ const managedWriteAllowlist = new Map([
   ["tests/Bwc.E2E/Find/FindTests.cs", "Seeds E2E run keys through the harness for find tests."],
   ["tests/Bwc.E2E/Hex/HexEditingTests.cs", "Seeds E2E run keys through the harness for hex editing tests."],
   ["tests/Bwc.E2E/Hives/HiveTests.cs", "Seeds E2E run keys through the harness for hive tests."],
+  [
+    "tests/Bwc.E2E/Hives/HiveMountTests.cs",
+    "Seeds the sandbox key through SandboxRegistry for the elevated hive test. Its mount is never written by managed code.",
+  ],
   ["tests/Bwc.E2E/Remote/RemoteRegistryTests.cs", "Seeds E2E run keys through the harness for remote registry tests."],
   ["tests/Bwc.E2E/Hex/HexViewerTests.cs", "Seeds E2E run keys through the harness for hex viewer tests."],
   ["tests/Bwc.E2E/ImportExport/ImportExportTests.cs", "Seeds E2E run keys through the harness for import and export tests."],

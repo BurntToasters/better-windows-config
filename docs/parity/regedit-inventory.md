@@ -382,12 +382,12 @@ Skipped (format fragments with no user text): 8100 (" : " joiner) and 8111 (a 19
 | MSG-171 | Read Control | RT_STRING 7010 | R11, B10 | pass |
 | MSG-172 | Read | RT_STRING 7011 | R11, B10 | pass |
 | MSG-173 | Full Control | RT_STRING 7012 | R11, B10 | pass |
-| MSG-174 | Special Access... | RT_STRING 7013 | R11, B10 | gap |
+| MSG-174 | Special Access... | RT_STRING 7013 | R11, B10 | declared-difference |
 | MSG-175 | Registry &Key | RT_STRING 7014 | R11 | gap |
-| MSG-176 | R&eplace Permission on Existing Subkeys | RT_STRING 7015 | R11, B10 | gap |
-| MSG-177 | Audit Permission on Existing Subkeys | RT_STRING 7016 | R11, B10 | gap |
+| MSG-176 | R&eplace Permission on Existing Subkeys | RT_STRING 7015 | R11, B10 | declared-difference |
+| MSG-177 | Audit Permission on Existing Subkeys | RT_STRING 7016 | R11, B10 | declared-difference |
 | MSG-178 | Do you want to replace the permission on all existing subkeys within %1? | RT_STRING 7017 | R11, B10 | pass |
-| MSG-179 | Do you want to audit all existing subkeys within %1? | RT_STRING 7018 | R11, B10 | gap |
+| MSG-179 | Do you want to audit all existing subkeys within %1? | RT_STRING 7018 | R11, B10 | declared-difference |
 | MSG-180 | Read | RT_STRING 7019 | R11, B10 | pass |
 | MSG-181 | Registry Editor could not retrieve the security information. \nThe key currently selected does not give you access to retrieve such information. | RT_STRING 7050 | R11, B10 | pass |
 | MSG-182 | Registry Editor could not retrieve the security information. \nThe key currently selected is marked for deletion. | RT_STRING 7051 | R11, B10 | pass |
@@ -541,7 +541,7 @@ Skipped (format fragments with no user text): 8100 (" : " joiner) and 8111 (a 19
 | BEH-023 | Remote registry roots: a connected remote computer shows only HKEY_LOCAL_MACHINE and HKEY_USERS (brief). | Brief | R8, B9 | pass |
 | BEH-024 | Disconnect removes a connected remote computer from the tree (File > Disconnect Network Registry, RT_MENU 103 id 768; RT_MENU 107 id 768 on the remote root). | RT_MENU 103, 107 | R8, B9 | pass |
 | BEH-025 | Connecting to your own computer is refused (RT_STRING 153). Connection failures use RT_STRING 154 to 156; a connect that cannot reach all roots reports RT_STRING 155. | RT_STRING 153 to 156 | R8, B9 | pass |
-| BEH-026 | Permissions (Edit > Permissions, RT_MENU 103 id 678; context item 678) opens the standard ACL editor for the selected key, with Advanced for special permissions (brief). The ACL UI is an OS component; the dump has only its strings (RT_STRING 7001 to 7092). Behavior is open (OQ-42). | Brief; RT_MENU 103, 104; RT_STRING 7001 to 7092 | R11, B10 | gap |
+| BEH-026 | Permissions (Edit > Permissions, RT_MENU 103 id 678; context item 678) opens the standard ACL editor for the selected key, with Advanced for special permissions (brief). The ACL UI is an OS component; the dump has only its strings (RT_STRING 7001 to 7092). Behavior is open (OQ-42). | Brief; RT_MENU 103, 104; RT_STRING 7001 to 7092 | R11, B10 | pass |
 | BEH-027 | Print of the selected branch (or all): a progress dialog with Cancel (dialog 105) and a print range panel (dialog 108). Printed text uses labels RT_STRING 8101 to 8192 (inferred from the text; no print golden exists; OQ-44). | Brief; RT_DIALOG 105, 108; RT_STRING 8101 to 8192 | R14, B11 | declared-difference |
 | BEH-028 | Tree keyboard navigation: Up and Down move the selection; Home and End move to the first and last items (brief; exact rules verify). PageUp and PageDown page. Left collapses an expanded key or moves to its parent. Right expands a collapsed key or moves to its first child (brief). | Brief | U5, U6 | pass |
 | BEH-029 | Value list multi-select: several values can be selected and deleted together (RT_STRING 50 and 89 cover the multi-value case). | Brief; RT_STRING 50, 89 | U7, R4 | pass |
@@ -731,7 +731,7 @@ OQ-40. My Computer (string 34): the dump does not say where it appears. The tree
 
 OQ-41. Shell verbs and file type strings: Registration Entries (309) and Mer&ge (310) suggest an Explorer verb for .reg files. The brief does not cover it. Whether BWC registers a file type or a Merge verb is a decision, not a parity fact.
 
-OQ-42. Permissions: BWC uses the OS ACL editor, so the prompts are not in the dump. Owner recursion, the audit tab and remote apply have E2E checks; effective access is not tested. Prompts 7013, 7014, 7015, 7016 and 7018 are absent from the source (regedit-audit.md, OQ-42).
+OQ-42. Permissions: BWC uses the OS ACL editor, so the prompts are not in the dump. Owner recursion, the audit tab, remote apply and effective access have E2E checks. Prompts 7013, 7015, 7016 and 7018 are declared (regedit-audit.md, MSG-174, MSG-176, MSG-177, MSG-179); 7014 is open (MSG-175).
 
 OQ-43. Favorites: the name uniqueness rule (case sensitivity; string 171) and whether Remove asks for confirmation (no string in the dump).
 
