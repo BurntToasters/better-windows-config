@@ -562,11 +562,12 @@ public sealed class RegistryFinder
         {
             try
             {
-                return parent.Append(component);
+                // The name was enumerated from the registry, so "." and ".." are real keys (writer section K3).
+                return parent.AppendEnumeratedName(component);
             }
             catch (ArgumentException)
             {
-                // A name that RegistryPath cannot represent, such as "." or "..", is skipped
+                // A name that RegistryPath cannot represent, such as one with a separator or NUL, is skipped
                 // instead of aborting the whole search.
                 return null;
             }

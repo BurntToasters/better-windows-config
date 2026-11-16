@@ -140,7 +140,7 @@ internal sealed class HiveRemoteCommands
 
         if (RegeditSelectionGuards.IsRemoteSelected(_context))
         {
-            // Remote computers are read-only in this version, so a hive never loads into one.
+            // A hive loads only into the local registry, so a remote selection is refused before any input is asked for.
             await _context.ShowMessageAsync(Get("DialogRemoteReadOnly"));
             return;
         }

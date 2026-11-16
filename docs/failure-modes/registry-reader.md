@@ -13,7 +13,7 @@ path. The tree can still show the key because enumeration of the parent only nee
 read access. Opening the child later surfaces the error in the UI, which is what classic regedit
 does.
 
-`KeyExists` and `ValueExists` treat only `ERROR_FILE_NOT_FOUND` (2) as "missing". Access denied
+`KeyExists` treats `ERROR_FILE_NOT_FOUND` (2) and `ERROR_PATH_NOT_FOUND` (3) as "missing" (section 18), and `ValueExists` treats only 2 as missing. Access denied
 is thrown, not reported as false, so a caller cannot mistake an unreadable key for an absent one.
 
 ## 2. Missing key versus missing value
@@ -197,3 +197,13 @@ operation `EnumKey`. A name that fits within the cap is returned as before. The 
 `RegistryReader.CollectSubKeyNames`, which takes the native read as a delegate, so the test can
 report "more data" without a real key. Tests: `EnumerateSubKeyNamesGivesUpAfterTheRetryCap` and
 `EnumerateSubKeyNamesGrowsTheBufferAndReturnsTheName`.
+
+## 18. Missing key: ERROR_FILE_NOT_FOUND and ERROR_PATH_NOT_FOUND
+
+`KeyExists` returns false when the open fails with `ERROR_FILE_NOT_FOUND` (2) or `ERROR_PATH_NOT_FOUND`
+(3). The writer's `KeyExists`, used by the remote rename fallback to test whether the destination exists,
+treats the same two codes as missing, so the two agree. Before this change the reader accepted only 2, so
+a path that reports 3 threw from the reader while the writer treated it as missing. Every other failure
+still throws `RegistryOperationException`, so access denied is never reported as missing. Tests:
+`KeyExistsTreatsPathNotFoundAsMissing` (reader, through a path whose open reports 3) and
+`KeyExistsAndTheWriterAgreeOnMissingKeys` (the same path through the writer's rename fallback).

@@ -297,7 +297,8 @@ public sealed class RegistryReader
                 return true;
             }
 
-            if (error == WIN32_ERROR.ERROR_FILE_NOT_FOUND)
+            // The writer's KeyExists treats the same two codes as missing (reader section 18).
+            if (error is WIN32_ERROR.ERROR_FILE_NOT_FOUND or WIN32_ERROR.ERROR_PATH_NOT_FOUND)
             {
                 return false;
             }

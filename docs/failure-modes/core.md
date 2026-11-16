@@ -307,6 +307,31 @@ finish within the brief wait, the process can still exit because the loop runs o
 task. A message handler that throws is caught and traced; it cannot kill the accept loop. A
 retry delay is cancellable, so disposal does not wait for a full backoff interval.
 
+### Accept attempts bound (replaces the CPU sample)
+
+The old test sampled the process CPU time for 1.5 seconds and failed above 900 ms. JIT, GC, and other
+threads of the test host count toward that number, so the test flaked without any loop defect. The
+check now counts accept attempts. `SingleInstance.AcceptAttempts` (internal, visible to
+`Bwc.Core.Tests`) increments once per attempt to create the server, successful or not.
+
+The schedule is fixed by the constants: the first retry waits 50 ms, then 100, 200, 400, 800, and 1000
+ms (capped). Attempts therefore fall at 0, 50, 150, 350, 750, and 1550 ms. In a 1.5 second window at most
+five fall inside it, and one more can fall in with timer slack. The test allows seven and requires at least
+two, so a loop that spins fails at once, and a loop that never retries fails too.
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| SI-B1 | Pipe name held by another server for 1.5 s | Tight retry loop | At most seven attempts, at least two | `PipeNameTakenBacksOffTheAcceptLoop` |
+| SI-B2 | Dispose while the loop is backing off | Attempts continue after disposal | The counter does not change after `Dispose` returns | `PipeNameTakenBacksOffTheAcceptLoop` |
+| SI-B3 | Dispose while the loop is still running after the 2 s wait | Token disposed under a live loop | The cancellation source is disposed only after the loop task ends, through a continuation | Reviewed in code. A loop that exits on cancellation does not reach this path in a test |
+
+### Dispose ordering of the cancellation source
+
+`Dispose` waits up to 2 seconds for the accept task. Before this change it then disposed the
+`CancellationTokenSource` whether or not the task had finished. A loop still running at that point would
+keep using a token whose source was disposed. Now the source is disposed right away only when the task has
+completed. Otherwise a continuation disposes it when the task ends, so no live loop sees a disposed source.
+
 ### Stale state after a crash
 
 Named kernel objects disappear when the last handle closes. A crashed first instance releases its

@@ -331,3 +331,19 @@ Automation reports disabled. Open, not fixed: after a nested viewer closes, the 
 window, so Escape does not close the list that opened it (ModalDialogWindow.RestoreOwner activates the owner but does not restore its key focus).
 Check: `ResourceViewers_OpenWithEnterAndShowTheClassicLayout`, the `resources.*.rows`, `resources.descriptor.bus` and
 `resources.requirements.access` checks. Select on a ListItem must raise the list's SelectionChanged (`resources.list.display-enabled`).
+
+## 8. Name tables kept equal across Bwc.Registry and Bwc.UI
+
+The resource names are kept twice: `ResourceNames` in `src/Bwc.Registry/Resources/ResourceNames.cs` (English
+literals, used by the text export) and the `.resw` entries that `ResourceText` reads in `src/Bwc.UI`. Bwc.UI has no
+reference to Bwc.Registry, so nothing in the build links the two. Drift fails silently: the export and the viewers
+would print different words for the same value.
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| 8.1 | Bus name edited in one table only | Export and viewer disagree | Each INTERFACE_TYPE 0 to 11 and the out-of-range value match the `ResourceBusType<n>` and `ResourceInvalid` entries | `InterfaceTypeNamesMatchTheUiResources` |
+| 8.2 | Share disposition, partial type, memory access, interrupt, or port name edited in one table | Same | Each value named in the engine table equals the `.resw` text for its key, and each out-of-range value equals `ResourceInvalid` | `DispositionAndDescriptorNamesMatchTheUiResources` |
+| 8.3 | A key the UI reads is missing from the `.resw` | Viewer shows the key or an empty string | Every key the test names exists in `src/Bwc.UI/Strings/en-US/Resources.resw` | Both tests above (a missing key fails the lookup) |
+
+The test reads the `.resw` by path from the repository root, found by walking up to `BetterWindowsConfig.slnx`. It
+runs in the registry test step of the quality gate, so a drift fails the build's test step, not a later release.

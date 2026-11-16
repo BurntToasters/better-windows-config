@@ -67,8 +67,50 @@ internal static partial class RegistryLinkFixture
     [LibraryImport("advapi32.dll")]
     private static partial int RegCloseKey(nint hKey);
 
-    /// <summary>Creates a symbolic link named <paramref name="name"/> under <paramref name="parentPath"/>.</summary>
-    internal static void CreateLink(string parentPath, string name, string targetPath)
+    /// <summary>
+    /// Creates a normal key named <paramref name="name"/> under <paramref name="parentPath"/>, with an optional class
+    /// name. The name may be "." or "..", which the managed API refuses but the registry allows.
+    /// </summary>
+    internal static void CreateKey(string parentPath, string name, string? className = null)
+    {
+        nint parent = OpenKey(parentPath, KeyAllAccess);
+        try
+        {
+            int status = RegCreateKeyEx(
+                parent,
+                name,
+                0,
+                className,
+                RegOptionNonVolatile,
+                KeyAllAccess | KeyWow64_64Key,
+                nint.Zero,
+                out nint key,
+                out _);
+            Check(status, "create key " + name);
+            RegCloseKey(key);
+        }
+        finally
+        {
+            RegCloseKey(parent);
+        }
+    }
+
+    /// <summary>Writes one value of the given raw bytes under <paramref name="keyPath"/>, relative to HKCU.</summary>
+    internal static void WriteValue(string keyPath, string valueName, uint type, byte[] data)
+    {
+        nint key = OpenKey(keyPath, KeyAllAccess);
+        try
+        {
+            Check(RegSetValueEx(key, valueName, 0, type, data, (uint)data.Length), "write value " + valueName);
+        }
+        finally
+        {
+            RegCloseKey(key);
+        }
+    }
+
+    /// <summary>Creates a link whose target is the given NT path as written, for probes of unusual targets.</summary>
+    internal static void CreateRawLink(string parentPath, string name, string ntTargetPath)
     {
         nint parent = OpenKey(parentPath, KeyAllAccess);
         try
@@ -87,7 +129,7 @@ internal static partial class RegistryLinkFixture
 
             try
             {
-                byte[] target = Encoding.Unicode.GetBytes(NtPath(targetPath));
+                byte[] target = Encoding.Unicode.GetBytes(ntTargetPath);
                 Check(
                     RegSetValueEx(link, LinkValueName, 0, RegLinkType, target, (uint)target.Length),
                     "write link target " + name);
@@ -102,6 +144,10 @@ internal static partial class RegistryLinkFixture
             RegCloseKey(parent);
         }
     }
+
+    /// <summary>Creates a symbolic link named <paramref name="name"/> under <paramref name="parentPath"/>.</summary>
+    internal static void CreateLink(string parentPath, string name, string targetPath) =>
+        CreateRawLink(parentPath, name, NtPath(targetPath));
 
     /// <summary>
     /// Gives the child <paramref name="name"/> of <paramref name="parentPath"/> the DACL in

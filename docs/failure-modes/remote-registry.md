@@ -239,7 +239,10 @@ before any native call. Local writes keep their existing rules and error codes.
 | Rename of a remote key | `RegRenameKey` fails on a remote handle with 6 (`ERROR_INVALID_HANDLE`, measured). The engine runs the managed copy-then-delete fallback for 6, and also for 50, 120 and 1. Any other code throws. | `RemoteRenameKeyLeavesOneKeyAtTheNewName` (loopback); `RenameByCopyMovesTheTree` (route) |
 | Fallback: the new name already exists | Refused with 183 before any write. The copy would otherwise merge into the existing key. | `RenameByCopyRefusesAnExistingDestination` |
 | Fallback: case-only rename | Refused with 50 before any write. The copy source and destination are the same key. | `RenameByCopyRefusesACaseOnlyRename` |
-| Fallback: the copy fails part way | The destination key this call created is removed (best effort). The source is not touched. If the removal also fails, the error names both paths. | Not injected (a partial copy cannot be forced through the policy). Reviewed in code. |
+| Fallback: the copy fails part way with a Win32 error or a refused write | The destination key this call created is removed. The source is not touched. The original exception is rethrown. If the removal also fails, a `RegistryOperationException` names the partial copy and says it could not be removed (writer section J2). | `RenameByCopyRollsBackWhenAChildWriteIsRefused`, `RenameByCopyReportsAFailedRollback` |
+| Fallback: the copy fails part way with an argument error (a value name containing NUL) | Same as above: the destination is removed and the `ArgumentException` is rethrown. Before the fix the partial copy stayed. | `RenameByCopyRollsBackWhenAValueNameIsRefused` |
+| Fallback: a child named `.` or `..` | Copied. Child paths use `AppendEnumeratedName`. The sandbox policy refuses a remote write with such a component (the `..` and `.` row above), so the test uses a test-only policy that allows only the run root. | `RenameByCopyCopiesDotNamedChildren` |
+| Fallback: the copy keeps the owner and class name | Owner written best effort before the DACL. Class name passed to the create. A refused owner is skipped, not reported. SACL, group, volatility and last write time are not copied (writer section J5). | `RenameByCopyCopiesTheOwnerAndTheClassName` |
 | Fallback: the copy succeeds but deleting the source fails | The error is thrown with operation `RenameKey` and the message starts "Both keys now exist" and names the original and the copy. The copy is kept: a recursive delete is not atomic, so removing the copy could destroy the only complete tree. The original may be partly removed. | `RenameByCopyKeepsTheCopyWhenTheSourceDeleteFails` (route) |
 | Remote `CopyTree` | Runs the managed copy, because `RegCopyTree` fails with 6 on a remote handle (measured). Merges into an existing destination, as `RegCopyTree` does. | `RemoteCopyTreeAndRecursiveDeleteOnRealLoopback` |
 | Hive operations (`LoadHive`, `UnloadHive`, `SaveKey`, `ReplaceKey`, `RestoreKey`) on a remote store | Refused with 50 (`ERROR_NOT_SUPPORTED`) after the policy and before any native call. `SaveKey` must not create its file. | `RemoteHiveOperationsAreNotSupportedAndTouchNothing` |
@@ -257,7 +260,9 @@ probe is not kept in the repo):
 - `RegCopyTree` (source key handle, null subkey, destination handle): 6 on a remote handle. So the fallback copies
   with managed code, `RegistryWriter.CopyTreeByHand`: each key's values are written with `SetValue`, its children
   with `CreateKey` and recursion, and its DACL last with `SetKeySecurity`. Reads come from the connection's reader.
-  The DACL is copied per key. Owner and group are not copied. Every write passes the policy.
+  Each key's class name and owner are copied (the owner best effort, before the DACL). The DACL is copied per key.
+  The SACL, the primary group, volatility and the last write time are not copied (writer section J5).
+  Every write passes the policy.
 - The fallback deletes the original with `DeleteKey(recursive: true)`, which is `RegDeleteTree`. That works on a
   remote handle (measured 0).
 - A failed delete of the original keeps the copy and throws, with a message that names both keys (section 15.1).
