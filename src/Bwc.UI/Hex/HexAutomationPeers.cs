@@ -7,12 +7,14 @@ using Windows.Foundation;
 namespace Bwc.UI.Hex;
 
 /// <summary>
-/// UIA peer for the hex editor. The grid has one row per eight bytes and eighteen columns: the
-/// offset, eight byte columns, and the ASCII column. Only realized rows have row peers; asking for
-/// a distant row returns the editor instead of forcing the virtualized row into existence.
+/// UIA peer for the hex editor. The grid has one row per eight bytes and ten columns: the offset (column 0), eight byte
+/// cells (columns 1 to 8), and the ASCII cell (column 9). GetItem returns a cell for any row, realized or not, so a
+/// byte cell reads its own value. Value is the whole content as hex text, separated by spaces.
 /// </summary>
-internal sealed class HexEditorAutomationPeer : FrameworkElementAutomationPeer, IGridProvider
+internal sealed class HexEditorAutomationPeer : FrameworkElementAutomationPeer, IGridProvider, IValueProvider
 {
+    private const int AsciiColumn = HexEditor.BytesPerRow + 1;
+
     private readonly HexEditor _editor;
 
     public HexEditorAutomationPeer(HexEditor editor)
@@ -25,22 +27,55 @@ internal sealed class HexEditorAutomationPeer : FrameworkElementAutomationPeer, 
 
     public int RowCount => _editor.RowCount;
 
+    public string Value => string.Join(' ', _editor.Data.ToArray().Select(value => value.ToString("X2", System.Globalization.CultureInfo.InvariantCulture)));
+
+    public bool IsReadOnly => _editor.IsReadOnly;
+
+    /// <summary>The hex editor is changed through its keyboard and menus, not through a value setter.</summary>
+    public void SetValue(string value)
+    {
+    }
+
     public IRawElementProviderSimple GetItem(int row, int column)
     {
-        if (row < 0 || row >= _editor.RowCount)
+        if (row < 0 || row >= _editor.RowCount || column < 0 || column >= ColumnCount)
         {
             return ProviderFromPeer(this);
         }
 
-        HexRowElement? element = _editor.TryGetRowElement(row);
-        if (element is null)
+        return ProviderFromPeer(new HexCellAutomationPeer(this, row, column, CellText(row, column)));
+    }
+
+    /// <summary>The Grid provider of this editor, for the ContainingGrid of a cell.</summary>
+    internal IRawElementProviderSimple GridProvider() => ProviderFromPeer(this);
+
+    /// <summary>The text of one cell: the offset, a hex byte (blank past the row's end), or the row's ASCII text.</summary>
+    private string CellText(int row, int column)
+    {
+        int offset = row * HexEditor.BytesPerRow;
+        if (column == 0)
         {
-            return ProviderFromPeer(this);
+            return offset.ToString("X" + _editor.OffsetDigits.ToString(System.Globalization.CultureInfo.InvariantCulture), System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        AutomationPeer? peer = FrameworkElementAutomationPeer.FromElement(element)
-            ?? FrameworkElementAutomationPeer.CreatePeerForElement(element);
-        return peer is null ? ProviderFromPeer(this) : ProviderFromPeer(peer);
+        ReadOnlySpan<byte> data = _editor.Data.Span;
+        int count = _editor.RowByteCount(row);
+        if (column == AsciiColumn)
+        {
+            var ascii = new System.Text.StringBuilder(count);
+            for (int index = 0; index < count; index++)
+            {
+                byte value = data[offset + index];
+                ascii.Append(value is >= 32 and <= 126 ? (char)value : '.');
+            }
+
+            return ascii.ToString();
+        }
+
+        int byteIndex = column - 1;
+        return byteIndex < count
+            ? data[offset + byteIndex].ToString("X2", System.Globalization.CultureInfo.InvariantCulture)
+            : string.Empty;
     }
 
     protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Pane;
@@ -55,8 +90,62 @@ internal sealed class HexEditorAutomationPeer : FrameworkElementAutomationPeer, 
 
     protected override bool IsContentElementCore() => true;
 
-    protected override object? GetPatternCore(PatternInterface patternInterface) =>
-        patternInterface == PatternInterface.Grid ? this : base.GetPatternCore(patternInterface);
+    protected override object? GetPatternCore(PatternInterface patternInterface) => patternInterface switch
+    {
+        PatternInterface.Grid => this,
+        PatternInterface.Value => this,
+        _ => base.GetPatternCore(patternInterface),
+    };
+}
+
+/// <summary>
+/// UIA peer for one hex cell: an offset, a byte, or the ASCII text of a row. The cell is a DataItem with the Value and
+/// GridItem patterns. Its Name and Value are the cell text, and it is read only.
+/// </summary>
+internal sealed class HexCellAutomationPeer : AutomationPeer, IValueProvider, IGridItemProvider
+{
+    private readonly HexEditorAutomationPeer _grid;
+    private readonly string _text;
+
+    public HexCellAutomationPeer(HexEditorAutomationPeer grid, int row, int column, string text)
+    {
+        _grid = grid;
+        _text = text;
+        Row = row;
+        Column = column;
+    }
+
+    public string Value => _text;
+
+    public bool IsReadOnly => true;
+
+    public int Row { get; }
+
+    public int Column { get; }
+
+    public int RowSpan => 1;
+
+    public int ColumnSpan => 1;
+
+    public IRawElementProviderSimple ContainingGrid => _grid.GridProvider();
+
+    /// <summary>A cell is read only, so its value cannot be set through UI Automation.</summary>
+    public void SetValue(string value)
+    {
+    }
+
+    protected override string GetClassNameCore() => "HexCell";
+
+    protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.DataItem;
+
+    protected override string GetNameCore() => _text;
+
+    protected override object? GetPatternCore(PatternInterface patternInterface) => patternInterface switch
+    {
+        PatternInterface.Value => this,
+        PatternInterface.GridItem => this,
+        _ => null,
+    };
 }
 
 /// <summary>

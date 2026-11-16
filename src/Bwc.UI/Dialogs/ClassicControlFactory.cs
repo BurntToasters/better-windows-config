@@ -162,6 +162,7 @@ internal static class ClassicControlFactory
                 var columns = new ClassicColumnList(font);
                 columns.SetColumns(definition.Columns);
                 columns.SetListAutomationId(definition.AutomationId);
+                columns.SetListName(name);
                 element = columns;
                 break;
 
