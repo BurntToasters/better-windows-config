@@ -129,6 +129,32 @@ export function readRequestedLevels(bytes) {
   return [...levels].sort();
 }
 
+// The level the built setup EXE must request, by flavor. Ship installs per machine (Program Files, HKLM), so it
+// asks for elevation. The E2E setup never asks, so no test or dev build can show a prompt.
+export const SETUP_EXECUTION_LEVELS = Object.freeze({ ship: "requireAdministrator", e2e: "asInvoker" });
+
+// Checks the embedded manifest of a built setup EXE (bytes) against its flavor. NSIS stores the manifest as plain text
+// in the resource section, so readRequestedLevels finds it. Returns { ok, levels, expected, problem }.
+export function checkSetupManifestLevel(bytes, flavor) {
+  const expected = SETUP_EXECUTION_LEVELS[flavor];
+  if (expected === undefined) {
+    return { ok: false, levels: [], expected: null, problem: `unknown flavor "${flavor}"` };
+  }
+  const levels = readRequestedLevels(bytes);
+  if (levels.length === 0) {
+    return { ok: false, levels, expected, problem: `no requestedExecutionLevel in the setup manifest, expected ${expected}` };
+  }
+  if (levels.length > 1 || levels[0] !== expected) {
+    return {
+      ok: false,
+      levels,
+      expected,
+      problem: `setup requestedExecutionLevel=${levels.join(", ")}, expected ${expected} for the ${flavor} flavor`,
+    };
+  }
+  return { ok: true, levels, expected, problem: null };
+}
+
 // The level a project's source manifest declares, or null when the file has no such element.
 export function readSourceManifestLevel(filePath) {
   const xml = fs.readFileSync(filePath, "utf8");

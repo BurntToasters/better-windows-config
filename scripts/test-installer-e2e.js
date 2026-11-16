@@ -31,7 +31,7 @@ import {
   buildPayloadNsh,
 } from "./build-installer.js";
 import { generateNugetNotices } from "./generate-nuget-licenses.js";
-import { checkPublishFlavor, formatFlavorReport } from "./flavor-metadata.js";
+import { checkPublishFlavor, checkSetupManifestLevel, formatFlavorReport } from "./flavor-metadata.js";
 import { parsePackageVersion } from "./sync-version-helpers.js";
 
 const SCRIPT = "scripts/test-installer-e2e.js";
@@ -65,7 +65,9 @@ const EXIT_NSIS_MISSING = 3;
 const usage = `Usage: node ${SCRIPT} --rid win-arm64|win-x64
 
 Builds unsigned E2E installers A (package.json version) and B (next patch), then runs the Installer E2E tests:
-an in-app update from A to B through the Hub, a case with BwcRegedit open, and an uninstall.
+an in-app update from A to B through the Hub, a case with BwcRegedit open, an uninstall, the refusal to install
+over a newer version, and the refusal of the E2E /MACHINE switch without an elevated token. The E2E installer is the
+per-user sandbox, so everything here runs unelevated; the per-machine proof is the elevated runner (docs/installer.md).
 
 Options:
   --rid win-x64|win-arm64   Required. The app runtime identifier.
@@ -276,6 +278,12 @@ function buildInstallerB(rid, version, publishDir, makensis) {
   if (result.error || result.status !== 0 || !existsSync(setup)) {
     const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.split(/\r?\n/).slice(-40).join("\n");
     throw new Error(`makensis failed for installer B: ${result.error?.message ?? `exit ${result.status}`}\n${output}`);
+  }
+  // B is an E2E setup like A, so it must never ask for elevation (the same audit build-installer.js runs).
+  const manifest = checkSetupManifestLevel(readFileSync(setup), "e2e");
+  if (!manifest.ok) {
+    rmSync(setup, { force: true });
+    throw new Error(`installer B: ${manifest.problem}`);
   }
   return setup;
 }

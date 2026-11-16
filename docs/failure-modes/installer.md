@@ -667,3 +667,88 @@ PowerShell refusals, the override paths, the dry-run exit codes, and the verify 
 - The unsigned-exe check uses a BWC-built file from `publish/<rid>` when one exists. Otherwise it
   uses a minimal unsigned PE image that the self-test writes to its temp folder, and the result says
   which one it used.
+
+## Per-machine install and migration (0.1.2)
+
+From 0.1.2 the ship installer is per machine: it asks for administrator rights (`RequestExecutionLevel admin`), installs
+into `%ProgramFiles%\Better Windows Config`, writes its uninstall entry to HKLM (64-bit view), and puts the two shortcuts
+in the all-users Start menu. The design is in the Fable audit `install-design.md` (items M1 to M30 below are its failure
+list) and the user's decisions: all-users shortcuts, option B for the in-app update (protected copy in
+`<install dir>.upd`), and manual download for 0.1.1 users. Written before the code, per AGENTS.md.
+
+This section replaces the older text above where it describes a per-user ship install: the HKCU uninstall key, the
+default `%LOCALAPPDATA%\Programs` folder, `InstallDirRegKey`, the directory page, `/D=` as the install folder,
+`ShortcutDir`, `RMDir /r "$TEMP\BWC-Update"`, and `/RELAUNCH` starting the Hub with `Exec`. The E2E per-user sandbox
+still follows the older text, except that it too starts the Hub through `BwcUpdate.exe --launch-hub`, has no
+directory page, refuses to go over a newer version, and removes the empty sandbox keys on uninstall.
+
+What the decisions change in the original list:
+
+- 0.1.1 will not apply 0.1.2 in the app (the new feed name keeps it away from the installer). A 0.1.1 user downloads the
+  setup and starts it. So the installer gets no `/D=` from 0.1.1 in the normal case. The `/D=` legacy-hint rules stay as
+  a defense (an older helper, a script, a hand-made command line).
+- The shortcuts are all-users, so the 0.1.1 uninstaller of a per-user copy cannot delete them (same names, other folder).
+- `<install dir>.upd` is the protected root of the elevated helper (`docs/contracts/update-cli.md`). The installer runs
+  from `<install dir>.upd\<32 hex>\installer.exe` during an update, so it must never remove the folder it runs from.
+- The legacy Hub cannot be relaunched by this installer: `--launch-hub` starts only the Hub beside its own
+  `BwcUpdate.exe`, and 0.1.1's helper has no such mode. After a failed migration the user starts the old copy from the
+  Start menu or its folder.
+
+Flavors. Ship is per machine only. The E2E flavor keeps today's per-user sandbox (`HKCU\Software\BWC-E2E\<RUNID>\Uninstall`,
+a temp folder, `/SHORTCUTS=`), manifest level `asInvoker`, so no test build can prompt. It adds an E2E-only `/MACHINE` switch
+that uses the machine layout in a sandbox: `%ProgramFiles%\BWC-E2E\<RUNID>`, `HKLM\Software\BWC-E2E\<RUNID>\Uninstall\...`
+(64-bit view), all-users shortcuts in a `BWC-E2E-<RUNID>` folder of the Start menu. It needs a token that is already
+elevated and never asks for elevation. Only the elevated runner (I4) runs it to the end.
+
+Proof column: **E2E** = the unelevated installer E2E (`scripts/test-installer-e2e.js`, user flavor, or the `/MACHINE`
+refusal); **Build** = `scripts/build-installer.js`; **Elevated** = the elevated runner tests of I4 (never run by the
+build or by the unelevated E2E); **Hub** = the Hub piece (I3); **Doc** = a documented duty that only a person or a VM run shows.
+
+| ID | Case | Required result | Proof |
+|----|------|-----------------|-------|
+| M1 | The user declines the consent prompt (ship setup started by hand or by the elevated helper) | Windows never starts the setup. Nothing changes. The caller sees a launch failure (the helper maps 1223 to `ElevationDeclined`) | Doc |
+| M2 | E2E `/MACHINE` without an elevated token (install or uninstall) | `.onInit` aborts: the exit code is not 0, and no folder, key, or shortcut is written. It never asks for elevation | E2E (`Installer_MachineMode_UnelevatedAbortsWithoutChanges`) |
+| M3 | A ship setup built `asInvoker`, or an E2E setup built `requireAdministrator` | The build audit reads the manifest level of the built setup EXE and fails (exit 1, the EXE is removed). `--dry-run` also checks that `bwc.nsi` picks the level by flavor | Build |
+| M4 | HKLM written through the 32-bit view (the stub is a 32-bit program) | `SetRegView 64` before every HKLM access, in the installer and the uninstaller. The Elevated test reads the native view | Elevated |
+| M5 | `/D=` names a folder other than the target (for example the old per-user folder) | Never the target. The ship target is always the HKLM `InstallLocation` (when valid) or `%ProgramFiles%\Better Windows Config`. The value is only a legacy hint (M9) | Elevated |
+| M6 | `/D=` is not a Better Windows Config install (no `installed-files.txt` or no `BetterWindowsConfig.exe`), is not a plain `X:\...` path, or has `..`, `/` or a quote | The hint is ignored, with a log line. Nothing is closed and nothing is removed there. A `/D=` that is a drive or share root is still refused, as before | Doc, Elevated |
+| M7 | HKLM `InstallLocation` is empty, relative, has `..`, is outside `%ProgramFiles%`, or is `%ProgramFiles%` itself | The default folder is used. Only the folder rules of M8 apply after that | Elevated |
+| M8 | The target exists, is not empty and has no `installed-files.txt` | Refuse before any change (`BwcCheckInstDir`), exit 2 when silent. There is no directory page, so the text says to move the folder | E2E (existing rules), Elevated |
+| M9 | A legacy per-user copy (from a valid `/D=` hint) is running | The setup runs the staged `BwcUpdate.exe --close-running --install-dir <legacy>` after it closes the target's apps. A process that stays aborts before any change (Retry or Cancel, silent exit code 2). The legacy folder is never changed or uninstalled | Elevated |
+| M10 | An elevated Registry Editor is open in this session | The close step runs elevated, so it sees and closes it. A save prompt that keeps it open ends in exit 3: Retry or Cancel, silent exit code 2, nothing changed | Elevated |
+| M11 | BWC runs in another Windows session (`--close-running` exit 4) | Abort before any installed file changes, with a message that BWC runs in another session (the helper's lines above it name the session). Silent exit code 4. With `/RELAUNCH` the installed Hub is started with `--update-result InstallerFailed` | Doc, Elevated |
+| M12 | The install fails after staging (swap, shortcuts, uninstall entry) | Rollback (`BwcRollback`): the previous version is back, a first install leaves no shortcut and no entry. The legacy folder was never touched. With `/RELAUNCH` the installed Hub (if any) is started with `--update-result InstallerFailed` through `--launch-hub` | E2E (update path), Elevated |
+| M13 | The machine install is done and the legacy per-user copy is still there | Both exist until the Hub removes the old one at its next start. The installer does not delete it | Hub (I3) |
+| M14 | The old per-user `Uninstall.exe` is missing | The Hub removes the stale HKCU key and the old shortcuts by their fixed names, with a log line | Hub (I3) |
+| M15 | The old uninstaller does not finish | The Hub logs it, retries at the next start, never blocks | Hub (I3) |
+| M16 | The Hub runs elevated | It skips the cleanup of M13 to M15 | Hub (I3) |
+| M17 | The HKCU `InstallLocation` of the old install names the machine folder, a root, or a system folder | The Hub refuses to run any uninstaller from it | Hub (I3) |
+| M18 | This setup has the same version as HKLM `DisplayVersion` | A repair: it runs as an upgrade over the same version and ends the same way | E2E (`Installer_SameVersion_RepairsAndOlderIsRefused`) |
+| M19 | This setup is older than HKLM `DisplayVersion` (semantic order: `0.1.2` is newer than `0.1.2-beta.3`, `0.1.10` is newer than `0.1.9`) | Refuse in `.onInit`, before any change. A version that cannot be read is not "newer" (no refusal) | E2E (`Installer_SameVersion_RepairsAndOlderIsRefused`) |
+| M20 | Over-the-shoulder elevation (a standard user types an administrator's credentials) | The setup reads no HKCU and no `%LOCALAPPDATA%`, and writes no per-user Start menu entry. The all-users shortcut and HKLM paths are used. The update hand-off needs the signed-in user to be an administrator (see `update-elevation.md`, EA33) | Doc, Elevated |
+| M21 | The Hub cannot be started unelevated (`--launch-hub` exit 8) | No Hub starts. The helper logs why. The install result is not changed | Elevated |
+| M22 | The finish page "Start" option | Calls `BwcUpdate.exe --launch-hub`, never the Hub itself, so the Hub never starts elevated. When the setup is not elevated (E2E user flavor) the same call is a normal start | E2E (the update path uses the same call), Elevated |
+| M23 | An all-users shortcut cannot be written | The install fails and rolls back (M12). It is not a warning | Elevated |
+| M24 | Uninstall | Ship prompts for elevation (the uninstaller has the same level). It removes the HKLM key (only when `InstallLocation` is this folder), the all-users shortcuts, the payload, and `<install dir>.upd` (only 32-hex folders, never through a link). It never touches a data root or `%TEMP%` (the `RMDir /r "$TEMP\BWC-Update"` of 0.1.1 is gone: the Hub prunes its own staging) | E2E (user flavor), Elevated |
+| M25 | `<install dir>.upd` left by a crashed update | Removed at install start: only direct subfolders named with 32 hex digits, only plain folders that hold plain files, never through a link or junction, never the folder the setup itself runs from. A folder that holds a subfolder or a link stays | Elevated |
+| M26 | The elevated helper meets a link, a junction, an oversize file, or a file that changes during the copy | The helper refuses (see `update-elevation.md`, EA9 to EA12). The installer then does not start | Doc |
+| M27 | The elevated helper is the same or an older version than the staged one | The helper refuses whatever the arguments say (EA4, EA5). The installer's own check of M19 is the second line | Doc |
+| M28 | The elevated helper writes a file log | It never does (NL1). The installer starts the close and relaunch steps with the same rule (the helper's elevated modes skip the log) | Doc |
+| M29 | An x64 setup runs on an Arm64 PC over an Arm64 install | Same folder and key, handled as an upgrade by M19 and M18. The key keeps the 0.1.1 values: the architecture is not stored there (the file version and the payload show it) | Doc |
+| M30 | A custom install folder | Not supported in 0.1.2. There is no directory page and `/D=` is not the target (M5) | Doc |
+
+Rows added by the implementation:
+
+| ID | Case | Required result | Proof |
+|----|------|-----------------|-------|
+| M31 | The ship setup runs without an elevated token (`__COMPAT_LAYER=RunAsInvoker`, or an old shell) | `.onInit` checks the token and aborts, nothing written. The E2E `/MACHINE` mode uses the same check (M2) | Elevated, E2E (E2E flavor) |
+| M32 | The AUMID helper script runs from `%TEMP%` while elevated | It is not extracted to the plugins folder in `%TEMP%` (a medium process could replace it). It is written into `<install dir>.new` (under Program Files) and PowerShell runs it from there | Doc, Elevated |
+| M33 | An elevated child starts with a user-writable working directory | After the swap the setup moves its working directory to `%WINDIR%`, so `BwcUpdate.exe` (close and launch steps) never inherits `%TEMP%` or the staging folder | Doc |
+| M34 | `/RELAUNCH` and the Hub is missing, or `BwcUpdate.exe` is missing (a rollback that did not finish) | The launch is skipped with a log line. The exit code does not change | Doc |
+| M35 | The uninstall entry write fails after the swap | Same as M23: rollback, and a first install leaves no key | Elevated |
+| M36 | A refusal in `.onInit` (not elevated, newer version installed, bad folder) | The setup exits before `.onInstFailed`, so no Hub is started by the installer. The helper's own refusals (EA4, EA5) make this case unreachable from an update | Doc |
+| M37 | The uninstaller copies itself to `%TEMP%` and runs from there (NSIS behavior) | The run from a copy in a user-writable folder is the NSIS default and is an accepted residual risk. The build requires NSIS 3.10 or newer | Doc |
+
+Known limits of the unelevated proof: nothing in this section that writes under Program Files, HKLM, or the all-users
+Start menu is run by `scripts/test-installer-e2e.js`. The `Elevated` rows are proved only by the elevated runner
+(`tests/Bwc.E2E/Installer`, category `Elevated`, I4), which a person installs and starts.
