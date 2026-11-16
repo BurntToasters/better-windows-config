@@ -4,14 +4,14 @@
 
 This file is the first full audit of `docs/parity/regedit-inventory.md` (release 0.1.2, branch `next-0.1.2`,
 base `ed0c508`). Each of the 535 inventory rows has one line below. The Status column of the inventory is
-kept equal to this file.
+kept equal to this file. Refreshed at 7d3f8f2 for the commits after 28d165c.
 
 - `pass`: a named test or golden proves the row. E2E tests are named by method (`tests/Bwc.E2E`), engine
   tests by class (`tests/Bwc.Registry.Tests`). Informational rows that state no behavior say so.
 - `declared-difference`: BWC differs on purpose. The reason is in the row.
 - `gap`: not proven or not built. The Piece column names the 0.1.2 work piece that closes it (see the plan
   pieces: O1 oracle measurements, V1 value identity and display, K1 keyboard, menus and small dialogs,
-  P1 Print, D1 resource viewers, R2 remote UI, S1 Permissions, X1 accessibility, F2 audit leftovers).
+  P1 Print, D1 resource viewers, R2 remote UI, S1 Permissions, S1b Permissions prompts, X1 accessibility, F2 audit leftovers; Elevated labels the rows that need the user's elevated runner).
 
 MSG rows were sorted by a scan of the BWC sources for each RT_STRING text from
 `docs/parity/oracle/regedit-resources.json`: text equal in a resource file or source literal is `pass`
@@ -25,23 +25,25 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 
 | Section | pass | declared-difference | gap |
 | --- | --- | --- | --- |
-| MENU | 36 | 0 | 1 |
+| MENU | 35 | 0 | 2 |
 | CTX | 41 | 0 | 0 |
-| DLG | 40 | 5 | 6 |
-| ACC | 27 | 0 | 1 |
-| MSG | 174 | 45 | 57 |
+| DLG | 35 | 7 | 9 |
+| ACC | 28 | 0 | 0 |
+| MSG | 209 | 45 | 22 |
 | VIEW | 18 | 2 | 1 |
 | BEH | 40 | 5 | 4 |
 | EXP | 32 | 0 | 0 |
-| All (535) | 408 | 57 | 70 |
+| All (535) | 438 | 59 | 38 |
 
 ## Gaps by piece
 
 | Piece | Rows |
 | --- | --- |
-| F2 | DLG-023, DLG-035, DLG-036, MSG-022, MSG-052, MSG-053, MSG-060, MSG-061, MSG-062, MSG-066, MSG-072, MSG-109, MSG-110, MSG-111, VIEW-009, BEH-009, BEH-043 |
-| P1 | MENU-009, DLG-009, DLG-015, DLG-016, ACC-011, MSG-245, MSG-246, MSG-247, MSG-248, MSG-249, MSG-250, MSG-251, MSG-252, MSG-253, MSG-254, MSG-255, MSG-256, MSG-257, MSG-258, MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-264, MSG-265, MSG-266, MSG-267, MSG-268, MSG-269, MSG-270, MSG-271, MSG-272, MSG-273, MSG-274, MSG-275, MSG-276, BEH-027 |
-| S1 | MSG-174, MSG-175, MSG-176, MSG-177, MSG-179, MSG-181, MSG-182, MSG-183, MSG-184, MSG-185, MSG-187, MSG-188, MSG-189, MSG-190, BEH-026 |
+| F2 | DLG-023, DLG-035, DLG-036, MSG-022, MSG-052, MSG-053, MSG-060, MSG-061, MSG-062, MSG-072, MSG-109, MSG-110, MSG-111, VIEW-009, BEH-007, BEH-009 |
+| P1 | MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-275, MSG-276, BEH-027 |
+| D1 | DLG-042, DLG-043, DLG-046, DLG-047 |
+| S1b | MSG-174, MSG-175, MSG-176, MSG-177, MSG-179, BEH-026 |
+| Elevated | MENU-005, MENU-006, DLG-007, DLG-008 |
 
 ## Rows
 
@@ -53,11 +55,11 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MENU-002 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
 | MENU-003 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
 | MENU-004 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
-| MENU-005 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
-| MENU-006 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
+| MENU-005 | gap | Owned Load Hive file dialog opens only with SeRestorePrivilege. Load is enabled only at HKLM and HKU (AppServices_HiveRulesEnableLoadAndUnloadByRoot); Hives_LoadHiveRefusesWithoutPrivilegeBeforeAskingForFile shows the refusal. Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey runs at HKCU, where Load is disabled, so it never opens the dialog | Elevated |
+| MENU-006 | gap | Unload Hive is never invoked by a test. Only its enable rule is proven (AppServices_HiveRulesEnableLoadAndUnloadByRoot); unloading needs SeRestorePrivilege | Elevated |
 | MENU-007 | pass | Shell_MenuTableMatchesCommandStates; Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection (dialog content is DLG-031, R2) |  |
 | MENU-008 | pass | Remote_DisconnectDialogRemovesComputer (loopback connection to 127.0.0.1); Shell_MenuTableMatchesCommandStates |  |
-| MENU-009 | gap | Disabled at Computer; classic enables Print at Computer, a hive root and a key (regedit-print.json) | P1 |
+| MENU-009 | pass | Print_OwnedDialogCancelsAndCommandStateFollowsSelection (Print enabled at Computer, a hive and a key) |  |
 | MENU-010 | pass | Shell_MenuTableMatchesCommandStates; Shell_CloseLeavesNoTestProcess |  |
 | MENU-011 | pass | Shell_MenuTableMatchesCommandStates (New children); Editing_CreatesRenamesAndDeletesRegistryObjects |  |
 | MENU-012 | pass | Shell_MenuTableMatchesCommandStates (New children); Editing_CreatesRenamesAndDeletesRegistryObjects |  |
@@ -143,16 +145,16 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | DLG-004 | pass | ClassicDialogs_EditStringAndDwordFollowTheTemplate; ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates |  |
 | DLG-005 | pass | ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates (caption Edit Binary Value); HexContextMenu_HasTheRt108ItemsAndStates |  |
 | DLG-006 | pass | HexEditing_EditsCancelsAndCopies; HexEditingFixes_TypeBackspaceAndPasteUseRealKeys |  |
-| DLG-007 | pass | Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
-| DLG-008 | pass | Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
-| DLG-009 | gap | No print progress dialog (PrintController.cs) | P1 |
+| DLG-007 | gap | Key Name prompt (template 104) opens only after a file is chosen, which needs SeRestorePrivilege. No test reaches it, so its layout is not asserted | Elevated |
+| DLG-008 | gap | Control 1001 takes the key name in the prompt of DLG-007. No test reaches it (needs an elevated hive load) | Elevated |
+| DLG-009 | pass | Print_ProgressCancelStopsJobAndLeavesNoOutput (progress text, Cancel, main window disabled while it runs; records not run without Microsoft Print to PDF); built from template 105 (ClassicDialogTemplates.cs) |  |
 | DLG-010 | pass | Find_FollowsTheClassicTwoDialogSequence; find-sequence.json |  |
 | DLG-011 | pass | Find_FollowsTheClassicTwoDialogSequence; find-sequence.json |  |
 | DLG-012 | pass | Find_FollowsTheClassicTwoDialogSequence; find-sequence.json |  |
 | DLG-013 | pass | Remote_DisconnectDialogRemovesComputer (dialog 107, multi-select list 1175 as in the template style) |  |
 | DLG-014 | pass | Remote_DisconnectDialogRemovesComputer (dialog 107, multi-select list 1175 as in the template style) |  |
-| DLG-015 | gap | Print uses plain PrintDlgW without template 108 (RegistryPrinter.cs:96-109) | P1 |
-| DLG-016 | gap | Print uses plain PrintDlgW without template 108 (RegistryPrinter.cs:96-109) | P1 |
+| DLG-015 | declared-difference | PrintDlgExW has no template handle, so template 108 cannot be passed (docs/failure-modes/print.md, Print dialog section). Classic opens the system print host, which shows no range radios (regedit-print.json, OQ-44). BWC prints the selected branch at a key and All at Computer. E2E: Print_DialogUiaMatchesOracle (no radio buttons in the host) |  |
+| DLG-016 | declared-difference | PrintDlgExW has no template handle, so template 108 cannot be passed (docs/failure-modes/print.md, Print dialog section). Classic opens the system print host, which shows no range radios (regedit-print.json, OQ-44). BWC prints the selected branch at a key and All at Computer. E2E: Print_DialogUiaMatchesOracle (no radio buttons in the host) |  |
 | DLG-017 | pass | Find_FollowsTheClassicTwoDialogSequence |  |
 | DLG-018 | pass | Find_FollowsTheClassicTwoDialogSequence |  |
 | DLG-019 | pass | ImportProgress_ShowsClassicProgressWithoutCancel; ImportProgress_DarkPaletteCaptionAndFace |  |
@@ -178,12 +180,12 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | DLG-039 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
 | DLG-040 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
 | DLG-041 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
-| DLG-042 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
-| DLG-043 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
+| DLG-042 | gap | Only the Memory detail (1601) is opened by a test (ResourceViewerTests). Port 1700, Interrupt 1800 and DMA 1900 never open, so their static fields and read-only state are unproven | D1 |
+| DLG-043 | gap | Port requirement detail viewer (1700) is never opened by a test; only the Memory detail is | D1 |
 | DLG-044 | declared-difference | Developer dialog with no menu item, accelerator or string that opens it (OQ-17); BWC does not implement it |  |
 | DLG-045 | declared-difference | Developer dialog with no menu item, accelerator or string that opens it (OQ-17); BWC does not implement it |  |
-| DLG-046 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1800 and 1900, not measured on classic (no sample) |  |
-| DLG-047 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1800 and 1900, not measured on classic (no sample) |  |
+| DLG-046 | gap | Interrupt requirement detail viewer (1800) is never opened by a test. Classic not measured (no sample, OQ-16) | D1 |
+| DLG-047 | gap | DMA requirement detail viewer (1900) is never opened by a test. Classic not measured (no sample, OQ-16) | D1 |
 | DLG-048 | declared-difference | Template 2020 is never opened by classic in this build: Display Binary Data opens variant B (2021) for every value type (regedit-binary.json). BWC does not implement variant A |  |
 | DLG-049 | declared-difference | Template 2020 is never opened by classic in this build: Display Binary Data opens variant B (2021) for every value type (regedit-binary.json). BWC does not implement variant A |  |
 | DLG-050 | pass | BinaryViewer_FollowsTheClassicLayoutAndFormats; HexViewer_ClassicBinaryDataFollowsTheFormats |  |
@@ -202,8 +204,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | ACC-007 | pass | Shell_F6CyclesPanesLikeTab |  |
 | ACC-008 | pass | ContextMenus_ShiftF10OnListBackgroundAndComputerRoot (regedit-keys.json) |  |
 | ACC-009 | pass | Basics_DeleteWithTreeFocusDeletesTheKey |  |
-| ACC-010 | pass | Find_EditMenuFindRunsFromTheKeyboard |  |
-| ACC-011 | gap | Ctrl+P is window-wide in code; no E2E from the address bar yet (P1 tests it with the Print dialog) | P1 |
+| ACC-010 | pass | Find_FollowsTheClassicTwoDialogSequence (Ctrl+F opens Find: find.ctrlF.open) |  |
+| ACC-011 | pass | Print_CtrlPFromAddressBarOpensOwnedDialog (Ctrl+P from the address bar opens the owned print dialog, which is cancelled) |  |
 | ACC-012 | pass | Parity_CtrlT_TogglesBetweenLocalMachineAndCurrentUser |  |
 | ACC-013 | pass | Shell_CtrlLAndAltDFocusAddressBar |  |
 | ACC-014 | pass | Shell_CtrlLAndAltDFocusAddressBar |  |
@@ -238,7 +240,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-010 | pass | String parity check: text equal (ContextCollapse) |  |
 | MSG-011 | pass | String parity check: text equal (ContextModify) |  |
 | MSG-012 | pass | String parity check: text equal (Bwc.Regedit/Controllers/MessageCatalog.cs) |  |
-| MSG-013 | pass | Format template; ValueDisplay_DwordDataColumnShowsOracleHexAndDecimal |  |
+| MSG-013 | pass | Format template; RegistryValueDisplayTests.DwordShowsOracleHexWidthAndUnsignedDecimal (0x00001388 (5000)) |  |
 | MSG-014 | pass | String parity check: text equal (Bwc.Registry/RegistryValueDisplay.cs) |  |
 | MSG-015 | pass | String parity check: text equal (Bwc.UI/Dialogs/ClassicDialogTemplates.cs) |  |
 | MSG-016 | pass | Format template; ValueDisplayTests (QWORD rows compared with classic) |  |
@@ -291,7 +293,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-063 | pass | String parity check: text equal (Bwc.Hub/MainWindow.xaml) |  |
 | MSG-064 | pass | String parity check: text equal (MsgImportInvalidKey) |  |
 | MSG-065 | pass | String parity check: text equal (MsgImportPrivileges) |  |
-| MSG-066 | gap | Text not found verbatim in the source; check and fix | F2 |
+| MSG-066 | pass | String parity check: text equal (MsgImportRemoteSucceeded, string 128) |  |
 | MSG-067 | pass | String parity check: text equal (MsgImportOpenFailed) |  |
 | MSG-068 | pass | String parity check: text equal (MsgImportReadFailed) |  |
 | MSG-069 | pass | String parity check: text equal (MsgImportRemoteAccess) |  |
@@ -399,23 +401,23 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-171 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
 | MSG-172 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
 | MSG-173 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
-| MSG-174 | gap | Text not in the source | S1 |
-| MSG-175 | gap | Text not in the source | S1 |
-| MSG-176 | gap | Text not in the source | S1 |
-| MSG-177 | gap | Text not in the source | S1 |
+| MSG-174 | gap | Text not in the source (string 7013, Special Access...) | S1b |
+| MSG-175 | gap | Text not in the source (string 7014). Not named in S1b; S1b decides whether BWC shows it | S1b |
+| MSG-176 | gap | Text not in the source (string 7015) | S1b |
+| MSG-177 | gap | Text not in the source (string 7016) | S1b |
 | MSG-178 | pass | String parity check: text equal (MsgReplaceSubkeysConfirm) |  |
-| MSG-179 | gap | Text not in the source | S1 |
+| MSG-179 | gap | Text not in the source (string 7018) | S1b |
 | MSG-180 | pass | String parity check: text equal (Bwc.Regedit/Dialogs/RegistryPermissionsDialog.cs) |  |
-| MSG-181 | gap | Text differs from the oracle (MsgSecurityRetrieveDenied) | S1 |
-| MSG-182 | gap | Text differs from the oracle (MsgSecurityRetrieveDeleted) | S1 |
-| MSG-183 | gap | Text differs from the oracle (MsgSecurityRetrieveFailed) | S1 |
-| MSG-184 | gap | Text differs from the oracle (MsgSecuritySaveDenied) | S1 |
-| MSG-185 | gap | Text not in the source | S1 |
+| MSG-181 | pass | String parity check: text equal (MsgSecurityRetrieveDenied) |  |
+| MSG-182 | pass | String parity check: text equal (MsgSecurityRetrieveDeleted) |  |
+| MSG-183 | pass | String parity check: text equal (MsgSecurityRetrieveFailed) |  |
+| MSG-184 | pass | String parity check: text equal (MsgSecuritySaveDenied) |  |
+| MSG-185 | pass | String parity check: text equal (MsgSecuritySaveDeleted) |  |
 | MSG-186 | pass | String parity check: text equal (MsgSecuritySetFailed) |  |
-| MSG-187 | gap | Text not in the source | S1 |
-| MSG-188 | gap | Text not in the source | S1 |
-| MSG-189 | gap | Text not in the source | S1 |
-| MSG-190 | gap | Text not in the source | S1 |
+| MSG-187 | pass | String parity check: text equal (MsgOwnerSetFailed) |  |
+| MSG-188 | pass | String parity check: text equal (MsgSecuritySubkeysDenied) |  |
+| MSG-189 | pass | String parity check: text equal (MsgSecuritySubkeysDeleted) |  |
+| MSG-190 | pass | String parity check: text equal (MsgSecuritySubkeysFailed) |  |
 | MSG-191 | pass | String parity check: text equal (PermissionsInheritThisKeyOnly) |  |
 | MSG-192 | pass | String parity check: text equal (PermissionsInheritThisKeyAndSubkeys) |  |
 | MSG-193 | pass | String parity check: text equal (PermissionsInheritSubkeysOnly) |  |
@@ -470,38 +472,38 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-242 | pass | String parity check: text equal (PrintValueData) |  |
 | MSG-243 | pass | String parity check: text equal (PrintNoName) |  |
 | MSG-244 | pass | String parity check: text equal (PrintNoClass) |  |
-| MSG-245 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-246 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-247 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-248 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-249 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-250 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-251 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-252 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-253 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-254 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-255 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-256 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-257 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-258 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-259 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-260 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-261 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-262 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-263 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-264 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-265 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-266 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-267 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-268 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-269 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-270 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-271 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-272 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-273 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-274 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-275 | gap | Resource print text (needs the classic text golden) | P1 |
-| MSG-276 | gap | Resource print text (needs the classic text golden) | P1 |
+| MSG-245 | pass | Classic text golden has "Full Resource Descriptor" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-246 | pass | Classic text golden has "Partial Descriptor" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-247 | pass | Classic text golden has "Interface Type:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-248 | pass | Classic text golden has "Bus Number:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-249 | pass | Classic text golden has "Version:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-250 | pass | Classic text golden has "Revision:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-251 | pass | Classic text golden has "Resource:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-252 | pass | Classic text golden has "Disposition:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-253 | pass | Classic text golden has "Type:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-254 | pass | Classic text golden has "Start:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-255 | pass | Classic text golden has "Length:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-256 | pass | Classic text golden has "Level:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-257 | pass | Classic text golden has "Vector:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-258 | pass | Classic text golden has "Affinity:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-259 | gap | Label "Channel:" is a DMA field; the classic text golden has no DMA layout (export.md open point 3) | P1 |
+| MSG-260 | gap | Label "Port:" is a DMA field; the classic text golden has no DMA layout (export.md open point 3) | P1 |
+| MSG-261 | gap | Label "Reserved1:" is a device-specific field; the classic text golden has no such layout (export.md open point 3) | P1 |
+| MSG-262 | gap | Label "Reserved2:" is a device-specific field; the classic text golden has no such layout (export.md open point 3) | P1 |
+| MSG-263 | gap | Label "Data:" of a device-specific partial descriptor; the golden has "Data:" only as the value label (export.md open point 3) | P1 |
+| MSG-264 | pass | Classic text golden has "Interface Type:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-265 | pass | Classic text golden has "Bus Number:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-266 | pass | Classic text golden has "Slot Number:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-267 | pass | Classic text golden has "List" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-268 | pass | Classic text golden has "Descriptor" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-269 | pass | Classic text golden has "Option:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-270 | pass | Classic text golden has "Alignment:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-271 | pass | Classic text golden has "Minimum Address:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-272 | pass | Classic text golden has "Maximum Address:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-273 | pass | Classic text golden has "Minimum Vector:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-274 | pass | Classic text golden has "Maximum Vector:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
+| MSG-275 | gap | Label "Minimum Channel:" is a DMA requirement field; the classic text golden has no DMA layout (export.md open point 3) | P1 |
+| MSG-276 | gap | Label "Maximum Channel:" is a DMA requirement field; the classic text golden has no DMA layout (export.md open point 3) | P1 |
 
 ### VIEW
 
@@ -539,7 +541,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | BEH-004 | declared-difference | BWC keeps LastKey, Find flags, placement, splitter and column widths in its own settings so it never writes classic's Applets key except Favorites; it reads classic LastKey on first start (Navigation_ShowsRootsAndRestoresLastKey; AppServices_PlacementSplitAndColumnsPersistAcrossRestart) |  |
 | BEH-005 | declared-difference | BWC keeps LastKey, Find flags, placement, splitter and column widths in its own settings so it never writes classic's Applets key except Favorites; it reads classic LastKey on first start (Navigation_ShowsRootsAndRestoresLastKey; AppServices_PlacementSplitAndColumnsPersistAcrossRestart) |  |
 | BEH-006 | declared-difference | BWC keeps LastKey, Find flags, placement, splitter and column widths in its own settings so it never writes classic's Applets key except Favorites; it reads classic LastKey on first start (Navigation_ShowsRootsAndRestoresLastKey; AppServices_PlacementSplitAndColumnsPersistAcrossRestart) |  |
-| BEH-007 | pass | Basics_CopyKeyNameAndF5KeepTheView |  |
+| BEH-007 | gap | No test asserts absence before F5: Basics_CopyKeyNameAndF5KeepTheView adds the value and presses F5 in one step. Test must assert absence before F5 | F2 |
 | BEH-008 | pass | Shell_MenuTableMatchesCommandStates (no Undo item) |  |
 | BEH-009 | gap | No negative drag-and-drop test | F2 |
 | BEH-010 | pass | Tree_RenameCommitsOnEnterAndFocusLossAndCancelsOnEscape; Keyboard_SlowSecondClickStartsRename; Keyboard_DoubleClickOnSelectedValueOpensEditorWithoutRename; Keyboard_DoubleClickOnSelectedKeyTogglesWithoutRename; Keyboard_ClickOnSelectedListRowFromTreeFocusDoesNotRename |  |
@@ -558,8 +560,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | BEH-023 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus (only HKEY_LOCAL_MACHINE and HKEY_USERS); Remote_DisconnectDialogRemovesComputer; every command on remote keys: Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox, Remote_FindLocatesRemoteValue, Remote_ExportBranchMatchesLocalExport, Remote_AddressBarNavigatesToRemotePath |  |
 | BEH-024 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus (only HKEY_LOCAL_MACHINE and HKEY_USERS); Remote_DisconnectDialogRemovesComputer; every command on remote keys: Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox, Remote_FindLocatesRemoteValue, Remote_ExportBranchMatchesLocalExport, Remote_AddressBarNavigatesToRemotePath |  |
 | BEH-025 | pass | Remote_ConnectOwnComputerShowsStringOneFiftyThree; Remote_ConnectUnreachableShowsStringOneFiftyFour; 155 and 156 are reviewed in code, not automated (no way to reach half a computer from this machine) |  |
-| BEH-026 | gap | Cancel and replace-children tested; owner, auditing, effective access and prompts 7015 to 7018 missing | S1 |
-| BEH-027 | gap | Range panel, progress and print output missing (OQ-44) | P1 |
+| BEH-026 | gap | Owner recursion and the audit tab are tested (Permissions_OwnerRecursionSetsTheOwnerOfEverySubkey, Permissions_AuditingTabWithoutSecurityPrivilegeShowsTheSystemState). Effective access is not tested. Prompts 7013, 7015, 7016 and 7018 are absent from the source | S1b |
+| BEH-027 | gap | Range panel: declared (DLG-016). Progress: pass (DLG-009). Report labels: pass (MSG-245 to MSG-258, MSG-264 to MSG-274). Printed page layout (margins, font, wrapping) has no classic print output golden (OQ-44) | P1 |
 | BEH-028 | pass | Tree_RightAndLeftArrowSemantics; Tree_NumpadKeysAndPageKeys |  |
 | BEH-029 | pass | Basics_MultiDeleteTextAndDefaultRow; List_KeyboardSelectionAndFocus |  |
 | BEH-030 | pass | Shell_TabCyclesTreeListAddressBar; List_KeyboardSelectionAndFocus |  |
@@ -575,7 +577,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | BEH-040 | pass | Find_FollowsTheClassicTwoDialogSequence; Find_FinishedIsStickyUntilTheSelectionMoves; RegistryFinderTests |  |
 | BEH-041 | pass | Find_FollowsTheClassicTwoDialogSequence; Find_FinishedIsStickyUntilTheSelectionMoves; RegistryFinderTests |  |
 | BEH-042 | pass | Find_FollowsTheClassicTwoDialogSequence; Find_FinishedIsStickyUntilTheSelectionMoves; RegistryFinderTests |  |
-| BEH-043 | gap | Classic and BWC both ask for highestAvailable (regedit-manifest.json; src/Bwc.Regedit.App/app.manifest); no check guards the BWC manifest | F2 |
+| BEH-043 | pass | scripts/flavor-metadata.js checkExeManifests: the published BwcRegedit.exe requestedExecutionLevel must match src/Bwc.Regedit.App/app.manifest (highestAvailable, as classic in regedit-manifest.json). Run by scripts/dotnet-build.js publish, which fails on a problem, and by the test-all flavor step |  |
 | BEH-044 | pass | Hives_LoadHiveRefusesWithoutPrivilegeBeforeAskingForFile |  |
 | BEH-045 | pass | Robustness_PolicyOverrideShowsRegistryEditingDisabled; Robustness_PolicyLevelTwoRefusesSilentImport |  |
 | BEH-046 | pass | Basics_EnterAndDoubleClickOpenTheEditorForEachType |  |
@@ -650,7 +652,7 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-21 | Unload is enabled only on a direct child of HKLM or HKU (AppServices_HiveRulesEnableLoadAndUnloadByRoot). |
 | OQ-22 | Strings 55 and 56 are present; the binary hive import flow is checked in F2. |
 | OQ-23 | DisableRegistryTools 1 and 2 (Robustness_PolicyOverrideShowsRegistryEditingDisabled, Robustness_PolicyLevelTwoRefusesSilentImport). |
-| OQ-24 | BWC ships highestAvailable (src/Bwc.Regedit.App/app.manifest). Classic asks for highestAvailable too (regedit-manifest.json). A guard check is F2. |
+| OQ-24 | BWC ships highestAvailable (src/Bwc.Regedit.App/app.manifest). Classic asks for highestAvailable too (regedit-manifest.json). The guard is scripts/flavor-metadata.js (checkExeManifests), run by the publish and the test-all flavor step (BEH-043). |
 | OQ-25 | Value order: List_OrderTypeAheadAndHeaderClick. Tree order for non-ASCII and symbol names: F2. Export order follows the golden (RegistryExportTests). |
 | OQ-26 | sort-order.json and List_OrderTypeAheadAndHeaderClick; non-ASCII value names: V1. |
 | OQ-27 | Selection colors: regedit-selection-colors.json (Theme tests). Icon sizes: Icons_TreeAndListRowsMatchClassicLayout. |
@@ -660,7 +662,7 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-31 | The writer matches the golden (truncates at the first NUL), as classic does. |
 | OQ-32 | The lossy round trip is classic behavior; export bytes match the goldens. |
 | OQ-33 | The golden governs (78 characters); RegistryExportTests. |
-| OQ-34 | Text export: ExportDialogs_RangePanelWritesAllBranchTextAndRegedit4. Hive export: RegistryExportHiveTests. Exit codes: CommandLine_SilentImportExitCodesFollowTheResult. Print golden: P1. |
+| OQ-34 | Text export: ExportDialogs_RangePanelWritesAllBranchTextAndRegedit4. Hive export: RegistryExportHiveTests. Exit codes: CommandLine_SilentImportExitCodesFollowTheResult. Print report: the export text, so it matches the classic text golden (SeedExportMatchesTheClassicTextGoldenByteForByte) and Parity_PrintReport_UsesClassicLabels. Print page layout: OQ-44. |
 | OQ-35 | See OQ-22 (F2). |
 | OQ-36 | Basics_EnterAndDoubleClickOpenTheEditorForEachType; Tree_DoubleClickTogglesExpansion. |
 | OQ-37 | Editing_CreatesRenamesAndDeletesRegistryObjects (new items enter rename with the name selected). |
@@ -668,9 +670,9 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-39 | Rename and Delete are off at Computer and the hive roots (Shell_MenuTableMatchesCommandStates); the Computer-root context menu: O1. |
 | OQ-40 | String 34 is not shown; the root is Computer (string 19). |
 | OQ-41 | Decision: BWC does not register a .reg file type or Merge verb. |
-| OQ-42 | BWC uses the OS ACL editor (Permissions tests). Owner, auditing, effective access and the prompts for strings 7015 to 7018: S1. |
+| OQ-42 | BWC uses the OS ACL editor (Permissions tests). Owner recursion and the audit tab: Permissions_OwnerRecursionSetsTheOwnerOfEverySubkey, Permissions_AuditingTabWithoutSecurityPrivilegeShowsTheSystemState. Remote apply: Permissions_RemoteKeyApplyChangesTheDaclThroughTheConnection. Effective access is not tested. Prompts 7013, 7014, 7015, 7016 and 7018 are absent from the source: S1b (BEH-026, MSG-174 to MSG-179). |
 | OQ-43 | Favorites_AddRemoveNavigateAndReportMissingPath (duplicate name refused, no confirmation on Remove). |
-| OQ-44 | Not measured: on this build classic opens the Windows print host, whose default view has no range controls, and the default printer is a physical printer, so nothing was printed (regedit-print.json). P1 follows templates 105 and 108. |
+| OQ-44 | Classic opens the Windows print host, whose default view has no range controls, and the default printer is a physical printer, so nothing was printed (regedit-print.json). BWC uses PrintDlgExW with no range panel (DLG-015 and DLG-016 declared). Progress window with Cancel: DLG-009. Report text: the classic text golden (MSG-245 to MSG-258, MSG-264 to MSG-274). Open (P1): the printed page layout, and the DMA and device-specific labels (MSG-259 to MSG-263, MSG-275, MSG-276). |
 | OQ-45 | Classic opens the system object picker (RichEdit name box); typing into it could not be automated, so the connect is not measured (regedit-remote.json). BWC opens the same system picker (Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection) and falls back to a name prompt when the picker cannot run. |
 | OQ-46 | CommandLine_SilentImportExitCodesFollowTheResult; CommandLine_ExportsImportsAndRejectsOutsideSandbox. |
 | OQ-47 | The name box is read-only in every value editor (ClassicDialogs_EditStringAndDwordFollowTheTemplate). |
