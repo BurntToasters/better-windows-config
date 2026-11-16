@@ -210,7 +210,7 @@ through its Cancel button or Escape. On this build the dialog is the system
 `ApplicationFrameWindow` host, so `print.owner` passes when the host has no HWND owner but the main
 window is disabled, which is the modality contract the operating system provides. When a classic
 `#32770` appears, `print.owner` also checks `GetWindow(GW_OWNER) == main` strictly.
-It also records `print.menu.computer-disabled` and `print.menu.key-enabled` for the command state.
+It also records `print.menu.computer-enabled` and `print.menu.key-enabled` for the command state.
 It never presses OK, so no spooler job is created and no PDF path is automated even when
 "Microsoft Print to PDF" is the default printer. If the dialog does not appear because the machine
 has no printer, the test records an informational skip with the observed state and still checks that
@@ -246,7 +246,7 @@ cancelled, and the walk stops at its next line. The job then calls AbortDoc and 
 `BWC_E2E_PRINT_LINE_DELAY_MS` paces each line so a cancel test has time to press Cancel. Ship builds have no delay.
 
 The PDF test (`PrintPdfTests`) is the only test that produces output. It first checks that "Microsoft Print to PDF"
-exists with the "Microsoft Print To PDF" driver (EnumPrinters). If not, it records "not run" and passes. Otherwise
+exists with the "Microsoft Print To PDF" driver (EnumPrinters). If not, it records a "not run" note and the test is Inconclusive. Otherwise
 it prints through the guarded path to `artifacts/e2e/print/<run-id>.pdf` and checks the `%PDF-` header. The cancel
 test uses the same printer and checks that no complete PDF (no `%%EOF`) and no spooler job remain.
 

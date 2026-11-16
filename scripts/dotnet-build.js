@@ -39,7 +39,8 @@ Publishes Bwc.Hub, Bwc.Regedit.App, then Bwc.Update into
 publish/<rid> (ship) or publish/<rid>-e2e (e2e).
 
 Before each project publishes, its stale ReadyToRun intermediates
-(obj/<platform>/Release/<tfm>/<rid>/R2R) are deleted and logged.
+(obj/<platform>/Release/<tfm>/<rid>/R2R) and its rid-specific copy-local output
+(bin/<platform>/Release/<tfm>/<rid>) are deleted and logged.
 
 After the publish, every managed Bwc* and BetterWindowsConfig* assembly in the
 folder root must carry BwcFlavor=ship (ship) or BwcFlavor=E2E (e2e). A missing or
@@ -239,6 +240,27 @@ function removeStaleReadyToRun({ project, rid, platform }) {
   return removed;
 }
 
+/**
+ * Deletes the rid-specific copy-local output in bin/<platform>/Release/<tfm>/<rid>. Copy-local skips a file
+ * whose size and timestamp match, so a Bwc.UI.dll left by a ship build (BwcFlavor=ship) could survive in
+ * Bwc.Hub's bin and differ from the E2E copy in Bwc.Regedit.App, which the shared-folder check then refuses.
+ * The publish copies every referenced assembly again. Returns the repo-relative folders it removed.
+ */
+function removeStaleCopyLocalOutput({ project, rid, platform }) {
+  const projectDir = path.dirname(path.join(REPO_ROOT, project));
+  const releaseDir = path.join(projectDir, "bin", platform, "Release");
+  if (!fs.existsSync(releaseDir)) return [];
+  const removed = [];
+  for (const entry of fs.readdirSync(releaseDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const ridDir = path.join(releaseDir, entry.name, rid);
+    if (!fs.existsSync(ridDir)) continue;
+    fs.rmSync(ridDir, { recursive: true, force: true });
+    removed.push(path.relative(REPO_ROOT, ridDir).split(path.sep).join("/"));
+  }
+  return removed;
+}
+
 function publishProject({ project, rid, platform, flavor, outDir }) {
   const args = [
     "publish",
@@ -357,14 +379,20 @@ function main(argv = process.argv) {
   if (!errorMessage) {
     for (const project of PROJECTS) {
       let r2rRemoved = [];
+      let copyLocalRemoved = [];
       try {
         r2rRemoved = removeStaleReadyToRun({
           project: project.project,
           rid,
           platform,
         });
+        copyLocalRemoved = removeStaleCopyLocalOutput({
+          project: project.project,
+          rid,
+          platform,
+        });
       } catch (error) {
-        errorMessage = `${project.name}: could not remove stale ReadyToRun output: ${error instanceof Error ? error.message : String(error)}`;
+        errorMessage = `${project.name}: could not remove stale build output: ${error instanceof Error ? error.message : String(error)}`;
         break;
       }
       console.log(
@@ -373,6 +401,14 @@ function main(argv = process.argv) {
           : `${project.name}: removed ${r2rRemoved.length} stale ReadyToRun folder(s)`,
       );
       for (const removedPath of r2rRemoved) {
+        console.log(`  removed ${removedPath}`);
+      }
+      console.log(
+        copyLocalRemoved.length === 0
+          ? `${project.name}: no stale copy-local output to remove`
+          : `${project.name}: removed ${copyLocalRemoved.length} stale copy-local folder(s)`,
+      );
+      for (const removedPath of copyLocalRemoved) {
         console.log(`  removed ${removedPath}`);
       }
 
@@ -389,6 +425,7 @@ function main(argv = process.argv) {
         exitCode: result.exitCode,
         warnings: result.warnings,
         staleReadyToRunRemoved: r2rRemoved,
+        staleCopyLocalRemoved: copyLocalRemoved,
       });
 
       const status =

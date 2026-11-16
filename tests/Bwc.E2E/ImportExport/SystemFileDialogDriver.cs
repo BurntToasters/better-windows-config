@@ -394,14 +394,14 @@ internal sealed class SystemFileDialogDriver : IDisposable
         }
 
         Thread.Sleep(200);
-        Keyboard.Press(VirtualKeyShort.HOME);
+        Keyboard.Type(VirtualKeyShort.HOME);
         for (var step = 1; step < index; step++)
         {
-            Keyboard.Press(VirtualKeyShort.DOWN);
+            Keyboard.Type(VirtualKeyShort.DOWN);
             Thread.Sleep(50);
         }
 
-        Keyboard.Press(VirtualKeyShort.RETURN);
+        Keyboard.Type(VirtualKeyShort.RETURN);
         Thread.Sleep(200);
 
         string selected = ReadFileType(dialog);

@@ -200,7 +200,7 @@ public sealed class HexEditingFixesTests
     private static bool BackspaceBeforeCaret()
     {
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.END);
-        Keyboard.Press(VirtualKeyShort.BACK);
+        Keyboard.Type(VirtualKeyShort.BACK);
         return true;
     }
 
@@ -220,7 +220,7 @@ public sealed class HexEditingFixesTests
         }
 
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.HOME);
-        Keyboard.Press(VirtualKeyShort.RIGHT);
+        Keyboard.Type(VirtualKeyShort.RIGHT);
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_V);
         return true;
     }

@@ -9,7 +9,8 @@ namespace Bwc.E2E.Print;
 /// <summary>
 /// The only print tests that produce output. They bypass the Windows print dialog and print through the E2E guarded
 /// path to "Microsoft Print to PDF", with the output file under artifacts/e2e/print/&lt;run-id&gt;.pdf. The printer must
-/// exist with the "Microsoft Print To PDF" driver. When it does not, the test records "not run" and passes.
+/// exist with the "Microsoft Print To PDF" driver. When it does not, a "not run" note is recorded and the test is
+/// Inconclusive.
 /// </summary>
 [TestClass]
 public sealed class PrintPdfTests
@@ -190,10 +191,10 @@ public sealed class PrintPdfTests
             return true;
         }
 
-        E2EResults.Record(
-            checkId + ".not-run",
-            true,
-            $"not run: '{PrintTestSupport.PdfPrinterName}' installed={state.Installed}, driver='{state.Driver}'.");
+        // Not run is a note, and the test is Inconclusive, so it never counts as a pass.
+        string note = $"not run: '{PrintTestSupport.PdfPrinterName}' installed={state.Installed}, driver='{state.Driver}'.";
+        E2EResults.Note(checkId + ".not-run", note);
+        Assert.Inconclusive(note);
         return false;
     }
 

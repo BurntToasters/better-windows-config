@@ -86,8 +86,8 @@ public sealed class ValueEnterTests
             Record("valueenter.before", before == 0, $"edit windows before Enter={before}.");
 
             _ = ControlTestSupport.EnsureForeground(session);
-            Keyboard.Press(VirtualKeyShort.RETURN);
-            Keyboard.Press(VirtualKeyShort.RETURN);
+            Keyboard.Type(VirtualKeyShort.RETURN);
+            Keyboard.Type(VirtualKeyShort.RETURN);
             bool opened = ControlTestSupport.WaitUntil(() => CountEditWindows(pid) >= 1, UiTimeout);
             Thread.Sleep(1500);
             int after = CountEditWindows(pid);

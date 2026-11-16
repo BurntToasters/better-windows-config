@@ -18,8 +18,9 @@ namespace Bwc.E2E.Remote;
 /// <summary>
 /// Remote commands on a loopback connection to 127.0.0.1. Every write goes to
 /// HKEY_USERS\SID\Software\BWC-E2E\run-id, the local sandbox key with the root swapped. Section 16 of
-/// docs/failure-modes/remote-registry.md is the spec. A connect that the remote registry refuses is
-/// recorded as not run and the test is Inconclusive. The test never starts or configures the service.
+/// docs/failure-modes/remote-registry.md is the spec. A connect that the remote registry refuses is a note
+/// and the test is Inconclusive only while RemoteRegistry is not Running; otherwise it is a failed check. The test
+/// never starts or configures the service.
 /// </summary>
 [TestClass]
 public sealed class RemoteCommandTests
@@ -654,8 +655,8 @@ public sealed class RemoteCommandTests
     /// <summary>
     /// Print on a remote key reads the connection's store and writes the classic remote Key Name form,
     /// \\127.0.0.1\HKEY_USERS\SID\... The report seam writes the file, and no print dialog opens. When the loopback
-    /// connection fails because RemoteRegistry is stopped, the check records "not run" and passes. The service is not
-    /// started or stopped here.
+    /// connection is refused while RemoteRegistry is not Running, the test records a note and is Inconclusive.
+    /// A refusal with the service Running is a failed check. The service is not started or stopped here.
     /// </summary>
     [TestMethod]
     [TestCategory("Print")]
@@ -694,11 +695,7 @@ public sealed class RemoteCommandTests
             ConnectResult connection = ConnectLoopback(session, driver);
             if (!connection.Connected && connection.RemoteError is not null)
             {
-                E2EResults.Record(
-                    "print.remote.not-run",
-                    true,
-                    $"not run: remote registry unavailable ({connection.RemoteError}).");
-                return;
+                RemoteRegistryService.RefusedConnect("print.remote.connect", "print.remote.not-run", connection.RemoteError);
             }
 
             E2EResults.Record("print.remote.connect", connection.Connected, connection.Detail);
@@ -759,8 +756,9 @@ public sealed class RemoteCommandTests
     }
 
     /// <summary>
-    /// Connects to 127.0.0.1 through File > Connect Network Registry. A remote error is recorded as not run and
-    /// the test is Inconclusive, the same as ConnectOrSkip. A UI failure is a failed check.
+    /// Connects to 127.0.0.1 through File > Connect Network Registry. A refused connect is "not run" (a note, and the
+    /// test is Inconclusive) only when RemoteRegistry is not Running. Otherwise it is a failed check. A UI failure is a
+    /// failed check.
     /// </summary>
     private static void RequireConnected(AppSession session, EditingDriver driver)
     {
@@ -773,9 +771,7 @@ public sealed class RemoteCommandTests
 
         if (result.RemoteError is not null)
         {
-            string note = $"not run: remote registry unavailable ({result.RemoteError})";
-            E2EResults.Note("remote.connect.not-run", note);
-            Assert.Inconclusive(note);
+            RemoteRegistryService.RefusedConnect("remote.connect", "remote.connect.not-run", result.RemoteError);
         }
 
         E2EResults.Record("remote.connect", false, result.Detail);

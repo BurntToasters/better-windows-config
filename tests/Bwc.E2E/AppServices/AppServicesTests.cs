@@ -549,7 +549,7 @@ public sealed class AppServicesTests
         bool aboutFocused = AppServicesSupport.Activate(dialog, "appsvc.about.foreground");
         if (aboutFocused)
         {
-            Keyboard.Press(VirtualKeyShort.ENTER);
+            Keyboard.Type(VirtualKeyShort.ENTER);
         }
 
         bool closed = aboutFocused && AppServicesSupport.WaitUntil(() => !AppServicesSupport.IsWindow(dialog), DialogTimeout);
@@ -685,7 +685,7 @@ public sealed class AppServicesTests
 
         address.Focus();
         address.AsTextBox().Text = path;
-        Keyboard.Press(VirtualKeyShort.ENTER);
+        Keyboard.Type(VirtualKeyShort.ENTER);
         _ = AppServicesSupport.WaitUntil(() => AddressText(app) == path, UiTimeout);
         Thread.Sleep(300);
     }
@@ -710,8 +710,8 @@ public sealed class AppServicesTests
 
     private static void CloseMenus()
     {
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
     }
 
     private static double WaitForRowHeight(RegeditProcess app)

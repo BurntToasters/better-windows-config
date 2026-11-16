@@ -256,7 +256,7 @@ public sealed class RobustnessTests
             // absent for the value to be read-only.
             bool viewer = driver.WaitForElement("ResourceListColumns") is not null;
             bool writable = driver.WaitForElement("HexEditor", TimeSpan.FromSeconds(1)) is not null;
-            Keyboard.Press(VirtualKeyShort.ESCAPE);
+            Keyboard.Type(VirtualKeyShort.ESCAPE);
             bool closed = viewer && driver.WaitForNoDialog();
             E2EResults.Record(
                 "robust.resource.readonly",

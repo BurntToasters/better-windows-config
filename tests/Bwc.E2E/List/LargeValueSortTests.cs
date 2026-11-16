@@ -21,7 +21,6 @@ public sealed class LargeValueSortTests
     private const int TotalRows = NamedValueCount + 1;
     private const int WalkSteps = 14;
     private const int PagesPerStep = 25;
-    private static readonly TimeSpan StepSettle = TimeSpan.FromMilliseconds(150);
     private const string DefaultLabel = "(Default)";
     private static int _checkStart;
 
@@ -174,11 +173,12 @@ public sealed class LargeValueSortTests
             }
 
             ControlTestSupport.SendKeys(session, Enumerable.Repeat("NEXT", PagesPerStep).ToArray());
-            Thread.Sleep(StepSettle);
+            _ = WaitForFilledRows(session);
         }
 
         ControlTestSupport.SendKeys(session, "END");
         _ = ControlTestSupport.WaitUntil(() => RealizedRows(session).Any(row => row.Index == expected.Length - 1), TimeSpan.FromSeconds(5));
+        _ = WaitForFilledRows(session);
         (int lastIndex, string lastName) = RealizedRows(session).LastOrDefault();
         bool lastMatches = lastIndex == expected.Length - 1 && lastName == expected[^1];
 
@@ -207,6 +207,17 @@ public sealed class LargeValueSortTests
 
         return rows.OrderBy(row => row.Index).ToList();
     }
+
+    // A row recycled by a scroll reads blank until the list fills it. Wait until at least one row is realized and
+    // none is blank, so the walk never reads a recycled row. Polls UIA; there is no fixed sleep.
+    private static bool WaitForFilledRows(AppSession session) =>
+        ControlTestSupport.WaitUntil(
+            () =>
+            {
+                List<(int Index, string Name)> rows = RealizedRows(session);
+                return rows.Count > 0 && rows.All(row => row.Name.Length > 0);
+            },
+            TimeSpan.FromSeconds(5));
 
     private static AutomationElement? RowAt(AppSession session, int index)
     {

@@ -1103,7 +1103,7 @@ public sealed class FindTests
                 return false;
             }
 
-            Keyboard.Press(key);
+            Keyboard.Type(key);
             return true;
         }
 

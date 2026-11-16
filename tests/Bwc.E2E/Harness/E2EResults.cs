@@ -247,6 +247,7 @@ public static class E2EResults
         {
             schema = 2,
             pass = snapshot.Length > 0 && snapshot.All(c => c.Pass),
+            scope = config.IsFullRun ? "full" : "filtered",
             runId = config.RunId,
             rid = config.Rid,
             appRid = config.Rid,
@@ -269,12 +270,29 @@ public static class E2EResults
         };
 
         Directory.CreateDirectory(config.ArtifactsDir);
-        var json = JsonSerializer.Serialize(payload, JsonOptions);
-        File.WriteAllText(Path.Combine(config.ArtifactsDir, ResultFileName(config)), json + Environment.NewLine);
+        var json = JsonSerializer.Serialize(payload, JsonOptions) + Environment.NewLine;
+        foreach (string name in ResultFileNames(config))
+        {
+            File.WriteAllText(Path.Combine(config.ArtifactsDir, name), json);
+        }
     }
 
-    /// <summary>File name of the result artifact for one rid and flavor, read by scripts/test-e2e.js.</summary>
-    public static string ResultFileName(E2EConfig config) => $"result-{config.Rid}-{config.Flavor}.json";
+    /// <summary>
+    /// File names of the result artifact for one rid, flavor and run. The first name is the one scripts/test-e2e.js
+    /// and scripts/test-all.js read, and every run overwrites it. The run-id copy keeps this run's evidence. The
+    /// full-run copy is written only when the run has no user filter.
+    /// </summary>
+    public static IReadOnlyList<string> ResultFileNames(E2EConfig config)
+    {
+        string stem = $"result-{config.Rid}-{config.Flavor}";
+        var names = new List<string> { $"{stem}.json", $"{stem}-{config.RunId}.json" };
+        if (config.IsFullRun)
+        {
+            names.Add($"{stem}-full.json");
+        }
+
+        return names;
+    }
 
     private static string Sanitize(string id)
     {

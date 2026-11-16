@@ -226,7 +226,7 @@ public sealed class HexEditingTests
         bool insert = focused;
         if (insert)
         {
-            Keyboard.Press(VirtualKeyShort.INSERT);
+            Keyboard.Type(VirtualKeyShort.INSERT);
         }
 
         bool insertStatus = insert && ControlTestSupport.WaitUntil(
@@ -243,19 +243,19 @@ public sealed class HexEditingTests
         if (moved)
         {
             Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.HOME);
-            Keyboard.Press(VirtualKeyShort.RIGHT);
+            Keyboard.Type(VirtualKeyShort.RIGHT);
         }
 
         bool deleted = moved;
         if (deleted)
         {
-            Keyboard.Press(VirtualKeyShort.DELETE);
+            Keyboard.Type(VirtualKeyShort.DELETE);
         }
 
         bool backspaced = deleted;
         if (backspaced)
         {
-            Keyboard.Press(VirtualKeyShort.BACK);
+            Keyboard.Type(VirtualKeyShort.BACK);
         }
 
         bool lengthChanged = backspaced && ControlTestSupport.WaitUntil(
@@ -266,7 +266,7 @@ public sealed class HexEditingTests
             moved && deleted && backspaced && lengthChanged,
             $"moved={moved}, deleted={deleted}, backspaced={backspaced}, status='{StatusOf(driver)}', help='{HelpTextOf(editor)}'.");
 
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
         bool closed = driver.WaitForNoDialog();
 
         byte[] expected = CreatePattern();
@@ -331,7 +331,7 @@ public sealed class HexEditingTests
             selectAll,
             $"focused={focused}, selectAll={selectAll}, help='{HelpTextOf(editor)}'.");
 
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
         bool closed = driver.WaitForNoDialog();
         bool focusReturned = ControlTestSupport.WaitUntil(
             () => HasKeyboardFocus(session.Find(ControlTestSupport.ListControl)),
