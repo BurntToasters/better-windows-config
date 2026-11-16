@@ -56,6 +56,9 @@ public sealed class ClassicColumnList : Grid
     /// </summary>
     internal void SetListAutomationId(string automationId) => AutomationProperties.SetAutomationId(_list, automationId);
 
+    /// <summary>Sets the UI Automation Name of the list, the name a screen reader gives the column list.</summary>
+    internal void SetListName(string name) => AutomationProperties.SetName(_list, name);
+
     /// <summary>Raised when the selected row changes, by keyboard, mouse, or <see cref="SelectRow"/>.</summary>
     public event EventHandler? SelectionChanged;
 

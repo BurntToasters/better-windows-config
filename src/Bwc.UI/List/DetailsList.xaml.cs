@@ -176,6 +176,8 @@ public sealed partial class DetailsList : UserControl
         RenameBox.LostFocus += OnRenameLostFocus;
         Bwc.UI.Menu.TextEditMenu.Attach(RenameBox);
         LostFocus += (_, _) => CancelPendingRename();
+        // The column header is the classic button face (COLOR_BTNFACE), not a Fluent layer color, so it follows the palette.
+        HeaderHost.Background = BwcBrushes.Face;
 
         ApplyMetrics();
         UpdateHelpText();

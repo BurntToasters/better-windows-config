@@ -175,9 +175,10 @@ public static unsafe class CommonFileDialogs
         var dialog = (IFileSaveDialog)new FileSaveDialog();
         AddExportRange(dialog, hasSelectedKey, branch.Prefill);
 
-        var events = new ExportRangeEvents((IFileDialogCustomize)dialog, branch, hasSelectedKey);
+        var events = new ExportRangeEvents((IFileDialogCustomize)dialog, branch, hasSelectedKey, dialog);
         var advise = (IFileDialogAdvise)dialog;
         Check(advise.Advise(events, out uint cookie));
+        events.StartAnnotation();
         string? path;
         try
         {
@@ -192,6 +193,7 @@ public static unsafe class CommonFileDialogs
         }
         finally
         {
+            events.ReleaseAnnotation();
             _ = advise.Unadvise(cookie);
         }
 

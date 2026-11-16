@@ -290,13 +290,25 @@ Guard: the default button comes from the definition. The E2E check tests Enter b
 
 A child dialog (Resources from Resource Lists, a detail viewer from Requirements List, or Binary Data from Resources)
 is opened by a dialog, not by the main window. When the child closes, keyboard focus must return to the element that
-had it in the parent dialog. Observed (see status): after a child closes, Escape does not close the owner dialog.
+had it in the parent dialog. The symptom was: after a child closes, Escape does not close the owner dialog.
 
-Status: open, owned by X1. The attempted guard (the owner records its focused element before the child opens and
-restores it when the child closes) did not stop Escape from failing on the owner, and it was reverted. Evidence (the
-`resources.focus.*` notes of the ResourceViewers run): after the child closes, the owner is foreground and active and the
-keyboard focus is on the owner's XAML input site, yet Escape does not close the owner. Until the cause is fixed, the
-ResourceViewers test closes the nested owners with OK (UI Automation Invoke), not Escape.
+Status: fixed (X1). Root cause: the owner did not handle Escape at all, with or without a child. Escape reached the
+owner's dialog root, which called `ClassicDialog.InvokeEscapeButton`. That method looks for a Cancel button (control id 2,
+IDCANCEL) and then for a default button. The Resource Lists (RT_DIALOG 116) and Requirements List (RT_DIALOG 1501)
+templates have only OK, and it is not the default, so both lookups failed and Escape did nothing. Classic regedit ends a
+dialog on IDCANCEL (DefDlgProc), so Escape closes these viewers. The earlier focus evidence was accurate (the owner was
+active and focused, and the key was delivered), but the key had no handler. The nested child only made it visible.
+
+Fix: `InvokeEscapeButton` cancels the dialog when it has a button but neither a Cancel nor a default button. Dialogs
+with a default button (the OK-only message boxes) still treat Escape as OK. Dialogs with no buttons (progress) are
+unchanged. The owner's window is re-enabled in `ModalDialogWindow.Close` before the child is destroyed, which was
+checked and is not the cause: with the handler in place, the owner receives Escape after the child closes.
+
+Guard: the ResourceViewers test presses Escape on the Resource Lists viewer with no child open
+(`resources.list.escape-without-child`), on the Resource Lists viewer after its Resources child closes
+(`resources.list.escape-after-child`), and on the Requirements List viewer after its Memory detail closes
+(`resources.requirements.escape-after-child`). The nested owners are no longer closed with OK. The pre-fix build was
+not re-run in this session; the cause above comes from the template and the code path, and the post-fix run passes.
 
 ## 4. Placement and sizing
 

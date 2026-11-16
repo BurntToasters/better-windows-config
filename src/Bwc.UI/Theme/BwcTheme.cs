@@ -21,6 +21,9 @@ public static class BwcTheme
 #if BWC_E2E
     /// <summary>The E2E-only launch override. It wins over the app override, so a persisted choice cannot replace it.</summary>
     private static BwcThemeOverride? _e2eOverride;
+
+    /// <summary>E2E only: BWC_E2E_HIGH_CONTRAST=1 selects the fixed high contrast palette. The system is untouched.</summary>
+    private static bool _e2eHighContrast;
 #endif
     private static BwcPalette _current;
     private static bool _initialized;
@@ -114,8 +117,10 @@ public static class BwcTheme
         }
 
 #if BWC_E2E
-        // E2E-only override. The variable is read at launch, never in a ship build.
+        // E2E-only overrides, read at launch and never in a ship build. The high contrast one only changes the palette.
         _e2eOverride = ParseE2EOverride(Environment.GetEnvironmentVariable("BWC_E2E_THEME"));
+        _e2eHighContrast = Environment.GetEnvironmentVariable("BWC_E2E_HIGH_CONTRAST") == "1";
+        BwcSystemColors.E2EFixedHighContrast = _e2eHighContrast;
 #endif
 
         ApplyPalette(raise: false);
@@ -225,6 +230,13 @@ public static class BwcTheme
 
     private static bool IsHighContrast()
     {
+#if BWC_E2E
+        if (_e2eHighContrast)
+        {
+            return true;
+        }
+#endif
+
         try
         {
             return _accessibility?.HighContrast == true;

@@ -215,6 +215,18 @@ public sealed class ResourceViewerTests
         CheckRows(columns, "resources.list.rows", new[] { new[] { "0", "PCI" } });
         CheckText(driver, DisplayButton, "resources.list.display-disabled-before-select", enabled: false);
 
+        // Probe: Escape with no child open. The Resource Lists template has no Cancel button (id 2) and no default
+        // button, and classic regedit closes the viewer on IDCANCEL, so Escape must close it here.
+        Activate(driver, ListColumns);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
+        bool closedAlone = driver.WaitForNoDialog(TimeSpan.FromSeconds(3));
+        E2EResults.Record("resources.list.escape-without-child", closedAlone, "Escape closed the Resource Lists viewer with no child open.");
+        if (closedAlone)
+        {
+            OpenWithEnter(session, driver, ListValue);
+            CheckRowsAgain(driver);
+        }
+
         Activate(driver, ListColumns);
         bool selected = SelectFirstRow(driver, ListColumns);
         E2EResults.Record("resources.list.row-selected", selected, "the first row was selected through UI Automation.");
@@ -229,11 +241,23 @@ public sealed class ResourceViewerTests
         LogFocus("child-closed");
         E2EResults.Record("resources.list.still-open", driver.WaitForElement(ListColumns, TimeSpan.FromSeconds(3)) is not null, "the list stayed open.");
 
+        // Escape on the owner after its nested viewer closed must close the owner.
         Activate(driver, ListColumns);
-        // Escape after a nested viewer closes does not reach this list (see the resources.focus notes), so OK closes it.
         LogFocus("list-before-escape");
-        _ = driver.Invoke("DialogPrimary");
-        E2EResults.Record("resources.list.closed", driver.WaitForNoDialog(), "OK closed the list viewer.");
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
+        bool closed = driver.WaitForNoDialog(TimeSpan.FromSeconds(5));
+        E2EResults.Record("resources.list.escape-after-child", closed, "Escape closed the Resource Lists viewer after its nested viewer closed.");
+        if (!closed)
+        {
+            _ = driver.Invoke("DialogPrimary");
+        }
+    }
+
+    /// <summary>The seeded list value has one row again after a reopen, so the rows are checked once more.</summary>
+    private static void CheckRowsAgain(EditingDriver driver)
+    {
+        AutomationElement? columns = driver.WaitForElement(ListColumns, UiTimeout);
+        CheckRows(columns, "resources.list.reopen-rows", new[] { new[] { "0", "PCI" } });
     }
 
     private static void CheckDescriptor(AppSession session, EditingDriver driver, string memoryLength, bool hasDeviceRow)
@@ -278,9 +302,17 @@ public sealed class ResourceViewerTests
         Keyboard.Type(VirtualKeyShort.ESCAPE);
         bool detailClosed = ControlTestSupport.WaitUntil(() => driver.WaitForElement("MinimumAddressValue", TimeSpan.FromMilliseconds(200)) is null, TimeSpan.FromSeconds(5));
         E2EResults.Record("resources.requirements.detail-closed", detailClosed, "Escape closed the Memory detail.");
-        // Escape after the detail closes does not reach this list (see the resources.focus notes), so OK closes it.
-        _ = driver.Invoke("DialogPrimary");
-        E2EResults.Record("resources.requirements.closed", driver.WaitForNoDialog(), "OK closed the requirement viewer.");
+        // Escape on the owner after the nested detail closed must close the owner.
+        Activate(driver, RequirementColumns);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
+        bool closed = driver.WaitForNoDialog(TimeSpan.FromSeconds(5));
+        E2EResults.Record("resources.requirements.escape-after-child", closed, "Escape closed the Requirements List viewer after its nested detail closed.");
+        if (!closed)
+        {
+            _ = driver.Invoke("DialogPrimary");
+        }
+
+        E2EResults.Record("resources.requirements.closed", driver.WaitForNoDialog(), "the requirement viewer is closed.");
     }
 
     private static void CheckMalformed(AppSession session, EditingDriver driver)

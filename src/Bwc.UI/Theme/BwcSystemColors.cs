@@ -31,6 +31,13 @@ internal static class BwcSystemColors
     /// </summary>
     public static BwcPalette SystemPalette(BwcThemeKind kind)
     {
+#if BWC_E2E
+        if (kind == BwcThemeKind.HighContrast && E2EFixedHighContrast)
+        {
+            return FixedHighContrastPalette();
+        }
+#endif
+
         Color window = SystemColor(SYS_COLOR_INDEX.COLOR_WINDOW);
         Color windowText = SystemColor(SYS_COLOR_INDEX.COLOR_WINDOWTEXT);
         Color highlight = SystemColor(SYS_COLOR_INDEX.COLOR_HIGHLIGHT);
@@ -64,6 +71,43 @@ internal static class BwcSystemColors
             ListFocused: new BwcSelection(highlight, NoBorder, highlightText),
             ListInactive: new BwcSelection(window, NoBorder, windowText));
     }
+
+#if BWC_E2E
+    /// <summary>
+    /// E2E only. Set from the BWC_E2E_HIGH_CONTRAST launch variable: the high contrast palette is then the fixed one
+    /// below, and the system high contrast setting is never read or written.
+    /// </summary>
+    internal static bool E2EFixedHighContrast { get; set; }
+
+    /// <summary>
+    /// The fixed high contrast palette for E2E. Each value stands for a system color: COLOR_WINDOW, COLOR_WINDOWTEXT,
+    /// COLOR_HIGHLIGHT, COLOR_HIGHLIGHTTEXT, COLOR_BTNFACE, COLOR_GRAYTEXT, COLOR_3DSHADOW, and COLOR_3DHILIGHT.
+    /// </summary>
+    private static BwcPalette FixedHighContrastPalette()
+    {
+        Color window = Color.FromArgb(0xFF, 0x0C, 0x0C, 0x0C);
+        Color windowText = Color.FromArgb(0xFF, 0xFF, 0xFF, 0x00);
+        Color highlight = Color.FromArgb(0xFF, 0x00, 0x80, 0xFF);
+        Color highlightText = Color.FromArgb(0xFF, 0x00, 0x00, 0x00);
+        Color face = Color.FromArgb(0xFF, 0x20, 0x20, 0x20);
+        var selected = new BwcSelection(highlight, NoBorder, highlightText);
+        return new(
+            BwcThemeKind.HighContrast,
+            Window: window,
+            WindowText: windowText,
+            Highlight: highlight,
+            HighlightText: highlightText,
+            InactiveSelection: face,
+            Face: face,
+            GrayText: Color.FromArgb(0xFF, 0xA0, 0xA0, 0xA0),
+            Shadow: Color.FromArgb(0xFF, 0x60, 0x60, 0x60),
+            Highlight3D: Color.FromArgb(0xFF, 0xC0, 0xC0, 0xC0),
+            TreeFocused: selected,
+            TreeInactive: new BwcSelection(face, NoBorder, windowText),
+            ListFocused: selected,
+            ListInactive: new BwcSelection(window, NoBorder, windowText));
+    }
+#endif
 
     /// <summary>
     /// The dark palette. The focused selection is the Windows accent, and its text is black on a

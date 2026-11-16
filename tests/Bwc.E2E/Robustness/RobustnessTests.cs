@@ -250,9 +250,11 @@ public sealed class RobustnessTests
             _ = SelectListRow(session, "Resources");
             E2EGuards.RequireListRowSelected(session, "Resources", "robust.resource.row");
             driver.OpenMenu(MenuEdit, MenuEditModify);
-            // The viewer is the classic Binary Data dialog, identified by its read-only list (HexViewerList). The
-            // writable editor has the HexEditor control and no list, so it must be absent for the value to be read-only.
-            bool viewer = driver.WaitForElement("HexViewerList") is not null;
+            // Modify on a resource list opens the classic Resource Lists viewer (RT_DIALOG 116, commit a08301b,
+            // docs/parity/oracle/regedit-resource-viewers.json), identified by its read-only column list
+            // (ResourceListColumns). The writable editor has the HexEditor control and no column list, so it must be
+            // absent for the value to be read-only.
+            bool viewer = driver.WaitForElement("ResourceListColumns") is not null;
             bool writable = driver.WaitForElement("HexEditor", TimeSpan.FromSeconds(1)) is not null;
             Keyboard.Press(VirtualKeyShort.ESCAPE);
             bool closed = viewer && driver.WaitForNoDialog();

@@ -27,6 +27,10 @@ internal sealed class DetailsListAutomationPeer : FrameworkElementAutomationPeer
 
     public RowOrColumnMajor RowOrColumnMajor => RowOrColumnMajor.RowMajor;
 
+    /// <summary>
+    /// The cell at a grid position. A realized row gives its cell text (Name, Type, or Data for the column), so the
+    /// name cell carries the value name and the data cell carries the data. A row that is not realized gives the list.
+    /// </summary>
     public IRawElementProviderSimple GetItem(int row, int column)
     {
         DetailsRowElement? element = _list.RealizedRow(row);
@@ -35,8 +39,20 @@ internal sealed class DetailsListAutomationPeer : FrameworkElementAutomationPeer
             return ProviderFromPeer(this);
         }
 
-        return ProviderFor(element);
+        return ProviderFromPeer(new DetailsCellAutomationPeer(this, row, column, CellText(element.Row, column)));
     }
+
+    /// <summary>The Grid provider of this list, for the ContainingGrid of a cell.</summary>
+    internal IRawElementProviderSimple GridProvider() => ProviderFromPeer(this);
+
+    private static string CellText(DetailsRow? row, int column) => row is null
+        ? string.Empty
+        : column switch
+        {
+            0 => row.Name,
+            1 => row.Type,
+            _ => row.Data,
+        };
 
     public IRawElementProviderSimple[] GetColumnHeaders()
     {
@@ -77,4 +93,55 @@ internal sealed class DetailsListAutomationPeer : FrameworkElementAutomationPeer
             ?? FrameworkElementAutomationPeer.CreatePeerForElement(element);
         return peer is null ? ProviderFromPeer(this) : ProviderFromPeer(peer);
     }
+}
+
+/// <summary>
+/// UIA peer for one cell of a details row. A cell is a DataItem with the Value and GridItem patterns: its Name and
+/// Value are the cell text, and Row and Column are its grid position. The cell is not in the visual tree and is
+/// read only.
+/// </summary>
+internal sealed class DetailsCellAutomationPeer : AutomationPeer, IValueProvider, IGridItemProvider
+{
+    private readonly DetailsListAutomationPeer _grid;
+    private readonly string _text;
+
+    public DetailsCellAutomationPeer(DetailsListAutomationPeer grid, int row, int column, string text)
+    {
+        _grid = grid;
+        _text = text;
+        Row = row;
+        Column = column;
+    }
+
+    public string Value => _text;
+
+    public bool IsReadOnly => true;
+
+    public int Row { get; }
+
+    public int Column { get; }
+
+    public int RowSpan => 1;
+
+    public int ColumnSpan => 1;
+
+    public IRawElementProviderSimple ContainingGrid => _grid.GridProvider();
+
+    /// <summary>A details cell is read only, so the value cannot be set through UI Automation.</summary>
+    public void SetValue(string value)
+    {
+    }
+
+    protected override string GetClassNameCore() => "DetailsListCell";
+
+    protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.DataItem;
+
+    protected override string GetNameCore() => _text;
+
+    protected override object? GetPatternCore(PatternInterface patternInterface) => patternInterface switch
+    {
+        PatternInterface.Value => this,
+        PatternInterface.GridItem => this,
+        _ => null,
+    };
 }

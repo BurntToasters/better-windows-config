@@ -10,6 +10,17 @@ public static class ClassicDialogTemplates
 {
     private const string TemplateFont = ClassicDialogMetrics.TemplateFontFace;
 
+    /// <summary>The UI Automation names of the value editors' edits: the classic "Value data" and "Value name".</summary>
+    private const string ValueDataName = "Value data";
+    private const string ValueNameName = "Value name";
+
+    /// <summary>
+    /// The UI Automation Name of a control whose label is the caller's text: the mnemonic is removed and the colon
+    /// that ends a classic label is dropped. A label without a mnemonic keeps its text.
+    /// </summary>
+    private static string PlainName(string label) =>
+        label.Replace("&", string.Empty, StringComparison.Ordinal).TrimEnd(':', ' ');
+
     /// <summary>Edit String (RT_DIALOG 102): one-line value data, read-only value name. 252 x 84 DLU.</summary>
     public static ClassicDialogDefinition EditString(string caption) =>
         new(
@@ -19,11 +30,11 @@ public static class ClassicDialogTemplates
             84,
             [
                 Label("ValueDataLabel", "&Value data:", 6, 35, 161, 8),
-                Edit("ValueEditorInput", 1001, 6, 46, 240, 12),
+                Edit("ValueEditorInput", 1001, 6, 46, 240, 12, ValueDataName),
                 Button("DialogPrimary", 1, "OK", 142, 64, 50, 14, isDefault: true),
                 Button("DialogSecondary", 2, "Cancel", 196, 64, 50, 14),
                 Label("ValueNameLabel", "Value &name:", 6, 6, 134, 8),
-                Edit("ValueNameInput", 1000, 6, 17, 240, 12, readOnly: true),
+                Edit("ValueNameInput", 1000, 6, 17, 240, 12, ValueNameName, readOnly: true),
             ])
         {
             FontFace = TemplateFont,
@@ -46,11 +57,11 @@ public static class ClassicDialogTemplates
             178,
             [
                 Label("ValueDataLabel", "&Value data:", 6, 33, 220, 8),
-                MultiLineEdit("ValueEditorInput", 1001, 6, 44, 220, 110),
+                MultiLineEdit("ValueEditorInput", 1001, 6, 44, 220, 110, ValueDataName),
                 Button("DialogPrimary", 1, "OK", 120, 158, 50, 14, isDefault: true),
                 Button("DialogSecondary", 2, "Cancel", 176, 158, 50, 14),
                 Label("ValueNameLabel", "Value &name:", 6, 6, 220, 8),
-                Edit("ValueNameInput", 1000, 6, 17, 220, 12, readOnly: true),
+                Edit("ValueNameInput", 1000, 6, 17, 220, 12, ValueNameName, readOnly: true),
             ])
         {
             FontFace = TemplateFont,
@@ -70,7 +81,7 @@ public static class ClassicDialogTemplates
                 Button("DialogPrimary", 1, "OK", 120, 158, 50, 14, isDefault: true),
                 Button("DialogSecondary", 2, "Cancel", 176, 158, 50, 14),
                 Label("ValueNameLabel", "Value &name:", 6, 6, 220, 8),
-                Edit("ValueNameInput", 1000, 6, 17, 220, 12, readOnly: true),
+                Edit("ValueNameInput", 1000, 6, 17, 220, 12, ValueNameName, readOnly: true),
             ])
         {
             FontFace = TemplateFont,
@@ -100,7 +111,7 @@ public static class ClassicDialogTemplates
             96,
             [
                 Label("FindWhatLabel", findWhat, 6, 8, 40, 8),
-                Edit("FindText", 1150, 50, 6, 150, 14),
+                Edit("FindText", 1150, 50, 6, 150, 14, PlainName(findWhat)),
                 CheckBox("FindKeys", 1152, keys, 12, 38, 35, 10, isChecked: true),
                 CheckBox("FindValues", 1153, values, 12, 50, 35, 10, isChecked: true),
                 CheckBox("FindData", 1154, data, 12, 62, 35, 10, isChecked: true),
@@ -170,7 +181,7 @@ public static class ClassicDialogTemplates
             [
                 Button("DialogPrimary", 1, primaryText, 137, 7, 50, 14, isDefault: true),
                 Button("DialogSecondary", 2, secondaryText, 137, 28, 50, 14),
-                ListBox("FavoritesList", 1191, 7, 23, 121, 72, multiSelect: true),
+                ListBox("FavoritesList", 1191, 7, 23, 121, 72, PlainName(label), multiSelect: true),
                 Label("FavoritesLabel", label, 7, 7, 93, 8),
             ])
         {
@@ -191,7 +202,7 @@ public static class ClassicDialogTemplates
             65,
             [
                 Label("FavoriteNameLabel", label, 7, 15, 75, 8),
-                Edit("DialogTextInput", 1190, 7, 27, 120, 12),
+                Edit("DialogTextInput", 1190, 7, 27, 120, 12, PlainName(label)),
                 Button("DialogPrimary", 1, "OK", 133, 7, 50, 14, isDefault: true),
                 Button("DialogSecondary", 2, "Cancel", 133, 24, 50, 14),
             ])
@@ -212,7 +223,7 @@ public static class ClassicDialogTemplates
             53,
             [
                 Label("PromptLabel", label, 6, 6, 134, 8),
-                Edit("DialogTextInput", 1001, 6, 17, 240, 12),
+                Edit("DialogTextInput", 1001, 6, 17, 240, 12, PlainName(label)),
                 Button("DialogPrimary", 1, "OK", 142, 35, 50, 14, isDefault: true),
                 Button("DialogSecondary", 2, "Cancel", 196, 35, 50, 14),
             ])
@@ -234,7 +245,7 @@ public static class ClassicDialogTemplates
             161,
             [
                 Label("DataLabel", "D&ata:", 4, 6, 20, 8),
-                ListBox("HexViewerList", 2022, 4, 15, 433, 71, multiSelect: false),
+                ListBox("HexViewerList", 2022, 4, 15, 433, 71, "Data", multiSelect: false),
                 Group("FormatGroup", "Format", 4, 92, 212, 35),
                 Radio("FormatByte", 2023, "&Byte", 24, 105, 30, 10, tabStop: false, isChecked: true),
                 Radio("FormatWord", 2024, "&Word", 64, 105, 35, 10, tabStop: false, isChecked: false),
@@ -258,7 +269,7 @@ public static class ClassicDialogTemplates
             170,
             120,
             [
-                ColumnList("ResourceListColumns", 1205, 10, 10, 150, 76, "Bus Number", "Interface Type"),
+                ColumnList("ResourceListColumns", 1205, 10, 10, 150, 76, "Resource lists", "Bus Number", "Interface Type"),
                 Button("DialogPrimary", 1, okText, 37, 96, 40, 14),
                 Button("ResourceDisplay", 1203, displayText, 93, 96, 40, 14),
             ])
@@ -278,11 +289,11 @@ public static class ClassicDialogTemplates
             281,
             308,
             [
-                ColumnList("DmaColumns", 1306, 10, 15, 261, 36, "Channel", "Port"),
-                ColumnList("InterruptColumns", 1307, 10, 63, 261, 36, "Vector", "Level", "Affinity", "Type"),
-                ColumnList("MemoryColumns", 1308, 10, 111, 261, 36, "Physical Address", "Length", "Access"),
-                ColumnList("PortColumns", 1309, 10, 159, 261, 36, "Physical Address", "Length", "Type"),
-                ColumnList("DeviceSpecificColumns", 1304, 10, 207, 261, 36, "Reserved1", "Reserved2", "Data Size"),
+                ColumnList("DmaColumns", 1306, 10, 15, 261, 36, "DMA", "Channel", "Port"),
+                ColumnList("InterruptColumns", 1307, 10, 63, 261, 36, "Interrupt", "Vector", "Level", "Affinity", "Type"),
+                ColumnList("MemoryColumns", 1308, 10, 111, 261, 36, "Memory", "Physical Address", "Length", "Access"),
+                ColumnList("PortColumns", 1309, 10, 159, 261, 36, "Port", "Physical Address", "Length", "Type"),
+                ColumnList("DeviceSpecificColumns", 1304, 10, 207, 261, 36, "Device specific", "Reserved1", "Reserved2", "Data Size"),
                 StaticText("DmaLabel", 65535, "DMA:", 10, 5, 20, 8),
                 StaticText("InterruptLabel", 65535, "Interrupt:", 10, 53, 35, 8),
                 StaticText("MemoryLabel", 65535, "Memory:", 10, 101, 28, 8),
@@ -318,7 +329,7 @@ public static class ClassicDialogTemplates
             220,
             135,
             [
-                ColumnList("RequirementColumns", 1502, 10, 10, 200, 66, "Alternative List", "Resource List", "Descriptor", "Device Type"),
+                ColumnList("RequirementColumns", 1502, 10, 10, 200, 66, "Requirements list", "Alternative List", "Resource List", "Descriptor", "Device Type"),
                 StaticText("InterfaceTypeLabel", 65535, "Interface Type:", 10, 80, 51, 8),
                 StaticText("BusNumberLabel", 65535, "Bus Number:", 10, 90, 51, 8),
                 StaticText("SlotNumberLabel", 65535, "Slot Number:", 10, 100, 51, 8),
@@ -453,15 +464,16 @@ public static class ClassicDialogTemplates
         int y,
         int cx,
         int cy,
+        string name,
         params string[] columns) =>
-        new(ClassicControlKind.ColumnList, id, automationId, string.Empty, x, y, cx, cy)
+        new(ClassicControlKind.ColumnList, id, automationId, name, x, y, cx, cy)
         {
             TabStop = true,
             Columns = columns,
         };
 
-    private static ClassicControlDefinition MultiLineEdit(string automationId, int id, int x, int y, int cx, int cy) =>
-        Edit(automationId, id, x, y, cx, cy, multiline: true);
+    private static ClassicControlDefinition MultiLineEdit(string automationId, int id, int x, int y, int cx, int cy, string name) =>
+        Edit(automationId, id, x, y, cx, cy, name, multiline: true);
 
     private static ClassicControlDefinition HexControl(string automationId, int id, int x, int y, int cx, int cy) =>
         new(ClassicControlKind.HexEditor, id, automationId, "Value data", x, y, cx, cy)
@@ -469,8 +481,8 @@ public static class ClassicDialogTemplates
             TabStop = true,
         };
 
-    private static ClassicControlDefinition ListBox(string automationId, int id, int x, int y, int cx, int cy, bool multiSelect) =>
-        new(ClassicControlKind.ListBox, id, automationId, string.Empty, x, y, cx, cy)
+    private static ClassicControlDefinition ListBox(string automationId, int id, int x, int y, int cx, int cy, string name, bool multiSelect) =>
+        new(ClassicControlKind.ListBox, id, automationId, name, x, y, cx, cy)
         {
             TabStop = true,
             MultiSelect = multiSelect,
@@ -499,14 +511,14 @@ public static class ClassicDialogTemplates
             103,
             [
                 Label("ValueDataLabel", "&Value data:", 6, 35, 61, 8),
-                Edit("ValueEditorInput", 1001, 6, 46, 92, 12),
+                Edit("ValueEditorInput", 1001, 6, 46, 92, 12, ValueDataName),
                 Group("BaseGroup", "Base", 105, 35, 108, 39),
                 Radio("BaseHex", 1002, "&Hexadecimal", 115, 46, 60, 10, tabStop: true, isChecked: true),
                 Radio("BaseDec", 1003, "&Decimal", 115, 59, 60, 10, tabStop: false, isChecked: false),
                 Button("DialogPrimary", 1, "OK", 108, 81, 50, 14, isDefault: true),
                 Button("DialogSecondary", 2, "Cancel", 163, 81, 50, 14),
                 Label("ValueNameLabel", "Value &name:", 6, 6, 69, 8),
-                Edit("ValueNameInput", 1000, 6, 17, 207, 12, readOnly: true),
+                Edit("ValueNameInput", 1000, 6, 17, 207, 12, ValueNameName, readOnly: true),
             ])
         {
             FontFace = TemplateFont,
@@ -516,6 +528,7 @@ public static class ClassicDialogTemplates
     private static ClassicControlDefinition Label(string automationId, string text, int x, int y, int cx, int cy) =>
         new(ClassicControlKind.Label, 0, automationId, text, x, y, cx, cy);
 
+    /// <summary>An edit. Its Name is the label the classic dialog gives it, because an edit has no text of its own.</summary>
     private static ClassicControlDefinition Edit(
         string automationId,
         int id,
@@ -523,9 +536,10 @@ public static class ClassicDialogTemplates
         int y,
         int cx,
         int cy,
+        string name,
         bool readOnly = false,
         bool multiline = false) =>
-        new(ClassicControlKind.Edit, id, automationId, string.Empty, x, y, cx, cy)
+        new(ClassicControlKind.Edit, id, automationId, name, x, y, cx, cy)
         {
             TabStop = true,
             ReadOnly = readOnly,

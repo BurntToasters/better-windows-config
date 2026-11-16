@@ -78,13 +78,132 @@ internal sealed class ExportRangeEvents : IFileDialogEvents
     private readonly ExportBranchRules _rules;
     private readonly bool _hasSelectedKey;
     private readonly DispatcherQueue? _queue;
+    private readonly object _dialog;
+    private nint _annotatedEdit;
+    private DispatcherQueueTimer? _retry;
 
-    internal ExportRangeEvents(CommonFileDialogs.IFileDialogCustomize customize, ExportBranchRules rules, bool hasSelectedKey)
+    /// <summary>
+    /// The naming retry: every 100 ms for up to 60 seconds. A loaded machine can delay the shell's controls well past a
+    /// few seconds, and the timer stops at once when the name is set or the dialog releases it.
+    /// </summary>
+    private const int RetryIntervalMs = 100;
+    private const int MaxRetryAttempts = 600;
+
+    internal ExportRangeEvents(
+        CommonFileDialogs.IFileDialogCustomize customize,
+        ExportBranchRules rules,
+        bool hasSelectedKey,
+        object dialog)
     {
         _customize = customize;
         _rules = rules;
         _hasSelectedKey = hasSelectedKey;
+        _dialog = dialog;
         _queue = DispatcherQueue.GetForCurrentThread();
+    }
+
+    /// <summary>
+    /// Names the branch path edit for screen readers (Dynamic Annotation). The shell creates the edit after the dialog
+    /// initializes, so the name is set on the first folder or selection event, and again if the edit window changes.
+    /// </summary>
+    private void AnnotateBranchEdit()
+    {
+        if (!TryAnnotateOnce())
+        {
+            StartRetry();
+        }
+    }
+
+    /// <summary>
+    /// Starts the naming as soon as the dialog is advised, so it does not depend on a shell event arriving. The timer
+    /// keeps trying until the edit is named, or until the dialog releases it.
+    /// </summary>
+    internal void StartAnnotation() => StartRetry();
+
+    /// <summary>
+    /// One attempt. Returns true when the edit is named, or when naming is not possible at all (no dialog window).
+    /// False means the edit window is not there yet, and the caller retries.
+    /// </summary>
+    private bool TryAnnotateOnce()
+    {
+        try
+        {
+            if (_annotatedEdit != 0)
+            {
+                return true;
+            }
+
+            // A file dialog object without IOleWindow cannot be named, so the retry stops. A dialog window that does not exist
+            // yet is retried, because the shell creates it when the dialog is shown.
+            if (_dialog is not IOleWindowAnnotation window)
+            {
+                return true;
+            }
+
+            if (window.GetWindow(out nint dialogWindow) < 0 || dialogWindow == 0)
+            {
+                return false;
+            }
+
+            nint edit = ExportBranchAnnotation.FindBranchEdit(dialogWindow, CommonFileDialogs.ExportRangeBranchEditId);
+            if (edit == 0)
+            {
+                return false;
+            }
+
+            string name = BwcStrings.Get("FileDialogExportRangeSelectedBranch").Replace("&", string.Empty, StringComparison.Ordinal);
+            if (ExportBranchAnnotation.TrySetName(edit, name))
+            {
+                _annotatedEdit = edit;
+                return true;
+            }
+
+            return false;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // A callback must not throw into the shell. The edit stays unnamed and the export still works.
+            UiDiagnostics.Warn?.Invoke("The export branch path edit could not be named: " + ex.Message);
+            return true;
+        }
+    }
+
+    /// <summary>Retries the naming on a timer until the edit window exists, for a bounded number of attempts.</summary>
+    private void StartRetry()
+    {
+        if (_retry is not null || _queue is null)
+        {
+            return;
+        }
+
+        int attempts = 0;
+        DispatcherQueueTimer timer = _queue.CreateTimer();
+        timer.Interval = TimeSpan.FromMilliseconds(RetryIntervalMs);
+        timer.Tick += (_, _) =>
+        {
+            attempts++;
+            if (TryAnnotateOnce() || attempts >= MaxRetryAttempts)
+            {
+                timer.Stop();
+                _retry = null;
+            }
+        };
+        _retry = timer;
+        timer.Start();
+    }
+
+    /// <summary>Clears the branch edit's name and stops any pending retry. Called when the dialog closes.</summary>
+    internal void ReleaseAnnotation()
+    {
+        _retry?.Stop();
+        _retry = null;
+        if (_annotatedEdit == 0)
+        {
+            return;
+        }
+
+        ExportBranchAnnotation.ClearName(_annotatedEdit);
+        _annotatedEdit = 0;
     }
 
     /// <summary>The branch path that OK approved. Empty when All was chosen, or when no approval happened.</summary>
@@ -119,9 +238,17 @@ internal sealed class ExportRangeEvents : IFileDialogEvents
 
     public int OnFolderChanging(nint pfd, nint psiFolder) => SOk;
 
-    public int OnFolderChange(nint pfd) => SOk;
+    public int OnFolderChange(nint pfd)
+    {
+        AnnotateBranchEdit();
+        return SOk;
+    }
 
-    public int OnSelectionChange(nint pfd) => SOk;
+    public int OnSelectionChange(nint pfd)
+    {
+        AnnotateBranchEdit();
+        return SOk;
+    }
 
     public int OnShareViolation(nint pfd, nint psi, out int response)
     {
