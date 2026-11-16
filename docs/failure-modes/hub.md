@@ -303,6 +303,93 @@ and an unknown failure shows a generic sentence. The download and the check have
 | MS7 | A cancel reads as an error | Cancel looks like a failure | `hub.update.cancel.status` (existing check) reads the cancel wording, not a failure |
 | MS8 | `--update-result Unexpected` or a check/download failure with code `Unexpected` shows the generic sentence, or the code name | The user gets a vague message with no hint of an internal error | `hub.updateResult.unexpected`: the dialog says the update did not install because of an unexpected error, names the current version, and does not show `Unexpected` |
 
+## Update dialog and result texts (0.1.2)
+
+Written before the tests and the code of the Hub piece (I3), per AGENTS.md. The 0.1.2 install is per machine, so the
+in-app update asks Windows for permission (a consent prompt) after the user presses Download and Install. The Hub says
+so before the click, and it has a plain sentence for each new failure code of `update-elevation.md`.
+
+| ID | Failure | What the user sees | Detection (check id) |
+|----|---------|--------------------|----------------------|
+| UD1 | The Update Available text does not warn about the Windows permission prompt | The prompt after Download and Install is a surprise, and a Cancel reads as a failure | `hub.update.available.permission`: the text says that Windows will ask for permission to install |
+| UD2 | `--update-result ElevationDeclined` shows the generic "did not install" text, or the code name | The user thinks something broke after pressing Cancel on the prompt | `hub.updateResult.elevationDeclined`: the message says the update was canceled and that the installed tools were not changed, names the current version, and does not show `ElevationDeclined` |
+| UD3 | `--update-result NotElevated` | A vague text | `hub.updateResult.notElevated`: says the update did not install because it did not get administrator rights, names the current version, no code name |
+| UD4 | `--update-result RunningInOtherSession` | The user does not know why a closed Hub blocks the update | `hub.updateResult.otherSession`: says Better Windows Config is open in another Windows session, to close it there, names the current version, no code name |
+| UD5 | `--update-result DeElevationFailed` (the helper could not start the Hub at the user's level; in practice the Hub is not started at all in that case, so this text is a safety net) | A vague text | `hub.updateResult.deElevation`: says the Hub could not be started again after the update and to open it from the Start menu, no code name |
+| UD6 | A check or download that fails with one of the four codes shows the generic "could not be verified" sentence | A misleading reason | `FriendlyFailureKey` maps the four codes to their own `UpdateFail*` sentences. Code review of the switch and the resource keys (only the apply path produces these codes, so no check or download run reaches them) |
+| UD7 | Any other unknown code | A blank or technical text | Unchanged: the generic sentence (`UpdateResultNotInstalled`, `UpdateFailGeneric`) |
+
+## Legacy per-user cleanup (0.1.2)
+
+0.1.1 installed per user (`%LOCALAPPDATA%\Programs\Better Windows Config`, an uninstall entry in
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\BetterWindowsConfig`, two shortcuts in the user's own Start
+menu). 0.1.2 installs per machine and never touches that copy (installer.md M9, M13). The Hub, which runs unelevated as the
+user, removes the old per-user install once per run, in the background, at startup. Design: `install-design.md`,
+"Migration". The 0.1.1 uninstaller is `RequestExecutionLevel user` (`git show v0.1.1:installer/bwc.nsi`, line 89), so
+running it unelevated is its normal case.
+
+Rules:
+
+- Skip when the Hub is elevated or high integrity (`ProcessIdentity`, which fails closed). Never read the key then.
+- Read `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\BetterWindowsConfig`, value `InstallLocation`, and
+  nothing else. `UninstallString` and `QuietUninstallString` are never read and never run. HKCU is not redirected for
+  this key, so no second registry view is read.
+- `InstallLocation` must be a plain absolute local path: `X:\folder\...`, no `..`, no `/`, no quote, wildcard, colon after
+  the drive, control character, no segment that ends in a dot or a space, at most 240 characters. It must not be the
+  Hub's own folder, a drive root, a system folder (the Windows folder and everything in it, ProgramData, the profile root,
+  and the roots of LocalAppData, AppData, Desktop and Documents), or under Program Files (either). The run command is
+  always `<InstallLocation>\Uninstall.exe`, a fixed name.
+- That file must be a regular file (no link, not a folder), 1 byte to 16 MiB, and its embedded manifest must request
+  `asInvoker`. Any other level, no manifest, or a manifest that cannot be read refuses it (a file with no manifest is
+  also refused: an installer-looking name with no manifest is elevated by the Windows installer-detection heuristic).
+  The check reads the bytes only; it never loads or runs the file. It is the logic of `readRequestedLevels` in
+  `scripts/flavor-metadata.js`, ported to C#.
+- It is started with `/S`, `UseShellExecute` false (so no consent prompt is possible: `CreateProcess` fails with error 740
+  for an exe that needs elevation), the Windows folder as working directory, and not waited for. The NSIS uninstaller
+  copies itself to `%TEMP%`, runs there, and removes the HKCU key last, so the Hub polls for the key to disappear (every
+  500 ms, up to 120 s).
+- Missing `Uninstall.exe`, and the folder is gone: remove only the stale HKCU key, and the two old shortcuts by their fixed
+  names (`Better Windows Config.lnk`, `Registry Editor (BWC).lnk`) in the user's own Start menu Programs folder. Never
+  the all-users folder. A shortcut that is a folder or a link is left.
+- Everything logs. Any failure or timeout is logged and tried again at the next start. The window is never held up: the
+  work is a background task started after the main window is shown, and every exception is caught and logged.
+- E2E flavor only: with no seam the cleanup is off (the E2E Hub must never read the real key or touch the real Start
+  menu). `BWC_E2E_LEGACY_RUNID=<id>` moves the key to `HKCU\Software\BWC-E2E\<id>\Uninstall\BetterWindowsConfig`,
+  `BWC_E2E_LEGACY_SHORTCUTS=<folder>` replaces the Programs folder, and the old uninstaller is started with
+  `BWC_E2E_INSTALLER_RUNID=<id>` (what the E2E uninstaller reads in place of `/RUNID=`). Both variables must be valid, or
+  the cleanup is off. The names are compiled only under `BWC_E2E`, and the publish audit refuses a ship Hub that holds
+  `BWC_E2E_LEGACY_`.
+
+Log lines (the E2E reads them; every line starts with `Legacy cleanup`): `skipped (<code>)`, `refused (<code>)`,
+`started`, `finished: the uninstall entry is gone`, `timeout`, `stale entry removed`, `failed (<code>)`. Codes:
+`elevated`, `e2e-no-seam`, `e2e-seam-invalid`, `no-key`, `no-install-location`, `bad-path`, `own-folder`, `drive-root`,
+`system-folder`, `program-files`, `uninstaller-missing`, `uninstaller-invalid`, `uninstaller-elevation`, `start-failed`.
+
+| ID | Failure | Required result | Detection (check id, `tests/Bwc.E2E/Installer/MigrationTests.cs`) |
+|----|---------|-----------------|-----------------------------------------------------------------|
+| LC1 | The Hub is elevated | Skipped, key not read, nothing changes (installer.md M16) | `migration.elevated.skipped`: `BWC_E2E_UPDATE_FORCE_ELEVATED=1`, key and folder untouched, log `skipped (elevated)` |
+| LC2 | No HKCU key (a clean 0.1.2 install, the normal case) | No uninstaller, nothing logged beyond `skipped (no-key)`, no registry write | `migration.nokey.skipped` |
+| LC3 | The key has no `InstallLocation`, or it is empty or not text | Refused `no-install-location`, key untouched | `migration.noLocation.refused` |
+| LC4 | `InstallLocation` is relative, UNC or device (`\\?\`), has `..`, `/`, a quote, a wildcard, or is not a path | Refused `bad-path`, nothing run | `migration.badPath.<case>.refused` |
+| LC5 | `InstallLocation` is the Hub's own folder (any case, trailing separator) | Refused `own-folder`, key and folder untouched (M17) | `migration.ownFolder.refused` |
+| LC6 | `InstallLocation` is a drive root | Refused `drive-root` (M17) | `migration.driveRoot.refused` |
+| LC7 | `InstallLocation` is a system folder (the Windows folder, System32, ProgramData, the profile root) | Refused `system-folder` (M17) | `migration.systemFolder.<case>.refused` |
+| LC8 | `InstallLocation` is under Program Files (the per-machine folder) | Refused `program-files`, so the new install is never uninstalled by its own Hub (M17) | `migration.programFiles.refused` |
+| LC9 | The key names a real old per-user install with its `Uninstall.exe` (the E2E installer A is the old install) | The old uninstaller runs unelevated with `/S`; the folder, the key and the shortcuts are gone; the Hub keeps running (M13) | `migration.realUninstall.*`: `startedLogged`, `folderGone`, `keyGone`, `shortcutsGone`, `hubStillRunning` |
+| LC10 | `Uninstall.exe` is a folder, empty, or larger than 16 MiB | Refused `uninstaller-invalid`, nothing run | `migration.uninstallerInvalid.refused` (a folder named `Uninstall.exe`) |
+| LC11 | The manifest of `Uninstall.exe` requests `requireAdministrator` or `highestAvailable`, or there is no manifest | Refused `uninstaller-elevation`, never started, key untouched. The fake is a text file with a manifest text, so a wrong start fails with a Windows error and shows no prompt | `migration.elevatedManifest.refused`, `migration.noManifest.refused` |
+| LC12 | `Uninstall.exe` is missing and the folder still exists | Refused `uninstaller-missing`, key and shortcuts left, tried again at the next start (M15) | `migration.uninstallerMissingFolderPresent.refused` |
+| LC13 | `Uninstall.exe` is missing and the folder is gone | The stale key and the two fixed-name shortcuts are removed, nothing else (M14). A shortcut with another name stays | `migration.staleEntry.*`: `keyGone`, `shortcutsGone`, `otherShortcutKept` |
+| LC14 | The old uninstaller cannot start (Win32 error) | Logged `failed (start-failed)`, no prompt, tried again at the next start | Code review (the E2E cannot make `CreateProcess` fail on a file that passed the checks) |
+| LC15 | The key is still there after 120 s | Logged `timeout`, the Hub runs on, the uninstaller is not killed, the next start looks again (M15) | `Doc` (a 120 s wait; the poll loop is the one LC9 runs) |
+| LC16 | The Hub closes while the poll runs | The poll stops with the process; the uninstaller keeps running by itself | `Doc` |
+| LC17 | The cleanup would run twice in one process | A static guard: once per run | `Doc` (a second Hub instance exits before the cleanup is reached) |
+| LC18 | The cleanup throws | Caught and logged as `failed`, the Hub is unaffected | `Doc` |
+| LC19 | The E2E flavor without the seam | Off: `skipped (e2e-no-seam)`. Every other Hub E2E test runs this way, so none can read the real key | `migration.noSeam.skipped` |
+| LC20 | The E2E seam names an invalid run id or no shortcut folder | Off: `skipped (e2e-seam-invalid)` | `migration.badSeam.skipped` |
+| LC21 | A ship build | The two seam variables are not read; the audit refuses a ship Hub that holds `BWC_E2E_LEGACY_` | `release-selftest` (`ship_e2e_strings`), publish audit |
+| LC22 | Another Windows user also has a 0.1.1 per-user install | Each user's own Hub cleans that user's HKCU key. The Hub never reads another user's key | `Doc` |
+
 ## Single instance race
 
 The first Hub instance creates the named mutex and starts the pipe server. A second instance opens

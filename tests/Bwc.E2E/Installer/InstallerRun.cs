@@ -114,6 +114,22 @@ internal sealed class InstallerRun : IDisposable
         return key is not null;
     }
 
+    /// <summary>
+    /// Writes a stand-in for an old per-user install to this run's sandbox uninstall key (never the real key): the
+    /// InstallLocation value only when one is given, and the ShortcutDir value of this run. For the migration E2E.
+    /// </summary>
+    public void SeedUninstallKey(string? installLocation)
+    {
+        using RegistryKey key = Registry.CurrentUser.CreateSubKey(RunKey + @"\" + UninstallSubkey, writable: true);
+        if (installLocation is not null)
+        {
+            key.SetValue("InstallLocation", installLocation, RegistryValueKind.String);
+        }
+
+        key.SetValue("ShortcutDir", ShortcutDir, RegistryValueKind.String);
+        key.SetValue("DisplayName", "Better Windows Config (E2E stand-in)", RegistryValueKind.String);
+    }
+
     /// <summary>The number of .lnk files the installer wrote to the shortcut folder.</summary>
     public int ShortcutCount() =>
         Directory.Exists(ShortcutDir) ? Directory.GetFiles(ShortcutDir, "*.lnk", SearchOption.AllDirectories).Length : 0;

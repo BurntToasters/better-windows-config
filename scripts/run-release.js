@@ -12,6 +12,10 @@
  *                  at the mirror and never runs git. Publish, then `npm run release:cleanup`.
  * --from <step>    with --continue: run the gate, then the steps from <step> on. A gate step name starts
  *                  the flow there. `release:win:upload` is `--continue --from release:draft`.
+ * --legacy-feed <frozen|no-installer|none>
+ *                  Required for a stable version whenever the run reaches release:assemble. What 0.1.1 clients
+ *                  (per-user install) see at bwc-stable.json. frozen also needs --legacy-source <the published 0.1.1
+ *                  bwc-stable.json>. The user picks one at release time (docs/RELEASE.md, "The 0.1.1 feed").
  *
  * Every step is an npm script, except release:clean, which removes only artifacts/release/<version>.
  * Steps run through an injected runner, so scripts/run-release-selftest.js records the order without
@@ -27,6 +31,7 @@ import { fileURLToPath } from "node:url";
 import { isDirectExecutionOf } from "./direct-execution.mjs";
 import { EXIT, describeError } from "./lib/cli.js";
 import { embeddedReleaseKeys, readPackageVersion } from "./lib/release-policy.js";
+import { isLegacyMode, LEGACY_MODES } from "./lib/legacy-feed.js";
 import { channelForVersion, tryParseSemVer } from "./lib/semver.js";
 import { isExplicitTruthy, SIGNING_REQUIRED_VARIABLES } from "./release-policy.js";
 
@@ -53,8 +58,12 @@ function printHelp() {
                                        The gate, then the steps from <step> on (release:win:upload is
                                        --from release:draft). Valid steps: ${continueStepNames().join(", ")}.
 
+A stable run that reaches release:assemble needs --legacy-feed <${LEGACY_MODES.join("|")}> (and
+--legacy-source <file> with frozen). It decides what 0.1.1 clients see: frozen = "up to date", no-installer = "No update
+is available for this type of computer yet.", none = a download failure. Details: docs/RELEASE.md, "The 0.1.1 feed".
+
 The trusted release key is the one embedded in src/Bwc.Update/Signing/TrustedKeys.cs. A placeholder
-there refuses the run (docs/RELEASE.md, "User-owned steps"). Flags: --continue, --from, --help.`);
+there refuses the run (docs/RELEASE.md, "User-owned steps"). Flags: --continue, --from, --legacy-feed, --legacy-source, --help.`);
 }
 
 /** The run mode and the resume step from argv. Unknown flags and positional arguments are usage errors. */
@@ -64,9 +73,30 @@ export function parseReleaseArgs(argv) {
   let continueFlag = false;
   let help = false;
   let from = null;
+  let legacyFeed = null;
+  let legacySource = null;
+  const valueOf = (name, index, inline) => {
+    if (inline !== undefined) return inline;
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith("-") || value === "") throw usageError(`${name} needs a value`);
+    return value;
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "--from") {
+    if (arg === "--legacy-feed" || arg.startsWith("--legacy-feed=")) {
+      if (legacyFeed !== null) throw usageError("--legacy-feed was given more than once");
+      const inline = arg.startsWith("--legacy-feed=") ? arg.slice("--legacy-feed=".length) : undefined;
+      legacyFeed = valueOf("--legacy-feed", index, inline);
+      if (inline === undefined) index += 1;
+      if (!isLegacyMode(legacyFeed)) {
+        throw usageError(`--legacy-feed is ${JSON.stringify(legacyFeed)}, expected ${LEGACY_MODES.join(", ")}`);
+      }
+    } else if (arg === "--legacy-source" || arg.startsWith("--legacy-source=")) {
+      if (legacySource !== null) throw usageError("--legacy-source was given more than once");
+      const inline = arg.startsWith("--legacy-source=") ? arg.slice("--legacy-source=".length) : undefined;
+      legacySource = valueOf("--legacy-source", index, inline);
+      if (inline === undefined) index += 1;
+    } else if (arg === "--from") {
       const value = argv[index + 1];
       if (value === undefined || value.startsWith("-")) {
         throw usageError(`--from needs a step name. Valid steps: ${continueStepNames().join(", ")}`);
@@ -86,7 +116,13 @@ export function parseReleaseArgs(argv) {
   if (positionals.length > 0) {
     throw usageError(`Unexpected argument: ${positionals[0]}. Usage: node ${SCRIPT} [--continue] [--from <step>]`);
   }
-  if (help) return { help: true, mode: continueFlag ? "continue" : "win", from: null };
+  if (help) return { help: true, mode: continueFlag ? "continue" : "win", from: null, legacyFeed: null, legacySource: null };
+  if (legacyFeed === "frozen" && legacySource === null) {
+    throw usageError("--legacy-feed frozen needs --legacy-source <the published 0.1.1 bwc-stable.json>");
+  }
+  if (legacySource !== null && legacyFeed !== "frozen") {
+    throw usageError("--legacy-source is only for --legacy-feed frozen");
+  }
   if (from !== null) {
     if (!continueFlag) throw usageError("--from needs --continue");
     if (from === "") throw usageError(`--from needs a step name. Valid steps: ${continueStepNames().join(", ")}`);
@@ -94,7 +130,13 @@ export function parseReleaseArgs(argv) {
       throw usageError(`Unknown --from step: ${from}. Valid steps: ${continueStepNames().join(", ")}`);
     }
   }
-  return { help: false, mode: continueFlag ? "continue" : "win", from };
+  return {
+    help: false,
+    mode: continueFlag ? "continue" : "win",
+    from,
+    legacyFeed: legacyFeed ?? undefined,
+    legacySource: legacySource ?? undefined,
+  };
 }
 
 /** Relative folder that holds one channel's assembled bundle: artifacts/release/<version>/<channel>. */
@@ -139,7 +181,9 @@ export function continueStepNames() {
 }
 
 /** The ordered steps of release:win (mode "win") or release:win:continue (mode "continue"). */
-export function releaseSteps(mode, { version, env = process.env, from = null }) {
+export function releaseSteps(mode, { version, env = process.env, from = null, legacyFeed, legacySource }) {
+  // The legacy-feed options go to release:assemble, and through release:win to release:win:continue.
+  const legacyArgs = legacyFeed ? ["--legacy-feed", legacyFeed, ...(legacySource ? ["--legacy-source", legacySource] : [])] : [];
   if (mode === "win") {
     return [
       { name: "release:policy", args: [] },
@@ -148,7 +192,7 @@ export function releaseSteps(mode, { version, env = process.env, from = null }) 
       // --force replaces a session left by an earlier attempt, so the proof is for this run's gate.
       { name: "release:session:create", args: ["--", "--require-gate", "--force"] },
       { name: CLEAN_STEP, args: [] },
-      { name: "release:win:continue", args: [] },
+      { name: "release:win:continue", args: legacyArgs.length > 0 ? ["--", ...legacyArgs] : [] },
     ];
   }
   const folder = releaseFolder(version);
@@ -173,6 +217,7 @@ export function releaseSteps(mode, { version, env = process.env, from = null }) 
         installerPath(version, "win-arm64"),
         "--expires-hours",
         String(RELEASE_EXPIRES_HOURS),
+        ...legacyArgs,
       ],
     },
     { name: "release:sign:gpg", args: ["--", "--dir", folder] },
@@ -310,8 +355,26 @@ export function main(argv = process.argv.slice(2), runner = null, { root = REPO_
   if (!keys.ok) {
     throw usageError(keys.detail, keys.reason === "missing-trusted-key-source" ? EXIT.MISSING : EXIT.REFUSED);
   }
+  const steps = releaseSteps(options.mode, {
+    version,
+    env,
+    from: options.from,
+    legacyFeed: options.legacyFeed,
+    legacySource: options.legacySource,
+  });
+  // The choice is the user's, at release time, so a stable run that will assemble refuses without it, before any step.
+  if (steps.some((step) => step.name === "release:assemble" || step.name === "release:win:continue")) {
+    if (channelForVersion(version) === "stable" && !options.legacyFeed) {
+      throw usageError(
+        `a stable release needs --legacy-feed <${LEGACY_MODES.join("|")}> (what 0.1.1 clients see; docs/RELEASE.md, "The 0.1.1 feed")`,
+      );
+    }
+    if (channelForVersion(version) !== "stable" && options.legacyFeed && options.legacyFeed !== "none") {
+      throw usageError("a beta release never writes the 0.1.1 feed; use --legacy-feed none or leave it out");
+    }
+  }
   const run = runner ?? npmRunner(root, version);
-  for (const step of releaseSteps(options.mode, { version, env, from: options.from })) {
+  for (const step of steps) {
     run(step.name, step.args);
   }
   return EXIT.OK;

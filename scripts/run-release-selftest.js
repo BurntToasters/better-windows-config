@@ -403,14 +403,60 @@ try {
 
   check("main --continue records exactly the continue step list when a real key is embedded", () => {
     const calls = [];
-    main(["--continue"], (name, args) => calls.push({ name, args }), { root: keyRepo, env: cleanEnv() });
-    assertEqual(calls, releaseSteps("continue", { version: VERSION, env: cleanEnv() }), "recorded");
+    main(["--continue", "--legacy-feed", "none"], (name, args) => calls.push({ name, args }), { root: keyRepo, env: cleanEnv() });
+    assertEqual(calls, releaseSteps("continue", { version: VERSION, env: cleanEnv(), legacyFeed: "none" }), "recorded");
   });
 
   check("main with no flag records release:win steps and hands off to release:win:continue", () => {
     const calls = [];
-    main([], (name, args) => calls.push({ name, args }), { root: keyRepo, env: cleanEnv() });
-    assertEqual(calls, releaseSteps("win", { version: VERSION, env: cleanEnv() }), "recorded");
+    main(["--legacy-feed", "none"], (name, args) => calls.push({ name, args }), { root: keyRepo, env: cleanEnv() });
+    assertEqual(calls, releaseSteps("win", { version: VERSION, env: cleanEnv(), legacyFeed: "none" }), "recorded");
+  });
+
+  check("LF1 main: a stable run with no --legacy-feed is refused before any step (exit 2)", () => {
+    for (const argv of [[], ["--continue"], ["--continue", "--from", "release:assemble"], ["--continue", "--from", "release:policy"]]) {
+      const calls = [];
+      try {
+        main(argv, (name) => calls.push(name), { root: keyRepo, env: cleanEnv() });
+      } catch (error) {
+        assertEqual(error.exitCode, EXIT.USAGE, "exit for " + argv.join(" "));
+        if (!/--legacy-feed/.test(error.message)) throw new Error("message does not name the option: " + error.message);
+        assertEqual(calls, [], "calls for " + argv.join(" "));
+        continue;
+      }
+      throw new Error("accepted " + (argv.join(" ") || "(no arguments)"));
+    }
+  });
+
+  check("LF1 main: --from a step after release:assemble needs no legacy option", () => {
+    const calls = [];
+    main(["--continue", "--from", "release:draft"], (name) => calls.push(name), { root: keyRepo, env: cleanEnv() });
+    if (calls.length === 0) throw new Error("nothing ran");
+  });
+
+  check("LF2 parse: --legacy-feed takes frozen, no-installer, or none, and nothing else", () => {
+    assertEqual(parseReleaseArgs(["--legacy-feed", "none"]).legacyFeed, "none", "none");
+    assertEqual(parseReleaseArgs(["--legacy-feed=no-installer"]).legacyFeed, "no-installer", "equals form");
+    assertEqual(parseReleaseArgs(["--legacy-feed", "frozen", "--legacy-source", "C:/x/bwc-stable.json"]).legacySource, "C:/x/bwc-stable.json", "source");
+    for (const argv of [["--legacy-feed", "notice"], ["--legacy-feed"], ["--legacy-feed", "none", "--legacy-feed", "none"], ["--legacy-feed", "frozen"], ["--legacy-feed", "none", "--legacy-source", "x"], ["--legacy-source", "x"]]) {
+      try {
+        parseReleaseArgs(argv);
+      } catch (error) {
+        assertEqual(error.exitCode, EXIT.USAGE, "exit for " + argv.join(" "));
+        continue;
+      }
+      throw new Error("accepted " + argv.join(" "));
+    }
+  });
+
+  check("LF15 steps: the legacy options reach release:assemble and release:win:continue", () => {
+    const frozen = { version: VERSION, env: cleanEnv(), legacyFeed: "frozen", legacySource: "C:/x/bwc-stable.json" };
+    const assemble = releaseSteps("continue", frozen).find((step) => step.name === "release:assemble");
+    assertEqual(assemble.args.slice(-4), ["--legacy-feed", "frozen", "--legacy-source", "C:/x/bwc-stable.json"], "assemble args");
+    const handoff = releaseSteps("win", frozen).find((step) => step.name === "release:win:continue");
+    assertEqual(handoff.args, ["--", "--legacy-feed", "frozen", "--legacy-source", "C:/x/bwc-stable.json"], "continue args");
+    const none = releaseSteps("continue", { version: VERSION, env: cleanEnv(), legacyFeed: "none" }).find((step) => step.name === "release:assemble");
+    assertEqual(none.args.slice(-2), ["--legacy-feed", "none"], "none args");
   });
 
   check("main stops at the first failing step and starts no later step", () => {
@@ -419,7 +465,7 @@ try {
       calls.push(name);
       if (name === "release:preflight") throw new Error("preflight refused");
     };
-    assertThrows(() => main([], failing, { root: keyRepo, env: cleanEnv() }), /preflight refused/, "failure");
+    assertThrows(() => main(["--legacy-feed", "none"], failing, { root: keyRepo, env: cleanEnv() }), /preflight refused/, "failure");
     assertEqual(calls, ["release:policy", "release:preflight"], "calls");
   });
 } finally {

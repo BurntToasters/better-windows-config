@@ -352,6 +352,8 @@ async function run(options) {
     keyText: key.text,
     password: key.password,
     dryRun: key.ephemeral,
+    // A dry run publishes nothing, so it never writes the 0.1.1 feed (a real stable release picks the mode).
+    legacyFeed: "none",
     pubDate: options.pubDate,
     expiresHours: options.expiresHours,
     baseUrl: options.baseUrl,

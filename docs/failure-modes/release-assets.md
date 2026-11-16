@@ -78,7 +78,7 @@ Zinnia uses. It does not collide with BWC's own sidecars: `<asset>.minisig` (min
 
 | ID | Case | Risk | Required result |
 |----|------|------|-----------------|
-| L1 | `bwc-stable.json` or its `.minisig` returns a non-200 status | Hub reads nothing | Refuse `http-status`. Exit 1. |
+| L1 | `bwc-stable-v2.json` or its `.minisig` returns a non-200 status | Hub reads nothing | Refuse `http-status`. Exit 1. |
 | L2 | Transport error or timeout | Unknown state reported as pass | Refuse `fetch-failed`. Exit 4. |
 | L3 | Manifest is not strict JSON or breaks the schema | Hub parses differently | Refuse with the validator's reason (`invalid-json`, `manifest-invalid`, and so on). Exit 1. |
 | L4 | Manifest is not signed by an embedded key | Forged manifest | Refuse `embedded-key-mismatch`. Exit 1. |

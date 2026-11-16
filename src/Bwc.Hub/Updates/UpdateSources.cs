@@ -10,11 +10,13 @@ internal static class UpdateSources
     public const string ChannelBeta = "beta";
 
     /// <summary>
-    /// The stable manifest: the bwc-stable.json asset of the latest stable GitHub release. GitHub's "latest"
-    /// skips prereleases and drafts, so a beta publish never changes this URL.
+    /// The stable manifest: the bwc-stable-v2.json asset of the latest stable GitHub release. GitHub's "latest"
+    /// skips prereleases and drafts, so a beta publish never changes this URL. The name carries v2 because 0.1.1
+    /// (per-user install) reads bwc-stable.json, and a 0.1.1 client must never be offered the per-machine installer
+    /// by the in-app update (docs/failure-modes/release.md, "LF").
     /// </summary>
     public const string BuildStableManifestUrl =
-        "https://github.com/BurntToasters/better-windows-config/releases/latest/download/bwc-stable.json";
+        "https://github.com/BurntToasters/better-windows-config/releases/latest/download/bwc-stable-v2.json";
 
     /// <summary>The beta channel's manifest URL for this build. Empty: no beta channel is published yet.</summary>
     public const string BuildBetaManifestUrl = "";

@@ -158,7 +158,7 @@ https://www.mozilla.org/MPL/2.0/
   <data name="UpdateAvailableText" xml:space="preserve">
     <value>Better Windows Config {0} is available. You have {1}.
 
-Download and Install checks the update again, closes the Hub, and replaces the installed files. Later keeps your current version.</value>
+Download and Install checks the update again, closes the Hub, and replaces the installed files. Windows will ask for permission to install, because Better Windows Config is installed for all users. Later keeps your current version.</value>
   </data>
   <data name="UpdateInstallButton" xml:space="preserve">
     <value>&amp;Download and Install</value>
@@ -214,6 +214,18 @@ Download and Install checks the update again, closes the Hub, and replaces the i
   <data name="UpdateFailElevated" xml:space="preserve">
     <value>Updates are not checked while Better Windows Config runs with administrator rights. Close it, open it again without administrator rights, and check for updates there. Your installed tools have not been changed.</value>
   </data>
+  <data name="UpdateFailElevationDeclined" xml:space="preserve">
+    <value>The update was canceled. Your installed tools have not been changed.</value>
+  </data>
+  <data name="UpdateFailNotElevated" xml:space="preserve">
+    <value>The update did not get the administrator rights it needs, so it was not installed. Your installed tools have not been changed.</value>
+  </data>
+  <data name="UpdateFailOtherSession" xml:space="preserve">
+    <value>Better Windows Config is open in another Windows session. Close it there and try again. Your installed tools have not been changed.</value>
+  </data>
+  <data name="UpdateFailDeElevation" xml:space="preserve">
+    <value>The update finished, but Better Windows Config could not be started again. Open it from the Start menu.</value>
+  </data>
   <data name="UpdateFailGeneric" xml:space="preserve">
     <value>The update could not be verified, so it was not installed. Your installed tools have not been changed. Try again later.</value>
   </data>
@@ -264,6 +276,18 @@ Download and Install checks the update again, closes the Hub, and replaces the i
   </data>
   <data name="UpdateResultElevated" xml:space="preserve">
     <value>The update did not install because its helper was started with administrator rights. Check for updates from Better Windows Config without administrator rights. Better Windows Config {0} is still in place.</value>
+  </data>
+  <data name="UpdateResultElevationDeclined" xml:space="preserve">
+    <value>The update was canceled. Your installed tools have not been changed. Better Windows Config {0} is still in place.</value>
+  </data>
+  <data name="UpdateResultNotElevated" xml:space="preserve">
+    <value>The update did not install because it did not get administrator rights. Better Windows Config {0} is still in place.</value>
+  </data>
+  <data name="UpdateResultOtherSession" xml:space="preserve">
+    <value>The update did not install because Better Windows Config is open in another Windows session. Close it there and check for updates again. Better Windows Config {0} is still in place.</value>
+  </data>
+  <data name="UpdateResultDeElevation" xml:space="preserve">
+    <value>The update was installed, but Better Windows Config could not be started again. Open it from the Start menu. The version before the update was {0}.</value>
   </data>
   <data name="UpdateResultUnexpected" xml:space="preserve">
     <value>The update did not install because of an unexpected error. Better Windows Config {0} is still in place.</value>
