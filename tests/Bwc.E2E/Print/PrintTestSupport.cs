@@ -63,6 +63,26 @@ internal static class PrintTestSupport
         return GetDefaultPrinter(name, ref size) ? name.ToString() : null;
     }
 
+    /// <summary>
+    /// Restores the default printer saved before a PDF job, only when the default changed. The only printer-settings
+    /// write the tests make. An empty saved name sets nothing, and the saved name is the only name ever set.
+    /// </summary>
+    internal static string? RestoreDefaultPrinter(string? saved)
+    {
+        if (string.IsNullOrWhiteSpace(saved))
+        {
+            return DefaultPrinterName();
+        }
+
+        string? current = DefaultPrinterName();
+        if (!string.Equals(current, saved, StringComparison.Ordinal) && !SetDefaultPrinter(saved))
+        {
+            return current;
+        }
+
+        return DefaultPrinterName();
+    }
+
     /// <summary>The number of spooler jobs for a local printer. -1 when the printer cannot be opened.</summary>
     internal static int JobCount(string printerName)
     {
@@ -279,4 +299,8 @@ internal static class PrintTestSupport
     [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetDefaultPrinter(StringBuilder? name, ref uint size);
+
+    [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "SetDefaultPrinterW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetDefaultPrinter(string name);
 }
