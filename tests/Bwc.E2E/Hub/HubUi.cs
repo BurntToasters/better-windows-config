@@ -247,9 +247,10 @@ internal static class HubUi
             {
                 windows.Add(automation.FromHandle(hwnd));
             }
-            catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException)
+            catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException
+                or FlaUI.Core.Exceptions.ElementNotAvailableException)
             {
-                // The window closed between the enumeration and the lookup.
+                // The window closed between the enumeration and the lookup, or UIA could not reach it yet.
             }
         }
 

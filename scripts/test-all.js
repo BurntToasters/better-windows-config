@@ -26,7 +26,8 @@ const ALL_RIDS = "all";
 const ALL_RID_ORDER = ["win-arm64", "win-x64"];
 const DOTNET_FALLBACK = "C:\\Program Files\\dotnet\\dotnet.exe";
 const MAX_BUFFER = 256 * 1024 * 1024;
-const STEP_TIMEOUT_MS = 30 * 60 * 1000;
+// A full E2E suite takes about 30 minutes on Arm64 and longer for x64 under emulation.
+const STEP_TIMEOUT_MS = 90 * 60 * 1000;
 const PROBE_TIMEOUT_MS = 60 * 1000;
 const ANSI_PATTERN = /\x1B\[[0-?]*[ -/]*[@-~]/g;
 
