@@ -691,3 +691,64 @@ restores use `AccessControlSections.Access`. `RestoreOwner` and the elevated own
 Open. Entries on the basic page carry no `CONTAINER_INHERIT_ACE` in `AccessRights`. The oracle does not record what classic
 sets for a principal added from the basic page, so this is not changed. Run the Add flow in classic and record the ACE flags
 before changing it.
+
+## 43. Permission prompts 7013 to 7018 and effective access (S1b, BEH-026)
+
+Each classic string id is either shown on the page that shows it, or declared here with the measured
+reason it is not shown. The measured classic texts are in `docs/parity/oracle/local/security-text.json`
+(the sheet and the Advanced window, cancelled, unelevated). The string texts are in
+`docs/parity/oracle/regedit-resources.md` (oracle 7013 to 7018).
+
+Failure modes this section covers:
+
+- A classic string that no measured classic control shows is added to BWC as a visible label. BWC then
+  shows a control that classic does not. Rule: a string is shown only when a measured classic control has
+  the same text.
+- A prompt that aclui already shows is duplicated by a BWC-owned prompt. The Advanced check box and the
+  Special permissions labels are aclui controls, so a second label would show the same thing twice.
+- A propagation option is offered that the engine cannot honor. The audit replace check box needs
+  `SI_RESET_SACL_TREE`; with it, aclui sends a SACL change that the engine refuses (section 22).
+- Effective access is missing or answers the wrong SID (section 38), or the E2E test reads a page that
+  is not the Effective Access page.
+
+Declarations (`Resources.resw` holds none of these texts, because BWC never shows them):
+
+- 7013 "Special Access..." (MSG-174, declared). Not on the measured sheet or the Advanced window. aclui
+  draws "Special permissions" from its own resources (control text "Special permissions", measured on the
+  sheet, and "Allow Special permissions" and "Deny Special permissions"). BWC shows the same aclui controls
+  (`GetAccessRights`, section 32), so the text is not duplicated.
+- 7015 "R&eplace Permission on Existing Subkeys" (MSG-176, declared). The classic check box on the Advanced
+  window is aclui's own text, "Replace all child object permission entries with inheritable permission
+  entries from this object" (measured). BWC shows that same check box (section 16). 7015 is not shown by
+  classic on any measured page, so BWC does not show it either.
+- 7016 "Audit Permission on Existing Subkeys" (MSG-177, declared) and 7018 "Do you want to audit all existing
+  subkeys within %1?" (MSG-179, declared). Both belong to an audit replace check box and its question. That
+  check box needs `SI_RESET_SACL_TREE`, and BWC does not set it: the engine refuses SACL propagation
+  (section 22), so the check box would change nothing. The Auditing tab cannot be read unelevated (section
+  37), so the classic text for this check box was not measured. Test that the refusal holds:
+  `PropagationRefusesSaclBeforeAnyChange`. The elevated classic text is open until an elevated oracle run.
+- 7014 "Registry &Key" (MSG-175, open). It is the apply-to name on the Permission Entry page. That page is
+  reached through Add or Edit, and the oracle captures only the sheet and the Advanced window. No measured
+  classic control shows the text, so this row stays a gap. It is tied to the open item of section 42.
+- 7017 "Do you want to replace the permission on all existing subkeys within %1?" is shown (MSG-178,
+  section 27).
+
+Effective access (BEH-026):
+
+- `SI_EDIT_EFFECTIVE` (`0x00020000`) is set in `GetObjectInformation` (section 38), and `IEffectivePermission` is
+  answered by `RegistryPermissionsDialog.GetEffectivePermission`. The E2E test
+  `Permissions_EffectiveAccessShowsResultsForTheCurrentUser` (unelevated, cancel only) opens Advanced on a sandbox key,
+  selects the Effective Access tab, picks the current user with "Select a user" (the same picker the owner test uses),
+  clicks "View effective access", and checks three things: the user is named in the User/ Group field, at least one
+  Effective access row reads "Allowed", and the tab and the button were found (their checks come first).
+- Failure: the flag is cleared, so the Effective Access tab has no "View effective access" control. The test fails at the
+  button check, and the note lists the controls it found.
+- Failure: the page names another user, or no user. The test fails at the user check.
+- Failure: the page has no Allowed row. The sandbox key grants the current user at least one right through the entries
+  it inherits from `HKCU\Software` (on the test machine, Full Control), so an empty result means the page did not answer.
+- Failure: the picker does not take the current user. The picker code of the owner test reports the cause in its notes.
+- Failure: UIA cannot reach the page. The test then fails at the first check it cannot make; it is not reported as a
+  pass. The engine call (IEffectivePermission) lives in `RegistryPermissionsDialog.cs`, which the test projects cannot
+  reference, so the proof of that call is this E2E test and the review of section 38.
+- Limit: the mask BWC computes comes from the DACL. It does not resolve groups of SIDs other than the current user
+  (section 38), so the check covers the current user only.

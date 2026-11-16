@@ -111,22 +111,38 @@ a switch registers the task again and leaves it disabled.
 | 0 | Every Elevated test passed. |
 | 1 | An Elevated test failed, or the task stopped without a final result. |
 | 2 | Not set up, or the runner refused before any test ran. The message says what to do. |
-| 3 | NOT RUN. The task did not start, timed out, or no test is tagged Elevated. |
+| 3 | NOT RUN. The task did not start or timed out, or no Elevated test ran. |
 
 An Elevated run that is not elevated never reports PASS. `test-e2e.js --filter TestCategory=Elevated`
 run from a normal shell exits 3 with NOT RUN.
 
 ## Which tests are Elevated
 
-- `tests/Bwc.Registry.Tests/RegistryHiveTests.cs`: `ElevatedSaveAndRestoreRoundTripStaysInsideTheSandbox`.
-  It is compiled in the E2E flavor and returns Inconclusive without both privileges.
-- No E2E test in `tests/Bwc.E2E` is tagged Elevated yet. The hive mount round trip (File > Load Hive
-  and Unload Hive) is not automated. Add a test with `[TestCategory("Elevated")]` when it is written.
+Tests tagged `[TestCategory("Elevated")]` are the only ones the runner runs. Each one reports Inconclusive
+(not run) unless its process is elevated and holds the privileges it needs, so a normal run never shows
+them as passed.
 
-The runner runs only the `Bwc.E2E` project, as specified. The registry round trip above runs only
-when you run its project from an elevated shell yourself, for example
-`dotnet test tests/Bwc.Registry.Tests/Bwc.Registry.Tests.csproj -c Release -p:BwcFlavor=E2E --filter TestCategory=Elevated`.
-Until an Elevated E2E test exists, the runner reports NOT RUN.
+The E2E tests (`tests/Bwc.E2E`) are run by `run.js` through `test-e2e.js --filter "TestCategory=Elevated"`:
+
+- `Permissions/PermissionsTests.cs`: `Permissions_ElevatedAddAndRemoveAudit` (adds and removes an audit entry on
+  a sandbox key; SeSecurityPrivilege) and `Permissions_ElevatedOwnerToAdministratorsAndBack` (owner to
+  Administrators and back; SeRestorePrivilege and SeTakeOwnershipPrivilege).
+- `Hives/HiveMountTests.cs`: `Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu`. It exports a sandbox key as a hive
+  file, loads it with File > Load Hive under `HKEY_USERS\BWC-E2E-<run-id>`, checks the Key Name prompt against the
+  classic layout (RT_DIALOG 104), checks the mounted values, unloads it with File > Unload Hive, and checks that the
+  mount is gone. Its `finally` unloads a mount that is left and deletes the hive file. It needs SeBackupPrivilege and
+  SeRestorePrivilege. Failure modes: `docs/failure-modes/hives.md` section 14.
+
+The registry tests (`tests/Bwc.Registry.Tests`) are compiled in the E2E flavor, but `run.js` does not run them. Run
+them yourself from an elevated shell, for example
+`dotnet test tests/Bwc.Registry.Tests/Bwc.Registry.Tests.csproj -c Release -p:BwcFlavor=E2E --filter TestCategory=Elevated`:
+
+- `RegistryHiveTests.cs`: `ElevatedSaveAndRestoreRoundTripStaysInsideTheSandbox`.
+- `RegistryExportHiveTests.cs`: `ElevatedHiveExportReloadsInsideTheSandbox`.
+- `RegistrySecurityPropagationTests.cs`: `PropagationContinuesPastAChildOwnedByAdministrators`.
+
+Until the user runs the E2E Elevated tests through the runner, their rows in `docs/parity/regedit-audit.md` (MENU-005,
+MENU-006, DLG-007, DLG-008) stay `gap` with the reason "pending the user's elevated run".
 
 ## Files
 

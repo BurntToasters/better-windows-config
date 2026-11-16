@@ -31,6 +31,9 @@ public sealed class PermissionsTests
     private const string SeedValueName = "PermissionValue";
     private const string ChildName = "PermissionChild";
     private const string ReplaceCheckBoxFragment = "Replace all child object permission entries";
+    private const string EffectiveAccessTab = "Effective Access";
+    private const string EffectiveAccessButton = "View effective access";
+    private const string EffectiveUserLink = "Select a user";
     private const string ThisKeyAndSubkeysText = "This key and subkeys";
     private const string InheritedFromText = @"CURRENT_USER\Software";
     private const string ReplaceConfirmFragment = "Do you want to replace the permission on all existing subkeys within";
@@ -506,6 +509,255 @@ public sealed class PermissionsTests
     }
 
     /// <summary>
+    /// BEH-026: Advanced > "View effective access" on a sandbox key. The page must exist, name the current user, and mark
+    /// at least one right for that user. Only Cancel is pressed, so nothing is changed. A missing control is named.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Permissions")]
+    public void Permissions_EffectiveAccessShowsResultsForTheCurrentUser()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+
+        try
+        {
+            config.EnsureExecutablesExist();
+        }
+        catch (Exception ex)
+        {
+            E2EResults.Record("permissions.effective.publish", false, ex.Message);
+            Assert.Fail(ex.Message);
+            return;
+        }
+
+        var sandbox = new SandboxRegistry(config);
+        string? dataRoot = null;
+
+        try
+        {
+            sandbox.Cleanup();
+            Seed(sandbox);
+            dataRoot = CreateFreshDataRoot(config, "permissions-effective");
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+            };
+
+            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
+            using var driver = new EditingDriver(session);
+
+            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+            bool seededRows = ControlTestSupport.WaitUntil(
+                () => ControlTestSupport.ListRowNames(session).Contains(SeedValueName, StringComparer.OrdinalIgnoreCase),
+                TimeSpan.FromSeconds(15));
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated && seededRows, "permissions.effective.sandbox.navigate");
+            E2EGuards.RequireSandboxSelection(session, sandbox, "permissions.effective.sandbox.menu");
+
+            nint sheet = OpenPermissionsSheet(session, driver, "permissions.effective");
+            if (sheet != 0)
+            {
+                nint advanced = OpenAdvanced(session, sheet, "permissions.effective");
+                if (advanced != 0)
+                {
+                    CheckEffectiveAccess(session, advanced);
+                    _ = TryCancel(session, advanced, out _);
+                    _ = ControlTestSupport.WaitUntil(() => !PermissionsNative.IsWindow(advanced), TimeSpan.FromSeconds(8));
+                }
+
+                _ = TryCancel(session, sheet, out _);
+                _ = ControlTestSupport.WaitUntil(() => !PermissionsNative.IsWindow(sheet), TimeSpan.FromSeconds(8));
+            }
+
+            FailIfNeeded();
+        }
+        finally
+        {
+            ControlTestSupport.CleanupRegistry(config);
+            DeleteDataRoot(dataRoot);
+        }
+    }
+
+    /// <summary>
+    /// Selects the Effective Access tab of the Advanced window, clicks "View effective access" and reads the result. The
+    /// result is the owned window that opens, or the Advanced window itself when the page is part of it. The page must
+    /// name the current user and mark at least one right.
+    /// </summary>
+    private static void CheckEffectiveAccess(AppSession session, nint advanced)
+    {
+        bool tabSelected = SelectTab(advanced, EffectiveAccessTab);
+        E2EResults.Record("permissions.effective.tab", tabSelected, $"the '{EffectiveAccessTab}' tab selected={tabSelected}.");
+        bool picked = tabSelected && ChooseCurrentUser(session, advanced, EffectiveUserLink);
+        E2EResults.Record("permissions.effective.user-picked", picked, $"the current user chosen with '{EffectiveUserLink}'={picked}.");
+        bool clicked = picked && ClickButtonNamed(advanced, EffectiveAccessButton);
+        E2EResults.Record("permissions.effective.button", clicked, $"'{EffectiveAccessButton}' clicked={clicked}.");
+        if (!clicked)
+        {
+            return;
+        }
+
+        nint page = WaitForOwnedDialogOf(session.ProcessId, advanced, TimeSpan.FromSeconds(5));
+        nint surface = page != 0 ? page : advanced;
+        string account = CurrentAccountName();
+        _ = ControlTestSupport.WaitUntil(
+            () => TextOfWindow(surface).Contains(account, StringComparison.Ordinal) && AllowedRightCount(surface) > 0,
+            TimeSpan.FromSeconds(10));
+        E2EResults.Note(
+            "permissions.effective.elements",
+            $"page hwnd=0x{page:X} (0 means the Advanced window itself); elements: {DescribeElements(surface)}");
+
+        bool named = TextOfWindow(surface).Contains(account, StringComparison.Ordinal);
+        E2EResults.Record(
+            "permissions.effective.user",
+            named,
+            $"the page names the current user '{account}'={named}.");
+
+        int allowed = AllowedRightCount(surface);
+        E2EResults.Record(
+            "permissions.effective.rights",
+            allowed > 0,
+            $"rights the page reports as Allowed for the current user={allowed}; the sandbox key grants at least one.");
+    }
+
+    /// <summary>Selects a tab of the window by its name. The tab is clicked when it has no selection pattern.</summary>
+    private static bool SelectTab(nint window, string name)
+    {
+        try
+        {
+            if (!ForegroundGuard.Ensure(window, "dialog.permissions.foreground", TimeSpan.FromSeconds(2)))
+            {
+                return false;
+            }
+
+            using var automation = new UIA3Automation();
+            AutomationElement root = automation.FromHandle(window);
+            AutomationElement? tab = root.FindFirstDescendant(
+                cf => cf.ByName(name).And(cf.ByControlType(ControlType.TabItem)));
+            if (tab is null)
+            {
+                return false;
+            }
+
+            if (tab.Patterns.SelectionItem.IsSupported)
+            {
+                tab.Patterns.SelectionItem.Pattern.Select();
+            }
+            else
+            {
+                tab.Click();
+            }
+
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>The account part of the current user's name, for example "jsmith" from "PC\jsmith".</summary>
+    private static string CurrentAccountName()
+    {
+        string name = WindowsIdentity.GetCurrent().Name;
+        int slash = name.LastIndexOf('\\');
+        return slash < 0 ? name : name[(slash + 1)..];
+    }
+
+    /// <summary>The names and the value patterns of every element in the window, one line per text.</summary>
+    private static string TextOfWindow(nint window)
+    {
+        using var automation = new UIA3Automation();
+        AutomationElement root = automation.FromHandle(window);
+        var parts = new List<string>();
+        foreach (AutomationElement element in root.FindAllDescendants())
+        {
+            parts.Add(SafeName(element));
+            parts.Add(SafeValue(element));
+        }
+
+        return string.Join(" | ", parts);
+    }
+
+    /// <summary>Control type, name, value and toggle state of the first elements of the window, for the notes.</summary>
+    private static string DescribeElements(nint window)
+    {
+        using var automation = new UIA3Automation();
+        AutomationElement root = automation.FromHandle(window);
+        return string.Join(
+            " | ",
+            root.FindAllDescendants()
+                .Take(150)
+                .Select(element => $"{SafeControlType(element)}:{SafeName(element)}={SafeValue(element)}[{SafeToggle(element)}]"));
+    }
+
+    private static string SafeName(AutomationElement element)
+    {
+        try
+        {
+            return element.Name ?? string.Empty;
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string SafeValue(AutomationElement element)
+    {
+        try
+        {
+            return element.Patterns.Value.IsSupported ? element.Patterns.Value.Pattern.Value.Value ?? string.Empty : string.Empty;
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string SafeToggle(AutomationElement element)
+    {
+        try
+        {
+            return element.Patterns.Toggle.IsSupported ? element.Patterns.Toggle.Pattern.ToggleState.Value.ToString() : string.Empty;
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string SafeControlType(AutomationElement element)
+    {
+        try
+        {
+            return element.ControlType.ToString();
+        }
+        catch (Exception)
+        {
+            return "?";
+        }
+    }
+
+    /// <summary>
+    /// The Effective access list rows the page reports as Allowed, such as "Effective access Allowed, Permission Full Control".
+    /// </summary>
+    private static int AllowedRightCount(nint window)
+    {
+        try
+        {
+            using var automation = new UIA3Automation();
+            AutomationElement root = automation.FromHandle(window);
+            return root
+                .FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem))
+                .Count(item => SafeName(item).StartsWith("Effective access Allowed", StringComparison.Ordinal));
+        }
+        catch (Exception)
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
     /// Changes one Allow box on an explicit entry for Everyone, presses Apply, and reads the DACL back through the
     /// managed API. The original descriptor is restored in the finally block. The entry for the current user is
     /// checked before and after, so the change cannot remove the user's own access.
@@ -968,18 +1220,18 @@ public sealed class PermissionsTests
     /// Clicks "Change" next to the owner and picks the current user in the "Select User or Group" dialog. aclui shows
     /// "Replace owner on subcontainers and objects" only once an owner has been chosen. The owner stays the same user.
     /// </summary>
-    private static bool ChooseCurrentUserAsOwner(AppSession session, nint advanced)
+    private static bool ChooseCurrentUser(AppSession session, nint advanced, string linkName)
     {
-        if (!ClickAnyNamed(advanced, "Change"))
+        if (!ClickAnyNamed(advanced, linkName))
         {
-            E2EResults.Note("permissions.owner.picker", "the Change link was not found.");
+            E2EResults.Note("permissions.picker", $"the {linkName} link was not found.");
             return false;
         }
 
         nint picker = WaitForOwnedDialogOf(session.ProcessId, advanced, TimeSpan.FromSeconds(10));
         if (picker == 0)
         {
-            E2EResults.Note("permissions.owner.picker", "the Select User or Group dialog did not open.");
+            E2EResults.Note("permissions.picker", "the Select User or Group dialog did not open.");
             return false;
         }
 
@@ -988,7 +1240,7 @@ public sealed class PermissionsTests
         {
             if (!ForegroundGuard.Ensure(picker, "dialog.permissions.foreground", TimeSpan.FromSeconds(2)))
             {
-                E2EResults.Note("permissions.owner.picker", "the picker never got the foreground.");
+                E2EResults.Note("permissions.picker", "the picker never got the foreground.");
                 _ = ClickButtonNamed(picker, "Cancel");
                 return false;
             }
@@ -1001,7 +1253,7 @@ public sealed class PermissionsTests
             stage = "ok";
             AutomationElement? okButton = root.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button).And(cf.ByName("OK")));
             E2EResults.Note(
-                "permissions.owner.picker",
+                "permissions.picker",
                 $"typed '{identity.Name}', OK enabled={okButton?.IsEnabled}.");
             if (okButton is null || !okButton.IsEnabled)
             {
@@ -1013,7 +1265,7 @@ public sealed class PermissionsTests
         }
         catch (Exception ex)
         {
-            E2EResults.Note("permissions.owner.picker", $"failed at {stage}: {ex.GetType().Name}: {ex.Message}");
+            E2EResults.Note("permissions.picker", $"failed at {stage}: {ex.GetType().Name}: {ex.Message}");
             _ = ClickButtonNamed(picker, "Cancel");
             return false;
         }
@@ -1024,7 +1276,7 @@ public sealed class PermissionsTests
             _ = ClickButtonNamed(picker, "Cancel");
         }
 
-        E2EResults.Note("permissions.owner.picker", $"picker closed after OK={closed}.");
+        E2EResults.Note("permissions.picker", $"picker closed after OK={closed}.");
         return closed;
     }
 
@@ -1165,7 +1417,7 @@ public sealed class PermissionsTests
                 nint advanced = OpenAdvanced(session, sheet, "permissions.owner");
                 if (advanced != 0)
                 {
-                    bool changed = ChooseCurrentUserAsOwner(session, advanced);
+                    bool changed = ChooseCurrentUser(session, advanced, "Change");
                     E2EResults.Record("permissions.owner.change", changed, $"the current user chosen as owner={changed}.");
                     bool recurse = false;
                     string recurseReason = "the owner was not chosen";

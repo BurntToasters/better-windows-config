@@ -973,11 +973,6 @@ internal sealed unsafe partial class RegistryKeySecurityInformation
     }
 
     /// <summary>
-    /// Reads the requested parts. A request for the SACL without SeSecurityPrivilege fails with
-    /// ERROR_PRIVILEGE_NOT_HELD, and the HRESULT reaches aclui, which shows its own "can't be displayed" text. The
-    /// SACL is never dropped from the answer silently (permissions.md section 37).
-    /// </summary>
-    /// <summary>
     /// The registry holds no inherited marks, but aclui needs them to tell inherited entries from explicit ones: they
     /// drive the "Inherited from" column, the greyed check boxes and what Apply sends (permissions.md section 41). A
     /// descriptor with a DACL gets them from the parent's entries. A parent that cannot be read leaves it as stored.
@@ -1003,6 +998,11 @@ internal sealed unsafe partial class RegistryKeySecurityInformation
     private static bool RegistryDescriptorHasDacl(byte[] descriptor) =>
         new RawSecurityDescriptor(descriptor, 0).DiscretionaryAcl is not null;
 
+    /// <summary>
+    /// Reads the requested parts. A request for the SACL without SeSecurityPrivilege fails with ERROR_ACCESS_DENIED (5)
+    /// from the registry, and the HRESULT reaches aclui, which shows its own "can't be displayed" text. The SACL is
+    /// never dropped from the answer silently (permissions.md section 37).
+    /// </summary>
     private byte[] ReadDescriptor(RegistrySecurityInformation requested) => _reader.GetKeySecurity(_path, requested);
 
     /// <summary>
