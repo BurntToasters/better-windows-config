@@ -703,3 +703,85 @@ capture: control 1 enabled=false with no text typed). BWC disables the button wh
 enables it as the text changes; Alt+N does nothing while it is disabled. Enter and F3 with an empty text
 still show the empty-text message. Test: `SmallDialogs_RectsMatchClassicMeasurements` checks the state
 at open and the live change (`rects.find.next-enabled`, `rects.find.next-live`).
+
+## 13. Decimal overflow prompt and the QWORD editor (F2a)
+
+Classic regedit does not refuse a decimal number above the width's maximum outright. It asks
+"Should the value be truncated in order to continue?" (RT_STRING 119 for DWORD, 120 for QWORD).
+The oracle dump records the text and not the buttons, the caption, or the truncation rule, so the
+spec is the text: Yes accepts the largest value of the width, and No returns to the editor with the
+typed text kept. The caption is RT_STRING 110 (Overflow). RT_STRING 111 (Warning) is not used, see
+MSG-053 in `regedit-audit.md`. The prompt is a Yes/No message box owned by the editor. Hexadecimal input
+above the width keeps the input error, because the classic prompt text names only decimal input.
+
+### 13.1 Decimal overflow shows the input error instead of the prompt
+
+Failure mode: typing 4294967296 in Decimal and pressing OK shows "Enter a decimal number from 0 to
+4294967295." Classic asks the truncation question instead. Guard: `ClassicNumberDialog.TryAccept` checks
+an all-digit decimal above the width before it reports the range error. E2E: `NumberOverflow_DwordDecimalAnswers` (Dialogs/NumberOverflowTests.cs).
+
+### 13.2 Prompt text is not the classic text
+
+Failure mode: the prompt is reworded, loses the CRLF between its two sentences, or uses a string that is
+not string 119 or 120. Guard: the prompt text is the Resources.resw entry whose comment cites the oracle id,
+and `scripts/check-regedit-strings.js` reports it equal. E2E: the message box text is compared with the
+oracle string, with line ends normalized to LF on both sides.
+
+### 13.3 Prompt caption is the editor's title
+
+Failure mode: the prompt is captioned "Edit DWORD (32-bit) Value" or "Edit QWORD (64-bit) Value", or the
+caption is the application name. Guard: the caption is RT_STRING 110, `Overflow`. E2E: the prompt window
+caption is checked on each overflow.
+
+### 13.4 No changes the value or closes the editor
+
+Failure mode: No stores the truncated value, closes the editor, or writes anything to the registry. Guard:
+`TryAccept` returns false for No, so nothing is accepted and the editor stays open with the typed text. E2E:
+the typed text is still shown after No, and the stored value is unchanged.
+
+### 13.5 Yes stores a value other than the largest value of the width
+
+Failure mode: Yes stores the typed number wrapped to the width (for example 4294967296 as 0), stores zero, or
+stores the input with its high bits dropped. Guard: Yes sets the accepted value to `uint.MaxValue` or
+`ulong.MaxValue`. The rule is the BWC choice for "truncated" (the dump has no algorithm), and it is written in
+`classic-dialog.md` so a change is visible. E2E: the stored DWORD is 4294967295 and the stored QWORD is
+18446744073709551615.
+
+### 13.6 Hexadecimal overflow shows the prompt
+
+Failure mode: a hexadecimal value above the width (for example 100000000 in a DWORD) asks the truncation
+question. The classic prompt text names decimal input only, so the hexadecimal path keeps the existing
+input error. Guard: the prompt is raised only for all-digit input in the Decimal base. E2E:
+`NumberOverflow_HexadecimalKeepsInputError` for DWORD and QWORD.
+
+### 13.7 Enter on the prompt reaches the editor
+
+Failure mode: the prompt is not the foreground modal, so Enter (or the editor's default button) answers for
+the editor and saves the typed value without the question. Guard: the prompt is a modal `ClassicMessageBox`
+owned by the editor, which stays disabled while the prompt is open. E2E: the prompt is found by its caption, and
+the editor is checked disabled while the prompt is open.
+
+### 13.8 QWORD editor layout differs from template 117
+
+Failure mode: the QWORD editor takes the DWORD rectangles, the wrong client size, or a different control order
+or tab order. Classic RT_DIALOG 117 has the same geometry as 111 (219 x 103 DLU), and its controls are listed
+in DLG-035. Guard: `ClassicDialogTemplates.EditQword` uses the 117 template. E2E: `NumberOverflow_QwordLayout` runs
+`CheckGeometry` against the 117 template, the tab order, the caption, the mnemonics and the read-only value name.
+
+### 13.9 QWORD editor opens in decimal
+
+Failure mode: the QWORD editor opens with the Decimal radio selected, or shows the stored value in decimal.
+Classic opens hexadecimal by default (OQ-12). Guard: the same base default as the DWORD editor. E2E:
+`NumberOverflow_QwordLayout` checks the Hexadecimal radio is selected and 5000 shows as 1388.
+
+### 13.10 Base switch loses digits at the top of the QWORD range
+
+Failure mode: converting FFFFFFFFFFFFFFFF from hexadecimal to decimal and back loses digits, because the
+conversion goes through a 32-bit value or a signed one. Guard: `TryParse` and `Render` work in `ulong`.
+E2E: `NumberOverflow_QwordLayout` converts the QWORD maximum typed in decimal to hexadecimal and back.
+
+### 13.11 String 111 used as the caption
+
+Failure mode: the prompt uses the caption "Warning" (RT_STRING 111). No classic prompt is identified in the dump
+as using it, so BWC does not show it. This is declared (MSG-053), not proven, and the reason is recorded in
+`regedit-audit.md`.

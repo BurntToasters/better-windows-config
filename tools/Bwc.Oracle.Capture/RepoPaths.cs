@@ -20,6 +20,7 @@ internal sealed class RepoPaths
         ImportBehaviorJson = Path.Combine(OracleDocs, "import-behavior.json");
         FindSequenceJson = Path.Combine(OracleDocs, "find-sequence.json");
         SortOrderJson = Path.Combine(OracleDocs, "sort-order.json");
+        TreeOrderJson = Path.Combine(OracleDocs, "tree-order.json");
         PermissionsInheritJson = Path.Combine(OracleDocs, "permissions-inherit.json");
         ResourcesJson = Path.Combine(OracleDocs, "regedit-resources.json");
         KeysJson = Path.Combine(OracleDocs, "regedit-keys.json");
@@ -52,6 +53,8 @@ internal sealed class RepoPaths
     internal string ImportBehaviorJson { get; }
     internal string FindSequenceJson { get; }
     internal string SortOrderJson { get; }
+
+    internal string TreeOrderJson { get; }
     internal string PermissionsInheritJson { get; }
 
     // Written by `resources` (untracked). Read by the 0.1.2 captures to name menus, dialogs and accelerators by id.

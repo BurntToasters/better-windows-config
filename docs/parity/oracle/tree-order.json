@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture tree-order",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26300",
+    "ubr": 9974,
+    "displayVersion": "26H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "parent": "TreeOrder",
+  "insertionOrder": [
+    "Z",
+    "10",
+    "a",
+    "é",
+    "2",
+    "B",
+    "ä",
+    "_x",
+    "1",
+    "-x",
+    "~x"
+  ],
+  "classicOrder": [
+    "_x",
+    "~x",
+    "1",
+    "10",
+    "2",
+    "a",
+    "ä",
+    "B",
+    "é",
+    "-x",
+    "Z"
+  ],
+  "note": "Names are the seeded test data under HKCU\\Software\\BWC-Oracle\\TreeOrder. The order is the order classic regedit lists the children of the selected key in its tree, not the registry enumeration order."
+}

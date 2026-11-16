@@ -99,13 +99,21 @@ returns the virtual node directly. No registry API is called for this node, so i
 
 ## Sorting and culture
 
-Child key names and value names are sorted with `StringComparer.CurrentCultureIgnoreCase`, the
-closest managed equivalent to the `lstrcmpiW` / `CompareStringEx` order the contract requires.
-The default value is forced first and the remaining value names follow. This is an approximation:
-the managed comparer can order punctuation or digit runs differently from the native linguistic
-comparison in edge cases. The contract marks digit runs as verify against oracle, and the E2E
-tests assert only the stable cases they seed. Sorting uses `OrderBy`, which is stable, so equal
-comparisons keep enumeration order.
+Child key names are sorted with `RegistryNameOrder.Comparer`, which is `RegistryFindCollation.Comparer`: `CompareStringEx`
+at the user default locale with `NORM_IGNORECASE`, the same comparison `lstrcmpiW` makes. Classic regedit lists the tree this
+way, and Find uses the same comparer. The managed `StringComparer.CurrentCultureIgnoreCase` is not used, because it orders
+hyphens and symbols differently from classic (VIEW-009, measured by the oracle capture `tree-order` in
+`docs/parity/oracle/tree-order.json`). Sorting uses `OrderBy`, which is stable, so equal comparisons keep enumeration order.
+
+### Failure modes of the sort order (VIEW-009, F2a)
+
+- Failure mode: a hyphen or an underscore sorts as a plain symbol, so `-x` lands after `_x` and before `~x`, where classic
+  lists `-x` after `é`. Guard: the native collation. E2E: `Navigation_TreeSiblingOrderMatchesClassic`.
+- Failure mode: the tree and the Find results order the same names differently. Guard: one comparer for both.
+- Failure mode: the comparer returns 0 for two names that differ. Guard: the native call returns 0 only for an error; the
+  fallback is an ordinal ignore-case compare, so the sort stays total.
+- Failure mode: a child list is sorted with one comparer and shown with another (the remote tree). Guard: `RemoteRegistryTreeSource`
+  uses the same accessor as the local tree.
 
 ## E2E isolation
 
@@ -130,3 +138,32 @@ The shell has no public setter for the tree pane width; the width lives in a pri
 changed only by the splitter. Persisting `TreeWidth` would require a new public
 `ClassicWindowShell` API, so this batch persists only LastKey, address bar visibility, and list
 column widths. The splitter continues to reset to the 216 DIP default on every launch.
+
+
+## Out-of-band changes and F5 (BEH-007, F2a)
+
+The tree and the value list are snapshots. Classic regedit does not watch the registry: a value added by another
+program appears only after F5 (View > Refresh, accelerator 648). BWC keeps that contract, so the E2E check first
+asserts that the new value is NOT listed, then presses F5 and asserts that it is listed.
+
+### Value added outside the app appears without F5
+
+Failure mode: the list updates on its own after a registry write, which is not classic behavior, and the absence check
+before F5 cannot see the value. Guard: no registry watcher exists in the view. E2E: `Navigation_RefreshShowsValueAddedOutside`
+asserts the row is absent before F5.
+
+### F5 does not show the value
+
+Failure mode: F5 re-reads the tree but not the list, or the list keeps the old snapshot. Guard: Refresh reloads the
+selected key's values through the same reader as a fresh navigation. E2E: the row is present after F5.
+
+### F5 drops the selection or the expansion
+
+Failure mode: F5 selects the root, collapses the tree, or moves the caret to another key. Classic keeps the selected key.
+Guard: Refresh keeps the selected key path and expanded nodes. E2E: the sandbox key is still selected after F5.
+
+### Value added to another key shows in the sandbox list
+
+Failure mode: the out-of-band write lands in a different key from the one listed, and a stale row is taken for a refresh.
+Guard: the test writes only under the run root, and it checks the listed row by name in the sandbox key. Cleanup removes the
+run key.

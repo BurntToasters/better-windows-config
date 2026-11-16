@@ -368,6 +368,7 @@ internal sealed class MessageCatalog
     {
         FileNotFoundException or DirectoryNotFoundException => "MsgImportFileMissing",
         UnauthorizedAccessException => "MsgImportPrivileges",
+        RegFileParseException { Refusal: RegFileRefusal.BinaryHive } => "MsgImportBinaryFile",
         RegFileParseException => "MsgImportNotRegistryFile",
         IOException => "MsgImportOpenFailed",
         _ => "MsgImportRegistryAccess",

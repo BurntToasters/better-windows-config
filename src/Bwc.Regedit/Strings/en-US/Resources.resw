@@ -637,6 +637,15 @@ Details: {1}</value>
     <!-- Oracle 133 -->
     <value>Cannot import {0}: The specified file is not a registry file. You can import only registry files.</value>
   </data>
+  <data name="MsgImportBinaryFile" xml:space="preserve">
+    <!-- Oracle 123. A binary registry hive is not a registry script. {0} is the file the user named. -->
+    <value>Cannot import {0}: The specified file is not a registry script.
+You can only import binary registry files from within the registry editor.</value>
+  </data>
+  <data name="MsgCommandLineMissingFilename" xml:space="preserve">
+    <!-- Oracle 43. A switch that takes a filename (/s, /e, /a) was given without one. -->
+    <value>Command line argument requires a filename and none was specified.</value>
+  </data>
   <data name="MsgImportFileMissing" xml:space="preserve">
     <!-- Oracle 235 -->
     <value>Cannot import {0}: The file specified does not exist.</value>

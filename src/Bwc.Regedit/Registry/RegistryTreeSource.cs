@@ -13,7 +13,8 @@ namespace Bwc.Regedit.Registry;
 /// </summary>
 public sealed class RegistryTreeSource : ITreeNodeSource
 {
-    private static readonly StringComparer NameComparer = StringComparer.CurrentCultureIgnoreCase;
+    // The classic display order (NLS, case ignored). See RegistryNameOrder and VIEW-009.
+    private static readonly IComparer<string> NameComparer = RegistryNameOrder.Comparer;
     private static readonly IReadOnlyList<TreeNode> NoChildren = Array.Empty<TreeNode>();
 
     private static readonly RegistryRoot[] RootOrder =

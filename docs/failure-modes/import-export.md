@@ -401,3 +401,95 @@ golden `docs/parity/oracle/exports/bwc-oracle-text.txt`. The table lists how the
 | An unreadable subkey stops the file | It is skipped with its subtree, as in section 2. The file has no marker line for it |
 | The file is written as UTF-8 or with a different line ending | UTF-16LE with a BOM and CRLF through `RegistryExportService.ExportTextFile(Stream)`, as the golden is. Print writes the same text as UTF-8 without a BOM, and the E2E check compares them after that normalization |
 | Labels follow the Windows UI language | The labels are text constants with the en-US wording of the golden. The text format is not localized |
+
+## 18. Command line switch without its filename (MSG-022, F2a)
+
+`/s`, `/e` and `/a` each take a filename. Classic regedit reports a switch with no filename with string 43,
+"Command line argument requires a filename and none was specified." BWC writes that text to standard
+error with the usage line and exits 2, as it does for every bad argument shape. The text is the classic string
+exactly, and the exit code is unchanged.
+
+### 18.1 Missing filename prints only the usage line
+
+Failure mode: `BwcRegedit.exe /s` prints the usage line alone, so the classic text never reaches the user.
+Guard: `RegeditCommandLine` names the switch and writes string 43 before the usage line. E2E:
+`CommandLine_SwitchWithoutFilenameReportsStringFortyThree` runs `/s`, `/e` and `/a` alone.
+
+### 18.2 Missing filename changes exit code or writes a file
+
+Failure mode: a switch with no filename exits 0 or 1, or creates an empty export file in the working directory.
+Guard: the refusal is taken before any file is opened or any registry read starts. Exit 2. E2E: `CommandLine_SwitchWithoutFilenameReportsStringFortyThree` checks the exit code is 2 for each switch alone.
+
+### 18.3 Missing filename after a valid operation
+
+Failure mode: `/e file.reg /s` (a second operation after a valid one) is read as a silent import of a file named
+`/s` and the export runs. Guard: a second operation switch is a usage error (exit 2, usage only, string 43 not
+used), as before. E2E: the same test checks that the exit code is 2 and the export file is not written.
+
+## 19. Binary registry file on the silent import (MSG-062, MSG-071, F2a)
+
+A binary registry hive ("regf" signature at offset 0) is not a registry script. Classic regedit text 123 is "Cannot
+import %1: The specified file is not a registry script. You can only import binary registry files from within the
+registry editor." BWC reports a hive file given to `/s` with string 123 on standard error and exits 1, and it refuses
+the file before any write. A text file without the header keeps string 133 (MSG-071). The spec for the choice is the
+text of string 123: a binary file is imported from within the editor, not as a script. This is spec-based, because the
+`regedit /s` route in the oracle is silent and records no message.
+
+### 19.1 A hive file on /s reports string 133
+
+Failure mode: a hive passed to `/s` reports "not a registry file", which is the text for an unknown header. Guard:
+`RegFileReader` checks the four bytes "regf" first and raises `RegFileRefusal.BinaryHive`; `RegFileImportReport` maps it
+to `MsgImportBinaryFile` (string 123). E2E: `CommandLine_BinaryHiveRefusedWithStringOneTwentyThree` checks exit 1, the
+text with the file name, and that the sandbox is unchanged.
+
+### 19.2 Case of the signature
+
+Failure mode: a text file whose first bytes read "REGF" or "regf" text is treated as a hive, or a hive written with
+a different case is treated as text. Guard: the comparison is byte-exact against the lowercase "regf" and runs before
+the text decoding. A `.reg` file must start with its header, and a header is never "regf". E2E: only the lowercase
+signature is driven (19.1); the uppercase case is not driven.
+
+### 19.3 Hive refused in the window with the registration filter
+
+Failure mode: the window's Import with the "Registration Files" filter and a hive file shows string 133, or it runs
+the hive restore without the hive filter. Guard: with the registration filter the file goes through the `.reg` reader,
+which refuses it as 123 (same `RegFileRefusal.BinaryHive`). The hive filter still restores through `RestoreHiveAsync`.
+E2E: not driven. The window route needs the system file dialog and is not in the test set; 19.1 checks the same text.
+
+## 20. Hive export errors (MSG-109, MSG-110, MSG-111, F2a)
+
+The hive format of File > Export runs `RegistryWriter.SaveKey` (RegSaveKey) to a temporary file beside the destination and
+moves it over the destination at the end (`ImportExportCommands.ExportToFile`). Classic reports its failures with the
+save-subtree texts: 213 for a value that cannot be read, 214 for a write error, 215 for a file that cannot be opened.
+BWC reports every hive failure with the `.reg` export texts (138 and 141), which is a known difference, declared in
+`regedit-audit.md` for MSG-109, MSG-110 and MSG-111. The reason is below.
+
+### 20.1 Hive save needs SeBackupPrivilege, and the unelevated run is refused first
+
+Failure mode: `SaveKey` enables the hive privileges (`EnableHivePrivileges`) before it saves. Without SeBackupPrivilege the
+save is refused with `ErrorPrivilegeNotHeld`, and the export shows the privilege text (142) before any temporary file is
+written. The unelevated E2E run does not hold the privilege, so the save-subtree failures (213 to 215) cannot be produced
+unelevated, and the test runner never elevates (Registry Editor never self-elevates; the elevated runner is opt-in).
+
+### 20.2 Save-subtree texts are not built
+
+Failure mode: a locked destination, a write error, or a value that cannot be read would have to show 215, 214 or 213.
+BWC does not map those failures to the save-subtree texts. No E2E check drives them, and none is claimed. This is the
+reason MSG-109, MSG-110 and MSG-111 are declared in the audit, not passed.
+
+### 20.3 A failed hive save leaves a partial destination or a temporary file
+
+Failure mode: after a failed save the destination is replaced, truncated, or a `.bwc-*.tmp` file stays beside it.
+Guard: the move happens only after the save completes, and the temporary file is deleted on failure (the existing rule
+for every export). E2E: not driven unelevated (20.1); the rule is the same one the `.reg` export tests check.
+
+### 20.4 Privilege failure uses the export privilege text
+
+Failure mode: a hive save that is refused for privileges shows the export privilege text (142). Classic has no
+save-subtree privilege text in the dump, so this stays on string 142, and it is the one hive failure BWC shows in an
+unelevated run.
+
+### 20.5 Insufficient memory
+
+String 212 (insufficient memory) is a declared difference (MSG-108), not driven.
+

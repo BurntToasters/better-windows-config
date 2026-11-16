@@ -122,6 +122,31 @@ theme resources exist, with `AccentFillColorSecondaryBrush` and
 re-resolve the brushes when `ActualThemeChanged` fires. The transparent backgrounds keep hit
 testing working while letting the pane background show through.
 
+### Sibling order for non-ASCII and symbol names (VIEW-009, F2a)
+
+Classic orders sibling keys with the locale's linguistic comparison, case ignored, so "ä" sorts with "a", "é" with "e",
+and "10" after "2" only when digit runs are compared as text. It is NOT the registry enumeration order (the export order in
+`import-export.md` section 1 is that order). Failure mode: the tree sorts by code point, so "ä" and "é" fall after "Z", or
+"10" sorts before "2" as a number. Guard: the tree uses the same comparer as the list. E2E: `Navigation_TreeSiblingOrderMatchesClassic`
+compares the tree children of a seeded key with `docs/parity/oracle/tree-order.json`, which records the order classic lists the
+same names in (oracle capture `tree-order`).
+
+Failure mode: the order changes after F5 or after a rename. Guard: the sort runs on each load, and the comparison is stable
+for equal names. E2E: not driven separately; the order is read once, after every seeded key is listed.
+
+### Drag and drop ignored (BEH-009, F2a)
+
+Classic regedit has no drag-and-drop for keys or values (no drag menu item or string exists in the dump). Dragging a key onto a
+key, a key onto the list, or a value onto a key must do nothing.
+
+Failure mode: a drag moves or copies the key or value, or it creates a new key or value. Guard: the tree and list do not start a
+drag operation and do not accept a drop. E2E: `Editing_DragAndDropDoesNothing` drags a key onto another key and a value onto the
+tree and the list, then reads the registry: the source key and value are still in place, the target gained nothing, and no key was
+copied.
+
+Failure mode: a drag starts the inline rename or changes the selection in a way that writes. Guard: the drag path does not enter
+the rename state. E2E: the same test checks the registry after the drags: no value changed and no key was created or moved.
+
 ## List
 
 ### Fixed row height and virtualization
