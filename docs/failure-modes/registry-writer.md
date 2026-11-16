@@ -169,8 +169,10 @@ rather than trimmed, so two spellings of one path cannot compare differently. Te
 ### A17. `.`, `..`, and embedded NUL in names
 
 `RegistryPath` rejects `.` and `..` components, separators, and NUL. A name with NUL would be cut
-at the NUL by the native wide-string API, so the writer rejects it before native code. Tests:
-`AppendRejectsUnsafeComponents`, `ValueNamesWithNulAreRejectedBeforeNativeCode`.
+at the NUL by the native wide-string API, so the writer rejects it before native code. Names the
+registry enumerated are the exception: they go through `AppendEnumeratedName`, so a `.` or `..` key
+found by a walk is reached (section K). Tests: `AppendRejectsUnsafeComponents`,
+`ValueNamesWithNulAreRejectedBeforeNativeCode`.
 
 ### A18. WOW64 redirection
 
@@ -405,6 +407,91 @@ so every step goes through the write policy and the link guard. It does not call
   is not refused for that reason. No lockout guard exists.
 - I6. A non-propagating call is unchanged. The existing `SetKeySecurity(path, information,
   descriptor)` overload keeps its behavior and signature. Test: existing `RegistrySecurityTests`.
+
+## J. Remote copy and rename by copy (partial state, copied metadata)
+
+`RegistryWriter.RenameKeyByCopy` and `CopyTreeByHand` run when the root is remote. The copy creates the
+destination, writes each key's values, creates its children, and writes each key's owner and DACL. The
+rename then deletes the source. See remote-registry.md section 15.2 for the measured path.
+
+### J1. Copy fails with an error that is not a Win32 error
+
+Example: a value name that contains NUL (`ValidateValueName` throws `ArgumentException`), or a write
+that the policy refuses on a child key (`RegistryOperationException`, access denied). Intended behavior:
+the destination key this call created is removed, the source is not changed, and the original exception
+is rethrown with its own type. Before this change only `RegistryOperationException` rolled back, so an
+`ArgumentException` left the partial copy beside the source and the caller saw an unexpected type.
+Tests: `RenameByCopyRollsBackWhenAValueNameIsRefused`, `RenameByCopyRollsBackWhenAChildWriteIsRefused`.
+
+### J2. The rollback also fails
+
+Example: the copy fails (J1) and then the delete of the destination is refused. Intended behavior: a
+`RegistryOperationException` with operation `RenameKey` and the destination path. Its Win32 code is the
+copy's code when the copy threw a `RegistryOperationException`, otherwise the rollback's code. Its message
+names the partial copy and says it could not be removed, so the partial copy is reported, not hidden.
+The source is unchanged. Test: `RenameByCopyReportsAFailedRollback`.
+
+### J3. Owner
+
+Each key's owner is written before its DACL, so the DACL write still runs under the rights the key was
+created with. The copy is best effort for the owner: when the owner cannot be read or written (for
+example the source owner is another SID and the token lacks `SeRestorePrivilege`), the key keeps the
+owner it was created with, which is the current user, and the copy continues. That refusal is not
+reported to the caller; it is a declared difference (J5). Test: `RenameByCopyCopiesTheOwnerAndTheClassName`
+covers a source owned by the current user. The refused branch needs an owner the test token cannot set
+and is reviewed in code, not forced.
+
+### J4. Class name
+
+Each created key receives the class name of its source (`RegCreateKeyEx` `lpClass`, read with
+`RegistryReader.GetKeyInfo`). A destination key that already exists keeps its class, because the native
+create returns the existing key. Test: `RenameByCopyCopiesTheOwnerAndTheClassName`.
+
+### J5. Not copied (declared differences)
+
+The copy is not a full migration. These are lost, and classic regedit's remote behavior is not recorded in
+this repository, so this list does not claim parity with it:
+
+- **Audit entries (SACL).** Reading and writing a SACL needs `SeSecurityPrivilege`, and the copy reads the
+  owner and the DACL only.
+- **Primary group.** Not read or written.
+- **Volatility.** `CreateKey` always passes `REG_OPTION_NON_VOLATILE`, so a volatile source key is created as
+  a normal key. The managed API used here does not report volatility.
+- **Last write time.** The copy's own writes set it.
+- **Link nodes below the source.** The managed copy opens each child with ordinary, following opens, so a
+  link node below the source is read through its target. This is not measured on a remote store. The local
+  `RegCopyTree` path refuses links under the link-rejecting policy (section A10), and the remote path shares
+  the same guard, so a link is refused under the sandbox policy before any write.
+
+### J6. Keys named "." and ".." in the copy
+
+The copy builds child paths with `AppendEnumeratedName`, so a child named `.` or `..` is copied. Under the
+sandbox policy a remote write with a `.` or `..` component is refused (remote-registry.md section 15.1), so a
+remote copy of such a key succeeds only under a policy without that rule. The test uses a test-only policy that
+allows the run root and nothing else. Test: `RenameByCopyCopiesDotNamedChildren`.
+
+## K. Keys named "." and ".." in the enumerate-then-open paths
+
+Windows allows a key named `.` or `..`. `RegistryPath.Append` refuses those names, so a walk that used it
+threw `ArgumentException` on the first such child. `RegistryPath.AppendEnumeratedName` accepts them and still
+refuses a separator, NUL, an empty name, and a name over 255 characters.
+
+### K1. Permission propagation reaches "." and ".." keys
+
+`SetKeySecurity(path, descriptor, information, propagateToSubkeys: true)` appends each enumerated child name
+with `AppendEnumeratedName`. Before this change the walk threw `ArgumentException` at the first such child,
+after the keys before it had changed and with no failure list. Intended behavior: every child is visited,
+including `.` and `..`, and each receives the inherited entries. Test: `PropagationReachesDotNamedKeys`.
+
+### K2. Owner walk reaches "." and ".." keys
+
+`SetKeyOwnerTree` uses the same change as K1. Test: `OwnerWalkReachesDotNamedKeys`.
+
+### K3. Search descends into "." and ".." keys
+
+`RegistryFinder` skipped a child whose name `RegistryPath.Append` refused, so a search silently skipped
+such keys. It now uses `AppendEnumeratedName`, so a search visits them. A name that still cannot be
+represented (a separator, NUL, or an overlong name) is skipped as before. Test: `FinderVisitsDotNamedKeys`.
 
 ## G. Retained failure modes
 

@@ -73,7 +73,7 @@ public sealed class RemoteRegistryConnection : IDisposable
     }
 
     /// <summary>
-    /// Opens read-only HKEY_LOCAL_MACHINE and HKEY_USERS handles for a remote computer.
+    /// Opens HKEY_LOCAL_MACHINE and HKEY_USERS handles for a remote computer. Reads and writes use them.
     /// A name that identifies this computer is rejected before any native call.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="computerName"/> is null.</exception>

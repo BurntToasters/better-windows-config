@@ -47,13 +47,43 @@ public sealed partial class RegistryWriter
 
         foreach (string name in reader.EnumerateSubKeyNames(source))
         {
+            RegistryPath sourceChild = source.AppendEnumeratedName(name);
             RegistryPath destinationChild = destination.AppendEnumeratedName(name);
-            CreateKey(destinationChild);
-            CopyKeyContents(reader, source.AppendEnumeratedName(name), destinationChild, depth + 1, operation);
+            CreateKey(destinationChild, reader.GetKeyInfo(sourceChild).ClassName);
+            CopyKeyContents(reader, sourceChild, destinationChild, depth + 1, operation);
         }
 
-        // The descriptor is written last, so a restrictive copied DACL cannot stop the children from being created.
+        // The owner is written before the DACL, and the DACL is written last. A restrictive copied DACL then cannot stop
+        // the children from being created, and the owner write runs under the rights the key was created with.
+        CopyOwnerBestEffort(reader, source, destination);
         byte[] descriptor = reader.GetKeySecurity(source, RegistrySecurityInformation.Dacl);
         SetKeySecurity(destination, RegistrySecurityInformation.Dacl, descriptor);
+    }
+
+    /// <summary>
+    /// Copies the owner when the token may set it (writer section J3). A source owner that cannot be read, or an owner
+    /// change that is refused (another SID without SeRestorePrivilege, for example), leaves the owner the destination
+    /// was created with. The refusal is not reported, which is a declared difference.
+    /// </summary>
+    private void CopyOwnerBestEffort(RegistryReader reader, RegistryPath source, RegistryPath destination)
+    {
+        byte[] owner;
+        try
+        {
+            owner = reader.GetKeySecurity(source, RegistrySecurityInformation.Owner);
+        }
+        catch (RegistryOperationException)
+        {
+            return;
+        }
+
+        try
+        {
+            SetKeySecurity(destination, RegistrySecurityInformation.Owner, owner);
+        }
+        catch (RegistryOperationException)
+        {
+            // The owner stays as created.
+        }
     }
 }

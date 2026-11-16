@@ -45,7 +45,10 @@ public sealed partial class RegistryWriter
         _reader = reader;
     }
 
-    public void CreateKey(RegistryPath path)
+    public void CreateKey(RegistryPath path) => CreateKey(path, className: null);
+
+    /// <summary>Creates the key with <paramref name="className"/> as its class, or with no class when it is empty.</summary>
+    private void CreateKey(RegistryPath path, string? className)
     {
         ArgumentNullException.ThrowIfNull(path);
         RejectRoot(path, "A predefined registry root cannot be created.");
@@ -72,13 +75,12 @@ public sealed partial class RegistryWriter
         SafeRegistryHandle? created = null;
         try
         {
-            WIN32_ERROR error = PInvoke.RegCreateKeyEx(
+            WIN32_ERROR error = CreateKeyHandle(
                 parent,
                 path.Components[^1],
-                default,
+                className,
                 options,
                 access,
-                null,
                 out SafeRegistryHandle createdHandle);
 
             created = createdHandle;
@@ -92,6 +94,29 @@ public sealed partial class RegistryWriter
         finally
         {
             created?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Calls RegCreateKeyEx. The native class parameter is a mutable wide string, so a class name is passed through a
+    /// pinned pointer. An empty class name passes no class, as before.
+    /// </summary>
+    private static unsafe WIN32_ERROR CreateKeyHandle(
+        SafeRegistryKeyHandle parent,
+        string leaf,
+        string? className,
+        REG_OPEN_CREATE_OPTIONS options,
+        REG_SAM_FLAGS access,
+        out SafeRegistryHandle created)
+    {
+        if (string.IsNullOrEmpty(className))
+        {
+            return PInvoke.RegCreateKeyEx(parent, leaf, default, options, access, null, out created);
+        }
+
+        fixed (char* classPointer = className)
+        {
+            return PInvoke.RegCreateKeyEx(parent, leaf, new PWSTR(classPointer), options, access, null, out created);
         }
     }
 
@@ -261,27 +286,33 @@ public sealed partial class RegistryWriter
                 $"A key named '{newName}' already exists.");
         }
 
-        CreateKey(destination);
+        // The destination takes the source's class name, so the renamed key keeps it (writer section J4).
+        string className = _reader?.GetKeyInfo(path).ClassName ?? string.Empty;
+        CreateKey(destination, className);
 
         try
         {
             CopyTree(path, destination);
         }
-        catch (RegistryOperationException copyError)
+        catch (Exception copyError)
         {
             // The destination was created by this call, so everything under it is the partial copy. The source
-            // was not changed by a failed copy.
+            // was not changed by a failed copy. Any failure removes the partial copy, not only a Win32 failure
+            // (writer section J1). The original exception is rethrown unchanged when the removal works.
             try
             {
                 DeleteKey(destination, recursive: true);
             }
             catch (RegistryOperationException rollbackError)
             {
+                int code = copyError is RegistryOperationException copyFailure
+                    ? copyFailure.Win32Error
+                    : rollbackError.Win32Error;
                 throw new RegistryOperationException(
                     Operation,
                     path,
-                    copyError.Win32Error,
-                    $"The copy to '{destination.ToAbbreviatedString()}' failed and the partial copy could not be removed: {rollbackError.Message}");
+                    code,
+                    $"The copy to '{destination.ToAbbreviatedString()}' failed ({copyError.Message}) and the partial copy could not be removed: {rollbackError.Message}");
             }
 
             throw;

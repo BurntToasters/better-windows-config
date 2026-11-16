@@ -163,9 +163,10 @@ the owning package records the observed behavior as a golden before implementing
 - Measured on loopback: `RegRenameKey` and `RegCopyTree` both fail with `ERROR_INVALID_HANDLE` (6) on a remote handle,
   while `RegDeleteTree` and the key security calls work. So `RenameKey` on a remote root tries `RegRenameKey` first and
   runs a managed copy-then-delete fallback for 6, 50, 120 and 1. Any other code throws. `CopyTree` on a remote root is
-  always managed (values, children, then the DACL). The new key must not exist (183). A case-only remote rename is
-  refused with 50. A failed delete of the original keeps the copy, and the error says that both keys exist and names
-  both.
+  always managed (values, children, then the owner and the DACL, with the class name set at create). The new key must
+  not exist (183). A case-only remote rename is refused with 50. A copy that fails for any reason removes the
+  destination it created and rethrows. A failed delete of the original keeps the copy, and the error says that both
+  keys exist and names both.
 - Hive operations (`LoadHive`, `UnloadHive`, `SaveKey`, `ReplaceKey`, `RestoreKey`) on a remote store throw
   `RegistryOperationException` with `ERROR_NOT_SUPPORTED` (50) after the policy check and before any native call.
   The E2E counted-name value seam is refused the same way.

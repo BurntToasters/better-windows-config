@@ -183,7 +183,8 @@ public sealed partial class RegistryWriter
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            RegistryPath child = path.Append(name);
+            // The names come from the registry, which allows "." and "..", so the safe append is used (writer section K).
+            RegistryPath child = path.AppendEnumeratedName(name);
             IReadOnlyList<string>? childNames = null;
             try
             {
@@ -295,7 +296,8 @@ public sealed partial class RegistryWriter
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            RegistryPath child = path.Append(name);
+            // The names come from the registry, which allows "." and "..", so the safe append is used (writer section K).
+            RegistryPath child = path.AppendEnumeratedName(name);
             byte[] childEffective;
             IReadOnlyList<string>? childNames;
             try

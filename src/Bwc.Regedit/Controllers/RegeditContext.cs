@@ -602,7 +602,7 @@ internal sealed partial class RegeditContext
     /// <summary>Refreshes the enabled state of every command that depends on the selection.</summary>
     public void UpdateCommandStates()
     {
-        // A remote key takes the key and value commands. Load Hive, Unload Hive, and Print stay local-only.
+        // A remote key takes the key and value commands and Print. Load Hive and Unload Hive stay local-only.
         bool hasKey = TryGetSelectedLocation(out KeyLocation location);
         RegistryPath key = hasKey ? location.Path : null!;
         bool localKey = hasKey && !location.IsRemote;
