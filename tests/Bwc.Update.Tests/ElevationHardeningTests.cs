@@ -611,6 +611,7 @@ public sealed class ElevationHardeningTests
     [DataRow(UpdateMode.CloseRunning, false)]
     [DataRow(UpdateMode.WaitPid, false)]
     [DataRow(UpdateMode.LaunchHub, false)]
+    [DataRow(UpdateMode.SetAumid, false)]
     [DataRow(UpdateMode.Help, false)]
     [DataRow(UpdateMode.Invalid, false)]
     public void Elevation_Gate_Refuses_Check_And_Download(UpdateMode mode, bool refuses)

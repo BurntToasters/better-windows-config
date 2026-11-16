@@ -52,6 +52,7 @@ public sealed class InstallerMachineTests
     [ClassCleanup]
     public static void ClassCleanup()
     {
+        MachineWorkRoot.Cleanup();
         MachineChecks.Write(GuiGate.Config, _inputs);
     }
 
@@ -94,7 +95,7 @@ public sealed class InstallerMachineTests
         int start = MachineChecks.Count;
         try
         {
-            using InstallerRun legacy = InstallerRun.Create(config, "upgl")
+            using InstallerRun legacy = InstallerRun.Create(config, "upgl", MachineWorkRoot.Required)
                 .UseRecorder((id, pass, notes) => MachineChecks.Record(id, pass, notes));
             using InstallerRun machine = InstallerRun.CreateMachine(config, "upgm");
             if (InstallPerUser(legacy, inputs.A, "upg.legacy"))
@@ -195,7 +196,7 @@ public sealed class InstallerMachineTests
             using InstallerRun run = InstallerRun.CreateMachine(config, "unin");
             if (InstallMachine(run, inputs.B, "unin"))
             {
-                RunUninstall(run);
+                RunUninstall(run, inputs.B);
             }
         }
         catch (Exception ex)
@@ -230,6 +231,31 @@ public sealed class InstallerMachineTests
         AssertNoFailures(start);
     }
 
+    /// <summary>installer.md M47, installer-e2e.md 90: an uninstaller started with _?= naming another folder stops.</summary>
+    [TestMethod]
+    [TestCategory("Installer-Machine")]
+    [TestCategory("Elevated")]
+    [TestCategory("E2EOnly")]
+    public void InstallerMachine_UninstallerRefusesAnotherFolder()
+    {
+        (E2EConfig config, MachineInputs inputs) = RequireReady();
+        int start = MachineChecks.Count;
+        try
+        {
+            using InstallerRun run = InstallerRun.CreateMachine(config, "locn");
+            if (InstallMachine(run, inputs.B, "locn"))
+            {
+                RunUninstallAnotherFolder(run);
+            }
+        }
+        catch (Exception ex)
+        {
+            MachineChecks.Record("locn.exception", false, ex.GetType().Name + ": " + ex.Message);
+        }
+
+        AssertNoFailures(start);
+    }
+
     // ------------------------------------------------------------------------------------------------------------------
     // Gates and shared steps
     // ------------------------------------------------------------------------------------------------------------------
@@ -254,9 +280,15 @@ public sealed class InstallerMachineTests
             Assert.Inconclusive(reason);
         }
 
+        MachineWorkRoot? work = MachineWorkRoot.TryEnsure(inputs, out string stageReason);
+        if (work is null)
+        {
+            Assert.Inconclusive(stageReason);
+        }
+
         _inputs = inputs;
         MachineChecks.Begin(config);
-        return (config, inputs);
+        return (config, work.Staged);
     }
 
     /// <summary>
@@ -740,13 +772,19 @@ public sealed class InstallerMachineTests
     // Uninstall and version order
     // ------------------------------------------------------------------------------------------------------------------
 
-    private static void RunUninstall(InstallerRun run)
+    private static void RunUninstall(InstallerRun run, MachineInputs.SetupFile setup)
     {
-        // A plain copy folder in .upd, as a finished update leaves it (a 32-hex folder with files only).
+        // A copy folder in .upd, as a finished update leaves it: a 32-hex folder with the installer and its plain "tmp" child
+        // (installer.md M50, installer-e2e.md 91).
         string copy = Path.Combine(run.ProtectedDir, Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(copy);
+        string copyTemp = Path.Combine(copy, "tmp");
+        Directory.CreateDirectory(copyTemp);
         File.WriteAllText(Path.Combine(copy, "installer.exe"), "stand-in for a protected copy");
-        MachineChecks.Record("unin.planted", Directory.Exists(copy), "A plain protected copy folder exists in " + run.ProtectedDir + " before the uninstall.");
+        File.WriteAllText(Path.Combine(copyTemp, "x.dat"), "stand-in for the installer's own temp file");
+        MachineChecks.Record(
+            "unin.planted",
+            File.Exists(Path.Combine(copy, "installer.exe")) && File.Exists(Path.Combine(copyTemp, "x.dat")),
+            "A protected copy folder with a tmp child exists in " + run.ProtectedDir + " before the uninstall.");
 
         string[] pendingBefore = ReadPendingRenames();
         int exitCode = run.UninstallMachine(UninstallTimeout, out string commandLine);
@@ -761,7 +799,7 @@ public sealed class InstallerMachineTests
         string[] payload = [run.HubExe, run.RegeditExe, run.UpdaterExe, Path.Combine(run.InstallDir, "installed-files.txt"), Path.Combine(run.InstallDir, "LICENSE")];
         string[] left = payload.Where(File.Exists).ToArray();
         MachineChecks.Record("unin.payload", left.Length == 0, left.Length == 0 ? "The payload files are gone." : "Still there: " + string.Join(", ", left));
-        MachineChecks.Record("unin.upd", !Directory.Exists(run.ProtectedDir), "The protected folder <install dir>.upd is gone.");
+        MachineChecks.Record("unin.upd", !Directory.Exists(run.ProtectedDir), "The protected folder <install dir>.upd is gone, with the tmp child.");
         MachineChecks.Record(
             "unin.noStaging",
             !Directory.Exists(run.InstallDir + ".new") && !Directory.Exists(run.InstallDir + ".old"),
@@ -790,6 +828,52 @@ public sealed class InstallerMachineTests
                 : uninstallerLeft && !queued
                     ? "Uninstall.exe is left and is not queued for deletion at the restart."
                     : $"New PendingFileRenameOperations entries: {added.Count(entry => entry.Length > 0)} (all name this run's folder; documented, installer.md M38).");
+
+        CheckReinstallWhilePending(run, setup);
+    }
+
+    /// <summary>
+    /// installer.md M51, installer-e2e.md 89: while the restart queue still names this run's Uninstall.exe, a new
+    /// install of the
+    /// same folder is refused before anything changes (a new Uninstall.exe would be deleted at the restart). When the
+    /// uninstaller
+    /// removed itself, the queue has no such entry and the check records that it did not apply.
+    /// </summary>
+    private static void CheckReinstallWhilePending(InstallerRun run, MachineInputs.SetupFile setup)
+    {
+        string queuedName = @"\??\" + run.UninstallerExe;
+        bool queued = ReadPendingRenames().Any(entry => string.Equals(entry, queuedName, StringComparison.OrdinalIgnoreCase));
+        if (!queued)
+        {
+            MachineChecks.Record("unin.reinstallPending", true, "Did not apply: the restart queue does not name " + run.UninstallerExe + " (the uninstaller removed itself).");
+            return;
+        }
+
+        int exit = run.RunSetup(setup.Path, SetupTimeout);
+        bool refused = exit > 0 && !File.Exists(Path.Combine(run.InstallDir, "installed-files.txt")) && !run.UninstallKeyExists();
+        MachineChecks.Record(
+            "unin.reinstallPending",
+            refused,
+            $"Installing again while the queue names {run.UninstallerExe} exited {exit} (a refusal is a non-zero exit; -1 is a timeout); installed-files.txt exists: {File.Exists(Path.Combine(run.InstallDir, "installed-files.txt"))}; key exists: {run.UninstallKeyExists()}.");
+    }
+
+    private static void RunUninstallAnotherFolder(InstallerRun run)
+    {
+        // A decoy inside the work folder (admin-only) with a payload name. A wrong run would start it or delete it.
+        string decoy = Path.Combine(run.Root, "decoy");
+        Directory.CreateDirectory(decoy);
+        string decoyFile = Path.Combine(decoy, InstallerRun.UpdaterExeName);
+        File.WriteAllText(decoyFile, "not a program");
+        string before = Snapshot(run.InstallDir);
+
+        int exit = run.UninstallNamingFolder(decoy, UninstallTimeout, out string command);
+        MachineChecks.AddEvidence("locn.command", command);
+        MachineChecks.Record("locn.refused", exit > 0, $"{command} exited {exit} (a refusal is a non-zero exit; -1 is a timeout).");
+        MachineChecks.Record("locn.decoyKept", File.Exists(decoyFile), "The decoy folder and its payload-named file are untouched.");
+        MachineChecks.Record(
+            "locn.installKept",
+            Directory.Exists(run.InstallDir) && string.Equals(before, Snapshot(run.InstallDir), StringComparison.Ordinal) && run.UninstallKeyExists(),
+            "The real install folder has the same files and the HKLM key still exists.");
     }
 
     private static void RunVersionOrder(InstallerRun run, MachineInputs inputs)

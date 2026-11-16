@@ -297,9 +297,8 @@ silent uninstall. The steps below are still open.
 1. Compile the signed flavor (`BWC_SIGN` defined). Only the unsigned build (`SKIP_WIN_CODESIGN=1`)
    has been compiled, so the `!finalize` and `!uninstfinalize` lines of the signing hook are not
    yet checked by NSIS (see "Authenticode signing" in `docs/failure-modes/installer.md`).
-2. Check that the Start menu AUMID write works on this machine. `bwc-set-aumid.ps1` reads the value
-   back and exits `4` on mismatch, and it also exits `4` under Constrained Language Mode, which blocks
-   the `Add-Type` it uses. Either case only logs a warning.
+2. Check that the Start menu AUMID write works on this machine. `BwcUpdate.exe --set-aumid` reads the value
+   back and exits `4` on a mismatch or a COM failure. Either case only logs a warning.
 3. Test the upgrade rollback on a disposable machine: make one file in the new payload unwritable
    during the swap and confirm that the previous version runs again.
 4. Turn the manual E2E run into a repeatable test that writes a verifiable artifact. It should run the

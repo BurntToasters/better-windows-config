@@ -19,6 +19,8 @@ internal static partial class LegacyInstallCleanup
 {
     private const string UninstallKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\BetterWindowsConfig";
     private const string UninstallerFileName = "Uninstall.exe";
+    private const string ManifestFileName = "installed-files.txt";
+    private const string HubExeFileName = "BetterWindowsConfig.exe";
     private const string HubShortcutName = "Better Windows Config.lnk";
     private const string RegeditShortcutName = "Registry Editor (BWC).lnk";
     private const long MaxUninstallerBytes = 16L * 1024 * 1024;
@@ -108,6 +110,14 @@ internal static partial class LegacyInstallCleanup
                 return;
             }
 
+            // A folder is only "gone" when its drive is there. An offline drive may still hold the install.
+            string? driveRoot = Path.GetPathRoot(folder);
+            if (string.IsNullOrEmpty(driveRoot) || !Directory.Exists(driveRoot))
+            {
+                Log.Warn($"Legacy cleanup refused (drive-missing): the drive of {folder} is not available. Nothing was removed.");
+                return;
+            }
+
             RemoveStaleEntry(target);
             return;
         }
@@ -116,6 +126,13 @@ internal static partial class LegacyInstallCleanup
         if (problem is not null)
         {
             Log.Warn($"Legacy cleanup refused ({problem}): {uninstaller}");
+            return;
+        }
+
+        // The key is a user-writable value: only a folder that holds a BWC install may have its uninstaller run.
+        if (!File.Exists(Path.Combine(folder, ManifestFileName)) || !File.Exists(Path.Combine(folder, HubExeFileName)))
+        {
+            Log.Warn($"Legacy cleanup refused (not-bwc-install): {folder} has no {ManifestFileName} or no {HubExeFileName}.");
             return;
         }
 

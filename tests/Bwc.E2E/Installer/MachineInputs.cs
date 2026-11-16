@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Bwc.E2E.Harness;
 
 namespace Bwc.E2E.Installer;
@@ -14,6 +16,15 @@ internal sealed record MachineInputs(string Rid, MachineInputs.SetupFile A, Mach
 {
     public const string FileName = "installer-inputs.json";
     public const int Schema = 1;
+
+    /// <summary>The file name build-installer.js gives an E2E setup: version, rid, "e2e" (installer-e2e.md 82).</summary>
+    private static readonly Regex SetupName = new(
+        @"^BetterWindowsConfig-(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)-(?<rid>win-x64|win-arm64)-e2e-setup\.exe$",
+        RegexOptions.CultureInvariant);
+
+    private static readonly Regex ExecutionLevel = new(
+        @"<requestedExecutionLevel\b[^>]*?\blevel\s*=\s*""(?<level>[A-Za-z]+)""",
+        RegexOptions.CultureInvariant);
 
     /// <summary>The inputs, or null with the reason (a sentence that names the prepare command).</summary>
     public static MachineInputs? TryRead(E2EConfig config, out string reason)
@@ -54,8 +65,8 @@ internal sealed record MachineInputs(string Rid, MachineInputs.SetupFile A, Mach
             return null;
         }
 
-        SetupFile? a = ReadSetup(root, "installerA", out string problemA);
-        SetupFile? b = ReadSetup(root, "installerB", out string problemB);
+        SetupFile? a = ReadSetup(config, root, "installerA", out string problemA);
+        SetupFile? b = ReadSetup(config, root, "installerB", out string problemB);
         if (a is null || b is null)
         {
             reason = $"Not run: the inputs are stale or incomplete ({(a is null ? problemA : problemB)}). {prepare}";
@@ -66,7 +77,7 @@ internal sealed record MachineInputs(string Rid, MachineInputs.SetupFile A, Mach
         return new MachineInputs(config.Rid, a, b);
     }
 
-    private static SetupFile? ReadSetup(JsonElement root, string name, out string problem)
+    private static SetupFile? ReadSetup(E2EConfig config, JsonElement root, string name, out string problem)
     {
         problem = name + " is missing";
         if (!root.TryGetProperty(name, out JsonElement setup) || setup.ValueKind != JsonValueKind.Object)
@@ -90,6 +101,13 @@ internal sealed record MachineInputs(string Rid, MachineInputs.SetupFile A, Mach
             return null;
         }
 
+        string? place = PlaceProblem(config, path, version);
+        if (place is not null)
+        {
+            problem = name + " is refused: " + place;
+            return null;
+        }
+
         if (new FileInfo(path).Length != size)
         {
             problem = name + " has another size than recorded: " + path;
@@ -104,6 +122,50 @@ internal sealed record MachineInputs(string Rid, MachineInputs.SetupFile A, Mach
         }
 
         return new SetupFile(path, version, size, sha);
+    }
+
+    /// <summary>
+    /// Why a setup path is not acceptable, or null. The inputs file is in the checkout, so a user can write any path into it:
+    /// only a plain file in the build output folder, with the E2E name of this rid and version, whose manifest asks for
+    /// asInvoker only, is used (installer-e2e.md 82).
+    /// </summary>
+    internal static string? PlaceProblem(E2EConfig config, string path, string version)
+    {
+        string full = Path.GetFullPath(path);
+        string expectedFolder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.Combine(config.RepoRoot, "artifacts", "installer")));
+        string? folder = Path.GetDirectoryName(full);
+        if (folder is null || !string.Equals(Path.TrimEndingDirectorySeparator(folder), expectedFolder, StringComparison.OrdinalIgnoreCase))
+        {
+            return "it is not directly in " + expectedFolder;
+        }
+
+        string file = Path.GetFileName(full);
+        Match match = SetupName.Match(file);
+        if (!match.Success || match.Groups["rid"].Value != config.Rid || match.Groups["version"].Value != version)
+        {
+            return $"{file} is not named BetterWindowsConfig-{version}-{config.Rid}-e2e-setup.exe";
+        }
+
+        if (new FileInfo(full).Attributes.HasFlag(FileAttributes.ReparsePoint)
+            || new DirectoryInfo(expectedFolder).Attributes.HasFlag(FileAttributes.ReparsePoint))
+        {
+            return "the file or its folder is a link";
+        }
+
+        return LevelProblem(File.ReadAllBytes(full));
+    }
+
+    /// <summary>The E2E setup requests asInvoker and nothing else. A setup that asks for elevation is a ship setup.</summary>
+    internal static string? LevelProblem(byte[] setup)
+    {
+        MatchCollection levels = ExecutionLevel.Matches(Encoding.Latin1.GetString(setup));
+        if (levels.Count != 1)
+        {
+            return $"its manifest has {levels.Count} requestedExecutionLevel elements, expected 1";
+        }
+
+        string level = levels[0].Groups["level"].Value;
+        return level == "asInvoker" ? null : "its manifest requests " + level + ", not asInvoker";
     }
 
     private static string? Text(JsonElement parent, string name) =>

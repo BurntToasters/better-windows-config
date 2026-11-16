@@ -117,6 +117,44 @@ async function checkLegacyFeed({ artifactDir, channel, version, trustedTexts, er
 }
 
 /**
+ * The asset names a release of this bundle may hold: the manifest and its signature, the legacy pair only when the legacy
+ * mode has one, and the setups (release.md LF17). Nothing else is expected, so nothing else is uploaded.
+ */
+export function expectedAssetNames(bundle) {
+  return [
+    path.basename(bundle.manifestPath),
+    path.basename(bundle.signaturePath),
+    ...(bundle.legacy?.assets ?? []),
+    ...bundle.installers.map((installer) => installer.fileName),
+  ];
+}
+
+/**
+ * The assets of a release that are outside the expected set (LF17). A GPG signature `<expected name>.asc` is a sidecar of
+ * an expected asset and is allowed. Names compare exactly: a stale `bwc-stable.json` offers a 0.1.2 installer to 0.1.1 when
+ * releases/latest/download serves it, so it is never ignored.
+ */
+export function unexpectedAssets(release, expectedNames) {
+  const allowed = new Set(expectedNames);
+  return (release?.assets ?? []).filter((asset) => {
+    const name = asset?.name;
+    if (typeof name !== "string") return true;
+    if (allowed.has(name)) return false;
+    return !(name.endsWith(".asc") && allowed.has(name.slice(0, -4)));
+  });
+}
+
+/**
+ * The assets of a reused draft that are the legacy manifest or its signature while this bundle has no legacy feed (LF18).
+ * Only these are deleted by the draft step. Any other unexpected asset is refused and left for the user.
+ */
+export function staleLegacyAssets(release, bundle) {
+  if ((bundle.legacy?.assets ?? []).length > 0) return [];
+  const stale = new Set([LEGACY_MANIFEST_NAME, `${LEGACY_MANIFEST_NAME}.minisig`]);
+  return (release?.assets ?? []).filter((asset) => stale.has(asset?.name));
+}
+
+/**
  * Loads a D5 artifact folder and validates it with the D4 validator. It never contacts
  * the network. The caller decides whether a dry-run test key or stand-in installer is
  * acceptable for the operation.

@@ -19,6 +19,7 @@ internal sealed class InstallerRun : IDisposable
     public const string RegeditExeName = "BwcRegedit.exe";
     public const string UpdaterExeName = "BwcUpdate.exe";
     public const string UninstallerName = "Uninstall.exe";
+    private const string ShortcutsVariable = "BWC_E2E_INSTALLER_SHORTCUTS";
     private const string RegistryParent = @"Software\BWC-E2E";
     private const string UninstallSubkey = @"Uninstall\BetterWindowsConfig";
     private const string MachineParentName = "BWC-E2E";
@@ -31,13 +32,20 @@ internal sealed class InstallerRun : IDisposable
     private Action<string, bool, string> _record = (id, pass, notes) => InstallerChecks.Record(id, pass, notes);
     private bool _disposed;
 
-    private InstallerRun(E2EConfig config, string runId, string root, bool machine)
+    private InstallerRun(E2EConfig config, string runId, string root, bool machine, MachineWorkRoot? work)
     {
         Config = config;
         RunId = runId;
         Root = root;
         Machine = machine;
+        Work = work;
     }
+
+    /// <summary>
+    /// The admin-only work folder that holds this run's folders, or null for the unelevated per-user sandbox in
+    /// %TEMP%.
+    /// </summary>
+    private MachineWorkRoot? Work { get; }
 
     public E2EConfig Config { get; }
 
@@ -55,11 +63,11 @@ internal sealed class InstallerRun : IDisposable
         return this;
     }
 
-    /// <summary>The 64-bit Program Files folder (ProgramW6432), which is where the setup puts the machine run folder.</summary>
-    public static string ProgramFiles64 =>
-        Environment.GetEnvironmentVariable("ProgramW6432") is { Length: > 0 } value
-            ? value
-            : Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+    /// <summary>
+    /// The 64-bit Program Files folder from the shell's known folder (never from ProgramW6432, which the caller controls). It
+    /// is where the setup puts the machine run folder.
+    /// </summary>
+    public static string ProgramFiles64 => MachineNative.ProgramFilesFolder();
 
     /// <summary>%ProgramFiles%\BWC-E2E: the parent of every machine run folder.</summary>
     public static string MachineParentDir => Path.Combine(ProgramFiles64, MachineParentName);
@@ -85,36 +93,42 @@ internal sealed class InstallerRun : IDisposable
 
     private string RunKey => RegistryParent + @"\" + RunId;
 
-    /// <summary>Creates the temp folders for one run. The path must have no space, because /D= is passed unquoted.</summary>
-    public static InstallerRun Create(E2EConfig config, string caseId)
+    /// <summary>
+    /// Creates the folders for one per-user run. Without <paramref name="work"/> they are in %TEMP% (the unelevated installer
+    /// E2E), and the path must have no space because /SHORTCUTS= is passed unquoted. With it (the legacy sandbox of an Elevated
+    /// test) they are inside the admin-only work folder, and the shortcut folder reaches the setup through the environment.
+    /// </summary>
+    public static InstallerRun Create(E2EConfig config, string caseId, MachineWorkRoot? work = null)
     {
         string runId = "inst-" + Guid.NewGuid().ToString("N")[..10] + "-" + caseId;
-        string root = Path.Combine(Path.GetTempPath(), "bwc-installer-e2e-" + runId);
-        if (root.Contains(' ', StringComparison.Ordinal))
+        string root = work is null ? Path.Combine(Path.GetTempPath(), "bwc-installer-e2e-" + runId) : Path.Combine(work.Path, runId);
+        if (work is null && root.Contains(' ', StringComparison.Ordinal))
         {
-            throw new InvalidOperationException("The temp folder path has a space, which the unquoted /D= cannot carry: " + root);
+            throw new InvalidOperationException("The temp folder path has a space, which the unquoted /SHORTCUTS= cannot carry: " + root);
         }
 
-        var run = new InstallerRun(config, runId, root, machine: false);
+        var run = new InstallerRun(config, runId, root, machine: false, work);
         Directory.CreateDirectory(run.ShortcutDir);
         return run;
     }
 
     /// <summary>
-    /// Starts a machine run: only the temp working folder is created. The setup creates the Program Files folder, the HKLM
-    /// key, and the Start menu folder. The run id is new every time, so nothing from an earlier run is ever reused.
+    /// Starts a machine run: only the working folder inside the admin-only work folder is created. The setup creates the
+    /// Program Files folder, the HKLM key, and the Start menu folder. The run id is new every time, so nothing from an earlier
+    /// run is ever reused.
     /// </summary>
     public static InstallerRun CreateMachine(E2EConfig config, string caseId)
     {
+        MachineWorkRoot work = MachineWorkRoot.Required;
         string runId = "mach-" + Guid.NewGuid().ToString("N")[..10] + "-" + caseId;
         if (runId.Length > 64 || !runId.All(c => char.IsAsciiLetterOrDigit(c) || c == '-'))
         {
             throw new InvalidOperationException("The machine run id is not valid for the E2E setup: " + runId);
         }
 
-        string root = Path.Combine(Path.GetTempPath(), "bwc-installer-e2e-" + runId);
+        string root = Path.Combine(work.Path, runId);
         Directory.CreateDirectory(root);
-        return new InstallerRun(config, runId, root, machine: true).UseRecorder((id, pass, notes) => MachineChecks.Record(id, pass, notes));
+        return new InstallerRun(config, runId, root, machine: true, work).UseRecorder((id, pass, notes) => MachineChecks.Record(id, pass, notes));
     }
 
     /// <summary>
@@ -125,10 +139,15 @@ internal sealed class InstallerRun : IDisposable
     /// </summary>
     public int RunSetup(string setupPath, TimeSpan timeout, string? legacyHint = null)
     {
+        // A shortcut folder with a space cannot ride on the unquoted /SHORTCUTS=, so the setup reads it from the environment.
+        bool shortcutsInEnvironment = !Machine && ShortcutDir.Contains(' ', StringComparison.Ordinal);
         string arguments = Machine
             ? "/S /MACHINE /RUNID=" + RunId + (legacyHint is null ? string.Empty : " /D=" + legacyHint)
-            : "/S /RUNID=" + RunId + " /SHORTCUTS=" + ShortcutDir + " /D=" + InstallDir;
-        using Process process = Start(setupPath, arguments, environment: null);
+            : "/S /RUNID=" + RunId + (shortcutsInEnvironment ? string.Empty : " /SHORTCUTS=" + ShortcutDir) + " /D=" + InstallDir;
+        using Process process = Start(
+            setupPath,
+            arguments,
+            shortcutsInEnvironment ? new Dictionary<string, string> { [ShortcutsVariable] = ShortcutDir } : null);
         if (!process.WaitForExit(timeout))
         {
             process.Kill(entireProcessTree: true);
@@ -177,6 +196,25 @@ internal sealed class InstallerRun : IDisposable
         }
 
         using Process process = Start(exe, arguments, environment: null);
+        if (!process.WaitForExit(timeout))
+        {
+            process.Kill(entireProcessTree: true);
+            _ = process.WaitForExit(CleanupWait);
+            return -1;
+        }
+
+        return process.ExitCode;
+    }
+
+    /// <summary>
+    /// Runs this run's installed uninstaller in place with <c>_?=</c> naming another folder. The uninstaller must refuse
+    /// (installer.md M47); the exit code is returned (-1 after a timeout).
+    /// </summary>
+    public int UninstallNamingFolder(string folder, TimeSpan timeout, out string commandLine)
+    {
+        string arguments = "/S /MACHINE /RUNID=" + RunId + " _?=" + folder;
+        commandLine = "\"" + UninstallerExe + "\" " + arguments;
+        using Process process = Start(UninstallerExe, arguments, environment: null);
         if (!process.WaitForExit(timeout))
         {
             process.Kill(entireProcessTree: true);
@@ -287,8 +325,8 @@ internal sealed class InstallerRun : IDisposable
             return;
         }
 
-        bool folderGone = DeleteFolder(Root);
-        _record("cleanup.folder." + RunId, folderGone, folderGone ? "Temp folders removed." : "A temp folder is still there: " + Root);
+        bool folderGone = DeleteRoot();
+        _record("cleanup.folder." + RunId, folderGone, folderGone ? "Run folders removed." : "A run folder is still there: " + Root);
 
         try
         {
@@ -367,9 +405,9 @@ internal sealed class InstallerRun : IDisposable
         ForceDeleteOwnFolder(ShortcutDir, problems);
         RemoveParentWhenEmpty(MachineParentDir, problems);
         ForceDeleteOwnKey(problems);
-        if (!DeleteFolder(Root))
+        if (!DeleteRoot())
         {
-            problems.Add("temp folder " + Root);
+            problems.Add("run folder " + Root);
         }
 
         string notes = problems.Count == 0
@@ -524,6 +562,20 @@ internal sealed class InstallerRun : IDisposable
         }
 
         _started.Clear();
+    }
+
+    /// <summary>
+    /// Removes the run's working folder. An Elevated run deletes only inside its admin-only work folder (installer-e2e.md 86),
+    /// by the folder's full name and with no link on the way. The unelevated sandbox in %TEMP% deletes its own folder.
+    /// </summary>
+    private bool DeleteRoot()
+    {
+        if (Work is not null && !Work.Owns(Root))
+        {
+            return !Directory.Exists(Root);
+        }
+
+        return DeleteFolder(Root);
     }
 
     private static bool DeleteFolder(string folder)

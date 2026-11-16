@@ -363,7 +363,8 @@ Rules:
 Log lines (the E2E reads them; every line starts with `Legacy cleanup`): `skipped (<code>)`, `refused (<code>)`,
 `started`, `finished: the uninstall entry is gone`, `timeout`, `stale entry removed`, `failed (<code>)`. Codes:
 `elevated`, `e2e-no-seam`, `e2e-seam-invalid`, `no-key`, `no-install-location`, `bad-path`, `own-folder`, `drive-root`,
-`system-folder`, `program-files`, `uninstaller-missing`, `uninstaller-invalid`, `uninstaller-elevation`, `start-failed`.
+`system-folder`, `program-files`, `uninstaller-missing`, `uninstaller-invalid`, `uninstaller-elevation`, `not-bwc-install`,
+`drive-missing`, `start-failed`.
 
 | ID | Failure | Required result | Detection (check id, `tests/Bwc.E2E/Installer/MigrationTests.cs`) |
 |----|---------|-----------------|-----------------------------------------------------------------|
@@ -389,6 +390,8 @@ Log lines (the E2E reads them; every line starts with `Legacy cleanup`): `skippe
 | LC20 | The E2E seam names an invalid run id or no shortcut folder | Off: `skipped (e2e-seam-invalid)` | `migration.badSeam.skipped` |
 | LC21 | A ship build | The two seam variables are not read; the audit refuses a ship Hub that holds `BWC_E2E_LEGACY_` | `release-selftest` (`ship_e2e_strings`), publish audit |
 | LC22 | Another Windows user also has a 0.1.1 per-user install | Each user's own Hub cleans that user's HKCU key. The Hub never reads another user's key | `Doc` |
+| LC23 | `Uninstall.exe` is a plain `asInvoker` file, but the folder is not a Better Windows Config install: `installed-files.txt` or `BetterWindowsConfig.exe` is missing beside it (I5, security review 2, finding 8) | A key (or a planted HKCU value) can name any folder that holds an `asInvoker` program called `Uninstall.exe`, and the Hub would start it. Refused `not-bwc-install`, never started, key, shortcuts, and folder untouched. The check runs after the manifest check, so the LC10 and LC11 codes are unchanged | `migration.notBwc.refused` (with `.neverStarted`, `.untouched`, `.keyAndShortcutsKept`): an `asInvoker` text-file fake in a folder with no BWC files |
+| LC24 | `Uninstall.exe` is missing, the folder is missing, and the drive root does not exist (an unplugged or unmapped drive) | The old install may be on a drive that is only offline now; removing its key and shortcuts would orphan it. Refused `drive-missing`, key and shortcuts kept, tried again at the next start. Only a folder that is gone while its drive root exists counts as gone (LC13) | `migration.driveMissing.refused` (an unused drive letter) |
 
 ## Single instance race
 

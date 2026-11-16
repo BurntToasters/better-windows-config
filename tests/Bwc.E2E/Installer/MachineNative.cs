@@ -38,6 +38,41 @@ internal static class MachineNative
 
     public static readonly SecurityIdentifier LocalSystem = new(WellKnownSidType.LocalSystemSid, null);
 
+    /// <summary>NT SERVICETrustedInstaller, which owns most of the folders of Program Files.</summary>
+    public static readonly SecurityIdentifier TrustedInstaller = new("S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464");
+
+    private static readonly Guid ProgramFilesFolderId = new("905E63B6-C1BF-494E-B29C-65B732D3D21A");
+
+    /// <summary>
+    /// The Program Files folder of this process's own bitness (the 64-bit one in a 64-bit test host), from the shell's known
+    /// folder, never from an environment variable: ProgramW6432 is a value the caller of the test run controls.
+    /// </summary>
+    public static string ProgramFilesFolder()
+    {
+        Guid id = ProgramFilesFolderId;
+        int hr = SHGetKnownFolderPath(ref id, 0, nint.Zero, out nint text);
+        try
+        {
+            if (hr < 0 || text == nint.Zero)
+            {
+                throw new COMException("SHGetKnownFolderPath(FOLDERID_ProgramFiles) failed", hr);
+            }
+
+            return Marshal.PtrToStringUni(text) ?? throw new COMException("SHGetKnownFolderPath returned no text", hr);
+        }
+        finally
+        {
+            if (text != nint.Zero)
+            {
+                Marshal.FreeCoTaskMem(text);
+            }
+        }
+    }
+
+    /// <summary>True when the owner is Administrators, SYSTEM, or TrustedInstaller (a user's own SID is not).</summary>
+    public static bool OwnerIsTrusted(FolderAcl acl) =>
+        acl.Owner is not null && (acl.Owner.Equals(Administrators) || acl.Owner.Equals(LocalSystem) || acl.Owner.Equals(TrustedInstaller));
+
     private static readonly SecurityIdentifier[] ShouldNotWrite =
     [
         new(WellKnownSidType.BuiltinUsersSid, null),
@@ -456,6 +491,9 @@ internal static class MachineNative
         int flags,
         ref Guid riid,
         [MarshalAs(UnmanagedType.Interface)] out IPropertyStore? store);
+
+    [DllImport("shell32.dll")]
+    private static extern int SHGetKnownFolderPath(ref Guid folderId, uint flags, nint token, out nint path);
 
     [DllImport("propsys.dll")]
     private static extern int PropVariantToStringAlloc(ref PropVariant value, out nint text);

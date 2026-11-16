@@ -43,7 +43,6 @@ const RID_ARCH = new Map([
 ]);
 const FLAVORS = new Set(["ship", "e2e"]);
 const NSIS_SCRIPT = path.join(REPO_ROOT, "installer", "bwc.nsi");
-const SCRIPTS_DIR = path.join(REPO_ROOT, "installer", "scripts");
 const LICENSE_FILE = path.join(REPO_ROOT, "LICENSE");
 const ICON_FILE = path.join(REPO_ROOT, "resources", "bwc.ico");
 const INSTALLER_DIR = path.join(REPO_ROOT, "artifacts", "installer");
@@ -562,7 +561,6 @@ function buildDefines({
     ["BWC_ARCH", RID_ARCH.get(rid)],
     ["BWC_OUTPUT", outputPath],
     ["BWC_PAYLOAD_NSH", payloadPath],
-    ["BWC_SCRIPTS_DIR", SCRIPTS_DIR],
     ["BWC_UPDATER_SRC", updaterPath],
     ["BWC_LICENSE", LICENSE_FILE],
     ["BWC_NOTICES", noticesPath],

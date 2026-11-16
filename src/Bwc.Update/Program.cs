@@ -63,6 +63,8 @@ internal static class Program
                 return RunApplyElevated(parsed);
             case UpdateMode.LaunchHub:
                 return RunLaunchHub(parsed);
+            case UpdateMode.SetAumid:
+                return RunSetAumid(parsed);
             default:
                 return await RunApplyAsync(parsed);
         }
@@ -263,6 +265,40 @@ internal static class Program
             UpdateFailure.DeElevationFailed => 8,
             _ => UnexpectedExitCode,
         };
+    }
+
+    /// <summary>
+    /// <c>--set-aumid</c> (update-elevation.md SA): refuses a shortcut that is not one of the two of this product in the folder
+    /// the installer wrote them to, or that is a link, then sets and reads back the AppUserModelID. It starts nothing.
+    /// </summary>
+    private static int RunSetAumid(UpdateArguments parsed)
+    {
+        var shortcut = parsed.Single("--set-aumid")!;
+        var appId = parsed.Single("--app-id")!;
+        var commonPrograms = Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms);
+        var scope = ShortcutAumidRules.ShipScope(commonPrograms);
+#if BWC_E2E
+        scope = ShortcutAumidE2EScope.For(
+            Path.GetTempPath(),
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            commonPrograms);
+#endif
+        var problem = ShortcutAumidRules.ScopeProblem(shortcut, appId, scope) ?? ShortcutAumidRules.FileProblem(shortcut);
+        if (problem is not null)
+        {
+            return WriteSimple(UpdateFailure.PathRejected, problem, 3);
+        }
+
+        var written = ShortcutAumid.Write(shortcut, appId);
+        return written.Ok
+            ? WriteSimple(UpdateFailure.None, "AppUserModelID set and read back", 0)
+            : WriteSimple(written.Failure, written.Detail, 4);
+    }
+
+    private static int WriteSimple(UpdateFailure failure, string detail, int exitCode)
+    {
+        Console.WriteLine(JsonSerializer.Serialize(new { ok = failure == UpdateFailure.None, failure = failure.ToString(), detail }));
+        return exitCode;
     }
 
     private static int RunCloseRunning(UpdateArguments parsed)

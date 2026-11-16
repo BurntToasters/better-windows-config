@@ -31,7 +31,6 @@
 ;   BWC_ARCH           x64 or arm64
 ;   BWC_OUTPUT         absolute path of the setup EXE to write
 ;   BWC_PAYLOAD_NSH    generated file with the payload macros (file list, moves, deletes, rmdirs)
-;   BWC_SCRIPTS_DIR    installer\scripts, which holds the AUMID helper
 ;   BWC_UPDATER_SRC    absolute path of the BwcUpdate.exe that is installed (runs the close step)
 ;   BWC_LICENSE        absolute path of the repo LICENSE file
 ;   BWC_NOTICES        absolute path of the generated THIRD-PARTY-NOTICES.txt
@@ -59,9 +58,6 @@
 !endif
 !ifndef BWC_PAYLOAD_NSH
   !error "BWC_PAYLOAD_NSH is not defined. Run scripts/build-installer.js."
-!endif
-!ifndef BWC_SCRIPTS_DIR
-  !error "BWC_SCRIPTS_DIR is not defined. Run scripts/build-installer.js."
 !endif
 !ifndef BWC_UPDATER_SRC
   !error "BWC_UPDATER_SRC is not defined. Run scripts/build-installer.js."
@@ -184,7 +180,8 @@ Function .onInit
   Call BwcCheckArchitecture
   Call BwcCheckInstDir
   Call BwcRefuseNewer
-  Call BwcFindPowerShell
+  StrCmp $BwcMachine "1" 0 +2
+  Call BwcRefusePendingUninstall
   Call BwcReadParentPid
 FunctionEnd
 
@@ -195,9 +192,14 @@ Function un.onInit
     StrCpy $BwcMachine "1"
     StrCpy $BwcUninstallKey "${BWC_UNINSTALL_SUBKEY}"
   !endif
+  ; A per-machine run first drops the runtime variables, so no child inherits them (installer.md M48). The folder the
+  ; uninstaller was started for is then checked against the uninstall entry (M47) before anything runs or is deleted.
+  StrCmp $BwcMachine "1" 0 +2
+  Call un.BwcClearRuntimeEnvironment
   Call un.BwcApplyContext
   StrCmp $BwcMachine "1" 0 BwcUnInit_done
   Call un.BwcRequireElevated
+  Call un.BwcCheckInstallLocation
   BwcUnInit_done:
 FunctionEnd
 
@@ -522,11 +524,11 @@ Section "Better Windows Config" SecMain
   !endif
   IfErrors BwcSec_writeFailed 0
 
-  ; The AUMID helper runs from the staging folder (under Program Files in a per-machine run), not from the plugins
-  ; folder in %TEMP%: an elevated PowerShell must not run a script that a standard process can replace.
-  File "/oname=$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_AUMID_HELPER}" "${BWC_SCRIPTS_DIR}\${BWC_AUMID_HELPER}"
-  !insertmacro BWC_SET_AUMID_BODY "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_AUMID_HELPER}" "$BwcShortcutDir\${BWC_HUB_SHORTCUT}" "${BWC_HUB_AUMID}"
-  !insertmacro BWC_SET_AUMID_BODY "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_AUMID_HELPER}" "$BwcShortcutDir\${BWC_REGEDIT_SHORTCUT}" "${BWC_REGEDIT_AUMID}"
+  ; The AUMID is written by the installed BwcUpdate.exe (--set-aumid), never by PowerShell (installer.md M45). The working
+  ; folder is moved out of the staging folder first, so the child never inherits a folder the install is about to remove.
+  SetOutPath "$WINDIR"
+  !insertmacro BWC_SET_AUMID_BODY "$BwcShortcutDir\${BWC_HUB_SHORTCUT}" "${BWC_HUB_AUMID}"
+  !insertmacro BWC_SET_AUMID_BODY "$BwcShortcutDir\${BWC_REGEDIT_SHORTCUT}" "${BWC_REGEDIT_AUMID}"
   Goto BwcSec_written
   BwcSec_writeFailed:
   Call BwcWriteFailed

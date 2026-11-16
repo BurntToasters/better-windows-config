@@ -102,6 +102,29 @@ Exit codes:
 | `7` | An unexpected error. |
 | `8` | Elevated and the Hub cannot be started unelevated. Nothing was started (`DeElevationFailed`). |
 
+## `--set-aumid`
+
+```
+BwcUpdate.exe --set-aumid "<absolute path of a .lnk>" <app id>
+```
+
+The installer calls this for each Start menu shortcut instead of running PowerShell (installer.md M45). Both values are
+positional and required. The app id is exactly `BetterWindowsConfig.Hub` (for `Better Windows Config.lnk`) or
+`BetterWindowsConfig.Regedit` (for `Registry Editor (BWC).lnk`).
+
+- Sets `System.AppUserModel.ID` through `IPropertyStore`, saves the shortcut, loads it again, and compares.
+- The shortcut must be directly in the all-users Programs folder (`FOLDERID_CommonPrograms`). The E2E flavor also accepts its
+  sandbox folders (update-elevation.md SA5). A path that is not in its normal form, a link, or a missing file is refused.
+- It starts no process and, when elevated, writes no log file. Stdout is one JSON line: `{"ok":...,"failure":"...","detail":"..."}`.
+
+| Code | Meaning |
+|------|---------|
+| `0` | The id was written and read back. |
+| `2` | Usage: a missing or extra value, a path that is not a plain absolute `.lnk` path, or another app id. |
+| `3` | Refused: the name does not belong to the id, the folder is not the allowed one, or the file is missing or a link (`PathRejected`). |
+| `4` | Not written: a COM failure, or the value read back differs (`Io`). |
+| `7` | An unexpected error. |
+
 ## Use by the installer
 
 The installer should call `--wait-pid <elevated helper pid> --timeout-seconds 30` first, when it was given `/PARENTPID`,

@@ -10,6 +10,7 @@ public enum UpdateMode
     WaitPid,
     ApplyElevated,
     LaunchHub,
+    SetAumid,
     Invalid,
 }
 
@@ -54,6 +55,12 @@ public sealed class UpdateArguments
             Starts BetterWindowsConfig.exe from this program's folder at the shell's integrity level.
             Exit: 0 started, 2 usage, 6 no Hub exe or it did not start, 7 unexpected,
                   8 elevated and the Hub cannot be started unelevated (nothing was started).
+
+          BwcUpdate.exe --set-aumid <absolute path of a .lnk> <app id>
+            Sets System.AppUserModel.ID on one of the two Start menu shortcuts of this product (app id
+            BetterWindowsConfig.Hub for "Better Windows Config.lnk", BetterWindowsConfig.Regedit for "Registry Editor (BWC).lnk"),
+            directly in the all-users Programs folder, and reads it back. Run by the installer. Writes no log when elevated.
+            Exit: 0 written, 2 usage, 3 refused (another folder, name, or a link), 4 not written, 7 unexpected.
 
           BwcUpdate.exe --close-running --install-dir <absolute folder>
                         [--exclude-pid <pid>]... [--timeout-seconds <1-3600>]
@@ -117,6 +124,11 @@ public sealed class UpdateArguments
             return new UpdateArguments(UpdateMode.Help, string.Empty);
         }
 
+        if (args[0] == "--set-aumid")
+        {
+            return ParseSetAumid(args);
+        }
+
         UpdateMode mode;
         HashSet<string> values;
         HashSet<string> required;
@@ -167,7 +179,7 @@ public sealed class UpdateArguments
                 break;
             default:
                 return Invalid(
-                    "the first argument must be --check, --download, --apply, --apply-elevated, --launch-hub, --close-running, --wait-pid, or --help");
+                    "the first argument must be --check, --download, --apply, --apply-elevated, --launch-hub, --set-aumid, --close-running, --wait-pid, or --help");
         }
 
         var parsed = new UpdateArguments(mode, string.Empty);
@@ -211,6 +223,30 @@ public sealed class UpdateArguments
 
         var problem = ValidateValues(parsed);
         return problem is null ? parsed : Invalid(problem);
+    }
+
+    /// <summary>
+    /// <c>--set-aumid &lt;shortcut&gt; &lt;app id&gt;</c> is positional: exactly two values, neither of them
+    /// option-like. The path and id
+    /// rules are <see cref="ShortcutAumidRules.ArgumentProblem"/>.
+    /// </summary>
+    private static UpdateArguments ParseSetAumid(IReadOnlyList<string> args)
+    {
+        if (args.Count != 3 || args[1].StartsWith("--", StringComparison.Ordinal) || args[2].StartsWith("--", StringComparison.Ordinal))
+        {
+            return Invalid("--set-aumid needs a shortcut path and an app id, and nothing else");
+        }
+
+        var problem = ShortcutAumidRules.ArgumentProblem(args[1], args[2]);
+        if (problem is not null)
+        {
+            return Invalid(problem);
+        }
+
+        var parsed = new UpdateArguments(UpdateMode.SetAumid, string.Empty);
+        parsed._values["--set-aumid"] = [args[1]];
+        parsed._values["--app-id"] = [args[2]];
+        return parsed;
     }
 
     private static string? ValidateValues(UpdateArguments parsed)
