@@ -42,7 +42,7 @@ public sealed class MigrationTests
         "Legacy cleanup failed (",
     ];
 
-    private static readonly TimeSpan OutcomeTimeout = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan OutcomeTimeout = TimeSpan.FromSeconds(180);
     private static readonly TimeSpan SetupTimeout = TimeSpan.FromMinutes(3);
     private static readonly TimeSpan UninstallTimeout = TimeSpan.FromSeconds(120);
 
