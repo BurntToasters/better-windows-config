@@ -50,6 +50,9 @@ public partial class App : Application
         _window.Closed += OnWindowClosed;
         _window.Activate();
 
+        // Removes the 0.1.1 per-user install, if there is one. Background, once per run, never blocks the window.
+        Migration.LegacyInstallCleanup.StartInBackground();
+
         // The update helper relaunches the Hub with --update-result <code> when it did not install.
         if (ReadUpdateResult(Environment.GetCommandLineArgs()) is { } updateResult)
         {

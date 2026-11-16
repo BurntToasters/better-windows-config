@@ -124,7 +124,11 @@ const managedWriteAllowlist = new Map([
   ["tests/Bwc.E2E/Permissions/PermissionsTests.cs", "Seeds E2E run keys through the harness for permissions tests."],
   [
     "tests/Bwc.E2E/Installer/InstallerRun.cs",
-    "Deletes only its own run key, Software/BWC-E2E/<run-id>, after the installer test finishes.",
+    "Writes and deletes only its own run key, Software/BWC-E2E/<run-id>: the migration stand-in uninstall key, then cleanup.",
+  ],
+  [
+    "src/Bwc.Hub/Migration/LegacyInstallCleanup.cs",
+    "Removes the stale 0.1.1 per-user uninstall key (HKCU) when its folder is gone. E2E: only the sandbox key under BWC-E2E.",
   ],
   [
     "tools/Bwc.Oracle.Capture/RegistryGuard.cs",

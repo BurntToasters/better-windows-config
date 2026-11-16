@@ -23,6 +23,7 @@
     <Compile Include="..\Bwc.Update\Process\RunningImageRule.cs" Link="Shared\RunningImageRule.cs" />
     <Compile Include="..\Bwc.Update\Pipeline\StagingCleanup.cs" Link="Shared\StagingCleanup.cs" />
     <Compile Include="..\Bwc.Update\Manifest\ManifestLocation.cs" Link="Shared\ManifestLocation.cs" />
+    <Compile Include="..\Bwc.Update\Process\ProcessIdentity.cs" Link="Shared\ProcessIdentity.cs" />
   </ItemGroup>
 
 </Project>

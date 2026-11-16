@@ -192,16 +192,16 @@ function makeFakeGpg(options = {}) {
 function gpgFixture(root) {
   const dir = path.join(root, "release");
   write(path.join(dir, SETUP_X64), "installer bytes\n");
-  write(path.join(dir, "bwc-stable.json"), "{\"schema\":1}\n");
-  write(path.join(dir, "bwc-stable.json.minisig"), "untrusted comment: signature\n");
+  write(path.join(dir, "bwc-stable-v2.json"), "{\"schema\":1}\n");
+  write(path.join(dir, "bwc-stable-v2.json.minisig"), "untrusted comment: signature\n");
   write(path.join(dir, `${SETUP_X64}.sig`), "c2lnCg==\n");
   write(path.join(dir, "assembly.json"), "{}\n");
-  write(path.join(dir, "bwc-stable.json.asc"), "OLD SIGNATURE\n");
+  write(path.join(dir, "bwc-stable-v2.json.asc"), "OLD SIGNATURE\n");
   write(path.join(dir, "stale.exe.asc"), "STALE\n");
   return dir;
 }
 
-const SIGNABLE = [SETUP_X64, "bwc-stable.json", "bwc-stable.json.minisig", `${SETUP_X64}.sig`, "assembly.json"];
+const SIGNABLE = [SETUP_X64, "bwc-stable-v2.json", "bwc-stable-v2.json.minisig", `${SETUP_X64}.sig`, "assembly.json"];
 
 async function runGpgCases(temp, cases) {
   // Real CLI runs: missing gpg, missing or invalid environment, help, unknown option.
@@ -272,7 +272,7 @@ async function runGpgCases(temp, cases) {
     cases,
     "gpg: each signature is <asset>.asc and holds the signer output",
     SIGNABLE.every((name) => fs.existsSync(path.join(happyDir, `${name}.asc`))) &&
-      fs.readFileSync(path.join(happyDir, "bwc-stable.json.asc"), "utf8").includes("BEGIN PGP SIGNATURE"),
+      fs.readFileSync(path.join(happyDir, "bwc-stable-v2.json.asc"), "utf8").includes("BEGIN PGP SIGNATURE"),
     "a .asc file is missing or does not hold the signer output",
   );
   record(
@@ -280,7 +280,7 @@ async function runGpgCases(temp, cases) {
     "gpg: stale .asc files are not signed and the ones for signed assets are replaced",
     fs.readFileSync(path.join(happyDir, "stale.exe.asc"), "utf8") === "STALE\n" &&
       !fs.existsSync(path.join(happyDir, "stale.exe.asc.asc")) &&
-      !fs.readFileSync(path.join(happyDir, "bwc-stable.json.asc"), "utf8").includes("OLD"),
+      !fs.readFileSync(path.join(happyDir, "bwc-stable-v2.json.asc"), "utf8").includes("OLD"),
     "stale signature handling is wrong",
   );
   record(cases, "gpg: no temporary files remain after a clean run", hiddenEntries(happyDir).length === 0, hiddenEntries(happyDir).join(","));
@@ -362,7 +362,7 @@ async function runGpgCases(temp, cases) {
   record(
     cases,
     "gpg: a failed sign keeps the older .asc and leaves no temporary file",
-    fs.readFileSync(path.join(leakDir, "bwc-stable.json.asc"), "utf8") === "OLD SIGNATURE\n" && hiddenEntries(leakDir).length === 0,
+    fs.readFileSync(path.join(leakDir, "bwc-stable-v2.json.asc"), "utf8") === "OLD SIGNATURE\n" && hiddenEntries(leakDir).length === 0,
     "older signature changed or a temporary file remained",
   );
   await refusal("gpg: a sign that exits non-zero is sign-failed", { signStatus: 2, signStderr: "boom" }, FAKE_KEY_ID16, "sign-failed", EXIT.EXTERNAL);
@@ -410,14 +410,14 @@ async function runGpgCases(temp, cases) {
 function releaseFixture(root, version = VERSION) {
   const dir = path.join(root, "src", version, "stable");
   write(path.join(dir, SETUP_X64), "x64 installer bytes for the mirror\n");
-  write(path.join(dir, "bwc-stable.json"), `${JSON.stringify({ schema: 1, version }, null, 2)}\n`);
-  write(path.join(dir, "bwc-stable.json.minisig"), "untrusted comment: mirror test\n");
+  write(path.join(dir, "bwc-stable-v2.json"), `${JSON.stringify({ schema: 1, version }, null, 2)}\n`);
+  write(path.join(dir, "bwc-stable-v2.json.minisig"), "untrusted comment: mirror test\n");
   write(path.join(dir, `${SETUP_X64}.sig`), "bWlycm9yCg==\n");
   write(path.join(dir, "assembly.json"), "{\"ok\":true}\n");
   return dir;
 }
 
-const RELEASE_FILES = [SETUP_X64, "bwc-stable.json", "bwc-stable.json.minisig", `${SETUP_X64}.sig`, "assembly.json"];
+const RELEASE_FILES = [SETUP_X64, "bwc-stable-v2.json", "bwc-stable-v2.json.minisig", `${SETUP_X64}.sig`, "assembly.json"];
 
 async function runMirrorCases(temp, cases) {
   const src = releaseFixture(path.join(temp, "mirror-src"));
@@ -575,7 +575,7 @@ async function runMirrorCases(temp, cases) {
 
   // A real mirror: copies, verifies, replaces only the same-name file, keeps everything else.
   const dest = freshDest();
-  write(path.join(dest, VERSION, "bwc-stable.json"), "OLD MANIFEST\n");
+  write(path.join(dest, VERSION, "bwc-stable-v2.json"), "OLD MANIFEST\n");
   write(path.join(dest, VERSION, "unrelated.txt"), "keep me\n");
   write(path.join(dest, "0.0.9", "keep.txt"), "older release\n");
   const copy = await runChild("scripts/finalize-release-assets.js", ["--dir", src, "--version", VERSION, "--json"], {
@@ -591,7 +591,7 @@ async function runMirrorCases(temp, cases) {
     "mirror: the same-name file is replaced and unrelated files in the same and other versions are kept",
     fs.readFileSync(path.join(dest, VERSION, "unrelated.txt"), "utf8") === "keep me\n" &&
       fs.readFileSync(path.join(dest, "0.0.9", "keep.txt"), "utf8") === "older release\n" &&
-      fs.readFileSync(path.join(dest, VERSION, "bwc-stable.json"), "utf8") !== "OLD MANIFEST\n",
+      fs.readFileSync(path.join(dest, VERSION, "bwc-stable-v2.json"), "utf8") !== "OLD MANIFEST\n",
     "an unrelated file was lost or the same-name file was not replaced",
   );
   record(cases, "mirror: no hidden staging file remains after a real mirror", hiddenEntries(path.join(dest, VERSION)).length === 0, "a .mirror staging file remains");
@@ -732,8 +732,8 @@ async function runLiveCases(temp, cases) {
 
     const good = await signedManifest(both);
     function publish(manifest, { x64 = x64Bytes, arm64 = arm64Bytes, status = 200 } = {}) {
-      routes.set("/latest/bwc-stable.json", { body: manifest.bytes, status });
-      routes.set("/latest/bwc-stable.json.minisig", { body: Buffer.from(manifest.sig, "utf8") });
+      routes.set("/latest/bwc-stable-v2.json", { body: manifest.bytes, status });
+      routes.set("/latest/bwc-stable-v2.json.minisig", { body: Buffer.from(manifest.sig, "utf8") });
       routes.set(`/download/v${VERSION}/${SETUP_X64}`, { body: x64 });
       routes.set(`/download/v${VERSION}/${SETUP_ARM64}`, { body: arm64 });
     }
@@ -840,7 +840,7 @@ async function runLiveCases(temp, cases) {
     );
 
     publish(good);
-    routes.delete("/latest/bwc-stable.json.minisig");
+    routes.delete("/latest/bwc-stable-v2.json.minisig");
     expectExit(
       cases,
       "live: a missing .minisig refuses with http-status",

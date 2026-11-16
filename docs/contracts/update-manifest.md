@@ -24,7 +24,9 @@ Each channel has its own manifest URL. A manifest is signed for one channel, so 
 The updater never assumes a URL pattern. The Hub passes both URLs. Convention for the release
 tooling: the signature sits beside the manifest as `<manifest>.minisig`, and when the manifest URL has a
 query string, the `.minisig` suffix goes before the query (`beta.json.minisig?token=...`). The release
-asset names are `bwc-stable.json` and `bwc-beta.json`, with `.minisig` signatures beside them.
+asset names are `bwc-stable-v2.json` and `bwc-beta-v2.json`, with `.minisig` signatures beside them. The `-v2` names are the
+0.1.2 feed. 0.1.1 (per-user install) reads `bwc-stable.json`; a release keeps that file as a separate legacy feed that never
+offers an installer newer than 0.1.1 (`docs/RELEASE.md`, "The 0.1.1 feed"; `docs/failure-modes/release.md`, section LF).
 
 Every URL must be `https` (`http` is allowed only in tests), at most 4096 characters, with no user
 information and no fragment. The URL is split at its first `?`:

@@ -5,11 +5,13 @@
  * Builds two unsigned E2E-flavor installers: A at the package.json version, and B at the next patch version. B's
  * payload is published with the higher version into publish/<rid>-e2e-next, so package.json and the tracked version
  * files are never changed. Then runs the Installer tests (tests/Bwc.E2E/Installer) with the paths in the environment.
- * Those tests install A silently, press Download and Install in the Hub, and check the update.
+ * Those tests install A silently, press Download and Install in the Hub, and check the update. The Migration tests
+ * use A as the old per-user install and prove the Hub's legacy cleanup removes it (artifacts/e2e/migration-<rid>.json).
  *
  * Usage: node scripts/test-installer-e2e.js --rid win-arm64|win-x64
  *
- * Output: artifacts/e2e/installer-update.json. Exit 0 only when that file says pass. Failure modes:
+ * Output: artifacts/e2e/installer-update.json and artifacts/e2e/migration-<rid>.json. Exit 0 only when both say pass,
+ * and the migration file says the real old install case ran. Failure modes:
  * docs/failure-modes/installer-e2e.md. Needs NSIS (makensis) and must run unelevated.
  */
 import { spawnSync } from "node:child_process";
@@ -321,6 +323,30 @@ function runInstallerTests({ rid, publishA, setupA, setupB, versionA, versionB, 
   return result.status ?? 1;
 }
 
+/**
+ * Reads the migration artifact (the Hub's legacy per-user cleanup). It must exist, pass, and say the real old install
+ * case ran: a run that skipped that case proves nothing about removing a real old install. Returns the problem list.
+ */
+function migrationProblems(rid) {
+  const file = path.join(E2E_DIR, `migration-${rid}.json`);
+  let document;
+  try {
+    document = JSON.parse(readFileSync(file, "utf8"));
+  } catch (error) {
+    return [`no readable ${path.relative(REPO_ROOT, file)}: ${error.message}`];
+  }
+  const problems = [];
+  if (document.schema !== 1) problems.push(`migration schema is ${JSON.stringify(document.schema)}, expected 1`);
+  if (document.realInstall !== "run") problems.push("the real old install case did not run");
+  const checks = Array.isArray(document.checks) ? document.checks : [];
+  if (checks.length === 0) problems.push("the migration artifact has no checks");
+  for (const check of checks.filter((entry) => entry.pass !== true)) {
+    problems.push(`FAILED ${check.id}: ${check.notes}`);
+  }
+  if (document.pass !== true && problems.length === 0) problems.push("the migration artifact says it did not pass");
+  return problems;
+}
+
 /** Reads the result file and returns its verdict and the failed checks, or null when it is missing or unreadable. */
 function readVerdict() {
   let document;
@@ -410,13 +436,18 @@ function main(argv = process.argv.slice(2)) {
 
   const checks = Array.isArray(verdict.checks) ? verdict.checks : [];
   const failed = checks.filter((check) => check.pass !== true);
-  const pass = testExit === 0 && verdict.pass === true && checks.length > 0 && failed.length === 0;
+  const migration = migrationProblems(rid);
+  const pass = testExit === 0 && verdict.pass === true && checks.length > 0 && failed.length === 0 && migration.length === 0;
   console.log("");
   console.log(`installer-e2e: ${pass ? "PASS" : "FAIL"} ${rid} ${versionA} -> ${versionB}`);
   console.log(`installer-e2e: ${checks.length - failed.length} of ${checks.length} checks passed`);
   for (const check of failed) {
     console.log(`  FAILED ${check.id}: ${check.notes}`);
   }
+  for (const problem of migration) {
+    console.log(`  MIGRATION ${problem}`);
+  }
+  console.log(`installer-e2e: migration ${migration.length === 0 ? "PASS" : "FAIL"} artifacts/e2e/migration-${rid}.json`);
   console.log(`installer-e2e: result ${path.relative(REPO_ROOT, RESULT_PATH)}`);
   return pass ? 0 : 1;
 }

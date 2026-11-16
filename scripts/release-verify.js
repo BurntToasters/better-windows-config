@@ -160,6 +160,12 @@ async function applyVerify(context, options) {
   const expected = [
     { name: path.basename(context.bundle.manifestPath), file: context.bundle.manifestPath },
     { name: path.basename(context.bundle.signaturePath), file: context.bundle.signaturePath },
+    ...(context.bundle.legacy?.assets?.length > 0
+      ? [
+          { name: path.basename(context.bundle.legacy.manifestPath), file: context.bundle.legacy.manifestPath },
+          { name: path.basename(context.bundle.legacy.signaturePath), file: context.bundle.legacy.signaturePath },
+        ]
+      : []),
     ...context.bundle.installers.map((installer) => ({ name: installer.fileName, file: installer.file })),
   ];
   const missing = expected.filter((entry) => !assetByName(release, entry.name));

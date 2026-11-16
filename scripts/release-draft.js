@@ -157,10 +157,16 @@ function resolveCommitish(root, value) {
  * the dry-run reports are never uploaded.
  */
 function uniqueAssetPaths(bundle) {
-  const primary = [bundle.manifestPath, ...bundle.installers.map((installer) => installer.file)];
+  // The 0.1.1 feed (bwc-stable.json) is a public asset too, when the release chose frozen or no-installer.
+  const legacy = bundle.legacy?.assets?.length > 0 ? [bundle.legacy.manifestPath] : [];
+  const primary = [bundle.manifestPath, ...legacy, ...bundle.installers.map((installer) => installer.file)];
   const withSidecars = primary.flatMap((file) => [file, `${file}.minisig`, `${file}.sig`]);
   const paths = [bundle.signaturePath, ...withSidecars].flatMap((file) => [file, `${file}.asc`]);
-  const required = new Set([bundle.manifestPath, bundle.signaturePath, ...primary].map((file) => path.resolve(file)));
+  const required = new Set(
+    [bundle.manifestPath, bundle.signaturePath, ...primary, ...legacy.map((file) => `${file}.minisig`)].map((file) =>
+      path.resolve(file),
+    ),
+  );
   return [...new Set(paths.map((file) => path.resolve(file)))].filter(
     (file) => required.has(file) || fs.existsSync(file),
   );

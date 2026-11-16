@@ -29,7 +29,7 @@ detail and the refusal reasons.
 
 ### 1a. Release update key (once per key)
 
-The update key signs `bwc-stable.json` and each setup EXE; installed copies trust only the public
+The update key signs `bwc-stable-v2.json`, the 0.1.1 legacy feed `bwc-stable.json`, and each setup EXE; installed copies trust only the public
 keys compiled into `src/Bwc.Update/Signing/TrustedKeys.cs`. Use a key of BWC's own, not Zinnia's.
 
 1. On a trusted machine: `npx @tauri-apps/cli signer generate -w C:\keys\bwc-updater.key` and set a
@@ -62,8 +62,12 @@ The preflight checks this, and a dirty tree is refused.
 ### 3. Build, gate, sign, and upload the draft
 
 ```powershell
-npm run release:win
+npm run release:win -- --legacy-feed <frozen|no-installer|none> [--legacy-source <0.1.1 bwc-stable.json>]
 ```
+
+`--legacy-feed` is required for a stable version: the run is refused with exit 2, before any step, without it. It is your
+choice at release time (see "The 0.1.1 feed" below). Pass the same option to `npm run release:win:continue`
+when you resume before `release:assemble`; `release:win:upload` runs after it and needs none.
 
 This runs, in order:
 
@@ -180,7 +184,7 @@ scripts do not do for you.
    key id and key bytes. Rotation lists the old and new key during the overlap.
 3. Hosting is GitHub Releases, the same as Zinnia. The repository is
    `BurntToasters/better-windows-config` unless `.env` sets `GH_REPO_OWNER` and `GH_REPO_NAME`.
-   Run `gh auth login` on the release VM. The stable manifest is the `bwc-stable.json` asset of the
+   Run `gh auth login` on the release VM. The stable manifest is the `bwc-stable-v2.json` asset of the
    latest stable release (see the Hub's `UpdateSources.cs`), and each installer is an asset of
    `releases/download/v<version>/`. The beta URL stays empty until a beta channel is published.
 4. Install NSIS 3.10+ on the release VM. `build-installer.js` compiles `installer/bwc.nsi` with it. A
@@ -260,8 +264,8 @@ Validate a manifest, its signature, and optional installer bytes:
 
 ```powershell
 node scripts/validate-updater-manifest.js `
-  --manifest artifacts/release/0.1.0-beta.1/beta/bwc-beta.json `
-  --signature artifacts/release/0.1.0-beta.1/beta/bwc-beta.json.minisig `
+  --manifest artifacts/release/0.1.0-beta.1/beta/bwc-beta-v2.json `
+  --signature artifacts/release/0.1.0-beta.1/beta/bwc-beta-v2.json.minisig `
   --trusted-key artifacts/release/0.1.0-beta.1/beta/ephemeral/minisign.pub `
   --version 0.1.0-beta.1 --channel beta `
   --require-arch win-x64 --require-arch win-arm64 `
@@ -307,13 +311,14 @@ folder also holds `publish-<rid>.json`:
 
 | File | Contents |
 |------|----------|
-| `bwc-<channel>.json` | Schema 1 manifest for the chosen version and channel (`bwc-stable.json` or `bwc-beta.json`). These are the GitHub asset names. |
-| `bwc-<channel>.json.minisig` | Raw minisign signature. Its trusted comment is `version:<semver> channel:<channel> expires:<utc>`. |
-| `bwc-<channel>.json.sig` | Base64 envelope of the same signature. |
+| `bwc-<channel>-v2.json` | Schema 1 manifest for the chosen version and channel (`bwc-stable-v2.json` or `bwc-beta-v2.json`). These are the GitHub asset names. |
+| `bwc-<channel>-v2.json.minisig` | Raw minisign signature. Its trusted comment is `version:<semver> channel:<channel> expires:<utc>`. |
+| `bwc-<channel>-v2.json.sig` | Base64 envelope of the same signature. |
+| `bwc-stable.json` (+ `.minisig`, `.sig`) | The 0.1.1 legacy feed, stable only, and only for `--legacy-feed frozen` or `no-installer` (see "The 0.1.1 feed"). |
 | `BetterWindowsConfig-<version>-<rid>-setup.exe` | Real setup EXE, when a matching installer record exists. |
 | `BetterWindowsConfig-<version>-<rid>-setup.dry-run.json` | Stand-in when NSIS has not produced a setup EXE. |
 | `<installer>.minisig`, `<installer>.sig` | Installer signature, raw and base64. Its trusted comment is `version:<semver> arch:<win-x64 or win-arm64> product:bwc channel:<stable or beta>`. |
-| `assembly.json` | Key id, fingerprint, expiry, arches, and whether the key was a test key. No secret material. |
+| `assembly.json` | Key id, fingerprint, expiry, arches, whether the key was a test key, and the `legacyFeed` choice. No secret material. |
 | `ephemeral/minisign.pub` | Public key of an ephemeral test key (dry run only). The secret key is never written. |
 | `publish-<rid>.json` | Every file in `publish/<rid>` with its size and SHA-256, plus a tree hash. |
 | `release-plan.json` | Version, channel, RIDs, build commands, and artifact sources. |
@@ -341,9 +346,9 @@ node scripts/assemble-bundle.js --version 0.1.0-beta.1 `
 With `TAURI_SIGNING_PRIVATE_KEY` set in `.env`, leave out `--secret-key` and `--password-env`. The key
 comes from that variable, and its password from `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Through npm the
 same command is `npm run release:assemble -- --version 0.1.0 --installer-win-x64 <setup.exe>`, which
-loads `.env`. The bundle is written to `artifacts/release/<version>/<channel>/` with
-`bwc-<channel>.json`, `bwc-<channel>.json.minisig`, and `bwc-<channel>.json.sig`. Stable is
-`bwc-stable.json`, and beta is `bwc-beta.json`. The installer URLs default to
+loads `.env`. A stable version also needs `--legacy-feed` (see "The 0.1.1 feed"). The bundle is written to `artifacts/release/<version>/<channel>/` with
+`bwc-<channel>-v2.json`, `bwc-<channel>-v2.json.minisig`, and `bwc-<channel>-v2.json.sig`. Stable is
+`bwc-stable-v2.json`, and beta is `bwc-beta-v2.json`. The installer URLs default to
 `https://github.com/<owner>/<repo>/releases/download/v<version>/`, and `--download-base-url` replaces
 that directory. `--notes-url` replaces the notes page.
 
@@ -371,6 +376,49 @@ comment line of a key file is never used for that decision.
 The harness never opens a socket and never publishes. A non-dry run invokes
 `scripts/dotnet-build.js` for a missing publish; that build uses the local SDK and NuGet
 cache. A dry run does not build.
+
+## The 0.1.1 feed (`--legacy-feed`)
+
+0.1.1 installs per user. 0.1.2 installs per machine (Program Files, all users), and its setup asks Windows for permission.
+A 0.1.1 client must never be offered a 0.1.2 installer by its in-app update: it would run the per-machine setup without
+permission and fail. The two generations therefore read different feeds:
+
+| Reads | File (latest stable GitHub release) |
+|-------|-------------------------------------|
+| 0.1.2 and later | `bwc-stable-v2.json` (and `bwc-beta-v2.json` once a beta channel exists) |
+| 0.1.1 | `bwc-stable.json`, the legacy feed this release step owns |
+
+GitHub serves `releases/latest/download/<name>` from the latest stable release only, so every stable release has to
+carry a `bwc-stable.json` decision, or 0.1.1 loses its feed. You pick one at release time. The option has no default
+and a stable run without it is refused (`legacy-feed-missing`, exit 2).
+
+| `--legacy-feed` | What the release writes | What a 0.1.1 user sees after "Check for Updates" |
+|-----------------|-------------------------|---------------------------------------------------|
+| `frozen` (needs `--legacy-source`) | `bwc-stable.json` = the signed 0.1.1 manifest (version 0.1.1, its installer entries copied unchanged), re-signed with this release's expiry | "Better Windows Config 0.1.1 is up to date." No upgrade is offered. The user downloads 0.1.2 by hand. |
+| `no-installer` | `bwc-stable.json` = schema 1, this release's version, `"installers": {}`, signed with this release's expiry | "No update is available for this type of computer yet." The user downloads 0.1.2 by hand. |
+| `none` | No `bwc-stable.json`. GitHub answers 404 for it | An update failure (the generic "The update could not be verified, so it was not installed" text; the download of the manifest failed). The user downloads 0.1.2 by hand. |
+
+These texts are what 0.1.1's own parser and strings do with each file (checked against the v0.1.1 source: an empty
+`installers` map is accepted, `frozen` reads as the same version, and a missing file is a manifest download failure). Beta
+releases write no legacy file: only `none` is accepted for a beta.
+
+Rules the tooling enforces, each with a refusal reason (docs/failure-modes/release.md, section LF):
+
+- `frozen` takes `--legacy-source <file>`, the published 0.1.1 `bwc-stable.json` (download it from the v0.1.1 release; its
+  `.minisig` must sit beside it). It must be the stable 0.1.1 manifest, signed by an embedded key, with at least one well
+  formed installer entry. The signed expiry of 0.1.1's own file may have passed: the copy is re-signed with this release's
+  expiry. Otherwise: `legacy-source-missing`, `legacy-source-invalid`.
+- A legacy manifest never contains an installer entry for a version newer than 0.1.1 (`legacy-newer-installer`). The
+  assembler, the draft, verify, and publish gates all check it.
+- `--legacy-source` with any mode but `frozen` is refused (`legacy-source-unused`).
+- The files travel with the release: `bwc-stable.json` and its `.minisig` are uploaded, verified, and published like the v2
+  manifest (they are in `assembly.json` under `legacyFeed`).
+
+Example for the 0.1.2 release, keeping 0.1.1 users on "up to date" until they move by hand:
+
+```powershell
+npm run release:win -- --legacy-feed frozen --legacy-source C:\path\to\v0.1.1\bwc-stable.json
+```
 
 ## 3. Preflight and session (D6)
 
@@ -636,8 +684,9 @@ It checks the stable policy refusals, the exact step lists of `release:win` and 
 quality-gate proof, the trusted-key default, the package.json entry points, and `release:cleanup` in
 temporary git repositories (dirty, untracked, unpublished, unpushed, no-upstream, and fetch-failed trees
 are refused, and nothing is reset). The signing readiness checks (RP1 to RP24) run with injected fakes
-in `scripts/release-selftest.js`, which also covers the publish rerun decision and the
-`--require-trusted-key` CLI.
+in `scripts/release-selftest.js`, which also covers the publish rerun decision, the
+`--require-trusted-key` CLI, and the 0.1.1 feed: all three `--legacy-feed` modes, the refusal of a stable run with no option, the
+source checks of `frozen`, and the rule that a legacy manifest never lists an installer above 0.1.1 (LF1 to LF16).
 
 Result: `artifacts/release/selftest/result.json`. It covers wrong key, bad hash, size
 mismatch, wrong channel, placeholder key, malformed JSON, wrong architecture, installer
@@ -725,7 +774,7 @@ Verify one file by hand: `powershell.exe -NoProfile -ExecutionPolicy Bypass -Fil
   then `npm run release:win` refuses before its first step. Nothing above can run a real release.
 - The first `0.1.0` stable run on the release VM (runbook above), with a real `gh` login and the real key.
 - The stable manifest URL in `src/Bwc.Hub/Updates/UpdateSources.cs` points at the GitHub latest-release
-  asset `bwc-stable.json`. The beta URL is empty. Until the real key replaces the placeholder, the
+  asset `bwc-stable-v2.json`. The beta URL is empty. Until the real key replaces the placeholder, the
   Hub reports "not configured" and never fetches the manifest.
 - The real key must replace the placeholder in `TrustedKeys.cs`; until then every updater
   check fails closed.

@@ -357,9 +357,56 @@ public sealed class HubTests
         AssertNoFailures("Hub update result checks");
     }
 
-    /// <summary>Starts the Hub with --update-result code, then checks the window, the message, and OK.</summary>
-    private static void CheckUpdateResultMessage(string code, string checkId)
+    /// <summary>The per-machine update: the user pressed Cancel on the Windows permission prompt.
+    /// Nothing was changed.</summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateResult_ElevationDeclinedSaysCanceled()
     {
+        CheckUpdateResultMessage("ElevationDeclined", "hub.updateResult.elevationDeclined", "was canceled", "have not been changed");
+        AssertNoFailures("Hub update result checks");
+    }
+
+    /// <summary>The helper could not get administrator rights, so it did nothing.</summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateResult_NotElevatedSaysNoAdminRights()
+    {
+        CheckUpdateResultMessage("NotElevated", "hub.updateResult.notElevated", "did not install", "administrator rights", "still in place");
+        AssertNoFailures("Hub update result checks");
+    }
+
+    /// <summary>Another Windows session has Better Windows Config open, so the update stopped before it
+    /// changed anything.</summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateResult_RunningInOtherSessionSaysCloseThere()
+    {
+        CheckUpdateResultMessage("RunningInOtherSession", "hub.updateResult.otherSession", "did not install", "another Windows session", "still in place");
+        AssertNoFailures("Hub update result checks");
+    }
+
+    /// <summary>The safety net text for a helper that could not start the Hub again at the user's level.</summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateResult_DeElevationFailedSaysOpenFromStartMenu()
+    {
+        CheckUpdateResultMessage("DeElevationFailed", "hub.updateResult.deElevation", "could not be started again", "Start menu");
+        AssertNoFailures("Hub update result checks");
+    }
+
+    /// <summary>
+    /// Starts the Hub with --update-result code, then checks the window, the message, and OK. The message must hold every
+    /// phrase (by default the 'did not install ... still in place' pair), name the current version unless the text is the
+    /// canceled one, and never show the code name.
+    /// </summary>
+    private static void CheckUpdateResultMessage(string code, string checkId, params string[] phrases)
+    {
+        string[] required = phrases.Length > 0 ? phrases : ["did not install", "still in place"];
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
         E2EGuards.RequireE2EOnlyFlavor(config);
@@ -382,14 +429,13 @@ public sealed class HubTests
 
             AutomationElement? dialog = HubUi.FindWindowWithChild(automation, hubProcess.Id, NotInstalledTitle, "DialogMessage", DialogTimeout);
             string text = MessageText(dialog);
-            bool plain = text.Contains("did not install", StringComparison.Ordinal) &&
-                text.Contains("still in place", StringComparison.Ordinal) &&
+            bool plain = required.All(phrase => text.Contains(phrase, StringComparison.Ordinal)) &&
                 text.Contains(semVer, StringComparison.Ordinal) &&
                 !text.Contains(code, StringComparison.Ordinal);
             E2EResults.Record(
                 checkId,
                 plain,
-                $"The message was '{text}'. It must say the update did not install, name {semVer}, and not show {code}.");
+                $"The message was '{text}'. It must hold [{string.Join("; ", required)}], name {semVer}, and not show {code}.");
 
             if (dialog is not null)
             {
@@ -637,6 +683,10 @@ public sealed class HubTests
             bool offersNewer = text.Contains(UpdateFixture.NewerVersion, StringComparison.Ordinal) &&
                 text.Contains(installed, StringComparison.Ordinal);
             E2EResults.Record("hub.update.available.text", offersNewer, $"Update Available text was '{text}'.");
+            E2EResults.Record(
+                "hub.update.available.permission",
+                text.Contains("Windows will ask for permission to install", StringComparison.Ordinal),
+                $"Update Available text must say Windows will ask for permission to install. It was '{text}'.");
 
             AutomationElement? notes = HubUi.WaitWithin(available, "UpdateNotesLink", DialogTimeout);
             E2EResults.Record(

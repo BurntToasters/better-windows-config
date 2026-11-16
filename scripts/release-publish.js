@@ -207,7 +207,8 @@ function assetSnapshot(release) {
 }
 
 function uniqueAssetPaths(bundle) {
-  const paths = [bundle.manifestPath, bundle.signaturePath, ...bundle.installers.map((installer) => installer.file)];
+  const legacy = bundle.legacy?.assets?.length > 0 ? [bundle.legacy.manifestPath, bundle.legacy.signaturePath] : [];
+  const paths = [bundle.manifestPath, bundle.signaturePath, ...legacy, ...bundle.installers.map((installer) => installer.file)];
   return [...new Set(paths.map((file) => path.resolve(file)))];
 }
 

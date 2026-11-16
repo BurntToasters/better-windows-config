@@ -49,6 +49,9 @@ const EXE_HEADS = [
 // exe is its apphost). A seam name in either means a ship helper can be steered by an environment variable.
 const SHIP_SEAM_FILES = ["BwcUpdate.dll", "BwcUpdate.exe"];
 const SEAM_PREFIX = "BWC_E2E_UPDATE_";
+// The Hub's own E2E seams: the legacy per-user cleanup redirect (hub.md, LC21). A ship Hub must not hold them.
+export const HUB_SEAM_PREFIX = "BWC_E2E_LEGACY_";
+const SHIP_HUB_SEAM_FILES = ["BetterWindowsConfig.dll", "BetterWindowsConfig.exe"];
 const RUNTIME_CONFIG_NAME = "BwcUpdate.runtimeconfig.json";
 const STARTUP_HOOK_SWITCH = "System.StartupHookProvider.IsSupported";
 const E2E_EXECUTION_LEVEL = "asInvoker";
@@ -57,9 +60,27 @@ const LEVEL_ATTRIBUTE = /\blevel\s*=\s*["']([A-Za-z]+)["']/;
 
 export const FLAVORS = [...FLAVOR_VALUES.keys()];
 
-/** True when the bytes contain the E2E seam prefix as UTF-8 or as UTF-16LE (a .NET string literal is UTF-16). */
-export function containsSeamName(bytes) {
-  return bytes.includes(Buffer.from(SEAM_PREFIX, "utf8")) || bytes.includes(Buffer.from(SEAM_PREFIX, "utf16le"));
+/** True when the bytes contain an E2E seam prefix as UTF-8 or as UTF-16LE (a .NET string literal is UTF-16). */
+export function containsSeamName(bytes, prefix = SEAM_PREFIX) {
+  return bytes.includes(Buffer.from(prefix, "utf8")) || bytes.includes(Buffer.from(prefix, "utf16le"));
+}
+
+// A ship Hub must not contain the E2E legacy-cleanup seam names: with them a process could point the cleanup at another key.
+function checkHubSeams(dir, flavor, report) {
+  if (flavor !== "ship") {
+    return;
+  }
+  for (const name of SHIP_HUB_SEAM_FILES) {
+    let bytes;
+    try {
+      bytes = fs.readFileSync(path.join(dir, name));
+    } catch {
+      continue; // A missing file is reported by the required-assembly check.
+    }
+    if (containsSeamName(bytes, HUB_SEAM_PREFIX)) {
+      report.problems.push(`${name}: a ship build contains "${HUB_SEAM_PREFIX}" (an E2E seam is compiled in)`);
+    }
+  }
 }
 
 /**
@@ -354,6 +375,7 @@ export function checkPublishFlavor(dir, flavor) {
   }
   checkExeManifests(dir, flavor, names, report);
   checkUpdateHelper(dir, flavor, report);
+  checkHubSeams(dir, flavor, report);
   if (report.checked.length === 0 && report.problems.length === 0) {
     report.problems.push(
       `no managed ${PROJECT_PREFIXES.join(" or ")} assemblies found in ${report.folder}`,
