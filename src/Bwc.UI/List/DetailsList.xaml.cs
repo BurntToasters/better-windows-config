@@ -301,6 +301,12 @@ public sealed partial class DetailsList : UserControl
     /// <summary>Starts the inline rename box for the focused or single selected row. F2 uses the same path.</summary>
     public void BeginRenameSelected() => BeginRename();
 
+    /// <summary>
+    /// Commits a rename in progress now, as focus loss would. The host calls it before it rebinds the list
+    /// to another key, so the rename reaches the row it started on. Does nothing when no rename is open.
+    /// </summary>
+    public void CommitPendingRename() => CommitRename();
+
     /// <summary>The position of a row as displayed (after sorting), or -1 when the row is not in the list.</summary>
     public int DisplayIndexOf(DetailsRow row) => _rows.IndexOf(row);
 

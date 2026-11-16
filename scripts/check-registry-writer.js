@@ -65,6 +65,10 @@ const nativeWriteAllowlist = new Map([
     "Creates and removes symbolic link keys for the guard tests. The writer never creates links, so the test fixture is the only source of link inputs.",
   ],
   [
+    "tests/Bwc.E2E/List/ListKeyIdentityTests.cs",
+    "Creates one NUL-named value under the run root with NtSetValueKey, the only API that takes a counted name. The run key is removed in finally.",
+  ],
+  [
     "tools/Bwc.Oracle.Capture/RegistryGuard.cs",
     "Writes only HKCU/Software/BWC-Oracle and the Applets/Regedit key, through the guarded native call.",
   ],
@@ -92,6 +96,7 @@ const managedWriteAllowlist = new Map([
   ["tests/Bwc.Registry.Tests/RegistryReaderTests.cs", "Seeds sandbox run keys with typed values for reader tests."],
   ["tests/Bwc.Registry.Tests/RegistrySecurityTests.cs", "Seeds and removes sandbox run keys for security tests."],
   ["tests/Bwc.Registry.Tests/RegistryStoreTests.cs", "Seeds and removes sandbox run keys for store tests."],
+  ["tests/Bwc.Registry.Tests/RegistryValueNulNameTests.cs", "Seeds sandbox run keys with typed and NUL-named values for NUL-name tests."],
   ["tests/Bwc.Registry.Tests/RegistryWriterSandboxTests.cs", "Seeds and removes sandbox run keys for writer tests."],
   ["tests/Bwc.E2E/CommandLine/CommandLineTests.cs", "Seeds E2E run keys through the harness for command-line tests."],
   ["tests/Bwc.E2E/ContextMenus/ContextMenuTests.cs", "Seeds E2E run keys through the harness for context-menu tests."],
@@ -138,6 +143,7 @@ const unnamedCallAllowlist = new Map([
   ["tests/Bwc.E2E/Favorites/FavoritesFixesTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/Hex/HexEditingFixesTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/List/ListRenameFocusTests.cs", sandboxedSeedReason],
+  ["tests/Bwc.E2E/List/ListKeyIdentityTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/Dialogs/BinaryViewerTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/Dialogs/ClassicDialogTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/HarnessTests.cs", sandboxedSeedReason],
@@ -150,6 +156,10 @@ const unnamedCallAllowlist = new Map([
   [
     "tests/Bwc.Registry.Tests/RegistryWriterGuardTests.cs",
     "Calls RegistryWriter under test with a policy rooted at the run's own Software/BWC-E2E/<run-id> key.",
+  ],
+  [
+    "tests/Bwc.Registry.Tests/RegistryValueNulNameTests.cs",
+    "Seeds through RegistryWriter with a SandboxWritePolicy rooted at the run's own Software/BWC-E2E/<run-id> key.",
   ],
   [
     "tests/Bwc.Registry.Tests/RegistryWriterHardeningTests.cs",
