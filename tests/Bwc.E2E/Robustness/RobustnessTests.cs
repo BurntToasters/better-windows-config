@@ -158,13 +158,15 @@ public sealed class RobustnessTests
                     Thread.Sleep(2);
                 }
 
-                bool deleted = !sandbox.Exists("Wide");
                 E2EResults.Record(
                     "robust.busygate.disabled",
                     confirmed && sawDisabled,
                     $"confirmed={confirmed}, owner disabled during the delete={sawDisabled}, close posted={closeSent}.");
 
-                bool exited = WaitForProcessExit(session.ProcessId, ProcessTimeout);
+                // The window closes only after the write, so the key is checked once the process is gone. Under x64
+                // emulation the delete can outlast the polling loop above.
+                bool exited = WaitForProcessExit(session.ProcessId, ProcessTimeout + ProcessTimeout);
+                bool deleted = !sandbox.Exists("Wide");
                 E2EResults.Record(
                     "robust.busygate.heldclose",
                     deleted && exited,
