@@ -125,11 +125,13 @@ public sealed class FileDialogStringTests
             bool typed = dialogs.TrySetFileName(dialog, typedName, out nameNotes);
             bool accepted = typed && dialogs.TryAccept(dialog, "Save", out acceptNotes) && dialogs.WaitGone(dialog, TimeSpan.FromSeconds(15));
 
-            // The export runs after the dialog closes, so the file is polled for rather than checked at once.
+            // The export runs after the dialog closes and writes a temp file that it renames when done, so the folder
+            // is polled until a file exists and no temp file is left.
             string[] written = Array.Empty<string>();
             _ = ControlTestSupport.WaitUntil(
-                () => (written = DefextFiles(tempDir)).Length > 0,
-                TimeSpan.FromSeconds(20));
+                () => (written = DefextFiles(tempDir)).Length > 0 &&
+                    !written.Any(name => name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)),
+                TimeSpan.FromSeconds(30));
             bool named = written.Any(name => string.Equals(name, "defext." + ExpectedDefaultExtension, StringComparison.OrdinalIgnoreCase));
             bool exactCase = written.Contains("defext." + ExpectedDefaultExtension, StringComparer.Ordinal);
             E2EResults.Record(
