@@ -11,7 +11,12 @@
  * signed in place before the payload is listed. NSIS signs the setup EXE and the uninstaller through
  * !finalize and !uninstfinalize. Then verify-windows-authenticode.ps1 checks every signed file.
  *
- * --dry-run prints the exact makensis command line and exits 0 without NSIS, a publish, or any write.
+ * The built setup EXE's embedded manifest is audited against the flavor: ship must request requireAdministrator
+ * (per-machine install), e2e must request asInvoker (no test build can ever prompt). A mismatch fails the build and
+ * removes the EXE.
+ *
+ * --dry-run prints the exact makensis command line and exits 0 without NSIS, a publish, or any write. It also checks
+ * the source of installer/bwc.nsi for the flavor-to-level rule.
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -19,7 +24,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectExecutionOf } from "./direct-execution.mjs";
-import { publishFolderName } from "./flavor-metadata.js";
+import { checkSetupManifestLevel, publishFolderName, SETUP_EXECUTION_LEVELS } from "./flavor-metadata.js";
 import { generateNugetNotices } from "./generate-nuget-licenses.js";
 import {
   bwcSigningTargets,
@@ -61,6 +66,9 @@ const RESERVED_DIRECTORY = "bwc-tools";
 const SIGN_SCRIPT = path.join(REPO_ROOT, "scripts", "windows-artifact-sign.ps1");
 const VERIFY_SCRIPT = path.join(REPO_ROOT, "scripts", "verify-windows-authenticode.ps1");
 const SETUP_COMMAND = "npm run setup:win:artifact-signing";
+// The one place bwc.nsi picks the execution level: user for the E2E flavor, admin for ship.
+const EXECUTION_LEVEL_BLOCK =
+  /!ifdef\s+BWC_E2E\s+RequestExecutionLevel\s+user\s+!else\s+RequestExecutionLevel\s+admin\s+!endif/;
 // The NSIS defines that turn signing on (see installer/bwc.nsi). The audit checks them in both modes.
 export const SIGNING_DEFINE_NAMES = Object.freeze(["BWC_SIGN", "BWC_SIGN_SCRIPT", "BWC_SIGN_UNINST_COPY"]);
 
@@ -77,6 +85,9 @@ Options:
   --version <semver> Default: package.json version. Accepts X.Y.Z or X.Y.Z-beta.N.
   --dry-run          Print the exact makensis command line and exit 0. NSIS is not needed.
   --help             Show this help.
+
+Execution level: the ship setup requests administrator (per-machine install) and the e2e setup requests asInvoker.
+The built EXE's manifest is checked against that, and a mismatch fails the build.
 
 Signing: enforced unless SKIP_WIN_CODESIGN=1 (exactly). It needs the AZURE_* variables and the
 Artifact Signing Client Tools (${SETUP_COMMAND}, once as Administrator). See docs/installer.md.
@@ -521,6 +532,11 @@ export function auditNsisSource({ scriptPath, installerDir, defines, payloadText
   if (!/^\s*Function\s+\.onInit/m.test(scriptText)) {
     problems.push(`${sources[0].name}: no .onInit function`);
   }
+  if (!EXECUTION_LEVEL_BLOCK.test(scriptText)) {
+    problems.push(
+      `${sources[0].name}: RequestExecutionLevel must be "user" under !ifdef BWC_E2E and "admin" otherwise`,
+    );
+  }
   if (!/^\s*BwcCommit_rollback:/m.test(scriptText)) {
     problems.push("the generated payload jumps to BwcCommit_rollback, which installer/bwc.nsi does not define");
   }
@@ -682,6 +698,9 @@ function printDryRun({ options, names, publishDir, makensis, nsisVersion, payloa
     `  makensis: ${makensis.path ?? `not found (a real run exits ${EXIT_NSIS_MISSING})`}${nsisVersion ? ` version ${nsisVersion.text}` : ""}`,
   );
   console.log(`  output: ${relativeToRepo(names.setup)}`);
+  console.log(
+    `  manifest audit: the built setup must request ${SETUP_EXECUTION_LEVELS[options.flavor]} (${options.flavor} flavor)`,
+  );
   if (!publishPresent) {
     console.log("  estimated size: 0 KiB placeholder (computed from the publish folder on a real run)");
   }
@@ -880,6 +899,17 @@ function main(argv = process.argv) {
       return 1;
     }
 
+    // The setup's manifest level must match the flavor. NSIS writes it from RequestExecutionLevel, and signing does not
+    // change it. A wrong level removes the EXE, so a setup that would prompt (or not prompt) wrongly is never left.
+    const manifest = checkSetupManifestLevel(fs.readFileSync(names.setup), flavor);
+    if (!manifest.ok) {
+      fs.rmSync(names.setup, { force: true });
+      writeRecord(failRecord(manifest.problem));
+      console.error(`build-installer: FAIL: ${manifest.problem}`);
+      return 1;
+    }
+    console.log(`build-installer: manifest audit: setup requests ${manifest.levels[0]} (${flavor})`);
+
     // The setup EXE and the uninstaller copy were signed by NSIS. The publish binaries were signed above.
     const signedFiles = signing.enforced
       ? [...signedPublish, names.setup, signing.uninstallerCopy]
@@ -898,6 +928,7 @@ function main(argv = process.argv) {
       arch: RID_ARCH.get(rid),
       flavor,
       pass: true,
+      manifestLevel: manifest.levels[0],
       file: relativeToRepo(names.setup),
       size: stat.size,
       sha256: sha256File(names.setup),
