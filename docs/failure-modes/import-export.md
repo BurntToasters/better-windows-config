@@ -364,6 +364,22 @@ Failure mode: a typed path with a trailing backslash, in another case, or a pred
 (HKEY_CURRENT_USER) is not found. The leading `Computer\` prefix and the trailing backslashes are removed, and the rest is parsed
 with `RegistryPath.TryParse`. The comparison ignores case, as the tree does.
 
+### Branch path that exists but cannot be read
+
+Failure mode: a typed branch path that names an existing key the user cannot read (access denied on
+the key, error 5) made the existence check throw. `OnFileOk` caught the exception, returned S_FALSE, and
+logged a line. The dialog stayed open with no message, so OK seemed to do nothing.
+
+Rule: an unreadable typed key shows the classic "cannot be opened" box for that key, with the Win32
+text as details (`MsgOpenKeyFailed` / `MsgOpenKeyFailedDetails`, the same text the tree shows for an
+unreadable key). The dialog stays open, nothing is written, and the branch path is not approved. A
+missing key still shows RT_STRING 148 as before.
+
+Check: `ExportDialogs_BranchPathEditReportsAnUnreadableKey` in `tests/Bwc.E2E/ImportExport/ExportBranchPathTests.cs`.
+It denies query-values on a sandbox child key for the current user (so KEY_READ fails with access denied, and
+READ_CONTROL stays open for the restore), types its path, presses Save, and checks the
+box text and that the file dialog stays open with no file. The ACE is restored in a finally block.
+
 ## 18. Text export format (Text Files *.txt) and print
 
 `RegistryTextExporter` writes the text format for File > Export with the *Text Files (\*.txt)* filter, and

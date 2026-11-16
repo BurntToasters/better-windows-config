@@ -255,7 +255,8 @@ internal sealed class ImportExportCommands
             if (target is not null)
             {
                 // Reading HKEY_USERS first makes a connection that cannot be read fail before any write (string 131).
-                _ = store.Reader.KeyExists(RegistryPath.Parse("HKEY_USERS"));
+                // GetKeyInfo queries the remote key. KeyExists on a root only pins the handle and makes no call.
+                _ = store.Reader.GetKeyInfo(RegistryPath.Parse("HKEY_USERS"));
             }
 
             return RegFileImporter.ApplyFile(store, filePath, CancellationToken.None, progressSink);
@@ -435,7 +436,10 @@ internal sealed class ImportExportCommands
         // The whole registry of a connected computer is HKEY_LOCAL_MACHINE and HKEY_USERS in one .reg document.
         RemoteRegistryConnection? wholeRemote =
             remote is not null && choice.Range == ExportFileRange.WholeRegistry ? remote : null;
-        if (wholeRemote is not null && choice.Format is ExportFileFormat.Hive or ExportFileFormat.Text)
+        // Hive export is local only. A remote key or the whole computer refuses it before any write, with the classic
+        // remote text. The whole computer also refuses text, as before.
+        bool remoteKeyHive = remote is not null && hasSelectedKey && hive;
+        if ((wholeRemote is not null && choice.Format is ExportFileFormat.Hive or ExportFileFormat.Text) || remoteKeyHive)
         {
             await _context.ShowMessageAsync(Get("DialogExportRemoteFormat"));
             return;
@@ -579,9 +583,29 @@ internal sealed class ImportExportCommands
         return false;
     }
 
-    /// <summary>Whether a typed branch path names an existing key. Runs on the UI thread from the dialog's OK.</summary>
-    private bool BranchKeyExists(string text, RegistryReader reader) =>
-        TryParseBranch(text, out RegistryPath? key) && key is not null && reader.KeyExists(key);
+    /// <summary>
+    /// Whether a typed branch path names an existing key. Runs on the UI thread from the dialog's OK. A key that exists
+    /// but cannot be read throws the classic "cannot be opened" box for that key, which the dialog shows and stays open.
+    /// </summary>
+    private bool BranchKeyExists(string text, RegistryReader reader)
+    {
+        if (!TryParseBranch(text, out RegistryPath? key) || key is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return reader.KeyExists(key);
+        }
+        catch (RegistryOperationException ex)
+        {
+            string display = key.ToDisplayString();
+            Log.Warn($"Registry Editor could not check the export branch '{display}': Win32 {ex.Win32Error} ({ex.Message}).");
+            ClassicMessage message = _context.Messages.ForUnreadableKey(display, ex.Win32Error);
+            throw new ExportBranchUnreadableException(message.Caption, message.Text);
+        }
+    }
 
     /// <summary>
     /// Writes the export to a temporary file in the destination folder and moves it into place only
@@ -621,15 +645,13 @@ internal sealed class ImportExportCommands
                 RegFileFormat remoteFormat = choice.Format == ExportFileFormat.RegistrationRegedit4
                     ? RegFileFormat.Regedit4
                     : RegFileFormat.V5;
+                // Each key section streams to the temporary file as it is read, as the local whole-registry export does.
                 var remoteService = new RegistryExportService(reader);
-                var keys = new List<RegFileKey>();
-                foreach (RegistryRoot root in new[] { RegistryRoot.LocalMachine, RegistryRoot.Users })
-                {
-                    RegistryPath rootPath = RegistryPath.Parse(root.DisplayName());
-                    keys.AddRange(remoteService
-                        .ExportRegFile(rootPath, remoteFormat, RegistryExportScope.Selection, cancellationToken, progress)
-                        .Keys);
-                }
+                IReadOnlyList<RegistryPath> remoteRoots =
+                [
+                    RegistryPath.Parse(RegistryRoot.LocalMachine.DisplayName()),
+                    RegistryPath.Parse(RegistryRoot.Users.DisplayName()),
+                ];
 
                 using (var remoteStream = new FileStream(
                     tempPath,
@@ -639,7 +661,7 @@ internal sealed class ImportExportCommands
                     bufferSize: 64 * 1024,
                     FileOptions.SequentialScan))
                 {
-                    RegFileWriter.Write(new RegFileDocument(remoteFormat, keys), remoteStream);
+                    remoteService.WriteRegFileRoots(remoteRoots, remoteStream, remoteFormat, cancellationToken, progress);
                     remoteStream.Flush(flushToDisk: true);
                 }
 

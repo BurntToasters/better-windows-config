@@ -468,7 +468,7 @@ internal sealed partial class RegeditContext
         path = null!;
         TreeNode? node = Shell.TreeContent.SelectedNode;
         if (node?.RegistryPath is not { Length: > 0 } displayPath ||
-            !RegistryPath.TryParse(displayPath, out RegistryPath? parsed) ||
+            !RegistryTreeSource.TryParseNodePath(displayPath, out RegistryPath? parsed) ||
             parsed is null)
         {
             return false;
@@ -520,7 +520,7 @@ internal sealed partial class RegeditContext
             return true;
         }
 
-        if (!RegistryPath.TryParse(displayPath, out RegistryPath? parsed) || parsed is null)
+        if (!RegistryTreeSource.TryParseNodePath(displayPath, out RegistryPath? parsed) || parsed is null)
         {
             return false;
         }
@@ -1017,7 +1017,7 @@ internal sealed partial class RegeditContext
                     unreadable = listing.Failure;
                 }
             }
-            else if (RegistryPath.TryParse(displayPath, out RegistryPath? parsed) && parsed is not null)
+            else if (RegistryTreeSource.TryParseNodePath(displayPath, out RegistryPath? parsed) && parsed is not null)
             {
                 // A key that cannot be opened or enumerated shows the classic error and an empty list. The probe
                 // catches a failed open; a failed enumeration comes back in the listing's Failure.

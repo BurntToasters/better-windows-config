@@ -1,3 +1,4 @@
+using System.Security.AccessControl;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Dialogs;
 using Bwc.E2E.Editing;
@@ -196,6 +197,108 @@ public sealed class ExportBranchPathTests
         finally
         {
             ControlTestSupport.CleanupRegistry(config);
+        }
+    }
+
+    /// <summary>
+    /// A typed branch path that names an existing key the user cannot read (docs/failure-modes/import-export.md, "Branch
+    /// path that exists but cannot be read"). The box shows the classic "cannot be opened" text for that key, the dialog
+    /// stays open, and nothing is written. The deny ACE is restored in finally.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("ImportExport")]
+    [TestCategory("Mutating")]
+    public void ExportDialogs_BranchPathEditReportsAnUnreadableKey()
+    {
+        int checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+        config.EnsureExecutablesExist();
+
+        var sandbox = new SandboxRegistry(config);
+        string tempDir = Path.Combine(config.ArtifactsDir, "import-export", config.RunId, "branch-unreadable");
+        RegistrySecurity? original = null;
+        try
+        {
+            sandbox.Cleanup();
+            Directory.CreateDirectory(tempDir);
+            Seed(sandbox);
+            // QueryValues is denied, so KEY_READ fails with access denied. READ_CONTROL and WRITE_DAC stay open, which
+            // the restore needs. A deny on ReadKey would also block READ_CONTROL.
+            original = sandbox.DenyCurrentUser(BranchChildName, RegistryRights.QueryValues);
+            E2EResults.Record(
+                "branch.unreadable.seed",
+                original is not null,
+                "The typed child key carries a deny-query-values ACE for the current user.");
+
+            using var session = StartApp(config, sandbox, "export-branch-unreadable");
+            using var driver = new EditingDriver(session);
+            using var dialogs = new SystemFileDialogDriver(session);
+
+            NavigateToRunRoot(session, config, sandbox, "branch.unreadable");
+            IntPtr dialog = OpenFileCommand(driver, dialogs, MenuFileExport, "branch.unreadable");
+            if (dialog == IntPtr.Zero)
+            {
+                FailIfNeeded(checkStart);
+                return;
+            }
+
+            string typedKey = RunRootClassicPath(sandbox) + @"\" + BranchChildName;
+            AutomationElement? edit = dialogs.FindBranchEdit(dialog);
+            string typedBack = "(not typed)";
+            bool typed = edit is not null && dialogs.TrySetEditText(dialog, edit, typedKey, out typedBack);
+            E2EResults.Record(
+                "branch.unreadable.typed",
+                typed,
+                $"typed '{typedKey}', edit reads '{(edit is null ? "(no edit)" : typedBack)}'.");
+
+            string file = Path.Combine(tempDir, "unreadable.reg");
+            string nameNotes = "not attempted";
+            string acceptNotes = "not attempted";
+            bool named = typed && dialogs.TrySetFileName(dialog, file, out nameNotes);
+            bool accepted = named && dialogs.TryAccept(dialog, "Save", out acceptNotes);
+            E2EResults.Record("branch.unreadable.save", accepted, $"{nameNotes} {acceptNotes}");
+
+            AutomationElement? error = null;
+            _ = ControlTestSupport.WaitUntil(
+                () => (error = dialogs.FindProcessElement("DialogErrorText")) is not null,
+                TimeSpan.FromSeconds(10));
+            string errorText = error is null ? string.Empty : ReadText(error);
+            E2EResults.Record(
+                "branch.unreadable.message",
+                error is not null &&
+                    errorText.Contains("cannot be opened", StringComparison.OrdinalIgnoreCase) &&
+                    errorText.Contains(BranchChildName, StringComparison.OrdinalIgnoreCase),
+                $"box shown={error is not null}, text='{errorText}'.");
+
+            bool stillOpen = Win32.IsWindow(dialog);
+            E2EResults.Record(
+                "branch.unreadable.dialog-open",
+                stillOpen && !File.Exists(file),
+                $"file dialog still open={stillOpen}, nothing written={!File.Exists(file)}.");
+
+            bool dismissed = error is not null && driver.DismissErrorBox();
+            bool cancelled = dialogs.TryCancel(dialog);
+            E2EResults.Record(
+                "branch.unreadable.cancel",
+                dismissed && cancelled && !File.Exists(file),
+                $"error dismissed={dismissed}, cancelled={cancelled}, nothing written={!File.Exists(file)}.");
+
+            FailIfNeeded(checkStart);
+        }
+        finally
+        {
+            try
+            {
+                if (original is not null)
+                {
+                    sandbox.RestoreSecurity(BranchChildName, original);
+                }
+            }
+            finally
+            {
+                ControlTestSupport.CleanupRegistry(config);
+            }
         }
     }
 

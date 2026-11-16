@@ -501,6 +501,113 @@ public sealed class RemoteCommandTests
         }
     }
 
+    /// <summary>
+    /// Hive export is local only (docs/failure-modes/export.md, section 8). A remote key with the Registry Hive Files
+    /// filter gets the classic remote text before any write, and no file is created.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Remote")]
+    [TestCategory("Mutating")]
+    public void Remote_ExportHiveOfRemoteKeyIsRefused()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+        EnsurePublished(config);
+
+        const string RemoteFormatText =
+            "The registry of a connected computer exports as a Registration file. Choose Registration Files (.reg).";
+        const int HiveFilterIndex = 2;
+
+        var sandbox = new SandboxRegistry(config);
+        var remote = new RemoteRun(CurrentSid(), config);
+        string exportDir = Path.Combine(config.ArtifactsDir, "remote-commands", config.RunId, "hive-refused");
+        string hiveFile = Path.Combine(exportDir, "remote-key.hiv");
+        try
+        {
+            sandbox.Cleanup();
+            remote.Cleanup();
+            SeedRemoteTree(remote);
+            if (Directory.Exists(exportDir))
+            {
+                Directory.Delete(exportDir, recursive: true);
+            }
+
+            Directory.CreateDirectory(exportDir);
+
+            using AppSession session = StartApp(config, sandbox, "remote-hive-refused");
+            using var driver = new EditingDriver(session);
+            using var dialogs = new SystemFileDialogDriver(session);
+            RequireConnected(session, driver);
+
+            bool remoteNavigated = NavigateAddress(session, remote.DisplayRoot, remote.RunId);
+            RequireAddressInside(session, remote, "remote.hive.selection");
+            IntPtr dialog = remoteNavigated ? OpenExportSaveDialog(driver, dialogs) : IntPtr.Zero;
+            string typeNotes = "no dialog";
+            bool hiveSelected = dialog != IntPtr.Zero &&
+                dialogs.SelectFileType(dialog, HiveFilterIndex, "Hive", out typeNotes);
+            E2EResults.Record(
+                "remote.hive.filter",
+                hiveSelected,
+                $"export dialog={dialog != IntPtr.Zero}, hive filter selected={hiveSelected} ({typeNotes}).");
+
+            string nameNotes = "not attempted";
+            string acceptNotes = "not attempted";
+            bool named = hiveSelected && dialogs.TrySetFileName(dialog, hiveFile, out nameNotes);
+            bool accepted = named && dialogs.TryAccept(dialog, "Save", out acceptNotes);
+            bool closed = accepted && dialogs.WaitGone(dialog, TimeSpan.FromSeconds(15));
+            if (!closed && dialog != IntPtr.Zero)
+            {
+                _ = dialogs.TryCancel(dialog);
+            }
+
+            bool messageShown = closed && driver.WaitForDialog(TimeSpan.FromSeconds(10));
+            string messageText = messageShown ? driver.TextOf("DialogErrorText") : string.Empty;
+            E2EResults.Record(
+                "remote.hive.refused.message",
+                messageShown && string.Equals(messageText, RemoteFormatText, StringComparison.Ordinal),
+                $"{nameNotes} {acceptNotes} message shown={messageShown}, text='{messageText}'.");
+
+            bool dismissed = messageShown && driver.DismissErrorBox();
+            bool noFile = !File.Exists(hiveFile);
+            E2EResults.Record(
+                "remote.hive.refused.nothing-written",
+                dismissed && noFile,
+                $"error dismissed={dismissed}, no hive file written={noFile}.");
+
+            FailIfNeeded();
+        }
+        finally
+        {
+            ControlTestSupport.CleanupRegistry(config);
+            remote.Cleanup();
+            DeleteDataRoot(config, "remote-hive-refused");
+        }
+    }
+
+    /// <summary>Opens File > Export and returns the save dialog, or zero when it did not open.</summary>
+    private static IntPtr OpenExportSaveDialog(EditingDriver driver, SystemFileDialogDriver dialogs)
+    {
+        if (!OpenFileMenu(driver))
+        {
+            return IntPtr.Zero;
+        }
+
+        AutomationElement? command = null;
+        _ = ControlTestSupport.WaitUntil(
+            () => (command = dialogs.FindProcessElement("MenuCommand_" + MenuFileExport)) is not null,
+            TimeSpan.FromSeconds(5));
+        if (command is null)
+        {
+            return IntPtr.Zero;
+        }
+
+        command.Focus();
+        Thread.Sleep(150);
+        Keyboard.Type(VirtualKeyShort.RETURN);
+        return dialogs.WaitForDialog(TimeSpan.FromSeconds(10));
+    }
+
     [TestMethod]
     [TestCategory("Remote")]
     [TestCategory("Mutating")]

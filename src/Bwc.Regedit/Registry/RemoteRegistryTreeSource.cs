@@ -61,15 +61,13 @@ public sealed class RemoteRegistryTreeSource : ITreeNodeSource
             return false;
         }
 
-        try
-        {
-            path = RegistryPath.Parse(remainder);
-        }
-        catch (FormatException)
+        // Keys named '.' or '..' parse as enumerated names, as they are listed in the tree.
+        if (!RegistryTreeSource.TryParseNodePath(remainder, out RegistryPath? parsed))
         {
             return false;
         }
 
+        path = parsed;
         return path.Root is RegistryRoot.LocalMachine or RegistryRoot.Users;
     }
 
@@ -135,12 +133,11 @@ public sealed class RemoteRegistryTreeSource : ITreeNodeSource
                 RegistryPath childPath;
                 try
                 {
-                    childPath = path.Append(name);
+                    // A key can be named '.' or '..'. AppendEnumeratedName accepts those names, as the local tree does.
+                    childPath = path.AppendEnumeratedName(name);
                 }
                 catch (ArgumentException ex)
                 {
-                    // A real registry key can be named '.' or '..', which RegistryPath rejects
-                    // because the same string is ambiguous in a display path.
                     Log.Warn(
                         $"Remote registry tree skipped the child '{name}' of '{path.ToDisplayString()}': {ex.Message}");
                     continue;

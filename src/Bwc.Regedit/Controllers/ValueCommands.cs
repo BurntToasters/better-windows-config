@@ -776,7 +776,7 @@ internal sealed class ValueCommands
             return;
         }
 
-        string? error = ValidateRenameValue(key, store, oldName, newName);
+        string? error = await ValidateRenameValueAsync(key, store, oldName, newName);
         if (error is not null)
         {
             await _context.ShowMessageAsync(Get("MsgCaptionRenameValueError"), error);
@@ -785,7 +785,8 @@ internal sealed class ValueCommands
 
         try
         {
-            store.RenameValue(key, oldName, newName);
+            // The rename is a registry write, so it runs off the UI thread. A remote key makes a network call.
+            await _context.RunRegistryWriteAsync(() => store.RenameValue(key, oldName, newName));
         }
         catch (RegistryOperationException ex)
         {
@@ -800,7 +801,7 @@ internal sealed class ValueCommands
     /// The text for a rename that cannot proceed. The classic rename texts name the old value, so the
     /// subject is the current name. Null when the new name is acceptable.
     /// </summary>
-    private string? ValidateRenameValue(RegistryPath key, RegistryStore store, string oldName, string newName)
+    private async Task<string?> ValidateRenameValueAsync(RegistryPath key, RegistryStore store, string oldName, string newName)
     {
         string subject = ValueLabel(oldName);
         if (newName.Length == 0)
@@ -821,9 +822,9 @@ internal sealed class ValueCommands
 
         try
         {
-            return store.Reader.ValueExists(key, newName)
-                ? string.Format(CultureInfo.CurrentCulture, Get("MsgRenameValueExists"), subject)
-                : null;
+            // The probe is a registry read, so it runs off the UI thread. A remote key makes a network call.
+            bool exists = await _context.RunRegistryAsync(() => store.Reader.ValueExists(key, newName));
+            return exists ? string.Format(CultureInfo.CurrentCulture, Get("MsgRenameValueExists"), subject) : null;
         }
         catch (RegistryOperationException ex)
         {

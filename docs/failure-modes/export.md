@@ -240,6 +240,21 @@ Whole-registry `.reg` output is one document, not one file per root. It starts w
 REGEDIT4 header and then every key section in root order. Duplicate key paths cannot occur across
 roots because every path includes its root.
 
+### Whole-computer export of a connected computer (remote)
+
+File > Export with the Computer node of a connected computer selected writes `HKEY_LOCAL_MACHINE` and
+`HKEY_USERS` in one document, through the same streaming writer as the local whole-registry export.
+Before the fix, the remote path built every section in memory first, and it exported each root as a
+selection, so an unreadable `HKEY_USERS` root failed the whole export.
+
+Rule: the two remote roots use the local whole-registry rules. An inaccessible root or key is skipped
+with its subtree (access denied, file not found, key deleted), the rest of the document is written, and
+any other read failure still throws. Each key section is written as it is read.
+
+Check: no automated check. Measuring it needs a whole `HKEY_LOCAL_MACHINE` read over loopback, which the
+E2E budget does not allow, and a second computer is needed to make `HKEY_USERS` unreadable. The path is
+reviewed against `RegFileExporter.ExportRootKeys`, which the local path also uses.
+
 ## 7. What classic `.reg` files cannot represent
 
 The `.reg` writer follows the goldens and the contract even when that is lossy:
@@ -276,6 +291,17 @@ with `RestoreKey`, or loading it at a direct child of `HKEY_LOCAL_MACHINE` or `H
 the process has the privileges, reproduces the saved subtree. The unit test suite proves save and
 restore inside `HKCU\Software\BWC-E2E`; the mount half runs only in the elevated suite because it
 needs the hive privileges and a mount point outside the sandbox.
+
+Hive export is local only. A remote store refuses hive operations with `ERROR_NOT_SUPPORTED` (50),
+which the export used to show as a raw error. Now a remote key whose export format is Registry Hive
+Files is refused before any write, with the classic remote text `DialogExportRemoteFormat` ("The
+registry of a connected computer exports as a Registration file. Choose Registration Files (.reg)."),
+and no file is written. Text and Registration exports of a remote key still work.
+
+Check: `Remote_ExportHiveOfRemoteKeyIsRefused` in `tests/Bwc.E2E/Remote/RemoteCommandTests.cs` connects
+to loopback, selects a remote key, chooses the Registry Hive Files filter in the save dialog, and checks
+the message and that no file exists. It runs only while RemoteRegistry is Running; otherwise it is the
+existing not-run rule (`RemoteRegistryService.RefusedConnect`).
 
 ## 9. Tests and repeatable artifact
 

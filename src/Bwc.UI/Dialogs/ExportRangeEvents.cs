@@ -228,6 +228,12 @@ internal sealed class ExportRangeEvents : IFileDialogEvents
             ShowMissingBranch();
             return SFalse;
         }
+        catch (ExportBranchUnreadableException ex)
+        {
+            // The typed key exists but cannot be read. The classic box names it, and the dialog stays open.
+            ShowBranchMessage(ex.Caption, ex.Message);
+            return SFalse;
+        }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             // The branch could not be checked. Nothing is approved, so the caller refuses the export.
@@ -298,7 +304,10 @@ internal sealed class ExportRangeEvents : IFileDialogEvents
         }
     }
 
-    private void ShowMissingBranch()
+    private void ShowMissingBranch() => ShowBranchMessage(_rules.MissingCaption, _rules.MissingMessage);
+
+    /// <summary>Shows a box for the branch edit's check, after the callback returns. The dialog stays open.</summary>
+    private void ShowBranchMessage(string caption, string message)
     {
         if (_queue is null)
         {
@@ -307,8 +316,6 @@ internal sealed class ExportRangeEvents : IFileDialogEvents
         }
 
         // The box is shown after this callback returns, so the file dialog's own message loop keeps running.
-        string caption = _rules.MissingCaption;
-        string message = _rules.MissingMessage;
         _ = _queue.TryEnqueue(() => { _ = ShowMissingBranchAsync(caption, message); });
     }
 
@@ -321,4 +328,20 @@ internal sealed class ExportRangeEvents : IFileDialogEvents
     }
 
     private static unsafe nint ActiveWindowHandle() => (nint)PInvoke.GetActiveWindow().Value;
+}
+
+/// <summary>
+/// Thrown by the branch check (ExportBranchRules.BranchExists) when a typed key exists but cannot be read. The message
+/// is the classic box text for that key, and Caption is its caption. The sink shows it and keeps the dialog open.
+/// </summary>
+public sealed class ExportBranchUnreadableException : Exception
+{
+    public ExportBranchUnreadableException(string caption, string message)
+        : base(message)
+    {
+        Caption = caption;
+    }
+
+    /// <summary>The caption of the box.</summary>
+    public string Caption { get; }
 }
