@@ -25,10 +25,45 @@ internal static class HiveMountNative
         TokenHasPrivilege(BackupPrivilege) &&
         TokenHasPrivilege(RestorePrivilege);
 
+    /// <summary>
+    /// Titles of the visible top-level windows of <paramref name="processId"/> other than <paramref name="main"/>:
+    /// a progress window or message box the app still shows. Read only.
+    /// </summary>
+    internal static IReadOnlyList<string> OtherVisibleWindows(int processId, nint main)
+    {
+        var titles = new List<string>();
+        _ = EnumWindows(
+            (hwnd, _) =>
+            {
+                _ = GetWindowThreadProcessId(hwnd, out uint owner);
+                if (owner == (uint)processId && hwnd != main && IsWindowVisible(hwnd))
+                {
+                    titles.Add($"0x{hwnd.ToInt64():X} '{Bwc.E2E.Harness.Win32.TitleOf(hwnd)}'");
+                }
+
+                return true;
+            },
+            nint.Zero);
+        return titles;
+    }
+
     /// <summary>Unloads HKEY_USERS\<paramref name="name"/>. Returns the Win32 error, 0 on success.</summary>
     internal static int UnloadMount(string name) => RegUnLoadKeyW(HkeyUsers, name);
 
 #pragma warning disable SYSLIB1054 // A few token and unload calls do not justify LibraryImport plumbing.
+    private delegate bool EnumWindowsProc(nint hwnd, nint lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumWindows(EnumWindowsProc callback, nint lParam);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(nint hwnd);
+
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "RegUnLoadKeyW")]
     private static extern int RegUnLoadKeyW(nint hKey, string lpSubKey);
 

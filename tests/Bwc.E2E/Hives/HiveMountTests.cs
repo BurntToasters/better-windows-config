@@ -194,7 +194,22 @@ public sealed class HiveMountTests
             "hives.elevated.export.file",
             written && isHive,
             $"hive file written={written}, first four bytes='{signature}', expected 'regf'.");
-        return written && isHive;
+        if (!(written && isHive))
+        {
+            return false;
+        }
+
+        // The file exists before the export finishes: the progress window can still be open and take the foreground
+        // from the main window. The next step types into the address bar, so it waits for the app's other windows.
+        IReadOnlyList<string> others = [];
+        bool finished = ControlTestSupport.WaitUntil(
+            () => (others = HiveMountNative.OtherVisibleWindows(session.ProcessId, session.MainHwnd)).Count == 0,
+            TimeSpan.FromSeconds(60));
+        E2EResults.Record(
+            "hives.elevated.export.finished",
+            finished,
+            finished ? "No other window of the app is open after the export." : "Still open: " + string.Join(", ", others));
+        return finished;
     }
 
     /// <summary>Selects HKEY_USERS, runs File > Load Hive, picks the file and names the mount in the Key Name prompt.</summary>
