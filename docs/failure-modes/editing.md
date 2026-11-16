@@ -113,6 +113,25 @@ the classic warning "Deleting this key will delete all of its subkeys." The conf
 calls `RegistryStore.DeleteKey(path, recursive: true)`. Cancelling leaves the key and all of its
 children untouched.
 
+### Delete that fails part way
+
+`RegistryWriter.DeleteKey(path, recursive: true)` calls `RegDeleteTree`, which removes the subkeys
+before it deletes the key itself. A key whose DELETE right is denied therefore ends with its subkeys
+gone and the key still present. The error dialog shows the classic delete text for that key.
+
+Before the fix, the command returned after the error dialog without a refresh. The tree still showed
+the removed subkeys under the key, so the next click on one of them failed with a stale path.
+
+Rule: after any failed delete, the tree is rebuilt from the registry and the key that failed stays
+selected. Its children are read again, so a removed subkey does not stay on screen. The rebuild runs
+before the error dialog is shown, so the tree behind the dialog is already correct.
+
+Check: `Editing_DeleteFailureRebuildsTheTree` in `tests/Bwc.E2E/Editing/KeyDeleteFailureTests.cs`. It
+expands a sandbox key with two subkeys, denies DELETE on that key for the current user with an ACE that
+is not inherited, deletes the key, dismisses the error box, and checks that the tree shows no children
+under it while the registry shows none either. The ACL is restored in a finally block before the run
+subtree is removed.
+
 ### Refresh and stale selection
 
 Mutations rebuild the tree source instead of patching cached children. The target path is resolved

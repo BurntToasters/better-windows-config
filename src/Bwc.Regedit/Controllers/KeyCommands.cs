@@ -87,11 +87,13 @@ internal sealed class KeyCommands
             return;
         }
 
-        string name = NextUniqueKeyName(parent);
+        // The name search and the create read and write the registry, so they run off the UI thread. A remote key
+        // makes a network call for each probe.
+        string name = await _context.RunRegistryAsync(() => NextUniqueKeyName(parent));
         RegistryPath created = parent.Path.Append(name);
         try
         {
-            parent.Store.CreateKey(created);
+            await _context.RunRegistryWriteAsync(() => parent.Store.CreateKey(created));
         }
         catch (RegistryOperationException ex)
         {
@@ -136,7 +138,7 @@ internal sealed class KeyCommands
         // subkey count is still read so that a key which cannot be read is reported before the prompt.
         try
         {
-            _ = location.Reader.GetKeyInfo(path);
+            _ = await _context.RunRegistryAsync(() => location.Reader.GetKeyInfo(path));
         }
         catch (RegistryOperationException ex)
         {
@@ -161,6 +163,9 @@ internal sealed class KeyCommands
         }
         catch (RegistryOperationException ex)
         {
+            // RegDeleteTree can remove some subkeys and then fail on the key. Rebuild the tree from the registry first,
+            // with the failed key still selected, so no removed subkey stays on screen behind the error box.
+            await _context.RefreshTreeAsync(location.DisplayOf(path));
             await _context.ShowRegistryErrorAsync(ex, RegistryAction.DeleteKey, RegeditContext.DefaultSubject(path));
             return;
         }
@@ -177,7 +182,7 @@ internal sealed class KeyCommands
             return;
         }
 
-        string? error = ValidateRenameKey(location, newName);
+        string? error = await ValidateRenameKeyAsync(location, newName);
         if (error is not null)
         {
             await _context.ShowMessageAsync(Get("MsgCaptionRenameKeyError"), error);
@@ -202,7 +207,7 @@ internal sealed class KeyCommands
     /// The text for a rename that cannot proceed. The classic rename texts name the old key, so the
     /// subject is the current leaf name. Null when the name is acceptable.
     /// </summary>
-    private string? ValidateRenameKey(KeyLocation location, string newName)
+    private async Task<string?> ValidateRenameKeyAsync(KeyLocation location, string newName)
     {
         RegistryPath path = location.Path;
         if (string.Equals(path.Components[^1], newName, StringComparison.OrdinalIgnoreCase))
@@ -238,7 +243,9 @@ internal sealed class KeyCommands
 
         try
         {
-            return location.Reader.KeyExists(target) ? Format("MsgRenameKeyExists", subject) : null;
+            // The probe is a registry read, so it runs off the UI thread. A remote key makes a network call.
+            bool exists = await _context.RunRegistryAsync(() => location.Reader.KeyExists(target));
+            return exists ? Format("MsgRenameKeyExists", subject) : null;
         }
         catch (RegistryOperationException ex)
         {

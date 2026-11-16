@@ -61,6 +61,10 @@ const scriptProcessLaunch =
 // Files that may call native write APIs. Each entry records why it is exempt.
 const nativeWriteAllowlist = new Map([
   [
+    "tests/Bwc.E2E/Harness/SandboxRegistry.cs",
+    "Restores a DACL on a sandbox key under the run root through RegSetKeySecurity with WRITE_DAC alone. A managed writable open needs the read rights that the test's deny ACE removes.",
+  ],
+  [
     "tests/Bwc.Registry.Tests/RegistryLinkFixture.cs",
     "Creates and removes symbolic link keys for the guard tests. The writer never creates links, so the test fixture is the only source of link inputs.",
   ],

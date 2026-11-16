@@ -533,7 +533,7 @@ internal sealed class HiveRemoteCommands
     private static bool TryGetNodeKeyPath(TreeNode? node, out RegistryPath path)
     {
         if (node?.RegistryPath is { Length: > 0 } displayPath &&
-            RegistryPath.TryParse(displayPath, out RegistryPath? parsed) &&
+            RegistryTreeSource.TryParseNodePath(displayPath, out RegistryPath? parsed) &&
             parsed is not null)
         {
             path = parsed;
