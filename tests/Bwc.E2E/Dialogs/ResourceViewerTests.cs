@@ -537,12 +537,17 @@ public sealed class ResourceViewerTests
 
     private static void CheckRows(AutomationElement? columns, string checkId, string[][] expected)
     {
-        IReadOnlyList<string[]> rows = columns is null
-            ? Array.Empty<string[]>()
-            : columns.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem))
-                .Select(item => item.Name.Split('|'))
-                .ToArray();
-        bool ok = rows.Count == expected.Length && rows.Zip(expected).All(pair => pair.First.SequenceEqual(pair.Second));
+        // The rows can arrive after the column list exists, so they are polled until they match or the wait ends.
+        IReadOnlyList<string[]> rows = Array.Empty<string[]>();
+        bool ok = columns is not null && ControlTestSupport.WaitUntil(
+            () =>
+            {
+                rows = columns.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem))
+                    .Select(item => item.Name.Split('|'))
+                    .ToArray();
+                return rows.Count == expected.Length && rows.Zip(expected).All(pair => pair.First.SequenceEqual(pair.Second));
+            },
+            UiTimeout);
         E2EResults.Record(checkId, ok, $"rows=[{string.Join(" | ", rows.Select(r => string.Join(",", r)))}].");
     }
 

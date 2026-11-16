@@ -347,8 +347,9 @@ public sealed class ExportRangeTests
                     $"foreground={foreground}, window open after Alt+F4={kept}, main still disabled={stillDisabled}.");
             }
 
+            // A 1000-key import takes far longer for x64 under emulation late in a full run, so the wait is generous.
             bool progressClosed = progress != IntPtr.Zero &&
-                ControlTestSupport.WaitUntil(() => !Win32.IsWindow(progress), TimeSpan.FromSeconds(120));
+                ControlTestSupport.WaitUntil(() => !Win32.IsWindow(progress), TimeSpan.FromSeconds(300));
             IntPtr result = ImportExportWindows.WaitForResult(
                 session.MainHwnd,
                 text => text.Contains("successfully added to the registry", StringComparison.Ordinal),
