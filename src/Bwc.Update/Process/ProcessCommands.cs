@@ -15,6 +15,9 @@ public static class ProcessCommands
     public static IReadOnlyList<string> ProcessNames { get; } =
         ["BetterWindowsConfig", .. ToolCatalog.Tools.Select(tool => Path.GetFileNameWithoutExtension(tool.ExeName))];
 
+    /// <summary>Exit code of CloseRunning when a BWC process of the folder runs in another session.</summary>
+    public const int OtherSessionExitCode = 4;
+
     private const int PollMilliseconds = 250;
     private const uint WmClose = 0x0010;
 
@@ -22,19 +25,50 @@ public static class ProcessCommands
     /// Sends WM_CLOSE to the top-level windows of every BWC process that runs from <paramref name="installDir"/>,
     /// except <paramref name="excluded"/> and this process, and waits up to <paramref name="timeoutSeconds"/>
     /// for none to remain. Returns 0 when none remain, or 3 and prints each remaining name and pid.
+    /// Before anything is closed, a BWC process of the folder in another session ends the command with
+    /// <see cref="OtherSessionExitCode"/>: each one is printed as <c>RunningInOtherSession session=n name pid=n</c>.
     /// </summary>
-    public static int CloseRunning(string installDir, IReadOnlyList<int> excluded, int timeoutSeconds, TextWriter output)
+    public static int CloseRunning(string installDir, IReadOnlyList<int> excluded, int timeoutSeconds, TextWriter output) =>
+        CloseRunning(installDir, excluded, timeoutSeconds, output, new SystemProcessSource(), ProcessScan.CurrentSessionId(), PostCloseToWindows);
+
+    /// <summary>
+    /// The same command with the process list, the current session, and the "ask this process to close" step given by the
+    /// caller. Tests use this overload, so no window is ever closed by a test.
+    /// </summary>
+    public static int CloseRunning(
+        string installDir,
+        IReadOnlyList<int> excluded,
+        int timeoutSeconds,
+        TextWriter output,
+        IProcessSource source,
+        int currentSession,
+        Action<int> postClose)
     {
         ArgumentNullException.ThrowIfNull(installDir);
         ArgumentNullException.ThrowIfNull(excluded);
         ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(postClose);
 
         var skip = new HashSet<int>(excluded) { Environment.ProcessId };
+        var otherSessions = ProcessScan.RunningFromOtherSessions(installDir, skip, source, currentSession);
+        if (otherSessions.Count > 0)
+        {
+            foreach (var (pid, name, session) in otherSessions)
+            {
+                output.WriteLine(
+                    "RunningInOtherSession session=" + session.ToString(CultureInfo.InvariantCulture)
+                    + " " + name + " pid=" + pid.ToString(CultureInfo.InvariantCulture));
+            }
+
+            return OtherSessionExitCode;
+        }
+
         var asked = new HashSet<int>();
         var clock = System.Diagnostics.Stopwatch.StartNew();
         while (true)
         {
-            var running = RunningFrom(installDir, skip);
+            var running = ProcessScan.RunningFrom(installDir, skip, source, currentSession);
             if (running.Count == 0)
             {
                 return 0;
@@ -44,7 +78,7 @@ public static class ProcessCommands
             {
                 if (asked.Add(pid))
                 {
-                    PostCloseToWindows(pid);
+                    postClose(pid);
                 }
             }
 
@@ -87,9 +121,6 @@ public static class ProcessCommands
             Thread.Sleep(PollMilliseconds);
         }
     }
-
-    private static List<(int Pid, string Name)> RunningFrom(string installDir, HashSet<int> skip) =>
-        ProcessScan.RunningFrom(installDir, skip, new SystemProcessSource(), ProcessScan.CurrentSessionId());
 
     private static void PostCloseToWindows(int pid)
     {

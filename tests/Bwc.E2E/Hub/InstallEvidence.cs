@@ -15,9 +15,10 @@ internal static class InstallEvidence
 {
     public const string RecordFileName = "installer-record.txt";
     public const string HubLogLine = "Update install started. Helper pid ";
-    public const string HelperStartedLine = "update installer started:";
+    public const string HelperStartedLine = "update elevated helper started:";
 
     private const string StagingFolderName = "BWC-Update";
+    private const string ProtectedFolderName = "BWC-Protected";
     private const string InstallerFileName = "installer.exe";
     private const string ReceiptFileName = "receipt.json";
 
@@ -28,6 +29,12 @@ internal static class InstallEvidence
     /// <see cref="E2EConfig.TempEnvironment"/>). It is inside the run's data folder, not the developer's %TEMP%.
     /// </summary>
     public static string StagingRoot(E2EConfig config, string scope) => Path.Combine(config.TempRootFor(scope), StagingFolderName);
+
+    /// <summary>
+    /// The protected root of the elevated helper in the E2E flavor (BWC_E2E_UPDATE_PROTECTED_ROOT): a folder inside the
+    /// scope's temp folder, beside the staging root. The elevated helper copies the installer into a 32-hex folder there.
+    /// </summary>
+    public static string ProtectedRoot(E2EConfig config, string scope) => Path.Combine(config.TempRootFor(scope), ProtectedFolderName);
 
     /// <summary>The names of the staging folders under the root that exist now.</summary>
     public static HashSet<string> StagingFolders(string root)
@@ -125,7 +132,7 @@ internal static class InstallEvidence
     public static bool HubLogContains(string dataRoot, string text) =>
         ReadLogLines(Path.Combine(dataRoot, "hub", "logs")).Any(line => line.Contains(text, StringComparison.Ordinal));
 
-    /// <summary>True when the helper's own log says it started the installer.</summary>
+    /// <summary>True when the medium helper's own log says it started the elevated helper.</summary>
     public static bool HelperStartedInstaller(string dataRoot) =>
         ReadLogLines(Path.Combine(dataRoot, "update", "logs")).Any(line => line.Contains(HelperStartedLine, StringComparison.Ordinal));
 

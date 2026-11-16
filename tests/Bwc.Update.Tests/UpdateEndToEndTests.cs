@@ -5,8 +5,8 @@ namespace Bwc.Update.Tests;
 
 /// <summary>
 /// Full path over a loopback server: a signed manifest, the manifest check, the installer download,
-/// the same-version refusal, and the helper's verify-then-start on a fake host. It writes
-/// artifacts/update-verifier/result.json.
+/// the same-version refusal, the helper's verify-then-hand-off, and the elevated helper's copy, verify, and start
+/// (both on a fake host). It writes artifacts/update-verifier/result.json.
 /// </summary>
 [TestClass]
 public sealed class UpdateEndToEndTests
@@ -29,24 +29,35 @@ public sealed class UpdateEndToEndTests
         steps.Add(new Step("download: installer verified against the manifest and its signature, receipt written", download.Ok, download.Detail));
         Assert.IsTrue(download.Ok, download.Detail);
 
-        var host = new FakeHost();
-        var installDir = s.Dir.Sub("install");
-        var apply = await new UpdateApplier(s.Options(), host).ApplyAsync(
-            new ApplyRequest(
-                download.Value!.InstallerPath,
-                download.Value.ReceiptPath,
-                s.StagingRoot,
-                "0.1.0",
-                Architectures.X64,
-                installDir,
-                [],
-                TimeSpan.FromSeconds(2),
-                []),
-            CancellationToken.None);
-        var startedVerifiedBytes = host.SeenInstallerSha256 == payload.Sha256;
-        steps.Add(new Step("apply: installer started with the verified bytes, helper returns without waiting", apply.Failure == UpdateFailure.None && apply.InstallerStarted && startedVerifiedBytes, apply.Detail));
-        Assert.AreEqual(UpdateFailure.None, apply.Failure, apply.Detail);
-        Assert.IsTrue(startedVerifiedBytes);
+        var host = new FakeHost { HelperDirectory = s.Dir.Sub("install") };
+        var installDir = host.HelperDirectory;
+        var options = s.Options() with { ProgramFilesRoot = null };
+        var request = new ApplyRequest(
+            download.Value!.InstallerPath,
+            download.Value.ReceiptPath,
+            s.StagingRoot,
+            "0.1.0",
+            Architectures.X64,
+            installDir,
+            [],
+            TimeSpan.FromSeconds(2),
+            []);
+        var apply = await new UpdateApplier(options, host).ApplyAsync(request, CancellationToken.None);
+        var handedOff = apply.Failure == UpdateFailure.None && apply.ElevatedHelperStarted && !apply.InstallerStarted
+            && host.ElevatedRuns.Count == 1 && host.Runs.Count == 0 && host.SeenInstallerSha256 == payload.Sha256;
+        steps.Add(new Step("apply: verified, then the elevated helper is started with the staging folder only", handedOff, apply.Detail));
+        Assert.IsTrue(handedOff, apply.Detail);
+
+        // The elevated half, as the elevated helper runs it: copy into the protected root, verify the copy, start it.
+        host.Elevated = true;
+        host.SeenInstallerSha256 = null;
+        var elevated = new ElevatedApplier(options, host).Apply(
+            new ElevatedApplyRequest(host.ElevatedRuns[0].Folder, s.StagingRoot, installDir, "0.1.0", Architectures.X64));
+        var startedFromCopy = elevated.Failure == UpdateFailure.None && elevated.InstallerStarted && host.Runs.Count == 1
+            && host.SeenInstallerSha256 == payload.Sha256
+            && string.Equals(Path.GetDirectoryName(Path.GetDirectoryName(host.Runs[0].Path)), installDir + ProtectedStore.FolderSuffix, StringComparison.OrdinalIgnoreCase);
+        steps.Add(new Step("apply-elevated: the copy in the protected root is verified and started, with the verified bytes", startedFromCopy, elevated.Detail));
+        Assert.IsTrue(startedFromCopy, elevated.Detail);
 
         var again = await checker.CheckAsync(s.Request(current: "0.2.0"), CancellationToken.None);
         steps.Add(new Step("refuse: same version is not offered again", !again.Ok && again.Failure == UpdateFailure.SameVersion, again.Detail));

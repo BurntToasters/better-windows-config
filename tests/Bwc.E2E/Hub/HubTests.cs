@@ -717,6 +717,8 @@ public sealed class HubTests
         EnsureExecutables(config);
         string installStaging = InstallEvidence.StagingRoot(config, InstallScope);
         HashSet<string> stagingBefore = InstallEvidence.StagingFolders(installStaging);
+        string installProtected = InstallEvidence.ProtectedRoot(config, InstallScope);
+        HashSet<string> protectedBefore = InstallEvidence.StagingFolders(installProtected);
         string recordPath = Path.Combine(config.DataRootFor(InstallScope), InstallEvidence.RecordFileName);
 
         try
@@ -739,6 +741,7 @@ public sealed class HubTests
         finally
         {
             InstallEvidence.RemoveStagingSince(installStaging, stagingBefore);
+            InstallEvidence.RemoveStagingSince(installProtected, protectedBefore);
         }
 
         AssertNoFailures("Hub install checks");
@@ -1288,7 +1291,7 @@ public sealed class HubTests
         }
 
         int helperPid = InstallEvidence.HelperPidFromHubLog(dataRoot);
-        CheckInstallerRecord(config, fixture, InstallEvidence.ReadRecord(recordPath), hubProcess, helperPid);
+        CheckInstallerRecord(config, fixture, InstallEvidence.ReadRecord(recordPath), hubProcess, helperPid, sampler);
         bool helperSeen = helperPid > 0 && sampler.Seen.ContainsKey(helperPid);
         E2EResults.Record(
             "hub.install.helperPath",
@@ -1346,15 +1349,17 @@ public sealed class HubTests
     }
 
     /// <summary>
-    /// Checks the stand-in's record: the exact command line, the bytes that ran (the signed bytes), the staging path,
-    /// and that the Hub had exited before the installer ran.
+    /// Checks the stand-in's record: the exact command line, the bytes that ran (the signed bytes), the protected copy
+    /// path, and that the Hub had exited before the installer ran. The installer's parent is the elevated helper that the
+    /// medium helper started, not the medium helper itself.
     /// </summary>
     private static void CheckInstallerRecord(
         E2EConfig config,
         UpdateFixture fixture,
         Dictionary<string, string> record,
         Process hubProcess,
-        int helperPid)
+        int helperPid,
+        ProcessSampler sampler)
     {
         string installDir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(config.PublishDir));
         string argc = RecordField(record, "argc");
@@ -1377,11 +1382,16 @@ public sealed class HubTests
             $"'{InstallArgumentSwitch} {InstallRelaunchSwitch} {InstallParentPidPrefix}<n> {InstallDirectoryArgumentPrefix}{installDir}', unquoted and last.");
 
         string parentText = arg2.Length >= InstallParentPidPrefix.Length ? arg2[InstallParentPidPrefix.Length..] : string.Empty;
-        bool parentIsHelper = helperPid > 0 && string.Equals(parentText, helperPid.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        bool parentIsElevatedHelper = helperPid > 0 &&
+            int.TryParse(parentText, NumberStyles.None, CultureInfo.InvariantCulture, out int parentId) &&
+            parentId > 0 &&
+            parentId != helperPid;
+        bool parentSeen = parentIsElevatedHelper && sampler.Seen.ContainsKey(int.Parse(parentText, CultureInfo.InvariantCulture));
         E2EResults.Record(
             "hub.install.parentPid",
-            parentIsHelper,
-            $"The installer's parent pid is '{parentText}'. The helper pid the Hub logged is {helperPid}.");
+            parentIsElevatedHelper,
+            $"The installer's parent pid is '{parentText}', the elevated helper, and not the medium helper pid {helperPid} " +
+            $"that the Hub logged. The sampler {(parentSeen ? "saw" : "did not catch")} it running from the publish folder.");
 
         string commandLine = RecordField(record, "commandLine");
         string tail = " " + InstallArgumentSwitch + " " + InstallRelaunchSwitch + " " + arg2 + " " + InstallDirectoryArgumentPrefix + installDir;
@@ -1399,9 +1409,9 @@ public sealed class HubTests
 
         string processPath = RecordField(record, "processPath");
         E2EResults.Record(
-            "hub.install.stagedPath",
-            InstallEvidence.IsStagedInstaller(processPath, InstallEvidence.StagingRoot(GuiGate.Config, InstallScope)),
-            $"The installer ran from '{processPath}'.");
+            "hub.install.protectedPath",
+            InstallEvidence.IsStagedInstaller(processPath, InstallEvidence.ProtectedRoot(GuiGate.Config, InstallScope)),
+            $"The installer ran from '{processPath}', a copy under the protected root, and not from the staging folder.");
 
         DateTime? hubExit = InstallEvidence.ExitTimeUtc(hubProcess);
         string stamp = RecordField(record, "timestampUtc");
@@ -1630,6 +1640,9 @@ public sealed class HubTests
             environment["BWC_E2E_UPDATE_MANIFEST_URL"] = server.ManifestUrl;
             environment["BWC_E2E_UPDATE_TRUSTED_KEY"] = fixture.PublicKeyBase64;
             environment["BWC_E2E_UPDATE_ALLOW_HTTP"] = "1";
+
+            // The elevated helper runs unelevated in this flavor, and copies the installer under this folder of the run's temp.
+            environment["BWC_E2E_UPDATE_PROTECTED_ROOT"] = InstallEvidence.ProtectedRoot(config, scope);
         }
         else
         {

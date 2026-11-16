@@ -5,24 +5,27 @@ using Bwc.Core;
 namespace Bwc.Update;
 
 /// <summary>
-/// Helper mode. Order: refuse when elevated, check the request, check the paths and receipt, wait for
-/// the Hub and the tools to exit, verify the installer and keep its file open with no write or delete
-/// sharing, then start the installer with the verified file still held. The helper then returns: the
-/// installer waits for this process to exit (update-cli.md), and it relaunches the Hub itself.
+/// Helper mode (the medium-integrity half of an update). Order: refuse when elevated, check the request, check the
+/// paths and receipt, wait for the Hub and the tools to exit, verify the installer and keep its file open with no write
+/// or delete sharing, then ask the host to start <c>&lt;helper folder&gt;\BwcUpdate.exe --apply-elevated &lt;staging
+/// folder&gt;</c> (the shell shows the consent prompt) with the verified file still held. The helper then returns. It
+/// never starts the installer: the elevated helper copies it into a protected folder, verifies the copy, and starts it
+/// (<see cref="ElevatedApplier"/>). The installer relaunches the Hub itself.
 ///
-/// Every refusal before the installer starts relaunches the Hub with the failure code as the
-/// <c>--update-result</c> argument, so the user sees what happened. The Hub is relaunched only after the
-/// wait-for pids have exited, because the relaunched Hub would otherwise just activate the old one.
+/// Every refusal before the elevated helper starts relaunches the Hub with the failure code as the
+/// <c>--update-result</c> argument, so the user sees what happened (a declined prompt is ElevationDeclined). The Hub is
+/// relaunched only after the wait-for pids have exited, because it would otherwise just activate the old one.
 /// </summary>
 public sealed class UpdateApplier
 {
-    private const string HubExecutableName = "BetterWindowsConfig.exe";
-    private const string UpdateResultArgument = "--update-result";
+    private const string HubExecutableName = HubLauncher.HubExecutableName;
+    private const string HelperExecutableName = "BwcUpdate.exe";
+    private const string UpdateResultArgument = HubLauncher.UpdateResultArgument;
     private const int PollMilliseconds = 250;
 
     private readonly UpdateOptions _options;
     private readonly IUpdateProcessHost _host;
-    private bool _installerLaunched;
+    private bool _handedOff;
 
     public UpdateApplier(UpdateOptions options, IUpdateProcessHost host)
     {
@@ -31,8 +34,8 @@ public sealed class UpdateApplier
     }
 
     /// <summary>
-    /// Any unexpected exception before the installer starts ends as <see cref="UpdateFailure.Unexpected"/>, and the
-    /// Hub is relaunched with that code. After the installer starts, the helper never relaunches the Hub.
+    /// Any unexpected exception before the elevated helper starts ends as <see cref="UpdateFailure.Unexpected"/>, and the
+    /// Hub is relaunched with that code. After the elevated helper starts, the helper never relaunches the Hub.
     /// </summary>
     public async Task<ApplyOutcome> ApplyAsync(ApplyRequest request, CancellationToken ct = default)
     {
@@ -44,9 +47,14 @@ public sealed class UpdateApplier
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Log.Exception("unexpected error while applying the update", ex);
-            if (_installerLaunched)
+            if (_handedOff)
             {
-                return new ApplyOutcome(UpdateFailure.Unexpected, "unexpected error after the installer started", InstallerStarted: true, HubLaunched: false);
+                return new ApplyOutcome(
+                    UpdateFailure.Unexpected,
+                    "unexpected error after the elevated helper started",
+                    InstallerStarted: false,
+                    HubLaunched: false,
+                    ElevatedHelperStarted: true);
             }
 
             // The wait for the pids is skipped here: the failure may have come from the process check itself.
@@ -58,7 +66,8 @@ public sealed class UpdateApplier
     {
         ChildEnvironment.RemoveCompatibilityLayer();
 
-        // Staging under %TEMP% is writable by medium-integrity processes, so an elevated helper must not load from it.
+        // Staging under %TEMP% is writable by medium-integrity processes. An elevated process of this mode would load
+        // from it, so this mode refuses. The elevated work is done by --apply-elevated, which copies the installer first.
         if (_host.IsElevated())
         {
             return await RefuseAsync(request, UpdateFailure.RunningElevated, "the update helper runs elevated, so the update was not applied", ct, alreadyWaited: false);
@@ -91,11 +100,22 @@ public sealed class UpdateApplier
             return await RefuseAsync(request, folder.Failure, folder.Detail, ct, alreadyWaited: false);
         }
 
-        // The installer relaunches the Hub on success and waits for this process to exit before it does.
+        // The switches are checked as before, although the elevated helper builds its own command line and ignores them.
         var arguments = InstallerArguments.Build(request.InstallDir, request.InstallerSwitches, Environment.ProcessId);
         if (!arguments.Ok)
         {
             return await RefuseAsync(request, arguments.Failure, arguments.Detail, ct, alreadyWaited: false);
+        }
+
+        // The install dir is the folder of the running BwcUpdate.exe. The elevated helper derives the same folder itself.
+        if (!PathRules.SameDirectory(request.InstallDir, _host.HelperDirectory))
+        {
+            return await RefuseAsync(request, UpdateFailure.InstallDirUnsafe, "the install folder is not the folder of the update helper", ct, alreadyWaited: false);
+        }
+
+        if (_options.ProgramFilesRoot is { } programFiles && !ProgramFilesRule.IsUnder(_host.HelperDirectory, programFiles))
+        {
+            return await RefuseAsync(request, UpdateFailure.InstallDirUnsafe, "the update helper does not run from Program Files, so it is not run elevated", ct, alreadyWaited: false);
         }
 
         var receipt = UpdateReceipt.Read(request.ReceiptPath);
@@ -130,7 +150,7 @@ public sealed class UpdateApplier
                 return await RefuseAsync(request, UpdateFailure.ProcessesStillRunning, "apps are still running after the wait limit; nothing was installed", ct, alreadyWaited: true);
             }
 
-            return await VerifyAndStartAsync(request, offered, arguments.Value!, ct);
+            return await VerifyAndStartAsync(request, offered, ct);
         }
         catch (OperationCanceledException)
         {
@@ -139,7 +159,7 @@ public sealed class UpdateApplier
         }
     }
 
-    private async Task<ApplyOutcome> VerifyAndStartAsync(ApplyRequest request, UpdateReceipt offered, string arguments, CancellationToken ct)
+    private async Task<ApplyOutcome> VerifyAndStartAsync(ApplyRequest request, UpdateReceipt offered, CancellationToken ct)
     {
         var keys = _options.TrustedPublicKeys;
         var expected = new InstallerExpectation(offered.Version, offered.Architecture, offered.Size, offered.Sha256, offered.Signature);
@@ -152,10 +172,10 @@ public sealed class UpdateApplier
         }
 
         // The file stays open with FileShare.Read only. No other process can write or delete it from here
-        // until this method returns, so the bytes checked below are the bytes started.
+        // until this method returns, so the bytes checked below are the bytes the elevated helper opens.
         // The folder is held first, then the installer. Its final path must be the held folder's final path plus
         // installer.exe. Short names and junctioned parents resolve the same way on both sides; a swap between the
-        // two opens does not. The folder handle stays open until the installer has started.
+        // two opens does not. The folder handle stays open until the elevated helper has started.
         using var folder = InstallerPaths.OpenFolder(Path.GetDirectoryName(request.InstallerPath)!);
         if (folder is null)
         {
@@ -181,23 +201,26 @@ public sealed class UpdateApplier
             return await RefuseAsync(request, verified.Failure, verified.Detail, ct, alreadyWaited: true);
         }
 
+        // The only argument is the staging folder that was just verified. Nothing else of the request is forwarded.
+        var helperExe = Path.Combine(_host.HelperDirectory, HelperExecutableName);
+        var stagingFolder = Path.GetDirectoryName(Path.GetFullPath(request.InstallerPath))!;
         try
         {
-            if (!_host.StartInstaller(InstallerPaths.StripPrefix(finalPath), arguments))
+            if (_host.StartElevatedHelper(helperExe, stagingFolder) == ElevatedStart.Declined)
             {
-                return await RefuseAsync(request, UpdateFailure.InstallerFailed, "installer did not start", ct, alreadyWaited: true);
+                return await RefuseAsync(request, UpdateFailure.ElevationDeclined, "the elevation prompt was declined", ct, alreadyWaited: true);
             }
 
-            _installerLaunched = true;
+            _handedOff = true;
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or Win32Exception)
         {
-            Log.Exception("installer did not start", ex);
-            return await RefuseAsync(request, UpdateFailure.InstallerFailed, "installer did not start: " + ex.GetType().Name, ct, alreadyWaited: true);
+            Log.Exception("elevated helper did not start", ex);
+            return await RefuseAsync(request, UpdateFailure.InstallerFailed, "elevated helper did not start: " + ex.GetType().Name, ct, alreadyWaited: true);
         }
 
-        Log.Info($"update installer started: version={offered.Version} architecture={offered.Architecture}");
-        return new ApplyOutcome(UpdateFailure.None, "installer started", InstallerStarted: true, HubLaunched: false);
+        Log.Info($"update elevated helper started: version={offered.Version} architecture={offered.Architecture}");
+        return new ApplyOutcome(UpdateFailure.None, "elevated helper started", InstallerStarted: false, HubLaunched: false, ElevatedHelperStarted: true);
     }
 
     /// <summary>

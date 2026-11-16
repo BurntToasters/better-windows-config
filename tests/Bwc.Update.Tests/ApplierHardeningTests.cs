@@ -17,7 +17,7 @@ public sealed class ApplierHardeningTests
         Assert.AreEqual(UpdateFailure.ReceiptInvalid, outcome.Failure, outcome.Detail);
         Assert.IsTrue(outcome.HubLaunched, "the user still gets the app back");
         Assert.IsFalse(outcome.InstallerStarted);
-        Assert.AreEqual(0, h.Host.Runs.Count, "no installer runs");
+        Assert.AreEqual(0, h.Host.Launched, "no installer runs");
         Assert.AreEqual(1, h.Host.Started.Count);
         CollectionAssert.AreEqual(new[] { "--update-result", "ReceiptInvalid" }, h.Host.Started[0].Args.ToArray());
     }
@@ -33,7 +33,7 @@ public sealed class ApplierHardeningTests
         Assert.AreEqual(UpdateFailure.Unexpected, outcome.Failure, outcome.Detail);
         Assert.IsTrue(outcome.HubLaunched);
         Assert.IsFalse(outcome.InstallerStarted);
-        Assert.AreEqual(0, h.Host.Runs.Count, "the installer is not started");
+        Assert.AreEqual(0, h.Host.Launched, "the installer is not started");
         Assert.AreEqual(1, h.Host.Started.Count);
         CollectionAssert.AreEqual(new[] { "--update-result", "Unexpected" }, h.Host.Started[0].Args.ToArray());
     }
@@ -59,8 +59,8 @@ public sealed class ApplierHardeningTests
         var outcome = await h.Applier.ApplyAsync(request, CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
-        Assert.IsTrue(outcome.InstallerStarted);
-        Assert.AreEqual(1, h.Host.Runs.Count, "the verified installer is started");
+        Assert.IsTrue(outcome.ElevatedHelperStarted);
+        Assert.AreEqual(1, h.Host.ElevatedRuns.Count, "the elevated helper is started after the verified check");
     }
 
     [TestMethod]
@@ -87,7 +87,7 @@ public sealed class ApplierHardeningTests
         var outcome = await h.Applier.ApplyAsync(request, CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
-        Assert.IsTrue(outcome.InstallerStarted);
-        Assert.AreEqual(1, h.Host.Runs.Count);
+        Assert.IsTrue(outcome.ElevatedHelperStarted);
+        Assert.AreEqual(1, h.Host.ElevatedRuns.Count);
     }
 }
