@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Security.Principal;
 using System.Text;
 
 namespace Bwc.E2E.FakeInstaller;
@@ -11,10 +13,23 @@ namespace Bwc.E2E.FakeInstaller;
 /// (the path comes from BWC_E2E_INSTALLER_RECORD), then starts the Hub again from the /D= folder only when the
 /// command line has /RELAUNCH, because the real installer starts the new Hub when that switch is given
 /// (docs/contracts/update-manifest.md). It writes nothing else, installs nothing, and exits 0.
+///
+/// Two additions for the elevated machine tests (docs/failure-modes/installer-e2e.md, 63 to 75):
+/// - The record also holds the TEMP and TMP it was started with, whether it runs elevated, and the E2E protected root
+///   variable, so a test can check what the elevated helper gave the installer. With BWC_E2E_INSTALLER_NO_RELAUNCH=1
+///   the Hub is not started (the record says so).
+/// - Copied under the name BetterWindowsConfig.exe or BwcRegedit.exe it is a harmless stand-in for that program: it
+///   does nothing and waits up to 90 seconds. The tests use it where starting the real Hub would write the user's real
+///   settings folder, or where a process must never close.
 /// </summary>
 internal static class Program
 {
     public const string RecordVariable = "BWC_E2E_INSTALLER_RECORD";
+    public const string NoRelaunchVariable = "BWC_E2E_INSTALLER_NO_RELAUNCH";
+    private const string ProtectedRootVariable = "BWC_E2E_UPDATE_PROTECTED_ROOT";
+    private const string StandInHubName = "BetterWindowsConfig";
+    private const string StandInRegeditName = "BwcRegedit";
+    private const int StandInLifetimeSeconds = 90;
     private const string RelaunchSwitch = "/RELAUNCH";
 
     private const string HubExeName = "BetterWindowsConfig.exe";
@@ -26,6 +41,13 @@ internal static class Program
 
     private static int Main(string[] args)
     {
+        string? ownName = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
+        if (string.Equals(ownName, StandInHubName, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(ownName, StandInRegeditName, StringComparison.OrdinalIgnoreCase))
+        {
+            return RunStandIn();
+        }
+
         string? recordPath = Environment.GetEnvironmentVariable(RecordVariable);
         if (string.IsNullOrWhiteSpace(recordPath) || !Path.IsPathFullyQualified(recordPath))
         {
@@ -41,6 +63,7 @@ internal static class Program
         // The hash is of the file this process runs, so a test can compare it with the signed bytes.
         string sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(ownPath))).ToLowerInvariant();
         bool relaunch = args.Any(arg => string.Equals(arg, RelaunchSwitch, StringComparison.OrdinalIgnoreCase));
+        bool skipRelaunch = Environment.GetEnvironmentVariable(NoRelaunchVariable) == "1";
 
         var lines = new List<string>
         {
@@ -49,6 +72,11 @@ internal static class Program
             "sha256=" + sha256,
             "commandLine=" + Environment.CommandLine,
             "argc=" + args.Length.ToString(CultureInfo.InvariantCulture),
+            "processId=" + Environment.ProcessId.ToString(CultureInfo.InvariantCulture),
+            "elevated=" + (IsElevated() ? "1" : "0"),
+            "env.TEMP=" + (Environment.GetEnvironmentVariable("TEMP") ?? string.Empty),
+            "env.TMP=" + (Environment.GetEnvironmentVariable("TMP") ?? string.Empty),
+            "env.protectedRoot=" + (Environment.GetEnvironmentVariable(ProtectedRootVariable) ?? string.Empty),
         };
         for (int i = 0; i < args.Length; i++)
         {
@@ -56,6 +84,7 @@ internal static class Program
         }
 
         lines.Add("relaunchRequested=" + (relaunch ? "1" : "0"));
+        lines.Add("relaunchSkipped=" + (relaunch && skipRelaunch ? "1" : "0"));
 
         try
         {
@@ -77,7 +106,7 @@ internal static class Program
             return ExitRecordNotWritten;
         }
 
-        if (!relaunch)
+        if (!relaunch || skipRelaunch)
         {
             return ExitOk;
         }
@@ -85,6 +114,30 @@ internal static class Program
         string? installDir = DirectoryArgument(args);
         return installDir is not null && StartHub(installDir) ? ExitOk : ExitHubNotStarted;
     }
+
+    private static bool IsElevated()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
+    }
+
+    /// <summary>
+    /// The stand-in for the Hub or Regedit of a test install: no window, no work, no file. It waits so that a test can read
+    /// its token and stop it. The console is closed first so nothing flashes. It writes nothing because the shell may start
+    /// it at medium integrity, which cannot write the install folder.
+    /// </summary>
+    private static int RunStandIn()
+    {
+        _ = FreeConsole();
+        Thread.Sleep(TimeSpan.FromSeconds(StandInLifetimeSeconds));
+        return ExitOk;
+    }
+
+#pragma warning disable SYSLIB1054 // One call that frees the console; LibraryImport plumbing is not worth it.
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool FreeConsole();
+#pragma warning restore SYSLIB1054
 
     /// <summary>The folder after the last /D=, or null. The contract puts /D= last.</summary>
     private static string? DirectoryArgument(string[] args)

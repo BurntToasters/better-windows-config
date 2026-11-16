@@ -8,14 +8,18 @@
  * Those tests install A silently, press Download and Install in the Hub, and check the update. The Migration tests
  * use A as the old per-user install and prove the Hub's legacy cleanup removes it (artifacts/e2e/migration-<rid>.json).
  *
- * Usage: node scripts/test-installer-e2e.js --rid win-arm64|win-x64
+ * Usage: node scripts/test-installer-e2e.js --rid win-arm64|win-x64 [--prepare]
+ *
+ * --prepare builds A and B the same way and stops: it writes artifacts/e2e/installer-inputs.json (paths, versions, sizes,
+ * SHA-256, rid) for the Elevated machine-mode tests (docs/elevated-runner.md) and runs no test. Those tests read the
+ * file and report NOT RUN when it is missing, stale, or for another rid.
  *
  * Output: artifacts/e2e/installer-update.json and artifacts/e2e/migration-<rid>.json. Exit 0 only when both say pass,
  * and the migration file says the real old install case ran. Failure modes:
  * docs/failure-modes/installer-e2e.md. Needs NSIS (makensis) and must run unelevated.
  */
 import { spawnSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,12 +63,14 @@ const ICON_FILE = path.join(REPO_ROOT, "resources", "bwc.ico");
 const INSTALLER_DIR = path.join(REPO_ROOT, "artifacts", "installer");
 const E2E_DIR = path.join(REPO_ROOT, "artifacts", "e2e");
 const RESULT_PATH = path.join(E2E_DIR, "installer-update.json");
+const INPUTS_PATH = path.join(E2E_DIR, "installer-inputs.json");
+const INPUTS_SCHEMA = 1;
 const DOTNET_FALLBACK = "C:\\Program Files\\dotnet\\dotnet.exe";
 const NSIS_X86_HOME = path.join(process.env["ProgramFiles(x86)"] ?? "", "NSIS");
 const EXIT_USAGE = 2;
 const EXIT_NSIS_MISSING = 3;
 
-const usage = `Usage: node ${SCRIPT} --rid win-arm64|win-x64
+const usage = `Usage: node ${SCRIPT} --rid win-arm64|win-x64 [--prepare]
 
 Builds unsigned E2E installers A (package.json version) and B (next patch), then runs the Installer E2E tests:
 an in-app update from A to B through the Hub, a case with BwcRegedit open, an uninstall, the refusal to install
@@ -73,18 +79,24 @@ per-user sandbox, so everything here runs unelevated; the per-machine proof is t
 
 Options:
   --rid win-x64|win-arm64   Required. The app runtime identifier.
+  --prepare                 Build A and B, write artifacts/e2e/installer-inputs.json, run no test. Run this
+                            (unelevated) right before the elevated runner: the Elevated installer tests read the file.
   --help                    Show this help.
 
-Output: artifacts/e2e/installer-update.json
+Output: artifacts/e2e/installer-update.json (--prepare: artifacts/e2e/installer-inputs.json)
 Exit codes: 0 pass, 1 fail, 2 usage or environment error, ${EXIT_NSIS_MISSING} NSIS (makensis) missing.
 `;
 
 function parseArgs(argv) {
-  const options = { rid: undefined, help: false };
+  const options = { rid: undefined, help: false, prepare: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") {
       options.help = true;
+      continue;
+    }
+    if (arg === "--prepare") {
+      options.prepare = true;
       continue;
     }
     if (arg === "--rid") {
@@ -363,6 +375,35 @@ function readVerdict() {
   return document;
 }
 
+/** Size and SHA-256 of one setup, for the inputs file. */
+function describeSetup(file, version) {
+  const bytes = readFileSync(file);
+  return {
+    path: file,
+    version,
+    size: bytes.length,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+  };
+}
+
+/**
+ * Writes artifacts/e2e/installer-inputs.json for the Elevated tests. It is written last, after both builds passed, and
+ * the old file is removed before the build starts, so a failed prepare never leaves inputs that look current.
+ */
+function writeInputs({ rid, setupA, setupB, versionA, versionB }) {
+  const document = {
+    schema: INPUTS_SCHEMA,
+    rid,
+    createdUtc: new Date().toISOString(),
+    installerA: describeSetup(setupA, versionA),
+    installerB: describeSetup(setupB, versionB),
+  };
+  mkdirSync(E2E_DIR, { recursive: true });
+  writeFileSync(INPUTS_PATH, `${JSON.stringify(document, null, 2)}
+`, "utf8");
+  return document;
+}
+
 function main(argv = process.argv.slice(2)) {
   let options;
   try {
@@ -411,6 +452,10 @@ function main(argv = process.argv.slice(2)) {
   const runId = `${stamp(new Date())}-${randomBytes(4).toString("hex")}`;
   console.log(`installer-e2e: rid=${rid} A=${versionA} B=${versionB} runId=${runId}`);
 
+  if (options.prepare) {
+    rmSync(INPUTS_PATH, { force: true });
+  }
+
   let setupA;
   let setupB;
   try {
@@ -424,6 +469,16 @@ function main(argv = process.argv.slice(2)) {
   } catch (error) {
     console.error(`installer-e2e: FAIL while building: ${error.message}`);
     return 1;
+  }
+
+  if (options.prepare) {
+    const written = writeInputs({ rid, setupA, setupB, versionA, versionB });
+    console.log(`installer-e2e: prepared ${rid} A=${versionA} B=${versionB}`);
+    console.log(`installer-e2e:   A ${written.installerA.size} bytes sha256 ${written.installerA.sha256}`);
+    console.log(`installer-e2e:   B ${written.installerB.size} bytes sha256 ${written.installerB.sha256}`);
+    console.log(`installer-e2e: inputs ${path.relative(REPO_ROOT, INPUTS_PATH)}`);
+    console.log("installer-e2e: run the elevated runner next (docs/elevated-runner.md). A later build makes these inputs stale.");
+    return 0;
   }
 
   mkdirSync(E2E_DIR, { recursive: true });

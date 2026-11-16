@@ -124,7 +124,8 @@ const managedWriteAllowlist = new Map([
   ["tests/Bwc.E2E/Permissions/PermissionsTests.cs", "Seeds E2E run keys through the harness for permissions tests."],
   [
     "tests/Bwc.E2E/Installer/InstallerRun.cs",
-    "Writes and deletes only its own run key, Software/BWC-E2E/<run-id>: the migration stand-in uninstall key, then cleanup.",
+    "Writes and deletes only its own run key, Software/BWC-E2E/<run-id>: HKCU for the migration stand-in uninstall key, " +
+      "and HKLM (64-bit view) for the elevated machine-mode tests, where only cleanup deletes it and its empty BWC-E2E parent.",
   ],
   [
     "src/Bwc.Hub/Migration/LegacyInstallCleanup.cs",

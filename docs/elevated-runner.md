@@ -89,6 +89,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\elevated-runner\inst
 # Build the E2E publish the runner tests. Normal shell.
 node scripts/dotnet-build.js --rid win-arm64 --flavor e2e
 
+# Before the first run, and again after any rebuild of the installers: write the installer inputs. Normal shell.
+# It builds the two E2E setups (versions A and B) and records them in artifacts/e2e/installer-inputs.json.
+node scripts/test-installer-e2e.js --prepare --rid win-arm64
+
 # Run the Elevated tests and wait for the result. Normal shell. Never needs UAC.
 node scripts/elevated-runner/run.js
 
@@ -98,6 +102,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\elevated-runner\inst
 # Remove the task and %ProgramData%\BwcElevatedRunner. Elevated.
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\elevated-runner\uninstall.ps1
 ```
+
+The runner starts the tests with no arguments and no environment, so it cannot build the installers or pass their
+paths. `--prepare` is that step. It runs unelevated and writes `artifacts/e2e/installer-inputs.json` (rid, and for each
+setup its path, version, size, and SHA-256). Without the file, or when it is for another rid or a setup was rebuilt
+since, the seven installer tests below report Inconclusive (not run) with the command to run. Run `--prepare` last,
+after the E2E publish build, so the recorded setups match what the runner tests.
 
 `install.ps1 -Enable` and `-Disable` both need an elevated shell. A later `install.ps1` without
 a switch registers the task again and leaves it disabled.
@@ -132,6 +142,34 @@ The E2E tests (`tests/Bwc.E2E`) are run by `run.js` through `test-e2e.js --filte
   classic layout (RT_DIALOG 104), checks the mounted values, unloads it with File > Unload Hive, and checks that the
   mount is gone. Its `finally` unloads a mount that is left and deletes the hive file. It needs SeBackupPrivilege and
   SeRestorePrivilege. Failure modes: `docs/failure-modes/hives.md` section 14.
+
+- `Installer/InstallerMachineTests.cs`: seven tests that run the E2E `/MACHINE` setup (it needs the elevated token the
+  task has, and never prompts). They need `--prepare` (above). Failure modes: `docs/failure-modes/installer-e2e.md`,
+  43 to 81. Each test uses its own run id and writes only the names below; `finally` removes them.
+  - `InstallerMachine_FreshInstallOfB`: installs B. Checks the files, the HKLM key (64-bit view, nothing under
+    WOW6432Node), the `_?=` uninstall strings, the two all-users shortcuts and their AppUserModelIDs, and that the
+    folder inherits from Program Files with no write access for Users.
+  - `InstallerMachine_UpgradeFromPerUserAToMachineB`: a per-user A sandbox install (HKCU only) is open in Registry
+    Editor, then B is installed per machine with the A folder as the `/D=` hint. B goes to Program Files, the A folder
+    and key are untouched, and the open Registry Editor is closed.
+  - `InstallerMachine_ElevatedUpdateThroughHelperChain`: the real `BwcUpdate.exe --apply-elevated` starts a signed
+    stand-in installer from `<install dir>.upd<32 hex>`. Checks the hash, the command line, the elevated token, TEMP
+    and TMP in the copy, the protected ACLs (SYSTEM and Administrators only), and the removal of stale copies.
+  - `InstallerMachine_LaunchHubStartsAtMediumIntegrity`: `--launch-hub` from the elevated test starts the (stand-in)
+    Hub at medium integrity through the desktop shell.
+  - `InstallerMachine_CloseRunningClosesElevatedRegedit`: `--close-running` closes an elevated Registry Editor of the
+    test install, and the helper's token shows SeDebugPrivilege enabled while it scans.
+  - `InstallerMachine_UninstallThroughTheUninstallString`: the QuietUninstallString (in place, `_?=`) removes the key,
+    shortcuts, files, and `.upd`. Only `Uninstall.exe` may be left, queued for the restart.
+  - `InstallerMachine_DowngradeIsRefusedAndSameVersionRepairs`: A over B is refused with no change, and B over B
+    repairs.
+  The tests write only these paths, all named for the run id: `%ProgramFiles%BWC-E2E<id>` and its siblings
+  `<id>.new`, `<id>.old`, and `<id>.upd`; `HKLMSoftwareBWC-E2E<id>` (64-bit view); the all-users Start menu folder
+  `BWC-E2E-<id>`; and the per-user sandbox in the upgrade test (HKCU, a folder in %TEMP%, and its own Start menu folder). The in-place uninstaller
+  may add entries for `Uninstall.exe` and the run folder to `PendingFileRenameOperations` under
+  `HKLMSYSTEMCurrentControlSetControlSession Manager`. The test cannot remove them; they delete the leftover at
+  the next restart and are recorded in the artifact. Results: `artifacts/e2e/installer-machine.json` (every check, plus
+  the icacls and SDDL text of the folders). A stray key under `HKLMSoftwareWOW6432NodeBWC-E2E` is reported, not deleted.
 
 The registry tests (`tests/Bwc.Registry.Tests`) are compiled in the E2E flavor, but `run.js` does not run them. Run
 them yourself from an elevated shell, for example
