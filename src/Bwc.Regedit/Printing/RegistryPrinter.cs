@@ -86,7 +86,7 @@ public sealed class PrintDevice : IDisposable
 }
 
 /// <summary>
-/// Sends the registry report to the device returned by PrintDlgW. The report is the text export format
+/// Sends the registry report to the device returned by PrintDlgEx. The report is the text export format
 /// (<see cref="RegistryExportService.ExportTextFile(RegistryPath?, TextWriter, RegistryExportScope,
 /// CancellationToken, IProgress{ExportProgress}?)"/>), so print and File > Export write the same text. The
 /// dialog is always shown by the caller's UI thread; the caller may then run <see cref="PrintToDevice"/> on
@@ -108,6 +108,11 @@ public static class RegistryPrinter
         PdReturnDc |
         PdUseDevModeCopiesAndCollate |
         PdHidePrintToFile;
+
+    // commdlg.h PrintDlgEx values: PD_PAGENOTSPECIFIED, PD_RESULT_PRINT (cancel is 0, apply is 2), and S_FALSE.
+    private const uint PdPageNotSpecified = 0xFFFFFFFF;
+    private const uint PdResultPrint = 1;
+    private const int SFalse = 1;
 
     // wingdi.h indexes used by GetDeviceCaps.
     private const int HorzRes = 8;
@@ -144,7 +149,8 @@ public static class RegistryPrinter
         RegistryPath? startKey,
         TextWriter writer,
         CancellationToken cancellationToken = default,
-        IProgress<ExportProgress>? progress = null)
+        IProgress<ExportProgress>? progress = null,
+        Func<RegistryPath, string>? keyDisplay = null)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(writer);
@@ -152,7 +158,7 @@ public static class RegistryPrinter
         RegistryExportScope scope = startKey is null
             ? RegistryExportScope.WholeRegistry
             : RegistryExportScope.Selection;
-        new RegistryExportService(reader).ExportTextFile(startKey, writer, scope, cancellationToken, progress);
+        new RegistryExportService(reader).ExportTextFile(startKey, writer, scope, cancellationToken, progress, keyDisplay);
     }
 
 #if BWC_E2E
@@ -168,7 +174,8 @@ public static class RegistryPrinter
         string? outputFile,
         RegistryReader reader,
         RegistryPath? startKey,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<RegistryPath, string>? keyDisplay = null)
     {
         if (!PrintE2EGuard.Allows(printerName, outputFile, out string refusal))
         {
@@ -186,7 +193,7 @@ public static class RegistryPrinter
 
         using var device = new PrintDevice(deviceContext, 0, 0, printerName);
         return new E2EPrintOutcome(
-            PrintJob(device, reader, startKey, cancellationToken, outputFile),
+            PrintJob(device, reader, startKey, cancellationToken, outputFile, keyDisplay),
             DeviceContextCreated: true);
     }
 #endif
@@ -201,57 +208,61 @@ public static class RegistryPrinter
         out PrintResult result)
     {
         device = null;
-        var dialog = new PRINTDLGW
+
+        // PrintDlgEx takes no template handle, so the dialog is the system's own. The range is decided by the caller:
+        // Selected branch at a key, All at Computer (docs/failure-modes/print.md).
+        var dialog = new PRINTDLGEXW
         {
-            structSize = (uint)Marshal.SizeOf<PRINTDLGW>(),
-            owner = ownerHwnd,
-            flags = PrintDialogFlags,
+            lStructSize = (uint)Marshal.SizeOf<PRINTDLGEXW>(),
+            hwndOwner = ownerHwnd,
+            Flags = PrintDialogFlags,
+            nStartPage = PdPageNotSpecified,
         };
 
-        bool accepted;
+        int hresult;
         try
         {
-            accepted = PrintNativeMethods.PrintDlgW(ref dialog);
+            hresult = PrintNativeMethods.PrintDlgExW(ref dialog);
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
         {
-            FreeDialogBlocks(dialog.devMode, dialog.devNames);
+            FreeDialogBlocks(dialog.hDevMode, dialog.hDevNames);
             result = PrintResult.Failed(0, "The Windows print dialog is not available: " + ex.Message);
             return false;
         }
 
-        if (!accepted)
+        if (hresult < 0)
         {
-            uint dialogError = PrintNativeMethods.CommDlgExtendedError();
-            FreeDialogBlocks(dialog.devMode, dialog.devNames);
-
-            if (dialogError == 0)
-            {
-                result = PrintResult.Cancelled();
-                return false;
-            }
-
+            FreeDialogBlocks(dialog.hDevMode, dialog.hDevNames);
             result = PrintResult.Failed(
-                (int)dialogError,
+                hresult,
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "The Windows print dialog failed with common dialog error 0x{0:X4}.",
-                    dialogError));
+                    "The Windows print dialog failed with HRESULT 0x{0:X8}.",
+                    hresult));
             return false;
         }
 
-        if (dialog.deviceContext == 0)
+        // S_FALSE and PD_RESULT_CANCEL both mean the user cancelled. Only PD_RESULT_PRINT starts a job.
+        if (hresult == SFalse || dialog.dwResultAction != PdResultPrint)
         {
-            FreeDialogBlocks(dialog.devMode, dialog.devNames);
+            FreeDialogBlocks(dialog.hDevMode, dialog.hDevNames);
+            result = PrintResult.Cancelled();
+            return false;
+        }
+
+        if (dialog.hDC == 0)
+        {
+            FreeDialogBlocks(dialog.hDevMode, dialog.hDevNames);
             result = PrintResult.Failed(0, "The Windows print dialog returned no printer device context.");
             return false;
         }
 
         device = new PrintDevice(
-            dialog.deviceContext,
-            dialog.devMode,
-            dialog.devNames,
-            ReadDeviceName(dialog.devNames));
+            dialog.hDC,
+            dialog.hDevMode,
+            dialog.hDevNames,
+            ReadDeviceName(dialog.hDevNames));
         result = PrintResult.Printed();
         return true;
     }
@@ -290,8 +301,9 @@ public static class RegistryPrinter
         PrintDevice device,
         RegistryReader reader,
         RegistryPath? startKey,
-        CancellationToken cancellationToken = default) =>
-        PrintJob(device, reader, startKey, cancellationToken, outputFile: null);
+        CancellationToken cancellationToken = default,
+        Func<RegistryPath, string>? keyDisplay = null) =>
+        PrintJob(device, reader, startKey, cancellationToken, outputFile: null, keyDisplay);
 
     /// <summary>
     /// The one print job. A null start key prints the whole registry (Computer). <paramref name="outputFile"/> is
@@ -303,7 +315,8 @@ public static class RegistryPrinter
         RegistryReader reader,
         RegistryPath? startKey,
         CancellationToken cancellationToken,
-        string? outputFile)
+        string? outputFile,
+        Func<RegistryPath, string>? keyDisplay)
     {
         ArgumentNullException.ThrowIfNull(device);
         ArgumentNullException.ThrowIfNull(reader);
@@ -367,7 +380,7 @@ public static class RegistryPrinter
 
         try
         {
-            return PrintReport(deviceContext, reader, startKey, dpiX, dpiY, cancellationToken, outputFile);
+            return PrintReport(deviceContext, reader, startKey, dpiX, dpiY, cancellationToken, outputFile, keyDisplay);
         }
         finally
         {
@@ -383,7 +396,8 @@ public static class RegistryPrinter
         int dpiX,
         int dpiY,
         CancellationToken cancellationToken,
-        string? outputFile)
+        string? outputFile,
+        Func<RegistryPath, string>? keyDisplay)
     {
         int pageWidth = PrintNativeMethods.GetDeviceCaps(deviceContext, HorzRes);
         int pageHeight = PrintNativeMethods.GetDeviceCaps(deviceContext, VertRes);
@@ -449,7 +463,8 @@ public static class RegistryPrinter
                 new PageGeometry(left, top, bottom, lineHeight, columns),
                 cancellationToken,
                 outputPointer,
-                abortProc);
+                abortProc,
+                keyDisplay);
         }
         finally
         {
@@ -469,7 +484,8 @@ public static class RegistryPrinter
         PageGeometry geometry,
         CancellationToken cancellationToken,
         nint outputPointer,
-        AbortProcDelegate abortProc)
+        AbortProcDelegate abortProc,
+        Func<RegistryPath, string>? keyDisplay)
     {
         var document = new DOCINFOW
         {
@@ -507,7 +523,7 @@ public static class RegistryPrinter
                 geometry.Bottom,
                 geometry.LineHeight,
                 geometry.Columns);
-            WriteReport(reader, startKey, page, cancellationToken);
+            WriteReport(reader, startKey, page, cancellationToken, null, keyDisplay);
             page.Finish();
 
             if (PrintNativeMethods.EndPage(deviceContext) <= 0)
@@ -731,28 +747,31 @@ public static class RegistryPrinter
     }
 }
 
+// commdlg.h PRINTDLGEXW, in header order. It has no template handle: only hInstance and lpPrintTemplateName.
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-internal struct PRINTDLGW
+internal struct PRINTDLGEXW
 {
-    public uint structSize;
-    public nint owner;
-    public nint devMode;
-    public nint devNames;
-    public nint deviceContext;
-    public uint flags;
-    public ushort fromPage;
-    public ushort toPage;
-    public ushort minPage;
-    public ushort maxPage;
-    public ushort copies;
-    public nint instance;
-    public nint customData;
-    public nint printHook;
-    public nint setupHook;
-    public nint printTemplateName;
-    public nint setupTemplateName;
-    public nint printTemplate;
-    public nint setupTemplate;
+    public uint lStructSize;
+    public nint hwndOwner;
+    public nint hDevMode;
+    public nint hDevNames;
+    public nint hDC;
+    public uint Flags;
+    public uint Flags2;
+    public uint ExclusionFlags;
+    public uint nPageRanges;
+    public uint nMaxPageRanges;
+    public nint lpPageRanges;
+    public uint nMinPage;
+    public uint nMaxPage;
+    public uint nCopies;
+    public nint hInstance;
+    public nint lpPrintTemplateName;
+    public nint lpCallback;
+    public uint nPropertyPages;
+    public nint lphPropertyPages;
+    public uint nStartPage;
+    public uint dwResultAction;
 }
 
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -797,12 +816,9 @@ internal static class PrintNativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GlobalUnlock(nint memory);
 
-    [DllImport("comdlg32.dll", CharSet = CharSet.Unicode, EntryPoint = "PrintDlgW", ExactSpelling = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    internal static extern bool PrintDlgW(ref PRINTDLGW dialog);
-
-    [DllImport("comdlg32.dll", ExactSpelling = true)]
-    internal static extern uint CommDlgExtendedError();
+    // Returns an HRESULT: S_OK, S_FALSE for cancel, or a failure code.
+    [DllImport("comdlg32.dll", CharSet = CharSet.Unicode, EntryPoint = "PrintDlgExW", ExactSpelling = true)]
+    internal static extern int PrintDlgExW(ref PRINTDLGEXW dialog);
 
     [DllImport("gdi32.dll", CharSet = CharSet.Unicode, EntryPoint = "CreateFontW", ExactSpelling = true, SetLastError = true)]
     internal static extern nint CreateFontW(

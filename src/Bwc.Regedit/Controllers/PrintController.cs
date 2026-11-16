@@ -80,7 +80,7 @@ internal sealed class PrintController
             using (ready)
             {
                 result = await RunJobWithProgressAsync(
-                    token => RegistryPrinter.PrintToDevice(ready, target.Reader, target.StartKey, token));
+                    token => RegistryPrinter.PrintToDevice(ready, target.Reader, target.StartKey, token, target.KeyDisplay));
             }
         }
 
@@ -96,13 +96,14 @@ internal sealed class PrintController
     {
         if (_context.IsComputerSelected)
         {
-            target = new PrintTarget(null, _context.Store.Reader, "Computer");
+            target = new PrintTarget(null, _context.Store.Reader, "Computer", null);
             return true;
         }
 
         if (_context.TryGetSelectedLocation(out KeyLocation location))
         {
-            target = new PrintTarget(location.Path, location.Reader, location.DisplayPath);
+            Func<RegistryPath, string>? keyDisplay = location.IsRemote ? location.DisplayOf : null;
+            target = new PrintTarget(location.Path, location.Reader, location.DisplayPath, keyDisplay);
             return true;
         }
 
@@ -186,7 +187,15 @@ internal sealed class PrintController
     }
 
     /// <summary>The key or whole registry that a print reads, and the name the log uses for it.</summary>
-    private readonly record struct PrintTarget(RegistryPath? StartKey, RegistryReader Reader, string Name);
+    /// <summary>
+    /// The key or whole registry that a print reads, the name the log uses, and how each Key Name line is written.
+    /// A remote key writes the classic \\computer\HKEY_... form; a local key and Computer write the local form.
+    /// </summary>
+    private readonly record struct PrintTarget(
+        RegistryPath? StartKey,
+        RegistryReader Reader,
+        string Name,
+        Func<RegistryPath, string>? KeyDisplay);
 
 #if BWC_E2E
     private const string ReportPathVariable = "BWC_E2E_PRINT_REPORT_PATH";
@@ -226,7 +235,8 @@ internal sealed class PrintController
                     pdfPath,
                     target.Reader,
                     target.StartKey,
-                    token);
+                    token,
+                    target.KeyDisplay);
                 created = outcome.DeviceContextCreated;
                 return outcome.Result;
             });
@@ -253,7 +263,7 @@ internal sealed class PrintController
             string name = bar < 0 ? entry : entry[..bar];
             string? output = bar < 0 ? null : entry[(bar + 1)..];
             RegistryPrinter.E2EPrintOutcome outcome = await _context.RunRegistryAsync(() =>
-                RegistryPrinter.PrintNamedForE2E(name, output, target.Reader, target.StartKey, CancellationToken.None));
+                RegistryPrinter.PrintNamedForE2E(name, output, target.Reader, target.StartKey, CancellationToken.None, target.KeyDisplay));
             lines.Add(string.Join('\t', name, outcome.Result.Status, outcome.DeviceContextCreated, outcome.Result.Message));
         }
 
@@ -266,7 +276,7 @@ internal sealed class PrintController
         try
         {
             using var text = new StringWriter();
-            RegistryPrinter.WriteReport(target.Reader, target.StartKey, text);
+            RegistryPrinter.WriteReport(target.Reader, target.StartKey, text, CancellationToken.None, null, target.KeyDisplay);
             File.WriteAllText(reportPath, text.ToString(), new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             return PrintResult.Printed();
         }

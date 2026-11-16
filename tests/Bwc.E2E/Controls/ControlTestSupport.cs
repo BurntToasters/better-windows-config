@@ -709,7 +709,7 @@ internal static class ControlTestSupport
         return length > 0 ? buffer.ToString() : string.Empty;
     }
 
-    private static bool FocusAddressBar(AppSession session)
+    internal static bool FocusAddressBar(AppSession session)
     {
         if (!EnsureForeground(session))
         {

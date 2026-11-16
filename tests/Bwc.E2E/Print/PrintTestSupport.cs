@@ -19,6 +19,7 @@ internal static class PrintTestSupport
     internal const string PdfPathVariable = "BWC_E2E_PRINT_PDF_PATH";
     internal const string ResultPathVariable = "BWC_E2E_PRINT_RESULT_PATH";
     internal const string GuardProbeVariable = "BWC_E2E_PRINT_GUARD_PROBE";
+    internal const string ReportPathVariable = "BWC_E2E_PRINT_REPORT_PATH";
 
     /// <summary>The physical printers on this machine. The tests name them only to show they were never used.</summary>
     internal static readonly string[] PhysicalPrinters =

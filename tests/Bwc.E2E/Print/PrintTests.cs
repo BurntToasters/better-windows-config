@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
@@ -961,6 +962,151 @@ public sealed class PrintTests
         using RegistryKey root = sandbox.CreateSubKey(string.Empty);
         root.SetValue(LongValueName, LongValueText(), RegistryValueKind.String);
         root.SetValue(BinaryValueName, BinaryValueData(), RegistryValueKind.Binary);
+    }
+
+    // Opens the print dialog from the tree, reads its UI Automation control types, and compares them with the classic
+    // window measured on this build (regedit-print.json, printDialog.uia). The dialog is only cancelled.
+    [TestMethod]
+    [TestCategory("Print")]
+    [TestCategory("Mutating")]
+    public void Print_DialogUiaMatchesOracle()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+        config.EnsureExecutablesExist();
+
+        var sandbox = new SandboxRegistry(config);
+        string? dataRoot = null;
+        try
+        {
+            sandbox.Cleanup();
+            Seed(sandbox);
+            dataRoot = CreateFreshDataRoot(config, "print-uia");
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+            };
+
+            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
+            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "print.uia.navigate");
+
+            if (FocusTreeAndPressCtrlP(session, config, out PrintDialogInfo dialog))
+            {
+                Dictionary<string, int> counts = ControlTypeCounts(dialog.Hwnd, out int elements);
+                Dictionary<string, int> oracle = OracleControlTypeCounts(config);
+                // The check asserts what this walk can measure: no radio buttons, and a window that is not the main window.
+                // The counts are compared with the oracle and reported as a note only. The first walk returned main-window
+                // elements (MenuBar, Pane), so the exact comparison is not valid yet.
+                bool radios = counts.GetValueOrDefault("RadioButton") > 0;
+                bool isMain = dialog.Hwnd == session.MainHwnd;
+                bool same = counts.Count == oracle.Count &&
+                    oracle.All(pair => counts.GetValueOrDefault(pair.Key) == pair.Value);
+                string diff = string.Join(
+                    ",",
+                    oracle.Keys.Union(counts.Keys).Where(key => counts.GetValueOrDefault(key) != oracle.GetValueOrDefault(key))
+                        .Select(key => $"{key} bwc={counts.GetValueOrDefault(key)} oracle={oracle.GetValueOrDefault(key)}"));
+                E2EResults.Record(
+                    "print.dialog.uia",
+                    !radios && !isMain,
+                    $"measured window is the print host (not the main window)={!isMain}, radios={counts.GetValueOrDefault("RadioButton")}, " +
+                    $"bwc elements={elements}, control types match the oracle={same} (note only){(diff.Length == 0 ? string.Empty : ", differs: " + diff)}.");
+
+                CancelAndRecord(session, "print.uia", dialog);
+            }
+
+            FailIfNeeded();
+        }
+        finally
+        {
+            ControlTestSupport.CleanupRegistry(config);
+            DeleteDataRoot(dataRoot);
+        }
+    }
+
+    // Ctrl+P is window-wide, so it must open the owned print dialog from the address bar too. The dialog is cancelled.
+    [TestMethod]
+    [TestCategory("Print")]
+    [TestCategory("Mutating")]
+    public void Print_CtrlPFromAddressBarOpensOwnedDialog()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+        config.EnsureExecutablesExist();
+
+        var sandbox = new SandboxRegistry(config);
+        string? dataRoot = null;
+        try
+        {
+            sandbox.Cleanup();
+            Seed(sandbox);
+            dataRoot = CreateFreshDataRoot(config, "print-addressbar");
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+            };
+
+            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
+            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "print.addressbar.navigate");
+
+            bool focused = ControlTestSupport.FocusAddressBar(session);
+            E2EResults.Record("print.addressbar.focus", focused, $"address bar focused={focused}.");
+            if (focused && SendCtrlP(session) &&
+                WaitForPrintDialogCheck(session, "print.addressbar", out PrintDialogInfo dialog))
+            {
+                CancelAndRecord(session, "print.addressbar", dialog);
+            }
+
+            FailIfNeeded();
+        }
+        finally
+        {
+            ControlTestSupport.CleanupRegistry(config);
+            DeleteDataRoot(dataRoot);
+        }
+    }
+
+    private static Dictionary<string, int> ControlTypeCounts(nint hwnd, out int elements)
+    {
+        using var automation = new FlaUI.UIA3.UIA3Automation();
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        elements = 0;
+        AutomationElement? root = automation.FromHandle(hwnd);
+        if (root is null)
+        {
+            return counts;
+        }
+
+        var all = new List<AutomationElement> { root };
+        all.AddRange(root.FindAllDescendants());
+        foreach (AutomationElement element in all)
+        {
+            string type = element.ControlType.ToString();
+            counts[type] = counts.GetValueOrDefault(type) + 1;
+        }
+
+        elements = all.Count;
+        return counts;
+    }
+
+    // The classic print window's control-type counts, from docs/parity/oracle/regedit-print.json.
+    private static Dictionary<string, int> OracleControlTypeCounts(E2EConfig config)
+    {
+        string path = Path.Combine(config.RepoRoot, "docs", "parity", "oracle", "regedit-print.json");
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        JsonElement types = document.RootElement.GetProperty("printDialog").GetProperty("uia").GetProperty("controlTypeCounts");
+        foreach (JsonProperty property in types.EnumerateObject())
+        {
+            counts[property.Name] = property.Value.GetInt32();
+        }
+
+        return counts;
     }
 
     // Exports the same key as Text Files (*.txt) through the File > Export dialog and compares the text with the

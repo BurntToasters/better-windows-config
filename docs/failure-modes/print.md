@@ -19,11 +19,28 @@ therefore opened with `PD_NOSELECTION`, `PD_NOPAGENUMS`, `PD_RETURNDC`,
 `PD_USEDEVMODECOPIESANDCOLLATE`, and `PD_HIDEPRINTTOFILE`. The Print to File check box is hidden
 because the implementation prints through the device context that `PrintDlgW` returns.
 
-Open (not implemented): the template 108 range panel (DLG-016) with All and Selected branch. The plan was
-`PD_ENABLEPRINTTEMPLATEHANDLE`, but that flag replaces the whole dialog, and the standard printer controls would
-go with it. A hook-based child panel was not validated, so the dialog is unchanged. The progress window (template
-105) is implemented. The remote Key Name prefix (`\\127.0.0.1\HKEY_...`) and the remote print E2E test are also
-open; the remote report walks the connection's store, but its Key Name lines still use the local path form.
+The range panel (template 108, DLG-016) is not passed to the dialog. See "Print dialog: PrintDlgEx, range, and
+remote names" below for the decision and the measurement. The progress window (template 105) is implemented.
+
+## Print dialog: PrintDlgEx, range, and remote names
+
+The dialog is `PrintDlgExW`, which classic uses. Its `PRINTDLGEXW` struct (Windows SDK 10.0.28000.0, commdlg.h)
+has `hInstance` and `lpPrintTemplateName` for an application template, and no template handle. The handle form
+(`PD_ENABLEPRINTTEMPLATEHANDLE`) exists only on the legacy `PRINTDLGW`, and that form replaces the whole dialog.
+So the template 108 panel cannot be built in memory and passed to `PrintDlgExW`. The template would have to be
+a `RT_DIALOG` resource in a module, and BWC has none.
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| The panel is passed as a handle that PrintDlgEx ignores, and the range is silently wrong | No handle is passed. The range is decided by BWC: Selected branch at a key, All at Computer. The panel is not shown |
+| BWC's dialog differs from classic's | Classic on this build opens the system print host, which has no range radios (`regedit-print.json`, `printDialog`). E2E check `print.dialog.uia` asserts that the dialog has no radio buttons and is not the main window. Its UIA control-type counts are compared with the oracle as a note only: the first walk returned main-window elements (MenuBar, Pane), so the exact comparison is not valid yet and stays open |
+| The range panel is absent, so the range is unclear | The OS host shows no range panel, as in classic. The range used is Selected branch at a key and All at Computer; the Selected branch radio is not visible |
+| The dialog is accepted and a job starts | Not possible in tests: they only Cancel. A PrintDlgEx result of `PD_RESULT_PRINT` (1) starts the job; the E2E guard refuses it outside the PDF path |
+| Cancel is reported as an error | `S_FALSE`, or `S_OK` with `dwResultAction` `PD_RESULT_CANCEL` (0), is Cancelled. Nothing is shown |
+| A failed PrintDlgEx (for example no printer) | The HRESULT is the failure code. No device context exists, so no job starts |
+| A remote key's Key Name lines show the local path (`HKEY_USERS\...`) | The classic remote form `\\127.0.0.1\HKEY_USERS\...` comes from the connection's display prefix (`KeyLocation.DisplayOf`, `RemoteRegistryTreeSource.DisplayPathOf`). E2E: `Print_RemoteReportUsesClassicRemoteKeyName` |
+| The remote report is read from the local store | The report reads the connection's store (`KeyLocation.Reader`). E2E: the same test. If the RemoteRegistry service is stopped the check records "not run" and does not start or stop the service |
+| Ctrl+P from the address bar does nothing, or prints without a dialog | Ctrl+P is window-wide. E2E: `Print_CtrlPFromAddressBarOpensOwnedDialog`, which Cancels the dialog and never presses Print |
 
 ### Report shape: one source with text export
 
