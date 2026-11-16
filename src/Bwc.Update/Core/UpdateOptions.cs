@@ -20,6 +20,12 @@ public sealed record UpdateOptions
     /// </summary>
     public string? ProgramFilesRoot { get; init; } = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
 
+    /// <summary>
+    /// Who may own and write the protected folders of the elevated helper. Null means the ship rule (SYSTEM and
+    /// Administrators). Only the E2E flavor's seam, and the tests, give another one: the current user in their place.
+    /// </summary>
+    public ProtectedAcl? ProtectedAcl { get; init; }
+
     /// <summary>The longest allowed wait for one read. Exceeding it is a stalled download.</summary>
     public TimeSpan StallTimeout { get; init; } = TimeSpan.FromSeconds(60);
 

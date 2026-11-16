@@ -46,6 +46,7 @@ public sealed class HubTests
     private const string DownloadNotVerifiedText = "did not match the signed release";
     private const string NotInstalledTitle = "Update Not Installed";
     private const string InstallScope = "hub-install";
+    private const string ElevatedGateScope = "hub-elevated-gate";
     private const string RefuseScope = "hub-refuse";
     private const string MigrateScope = "hub-migrate";
     private const string KeepOffScope = "hub-keepoff";
@@ -699,6 +700,89 @@ public sealed class HubTests
 
         hub.Close();
         AssertNoFailures("Hub update checks");
+    }
+
+    /// <summary>
+    /// The real helper, started with the E2E-only force-elevated seam, refuses --check and --download with RunningElevated
+    /// (update-elevation.md HK1, HB4): exit code 1, the failure in its JSON line, and no connection to the feed.
+    /// Nothing is elevated, and the seam does not exist in a ship build.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Helper_Check_Refuses_When_Forced_Elevated()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        string helperPath = Path.Combine(config.PublishDir, HelperExeName);
+
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+            string baseUrl = "http://127.0.0.1:" + port.ToString(CultureInfo.InvariantCulture);
+            foreach (string mode in new[] { "--check", "--download" })
+            {
+                var startInfo = new ProcessStartInfo(helperPath)
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    WorkingDirectory = config.PublishDir,
+                };
+                foreach (string argument in new[]
+                {
+                    mode, "--manifest-url", baseUrl + "/m.json", "--signature-url", baseUrl + "/m.json.minisig",
+                    "--channel", "stable", "--current-version", "0.1.0",
+                })
+                {
+                    startInfo.ArgumentList.Add(argument);
+                }
+
+                foreach (KeyValuePair<string, string> pair in config.DataRootEnvironment(ElevatedGateScope))
+                {
+                    startInfo.Environment[pair.Key] = pair.Value;
+                }
+
+                foreach (KeyValuePair<string, string> pair in config.TempEnvironment(ElevatedGateScope))
+                {
+                    startInfo.Environment[pair.Key] = pair.Value;
+                }
+
+                startInfo.Environment["BWC_E2E_UPDATE_FORCE_ELEVATED"] = "1";
+                startInfo.Environment["BWC_E2E_UPDATE_ALLOW_HTTP"] = "1";
+
+                using Process process = Process.Start(startInfo)!;
+                Task<string> output = process.StandardOutput.ReadToEndAsync();
+                bool exited = process.WaitForExit(30000);
+                if (!exited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+
+                string text = exited ? output.GetAwaiter().GetResult() : string.Empty;
+                E2EResults.Record($"hub.elevatedGate{mode}.exit", exited && process.ExitCode == 1, $"{mode} exited {(exited ? process.ExitCode.ToString(CultureInfo.InvariantCulture) : "never")}.");
+                E2EResults.Record(
+                    $"hub.elevatedGate{mode}.failure",
+                    text.Contains("\"failure\":\"RunningElevated\"", StringComparison.Ordinal),
+                    $"{mode} printed: {text.Trim()}");
+            }
+
+            E2EResults.Record(
+                "hub.elevatedGate.noConnection",
+                !listener.Pending(),
+                "The feed was never contacted by a helper that believes it is elevated.");
+        }
+        finally
+        {
+            listener.Stop();
+        }
+
+        AssertNoFailures("Elevated gate checks");
     }
 
     /// <summary>

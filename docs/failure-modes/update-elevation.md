@@ -128,3 +128,118 @@ Terms:
 | CD2 | Own version text with build metadata (`0.1.2+abc`) or a prerelease | Parse fails on the informational version | The metadata is dropped, the prerelease kept | `Helper_Version_Strips_Metadata` |
 | CD3 | Program Files rule: sibling prefix (`C:\Program Files X`), another drive, case | A look-alike folder passes | Folder must be inside Program Files at any depth, compared without regard to case | `Program_Files_Rule` |
 | CD4 | Help text | A mode missing from the usage | Lists `--apply-elevated` and `--launch-hub` | `Help_Lists_Modes` |
+
+## HD. Hardening of the elevated path (0.1.2, security review of the first elevated-apply commit)
+
+Written before the tests and the code of the hardening piece (I2b). The review's threat: a medium-integrity process of the
+same user, or of another standard user, gets code run elevated, or makes elevated code write or delete where it should not.
+Test names are in `tests/Bwc.Update.Tests` unless marked. "Elevated" means only the user's elevated runner can show it (a real
+UAC token). "Doc" is a documented duty.
+
+### HE. Environment-injected code in the elevated CoreCLR helper (review finding 1)
+
+`DOTNET_STARTUP_HOOKS`, `CORECLR_ENABLE_PROFILING` with `CORECLR_PROFILER` and `CORECLR_PROFILER_PATH`, and `COREHOST_TRACE`
+with `COREHOST_TRACEFILE` run code or append files inside a .NET process before `Main`. A medium process can put them in
+`HKCU\Environment`, and the elevated helper (started with the runas verb) may inherit that environment.
+
+NativeAOT was tried first (it ignores all of them) and **reverted completely**. This machine cannot build it for both rids:
+win-arm64 needs the C++ ARM64 build tools (`VC\Tools\MSVC\<v>\lib\arm64` holds only the clang runtime and
+`bin\Hostarm64\arm64\link.exe` does not exist), and the win-x64 link on an ARM64 host stopped in the ILCompiler's
+`findvcvarsall.bat` (`'vswhere.exe' is not recognized`). The helper also uses classic COM interop (`ShellLaunch`: `[ComImport]`,
+`InvokeMember`), which NativeAOT does not support, so it needs a manual-vtable rewrite that only an elevated run could test.
+The time-box rule applied. The fallback below is what ships.
+
+**Open risk for the user.** The profiler variables and the host trace variables are still honored by the elevated helper, because
+a runtime setting cannot turn them off. The fix is NativeAOT for `BwcUpdate` (it needs the ARM64 and x64 C++ build tools on the
+build machine, the `ShellLaunch` rewrite, source-generated JSON for `Program.cs`, and a flavor audit that reads a native exe).
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| HE1 | Startup hooks | `DOTNET_STARTUP_HOOKS` loads an assembly in the elevated helper | `Bwc.Update.csproj` sets `StartupHookSupport` false. The published `BwcUpdate.runtimeconfig.json` must carry `System.StartupHookProvider.IsSupported` false in both flavors, and the publish audit refuses a folder where it does not | `release-selftest` (`runtimeconfig_startup_hook`), publish audit |
+| HE2 | The medium `--apply` starts the elevated helper | The elevated process inherits `DOTNET_*`, `COREHOST_*`, `CORECLR_*`, `COMPlus_*` | Before the runas start the medium helper removes every variable of those four prefixes from its own process environment. The runas path (`UseShellExecute` true) takes no custom environment block (`ProcessStartInfo.Environment` is only honored with `UseShellExecute` false), so the process environment is the only lever. Windows hands the caller's environment to the elevated process, so this closes the hole unless the elevation service rebuilds the block from the registry. **That cannot be shown unelevated** | `Medium_Apply_Scrubs_Runtime_Variables_Before_Elevated_Start`, `Runtime_Variable_Rule`, Elevated (does the elevated process get the block) |
+| HE3 | The elevated helper starts the installer | The same variables reach the installer and the helpers it starts | The installer gets an environment block without those variables (and without `__COMPAT_LAYER`). The same scrub runs at the start of `--apply-elevated`, so the `BwcUpdate` modes the installer starts do not inherit them. It cannot undo what ran before `Main` | `Elevated_Installer_Environment_Scrubbed`, `Elevated_Scrubs_Runtime_Variables_From_Process` |
+| HE4 | Variable names in other case, or a lookalike prefix | A name Windows treats as the same variable slips through, or an unrelated variable is removed | The match is case-insensitive on `DOTNET_`, `COREHOST_`, `CORECLR_`, `COMPlus_`. `DOTNETX` and `MYDOTNET_X` are not touched | `Runtime_Variable_Rule` |
+| HE5 | The profiler and the host trace | Code, or a file write, in the elevated helper before `Main` | Not closed in 0.1.2. Recorded above as an open risk. No test can close it | Doc |
+
+### HT. Temp folder and uninstaller of the elevated installer (review finding 2)
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| HT1 | The elevated installer inherits the user's `%TEMP%` | NSIS unpacks its plugins folder (`$PLUGINSDIR`, where the System plugin DLL is loaded from) into a user-writable folder | `StartInstaller` is given a temp folder, `<protected root>\<32 hex>\tmp`, created with the protected ACL (HP1). The installer's `TEMP` and `TMP` both name it. No other process of the user can create or change anything there | `Elevated_Installer_Gets_Protected_Temp` |
+| HT2 | The temp folder cannot be created | A fallback to the user's temp | Refuse `InstallerFailed`. Nothing is started, the copy is removed, the Hub is relaunched | `Elevated_Temp_Folder_Failure_Refused` |
+| HT3 | The temp folder is removed with the copy | Leftovers in Program Files | It is inside the copy folder, so every refusal, and the next run's stale removal (EA22), removes it | `Elevated_Refusal_Removes_Copy` (also checks `tmp`) |
+| HT4 | The uninstaller runs from a copy in `%TEMP%` (the NSIS default) | An elevated program started from a user-writable folder | `UninstallString` and `QuietUninstallString` end in `_?=$INSTDIR`, so the uninstaller runs in place from the admin-only install folder. See installer.md M37 | installer.md M37, `test-installer-e2e.js` |
+
+### HP. Protected root and the copy handle (review finding 3)
+
+The principals are the **Administrators** group and **SYSTEM** in the ship build. The E2E sandbox root
+(`BWC_E2E_UPDATE_PROTECTED_ROOT`) uses the same logic with the **current user** (and SYSTEM) in place of Administrators, so it is
+testable unelevated. Tests give the principals in the request (`ProtectedAcl`). A request with none gets the ship set.
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| HP1 | Creating `<install dir>.upd` | The folder inherits Program Files rules and is readable, and its files openable with share 0, by users | Created with an explicit DACL: full control for the principals only, inheritance from the parent off (protected), owner Administrators (E2E: the user). No other entry. The copy folder and the temp folder get the same rule | `Root_Is_Created_Protected`, `Copy_Folder_Is_Created_Protected`, `Ship_Principals_Are_System_And_Administrators` |
+| HP2 | The root exists and its owner is not a principal | A folder planted by another user | Refuse `PathRejected`. Nothing is copied | `Existing_Root_With_Foreign_Owner_Refused`, `Acl_Rule_Matrix` |
+| HP3 | The root exists and its DACL grants write (data, append, attributes, delete, change permissions, take ownership, generic write) to anyone but the principals and TrustedInstaller, on this folder | Another user adds files or replaces the copy | Refuse `PathRejected`. A read-only entry for other users is accepted. An inherit-only entry and a deny entry do not count | `Existing_Root_With_Foreign_Write_Refused`, `Existing_Root_Read_Only_Entry_Accepted`, `Acl_Rule_Matrix` |
+| HP4 | The root exists from an earlier run of this code | A second set of rules | A root this code created passes HP2 and HP3, so the next update reuses it | `Existing_Protected_Root_Is_Reused` |
+| HP5 | The root is a reparse point or a file | Writes land elsewhere | Never followed. Refuse `PathRejected` (EA20 stays) | `Protected_Root_Link_Refused`, `Protected_Root_Is_File_Refused` |
+| HP6 | The ACL cannot be applied or read | A silent fallback to an inherited ACL | Refuse `PathRejected` (`Io` for an IO error). No unprotected fallback | `Root_Acl_Failure_Refused` |
+| HP7 | The copy file is closed after the write and opened again | A user opens `installer.exe` with share 0 in the gap (a denial of service), or a write lands between write and verify | One writer handle (`FileShare.Read`) writes and flushes to disk. While it is open, a reader (`FileShare.ReadWrite`, so the writer coexists) is opened and the copy is verified through it. A second reader (`FileShare.Read`) is opened while the first is held, its size and SHA-256 are compared with the verified values, and only then are the first two closed. That reader stays open through the start. There is never a moment without a handle of ours, and the bytes started are the bytes verified | `Copy_Handles_Are_Held_Through_Start`, `Copy_Changed_Between_Handles_Refused` |
+| HP8 | A write or delete of the copy while the installer starts | A swap at the last moment | Blocked by the held reader (EA19 stays) | `Elevated_Copy_Is_Locked_During_Start` |
+| HP9 | A stale folder that another user holds open | Folders of ours that never go away | With HP1 no other user can open them. A folder still in use stays (EA24) | `Stale_Locked_Folder_Skipped` |
+
+### HC. Close-running and other sessions (review finding 4)
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| HC1 | `--close-running` runs elevated and the token holds `SeDebugPrivilege` | A process of another user cannot be inspected, so a look-alike blocks the install | The privilege is enabled (only if held) before the scan and put back to its earlier state afterwards, also when the scan throws | `CloseRunning_Enables_Debug_Privilege_Around_Scan`, `Privilege_Scope_Restores_State` |
+| HC2 | The token does not hold it (a medium token) | A failure of the command | Nothing is enabled. The scan runs as before. Not an error | `CloseRunning_Without_Privilege_Still_Scans`, `Privilege_Not_Held_Is_Not_Enabled` |
+| HC3 | An image that still cannot be read | Fail open, or a block by a look-alike | A process counts as running from the install dir only when its **name matches and it has no readable path** (fail closed, as before). A readable path outside the folder never counts. Trade-off: a protected process, or a run without the privilege, that carries a BWC name stops the install until it exits; the message names the process and its session | `Unreadable_Image_With_Matching_Name_Counts`, `Readable_Image_Elsewhere_Does_Not_Count` |
+| HC4 | The non-elevated modes | Needless privilege use | Only `--close-running` with an elevated token enables it. `--wait-pid` and the medium modes never do | `CloseRunning_Not_Elevated_Does_Not_Enable_Privilege` |
+
+### HK. `--check`, `--download`, and the staging cleanup (review finding 5)
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| HK1 | `--check` or `--download` runs elevated | The network and the staging root (a user-writable folder) are used by an elevated process | Refused like `--apply`: failure `RunningElevated`, exit 1, in the JSON shape of the mode. Nothing is fetched or written. An unreadable token counts as elevated | `Elevation_Gate_Refuses_Check_And_Download`, E2E `Helper_Check_Refuses_When_Forced_Elevated` |
+| HK2 | `StagingCleanup` is given a staging root that is a reparse point | A prune deletes 32-hex folders in the link's target | Nothing is walked or removed. Every level is checked: the root, each staging folder, and each entry inside (a link inside a staging folder is removed as a link, never entered) | `Prune_Root_Link_Refused`, `Discard_Root_Link_Refused`, `Prune_Inner_Link_Not_Followed` |
+| HK3 | The staging root cannot be inspected | Fail open | Treated as a link: nothing is removed | `Prune_Unreadable_Root_Refused` |
+
+### HH. The Hub is already elevated (review finding 6)
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| HH1 | The Hub runs elevated (UAC off, the built-in Administrator) and the user checks for updates | A confusing generic message, or an elevated Hub that downloads | `--check` and `--download` refuse (HK1). **Chosen: the elevated Hub cannot update**, and it says so: the Hub maps `RunningElevated` to its own sentence ("Updates are not checked while Better Windows Config runs with administrator rights..."), not the generic "could not be verified" text. A direct hand-off to `--apply-elevated` was considered and not done: the download must run unelevated (it writes a user-writable staging root), so there is no verified staged installer to hand over | `Elevation_Gate_Refuses_Check_And_Download`, Hub string audit (`validate`) |
+| HH2 | `--apply` runs elevated | Unchanged | Still `RunningElevated`, the Hub is relaunched with the code, and the Hub shows the existing `UpdateResultElevated` text | Existing tests |
+
+### HR. Program Files rule (review finding 7)
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| HR1 | The dir or the Program Files path makes `Path.GetFullPath` throw (embedded null, too long) | `IsUnder` returned true, because the shared rule counts a path it cannot normalize as inside | `ProgramFilesRule.IsUnder` normalizes itself and returns false on any exception. The shared running-process rule is not changed | `Program_Files_Rule_Fails_Closed_On_Bad_Path` |
+| HR2 | Dot parts, case, a sibling prefix (`C:\Program Files X`), another drive | A look-alike passes | Unchanged (CD3) | `Program_Files_Rule` |
+
+### HI. Installer trusted comment (review finding 8)
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| HI1 | The installer comment lacks `product:bwc`, or names another product | A signed installer of another product, made with the same key, is accepted | Refuse `InstallerCommentMismatch` | `Installer_Product_Missing_Rejected`, `Installer_Product_Wrong_Rejected` |
+| HI2 | The installer comment lacks `channel:`, or it differs from the channel of the manifest and receipt | A beta installer replayed on the stable channel | Refuse `InstallerCommentMismatch` | `Installer_Channel_Missing_Rejected`, `Installer_Channel_Mismatch_Rejected` |
+| HI3 | Release signing | The scripts do not write the new fields | `scripts/assemble-bundle.js` signs `version:<v> arch:<rid> product:bwc channel:<c>`. The validator in `scripts/lib/update-manifest.js` requires both fields and the channel match. The 0.1.1 verifier reads only `version`, `arch`, and `file`, and ignores other keys, so a bundle signed this way is still readable by 0.1.1 | `release-selftest`, `release-assets-selftest` |
+| HI4 | The elevated helper | The new fields are checked only on the medium side | The copy is verified with the same expectation (channel from the receipt, product `bwc`) after the copy | `Elevated_Comment_Mismatch_Refused`, `Elevated_Channel_Mismatch_Refused` |
+
+### HB. Ship and E2E code (review finding 9)
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| HB1 | The non-elevated branch of `ElevatedApplier` (E2E root, no token) in a ship build | Dead code that a request could reach | Compiled only under `BWC_E2E`. In ship, a request with an E2E root and a non-elevated host is `NotElevated` | `E2E_Root_Ignored_In_Ship` (ship test run), `Non_Elevated_With_E2E_Root_Proceeds` (run with `-p:BwcFlavor=E2E`) |
+| HB2 | `DefineConstants` in the environment of the build | `BWC_E2E` injected into a ship build | `scripts/dotnet-build.js` removes `DefineConstants` (any case) from the environment it gives MSBuild | `release-selftest` (`msbuild_environment_scrubbed`) |
+| HB3 | A ship `BwcUpdate` binary that contains an E2E variable name | The seam is in the ship build | The publish audit searches `BwcUpdate.dll` and `BwcUpdate.exe` of a ship folder for `BWC_E2E_UPDATE_` as UTF-8 and UTF-16 and fails when found. It runs where the ship publish is audited (`dotnet-build.js`, `test-all.js`, `test-installer-e2e.js`) | `release-selftest` (`ship_e2e_strings`), publish audit |
+| HB4 | The E2E force-elevated seam (`BWC_E2E_UPDATE_FORCE_ELEVATED=1`) | A switch that lets a ship run say it is elevated | Compiled only with `BWC_E2E`, in `ProcessIdentity`. It makes the E2E helper behave as elevated (it elevates nothing), so the refusals can be driven without a real token | HB3 (the name is under the E2E prefix), E2E `Helper_*_Forced_Elevated` |
+
+### HX. Comment (review finding 10)
+
+The comment in `UpdateApplier.VerifyAndStartAsync` said the verified file stays held until the elevated helper has opened it.
+After the runas start returns, the medium helper releases both handles (the start call returns when the elevated process was
+created, not when it opened the file). The comment now says that. The elevated helper does not rely on the medium helper's
+check: it copies, then verifies the copy (EA13 to EA16). Doc.

@@ -80,16 +80,18 @@ public sealed class WindowsUpdateProcessHost : IUpdateProcessHost
 #endif
     }
 
-    public bool StartInstaller(string installerPath, string arguments)
+    public bool StartInstaller(string installerPath, string arguments, string tempFolder)
     {
         // Only the elevated helper calls this, so the installer inherits its elevation and there is no prompt and no verb.
         // The command line is raw (/D= is last and unquoted). The working directory is the system folder, not the
-        // protected folder, so nothing next to the installer is loaded as a DLL.
+        // protected folder, so nothing next to the installer is loaded as a DLL. TEMP and TMP are the protected temp folder,
+        // so the installer's plugins folder is never in a user-writable place (HT1), and the runtime variables are gone (HE3).
         var psi = new ProcessStartInfo(installerPath, arguments)
         {
             UseShellExecute = false,
             WorkingDirectory = Environment.SystemDirectory,
         };
+        ChildEnvironment.ForInstaller(psi.Environment, tempFolder);
 
         using var process = Process.Start(psi) ?? throw new InvalidOperationException("the installer did not start");
         return true;

@@ -89,7 +89,7 @@ comment line is never displayed as authenticated; the verifier returns only the 
 | Signature | Trusted comment |
 |-----------|-----------------|
 | Manifest | Exactly `version:<semver> channel:<stable\|beta> expires:<yyyy-MM-ddTHH:mm:ssZ>`. One space between the fields, in this order, and nothing else. |
-| Installer | `version:<entry version>` and `arch:<win-x64 or win-arm64>`, as `key:value` fields separated by spaces or tabs. Optional `file:<plain file name>`, which may not contain a separator, a colon, or a dot name. Keys are lowercase letters, and a key may appear only once. |
+| Installer | `version:<entry version>`, `arch:<win-x64 or win-arm64>`, `product:bwc`, and `channel:<stable or beta>` (the manifest channel), as `key:value` fields separated by spaces or tabs. Optional `file:<plain file name>`, which may not contain a separator, a colon, or a dot name. Keys are lowercase letters, and a key may appear only once. Since 0.1.2 the updater requires `product` and `channel`; a 0.1.1 updater reads only `version`, `arch`, and `file` and ignores the rest. |
 
 The manifest comment binds three things:
 
@@ -103,7 +103,7 @@ Example manifest trusted comment:
 `version:0.2.0-beta.1 channel:beta expires:2026-11-18T00:00:00Z`
 
 Example installer trusted comment:
-`timestamp:1794102823 file:BetterWindowsConfig-Setup-0.2.0-beta.1-x64.exe version:0.2.0-beta.1 arch:win-x64`
+`timestamp:1794102823 file:BetterWindowsConfig-Setup-0.2.0-beta.1-x64.exe version:0.2.0-beta.1 arch:win-x64 product:bwc channel:beta`
 
 The release tooling (`scripts/assemble-bundle.js` with `scripts/sign-update-manifest.js`) builds the comment
 with `manifestTrustedComment` in `scripts/lib/update-manifest.js`, which writes exactly this comment.
@@ -150,7 +150,7 @@ staged under `%TEMP%\BWC-Update\<32 lowercase hex>\`:
    is downloaded. A folder whose installer no longer verifies is discarded.
 2. Otherwise a new folder is created, the installer is streamed to `installer.exe` with a 30 minute
    overall limit and a per-read stall limit, and it is verified (size, SHA-256, minisign signature, signed
-   `version:` and `arch:`). The receipt is written only after every check passes.
+   `version:`, `arch:`, `product:bwc`, and the manifest's `channel:`). The receipt is written only after every check passes.
 3. Every other staging folder is then removed.
 
 Progress goes to stdout as one line per few megabytes, before the result line:
@@ -205,7 +205,9 @@ Order:
    exited (the shared rule in `RunningImageRule`: fail closed, so an unreadable process counts as
    running). Default wait: 60 seconds. If they are still running, stop: nothing is installed.
 6. Open the installer with `FileShare.Read` only. Verify size, SHA-256, minisign signature, and the
-   signed `version:` and `arch:`. The file stays open until the elevated helper has been started.
+   signed `version:`, `arch:`, `product:bwc`, and `channel:`. The file stays open while the elevated helper is started. That
+   is a check for the user's benefit (a bad file is refused before the consent prompt), not a guarantee for the elevated helper:
+   the handle is released when the start returns, so the elevated helper copies the file and verifies the copy.
 7. Start `<folder of BwcUpdate.exe>\BwcUpdate.exe --apply-elevated <staging folder>` with the `runas` verb. Windows shows
    its consent prompt. The helper then returns at once. It does not start the installer and does not start the Hub.
    Declining the prompt (Win32 error 1223) is the failure `ElevationDeclined`.
@@ -223,11 +225,14 @@ single-instance gate does not hand the message to an old Hub. The argument carri
 2. The folder must be `%TEMP%\BWC-Update\<32 hex>`, with no link on the path or inside it. The receipt is read as above.
 3. It removes older `<install dir>.upd\<32 hex>` folders, then copies `installer.exe` to
    `<install dir>.upd\<new 32 hex>\installer.exe` (the source is held with `FileShare.Read`, and the copy stops one byte
-   over the receipt size).
-4. It verifies the copy (size, SHA-256, minisign signature, signed `version:` and `arch:`) with the copy held open.
+   over the receipt size). `<install dir>.upd` and the copy folder are created with an explicit protected DACL (SYSTEM and
+   Administrators only); an existing root with another owner, or one that others can write, is refused.
+4. It verifies the copy (size, SHA-256, minisign signature, signed `version:`, `arch:`, `product:bwc`, and `channel:`) with
+   the copy held open from the first write to the start of the installer.
 5. It starts the copy as `installer.exe` with the raw command line
    `/S /RELAUNCH /PARENTPID=<this pid> /D=<install dir>`. `/D=` is last and unquoted, as NSIS requires. There is no verb,
-   no caller switch, and the working directory is the system folder. It then exits.
+   no caller switch, and the working directory is the system folder. The installer's `TEMP` and `TMP` are a protected
+   `tmp` folder inside the copy folder, and its environment has no .NET runtime variable. It then exits.
 6. A refusal removes the copy and starts the Hub at the shell's integrity level with `--update-result <code>`.
 
 The elevated helper writes no file log. The helper removes `__COMPAT_LAYER` from its own environment before it starts any

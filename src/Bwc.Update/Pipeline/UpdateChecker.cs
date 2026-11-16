@@ -284,7 +284,13 @@ public sealed class UpdateChecker
                 continue;
             }
 
-            var expected = new InstallerExpectation(verified.Version, request.Architecture, installer.Size, installer.Sha256, installer.Signature);
+            var expected = new InstallerExpectation(
+                verified.Version,
+                request.Architecture,
+                installer.Size,
+                installer.Sha256,
+                installer.Signature,
+                UpdateChannelNames.ToText(request.Channel));
             Outcome<string> check;
             try
             {
@@ -360,7 +366,13 @@ public sealed class UpdateChecker
             using var file = File.Open(installerPath, FileMode.Open, FileAccess.Read, FileShare.Read);
             check = InstallerVerifier.Verify(
                 file,
-                new InstallerExpectation(verified.Version, request.Architecture, installer.Size, installer.Sha256, installer.Signature),
+                new InstallerExpectation(
+                    verified.Version,
+                    request.Architecture,
+                    installer.Size,
+                    installer.Sha256,
+                    installer.Signature,
+                    UpdateChannelNames.ToText(request.Channel)),
                 _options.TrustedPublicKeys);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

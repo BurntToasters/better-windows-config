@@ -70,6 +70,13 @@ internal static class Program
 
     private static async Task<int> RunCheckAsync(UpdateArguments parsed)
     {
+        // A check reads the network and writes the staging root, a folder that medium processes can write. It never runs
+        // elevated (HK1).
+        if (ElevationPolicy.RefusesElevated(parsed.Mode) && ProcessIdentity.IsElevatedOrHighIntegrity())
+        {
+            return WriteCheck(UpdateFailure.RunningElevated, ElevationPolicy.RefusalDetail, null, null, 1);
+        }
+
         var architecture = Architectures.Current();
         if (architecture is null)
         {
@@ -113,6 +120,11 @@ internal static class Program
 
     private static async Task<int> RunDownloadAsync(UpdateArguments parsed)
     {
+        if (ElevationPolicy.RefusesElevated(parsed.Mode) && ProcessIdentity.IsElevatedOrHighIntegrity())
+        {
+            return WriteDownload(UpdateFailure.RunningElevated, ElevationPolicy.RefusalDetail, null, null, null, 1);
+        }
+
         var architecture = Architectures.Current();
         if (architecture is null)
         {
@@ -197,12 +209,22 @@ internal static class Program
             return WriteApply(new ApplyOutcome(UpdateFailure.InvalidOptions, "unsupported architecture", false, false), 2);
         }
 
+        // The elevated helper does not pass on a startup hook, a profiler, or a host trace to what it starts (HE3). What
+        // already ran before Main is out of reach (HE5).
+        _ = ChildEnvironment.RemoveRuntimeVariables();
+
         var options = new UpdateOptions();
         var stagingRoot = UpdatePaths.DefaultStagingRoot;
         string? protectedRoot = null;
 #if BWC_E2E
         options = UpdateE2ESeam.ApplyCheckOverrides(options);
         protectedRoot = UpdateE2ESeam.ProtectedRoot(stagingRoot);
+
+        // The sandbox root is protected by the same rules, with the current user in place of Administrators (HP).
+        if (protectedRoot is not null)
+        {
+            options = options with { ProtectedAcl = ProtectedAcl.ForCurrentUser() };
+        }
 #endif
 
         // Only the staging folder comes from the command line. The install dir and the current version are this helper's own.

@@ -162,7 +162,13 @@ public sealed class UpdateApplier
     private async Task<ApplyOutcome> VerifyAndStartAsync(ApplyRequest request, UpdateReceipt offered, CancellationToken ct)
     {
         var keys = _options.TrustedPublicKeys;
-        var expected = new InstallerExpectation(offered.Version, offered.Architecture, offered.Size, offered.Sha256, offered.Signature);
+        var expected = new InstallerExpectation(
+            offered.Version,
+            offered.Architecture,
+            offered.Size,
+            offered.Sha256,
+            offered.Signature,
+            UpdateChannelNames.ToText(offered.Channel));
 
         // The layout can change during the wait (for example, a junction swapped in), so it is checked again here.
         var layout = InstallerPaths.Check(request.InstallerPath, request.ReceiptPath, request.StagingRoot);
@@ -171,11 +177,13 @@ public sealed class UpdateApplier
             return await RefuseAsync(request, layout.Failure, layout.Detail, ct, alreadyWaited: true);
         }
 
-        // The file stays open with FileShare.Read only. No other process can write or delete it from here
-        // until this method returns, so the bytes checked below are the bytes the elevated helper opens.
+        // The file stays open with FileShare.Read only, so no other process can write or delete it while this method
+        // runs. That is a check for the user's benefit (a bad file is refused before a consent prompt), not a guarantee for
+        // the elevated helper: both handles are released when the runas start returns, which is when Windows created the
+        // elevated process and not when it opened the file. The elevated helper copies the file and verifies the copy.
         // The folder is held first, then the installer. Its final path must be the held folder's final path plus
         // installer.exe. Short names and junctioned parents resolve the same way on both sides; a swap between the
-        // two opens does not. The folder handle stays open until the elevated helper has started.
+        // two opens does not.
         using var folder = InstallerPaths.OpenFolder(Path.GetDirectoryName(request.InstallerPath)!);
         if (folder is null)
         {
@@ -204,6 +212,10 @@ public sealed class UpdateApplier
         // The only argument is the staging folder that was just verified. Nothing else of the request is forwarded.
         var helperExe = Path.Combine(_host.HelperDirectory, HelperExecutableName);
         var stagingFolder = Path.GetDirectoryName(Path.GetFullPath(request.InstallerPath))!;
+        // The runas start hands this process's environment to the elevated helper, and takes no environment block of its
+        // own. A startup hook, a profiler, or a host trace set by a medium process must not reach it, so the runtime
+        // variables are out of the environment for the start and put back after it (HE2).
+        var removed = ChildEnvironment.RemoveRuntimeVariables();
         try
         {
             if (_host.StartElevatedHelper(helperExe, stagingFolder) == ElevatedStart.Declined)
@@ -217,6 +229,10 @@ public sealed class UpdateApplier
         {
             Log.Exception("elevated helper did not start", ex);
             return await RefuseAsync(request, UpdateFailure.InstallerFailed, "elevated helper did not start: " + ex.GetType().Name, ct, alreadyWaited: true);
+        }
+        finally
+        {
+            ChildEnvironment.Restore(removed);
         }
 
         Log.Info($"update elevated helper started: version={offered.Version} architecture={offered.Architecture}");

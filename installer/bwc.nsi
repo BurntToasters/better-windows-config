@@ -507,8 +507,11 @@ Section "Better Windows Config" SecMain
   WriteRegStr SHCTX "$BwcUninstallKey" "Publisher" "${BWC_PUBLISHER}"
   WriteRegStr SHCTX "$BwcUninstallKey" "DisplayIcon" "$INSTDIR\${BWC_HUB_EXE}"
   WriteRegStr SHCTX "$BwcUninstallKey" "InstallLocation" "$INSTDIR"
-  WriteRegStr SHCTX "$BwcUninstallKey" "UninstallString" '"$INSTDIR\${BWC_UNINSTALLER}"'
-  WriteRegStr SHCTX "$BwcUninstallKey" "QuietUninstallString" '"$INSTDIR\${BWC_UNINSTALLER}" /S'
+  ; _?=$INSTDIR makes the uninstaller run in place from the install folder (admin-only in a per-machine install)
+  ; instead of from a copy in %TEMP%, which an elevated process must not run (installer.md M37). The uninstaller then
+  ; cannot delete itself: Section Uninstall removes it and the folder at the next restart when it cannot (M38).
+  WriteRegStr SHCTX "$BwcUninstallKey" "UninstallString" '"$INSTDIR\${BWC_UNINSTALLER}" _?=$INSTDIR'
+  WriteRegStr SHCTX "$BwcUninstallKey" "QuietUninstallString" '"$INSTDIR\${BWC_UNINSTALLER}" /S _?=$INSTDIR'
   WriteRegDWORD SHCTX "$BwcUninstallKey" "EstimatedSize" ${BWC_ESTIMATED_KB}
   WriteRegDWORD SHCTX "$BwcUninstallKey" "NoModify" 1
   WriteRegDWORD SHCTX "$BwcUninstallKey" "NoRepair" 1
@@ -594,9 +597,21 @@ Section "Uninstall"
   RMDir "$INSTDIR${BWC_PROTECTED_SUFFIX}"
   BwcUn_noUpd:
 
-  ; Remove the folder only when it is empty. User files in it stay.
+  ; Remove the folder only when it is empty. User files in it stay. A copy of the uninstaller (no _?=) deletes the
+  ; original at once. An uninstaller that runs in place cannot delete itself or the folder it runs from, so the deletes
+  ; are repeated with /REBOOTOK, and only then (M38). The working folder moves out of the install folder first, so the
+  ; uninstaller's own current directory does not hold it.
+  SetOutPath "$WINDIR"
+  ClearErrors
   Delete "$INSTDIR\${BWC_UNINSTALLER}"
+  IfErrors 0 BwcUn_uninstallerGone
+  Delete /REBOOTOK "$INSTDIR\${BWC_UNINSTALLER}"
+  BwcUn_uninstallerGone:
+  ClearErrors
   RMDir "$INSTDIR"
+  IfErrors 0 BwcUn_folderDone
+  RMDir /REBOOTOK "$INSTDIR"
+  BwcUn_folderDone:
   !ifdef BWC_E2E
     StrCmp $BwcMachine "1" 0 BwcUn_noE2eRoot
     RMDir "$PROGRAMFILES64\${BWC_E2E_FOLDER}"

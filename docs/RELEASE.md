@@ -312,7 +312,7 @@ folder also holds `publish-<rid>.json`:
 | `bwc-<channel>.json.sig` | Base64 envelope of the same signature. |
 | `BetterWindowsConfig-<version>-<rid>-setup.exe` | Real setup EXE, when a matching installer record exists. |
 | `BetterWindowsConfig-<version>-<rid>-setup.dry-run.json` | Stand-in when NSIS has not produced a setup EXE. |
-| `<installer>.minisig`, `<installer>.sig` | Installer signature, raw and base64. Its trusted comment is `version:<semver> arch:<win-x64 or win-arm64>`. |
+| `<installer>.minisig`, `<installer>.sig` | Installer signature, raw and base64. Its trusted comment is `version:<semver> arch:<win-x64 or win-arm64> product:bwc channel:<stable or beta>`. |
 | `assembly.json` | Key id, fingerprint, expiry, arches, and whether the key was a test key. No secret material. |
 | `ephemeral/minisign.pub` | Public key of an ephemeral test key (dry run only). The secret key is never written. |
 | `publish-<rid>.json` | Every file in `publish/<rid>` with its size and SHA-256, plus a tree hash. |

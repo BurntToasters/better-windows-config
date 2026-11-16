@@ -26,7 +26,9 @@ import {
 } from "./lib/release-policy.js";
 import { publishIsGood } from "./build-installer.js";
 import { envelope, generateKeyPair, signFile } from "./lib/minisign.js";
-import { buildManifest, serializeManifest } from "./lib/update-manifest.js";
+import { buildEnvironment } from "./lib/build-environment.js";
+import { containsSeamName, startupHookProblem } from "./flavor-metadata.js";
+import { buildManifest, installerTrustedComment, serializeManifest } from "./lib/update-manifest.js";
 import { SIGNING_REQUIRED_VARIABLES } from "./release-policy.js";
 import { publishedReleaseMismatch } from "./release-publish.js";
 
@@ -167,7 +169,7 @@ async function buildFixture(temp) {
   const installerSignature = await signFile(
     installerPath,
     keyA.secretKeyText,
-    `version:${VERSION} arch:win-x64`,
+    `version:${VERSION} arch:win-x64 product:bwc channel:beta`,
   );
 
   const installers = {
@@ -728,8 +730,8 @@ async function runAssembleCases(temp, fixture, cases) {
     ? fs.readFileSync(`${installerCopy}.minisig`, "utf8").split("\n")
     : [];
   expectCheck(
-    "installer trusted comment is exactly version and arch",
-    installerLines[2] === `trusted comment: version:${VERSION} arch:win-x64`,
+    "installer trusted comment is exactly version, arch, product, and channel",
+    installerLines[2] === `trusted comment: version:${VERSION} arch:win-x64 product:bwc channel:beta`,
     `${installerLines[2] ?? "(missing)"}`,
     cases,
   );
@@ -759,6 +761,92 @@ async function runAssembleCases(temp, fixture, cases) {
  * TAURI_SIGNING_PRIVATE_KEY cases: the `tauri signer generate` form (base64 of the key file), a key
  * folder path, the refusals, and a check that a failing run prints neither the key nor the password.
  */
+/**
+ * I2b hardening cases (update-elevation.md HI, HB, HE): the signed installer comment must carry product:bwc and the
+ * manifest channel, the MSBuild environment drops DefineConstants, a ship binary may not hold the E2E seam names, and the
+ * runtimeconfig must turn startup hooks off.
+ */
+async function runHardeningCases(temp, fixture, cases) {
+  expectCheck(
+    "installer comment is version, arch, product, channel",
+    installerTrustedComment({ version: VERSION, architecture: "win-x64", channel: "beta" }) ===
+      `version:${VERSION} arch:win-x64 product:bwc channel:beta`,
+    installerTrustedComment({ version: VERSION, architecture: "win-x64", channel: "beta" }),
+    cases,
+  );
+  expectCheck(
+    "installer comment refuses a channel that is not stable or beta",
+    (() => {
+      try {
+        installerTrustedComment({ version: VERSION, architecture: "win-x64", channel: "nightly" });
+        return false;
+      } catch {
+        return true;
+      }
+    })(),
+    "a nightly comment was produced",
+    cases,
+  );
+
+  const variants = [
+    ["installer without product rejected", `version:${VERSION} arch:win-x64 channel:beta`, "installer-product-mismatch"],
+    ["installer for another product rejected", `version:${VERSION} arch:win-x64 product:other channel:beta`, "installer-product-mismatch"],
+    ["installer without channel rejected", `version:${VERSION} arch:win-x64 product:bwc`, "trusted-comment-invalid"],
+    ["installer for another channel rejected", `version:${VERSION} arch:win-x64 product:bwc channel:stable`, "installer-channel-mismatch"],
+  ];
+  for (const [name, comment, reason] of variants) {
+    const dir = path.join(temp, "fixtures", "hardening", reason + "-" + variants.findIndex((v) => v[0] === name));
+    fs.mkdirSync(dir, { recursive: true });
+    const installerFile = path.join(dir, "installer.exe");
+    fs.copyFileSync(fixture.installerPath, installerFile);
+    const signature = envelope(await signFile(installerFile, fixture.keyA.secretKeyText, comment));
+    const entry = { ...fixture.manifest.installers["win-x64"], signature };
+    const manifest = buildManifest({
+      version: VERSION,
+      channel: "beta",
+      pubDate: PUBDATE,
+      notesUrl: fixture.manifest.notesUrl,
+      installers: { "win-x64": entry },
+    });
+    const manifestPath = path.join(dir, "manifest.json");
+    fs.writeFileSync(manifestPath, serializeManifest(manifest));
+    const manifestSig = await signFile(manifestPath, fixture.keyA.secretKeyText, manifestComment(VERSION, "beta", FUTURE_EXPIRES));
+    fs.writeFileSync(`${manifestPath}.minisig`, manifestSig, "utf8");
+    expectRefusal(
+      name,
+      run("scripts/validate-updater-manifest.js", [
+        ...validatorArgs(fixture, { manifest: manifestPath, signature: `${manifestPath}.minisig` }),
+        "--installer",
+        `win-x64=${installerFile}`,
+      ]),
+      [reason],
+      cases,
+    );
+  }
+
+  const scrubbed = buildEnvironment({ DefineConstants: "BWC_E2E", defineconstants: "X", DEFINECONSTANTS: "Y", Path: "p", KEEP: "1" });
+  expectCheck(
+    "msbuild_environment_scrubbed",
+    Object.keys(scrubbed).sort().join(",") === "KEEP,Path",
+    Object.keys(scrubbed).join(","),
+    cases,
+  );
+
+  const seam = Buffer.concat([Buffer.from("xx"), Buffer.from("BWC_E2E_UPDATE_ROOT", "utf16le"), Buffer.from("yy")]);
+  const seamUtf8 = Buffer.from("zz BWC_E2E_UPDATE_ROOT zz", "utf8");
+  expectCheck("ship_e2e_strings", containsSeamName(seam) && containsSeamName(seamUtf8) && !containsSeamName(Buffer.from("BWC_E2E_THEME")), "seam names found as UTF-16 and UTF-8, nothing else", cases);
+
+  const off = JSON.stringify({ runtimeOptions: { configProperties: { "System.StartupHookProvider.IsSupported": false } } });
+  const on = JSON.stringify({ runtimeOptions: { configProperties: { "System.StartupHookProvider.IsSupported": true } } });
+  const absent = JSON.stringify({ runtimeOptions: { configProperties: {} } });
+  expectCheck(
+    "runtimeconfig_startup_hook",
+    startupHookProblem(off) === null && startupHookProblem(on) !== null && startupHookProblem(absent) !== null && startupHookProblem("{") !== null,
+    "only an explicit false passes",
+    cases,
+  );
+}
+
 async function runEnvironmentKeyCases(temp, fixture, cases) {
   const encryptedKeyText = fs.readFileSync(path.join(fixture.encryptedDir, "minisign.key"), "utf8");
   const tauriValue = Buffer.from(encryptedKeyText, "utf8").toString("base64");
@@ -1498,6 +1586,7 @@ async function main() {
     await runValidatorCases(temp, fixture, cases);
     await runAssembleCases(temp, fixture, cases);
     await runEnvironmentKeyCases(temp, fixture, cases);
+    await runHardeningCases(temp, fixture, cases);
     await runPolicyCases(temp, fixture, cases);
     await runSessionGateCases(temp, fixture, cases);
     runDetachedBranchCases(temp, cases);

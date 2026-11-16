@@ -237,7 +237,7 @@ public sealed class ElevationSupportTests
 
         public ElevatedStart StartElevatedHelper(string helperExe, string stagingFolder) => throw new NotSupportedException();
 
-        public bool StartInstaller(string installerPath, string arguments) => throw new NotSupportedException();
+        public bool StartInstaller(string installerPath, string arguments, string tempFolder) => throw new NotSupportedException();
 
         public bool StartDetached(string exePath, IReadOnlyList<string> arguments, string workingDirectory) => throw new NotSupportedException();
 

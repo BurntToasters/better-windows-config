@@ -66,9 +66,14 @@ internal sealed class FakeHost : IUpdateProcessHost
 
     public bool IsElevated() => Elevated;
 
+    /// <summary>The runtime variables (DOTNET_*, ...) that were in the process environment at each elevated start.</summary>
+    public List<string[]> RuntimeVariablesAtElevatedStart { get; } = [];
+
     public ElevatedStart StartElevatedHelper(string helperExe, string stagingFolder)
     {
         Events.Add("elevated");
+        RuntimeVariablesAtElevatedStart.Add(Environment.GetEnvironmentVariables().Keys.Cast<string>()
+            .Where(ChildEnvironment.IsRuntimeVariable).ToArray());
         ElevatedRuns.Add((helperExe, stagingFolder));
         Probe(Path.Combine(stagingFolder, "installer.exe"));
         if (ElevatedStartThrows)
@@ -79,10 +84,14 @@ internal sealed class FakeHost : IUpdateProcessHost
         return ElevatedResult;
     }
 
-    public bool StartInstaller(string path, string arguments)
+    /// <summary>The temp folder of each installer start, in order, and whether it existed at the start.</summary>
+    public List<(string Folder, bool Existed)> TempFolders { get; } = [];
+
+    public bool StartInstaller(string path, string arguments, string tempFolder)
     {
         Events.Add("installer");
         Runs.Add((path, arguments));
+        TempFolders.Add((tempFolder, Directory.Exists(tempFolder)));
         Probe(path);
 
         if (InstallerStartThrows)
