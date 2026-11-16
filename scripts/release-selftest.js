@@ -35,7 +35,7 @@ import {
   LEGACY_MANIFEST_NAME,
   validateLegacyManifest,
 } from "./lib/legacy-feed.js";
-import { loadReleaseBundle } from "./lib/release-bundle.js";
+import { expectedAssetNames, loadReleaseBundle, staleLegacyAssets, unexpectedAssets } from "./lib/release-bundle.js";
 import { SIGNING_REQUIRED_VARIABLES } from "./release-policy.js";
 import { publishedReleaseMismatch } from "./release-publish.js";
 
@@ -1340,6 +1340,52 @@ async function runLegacyFeedCases(temp, fixture, cases) {
     "LF11 a none bundle loads with no legacy asset",
     noneBundle.ok && noneBundle.legacy?.mode === "none" && !noneBundle.requiredAssets.includes(LEGACY_MANIFEST_NAME),
     JSON.stringify(noneBundle.errors),
+    cases,
+  );
+  // LF17, LF18: the asset set of a release. A stale bwc-stable.json is the one that reaches 0.1.1 through releases/latest.
+  const asset = (name, id) => ({ id, name, state: "uploaded" });
+  const frozenNames = expectedAssetNames(frozenBundle);
+  const noneNames = expectedAssetNames(noneBundle);
+  const frozenRelease = { assets: frozenNames.map((name, index) => asset(name, index + 1)) };
+  const noneRelease = { assets: noneNames.map((name, index) => asset(name, index + 1)) };
+  expectCheck(
+    "LF17 the expected set lists the v2 manifest, its signature, the setups, and the legacy pair only in the frozen mode",
+    frozenNames.includes(LEGACY_MANIFEST_NAME) &&
+      frozenNames.includes(`${LEGACY_MANIFEST_NAME}.minisig`) &&
+      !noneNames.includes(LEGACY_MANIFEST_NAME) &&
+      noneNames.includes(manifestFileName("stable")) &&
+      noneNames.some((name) => name.endsWith("-setup.exe")),
+    JSON.stringify({ frozenNames, noneNames }),
+    cases,
+  );
+  expectCheck(
+    "LF17 a release that holds exactly the expected assets has nothing unexpected",
+    unexpectedAssets(frozenRelease, frozenNames).length === 0 && unexpectedAssets(noneRelease, noneNames).length === 0,
+    "an unexpected asset was reported",
+    cases,
+  );
+  const withStale = { assets: [...noneRelease.assets, asset(LEGACY_MANIFEST_NAME, 90), asset(`${LEGACY_MANIFEST_NAME}.minisig`, 91)] };
+  expectCheck(
+    "LF17 a stale bwc-stable.json and its signature in a none release are unexpected",
+    unexpectedAssets(withStale, noneNames).map((entry) => entry.name).join(",") === `${LEGACY_MANIFEST_NAME},${LEGACY_MANIFEST_NAME}.minisig`,
+    JSON.stringify(unexpectedAssets(withStale, noneNames)),
+    cases,
+  );
+  expectCheck(
+    "LF17 any other extra asset is unexpected, and a GPG .asc of an expected asset is a sidecar",
+    unexpectedAssets({ assets: [...noneRelease.assets, asset("notes.txt", 92), asset("evil.exe", 93)] }, noneNames).length === 2 &&
+      unexpectedAssets({ assets: [...noneRelease.assets, asset(`${noneNames[0]}.asc`, 94)] }, noneNames).length === 0 &&
+      unexpectedAssets({ assets: [...noneRelease.assets, asset("stray.asc", 95)] }, noneNames).length === 1 &&
+      unexpectedAssets({ assets: [...noneRelease.assets, asset(`${noneNames[0]}.ASC.exe`, 96)] }, noneNames).length === 1,
+    "an extra asset was accepted or a sidecar refused",
+    cases,
+  );
+  expectCheck(
+    "LF18 only the legacy manifest and its signature are deleted from a none draft, and never in the frozen mode",
+    staleLegacyAssets(withStale, noneBundle).map((entry) => entry.id).join(",") === "90,91" &&
+      staleLegacyAssets({ assets: [...noneRelease.assets, asset("notes.txt", 92)] }, noneBundle).length === 0 &&
+      staleLegacyAssets({ assets: [...frozenRelease.assets] }, frozenBundle).length === 0,
+    JSON.stringify(staleLegacyAssets(withStale, noneBundle)),
     cases,
   );
   const missingLegacyDir = path.join(temp, "legacy-missing-file");

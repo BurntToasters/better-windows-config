@@ -257,6 +257,101 @@ public sealed class MigrationTests
         AssertNoFailures(start);
     }
 
+    /// <summary>
+    /// LC23, LC24 (security review 2, finding 8): the key is a user-writable value, so an `asInvoker` Uninstall.exe
+    /// in a folder that
+    /// is not a Better Windows Config install is never started, and a folder on a drive that is not there is not "gone". The
+    /// fake is a text file, so a wrong start would fail with a Windows error and show no prompt.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Installer")]
+    [TestCategory("E2EOnly")]
+    public void Migration_NotBwcInstallAndOfflineDriveAreRefused()
+    {
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        config.EnsureExecutablesExist();
+        int start = MigrationChecks.Count;
+
+        const string asInvokerManifest = "<?xml version=\"1.0\"?><assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">" +
+            "<trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\"><security><requestedPrivileges>" +
+            "<requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\" /></requestedPrivileges></security></trustInfo></assembly>";
+        string? offlineDrive = Enumerable.Range('D', 'Z' - 'D' + 1)
+            .Select(letter => (char)letter + @":\")
+            .FirstOrDefault(root => !Directory.Exists(root));
+        var cases = new (string Id, Func<InstallerRun, string> Prepare, string Code, bool FolderExists)[]
+        {
+            ("notBwc", run => MakeOldFolder(run, asInvokerManifest, manifest: false, hub: false), "not-bwc-install", true),
+            ("notBwc.manifestOnly", run => MakeOldFolder(run, asInvokerManifest, manifest: true, hub: false), "not-bwc-install", true),
+            ("notBwc.hubOnly", run => MakeOldFolder(run, asInvokerManifest, manifest: false, hub: true), "not-bwc-install", true),
+            ("driveMissing", _ => offlineDrive is null ? string.Empty : offlineDrive + "bwc-old-install-offline", "drive-missing", false),
+        };
+
+        foreach ((string id, Func<InstallerRun, string> prepare, string code, bool folderExists) in cases)
+        {
+            try
+            {
+                using InstallerRun run = InstallerRun.Create(config, "migb");
+                string location = prepare(run);
+                if (location.Length == 0)
+                {
+                    MigrationChecks.Record("migration." + id + ".refused", false, "No unused drive letter exists on this machine, so the offline-drive case cannot be built.");
+                    continue;
+                }
+
+                run.SeedUninstallKey(location);
+                int shortcutsBefore = SeedShortcuts(run.ShortcutDir);
+                string before = folderExists ? Leftovers(location) : "(no folder)";
+                string scope = "mig-notbwc";
+                using Process hub = StartHub(config, scope, run, seam: true, extra: null);
+                try
+                {
+                    string? outcome = WaitForOutcome(config, scope, OutcomeTimeout);
+                    string checkId = "migration." + id + ".refused";
+                    MigrationChecks.Record(checkId, outcome is not null && outcome.Contains($"refused ({code})", StringComparison.Ordinal), $"The log said: {outcome ?? "(no outcome in the log)"}. Expected refused ({code}).");
+                    string log = ReadHubLog(config, scope);
+                    MigrationChecks.Record(checkId + ".neverStarted", !log.Contains(StartedLine, StringComparison.Ordinal) && !log.Contains("(start-failed)", StringComparison.Ordinal), "The fake was not started (no start line and no start failure).");
+                    MigrationChecks.Record(checkId + ".untouched", (folderExists ? Leftovers(location) : "(no folder)") == before && Directory.Exists(location) == folderExists, "The old folder and its files are unchanged.");
+                    MigrationChecks.Record(checkId + ".keyAndShortcutsKept", run.UninstallKeyExists() && run.ShortcutCount() == shortcutsBefore, "The key and the shortcuts are unchanged, so the next start looks again.");
+                    MigrationChecks.Record(checkId + ".hubRunning", !hub.HasExited, "The Hub kept running.");
+                }
+                finally
+                {
+                    InstallEvidence.StopProcess(hub);
+                    ResetHubLog(config, scope);
+                }
+            }
+            catch (Exception ex)
+            {
+                MigrationChecks.Record("migration." + id + ".exception", false, ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+
+        AssertNoFailures(start);
+    }
+
+    /// <summary>
+    /// An old-install look-alike: an asInvoker Uninstall.exe, and optionally the manifest and the Hub exe (text
+    /// files).
+    /// </summary>
+    private static string MakeOldFolder(InstallerRun run, string uninstallerText, bool manifest, bool hub)
+    {
+        string folder = Path.Combine(run.Root, "old-look-alike");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, UninstallerName), uninstallerText);
+        if (manifest)
+        {
+            File.WriteAllText(Path.Combine(folder, "installed-files.txt"), "BetterWindowsConfig.exe\r\n");
+        }
+
+        if (hub)
+        {
+            File.WriteAllText(Path.Combine(folder, "BetterWindowsConfig.exe"), "not a program");
+        }
+
+        return folder;
+    }
+
     /// <summary>LC12, LC13: no Uninstall.exe. With the folder gone the stale key and the two shortcuts
     /// go; with the folder there nothing does.</summary>
     [TestMethod]

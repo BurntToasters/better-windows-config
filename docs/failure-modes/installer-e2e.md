@@ -267,6 +267,49 @@ per-user A of the upgrade test uses the usual E2E temp folder and `HKCU\Software
     at B, and leave no `.new` or `.old` (M19).
 79. **Same version does not repair.** Setup B over B must exit 0, leave key and file at B, and leave no `.new` or `.old` (M18).
 
+### Security review 2 (I5): the Elevated tests and the sandbox AUMID check
+
+Written before the tests and the code. The Elevated tests run as administrator, so everything they run or delete must come
+from a place a standard user cannot change. These rows are enforced by code that compiles in every run and executes only
+in the elevated runner (the unelevated run reports them as not run).
+
+82. **The setup path comes from a user-writable file (finding 5).** `installer-inputs.json` is in the checkout, so any path
+    in it (a UNC path, another folder) with its own size and hash would be accepted. The inputs are used only when each
+    setup is a plain file inside `<repo>\artifacts\installer` (the output folder of `build-installer.js`), is named
+    `BetterWindowsConfig-<semver>-<rid>-e2e-setup.exe` with the run's rid, is not a link, and its manifest requests only
+    `asInvoker` (the E2E setup; a ship setup, which asks for elevation, is refused). Otherwise NOT RUN with the reason.
+83. **The hash is checked once and the file is run later.** The test copies each setup into an admin-only run folder,
+    `%ProgramFiles%\BWC-E2E\work-<id>\inputs`, hashes the copy against the inputs file (and the size), and runs the copy.
+    A copy that differs is NOT RUN. The original is never run.
+84. **Program Files from the environment.** `ProgramW6432` is a variable the caller controls. The 64-bit Program Files folder
+    is `SHGetKnownFolderPath(FOLDERID_ProgramFiles)`. An existing `%ProgramFiles%\BWC-E2E` that is a link, or is not owned by
+    Administrators, SYSTEM, or TrustedInstaller, or that standard users can write, is refused: the Elevated tests are NOT RUN
+    (they would otherwise create and delete inside a folder a user controls).
+85. **The legacy per-user sandbox and the run's working folder are in `%TEMP%`.** The upgrade test ran the per-user A elevated
+    in `%TEMP%\bwc-installer-e2e-<id>`, started elevated children with that folder as the working directory, and deleted it
+    recursively as administrator. All of it now lives in `%ProgramFiles%\BWC-E2E\work-<id>\<run id>`: the legacy sandbox
+    (its install folder, shortcut folder, and uninstaller), the working folder of every Elevated run, and the inputs. The
+    per-user A there only has to look like a legacy install to the `/D=` hint (M6, M9). The path has a space, so the sandbox
+    shortcut folder reaches the setup through `BWC_E2E_INSTALLER_SHORTCUTS`, not through the unquoted `/SHORTCUTS=`.
+86. **The recursive delete.** The only recursive deletes of the Elevated tests are of folders inside the work folder, and
+    the work folder itself, each checked to be below `%ProgramFiles%\BWC-E2E` by name and not a link. A work folder that
+    cannot be removed is a failed cleanup check naming the path, never a silent leftover.
+87. **The unelevated run.** None of 82 to 86 runs without an elevated token. `RequireReady` returns NOT RUN first, so the work
+    folder is never created, and the unelevated installer E2E (`test-installer-e2e.js`) is unchanged: its sandbox stays in
+    `%TEMP%`, because it is unelevated.
+88. **The shortcut AUMID (finding 1, installer.md M45) is not checked in the unelevated run.** The user-sandbox install in
+    `Installer_Update_HubInstallsRealNewerInstaller` reads both shortcuts back through the shell property store: `<case>.a.aumid` (for example `update.a.aumid`) passes
+    only when the Hub shortcut carries `BetterWindowsConfig.Hub` and the Registry Editor shortcut `BetterWindowsConfig.Regedit`.
+    A missing AUMID is only a warning in the installer, but here it is a failed check, so a broken `--set-aumid` cannot pass.
+89. **Reinstall before the restart (installer.md M51).** After the uninstall of test 76, when the queue now names this run's
+    `Uninstall.exe`, the test runs the setup again and requires a non-zero exit, no `installed-files.txt`, and no key. When the
+    queue does not name it (the uninstaller deleted itself), the check records that it did not apply.
+90. **`_?=` names another folder (installer.md M47).** The Elevated test runs the uninstaller with `_?=` set to a folder in the
+    work folder that holds a copy of a BWC payload name. It must exit non-zero, and that folder and the real install and key
+    must be untouched.
+91. **A `.upd` copy with a `tmp` child (installer.md M50).** Test 76 plants `<dir>.upd\<32 hex>\installer.exe` and
+    `<dir>.upd\<32 hex>\tmp\x.dat` (what an update leaves), and the uninstall must remove `.upd` completely.
+
 ### Result file
 
 80. **`artifacts/e2e/installer-machine.json`.** Written when at least one machine test passed its gates: every check, the run

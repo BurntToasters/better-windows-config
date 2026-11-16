@@ -98,6 +98,30 @@ Terms:
 | LH7 | The shell call throws, or reports a start that did not happen | Exit 0 with no Hub | Mapped to `CannotDeElevate` by the host; exit 8 when elevated | `Doc` (real host; elevated runner test) |
 | LH8 | Unknown option, a value-less `--update-result`, an extra argument | Silent ignore | Usage error, exit 2 | `LaunchHub_Arguments_Parse` |
 
+## SA. `--set-aumid <shortcut> <app id>` (I5, security review 2, finding 1)
+
+Written before the tests and the code. The installer used to write the AppUserModelID with an elevated PowerShell, which loads
+modules from the user's `DocumentsWindowsPowerShellModules` and compiles with `csc` in `%TEMP%`. The installer now runs this
+mode of the installed, self-contained `BwcUpdate.exe` instead (installer.md M45). The command is positional:
+`BwcUpdate.exe --set-aumid "<absolute path of a .lnk>" <app id>`. It sets `System.AppUserModel.ID` (PKEY_AppUserModel_ID) through
+`IPropertyStore` with manual COM, saves the shortcut, loads it again, and compares. Exit codes: 0 written and read back, 2 usage,
+3 refused (the rules below), 4 not written (COM failure or the read-back differs), 7 unexpected. One JSON line on stdout.
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| SA1 | Missing value, a third value, an option-like value (`--x`), or a repeated mode | A silent default, or an injection | Usage error, exit 2 | `SetAumid_Arguments_Parse` |
+| SA2 | The shortcut path is relative, has a quote or a control character, has a `..` or `.` part or a doubled separator (it differs from its normalized form), is a UNC or device path, or does not end in `.lnk` | A write to a file the caller chose | Usage error, exit 2 | `SetAumid_Arguments_Parse`, `SetAumid_Path_Shape` |
+| SA3 | The app id is not exactly `BetterWindowsConfig.Hub` or `BetterWindowsConfig.Regedit` | Any text written into any shortcut | Usage error, exit 2 | `SetAumid_Arguments_Parse` |
+| SA4 | The file name and the id do not belong together (`Better Windows Config.lnk` takes the Hub id, `Registry Editor (BWC).lnk` the Regedit id) or the name is another one | The helper edits any shortcut in the Start menu | Refused `PathRejected`, exit 3, nothing written | `SetAumid_Name_And_Id_Rule` |
+| SA5 | Ship: the shortcut is not directly in the all-users Programs folder (`SHGetKnownFolderPath(FOLDERID_CommonPrograms)`, not an environment variable). E2E flavor only: also directly in a folder below the process's own temp folder (the per-user sandbox), below `%ProgramFiles%BWC-E2E` (the Elevated tests' sandbox), or directly in `<all-users Programs>BWC-E2E-<id>` (the `/MACHINE` sandbox) | A file in the user's own Start menu, or anywhere else, is edited by an elevated process | Refused `PathRejected`, exit 3, nothing written. The E2E rule is compiled only under `BWC_E2E` (the ship binary holds none of those folder names) | `SetAumid_Ship_Scope_Is_Common_Programs`, `SetAumid_E2E_Scope`, publish audit |
+| SA6 | The shortcut is missing, is a folder, or is a reparse point, or its folder is a reparse point | A link redirects the write | Refused `PathRejected`, exit 3. A link is never followed | `SetAumid_Files_Refused` |
+| SA7 | An 8.3 spelling or a junction in the path | The compare is fooled | The path must equal its normalized form (SA2) and its folder must be the allowed folder by exact comparison, so a short name or a junction never matches | `SetAumid_Path_Shape` |
+| SA8 | The process is elevated | An elevated write to the log folder (`BWC_DATA_ROOT`) | No file log when elevated, like the other modes (NL2). The result is the JSON line and the exit code | `Logging_Policy_Matrix` |
+| SA9 | COM fails, the shortcut is locked, or the value read back differs | A success that is not one | Exit 4, `Io`, the detail names the step. The installer logs a warning and goes on (installer.md M46) | Doc (real COM), E2E for the success path |
+| SA10 | An unexpected exception | A crash with no answer | One JSON line, exit 7, nothing else written | Doc |
+| SA11 | The mode must not elevate by itself | A prompt | It never asks for elevation and never starts a process. It runs at the token it was given | Doc (no start code in the mode) |
+| SA12 | The shortcut keeps its other properties | The target, arguments, icon, or working directory change | Only the AppUserModelID is set. The user-sandbox E2E reads the AUMID back and the Elevated test reads both shortcuts | E2E (`update.a.aumid`), Elevated (`fresh.shortcuts.*`) |
+
 ## NL. No file log in elevated modes
 
 | ID | Case | Risk | Required result | Test |

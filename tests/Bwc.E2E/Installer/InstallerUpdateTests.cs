@@ -522,7 +522,46 @@ public sealed class InstallerUpdateTests
 
         int shortcuts = run.ShortcutCount();
         InstallerChecks.Record(prefix + ".shortcuts", shortcuts > 0, $"{shortcuts} shortcut(s) were written.");
+        if (ran)
+        {
+            bool aumid = ShortcutAumidsAre(run, out string aumidNotes);
+            InstallerChecks.Record(prefix + ".aumid", aumid, aumidNotes);
+        }
+
         return ran && sameVersion;
+    }
+
+    /// <summary>
+    /// Both shortcuts carry their AppUserModelID, read back through the shell property store (installer.md M45: the installed
+    /// BwcUpdate.exe --set-aumid wrote them). The installer only warns on a miss, so this is where a broken write fails.
+    /// </summary>
+    private static bool ShortcutAumidsAre(InstallerRun run, out string notes)
+    {
+        var expected = new[]
+        {
+            (Name: "Better Windows Config.lnk", Id: "BetterWindowsConfig.Hub"),
+            (Name: "Registry Editor (BWC).lnk", Id: "BetterWindowsConfig.Regedit"),
+        };
+        var lines = new List<string>();
+        bool all = true;
+        foreach ((string name, string id) in expected)
+        {
+            string path = Path.Combine(run.ShortcutDir, name);
+            try
+            {
+                string? actual = MachineNative.ShortcutAppUserModelId(path);
+                lines.Add($"{name}: '{actual}', expected '{id}'");
+                all &= string.Equals(actual, id, StringComparison.Ordinal);
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or System.Runtime.InteropServices.COMException or FileNotFoundException)
+            {
+                lines.Add($"{name}: could not be read ({ex.GetType().Name})");
+                all = false;
+            }
+        }
+
+        notes = string.Join("; ", lines) + ".";
+        return all;
     }
 
     /// <summary>Starts BwcRegedit from the install folder, unelevated, and keeps it open for the installer to close.</summary>

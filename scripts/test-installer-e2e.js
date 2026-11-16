@@ -57,7 +57,6 @@ const PUBLISH_PROJECTS = [
 ];
 const REQUIRED_PUBLISH_FILES = ["BetterWindowsConfig.dll", "BetterWindowsConfig.exe", "BwcUpdate.exe"];
 const NSIS_SCRIPT = path.join(REPO_ROOT, "installer", "bwc.nsi");
-const SCRIPTS_DIR = path.join(REPO_ROOT, "installer", "scripts");
 const LICENSE_FILE = path.join(REPO_ROOT, "LICENSE");
 const ICON_FILE = path.join(REPO_ROOT, "resources", "bwc.ico");
 const INSTALLER_DIR = path.join(REPO_ROOT, "artifacts", "installer");
@@ -263,7 +262,6 @@ function buildInstallerB(rid, version, publishDir, makensis) {
     ["BWC_ARCH", RID_ARCH.get(rid)],
     ["BWC_OUTPUT", setup],
     ["BWC_PAYLOAD_NSH", payloadPath],
-    ["BWC_SCRIPTS_DIR", SCRIPTS_DIR],
     ["BWC_UPDATER_SRC", path.join(publishDir, "BwcUpdate.exe")],
     ["BWC_LICENSE", LICENSE_FILE],
     ["BWC_NOTICES", noticesPath],

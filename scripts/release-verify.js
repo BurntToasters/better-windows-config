@@ -22,7 +22,7 @@ import {
   removeDirectory,
   selectRelease,
 } from "./lib/github-release.js";
-import { loadReleaseBundle } from "./lib/release-bundle.js";
+import { expectedAssetNames, loadReleaseBundle, unexpectedAssets } from "./lib/release-bundle.js";
 import { prepareReleaseContext } from "./lib/release-context.js";
 import { readTrustedKeysFile } from "./lib/trusted-keys.js";
 import { git } from "./lib/release-policy.js";
@@ -172,6 +172,15 @@ async function applyVerify(context, options) {
   if (missing.length > 0) {
     for (const entry of missing) {
       console.error(`${SCRIPT}: REFUSED [asset-missing]: draft has no ${entry.name}`);
+    }
+    return EXIT.REFUSED;
+  }
+
+  // An asset outside the expected set is refused (release.md LF17): a stale bwc-stable.json would offer 0.1.2 to 0.1.1.
+  const unexpected = unexpectedAssets(release, expectedAssetNames(context.bundle));
+  if (unexpected.length > 0) {
+    for (const asset of unexpected) {
+      console.error(`${SCRIPT}: REFUSED [asset-unexpected]: the release holds ${asset?.name ?? "(unnamed)"}, which is not part of this bundle`);
     }
     return EXIT.REFUSED;
   }

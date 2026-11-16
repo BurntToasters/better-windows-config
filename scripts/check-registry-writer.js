@@ -156,6 +156,10 @@ const unnamedCallAllowlist = new Map([
     "src/Bwc.Registry/RegistryStore.cs",
     "The product store. It calls RegistryWriter, the only native writer, and the writer checks every path.",
   ],
+  [
+    "src/Bwc.Update/Helper/ShortcutAumid.cs",
+    "IPropertyStore.SetValue of a shortcut's AppUserModelID (a COM property store of a .lnk file, not the registry).",
+  ],
   ["tests/Bwc.E2E/ContextMenus/ContextMenuTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/Favorites/FavoritesFixesTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/Hex/HexEditingFixesTests.cs", sandboxedSeedReason],
