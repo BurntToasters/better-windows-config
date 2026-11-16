@@ -114,6 +114,13 @@ internal sealed partial class RegeditContext
 
     public CancellationTokenSource? ValueLoad { get; set; }
 
+    /// <summary>
+    /// The key the value list is bound to: the key of the rows shown, or of the rows being loaded. Every list command
+    /// acts on this key and on the list rows, never on the live tree selection. Null for Computer and for a node
+    /// without a key.
+    /// </summary>
+    public KeyLocation? ListKey { get; private set; }
+
     /// <summary>The pane that most recently had keyboard focus. Menu commands use it while the menu bar has focus.</summary>
     public Pane LastFocusedPane { get; set; } = Pane.Tree;
 
@@ -848,7 +855,70 @@ internal sealed partial class RegeditContext
     }
 
     /// <summary>
-    /// Reloads the list rows for the selected key. Stale results are dropped by generation. selectRawName is the raw
+    /// Binds the list to the key of a tree node that was selected. A different key first commits a rename in progress
+    /// to the key it started in, then drops every load still running and clears the rows, so no command can act on
+    /// rows of another key. The same key keeps its rows until its load replaces them.
+    /// </summary>
+    public void BindList(KeyLocation? key)
+    {
+        if (SameKey(ListKey, key))
+        {
+            return;
+        }
+
+        Shell.ListContent.CommitPendingRename();
+        ValueLoad?.Cancel();
+        ValueLoad = null;
+        ValueGeneration++;
+        ListKey = key;
+        Shell.ListContent.SetRows(Array.Empty<DetailsRow>());
+    }
+
+    /// <summary>The key of the bound list and its store. False when no key is bound.</summary>
+    public bool TryGetListKey(out RegistryPath path, out RegistryStore store)
+    {
+        if (ListKey is { } location)
+        {
+            path = location.Path;
+            store = location.Store;
+            return true;
+        }
+
+        path = null!;
+        store = null!;
+        return false;
+    }
+
+    /// <summary>
+    /// True when the list is bound to this key on this store. A remote store is one object per connection,
+    /// and the local store is one object, so the store identifies the computer.
+    /// </summary>
+    public bool IsListBoundTo(RegistryPath key, RegistryStore store) =>
+        ListKey is { } bound &&
+        ReferenceEquals(bound.Store, store) &&
+        string.Equals(bound.Path.ToDisplayString(), key.ToDisplayString(), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Refreshes the list after a write to <paramref name="key"/>. The list reloads only while it is still bound
+    /// to that key. A rename committed after the tree moved on writes to a key that is no longer shown.
+    /// </summary>
+    public Task RefreshWrittenValuesAsync(RegistryPath key, RegistryStore store, string? selectRawName) =>
+        IsListBoundTo(key, store) ? RefreshValuesAsync(selectRawName) : Task.CompletedTask;
+
+    /// <summary>True when two locations name the same key on one computer. Two null locations are the same.</summary>
+    public static bool SameKey(KeyLocation? a, KeyLocation? b)
+    {
+        if (a is null || b is null)
+        {
+            return a is null && b is null;
+        }
+
+        return ReferenceEquals(a.Connection, b.Connection) &&
+            string.Equals(a.Path.ToDisplayString(), b.Path.ToDisplayString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Reloads the list rows of the bound key. Stale results are dropped by generation. selectRawName is the raw
     /// value name to select (empty for the unnamed default value), or null to select nothing.
     /// </summary>
     public async Task RefreshValuesAsync(string? selectRawName)
@@ -857,7 +927,7 @@ internal sealed partial class RegeditContext
         ValueLoad = null;
         int generation = ++ValueGeneration;
 
-        if (!TryGetSelectedLocation(out KeyLocation location))
+        if (ListKey is not { } location)
         {
             Shell.ListContent.SetRows(Array.Empty<DetailsRow>());
             UpdateCommandStates();
@@ -920,6 +990,7 @@ internal sealed partial class RegeditContext
         var tokenSource = new CancellationTokenSource();
         ValueLoad = tokenSource;
         int generation = ++ValueGeneration;
+        KeyLocation? loadedFrom = TryGetLocationForNode(node, out KeyLocation nodeLocation) ? nodeLocation : null;
         RegistryValueListing listing = EmptyListing;
         string? unreadablePath = null;
         RegistryOperationException? unreadable = null;
@@ -988,6 +1059,7 @@ internal sealed partial class RegeditContext
             {
                 PendingListView? pending = PendingList;
                 PendingList = null;
+                ListKey = loadedFrom;
                 Shell.ListContent.SetRows(listing.Rows);
                 if (unreadablePath is not null && unreadable is not null)
                 {

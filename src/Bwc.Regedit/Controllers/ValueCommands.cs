@@ -45,23 +45,38 @@ internal sealed class ValueCommands
     /// <summary>Applies an inline rename that the list committed for one of its rows.</summary>
     public void RenameFromList(DetailsRow row, string newName)
     {
+        // The key is read here, before the command starts, so it is the key the edit began in. A row that is no
+        // longer in the bound list was cancelled by a key change, and nothing is written.
+        if (!_context.TryGetListKey(out RegistryPath key, out RegistryStore store) ||
+            _context.Shell.ListContent.DisplayIndexOf(row) < 0)
+        {
+            Log.Info("Registry Editor cancelled a rename whose value is no longer in the list.");
+            return;
+        }
+
         _context.StartCommand(async () =>
         {
-            if (!_context.TryGetSelectedKey(out RegistryPath key, out RegistryStore store))
-            {
-                await _context.ShowMessageAsync(Get("DialogNoSelection"));
-                return;
-            }
-
             if (row.IsDefault || !_context.TryGetRawValueName(row, out string oldName))
             {
                 await _context.ShowMessageAsync(Get("DialogDefaultValueLocked"));
                 return;
             }
 
+            if (IsNotAddressable(oldName))
+            {
+                await _context.ShowMessageAsync(Get("DialogInvalidValueName"));
+                return;
+            }
+
             await RenameValueCoreAsync(key, store, oldName, newName);
         });
     }
+
+    /// <summary>
+    /// True for a value name that no name-based call can address: one with an embedded NUL. The list still shows
+    /// such a value, and every command on it is refused with the classic invalid-name text (list.md section 11).
+    /// </summary>
+    private static bool IsNotAddressable(string rawName) => rawName.Contains('\0');
 
     /// <summary>Opens the read-only binary viewer for the single selected value.</summary>
     public void DisplayBinaryData() => _context.StartCommand(ShowBinaryDataAsync);
@@ -79,7 +94,7 @@ internal sealed class ValueCommands
             return;
         }
 
-        if (!_context.TryGetSelectedKey(out RegistryPath key, out RegistryStore store))
+        if (!_context.TryGetListKey(out RegistryPath key, out RegistryStore store))
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
@@ -89,6 +104,12 @@ internal sealed class ValueCommands
         if (rows.Count != 1 || !_context.TryGetRawValueName(rows[0], out string rawName))
         {
             await _context.ShowMessageAsync(Get("DialogHexNoSelection"));
+            return;
+        }
+
+        if (IsNotAddressable(rawName))
+        {
+            await _context.ShowMessageAsync(Get("DialogInvalidValueName"));
             return;
         }
 
@@ -193,9 +214,15 @@ internal sealed class ValueCommands
             return;
         }
 
-        if (!_context.TryGetSelectedKey(out RegistryPath key, out RegistryStore store) ||
+        if (!_context.TryGetListKey(out RegistryPath key, out RegistryStore store) ||
             !_context.TryGetRawValueName(activatedRow, out string rawName))
         {
+            return;
+        }
+
+        if (IsNotAddressable(rawName))
+        {
+            await _context.ShowMessageAsync(Get("DialogInvalidValueName"));
             return;
         }
 
@@ -248,7 +275,7 @@ internal sealed class ValueCommands
             return;
         }
 
-        await _context.RefreshValuesAsync(rawName);
+        await _context.RefreshWrittenValuesAsync(key, store, rawName);
     }
 
     private async Task ModifyBinaryDataAsync()
@@ -323,7 +350,7 @@ internal sealed class ValueCommands
         }
 
         DetailsRow row = rows[0];
-        if (!_context.TryGetSelectedKey(out RegistryPath key, out RegistryStore store))
+        if (!_context.TryGetListKey(out RegistryPath key, out RegistryStore store))
         {
             if (activated is null)
             {
@@ -341,6 +368,12 @@ internal sealed class ValueCommands
 
         if (!_context.TryGetRawValueName(row, out string rawName))
         {
+            return;
+        }
+
+        if (IsNotAddressable(rawName))
+        {
+            await _context.ShowMessageAsync(Get("DialogInvalidValueName"));
             return;
         }
 
@@ -393,7 +426,7 @@ internal sealed class ValueCommands
 
         if (saved)
         {
-            await _context.RefreshValuesAsync(rawName);
+            await _context.RefreshWrittenValuesAsync(key, store, rawName);
         }
     }
 
@@ -424,7 +457,7 @@ internal sealed class ValueCommands
             return;
         }
 
-        await _context.RefreshValuesAsync(string.Empty);
+        await _context.RefreshWrittenValuesAsync(key, store, string.Empty);
     }
 
     private async Task<bool> EditStringValueAsync(
@@ -578,7 +611,7 @@ internal sealed class ValueCommands
     /// </summary>
     private async Task NewValueAsync(NewValueKind kind)
     {
-        if (!_context.TryGetSelectedKey(out RegistryPath key, out RegistryStore store))
+        if (!_context.TryGetListKey(out RegistryPath key, out RegistryStore store))
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
@@ -595,7 +628,7 @@ internal sealed class ValueCommands
             return;
         }
 
-        await _context.RefreshValuesAsync(valueName);
+        await _context.RefreshWrittenValuesAsync(key, store, valueName);
         BeginListRenameSoon();
     }
 
@@ -646,7 +679,7 @@ internal sealed class ValueCommands
 
     private async Task DeleteValuesAsync()
     {
-        if (!_context.TryGetSelectedKey(out RegistryPath key, out RegistryStore store))
+        if (!_context.TryGetListKey(out RegistryPath key, out RegistryStore store))
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
@@ -685,12 +718,21 @@ internal sealed class ValueCommands
 
         // Every value is attempted. A failure does not stop the rest, and the first failure is shown once,
         // after the work, with the classic text. The list is refreshed in every case.
+        // A value whose name has an embedded NUL is refused without a call, and the other values are still deleted.
         RegistryOperationException? first = null;
         string? firstName = null;
+        bool refusedName = false;
         await _context.RunRegistryWriteAsync(() =>
         {
             foreach (string rawName in rawNames)
             {
+                if (IsNotAddressable(rawName))
+                {
+                    Log.Warn($"Registry Editor refused to delete a value whose name contains NUL ({rawName.Length} characters).");
+                    refusedName = true;
+                    continue;
+                }
+
                 try
                 {
                     store.DeleteValue(key, rawName);
@@ -701,12 +743,21 @@ internal sealed class ValueCommands
                     first ??= ex;
                     firstName ??= ValueLabel(rawName);
                 }
+                catch (ArgumentException ex)
+                {
+                    Log.Warn($"Registry Editor refused to delete value '{ValueLabel(rawName)}': {ex.Message}");
+                    refusedName = true;
+                }
             }
         });
 
         if (first is not null)
         {
             await _context.ShowRegistryErrorAsync(first, RegistryAction.DeleteValues, firstName);
+        }
+        else if (refusedName)
+        {
+            await _context.ShowMessageAsync(Get("DialogInvalidValueName"));
         }
         else if (syntheticSelected)
         {
@@ -715,7 +766,7 @@ internal sealed class ValueCommands
                 new ClassicMessage(Get("MsgCaptionDeleteValuesError"), Get("MsgDeleteValuesFailed")).ToErrorDialog());
         }
 
-        await _context.RefreshValuesAsync(selectRawName: null);
+        await _context.RefreshWrittenValuesAsync(key, store, selectRawName: null);
     }
 
     private async Task RenameValueCoreAsync(RegistryPath key, RegistryStore store, string oldName, string newName)
@@ -742,7 +793,7 @@ internal sealed class ValueCommands
             return;
         }
 
-        await _context.RefreshValuesAsync(newName);
+        await _context.RefreshWrittenValuesAsync(key, store, newName);
     }
 
     /// <summary>

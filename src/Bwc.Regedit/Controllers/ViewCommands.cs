@@ -79,6 +79,9 @@ internal sealed class ViewCommands
         string displayPath = node.RegistryPath ?? node.Name;
         _context.Shell.CurrentPath = displayPath;
         _context.Settings.LastKey = displayPath;
+
+        // The list leaves the old key's rows at once, so no list command can act on them while the new key loads.
+        _context.BindList(_context.TryGetLocationForNode(node, out KeyLocation location) ? location : null);
         _context.UpdateCommandStates();
         _ = _context.LoadValuesAsync(node);
     }

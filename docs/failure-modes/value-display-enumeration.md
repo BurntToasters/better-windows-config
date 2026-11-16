@@ -107,6 +107,12 @@ Tests: `RegistryReaderTests.EnumerationReturnsEmbeddedNulNamesWithTheirOwnData` 
 value is seeded through the E2E-only writer seam, because `RegSetValueExW` cannot pass an embedded
 NUL), `RegistryWriterSandboxTests` (name guard).
 
+Reader guard (0.1.2): `RegistryReader.ReadValue` and `ValueExists` read the name through `RegQueryValueExW`,
+which truncates at the NUL. `ReadValue("abc\0def")` returned `abc`'s data, so Modify and the binary viewer
+showed another value. The reader now refuses a NUL name with `ArgumentException` before any native call,
+as the writer does. Enumeration is unchanged and still returns the NUL-named value with its own data.
+Tests: `tests/Bwc.Registry.Tests/RegistryValueNulNameTests.cs`.
+
 ## 8. Names longer than 16,383 characters
 
 The platform limits value names to 16,383 characters. Windows does not create longer names, but

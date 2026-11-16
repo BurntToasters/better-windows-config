@@ -276,3 +276,78 @@ Failure modes:
 E2E: `List_TenThousandValuesSortInBackground` (in `tests/Bwc.E2E/List/LargeValueSortTests.cs`) seeds
 10,001 values in one key, checks that the first row is `(Default)`, and walks the realized rows with
 Home, PageDown, and End. It checks each row against the native collation order computed in the test.
+
+## 10. Key identity of the value list (0.1.2)
+
+The list shows the rows of one key. Before this change the rows were replaced only when the new key's
+load finished, and every value command took its key from the live tree selection and its value names
+from the rows. So a command could pair key B with the rows of key A.
+
+Failure modes:
+
+- **Stale rows after a tree change.** Selecting key B while key A's rows are still shown (a slow or
+  remote load). Delete on a row shown from A deletes the same-named value in B.
+- **Rename committed to the new key.** Rename a value in A, then right-click key B. The tree selects B
+  before focus moves, and the rename box commits on focus loss. The same-named value in B is renamed.
+- **Rename refresh reloads the wrong key.** After a rename committed to A, the refresh reads the tree key
+  (B) and selects the new name there.
+- **Rename box survives a row replacement.** A refresh replaces the rows while the rename box is open. The
+  box still holds the old row index, so the commit names a different row.
+- **Find cursor pairs keys.** The Find cursor reads the tree key and the first selected row. Rows from
+  another key would give a cursor for a value that the key does not hold.
+- **New value during a load.** New value writes to whatever key the tree shows at execution time, with no
+  listing bound to it.
+
+Design:
+
+- The list is bound to one key, `RegeditContext.ListKey`. The key and the rows change together. A tree
+  selection of a different key clears the rows and binds the new key at once, so no command can see the
+  old rows. A selection of the same key keeps the rows; the reload replaces them.
+- Every list command takes its key from `ListKey`, and its rows from the list. With no bound key (Computer,
+  or a node without a key) New value shows the no-selection text, and the row commands have no rows to act on.
+- A rename in progress is committed to its own key before the list is rebound. Classic regedit commits a
+  rename on focus loss to the key the edit started in. BWC commits it on the tree selection that moves
+  away, which runs before focus moves, so the commit lands in the old key. A rename whose row is no longer
+  in the bound list is cancelled, never applied to another key.
+- A refresh after a write reloads only when the bound key is the key that was written. Otherwise the write
+  does not touch the displayed list.
+- The Find cursor (`FindController`, read-only) still reads the tree key and the first selected row. The rows
+  always belong to the tree key, because a key change clears them, so the pairing holds without a change there.
+- `DetailsList.SetRows` ends a rename in progress without committing it, because the row index it holds
+  is no longer valid.
+
+E2E: `tests/Bwc.E2E/List/ListKeyIdentityTests.cs`.
+- `ListKeyIdentity_RenameCommitsToItsOwnKey` starts renaming A\X, right-clicks B, and checks that A's X is
+  renamed and B's X is untouched.
+- `ListKeyIdentity_DeleteDuringLoadTouchesNothing` holds B's load with the E2E-only delay hook, invokes
+  Delete, and checks that B's X still exists.
+- `ListKeyIdentity_NulNamedValueIsRefused` covers the NUL-named value (section 11 of
+  `value-display-enumeration.md`): Modify is refused, and a multi-delete that includes it deletes the rest
+  and refreshes the list.
+
+## 11. Value names with an embedded NUL (0.1.2)
+
+A value named `abc\0def` is listed (its name, data, and type come from one `RegEnumValueW` call), but no
+command can address it by name. Win32 name APIs read the name up to the first NUL, so every name-based call
+reaches the value `abc`.
+
+Failure modes:
+
+- **Modify shows another value.** `ReadValue("abc\0def")` returns `abc`'s data and type. The editor opens
+  on the wrong value and a save writes to `abc`.
+- **Delete stops the batch.** `DeleteValue` throws `ArgumentException` for a NUL name. The multi-delete loop
+  catches only `RegistryOperationException`, so the first NUL-named row stops the loop, and the refresh
+  after the loop is skipped.
+- **Rename reads the wrong value.** `RenameValue` reads the old name first, so it copies `abc`'s data
+  before it refuses.
+- **Binary and hex commands read the wrong value.** Modify Binary Data, Display Binary Data, and the
+  hex editor use the same name read.
+
+Design: every command on a NUL-named row is refused before any read or write. Modify, Modify Binary Data,
+Display Binary Data, and Rename show the classic invalid-name text (`DialogInvalidValueName`). Multi-delete
+attempts every other value, catches the refusal per value, reports the first failure after the work, and
+refreshes. The engine refuses a name with NUL on every name-based read (`ReadValue`, `ValueExists`) with
+`ArgumentException`, the same as the writer.
+
+Tests: `tests/Bwc.Registry.Tests/RegistryValueNulNameTests.cs` (reader, writer, and rename guards), and
+`ListKeyIdentity_NulNamedValueIsRefused` in `tests/Bwc.E2E/List/ListKeyIdentityTests.cs`.

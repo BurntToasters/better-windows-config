@@ -56,6 +56,7 @@ public sealed class RegistryValueSource
         try
         {
             ThrowIfInjectedEnumerationFailure(path);
+            WaitForInjectedLoadDelay(path);
             IReadOnlyList<RegistryValueInfo> values = _reader.EnumerateValues(path, cancellationToken);
 
             var rows = new List<DetailsRow>(values.Count + 1);
@@ -211,11 +212,40 @@ public sealed class RegistryValueSource
         }
     }
 
+    /// <summary>
+    /// E2E only: BWC_E2E_DELAY_VALUE_LOAD is "display path|milliseconds". The value load of that key
+    /// waits on the thread pool before it reads, so a test can hold its rows back. The ship build has no delay.
+    /// </summary>
+    private static readonly string? InjectedLoadDelay = Environment.GetEnvironmentVariable("BWC_E2E_DELAY_VALUE_LOAD");
+
+    private static void WaitForInjectedLoadDelay(RegistryPath path)
+    {
+        if (string.IsNullOrEmpty(InjectedLoadDelay))
+        {
+            return;
+        }
+
+        int bar = InjectedLoadDelay.LastIndexOf('|');
+        if (bar <= 0 ||
+            !int.TryParse(InjectedLoadDelay[(bar + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out int delayMs) ||
+            !string.Equals(StripComputer(path.ToDisplayString()), StripComputer(InjectedLoadDelay[..bar]), StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        System.Threading.Thread.Sleep(delayMs);
+    }
+
     /// <summary>Drops a leading "Computer\" so the address form and the tree form of a path compare equal.</summary>
     private static string StripComputer(string displayPath) =>
         displayPath.StartsWith("Computer\\", StringComparison.OrdinalIgnoreCase) ? displayPath["Computer\\".Length..] : displayPath;
 #else
     private static void ThrowIfInjectedEnumerationFailure(RegistryPath path)
+    {
+        _ = path;
+    }
+
+    private static void WaitForInjectedLoadDelay(RegistryPath path)
     {
         _ = path;
     }

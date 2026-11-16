@@ -259,10 +259,23 @@ public sealed class RegistryReader
     {
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(valueName);
+        RejectEmbeddedNul(valueName);
         cancellationToken.ThrowIfCancellationRequested();
 
         using SafeRegistryKeyHandle handle = OpenKey(key, cancellationToken);
         return QueryValueData(handle, key, valueName, cancellationToken);
+    }
+
+    /// <summary>
+    /// A name-based call cannot address a value whose name has an embedded NUL: the Win32 call stops at the NUL and
+    /// reads another value. Enumeration still returns such a value with its own data.
+    /// </summary>
+    private static void RejectEmbeddedNul(string valueName)
+    {
+        if (valueName.Contains('\0'))
+        {
+            throw new ArgumentException("A value name with an embedded NUL cannot be read by name.", nameof(valueName));
+        }
     }
 
     public RegistryValueInfo? ReadDefaultValue(
@@ -419,6 +432,7 @@ public sealed class RegistryReader
     {
         ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(valueName);
+        RejectEmbeddedNul(valueName);
         cancellationToken.ThrowIfCancellationRequested();
 
         WIN32_ERROR openError = TryOpen(path, REG_SAM_FLAGS.KEY_READ, out SafeRegistryKeyHandle? handle);
