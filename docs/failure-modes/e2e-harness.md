@@ -487,6 +487,76 @@ show the dialog after the sleep, and a fast one wastes the sleep. Negative check
 (`DialogsThatAppear` in the Hub test, and a loop in the AppServices test), and the wait for the re-sort polls until
 the realized rows are in name order.
 
+## 39. A test exception outside a Record call leaves a clean artifact
+
+`pass` used to come only from the recorded checks. A test that threw before its first `Record`, or
+between two of them, added nothing, so the artifact could say `pass: true` while `dotnet test`
+exited 2. The exception was visible only in the console.
+
+Guard: `GuiGate` has a `[GlobalTestCleanup]` method. MSTest runs it after every test method in the
+assembly, and it reads `TestContext.CurrentTestOutcome` and `TestContext.TestException`. Each test that
+ran records `test.<ClassName>.<Method>.outcome`. A passed test records a passing check. A failed or
+errored test records a failing check whose notes are the exception type and message. A test that
+reported Inconclusive records a note, not a check, because it neither passed nor failed. The artifact
+`pass` is therefore false whenever dotnet reports a failed test. `scripts/test-e2e.js` prints an
+explicit line when the dotnet exit code and the artifact disagree, and exits 1.
+
+Residual: a test that is ignored or excluded by the filter has no outcome check. A full-run artifact
+has one outcome entry for every test that ran.
+
+## 40. A filtered run overwrites the full-run artifact
+
+Every run wrote `result-<rid>-<flavor>.json`, so a run with `--filter` replaced the artifact of the
+last full run. A later reader could not tell which evidence it held.
+
+Guard: the harness writes three files. `result-<rid>-<flavor>.json` keeps the existing name, because
+`scripts/test-all.js`, `elevated-runner/run-elevated.ps1` and this document read it. Each run also
+writes `result-<rid>-<flavor>-<runId>.json`, a copy that names the run. A run with no user `--filter`
+also writes `result-<rid>-<flavor>-full.json`. `scripts/test-e2e.js` passes the scope to the test host
+in `BWC_RUN_SCOPE` (`full` or `filtered`). A host started without it is treated as filtered, so it never
+claims a full run. The `-full.json` file is written only for `full`.
+
+## 41. Keys left logically down
+
+`Keyboard.Press` sends key-down only. Twenty-eight call sites in 15 files pressed Enter, Escape, Insert,
+Delete, Back, Right, Home or Down and never released them. The key stays down in the system keyboard state until something releases it, so later input in the
+same run sees a held key: auto-repeat starts, and a held modifier changes what the next key does.
+
+Guard: every `Keyboard.Press` pairs with `Keyboard.Release` in the same `finally`, or uses
+`Keyboard.Type` (down and up). `ValueEnter_TwoFastPressesOpenOneEditor` keeps its two fast presses and
+releases both keys. No test may leave a key down when it returns. `Keyboard.Pressing` in a `using`
+block is the only scoped hold.
+
+## 42. Remote suite turns any error into "not run"
+
+`RemoteCommandTests` and `RemoteConnectImportTests` treated any error dialog after Connect as "the
+RemoteRegistry service is stopped", so a real connect failure was not run, not failed. The not-run
+result was recorded as a passing check `print.remote.not-run`. The PDF print test had the same
+pattern for a missing "Microsoft Print to PDF" printer.
+
+Guard: the tests read the `RemoteRegistry` service state with `QueryServiceStatus` (read only; the
+harness never starts, stops or configures it). "Not run" is allowed only when the service is not
+`Running`. With the service running, a connect error is a failed check. "Not run" is recorded with
+`E2EResults.Note`, never as a check. The same rule applies to the PDF printer-missing path.
+
+## 43. Build collision in the shared publish folder
+
+`scripts/dotnet-build.js` publishes Bwc.Hub, Bwc.Regedit.App and Bwc.Update into one folder. After each
+publish it compares every file with the earlier publishes, and it fails the build with
+`file collision: Bwc.UI.dll differs between Bwc.Hub and Regedit.App` when two copies differ.
+
+Cause (verified on the build tree): Bwc.UI.dll is copied into each app's bin folder by copy-local, and copy-local
+skips a file whose size and timestamp match. A Bwc.UI.dll from an earlier ship build (`BwcFlavor` ship) can
+therefore survive in `src/Bwc.Hub/bin/<platform>/Release/<tfm>/<rid>` while the E2E build of the same
+source carries `BwcFlavor` E2E. The stale ReadyToRun intermediates were already removed before each publish,
+but the copy-local output was not, so the two apps could disagree on the shared file.
+
+Guard: before each project publishes, `dotnet-build.js` also deletes that project's rid-specific copy-local
+folder (`bin/<platform>/Release/<tfm>/<rid>`) and logs it. The publish copies every referenced assembly again,
+and the result records `staleCopyLocalRemoved` for each project. The shared-folder check and the flavor check
+are unchanged. The exact timing that produced the collision was not reproduced; the guard removes the input
+that the verified tree shows to be stale.
+
 ## Verification artifact
 
 A successful harness run leaves `artifacts/e2e/result-<rid>-<flavor>.json` with schema 2, the run

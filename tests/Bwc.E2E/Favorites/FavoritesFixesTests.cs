@@ -124,7 +124,7 @@ public sealed class FavoritesFixesTests
             _ = driver.DismissErrorBox(TimeSpan.FromSeconds(3));
             if (driver.WaitForDialog(TimeSpan.FromSeconds(1)))
             {
-                Keyboard.Press(VirtualKeyShort.ESCAPE);
+                Keyboard.Type(VirtualKeyShort.ESCAPE);
             }
 
             _ = driver.WaitForNoDialog(TimeSpan.FromSeconds(5));

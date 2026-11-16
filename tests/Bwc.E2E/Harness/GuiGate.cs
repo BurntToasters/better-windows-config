@@ -51,6 +51,34 @@ public sealed class GuiGate
         AcquireGate();
     }
 
+    /// <summary>
+    /// Runs after every test method. It records one outcome check per test, so the artifact fails when dotnet
+    /// reports a failed test, even when the test threw before it recorded a check. An Inconclusive test records
+    /// a note, because it neither passed nor failed.
+    /// </summary>
+    [GlobalTestCleanup]
+    public static void RecordTestOutcome(TestContext testContext)
+    {
+        string className = testContext.FullyQualifiedTestClassName ?? "UnknownClass";
+        string id = $"test.{className[(className.LastIndexOf('.') + 1)..]}.{testContext.TestName}.outcome";
+        UnitTestOutcome outcome = testContext.CurrentTestOutcome;
+        if (outcome == UnitTestOutcome.Passed)
+        {
+            E2EResults.Record(id, true, "Passed.");
+        }
+        else if (outcome == UnitTestOutcome.Inconclusive)
+        {
+            E2EResults.Note(id, $"Inconclusive: {DescribeException(testContext.TestException)}");
+        }
+        else
+        {
+            E2EResults.Record(id, false, $"{outcome}: {DescribeException(testContext.TestException)}");
+        }
+    }
+
+    private static string DescribeException(Exception? exception) =>
+        exception is null ? "no exception was recorded" : $"{exception.GetType().Name}: {exception.Message}";
+
     [AssemblyCleanup]
     public static void AssemblyCleanup()
     {

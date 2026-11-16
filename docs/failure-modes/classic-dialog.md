@@ -310,6 +310,17 @@ Guard: the ResourceViewers test presses Escape on the Resource Lists viewer with
 (`resources.requirements.escape-after-child`). The nested owners are no longer closed with OK. The pre-fix build was
 not re-run in this session; the cause above comes from the template and the code path, and the post-fix run passes.
 
+### 3.11 Enter from the press that opened the dialog, or auto-repeat
+
+A press of Enter on a row opens a dialog. The dialog activates while the opening key may still be held, and
+the key-down that the auto-repeat engine sends for a held key reaches the new dialog with the repeat flag set.
+If the dialog treats that as a press, it accepts at once and closes before the user sees it. The same applies
+to Escape. A key-down that the dialog itself receives without the repeat flag is a press of its own.
+
+Guard: `ModalDialogWindow` ignores Enter and Escape key-downs whose `KeyStatus.WasKeyDown` is set, so auto-repeat
+and a key that was already down when the dialog opened never act. The E2E check is
+`ValueEnter_TwoFastPressesOpenOneEditor`, which presses Enter twice with no pause and expects one editor.
+
 ## 4. Placement and sizing
 
 ### 4.1 Centered outside the work area

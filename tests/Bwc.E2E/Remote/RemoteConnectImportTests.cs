@@ -19,7 +19,8 @@ namespace Bwc.E2E.Remote;
 /// 132). E2E builds read BWC_E2E_CONNECT_TARGET, so File > Connect runs its real command path without the picker.
 /// Remote writes go to HKEY_USERS\SID\Software\BWC-E2E\run-id, the local sandbox key with the root swapped. The
 /// sandbox helpers seed and clean, and Registry.Users only reads back. Section 17 of
-/// docs/failure-modes/remote-registry.md is the spec. A connect that the remote registry refuses is not run.
+/// docs/failure-modes/remote-registry.md is the spec. A connect that the remote registry refuses is a note
+/// only while RemoteRegistry is not Running (see RemoteRegistryService); otherwise it fails.
 /// </summary>
 [TestClass]
 public sealed class RemoteConnectImportTests
@@ -346,8 +347,9 @@ public sealed class RemoteConnectImportTests
     }
 
     /// <summary>
-    /// Connects through File > Connect with the target from the environment. A remote error is recorded as not run
-    /// and the test is Inconclusive, the same as RemoteCommandTests.RequireConnected. A UI failure is a failed check.
+    /// Connects through File > Connect with the target from the environment. A refused connect is "not run" (a note
+    /// and the test is Inconclusive) only while RemoteRegistry is not Running, the same as RequireConnected.
+    /// Otherwise it is a failed check. A UI failure is a failed check.
     /// </summary>
     private static void RequireLoopback(AppSession session, EditingDriver driver)
     {
@@ -360,9 +362,7 @@ public sealed class RemoteConnectImportTests
 
         if (outcome.Text.Length > 0)
         {
-            string note = $"not run: remote registry unavailable ({outcome.Text})";
-            E2EResults.Note("remote.connect.not-run", note);
-            Assert.Inconclusive(note);
+            RemoteRegistryService.RefusedConnect("remote.connect", "remote.connect.not-run", outcome.Text);
         }
 
         E2EResults.Record("remote.connect", false, $"Neither '{LoopbackNode}' nor an error appeared within 30 s.");

@@ -715,7 +715,7 @@ OQ-32. Lossy classes and round trip: the golden writes EmptyNoNul (0 bytes) as "
 
 OQ-33. Hex wrap width: golden hex lines are 78 characters including the trailing backslash. The contract says 80 columns. The golden governs; correct the contract or record the difference.
 
-OQ-34. Golden coverage gaps: no golden exists for text (*.txt) export, hive file export (save subtree), print output, or command-line exit codes and console messages.
+OQ-34. Golden coverage: text (*.txt) export is checked against the classic text golden (SeedExportMatchesTheClassicTextGoldenByteForByte). Hive export (save subtree) and command-line exit codes and console messages have E2E checks but no classic golden. Print page layout is open under OQ-44 (regedit-audit.md, OQ-34).
 
 OQ-35. Binary hive import path: the RegRestoreKey path and its confirmation (strings 55, 56) are inferred. No golden exists.
 
@@ -731,11 +731,11 @@ OQ-40. My Computer (string 34): the dump does not say where it appears. The tree
 
 OQ-41. Shell verbs and file type strings: Registration Entries (309) and Mer&ge (310) suggest an Explorer verb for .reg files. The brief does not cover it. Whether BWC registers a file type or a Merge verb is a decision, not a parity fact.
 
-OQ-42. Permissions: the ACL editor is an OS component and is not in the dump. Whether BWC uses the same component, and the prompt flows for replace and audit (strings 7015 to 7018; the checkboxes that trigger them are not in any dialog in the dump), are not known.
+OQ-42. Permissions: BWC uses the OS ACL editor, so the prompts are not in the dump. Owner recursion, the audit tab and remote apply have E2E checks; effective access is not tested. Prompts 7013, 7014, 7015, 7016 and 7018 are absent from the source (regedit-audit.md, OQ-42).
 
 OQ-43. Favorites: the name uniqueness rule (case sensitivity; string 171) and whether Remove asks for confirmation (no string in the dump).
 
-OQ-44. Print details: default print range, header and footer content, paper and orientation, and page layout. No print golden exists.
+OQ-44. Print details: default print range, header and footer, paper and orientation, and page layout. The classic print host opens with no range controls and the default printer is physical, so no classic print golden was made. Open: the printed page layout and the device-specific labels (regedit-audit.md, OQ-44).
 
 OQ-45. Remote connect: how the computer list is enumerated and what the computer-name prompt accepts. String 42 describes the picker.
 

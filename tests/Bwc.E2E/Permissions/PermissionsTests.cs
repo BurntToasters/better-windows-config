@@ -17,8 +17,9 @@ using Microsoft.Win32;
 namespace Bwc.E2E.Permissions;
 
 /// <summary>
-/// Opens the aclui security editor from Edit > Permissions and from the tree context menu. The
-/// tests only cancel the dialog: ACL mutation is covered by the registry engine tests.
+/// Opens the aclui security editor from Edit > Permissions and from the tree context menu. Most tests cancel the
+/// dialog. Tests that change security (Allow box, owner recursion, remote Apply) press OK or Apply on sandbox keys
+/// under the run root and read the result back. The registry engine tests cover the ACL logic itself.
 /// </summary>
 [TestClass]
 public sealed class PermissionsTests
@@ -475,6 +476,9 @@ public sealed class PermissionsTests
 
                 if (advanced != 0)
                 {
+                    // The dialog builds its list header after it appears. Wait for its controls to match the classic set,
+                    // up to 10 s, so the comparison reads the loaded dialog. A set that never matches still fails.
+                    _ = WaitForControlsToMatch(config, "advancedSecuritySettings", advanced, TimeSpan.FromSeconds(10));
                     CheckWindowAgainstOracle(config, "advancedSecuritySettings", advanced, "permissions.oracle.advanced");
                     bool inheritedFrom = ContainsText(advanced, InheritedFromText);
                     E2EResults.Record(
@@ -815,6 +819,18 @@ public sealed class PermissionsTests
             },
             IntPtr.Zero);
         return count;
+    }
+
+    private static bool WaitForControlsToMatch(E2EConfig config, string windowName, nint window, TimeSpan timeout)
+    {
+        (_, List<string> expected) = LoadOracleWindow(config, windowName);
+        return ControlTestSupport.WaitUntil(
+            () =>
+            {
+                (List<string> missing, List<string> extra) = DiffMultisets(expected, ControlSignatures(window));
+                return missing.Count == 0 && extra.Count == 0;
+            },
+            timeout);
     }
 
     private static void CheckWindowAgainstOracle(E2EConfig config, string windowName, nint window, string prefix)
@@ -1369,8 +1385,8 @@ public sealed class PermissionsTests
     /// Section 34: Edit > Permissions on a key under the loopback connection, and an Apply that changes the DACL of
     /// HKEY_USERS\SID\Software\BWC-E2E\run-id through the connection. The Everyone Read entry is removed, the user's
     /// entries are kept, and the original DACL is restored. A connect that the system refuses (the RemoteRegistry
-    /// service is stopped) is recorded as "not run: service stopped" and the test returns. The test never starts or
-    /// configures the service.
+    /// service is stopped) is a note and the test is Inconclusive, but only while RemoteRegistry is not Running. Any
+    /// other refusal is a failed check. The test never starts or configures the service.
     /// </summary>
     [TestMethod]
     [TestCategory("Permissions")]
@@ -1426,11 +1442,11 @@ public sealed class PermissionsTests
             {
                 if (connect.RemoteError is not null)
                 {
-                    // The service is stopped or refuses the connection. The test does not start it.
-                    E2EResults.Note(
+                    // A note and Inconclusive only while RemoteRegistry is not Running. The test never starts it.
+                    RemoteRegistryService.RefusedConnect(
+                        "permissions.remote.connect",
                         "permissions.remote.not-run",
-                        $"not run: service stopped (remote registry unavailable: {connect.RemoteError})");
-                    return;
+                        connect.RemoteError);
                 }
 
                 E2EResults.Record("permissions.remote.connect", false, connect.Detail);
@@ -1972,7 +1988,7 @@ public sealed class PermissionsTests
                 return false;
             }
 
-            Keyboard.Press(VirtualKeyShort.ESCAPE);
+            Keyboard.Type(VirtualKeyShort.ESCAPE);
             method = method == "cancel-button" ? "cancel-button-then-escape" : "escape";
             return true;
         }
