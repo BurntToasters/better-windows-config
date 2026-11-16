@@ -2,8 +2,10 @@
 
 Scope: `Bwc.Update` (`BwcUpdate.exe`): the manifest verification step (`--check`), the installer
 download and verification step (`--download`), the helper mode (`--apply`) that checks the
-verified installer and starts it, and the two process commands (`--close-running`, `--wait-pid`)
-that the installer calls. The minisign layer is the verifier proven in
+verified installer and asks for elevation, and the two process commands (`--close-running`, `--wait-pid`)
+that the installer calls. Since 0.1.2 (per-machine install) the elevated half, `--apply-elevated`, `--launch-hub`,
+and the other-session check of `--close-running` are in `docs/failure-modes/update-elevation.md`; this file's
+rows HT4, HT5, HT7, HL9, HL14, NE8, N1, N10, Q5, S8 and S18 changed with that hand-off. The minisign layer is the verifier proven in
 `spikes/S5-minisign/FAILURE-MODES.md`; this file covers what the update flow adds on top of it.
 
 Written before the tests and before the code, per AGENTS.md ("FIRST write all the ways it could
@@ -157,10 +159,10 @@ Terms:
 | HT1 | Installer modified after download, before apply | Tampered file runs | Re-verification fails, refuse, not run | `Apply_Modified_Installer_Refused` |
 | HT2 | Installer replaced by a validly signed file of another version | Replay | Refuse (comment `version:` or receipt mismatch) | `Apply_Replayed_Installer_Refused` |
 | HT3 | Installer swapped during the wait for the apps to exit | Swap between the first check and the run | Re-verification right before launch refuses | `Apply_Swapped_During_Wait_Refused` |
-| HT4 | Verified installer held open | Another process writes or replaces it between check and launch | Write-open and delete-open fail while the helper holds the file (FileShare.Read only) | `Verified_Installer_Is_Locked` |
-| HT5 | Bytes the launcher starts | Different bytes than verified | The launcher sees the same hash as the verified file | `Launch_Sees_Verified_Bytes` |
+| HT4 | Verified installer held open | Another process writes or replaces it between check and hand-off | Write-open and delete-open fail while the helper holds the file (FileShare.Read only) until the elevated helper has been started. The elevated helper then copies it (EA17 in `update-elevation.md`) | `Verified_Installer_Is_Locked` |
+| HT5 | Bytes the elevated helper opens | Different bytes than verified | The file the elevated helper is started for has the verified hash while the helper holds it. The copy is verified again by the elevated helper | `Launch_Sees_Verified_Bytes` |
 | HT6 | Receipt rewritten to match a swapped installer | Forged receipt | Refuse: the minisign signature of the swapped file fails | `Apply_Forged_Receipt_Refused` |
-| HT7 | Helper runs from the install folder, which the installer replaces | Installer cannot replace the locked `BwcUpdate.exe` | The helper does not copy itself. It starts the installer and exits at once; the installer waits for the helper pid with `--wait-pid` (section P), so the helper's file lock is gone before the installer writes. Installer duty (D1) | `Apply_Starts_Installer_And_Returns` (behavior), `Doc` (installer side) |
+| HT7 | Helper runs from the install folder, which the installer replaces | Installer cannot replace the locked `BwcUpdate.exe` | The medium helper does not start the installer. It starts the elevated helper and exits at once; the elevated helper starts the installer and exits, and the installer waits for the elevated helper pid (`/PARENTPID`) with `--wait-pid` (section P), so the lock is gone before the installer writes. Installer duty (D1) | `Apply_Starts_Elevated_Helper_Not_Installer` (behavior), `Doc` (installer side) |
 | HT8 | Helper folder copied to %TEMP% (removed in this revision) | Copies the whole install folder (about 330 MB) | No copy is made. Nothing to test: the relocation code is removed | `Doc` (removed) |
 
 ## H. Helper: processes, install folder, and launch
@@ -175,8 +177,8 @@ Terms:
 | HL6 | Install folder contains `"`, a control character, or a trailing backslash | Breaks the unquoted `/D=` argument | Refuse `InstallDirUnsafe` | `Install_Dir_Unsafe_Refused` |
 | HL7 | Install folder is relative or does not exist | Installs to the wrong place | Refuse `InstallDirUnsafe` | `Install_Dir_Missing_Refused` |
 | HL8 | Installer switch that is `/S`, `/D`, lowercase, has a space or quote, or has a value that breaks the rules in section O | Overriding the silent or directory switches, or a broken raw command line | Refuse `InstallerArgumentRejected`; allowed switches pass | `Installer_Arg_Validation` |
-| HL9 | Command line for the installer | `/D=` must be last and unquoted | Exactly `/S /RELAUNCH /PARENTPID=<helper pid> <switches> /D=<install dir>`, directory unquoted | `Installer_Command_Line_Exact` |
-| HL14 | Caller passes `/RELAUNCH` or `/PARENTPID` as an installer switch | Two values for one switch, or a PARENTPID that is not the helper | The helper drops them and writes its own, once each | `Installer_Relaunch_Switches_Not_Duplicated` |
+| HL9 | Command line for the elevated helper | The install dir must not come from an argument | Exactly `<helper folder>\BwcUpdate.exe --apply-elevated <staging folder>`, started with the runas verb. The installer's command line is built by `--apply-elevated` (EA18 in `update-elevation.md`) | `Elevated_Helper_Command_Exact` |
+| HL14 | Caller passes `/RELAUNCH` or `/PARENTPID` as an installer switch | Two values for one switch, or a PARENTPID that is not the helper | Still refused by the argument check of `--apply`. Switches are not forwarded: the elevated helper writes `/S /RELAUNCH /PARENTPID=<its pid> /D=<its folder>` itself, once each | `Installer_Arg_Validation`, `Elevated_Installer_Command_Line_Exact` |
 | HL10 | Installer exit code | Helper waits and reports the wrong thing | Removed: the helper does not wait for the installer (N1). The installer's own result is its duty | `Apply_Starts_Installer_And_Returns` |
 | HL11 | Installer does not exit | Hang in the helper | Removed: the helper has exited. The installer's time limit is its duty | `Doc` |
 | HL12 | Hub executable missing for a refusal relaunch | Crash | Reported as `HubMissing`, no exception, exit 6 | `Hub_Missing_Reported` |
@@ -211,7 +213,7 @@ Terms:
 | NE5 | Secrets in logs | `Doc`. Logs record host and path only, never query strings, keys, or signature text. |
 | NE6 | File replaced after the helper's launch | `Doc`. The lock (HT4) covers the window up to process creation. The installer owns the file after that. |
 | NE7 | Wrong-but-signed release content (a bad build signed by the real key) | `Doc`. Signing policy and release review are outside the verifier. |
-| NE8 | Installer's own elevation and file replacement | `Doc`. The helper never elevates (N10 refuses an elevated helper). The installer decides per-user or per-machine (D1). |
+| NE8 | Installer's own elevation and file replacement | `Doc`. The medium helper never elevates (N10 refuses an elevated helper). The install is per machine: the elevated helper (`--apply-elevated`, section ME and EA in `update-elevation.md`) runs the installer already elevated, and asks nothing more |
 
 ## L. Signed manifest metadata
 
@@ -259,7 +261,7 @@ installer starts relaunches the Hub with a result argument (`--update-result <Up
 
 | ID | Case | Risk | Required result | Test |
 |----|------|------|-----------------|------|
-| N1 | Every check passes | Helper stays alive holding locks | The installer is started. The helper exits 0 with `installerStarted: true`; it does not wait for the installer and does not start the Hub (the installer does) | `Apply_Starts_Installer_And_Returns` |
+| N1 | Every check passes | Helper stays alive holding locks | The elevated helper is started with the runas verb. The helper exits 0 with `elevatedHelperStarted: true` and `installerStarted: false`; it does not wait, does not start the installer, and does not start the Hub | `Apply_Starts_Elevated_Helper_Not_Installer` |
 | N2 | The installer cannot be started (Win32 error) | Silent failure | Refuse `InstallerFailed` with the error type; Hub relaunched with the code | `Installer_Start_Failure_Relaunches_Hub` |
 | N3 | Refusal before the installer starts (path, receipt, architecture, downgrade, same version, install folder, switch) | The user sees nothing | Hub relaunched with `--update-result <failure>` | `Refusal_Relaunches_Hub_With_Message` |
 | N4 | The installer file cannot be opened for verification | Hub left with nothing (was exit 3 with no relaunch) | Same as N3: Hub relaunched with the code | `Open_Failure_Relaunches_Hub` |
@@ -270,7 +272,7 @@ installer starts relaunches the Hub with a result argument (`--update-result <Up
 | N9 | Verified installer held open | Replacement before launch | Lock held until the start (HT4) | `Verified_Installer_Is_Locked` |
 | N15 | Installer succeeds (the helper passed `/RELAUNCH /PARENTPID=<pid>`) | The installer must start the Hub itself | Installer duty (D1): after the files are replaced it starts `BetterWindowsConfig.exe`. The helper does not | `Doc` (installer side) |
 | N16 | Installer fails after the helper started it | Hub never comes back and the user sees nothing | Installer duty (D1): start the still-installed Hub with `--update-result InstallerFailed` | `Doc` (installer side) |
-| N10 | Helper runs elevated (high integrity or administrator token) | Medium-integrity processes can write %TEMP% staging, so an elevated run would load planted files | Refuse `RunningElevated` before any action; Hub relaunched with the code; no installer started | `Apply_Elevated_Refused` |
+| N10 | Helper runs elevated (high integrity or administrator token) | Medium-integrity processes can write %TEMP% staging, so an elevated run of this mode would load planted files | Refuse `RunningElevated` before any action; Hub relaunched with the code; no helper started. The elevated work is `--apply-elevated`, which copies the installer first (`update-elevation.md`) | `Apply_Elevated_Refused` |
 | N11 | `__COMPAT_LAYER` in the helper environment | Compat layer leaks into the installer and the Hub | Removed from the helper's process environment before any child starts | `Compat_Layer_Removed_From_Children` |
 | N12 | The Hub's relaunch environment | Hub started with inherited compat flags | Covered by N11 (the helper scrubs its environment, and the Hub no longer sets the variable) | `Compat_Layer_Removed_From_Children` |
 | N13 | The GUI handoff: Download and Install pressed in the Hub, the helper from the publish folder | The helper or installer differs from what the user approved | The stand-in (the real signed bytes) runs from the staging folder after the Hub has exited, with exactly `/S /D=<install dir>`; the Hub starts again from the publish folder. Covered end to end by the GUI test, which reads the stand-in's record and the helper's log (`hub.install.*` checks in `docs/failure-modes/hub.md`) | `Hub_UpdateAvailable_InstallRunsVerifiedInstaller` |
@@ -315,7 +317,7 @@ Documented in `docs/contracts/update-cli.md`.
 | Q2 | Installer switch with a `=` value that holds `"`, a space, a control character, `..`, or `=` | Broken raw command line | Refuse `InstallerArgumentRejected` | `Installer_Arg_Validation` |
 | Q3 | Installer switch `/NAME=value` with a safe value (letters, digits, `_`, `.`, `-`, `:`, `\`) | Needed for the E2E installer (`/RUNID=`, `/SHORTCUTS=`) | Accept | `Installer_Arg_Validation` |
 | Q4 | Installer switch with a lowercase name, an empty value, or a value over 256 characters | Ambiguous switch | Refuse | `Installer_Arg_Validation` |
-| Q5 | E2E flavor: the `BWC_E2E` seam applies to `--apply` as well as `--check` | E2E installer switches pass the wrong checks | `Doc`: `UpdateE2ESeam` is compiled only into the E2E flavor and runs in the E2E build (not in the unit test project) | `Doc` |
+| Q5 | E2E flavor: the `BWC_E2E` seam applies to `--apply` and `--apply-elevated` as well as `--check` | E2E installer switches pass the wrong checks | `Doc`: `UpdateE2ESeam` is compiled only into the E2E flavor and runs in the E2E build (not in the unit test project). The protected root override is EE1 to EE5 in `update-elevation.md` | `Doc` |
 
 ## R. Keys and URLs
 
@@ -340,7 +342,7 @@ Added in the 0.1.1 audit. Every row is written before its test or code.
 | S5 | A staging folder cannot be enumerated, or its installer cannot be opened during reuse | Exception ends the download | Folder is not reused; the download continues | `Reuse_Unreadable_Folder_Skipped` |
 | S6 | The installer's final path (GetFinalPathNameByHandle) is not the final path of the staging folder it was opened from, plus `installer.exe`. The folder is held open first (backup semantics, share read, write, delete) | A different file runs than the one verified (a junction or swap between the two opens) | Refuse `PathRejected` before the installer starts. The folder handle stays open until the start | `Final_Path_Mismatch_Refused`, `Installer_Outside_Held_Folder_Refused` |
 | S7 | Final path spelling differs by a `\?\` prefix or by letter case | Refuses a good path | Equal after normalization (case-insensitive, prefix stripped) | `Final_Path_Compare_Normalizes` |
-| S8 | Installer started with the staging folder as its working directory | A planted DLL in staging loads | Started by the verified final path, working directory is the system directory; the handle stays open until the start | `Doc` (WindowsUpdateProcessHost; exe check) |
+| S8 | Installer started with the staging folder as its working directory | A planted DLL in staging loads | Started by the verified path in the protected copy, working directory is the system directory; the handle stays open until the start | `Doc` (WindowsUpdateProcessHost; exe check) |
 | S9 | A BWC process of another session or another user runs from the install folder | Install blocked, or waits for a process the user cannot close | Ignored by the running check | `Other_Session_Process_Ignored` |
 | S10 | A process whose session id cannot be read | Fail-open if ignored | Counted as running (fail closed, section O5) | `Unknown_Session_Counts_As_Running` |
 | S11 | Wait pids given to `--apply` | Other sessions' pids held forever | Wait pids are not session-filtered (the caller names them) | `Doc` |
@@ -350,7 +352,7 @@ Added in the 0.1.1 audit. Every row is written before its test or code.
 | S15 | Receipt write fails after the installer is verified | Temp file left in the folder | Temp file removed; the folder is discarded | `Doc` |
 | S16 | Unexpected exception in check or download mode | No output for the caller | One JSON line with failure `Unexpected`, exit code 7, logged | `Doc` (exe check) |
 | S17 | Unexpected exception in apply mode before the installer starts | The user is left with no app | Installer not started; the Hub is relaunched with `--update-result Unexpected`; exit code 7 | `Unexpected_In_Apply_Relaunches_Hub` |
-| S18 | Unexpected exception after the installer started | Hub relaunched while the installer runs | No relaunch; `installerStarted: true`, failure `Unexpected`, exit code 7 | `Doc` |
+| S18 | Unexpected exception after the elevated helper started | Hub relaunched while the installer runs | No relaunch; `elevatedHelperStarted: true`, failure `Unexpected`, exit code 7 | `Doc` (the exception before the start is `Unexpected_During_Elevated_Start_Relaunches_Hub`) |
 | S19 | Proxy that requires the Windows account | Download fails behind an authenticated proxy | Default credentials sent to the proxy | `Doc` |
 | S20 | Second instance sends to a pipe name that another user or session owns | Squatting or collision | See core.md, SingleInstance: client uses CurrentUserOnly, pipe name carries the session id | `Second_Instance_Message_Reaches_First` (core.md section) |
 | S21 | The staging path is given in 8.3 short form (for example `C:\Users\JOHNSM~1\...`, which `Path.GetTempPath` can return) | Every update refused as PathRejected on such machines | Accepted: the final-path check compares resolved paths, so the short form applies. Skipped with a recorded reason only when 8.3 names are disabled on the volume | `Staging_Path_8dot3_Applies` |

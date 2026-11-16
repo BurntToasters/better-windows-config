@@ -4,8 +4,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Bwc.Update.Tests;
 
 /// <summary>
-/// Stands in for the Windows process host. It never starts a real installer. It records what the
-/// applier asked for and what the installer file looked like while the applier held it.
+/// Stands in for the Windows process host. It never starts a real installer, never shows a prompt, and never uses the
+/// runas verb. It records what the applier asked for and what the installer file looked like while the applier held it.
 /// </summary>
 internal sealed class FakeHost : IUpdateProcessHost
 {
@@ -19,23 +19,44 @@ internal sealed class FakeHost : IUpdateProcessHost
     /// <summary>When true, the host reports an elevated (high integrity) process.</summary>
     public bool Elevated { get; set; }
 
+    /// <summary>The folder of the "running" BwcUpdate.exe. Tests that need a real folder set it.</summary>
+    public string HelperDirectory { get; set; } = @"C:\Program Files\Better Windows Config";
+
+    /// <summary>What the elevated helper start answers. Declined stands for ERROR_CANCELLED (1223).</summary>
+    public ElevatedStart ElevatedResult { get; set; } = ElevatedStart.Started;
+
+    /// <summary>When true, starting the elevated helper throws, as another Win32 failure would.</summary>
+    public bool ElevatedStartThrows { get; set; }
+
+    /// <summary>What the shell-integrity start answers.</summary>
+    public ShellStart ShellResult { get; set; } = ShellStart.Started;
+
     /// <summary>Runs right before the installer is "started", while the applier holds the file.</summary>
     public Action<string>? BeforeLaunch { get; set; }
 
     /// <summary>Installer starts, in order: path and arguments.</summary>
     public List<(string Path, string Arguments)> Runs { get; } = [];
 
+    /// <summary>Elevated helper starts, in order: the helper exe and the staging folder argument.</summary>
+    public List<(string Exe, string Folder)> ElevatedRuns { get; } = [];
+
     /// <summary>Detached starts (the Hub relaunch), in order.</summary>
     public List<(string Exe, IReadOnlyList<string> Args, string WorkDir)> Started { get; } = [];
 
-    /// <summary>The order of host calls: "live", "installer", "hub".</summary>
+    /// <summary>Starts at the shell's integrity level (the elevated helper's Hub relaunch), in order.</summary>
+    public List<(string Exe, IReadOnlyList<string> Args, string WorkDir)> ShellStarted { get; } = [];
+
+    /// <summary>The order of host calls: "live", "installer", "elevated", "hub", "shell".</summary>
     public List<string> Events { get; } = [];
 
-    public string? SeenInstallerSha256 { get; private set; }
+    public string? SeenInstallerSha256 { get; set; }
 
     public bool WriteOpenBlocked { get; private set; }
 
     public bool DeleteBlocked { get; private set; }
+
+    /// <summary>Installer starts of either kind. A refusal leaves this at zero.</summary>
+    public int Launched => Runs.Count + ElevatedRuns.Count;
 
     public IReadOnlyList<int> LiveProcesses(IReadOnlyList<int> pids, string installDir)
     {
@@ -45,10 +66,50 @@ internal sealed class FakeHost : IUpdateProcessHost
 
     public bool IsElevated() => Elevated;
 
+    public ElevatedStart StartElevatedHelper(string helperExe, string stagingFolder)
+    {
+        Events.Add("elevated");
+        ElevatedRuns.Add((helperExe, stagingFolder));
+        Probe(Path.Combine(stagingFolder, "installer.exe"));
+        if (ElevatedStartThrows)
+        {
+            throw new System.ComponentModel.Win32Exception(5, "fake elevated helper start failure");
+        }
+
+        return ElevatedResult;
+    }
+
     public bool StartInstaller(string path, string arguments)
     {
         Events.Add("installer");
         Runs.Add((path, arguments));
+        Probe(path);
+
+        if (InstallerStartThrows)
+        {
+            throw new IOException("fake installer start failure");
+        }
+
+        return true;
+    }
+
+    public bool StartDetached(string exePath, IReadOnlyList<string> arguments, string workingDirectory)
+    {
+        Events.Add("hub");
+        Started.Add((exePath, arguments, workingDirectory));
+        return StartSucceeds;
+    }
+
+    public ShellStart StartAtShellIntegrity(string exePath, IReadOnlyList<string> arguments, string workingDirectory)
+    {
+        Events.Add("shell");
+        ShellStarted.Add((exePath, arguments, workingDirectory));
+        return ShellResult;
+    }
+
+    /// <summary>What a start sees: the bytes, and whether a writer or a delete is blocked (the file is held).</summary>
+    private void Probe(string path)
+    {
         BeforeLaunch?.Invoke(path);
         SeenInstallerSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant();
 
@@ -74,20 +135,6 @@ internal sealed class FakeHost : IUpdateProcessHost
         {
             DeleteBlocked = true;
         }
-
-        if (InstallerStartThrows)
-        {
-            throw new IOException("fake installer start failure");
-        }
-
-        return true;
-    }
-
-    public bool StartDetached(string exePath, IReadOnlyList<string> arguments, string workingDirectory)
-    {
-        Events.Add("hub");
-        Started.Add((exePath, arguments, workingDirectory));
-        return StartSucceeds;
     }
 }
 

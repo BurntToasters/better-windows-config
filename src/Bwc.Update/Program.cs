@@ -41,20 +41,29 @@ internal static class Program
                 Console.Error.WriteLine("BwcUpdate: " + parsed.Error);
                 Console.Error.WriteLine(UpdateArguments.UsageText);
                 return 2;
+        }
+
+        // An elevated process never opens the file log: its folder comes from BWC_DATA_ROOT, which a caller can aim at a junction.
+        if (UpdateLogging.ShouldInitialize(parsed.Mode, ProcessIdentity.IsElevatedOrHighIntegrity()))
+        {
+            Log.Initialize(ToolId);
+        }
+
+        switch (parsed.Mode)
+        {
             case UpdateMode.Check:
-                Log.Initialize(ToolId);
                 return await RunCheckAsync(parsed);
             case UpdateMode.Download:
-                Log.Initialize(ToolId);
                 return await RunDownloadAsync(parsed);
             case UpdateMode.CloseRunning:
-                Log.Initialize(ToolId);
                 return RunCloseRunning(parsed);
             case UpdateMode.WaitPid:
-                Log.Initialize(ToolId);
                 return RunWaitPid(parsed);
+            case UpdateMode.ApplyElevated:
+                return RunApplyElevated(parsed);
+            case UpdateMode.LaunchHub:
+                return RunLaunchHub(parsed);
             default:
-                Log.Initialize(ToolId);
                 return await RunApplyAsync(parsed);
         }
     }
@@ -180,6 +189,60 @@ internal static class Program
         return WriteApply(outcome, ExitCodeFor(outcome));
     }
 
+    private static int RunApplyElevated(UpdateArguments parsed)
+    {
+        var architecture = Architectures.Current();
+        if (architecture is null)
+        {
+            return WriteApply(new ApplyOutcome(UpdateFailure.InvalidOptions, "unsupported architecture", false, false), 2);
+        }
+
+        var options = new UpdateOptions();
+        var stagingRoot = UpdatePaths.DefaultStagingRoot;
+        string? protectedRoot = null;
+#if BWC_E2E
+        options = UpdateE2ESeam.ApplyCheckOverrides(options);
+        protectedRoot = UpdateE2ESeam.ProtectedRoot(stagingRoot);
+#endif
+
+        // Only the staging folder comes from the command line. The install dir and the current version are this helper's own.
+        var host = new WindowsUpdateProcessHost();
+        var request = new ElevatedApplyRequest(
+            parsed.Single("--apply-elevated")!,
+            stagingRoot,
+            host.HelperDirectory,
+            HelperVersion.Read(typeof(Program).Assembly) ?? string.Empty,
+            architecture,
+            protectedRoot);
+        var outcome = new ElevatedApplier(options, host).Apply(request);
+        return WriteApply(outcome, ExitCodeFor(outcome));
+    }
+
+    private static int RunLaunchHub(UpdateArguments parsed)
+    {
+        UpdateFailure? updateResult = null;
+        if (parsed.Single("--update-result") is { } text && UpdateArguments.TryParseUpdateResult(text, out var failure))
+        {
+            updateResult = failure;
+        }
+
+        var host = new WindowsUpdateProcessHost();
+        var launched = HubLauncher.Launch(host, host.HelperDirectory, updateResult);
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            ok = launched.Ok,
+            failure = launched.Failure.ToString(),
+            detail = launched.Ok ? "Hub started" : launched.Detail,
+        }));
+        return launched.Failure switch
+        {
+            UpdateFailure.None => 0,
+            UpdateFailure.HubMissing => 6,
+            UpdateFailure.DeElevationFailed => 8,
+            _ => UnexpectedExitCode,
+        };
+    }
+
     private static int RunCloseRunning(UpdateArguments parsed)
     {
         var installDir = parsed.Single("--install-dir")!;
@@ -284,6 +347,7 @@ internal static class Program
             failure = outcome.Failure.ToString(),
             detail = outcome.Detail,
             installerStarted = outcome.InstallerStarted,
+            elevatedHelperStarted = outcome.ElevatedHelperStarted,
             hubLaunched = outcome.HubLaunched,
         }));
         return exitCode;

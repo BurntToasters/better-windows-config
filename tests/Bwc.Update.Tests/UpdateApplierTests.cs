@@ -33,7 +33,7 @@ public sealed class UpdateApplierTests
             Signed = Signing.Sign(staged, Key, Comment(version, architecture));
             File.Copy(staged, Installer);
             WriteValidReceipt();
-            Host = new FakeHost();
+            Host = new FakeHost { HelperDirectory = InstallDir };
         }
 
         public TempDir Dir { get; }
@@ -62,12 +62,30 @@ public sealed class UpdateApplierTests
 
         public FakeHost Host { get; }
 
+        // ProgramFilesRoot is off here, as in the E2E flavor: the sandbox install dir is not under Program Files.
         public UpdateOptions Options => new()
         {
             TrustedPublicKeys = [Key.PublicKeyText],
+            ProgramFilesRoot = null,
         };
 
         public UpdateApplier Applier => new(Options, Host);
+
+        /// <summary>The elevated helper, with the host elevated. The sandbox install dir is the helper's own folder.</summary>
+        public ElevatedApplier Elevated
+        {
+            get
+            {
+                Host.Elevated = true;
+                return new ElevatedApplier(Options, Host);
+            }
+        }
+
+        /// <summary>The protected root next to the sandbox install dir: the install dir plus <c>.upd</c>.</summary>
+        public string ProtectedRoot => InstallDir + ProtectedStore.FolderSuffix;
+
+        public ElevatedApplyRequest ElevatedRequest(string ownVersion = "0.1.0", string? architecture = null, string? stagingFolder = null) =>
+            new(stagingFolder ?? Folder, Root, InstallDir, ownVersion, architecture ?? Architecture);
 
         public static string Comment(string version, string architecture) =>
             $"timestamp:1794102823\tfile:installer.exe\tversion:{version}\tarch:{architecture}";
@@ -112,7 +130,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(request, CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.PathRejected, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -124,7 +142,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request() with { InstallerPath = escaped }, CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.PathRejected, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -137,7 +155,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request() with { InstallerPath = renamed }, CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.PathRejected, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -157,7 +175,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(request, CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.PathRejected, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -178,7 +196,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(request, CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.PathRejected, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -190,7 +208,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request() with { ReceiptPath = elsewhere }, CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.PathRejected, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -234,7 +252,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.ReceiptInvalid, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -245,7 +263,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(architecture: Architectures.Arm64), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.ArchitectureMismatch, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -256,7 +274,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(current: "0.3.0"), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.Downgrade, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -267,7 +285,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(current: "0.2.0"), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.SameVersion, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -280,7 +298,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(current: current), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.InvalidOptions, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -294,7 +312,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.InstallerHashMismatch, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -309,7 +327,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.InstallerHashMismatch, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -333,7 +351,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(pids: [4321]), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.InstallerHashMismatch, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -385,7 +403,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.InstallerSignatureInvalid, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -397,7 +415,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(pids: [1234], wait: TimeSpan.FromMilliseconds(300)), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.ProcessesStillRunning, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
         Assert.AreEqual(1, h.Host.Started.Count, "the Hub comes back with the reason");
         CollectionAssert.AreEqual(new[] { "--update-result", "ProcessesStillRunning" }, h.Host.Started[0].Args.ToArray());
     }
@@ -412,36 +430,143 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(pids: [1234]), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(1, h.Host.Runs.Count);
+        Assert.AreEqual(1, h.Host.ElevatedRuns.Count);
         Assert.IsTrue(calls >= 3, "the helper must poll until the waited processes are gone");
     }
 
     [TestMethod]
-    public async Task Apply_Starts_Installer_And_Returns()
+    public async Task Apply_Starts_Elevated_Helper_Not_Installer()
     {
         using var h = new Harness();
 
         var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
-        Assert.IsTrue(outcome.InstallerStarted);
-        Assert.IsFalse(outcome.HubLaunched, "after a successful start the installer relaunches the Hub, not the helper");
-        Assert.AreEqual(1, h.Host.Runs.Count);
-        Assert.AreEqual(0, h.Host.Started.Count, "the helper does not start the Hub when the installer runs");
+        Assert.IsTrue(outcome.ElevatedHelperStarted);
+        Assert.IsFalse(outcome.InstallerStarted, "the elevated helper starts the installer, not this process");
+        Assert.IsFalse(outcome.HubLaunched, "after the hand-off the installer relaunches the Hub, not this helper");
+        Assert.AreEqual(1, h.Host.ElevatedRuns.Count);
+        Assert.AreEqual(0, h.Host.Runs.Count, "the medium helper never starts the installer");
+        Assert.AreEqual(0, h.Host.Started.Count, "the helper does not start the Hub when the install is under way");
     }
 
     [TestMethod]
-    public async Task Installer_Start_Failure_Relaunches_Hub()
+    public async Task Elevated_Start_Failure_Relaunches_Hub()
     {
         using var h = new Harness();
-        h.Host.InstallerStartThrows = true;
+        h.Host.ElevatedStartThrows = true;
 
         var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.InstallerFailed, outcome.Failure, outcome.Detail);
-        Assert.IsFalse(outcome.InstallerStarted);
-        Assert.AreEqual(1, h.Host.Started.Count, "the Hub comes back when the installer cannot start");
+        Assert.IsFalse(outcome.ElevatedHelperStarted);
+        Assert.AreEqual(1, h.Host.Started.Count, "the Hub comes back when the elevated helper cannot start");
         CollectionAssert.AreEqual(new[] { "--update-result", "InstallerFailed" }, h.Host.Started[0].Args.ToArray());
+    }
+
+    [TestMethod]
+    public async Task Elevation_Declined_Relaunches_Hub()
+    {
+        using var h = new Harness();
+        h.Host.ElevatedResult = ElevatedStart.Declined;
+
+        var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
+
+        Assert.AreEqual(UpdateFailure.ElevationDeclined, outcome.Failure, outcome.Detail);
+        Assert.IsFalse(outcome.ElevatedHelperStarted);
+        Assert.IsTrue(outcome.HubLaunched);
+        Assert.AreEqual(1, h.Host.Started.Count, "the Hub comes back when the prompt is declined");
+        CollectionAssert.AreEqual(new[] { "--update-result", "ElevationDeclined" }, h.Host.Started[0].Args.ToArray());
+        Assert.AreEqual("hub", h.Host.Events[^1], "the Hub is started after the elevated start was answered");
+    }
+
+    [TestMethod]
+    public async Task Elevated_Helper_Command_Exact()
+    {
+        using var h = new Harness();
+
+        // Switches, version, and install dir of the request are never forwarded: only the staging folder is.
+        var outcome = await h.Applier.ApplyAsync(h.Request(switches: ["/ALLUSERS", "/RUNID=abc"]), CancellationToken.None);
+
+        Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
+        Assert.AreEqual(1, h.Host.ElevatedRuns.Count);
+        Assert.AreEqual(h.Folder, h.Host.ElevatedRuns[0].Folder);
+        Assert.AreEqual(0, h.Host.Runs.Count);
+    }
+
+    [TestMethod]
+    public async Task Elevated_Helper_Path_Is_Own_Folder()
+    {
+        using var h = new Harness();
+
+        var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
+
+        Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
+        Assert.AreEqual(Path.Combine(h.Host.HelperDirectory, "BwcUpdate.exe"), h.Host.ElevatedRuns[0].Exe);
+    }
+
+    [TestMethod]
+    public async Task Install_Dir_Not_Helper_Folder_Refused()
+    {
+        using var h = new Harness();
+        h.Host.HelperDirectory = h.Dir.Sub("another helper folder");
+
+        var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
+
+        Assert.AreEqual(UpdateFailure.InstallDirUnsafe, outcome.Failure, outcome.Detail);
+        Assert.AreEqual(0, h.Host.Launched, "no prompt for a folder that is not the helper's own");
+        CollectionAssert.AreEqual(new[] { "--update-result", "InstallDirUnsafe" }, h.Host.Started.Single().Args.ToArray());
+    }
+
+    [TestMethod]
+    public async Task Install_Dir_Same_Folder_Other_Spelling_Accepted()
+    {
+        using var h = new Harness();
+        h.Host.HelperDirectory = h.InstallDir.ToUpperInvariant() + "\\";
+
+        var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
+
+        Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task Helper_Outside_Program_Files_Refused()
+    {
+        using var h = new Harness();
+        var programFiles = h.Dir.Sub("Program Files");
+        var applier = new UpdateApplier(h.Options with { ProgramFilesRoot = programFiles }, h.Host);
+
+        var outcome = await applier.ApplyAsync(h.Request(), CancellationToken.None);
+
+        Assert.AreEqual(UpdateFailure.InstallDirUnsafe, outcome.Failure, outcome.Detail);
+        Assert.AreEqual(0, h.Host.Launched, "no prompt for a user-writable helper");
+    }
+
+    [TestMethod]
+    public async Task Helper_Inside_Program_Files_Accepted()
+    {
+        using var h = new Harness();
+        var applier = new UpdateApplier(h.Options with { ProgramFilesRoot = h.Dir.Root }, h.Host);
+
+        var outcome = await applier.ApplyAsync(h.Request(), CancellationToken.None);
+
+        Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
+        Assert.AreEqual(1, h.Host.ElevatedRuns.Count);
+    }
+
+    [TestMethod]
+    public async Task Unexpected_During_Elevated_Start_Relaunches_Hub()
+    {
+        using var h = new Harness();
+        h.Host.BeforeLaunch = _ => throw new NotSupportedException("simulated failure while the elevated start is under way");
+
+        var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
+
+        // The hand-off did not complete, so the user still gets the app back.
+        Assert.AreEqual(UpdateFailure.Unexpected, outcome.Failure, outcome.Detail);
+        Assert.IsFalse(outcome.ElevatedHelperStarted);
+        Assert.AreEqual(1, h.Host.ElevatedRuns.Count);
+        CollectionAssert.AreEqual(new[] { "--update-result", "Unexpected" }, h.Host.Started.Single().Args.ToArray());
     }
 
     [TestMethod]
@@ -490,7 +615,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(request, CancellationToken.None);
 
         Assert.AreEqual(expected, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count, "no installer starts after a refusal");
+        Assert.AreEqual(0, h.Host.Launched, "no installer starts after a refusal");
         Assert.AreEqual(1, h.Host.Started.Count, "the Hub comes back after a refusal");
         CollectionAssert.AreEqual(new[] { "--update-result", expected.ToString() }, h.Host.Started[0].Args.ToArray());
     }
@@ -504,7 +629,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.PathRejected, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
         Assert.AreEqual(1, h.Host.Started.Count, "an installer that cannot be opened is reported like every other refusal");
     }
 
@@ -532,7 +657,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.RunningElevated, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count, "an elevated helper starts no installer");
+        Assert.AreEqual(0, h.Host.Launched, "an elevated medium helper starts nothing");
         CollectionAssert.AreEqual(new[] { "--update-result", "RunningElevated" }, h.Host.Started.Single().Args.ToArray());
     }
 
@@ -574,7 +699,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request() with { InstallDir = installDir }, CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.InstallDirUnsafe, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -586,7 +711,7 @@ public sealed class UpdateApplierTests
         var outcome = await h.Applier.ApplyAsync(h.Request() with { InstallDir = missing }, CancellationToken.None);
 
         Assert.AreEqual(UpdateFailure.InstallDirUnsafe, outcome.Failure, outcome.Detail);
-        Assert.AreEqual(0, h.Host.Runs.Count);
+        Assert.AreEqual(0, h.Host.Launched);
     }
 
     [TestMethod]
@@ -622,42 +747,8 @@ public sealed class UpdateApplierTests
         else
         {
             Assert.AreEqual(UpdateFailure.InstallerArgumentRejected, outcome.Failure, outcome.Detail);
-            Assert.AreEqual(0, h.Host.Runs.Count);
+            Assert.AreEqual(0, h.Host.Launched);
         }
-    }
-
-    [TestMethod]
-    public async Task Installer_Command_Line_Exact()
-    {
-        using var h = new Harness();
-
-        var outcome = await h.Applier.ApplyAsync(h.Request(switches: ["/ALLUSERS", "/RUNID=abc"]), CancellationToken.None);
-
-        Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
-        Assert.AreEqual($"/S /RELAUNCH /PARENTPID={Environment.ProcessId} /ALLUSERS /RUNID=abc /D={h.InstallDir}", h.Host.Runs[0].Arguments);
-        Assert.IsTrue(h.InstallDir.Contains(' '), "the directory has a space, and it must stay unquoted after /D=");
-    }
-
-    [TestMethod]
-    public async Task Installer_Relaunch_Switches_Not_Duplicated()
-    {
-        using var h = new Harness();
-
-        var outcome = await h.Applier.ApplyAsync(h.Request(switches: ["/RELAUNCH", "/PARENTPID=1", "/ALLUSERS"]), CancellationToken.None);
-
-        Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
-        Assert.AreEqual($"/S /RELAUNCH /PARENTPID={Environment.ProcessId} /ALLUSERS /D={h.InstallDir}", h.Host.Runs[0].Arguments);
-    }
-
-    [TestMethod]
-    public async Task Installer_Command_Line_Without_Switches_Ends_With_Install_Dir()
-    {
-        using var h = new Harness();
-
-        var outcome = await h.Applier.ApplyAsync(h.Request(), CancellationToken.None);
-
-        Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
-        Assert.AreEqual($"/S /RELAUNCH /PARENTPID={Environment.ProcessId} /D={h.InstallDir}", h.Host.Runs[0].Arguments);
     }
 
     [TestMethod]

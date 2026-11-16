@@ -43,9 +43,10 @@ public sealed class SystemProcessSource : IProcessSource
 }
 
 /// <summary>
-/// The running-process scan used by the helper and by --close-running. Only processes of the current
-/// session are considered. A process of another session or another user is not ours to wait for or
-/// to close. A process whose session is unknown is still considered, so the fail-closed rule applies.
+/// The running-process scan used by the helper and by --close-running. <see cref="RunningFrom"/> considers only
+/// processes of the current session: a process of another session or another user is not ours to wait for or to
+/// close. A process whose session is unknown is still considered, so the fail-closed rule applies.
+/// <see cref="RunningFromOtherSessions"/> lists the others, so --close-running can refuse before it changes anything.
 /// </summary>
 public static class ProcessScan
 {
@@ -81,6 +82,39 @@ public static class ProcessScan
                 if (RunningImageRule.IsRunningFrom(entry.Pid, installDir))
                 {
                     found.Add((entry.Pid, name));
+                }
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>
+    /// BWC processes named in <see cref="ProcessCommands.ProcessNames"/> that run from <paramref name="installDir"/> in a
+    /// session other than <paramref name="currentSession"/>, except the pids in <paramref name="skip"/>. A process whose
+    /// session is unknown is not listed here: <see cref="RunningFrom"/> already counts it. Each pid is listed once.
+    /// </summary>
+    public static List<(int Pid, string Name, int Session)> RunningFromOtherSessions(
+        string installDir,
+        IReadOnlySet<int> skip,
+        IProcessSource source,
+        int currentSession)
+    {
+        var found = new List<(int Pid, string Name, int Session)>();
+        var seen = new HashSet<int>();
+        foreach (var name in ProcessCommands.ProcessNames)
+        {
+            foreach (var entry in source.ByName(name))
+            {
+                if (entry.SessionId is not { } session || session == currentSession
+                    || skip.Contains(entry.Pid) || !seen.Add(entry.Pid))
+                {
+                    continue;
+                }
+
+                if (RunningImageRule.IsRunningFrom(entry.Pid, installDir))
+                {
+                    found.Add((entry.Pid, name, session));
                 }
             }
         }
