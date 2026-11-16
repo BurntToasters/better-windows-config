@@ -132,9 +132,11 @@ Open points. The golden does not measure these, so the rule shown is BWC's own:
    quirk. Port requirements use the plain fields (Minimum at 8, Maximum at 16) and match the golden.
 3. Port, DMA, device-specific, bus-number, and large-memory layouts are not in the golden. A partial
    descriptor follows the field list of the matching UI viewer (`ResourceDescriptorDialog`): Port prints
-   Start, Length, Type; DMA prints Channel and Port; Device Specific prints Reserved1, Reserved2, Data
-   Size; large memory and bus number print Resource and Disposition only. A requirement of any type other
-   than Port, Memory, or Interrupt prints Resource, Option, and Disposition only.
+   Start, Length, Type; DMA prints Channel and Port; Device Specific prints Reserved1, Reserved2, and Data
+   (F2b, section 2.1: the labels are classic strings, the position and the data bytes are extrapolated);
+   large memory and bus number print Resource and Disposition only. A requirement of any type other than
+   Port, Memory, Interrupt, or DMA prints Resource, Option, and Disposition only. A DMA requirement prints
+   Minimum Channel and Maximum Channel (F2b).
 4. A resource value that does not parse prints as a hex dump of the whole value. Bytes after the last
    declared structure are ignored. Both are unmeasured.
 5. A DWORD of length 0 or more than 4 bytes is unmeasured. BWC zero-extends the first four bytes. The
@@ -151,6 +153,30 @@ Open points. The golden does not measure these, so the rule shown is BWC's own:
    false. The golden seed has one (`OddTypes\Link6`). `RegistryTextGoldenTests` wraps `SandboxWritePolicy` in
    a policy that allows that one value type, and every path is still decided by `SandboxWritePolicy`. The
    product policy is unchanged, and the manager should decide whether the test-only exception stays.
+10. The device-specific data line (`Data:`) is extrapolated (F2b, section 2.1). RT_STRING 8172 is `    Data:`
+    with no padding, so the bytes follow one space after it as lowercase hex pairs. Not measured.
+
+### 2.1 DMA, device-specific, and DMA requirement labels (F2b)
+
+Written before the change to `ResourceTextFormatter` and before its E2E check. The labels are the classic
+RT_STRING texts 8168, 8169, 8170, 8171, 8172, 8191, and 8192 (regedit-resources.json), so each label has the classic
+padding. The layout around them is extrapolated (open point 3); no classic text export holds these descriptors.
+
+- E1 DMA partial: `Channel:` (8168) and `Port:` (8169) padded to 17 at column 23, values in decimal. Failure: a label
+  printed without the padding, or the line dropped for channel 0. Check: `text.dma.labels` (exact lines).
+- E2 Device-specific partial: `Reserved1:` (8170) and `Reserved2:` (8171) padded to 17, then `Data:` (8172), which is
+  not padded. The data bytes follow after one space as lowercase hex pairs, one space apart. A partial with zero data
+  bytes prints the bare `Data:` label with no trailing space. Failure: `Data Size:` printed (string 8107 contradicts
+  the golden), or the bytes lost. Check: `text.device.labels`.
+- E3 DMA requirement: `Resource:`, `Option:`, `Disposition:`, then `Minimum Channel:` (8191) and `Maximum Channel:`
+  (8192), both padded to 17. No `Type:` line, because the DMA viewer (1900) has no Type field. Failure: a Type line, or
+  the Port and Interrupt fields printed for a DMA row. Check: `text.requirement.dma`.
+- E4 A label that is not the classic text (a retyped word, a different colon) fails, because the test compares each
+  line's label with the dump's string text. Check: `text.dma.labels` and `text.device.labels`.
+- E5 Layout: every line keeps the golden's column layout (field indent 23, label width 17). The layout of DMA and
+  device-specific partials is not measured. Check: the exact-line compare in the same checks.
+- E6 Print: the print report is the export text (MSG-245 to MSG-274), so E1 to E3 reach the print report too. No check
+  prints (print guard and PDF rule). Not checked here.
 
 ## 3. Text lossiness
 

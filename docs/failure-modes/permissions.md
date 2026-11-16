@@ -111,7 +111,9 @@ E2E tests create a disposable key under `HKCU\Software\BWC-E2E\<run-id>` and del
 process. A failed restore is a test failure, not a warning, because a changed ACL can outlive the
 run. The engine tests delete their run trees through the shared walk described in section 26, which
 restores the owner's full control on each key before its subkeys are listed, so a key left with no
-entries for the current user is still removed. The UI tests only open and cancel the dialog.
+entries for the current user is still removed. The UI tests open the dialog and either cancel it, or press OK or
+Apply on a sandbox key and read the DACL or the owner back (PermissionsTests: the Allow box, owner recursion,
+child replace, and the remote Apply).
 
 ## 14. Native calls and allocations
 

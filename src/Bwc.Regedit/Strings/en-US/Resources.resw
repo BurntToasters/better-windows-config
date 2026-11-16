@@ -391,6 +391,11 @@ Error code: {1} (0x{1:X8})
   <data name="DialogHexTitle" xml:space="preserve">
     <value>Binary Data</value>
   </data>
+  <!-- The caption of the Data... viewer for a device specific partial. No classic string id has this text (the classic
+       Resources dialog 1305 static reads "Device Specific Data:"). -->
+  <data name="DialogDeviceSpecificData" xml:space="preserve">
+    <value>Device Specific Data</value>
+  </data>
   <!-- Oracle DLG-005 (RT_DIALOG 103 caption). The Edit Binary dialog shows this caption. -->
   <data name="DialogHexEditTitle" xml:space="preserve">
     <value>Edit Binary Value</value>

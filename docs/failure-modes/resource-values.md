@@ -347,3 +347,97 @@ would print different words for the same value.
 
 The test reads the `.resw` by path from the repository root, found by walking up to `BetterWindowsConfig.slnx`. It
 runs in the registry test step of the quality gate, so a drift fails the build's test step, not a later release.
+
+## 9. Detail viewers, DMA and device-specific labels (F2b)
+
+Scope: the four requirement detail viewers (Memory 1601, Port 1700, Interrupt 1800, DMA 1900, rows DLG-042, DLG-043,
+DLG-046, DLG-047), and the DMA and device-specific labels that the viewers and the text export share (MSG-259 to
+MSG-263, MSG-275, MSG-276). The classic dump (`docs/parity/oracle/regedit-resources.json`) is the oracle for the
+static labels, control ids and the disabled state. Classic was not measured for the values (OQ-16), so each value
+format is BWC's own (7.5) and is checked as BWC's format only. This section was written before the E2E checks and
+before the change to `ResourceTextFormatter`.
+
+### 9.1 A static label differs from the classic dialog
+
+A template label with a typo, a missing colon, or another word would show a wrong caption next to a correct value.
+Guard: none in the product. The check reads the dump's static controls (class Static, id 65535) of dialog 1601,
+1700, 1800, and 1900 and requires each text as a Text element in the open viewer. Check:
+`ResourceViewers_DetailViewersMatchClassicLabelsValuesAndReadOnly`, `resources.detail.<kind>.labels`.
+
+### 9.2 A value field is wired to the wrong classic control id
+
+A value that shows in the place of another field is not caught by 9.1. Guard: none in the product. The check maps each
+value automation id to its classic id (table in the test) and requires the dump to hold a Static control with that id.
+Check: `resources.detail.<kind>.ids`.
+
+### 9.3 A template-disabled caption is enabled
+
+Preferred (2001) and Alternative (2002) are WS_DISABLED in every detail dialog (style 0x58020000). The viewer must show
+both disabled, and the dump style must carry the disabled bit (0x08000000). Guard: `ClassicDisabledText`. Check:
+`resources.detail.<kind>.template-disabled`.
+
+### 9.4 A requirement row opens the wrong viewer
+
+Type 1 opens Port, 2 opens Interrupt, 3 opens Memory, 4 opens DMA (`ResourceRequirementsDialog.OpenSelectedAsync`). A
+swapped mapping shows another field set. Check: `resources.detail.<kind>.opened`, with one seeded row per type in
+the order Port, Interrupt, DMA, Memory.
+
+### 9.5 A field decodes from the wrong bytes
+
+Length, alignment, minimum and maximum come from the IO descriptor union (Length 0, Alignment 4, Minimum 8, Maximum 16
+for port and memory; Minimum vector 0, maximum vector 4 for interrupt; minimum channel 0, maximum channel 4 for DMA).
+The seed uses distinct values in each field, so a swapped offset shows as a wrong text. Check:
+`resources.detail.<kind>.values`, which compares each field with the value the seed encodes.
+
+### 9.6 A field is editable
+
+The viewer is read only (classic: "Read-only edits: none", regedit-audit DLG-042). A text box in the viewer would let a
+user change what the viewer shows, and Modify would then look like a write. Check: `resources.detail.<kind>.read-only`
+(no Edit control in the viewer, and the value elements are not editable).
+
+### 9.7 Escape on the detail closes the list
+
+Escape closes the detail and leaves the Requirements List open, so the next row can be opened. A detail that closes
+the list too would hide the next row. Check: `resources.detail.<kind>.closed` and `resources.detail.list-open`.
+
+### 9.8 Column titles of the Resources viewer
+
+The Resources viewer (1305) shows classic column titles from the dump: DMA "Channel", "Port" (1306), Interrupt "Vector",
+"Level", "Affinity", "Type" (1307), Memory "Physical Address", "Length", "Access" (1308), Port "Physical Address",
+"Length", "Type" (1309), and Device specific "Reserved1", "Reserved2", "Data Size" (1304). A title that differs
+from the dump is a label drift. Guard: none in the product. Check: `resources.descriptor.headers`. The titles are
+Text elements of the viewer, so UI Automation reads them as names.
+
+### 9.9 A DMA or device-specific label in the text export drifts from the classic string
+
+The labels `Channel:`, `Port:`, `Reserved1:`, `Reserved2:`, `Data:`, `Minimum Channel:`, and `Maximum Channel:` are
+RT_STRING 8168 to 8172, 8191, and 8192 of the dump. The export must print each one at its classic text (padding
+included), and it must not print the retired `Data Size:` label (string 8107, which contradicts the golden). Check:
+`ResourceTextExport_DmaAndDeviceSpecificLabelsAndLayout` (see `docs/failure-modes/export.md` section 2.1).
+
+### 9.10 Layout is extrapolated
+
+The label text of 9.9 is classic. The position of each line, the value format of channel and port, and the
+device-specific data line are not measured, because no classic text export holds these descriptors (export.md
+section 2, open point 3). The check asserts BWC's layout and labels the layout extrapolated.
+
+### 9.11 Not measured and not checked
+
+- Classic's value text in the detail viewers and in the Resources columns (OQ-16). The values are BWC's formats (7.5).
+- The position and size of each static control (DLU). The check does not read control rectangles of the template.
+- The viewer caption (Memory, Port, Interrupt, DMA) is from the template; the check does not read it.
+- Requirement rows of type 6 (bus number) and unknown types open nothing (7.4); no check seeds them.
+
+### 9.12 Checks
+
+| Failure mode | Check |
+| --- | --- |
+| 9.1 static label | `resources.detail.<kind>.labels` |
+| 9.2 control id | `resources.detail.<kind>.ids` |
+| 9.3 template-disabled caption | `resources.detail.<kind>.template-disabled` |
+| 9.4 row to viewer mapping | `resources.detail.<kind>.opened` |
+| 9.5 decode offsets | `resources.detail.<kind>.values` |
+| 9.6 editable field | `resources.detail.<kind>.read-only` |
+| 9.7 Escape | `resources.detail.<kind>.closed`, `resources.detail.list-open` |
+| 9.8 column titles | `resources.descriptor.headers` |
+| 9.9 export labels | `text.dma.labels` and `text.device.labels` (export.md 2.1) |

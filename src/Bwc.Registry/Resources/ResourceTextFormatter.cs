@@ -132,7 +132,8 @@ internal static class ResourceTextFormatter
             case TypeDeviceSpecific:
                 AddField(lines, FieldIndent, FieldLabelWidth, "Reserved1:", Decimal(partial.Reserved1));
                 AddField(lines, FieldIndent, FieldLabelWidth, "Reserved2:", Decimal(partial.Reserved2));
-                AddField(lines, FieldIndent, FieldLabelWidth, "Data Size:", Decimal(partial.DataSize));
+                // Classic string 8172 is "Data:" with no padding (F2b). The bytes follow after one space.
+                lines.Add(new string(' ', FieldIndent) + "Data:" + DataBytes(partial.DeviceData));
                 break;
         }
     }
@@ -167,6 +168,12 @@ internal static class ResourceTextFormatter
 
         switch (descriptor.Type)
         {
+            case TypeDma:
+                // Classic strings 8191 and 8192. A DMA descriptor has no Type field, as the DMA viewer (1900) has none.
+                AddField(lines, FieldIndent, FieldLabelWidth, "Minimum Channel:", Decimal(descriptor.MinimumChannel));
+                AddField(lines, FieldIndent, FieldLabelWidth, "Maximum Channel:", Decimal(descriptor.MaximumChannel));
+                break;
+
             case TypePort:
                 AddField(lines, FieldIndent, FieldLabelWidth, "Type:", ResourceNames.PortType(descriptor.Flags));
                 AddField(lines, FieldIndent, FieldLabelWidth, "Length:", NonZeroHexPrefixed(descriptor.Length));
@@ -210,4 +217,10 @@ internal static class ResourceTextFormatter
     private static string Decimal(ulong value) => value.ToString(CultureInfo.InvariantCulture);
 
     private static string Signed(uint value) => ((int)value).ToString(CultureInfo.InvariantCulture);
+
+    // Lowercase hex pairs separated by single spaces, after one leading space. Empty data adds nothing.
+    private static string DataBytes(byte[]? data) =>
+        data is { Length: > 0 }
+            ? " " + string.Join(' ', data.Select(b => b.ToString("x2", CultureInfo.InvariantCulture)))
+            : string.Empty;
 }

@@ -27,20 +27,18 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | --- | --- | --- | --- |
 | MENU | 35 | 0 | 2 |
 | CTX | 41 | 0 | 0 |
-| DLG | 38 | 7 | 6 |
+| DLG | 42 | 7 | 2 |
 | ACC | 28 | 0 | 0 |
-| MSG | 214 | 50 | 12 |
+| MSG | 221 | 50 | 5 |
 | VIEW | 19 | 2 | 0 |
-| BEH | 42 | 5 | 2 |
+| BEH | 42 | 6 | 1 |
 | EXP | 32 | 0 | 0 |
-| All (535) | 449 | 64 | 22 |
+| All (535) | 460 | 65 | 10 |
 
 ## Gaps by piece
 
 | Piece | Rows |
 | --- | --- |
-| P1 | MSG-259, MSG-260, MSG-261, MSG-262, MSG-263, MSG-275, MSG-276, BEH-027 |
-| D1 | DLG-042, DLG-043, DLG-046, DLG-047 |
 | S1b | MSG-174, MSG-175, MSG-176, MSG-177, MSG-179, BEH-026 |
 | Elevated | MENU-005, MENU-006, DLG-007, DLG-008 |
 
@@ -179,12 +177,12 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | DLG-039 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
 | DLG-040 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
 | DLG-041 | pass | ResourceViewers_OpenWithEnterAndShowTheClassicLayout; ResourceParserTests; built from templates 1501, 1601 and 1700: no readable requirements list exists on this machine, so classic is not measured (resource-values.md 7.11) |  |
-| DLG-042 | gap | Only the Memory detail (1601) is opened by a test (ResourceViewerTests). Port 1700, Interrupt 1800 and DMA 1900 never open, so their static fields and read-only state are unproven | D1 |
-| DLG-043 | gap | Port requirement detail viewer (1700) is never opened by a test; only the Memory detail is | D1 |
+| DLG-042 | pass | Requirement detail viewers Memory 1601, Port 1700, Interrupt 1800, DMA 1900. ResourceViewers_DetailViewersMatchClassicLabelsValuesAndReadOnly checks each viewer's caption, every classic static text of its dump dialog, the control ids, the template-disabled Preferred and Alternative captions, the values decoded from the seed, read-only, and Escape. Classic value text not measured (OQ-16): values are BWC formats (resource-values.md 7.5) | |
+| DLG-043 | pass | Port requirement detail viewer (1700): resources.detail.port.{caption,labels,ids,values,template-disabled,read-only,closed,list-open} (ResourceViewers_DetailViewersMatchClassicLabelsValuesAndReadOnly). Labels and ids from regedit-resources.json; values from the seed. Classic value text and DLU positions not measured (OQ-16) | |
 | DLG-044 | declared-difference | Developer dialog with no menu item, accelerator or string that opens it (OQ-17); BWC does not implement it |  |
 | DLG-045 | declared-difference | Developer dialog with no menu item, accelerator or string that opens it (OQ-17); BWC does not implement it |  |
-| DLG-046 | gap | Interrupt requirement detail viewer (1800) is never opened by a test. Classic not measured (no sample, OQ-16) | D1 |
-| DLG-047 | gap | DMA requirement detail viewer (1900) is never opened by a test. Classic not measured (no sample, OQ-16) | D1 |
+| DLG-046 | pass | Interrupt requirement detail viewer (1800): resources.detail.interrupt.{caption,labels,ids,values,template-disabled,read-only,closed,list-open} (ResourceViewers_DetailViewersMatchClassicLabelsValuesAndReadOnly). Classic value text not measured (OQ-16) | |
+| DLG-047 | pass | DMA requirement detail viewer (1900): resources.detail.dma.{caption,labels,ids,values,template-disabled,read-only,closed,list-open} (ResourceViewers_DetailViewersMatchClassicLabelsValuesAndReadOnly). Classic value text not measured (OQ-16) | |
 | DLG-048 | declared-difference | Template 2020 is never opened by classic in this build: Display Binary Data opens variant B (2021) for every value type (regedit-binary.json). BWC does not implement variant A |  |
 | DLG-049 | declared-difference | Template 2020 is never opened by classic in this build: Display Binary Data opens variant B (2021) for every value type (regedit-binary.json). BWC does not implement variant A |  |
 | DLG-050 | pass | BinaryViewer_FollowsTheClassicLayoutAndFormats; HexViewer_ClassicBinaryDataFollowsTheFormats |  |
@@ -485,11 +483,11 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-256 | pass | Classic text golden has "Level:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
 | MSG-257 | pass | Classic text golden has "Vector:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
 | MSG-258 | pass | Classic text golden has "Affinity:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
-| MSG-259 | gap | Label "Channel:" is a DMA field; the classic text golden has no DMA layout (export.md open point 3) | P1 |
-| MSG-260 | gap | Label "Port:" is a DMA field; the classic text golden has no DMA layout (export.md open point 3) | P1 |
-| MSG-261 | gap | Label "Reserved1:" is a device-specific field; the classic text golden has no such layout (export.md open point 3) | P1 |
-| MSG-262 | gap | Label "Reserved2:" is a device-specific field; the classic text golden has no such layout (export.md open point 3) | P1 |
-| MSG-263 | gap | Label "Data:" of a device-specific partial descriptor; the golden has "Data:" only as the value label (export.md open point 3) | P1 |
+| MSG-259 | pass | Label is RT_STRING 8168 with its padding. ExportDialogs_ResourceLabelsWriteClassicTextLabels (resourceexport.dma.labels). Layout extrapolated, not measured (export.md 2.1) |  |
+| MSG-260 | pass | Label is RT_STRING 8169 with its padding. ExportDialogs_ResourceLabelsWriteClassicTextLabels (resourceexport.dma.labels). Layout extrapolated, not measured (export.md 2.1) |  |
+| MSG-261 | pass | Label is RT_STRING 8170 with its padding. ExportDialogs_ResourceLabelsWriteClassicTextLabels (resourceexport.device.labels). Layout extrapolated (export.md 2.1) |  |
+| MSG-262 | pass | Label is RT_STRING 8171 with its padding. ExportDialogs_ResourceLabelsWriteClassicTextLabels (resourceexport.device.labels). Layout extrapolated (export.md 2.1) |  |
+| MSG-263 | pass | Label is RT_STRING 8172 "Data:" (unpadded), bytes after one space. ExportDialogs_ResourceLabelsWriteClassicTextLabels (resourceexport.device.labels). Layout extrapolated (export.md 2.1) |  |
 | MSG-264 | pass | Classic text golden has "Interface Type:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
 | MSG-265 | pass | Classic text golden has "Bus Number:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
 | MSG-266 | pass | Classic text golden has "Slot Number:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
@@ -501,8 +499,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MSG-272 | pass | Classic text golden has "Maximum Address:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
 | MSG-273 | pass | Classic text golden has "Minimum Vector:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
 | MSG-274 | pass | Classic text golden has "Maximum Vector:" (SeedExportMatchesTheClassicTextGoldenByteForByte); print uses the export text (Parity_PrintReport_UsesClassicLabels) |  |
-| MSG-275 | gap | Label "Minimum Channel:" is a DMA requirement field; the classic text golden has no DMA layout (export.md open point 3) | P1 |
-| MSG-276 | gap | Label "Maximum Channel:" is a DMA requirement field; the classic text golden has no DMA layout (export.md open point 3) | P1 |
+| MSG-275 | pass | Label is RT_STRING 8191 with its padding. ExportDialogs_ResourceLabelsWriteClassicTextLabels (resourceexport.requirement.dma). Layout extrapolated (export.md 2.1) |  |
+| MSG-276 | pass | Label is RT_STRING 8192 with its padding. ExportDialogs_ResourceLabelsWriteClassicTextLabels (resourceexport.requirement.dma). Layout extrapolated (export.md 2.1) |  |
 
 ### VIEW
 
@@ -560,7 +558,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | BEH-024 | pass | Remote_LoopbackConnectShowsRemoteRootsAndMenus (only HKEY_LOCAL_MACHINE and HKEY_USERS); Remote_DisconnectDialogRemovesComputer; every command on remote keys: Remote_KeyAndValueCommandsWriteOnlyUnderTheSandbox, Remote_FindLocatesRemoteValue, Remote_ExportBranchMatchesLocalExport, Remote_AddressBarNavigatesToRemotePath |  |
 | BEH-025 | pass | Remote_ConnectOwnComputerShowsStringOneFiftyThree; Remote_ConnectUnreachableShowsStringOneFiftyFour; 155 and 156 are reviewed in code, not automated (no way to reach half a computer from this machine) |  |
 | BEH-026 | gap | Owner recursion and the audit tab are tested (Permissions_OwnerRecursionSetsTheOwnerOfEverySubkey, Permissions_AuditingTabWithoutSecurityPrivilegeShowsTheSystemState). Effective access is not tested. Prompts 7013, 7015, 7016 and 7018 are absent from the source | S1b |
-| BEH-027 | gap | Range panel: declared (DLG-016). Progress: pass (DLG-009). Report labels: pass (MSG-245 to MSG-258, MSG-264 to MSG-274). Printed page layout (margins, font, wrapping) has no classic print output golden (OQ-44) | P1 |
+| BEH-027 | declared-difference | Range panel: declared (DLG-016). Progress: pass (DLG-009). Report labels: pass (MSG-245 to MSG-276). Printed page layout (margins, font, wrapping) has no classic print output golden (OQ-44); regedit-print.json records no printed output and no PDF export, so the layout is BWC's own and is not compared |  |
 | BEH-028 | pass | Tree_RightAndLeftArrowSemantics; Tree_NumpadKeysAndPageKeys |  |
 | BEH-029 | pass | Basics_MultiDeleteTextAndDefaultRow; List_KeyboardSelectionAndFocus |  |
 | BEH-030 | pass | Shell_TabCyclesTreeListAddressBar; List_KeyboardSelectionAndFocus |  |
@@ -619,7 +617,7 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | EXP-029 | pass | RegistryExportTests (byte-for-byte against the three goldens); RegFileReaderTests (round trip). EXP-004, EXP-010 and EXP-011 match the golden; their lossy round trip is classic behavior too |  |
 | EXP-030 | pass | RegistryExportTests (byte-for-byte against the three goldens); RegFileReaderTests (round trip). EXP-004, EXP-010 and EXP-011 match the golden; their lossy round trip is classic behavior too |  |
 | EXP-031 | pass | RegistryExportTests (byte-for-byte against the three goldens); RegFileReaderTests (round trip). EXP-004, EXP-010 and EXP-011 match the golden; their lossy round trip is classic behavior too |  |
-| EXP-032 | pass | Informational row; print golden added by P1 |  |
+| EXP-032 | pass | Informational row; no print golden exists (BEH-027, OQ-44) |  |
 
 ## Open questions
 
@@ -671,7 +669,7 @@ open here until that measurement is in `docs/parity/oracle/`.
 | OQ-41 | Decision: BWC does not register a .reg file type or Merge verb. |
 | OQ-42 | BWC uses the OS ACL editor (Permissions tests). Owner recursion and the audit tab: Permissions_OwnerRecursionSetsTheOwnerOfEverySubkey, Permissions_AuditingTabWithoutSecurityPrivilegeShowsTheSystemState. Remote apply: Permissions_RemoteKeyApplyChangesTheDaclThroughTheConnection. Effective access is not tested. Prompts 7013, 7014, 7015, 7016 and 7018 are absent from the source: S1b (BEH-026, MSG-174 to MSG-179). |
 | OQ-43 | Favorites_AddRemoveNavigateAndReportMissingPath (duplicate name refused, no confirmation on Remove). |
-| OQ-44 | Classic opens the Windows print host, whose default view has no range controls, and the default printer is a physical printer, so nothing was printed (regedit-print.json). BWC uses PrintDlgExW with no range panel (DLG-015 and DLG-016 declared). Progress window with Cancel: DLG-009. Report text: the classic text golden (MSG-245 to MSG-258, MSG-264 to MSG-274). Open (P1): the printed page layout, and the DMA and device-specific labels (MSG-259 to MSG-263, MSG-275, MSG-276). |
+| OQ-44 | Classic opens the Windows print host, whose default view has no range controls, and the default printer is a physical printer, so nothing was printed (regedit-print.json). BWC uses PrintDlgExW with no range panel (DLG-015 and DLG-016 declared). Progress window with Cancel: DLG-009. Report text: the classic text golden (MSG-245 to MSG-258, MSG-264 to MSG-274). Printed page layout: declared difference (BEH-027). The DMA and device-specific labels (MSG-259 to MSG-263, MSG-275, MSG-276) are checked by ExportDialogs_ResourceLabelsWriteClassicTextLabels. |
 | OQ-45 | Classic opens the system object picker (RichEdit name box); typing into it could not be automated, so the connect is not measured (regedit-remote.json). BWC opens the same system picker (Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection) and falls back to a name prompt when the picker cannot run. |
 | OQ-46 | CommandLine_SilentImportExitCodesFollowTheResult; CommandLine_ExportsImportsAndRejectsOutsideSandbox. |
 | OQ-47 | The name box is read-only in every value editor (ClassicDialogs_EditStringAndDwordFollowTheTemplate). |
