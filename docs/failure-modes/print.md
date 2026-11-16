@@ -250,6 +250,11 @@ exists with the "Microsoft Print To PDF" driver (EnumPrinters). If not, it recor
 it prints through the guarded path to `artifacts/e2e/print/<run-id>.pdf` and checks the `%PDF-` header. The cancel
 test uses the same printer and checks that no complete PDF (no `%%EOF`) and no spooler job remain.
 
+Failure mode: Windows "Let Windows manage my default printer" makes the last printer used the default, so a PDF job
+changes the default. Every test that starts a job on "Microsoft Print to PDF" saves the default before the job and
+restores it in a finally block with `SetDefaultPrinterW`, only to the saved name, and records
+`print.default-printer.before`, `.after-restore`, and fails when they differ. An empty saved name never sets a default.
+
 ## Parity package: classic report layout and Computer
 
 | Way it could fail | Expected behavior |

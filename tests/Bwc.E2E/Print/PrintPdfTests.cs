@@ -46,6 +46,10 @@ public sealed class PrintPdfTests
         string pdfPath = Path.Combine(PrintTestSupport.ArtifactDir(config), config.RunId + ".pdf");
         string resultPath = Path.Combine(PrintTestSupport.ArtifactDir(config), $"pdf-{config.RunId}.txt");
 
+        // Windows may make the PDF printer the default. The default is saved here and restored after the job.
+        string? savedDefault = PrintTestSupport.DefaultPrinterName();
+        RecordDefaultBefore(savedDefault);
+
         try
         {
             sandbox.Cleanup();
@@ -74,13 +78,15 @@ public sealed class PrintPdfTests
                 $"artifact={pdfPath}, written={written}, pdfHeader={pdfHeader}.");
 
             E2EResults.Record("print.pdf.enabled", session.IsEnabled, $"the main window stayed enabled: {session.IsEnabled}.");
-            FailIfNeeded();
         }
         finally
         {
             ControlTestSupport.CleanupRegistry(config);
             PrintTestSupport.DeleteDataRoot(dataRoot);
+            RestoreAndRecordDefault(savedDefault);
         }
+
+        FailIfNeeded();
     }
 
     [TestMethod]
@@ -102,6 +108,9 @@ public sealed class PrintPdfTests
         string? dataRoot = null;
         string pdfPath = Path.Combine(PrintTestSupport.ArtifactDir(config), config.RunId + "-cancel.pdf");
         string resultPath = Path.Combine(PrintTestSupport.ArtifactDir(config), $"cancel-{config.RunId}.txt");
+
+        string? savedDefault = PrintTestSupport.DefaultPrinterName();
+        RecordDefaultBefore(savedDefault);
 
         try
         {
@@ -147,13 +156,30 @@ public sealed class PrintPdfTests
 
             bool reenabled = ControlTestSupport.WaitUntil(() => session.IsEnabled, TimeSpan.FromSeconds(10));
             E2EResults.Record("print.progress.reenabled", reenabled, $"the main window is enabled again: {reenabled}.");
-            FailIfNeeded();
         }
         finally
         {
             ControlTestSupport.CleanupRegistry(config);
             PrintTestSupport.DeleteDataRoot(dataRoot);
+            RestoreAndRecordDefault(savedDefault);
         }
+
+        FailIfNeeded();
+    }
+
+    // The default printer before the job, recorded so a changed default is visible in the result file.
+    private static void RecordDefaultBefore(string? saved) =>
+        E2EResults.Record("print.default-printer.before", true, $"before={saved ?? "(none)"}.");
+
+    // Restores the saved default only when it changed, then checks that the default now equals the saved name.
+    private static void RestoreAndRecordDefault(string? saved)
+    {
+        string? after = PrintTestSupport.RestoreDefaultPrinter(saved);
+        bool same = string.Equals(after, saved, StringComparison.Ordinal);
+        E2EResults.Record(
+            "print.default-printer.after-restore",
+            same,
+            $"before={saved ?? "(none)"}, after-restore={after ?? "(none)"}.");
     }
 
     private static bool RequirePdfPrinter(string checkId)
