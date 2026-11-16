@@ -45,7 +45,7 @@ differently from the original, that's a bug.
       The classic tree and list with classic menus, mnemonics, and accelerators. It includes
       editors for every common value type, Find, Favorites, Permissions, Load and Unload Hive,
       <code>.reg</code> import and export compatible with classic regedit, the classic command-line
-      switches, and read-only remote registry browsing.
+      switches, and remote registry editing on a connected computer.
     </td>
   </tr>
   <tr>
@@ -63,13 +63,16 @@ More classic tools will follow once the Registry Editor is solid.
 
 1. Download the setup EXE for your PC from the [latest release](https://github.com/BurntToasters/better-windows-config/releases/latest):
    `x64` for most PCs, `arm64` for Windows on ARM.
-2. Run it. The installer is per-user, so it doesn't need administrator rights.
+2. Run it and allow the administrator prompt. The installer installs for all users in
+   `Program Files`, so it needs administrator rights.
 
 If Windows SmartScreen says it protected your PC, choose **More info** and then **Run anyway**. The
 installer is signed, but a new release can take a while to build up SmartScreen reputation.
 
 To update, accept the update the Hub offers, or run a newer setup EXE over the installed copy.
-Coming from 0.1.0? 0.1.0 can't update itself, so download the latest setup EXE and run it once.
+From 0.1.2 on, each in-app update asks Windows for administrator permission once.
+Coming from 0.1.0 or 0.1.1? Those versions can't install this update in the app, so download the
+latest setup EXE and run it once. Your settings are kept.
 
 To uninstall, use **Settings** > **Apps** > **Installed apps** > **Better Windows Config** >
 **Uninstall**. Your settings stay in `%LOCALAPPDATA%\BetterWindowsConfig`; delete that folder too
