@@ -34,6 +34,7 @@ public sealed class HiveMountTests
     private const string PrimaryId = "DialogPrimary";
     private const string SecondaryId = "DialogSecondary";
     private const string LoadHiveCaption = "Load Hive";
+    private const string UnloadConfirmText = "Are you sure you want to unload the current key and all of its subkeys?";
     private const string SeedTextName = "HiveSeedText";
     private const string SeedTextValue = "mounted";
     private const string SeedDwordName = "HiveSeedDword";
@@ -375,8 +376,12 @@ public sealed class HiveMountTests
         InvokeMenuItem(unloadItem!);
         AutomationElement? confirm = driver.WaitForElement(PromptRootId, TimeSpan.FromSeconds(10));
         string message = confirm is null ? string.Empty : driver.TextOf("DialogMessage");
-        bool asked = confirm is not null && message.Contains(mount, StringComparison.Ordinal);
-        E2EResults.Record("hives.elevated.unload.confirm", asked, $"confirmation names the mount={asked}: '{message}'.");
+        // Classic regedit asks without naming the key (regedit-resources.json), and BWC uses the same string.
+        bool asked = confirm is not null && string.Equals(message, UnloadConfirmText, StringComparison.Ordinal);
+        E2EResults.Record(
+            "hives.elevated.unload.confirm",
+            asked,
+            $"confirmation is the classic text={asked}: '{message}', expected '{UnloadConfirmText}'.");
         if (!asked)
         {
             return false;

@@ -5,6 +5,7 @@ namespace Bwc.E2E.Hives;
 
 /// <summary>
 /// Native calls of the elevated hive test. <see cref="HasHivePrivileges"/> reads the process token and changes nothing.
+/// <see cref="UnloadMount"/> enables SeRestorePrivilege and SeBackupPrivilege only around its own RegUnLoadKey call.
 /// <see cref="UnloadMount"/> is the only native unload in the E2E project; it runs only in the test's finally block,
 /// on HKEY_USERS\BWC-E2E-&lt;run-id&gt;, after the test's own managed handles are closed (hives.md section 14).
 /// </summary>
@@ -14,6 +15,9 @@ internal static class HiveMountNative
     internal const string RestorePrivilege = "SeRestorePrivilege";
 
     private const uint TokenQuery = 0x0008;
+    private const uint TokenAdjustPrivileges = 0x0020;
+    private const uint SePrivilegeEnabled = 0x00000002;
+    private const int ErrorPrivilegeNotHeld = 1314;
     private const int TokenPrivilegesClass = 3;
     private const int LuidAndAttributesSize = 12;
     private const int PrivilegeCountSize = 4;
@@ -47,8 +51,53 @@ internal static class HiveMountNative
         return titles;
     }
 
-    /// <summary>Unloads HKEY_USERS\<paramref name="name"/>. Returns the Win32 error, 0 on success.</summary>
-    internal static int UnloadMount(string name) => RegUnLoadKeyW(HkeyUsers, name);
+    /// <summary>
+    /// Unloads HKEY_USERS\<paramref name="name"/>. Returns the Win32 error, 0 on success. RegUnLoadKey needs
+    /// SeRestorePrivilege and SeBackupPrivilege enabled (held is not enough: it returned 1314 in an elevated run), so
+    /// both are enabled on this process's token for the call and disabled again after it.
+    /// </summary>
+    internal static int UnloadMount(string name)
+    {
+        if (!SetPrivilege(RestorePrivilege, enable: true) || !SetPrivilege(BackupPrivilege, enable: true))
+        {
+            _ = SetPrivilege(RestorePrivilege, enable: false);
+            return ErrorPrivilegeNotHeld;
+        }
+
+        try
+        {
+            return RegUnLoadKeyW(HkeyUsers, name);
+        }
+        finally
+        {
+            _ = SetPrivilege(BackupPrivilege, enable: false);
+            _ = SetPrivilege(RestorePrivilege, enable: false);
+        }
+    }
+
+    private static bool SetPrivilege(string name, bool enable)
+    {
+        if (!LookupPrivilegeValueW(null, name, out Luid luid) ||
+            !OpenProcessToken(GetCurrentProcess(), TokenAdjustPrivileges | TokenQuery, out nint token))
+        {
+            return false;
+        }
+
+        try
+        {
+            var state = new TokenPrivilege1
+            {
+                Count = 1,
+                Privilege = new LuidAndAttributes { Luid = luid, Attributes = enable ? SePrivilegeEnabled : 0 },
+            };
+            return AdjustTokenPrivileges(token, false, ref state, 0, nint.Zero, nint.Zero) &&
+                Marshal.GetLastWin32Error() == 0;
+        }
+        finally
+        {
+            _ = CloseHandle(token);
+        }
+    }
 
 #pragma warning disable SYSLIB1054 // A few token and unload calls do not justify LibraryImport plumbing.
     private delegate bool EnumWindowsProc(nint hwnd, nint lParam);
@@ -83,6 +132,16 @@ internal static class HiveMountNative
         nint tokenInformation,
         int tokenInformationLength,
         out int returnLength);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AdjustTokenPrivileges(
+        nint tokenHandle,
+        [MarshalAs(UnmanagedType.Bool)] bool disableAllPrivileges,
+        ref TokenPrivilege1 newState,
+        int bufferLength,
+        nint previousState,
+        nint returnLength);
 
     [DllImport("kernel32.dll")]
     private static extern nint GetCurrentProcess();
@@ -156,5 +215,13 @@ internal static class HiveMountNative
     {
         public Luid Luid;
         public uint Attributes;
+    }
+
+    /// <summary>TOKEN_PRIVILEGES with one entry. Every field is 4-byte aligned, so it matches Windows.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TokenPrivilege1
+    {
+        public uint Count;
+        public LuidAndAttributes Privilege;
     }
 }
