@@ -27,9 +27,28 @@ without mounting a real hive.
 `RegistryWriter` calls `EnsureWriteAllowed` before any file or privilege work. Under the E2E
 `SandboxWritePolicy`, a hive operation whose target is outside `HKCU\Software\BWC-E2E\<runId>`
 fails with `ERROR_ACCESS_DENIED` (5) and the operation name. The target comparison is component
-based, so a sibling whose name starts with the sandbox name is not authorized. The E2E
-application still cannot mount a hive because its target must be under HKLM or HKU and the sandbox
-policy allows only HKCU, which is the intended defense in depth.
+based, so a sibling whose name starts with the sandbox name is not authorized.
+
+One exception exists, for the elevated round trip of section 14: `SandboxWritePolicy` allows
+`LoadHive` and `UnloadHive` at exactly `HKEY_USERS\BWC-E2E-<runId>`, where `<runId>` is the last
+component of a sandbox root of the form `HKCU\Software\BWC-E2E\<runId>`. Before this rule the
+policy refused that mount, so the round trip failed with "Access is denied" in the first elevated
+runs. The exception is compiled into E2E builds only, like the whole policy. Failure modes of the
+exception, each refused with `ERROR_ACCESS_DENIED` (5) before any file, privilege, or native work:
+
+- Another operation at the mount path (create key, set value, delete key, rename, security, save,
+  restore, replace). Only `LoadHive` and `UnloadHive` are excepted.
+- A path below the mount (`HKU\BWC-E2E-<runId>\Sub`), for any operation, including the two hive
+  operations. The test reads the mounted values; nothing writes into the mounted hive.
+- The same name under another root (`HKLM\BWC-E2E-<runId>`).
+- Another run's name, a name with extra characters before or after (`BWC-E2E-<runId>x`,
+  `xBWC-E2E-<runId>`), or the bare prefix `BWC-E2E-`.
+- A sandbox root without a run id (`HKCU\Software\BWC-E2E` itself) or deeper than the run root
+  (`HKCU\Software\BWC-E2E\<runId>\Sub`): no hive operation is allowed at all.
+- A remote computer, loopback included: the exception applies only to the local registry
+  (`RegistryWriter` also refuses remote hive operations before the policy).
+- The name differs only in case: the registry compares names case-insensitively, so it names the same
+  key and is allowed.
 
 ## 3. Target path rules
 

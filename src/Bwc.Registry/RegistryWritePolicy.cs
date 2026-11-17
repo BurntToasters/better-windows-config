@@ -92,7 +92,12 @@ public sealed class SandboxWritePolicy : IRegistryWritePolicy
     private static readonly RegistryPath SandboxBase =
         RegistryPath.Parse("HKCU\\Software\\BWC-E2E");
 
+    private const string HiveMountPrefix = "BWC-E2E-";
+
     private readonly RegistryPath _remoteSandboxRoot;
+
+    // HKEY_USERS\BWC-E2E-<runId> when the sandbox root is a run root HKCU\Software\BWC-E2E\<runId>; otherwise null.
+    private readonly string? _runMountName;
 
     public SandboxWritePolicy(RegistryPath sandboxRoot)
     {
@@ -108,6 +113,9 @@ public sealed class SandboxWritePolicy : IRegistryWritePolicy
 
         SandboxRoot = sandboxRoot;
         _remoteSandboxRoot = RemoteEquivalentOf(sandboxRoot);
+        _runMountName = sandboxRoot.Components.Count == SandboxBase.Components.Count + 1
+            ? HiveMountPrefix + sandboxRoot.Components[^1]
+            : null;
     }
 
     public RegistryPath SandboxRoot { get; }
@@ -132,6 +140,13 @@ public sealed class SandboxWritePolicy : IRegistryWritePolicy
 
     private void EnsureLocalWriteAllowed(RegistryPath path, RegistryWriteOperation operation)
     {
+        // The elevated hive round trip (docs/failure-modes/hives.md sections 2 and 14) mounts and unmounts this run's
+        // HKEY_USERS\BWC-E2E-<runId>. Only those two operations, only at that exact key; nothing below it.
+        if ((operation is RegistryWriteOperation.LoadHive or RegistryWriteOperation.UnloadHive) && IsRunMount(path))
+        {
+            return;
+        }
+
         if (path.Root != SandboxRoot.Root
             || !(path.Equals(SandboxRoot) || path.IsDescendantOf(SandboxRoot)))
         {
@@ -196,6 +211,12 @@ public sealed class SandboxWritePolicy : IRegistryWritePolicy
                 $"The sandbox root '{_remoteSandboxRoot.ToAbbreviatedString()}' cannot be renamed remotely.");
         }
     }
+
+    private bool IsRunMount(RegistryPath path) =>
+        _runMountName is not null &&
+        path.Root == RegistryRoot.Users &&
+        path.Components.Count == 1 &&
+        string.Equals(path.Components[0], _runMountName, StringComparison.OrdinalIgnoreCase);
 
     private static RegistryOperationException RemoteRefusal(
         string computerName,
