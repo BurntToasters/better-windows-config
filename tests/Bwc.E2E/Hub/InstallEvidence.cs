@@ -136,11 +136,30 @@ internal static class InstallEvidence
     public static bool HelperStartedInstaller(string dataRoot) =>
         ReadLogLines(Path.Combine(dataRoot, "update", "logs")).Any(line => line.Contains(HelperStartedLine, StringComparison.Ordinal));
 
-    /// <summary>Reads a record of key=value lines. The first equals sign of a line separates key and value.</summary>
+    /// <summary>
+    /// Reads a record of key=value lines. The first equals sign of a line separates key and value. The file exists before
+    /// the stand-in has finished writing it, and the read share of ReadAllLines fails while the writer holds it open, so
+    /// the read is retried until the writer has closed it (a complete record), up to 30 s. Seen under x64 emulation.
+    /// </summary>
     public static Dictionary<string, string> ReadRecord(string path)
     {
+        string[] lines = [];
+        DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (true)
+        {
+            try
+            {
+                lines = File.ReadAllLines(path);
+                break;
+            }
+            catch (IOException) when (DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(100);
+            }
+        }
+
         var fields = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string line in File.ReadAllLines(path))
+        foreach (string line in lines)
         {
             int equals = line.IndexOf('=', StringComparison.Ordinal);
             if (equals > 0)
@@ -195,6 +214,29 @@ internal static class InstallEvidence
         while (DateTime.UtcNow < deadline);
 
         return null;
+    }
+
+    /// <summary>
+    /// Stops every process of that name and image that started at or after <paramref name="notBeforeUtc"/>: the processes
+    /// a test started, including a Hub the updater relaunched. A test that throws before its own cleanup would otherwise
+    /// leave one running, and the next run's updater then refuses to install (ProcessesStillRunning). Returns the count.
+    /// </summary>
+    public static int StopStartedProcesses(string processName, string exePath, DateTime notBeforeUtc)
+    {
+        int stopped = 0;
+        foreach (Process candidate in Process.GetProcessesByName(processName))
+        {
+            if (!IsStartedSince(candidate, notBeforeUtc) || !HasImage(candidate, exePath))
+            {
+                candidate.Dispose();
+                continue;
+            }
+
+            StopProcess(candidate);
+            stopped++;
+        }
+
+        return stopped;
     }
 
     /// <summary>True when the process's image file is the given path, compared without regard to case.</summary>
