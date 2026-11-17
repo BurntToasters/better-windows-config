@@ -27,6 +27,7 @@ public sealed class InstallerUpdateTests
     private const string ManifestVariable = "BWC_E2E_UPDATE_MANIFEST_URL";
     private const string TrustedKeyVariable = "BWC_E2E_UPDATE_TRUSTED_KEY";
     private const string AllowHttpVariable = "BWC_E2E_UPDATE_ALLOW_HTTP";
+    private const string ProtectedRootVariable = "BWC_E2E_UPDATE_PROTECTED_ROOT";
     private const string InstallerRunIdVariable = "BWC_E2E_INSTALLER_RUNID";
     private const string InstallerShortcutsVariable = "BWC_E2E_INSTALLER_SHORTCUTS";
     private const string SettingsJson = "{\n  \"CheckForUpdatesOnStartup\": false,\n  \"SettingsVersion\": 2\n}";
@@ -86,6 +87,36 @@ public sealed class InstallerUpdateTests
         }
 
         RunUpdateCase(inputs, "regedit", holdRegedit: true);
+    }
+
+    [TestMethod]
+    [TestCategory("Installer")]
+    [TestCategory("E2EOnly")]
+    public void Installer_SameVersion_RepairsAndOlderIsRefused()
+    {
+        InstallerInputs? inputs = InstallerInputs.TryRead();
+        if (inputs is null)
+        {
+            Assert.Inconclusive("The installer E2E is started by scripts/test-installer-e2e.js.");
+            return;
+        }
+
+        RunVersionOrderCase(inputs);
+    }
+
+    [TestMethod]
+    [TestCategory("Installer")]
+    [TestCategory("E2EOnly")]
+    public void Installer_MachineMode_UnelevatedAbortsWithoutChanges()
+    {
+        InstallerInputs? inputs = InstallerInputs.TryRead();
+        if (inputs is null)
+        {
+            Assert.Inconclusive("The installer E2E is started by scripts/test-installer-e2e.js.");
+            return;
+        }
+
+        RunMachineAbortCase(inputs);
     }
 
     [TestMethod]
@@ -286,6 +317,148 @@ public sealed class InstallerUpdateTests
         return left.Length == 0 ? "(empty folder)" : string.Join(", ", left);
     }
 
+    /// <summary>
+    /// The installer refuses to go over a newer version and treats the same version as a repair. B is installed first;
+    /// then the older A must exit non-zero and leave B untouched; then B again must succeed, leaving no staging folder.
+    /// The E2E per-user flavor reads its sandbox key, which is the same code path the per-machine HKLM key uses.
+    /// </summary>
+    private static void RunVersionOrderCase(InstallerInputs inputs)
+    {
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        RequireFile(inputs.InstallerA);
+        RequireFile(inputs.InstallerB);
+
+        int start = InstallerChecks.Count;
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            using InstallerRun run = InstallerRun.Create(config, "version");
+            if (InstallSilently(run, inputs.InstallerB, inputs.VersionB, "version.b"))
+            {
+                int olderExit = run.RunSetup(inputs.InstallerA, SetupTimeout);
+                string? keptKey = run.ReadUninstallValue("DisplayVersion");
+                string? keptFile = InstallerRun.VersionOf(run.HubExe);
+                InstallerChecks.Record(
+                    "version.older.refused",
+                    olderExit > 0,
+                    $"Installing {inputs.VersionA} over {inputs.VersionB} exited {olderExit}; a refusal is a non-zero exit.");
+                InstallerChecks.Record(
+                    "version.older.untouched",
+                    keptKey == inputs.VersionB && keptFile == inputs.VersionB,
+                    $"After the refusal the key shows '{keptKey}' and the Hub exe '{keptFile}', expected {inputs.VersionB}.");
+                InstallerChecks.Record(
+                    "version.older.noStaging",
+                    !Directory.Exists(run.InstallDir + ".new") && !Directory.Exists(run.InstallDir + ".old"),
+                    "The refused setup left no <install folder>.new or .old.");
+
+                int sameExit = run.RunSetup(inputs.InstallerB, SetupTimeout);
+                string? repairedKey = run.ReadUninstallValue("DisplayVersion");
+                string? repairedFile = InstallerRun.VersionOf(run.HubExe);
+                InstallerChecks.Record(
+                    "version.same.repair",
+                    sameExit == 0 && repairedKey == inputs.VersionB && repairedFile == inputs.VersionB,
+                    $"Installing {inputs.VersionB} over itself exited {sameExit}; key '{repairedKey}', Hub exe '{repairedFile}'.");
+                InstallerChecks.Record(
+                    "version.same.noStaging",
+                    !Directory.Exists(run.InstallDir + ".new") && !Directory.Exists(run.InstallDir + ".old"),
+                    "The repair left no <install folder>.new or .old.");
+            }
+        }
+        catch (Exception ex)
+        {
+            InstallerChecks.Record("version.exception", false, ex.GetType().Name + ": " + ex.Message);
+        }
+        finally
+        {
+            InstallerChecks.Duration("version", stopwatch.ElapsedMilliseconds);
+        }
+
+        AssertNoFailures(start);
+    }
+
+    /// <summary>
+    /// The E2E /MACHINE switch without an elevated token. The setup must stop in .onInit with a non-zero exit, never
+    /// ask for elevation, and write nothing: no Program Files folder, no HKLM or HKCU key of the run, no all-users
+    /// shortcut folder. Only HKLM reads and folder checks happen here; nothing is written outside the run's names.
+    /// </summary>
+    private static void RunMachineAbortCase(InstallerInputs inputs)
+    {
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        RequireFile(inputs.InstallerA);
+
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        if (new System.Security.Principal.WindowsPrincipal(identity).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator))
+        {
+            Assert.Inconclusive("The test process is elevated, so the unelevated refusal cannot be shown. Run from a normal shell.");
+            return;
+        }
+
+        int start = InstallerChecks.Count;
+        var stopwatch = Stopwatch.StartNew();
+        string runId = "mach-" + Guid.NewGuid().ToString("N")[..10];
+        string root = Path.Combine(Path.GetTempPath(), "bwc-installer-e2e-" + runId);
+        string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        string machineDir = Path.Combine(programFiles, "BWC-E2E", runId);
+        string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "BWC-E2E-" + runId);
+        string runKey = @"Software\BWC-E2E\" + runId;
+        try
+        {
+            Directory.CreateDirectory(root);
+            var info = new ProcessStartInfo(inputs.InstallerA)
+            {
+                Arguments = "/S /RUNID=" + runId + " /MACHINE",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = root,
+            };
+            using Process process = Process.Start(info) ?? throw new InvalidOperationException("The setup did not start.");
+            bool exited = process.WaitForExit(SetupTimeout);
+            int exitCode = exited ? process.ExitCode : -1;
+            if (!exited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+
+            InstallerChecks.Record(
+                "machine.abort.exit",
+                exited && exitCode > 0,
+                $"The unelevated /MACHINE setup exited {exitCode} (a refusal is a non-zero exit; -1 is a timeout).");
+
+            using Microsoft.Win32.RegistryKey hklm = Microsoft.Win32.RegistryKey.OpenBaseKey(
+                Microsoft.Win32.RegistryHive.LocalMachine,
+                Microsoft.Win32.RegistryView.Registry64);
+            using Microsoft.Win32.RegistryKey? machineKey = hklm.OpenSubKey(runKey);
+            using Microsoft.Win32.RegistryKey? userKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(runKey);
+            InstallerChecks.Record("machine.abort.noKey", machineKey is null && userKey is null, "No HKLM or HKCU key exists for the run.");
+            InstallerChecks.Record(
+                "machine.abort.noFolder",
+                !Directory.Exists(machineDir) && !Directory.Exists(machineDir + ".new") && !Directory.Exists(machineDir + ".upd"),
+                "No Program Files folder, staging folder, or protected folder exists for the run.");
+            InstallerChecks.Record("machine.abort.noShortcuts", !Directory.Exists(startMenu), "No all-users Start menu folder exists for the run.");
+        }
+        catch (Exception ex)
+        {
+            InstallerChecks.Record("machine.abort.exception", false, ex.GetType().Name + ": " + ex.Message);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // The run's temp folder is empty; a locked folder is left for the next cleanup.
+            }
+
+            InstallerChecks.Duration("machine.abort", stopwatch.ElapsedMilliseconds);
+        }
+
+        AssertNoFailures(start);
+    }
+
     private static void RunUninstallCase(InstallerInputs inputs)
     {
         E2EConfig config = GuiGate.Config;
@@ -349,7 +522,46 @@ public sealed class InstallerUpdateTests
 
         int shortcuts = run.ShortcutCount();
         InstallerChecks.Record(prefix + ".shortcuts", shortcuts > 0, $"{shortcuts} shortcut(s) were written.");
+        if (ran)
+        {
+            bool aumid = ShortcutAumidsAre(run, out string aumidNotes);
+            InstallerChecks.Record(prefix + ".aumid", aumid, aumidNotes);
+        }
+
         return ran && sameVersion;
+    }
+
+    /// <summary>
+    /// Both shortcuts carry their AppUserModelID, read back through the shell property store (installer.md M45: the installed
+    /// BwcUpdate.exe --set-aumid wrote them). The installer only warns on a miss, so this is where a broken write fails.
+    /// </summary>
+    private static bool ShortcutAumidsAre(InstallerRun run, out string notes)
+    {
+        var expected = new[]
+        {
+            (Name: "Better Windows Config.lnk", Id: "BetterWindowsConfig.Hub"),
+            (Name: "Registry Editor (BWC).lnk", Id: "BetterWindowsConfig.Regedit"),
+        };
+        var lines = new List<string>();
+        bool all = true;
+        foreach ((string name, string id) in expected)
+        {
+            string path = Path.Combine(run.ShortcutDir, name);
+            try
+            {
+                string? actual = MachineNative.ShortcutAppUserModelId(path);
+                lines.Add($"{name}: '{actual}', expected '{id}'");
+                all &= string.Equals(actual, id, StringComparison.Ordinal);
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or System.Runtime.InteropServices.COMException or FileNotFoundException)
+            {
+                lines.Add($"{name}: could not be read ({ex.GetType().Name})");
+                all = false;
+            }
+        }
+
+        notes = string.Join("; ", lines) + ".";
+        return all;
     }
 
     /// <summary>Starts BwcRegedit from the install folder, unelevated, and keeps it open for the installer to close.</summary>
@@ -412,6 +624,10 @@ public sealed class InstallerUpdateTests
             [ManifestVariable] = server.ManifestUrl,
             [TrustedKeyVariable] = feed.PublicKeyBase64,
             [AllowHttpVariable] = "1",
+
+            // The update helper's elevated step runs unelevated in this flavor: it copies the installer under this
+            // folder of the run's temp, in place of <install folder>.upd, and the installer runs from that copy.
+            [ProtectedRootVariable] = InstallEvidence.ProtectedRoot(config, scope),
             [InstallerRunIdVariable] = run.RunId,
             [InstallerShortcutsVariable] = run.ShortcutDir,
         };

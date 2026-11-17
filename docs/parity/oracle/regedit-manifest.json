@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture manifest",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26300",
+    "ubr": 9974,
+    "displayVersion": "26H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "note": "The embedded RT_MANIFEST read as an image resource. regedit.exe was not started.",
+  "manifestResourceId": 1,
+  "manifestBytes": 1206,
+  "manifestSha256": "574046b6d56608b7cba84c2c5fc8da3207f8216a9840ca8741837c3a9ced727b",
+  "requestedExecutionLevel": {
+    "level": "highestAvailable",
+    "uiAccess": false
+  }
+}

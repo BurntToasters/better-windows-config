@@ -24,6 +24,12 @@ public enum RegFileRefusal
 
     /// <summary>The file could not be opened or read.</summary>
     ReadFailed = 3,
+
+    /// <summary>
+    /// The file starts with the lowercase <c>regf</c> signature of a binary registry hive, which is not a script. Regedit
+    /// string 123 says such files are imported from within the editor. <see cref="RegFileReader"/> raises it before decoding.
+    /// </summary>
+    BinaryHive = 4,
 }
 
 /// <summary>

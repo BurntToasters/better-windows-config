@@ -10,7 +10,8 @@ namespace Bwc.UI.Dialogs;
 /// and the Base group. Hexadecimal is selected by default and a hexadecimal value has no prefix in
 /// the box, as classic regedit shows it. Each base change converts the shown value, so 0x1388 in
 /// hexadecimal shows 5000 in decimal. A value that does not parse in the current base keeps the
-/// dialog open and shows an error.
+/// dialog open and shows an error. A decimal value above the width asks the classic truncation
+/// question (strings 110, 119 and 120): Yes stores the largest value of the width, No keeps the editor.
 /// </summary>
 public abstract class ClassicNumberDialog : ClassicDialog
 {
@@ -19,6 +20,7 @@ public abstract class ClassicNumberDialog : ClassicDialog
     private readonly RadioButton _hex;
     private readonly RadioButton _dec;
     private NumberBase _base = NumberBase.Hexadecimal;
+    private bool _truncationConfirmed;
 
     /// <summary>The number base the value is shown and typed in.</summary>
     private enum NumberBase
@@ -58,14 +60,69 @@ public abstract class ClassicNumberDialog : ClassicDialog
     /// <summary>Parses the box in the current base, and keeps the dialog open with an error when it does not parse.</summary>
     protected override bool TryAccept()
     {
+        if (_truncationConfirmed)
+        {
+            AcceptedValue = MaxValue;
+            return true;
+        }
+
         if (!TryParse(_input.Text, _base, _bits, out ulong value))
         {
-            _ = ShowInputErrorAsync();
+            if (_base == NumberBase.Decimal && IsDecimalOverflow(_input.Text, _bits))
+            {
+                _ = ConfirmTruncationAsync();
+            }
+            else
+            {
+                _ = ShowInputErrorAsync();
+            }
+
             return false;
         }
 
         AcceptedValue = value;
         return true;
+    }
+
+    /// <summary>
+    /// Asks the classic truncation question. The caption is string 110 and the text is string 119 (DWORD) or 120
+    /// (QWORD). No returns to the editor with the typed text. Yes accepts the largest value of the width.
+    /// </summary>
+    private async Task ConfirmTruncationAsync()
+    {
+        string text = BwcStrings.Get(_bits == 32 ? "NumberOverflowDword" : "NumberOverflowQword");
+        var prompt = new ConfirmDialog(BwcStrings.Get("NumberOverflowCaption"), text);
+
+        // The prompt is owned by this dialog, which stays disabled until the prompt closes.
+        bool yes = await prompt.ShowAsync(WindowNative.GetWindowHandle(this));
+        if (yes && prompt.Result == ClassicMessageResult.Yes)
+        {
+            _truncationConfirmed = true;
+            Accept();
+            return;
+        }
+
+        _ = _input.Focus(FocusState.Programmatic);
+        _input.SelectAll();
+    }
+
+    private ulong MaxValue => _bits == 32 ? uint.MaxValue : ulong.MaxValue;
+
+    /// <summary>True for decimal digits whose value is above the width's maximum. Leading zeros do not count.</summary>
+    private static bool IsDecimalOverflow(string? text, int bits)
+    {
+        string digits = (text ?? string.Empty).Trim().TrimStart('0');
+        if (digits.Length == 0 || !digits.All(char.IsAsciiDigit))
+        {
+            return false;
+        }
+
+        if (digits.Length > 20 || !ulong.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out ulong value))
+        {
+            return true;
+        }
+
+        return value > (bits == 32 ? uint.MaxValue : ulong.MaxValue);
     }
 
     /// <summary>Selects the value and focuses it, as the classic dialog does when it opens.</summary>
@@ -153,6 +210,13 @@ public abstract class ClassicNumberDialog : ClassicDialog
         }
         else
         {
+            // Leading zeros are not part of the value, so they do not count toward the digit limit.
+            digits = digits.TrimStart('0');
+            if (digits.Length == 0 && (text ?? string.Empty).Trim().Length > 0)
+            {
+                digits = "0";
+            }
+
             if (digits.Length == 0 || digits.Length > 20 || !digits.All(char.IsAsciiDigit))
             {
                 return false;

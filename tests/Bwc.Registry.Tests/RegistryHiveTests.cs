@@ -177,8 +177,8 @@ public sealed class RegistryHiveTests
 #if BWC_E2E
     /// <summary>
     /// Saves and restores a sandboxed key through a real hive file. The mount half of the round trip
-    /// is not run here: LoadHive and UnloadHive target HKLM or HKU, which SandboxWritePolicy refuses
-    /// by design, so no unit test mounts a hive.
+    /// is not run here: SandboxWritePolicy allows LoadHive and UnloadHive only at the run's
+    /// HKEY_USERS\BWC-E2E-&lt;runId&gt;, and only the elevated E2E round trip mounts it (hives.md section 14).
     /// </summary>
     [TestMethod]
     [TestCategory("Elevated")]
@@ -266,7 +266,7 @@ public sealed class RegistryHiveTests
     {
         public bool AllowsLinkValues => false;
 
-        public void EnsureWriteAllowed(RegistryPath path, RegistryWriteOperation operation)
+        public void EnsureWriteAllowed(string? computerName, RegistryPath path, RegistryWriteOperation operation)
         {
             ArgumentNullException.ThrowIfNull(path);
             throw new RegistryOperationException(operation.ToString(), path, ErrorAccessDenied);

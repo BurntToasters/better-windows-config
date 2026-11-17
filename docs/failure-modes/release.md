@@ -96,7 +96,7 @@ run, then exits 1. This keeps the plan visible without pretending the release is
 | D8 | Two runs with the same version | Old files mixed with new | Overwrite only the files this tool owns under `artifacts/release/<version>/<channel>`. |
 | D9 | `--secret-key` is an encrypted key and the password is wrong or missing | Wrong key material, or a prompt that never comes | A wrong password refuses `wrong-password`, exit 1. No password source (no env var, no TTY) refuses `password-missing`, exit 2. |
 | D10 | A real key is given but its public key is not in `src/Bwc.Update/Signing/TrustedKeys.cs` | A test or foreign key signs a release bundle | Refuse `embedded-key-mismatch`. Exit 1 in `assemble-bundle`. A dry run with a test key is labelled `testKey: true` by key id and bytes, never by comment text. |
-| D11 | `assemble-bundle` output is not exactly what `BwcUpdate --check` and `--apply` read | Updater refuses a valid bundle, or accepts a bad one | The bundle is validated with the same validator the updater contract describes before the command reports PASS. Manifest trusted comment: exactly `version:<semver> channel:<stable or beta> expires:<yyyy-MM-ddTHH:mm:ssZ>`. Installer trusted comment: exactly `version:<semver> arch:<win-x64 or win-arm64>`. |
+| D11 | `assemble-bundle` output is not exactly what `BwcUpdate --check` and `--apply` read | Updater refuses a valid bundle, or accepts a bad one | The bundle is validated with the same validator the updater contract describes before the command reports PASS. Manifest trusted comment: exactly `version:<semver> channel:<stable or beta> expires:<yyyy-MM-ddTHH:mm:ssZ>`. Installer trusted comment: exactly `version:<semver> arch:<win-x64 or win-arm64> product:bwc channel:<stable or beta>`, with the channel of the bundle. |
 | D12 | Manifest for one channel is written into another channel's folder | Stable and beta bundles mixed | One manifest per channel, in `artifacts/release/<version>/<channel>/`. The channel is part of the path and of the signed comment. |
 
 ## D. Preflight and session (`scripts/release-preflight.js`, `scripts/release-session.js`)
@@ -195,11 +195,11 @@ signing key by construction. `--check` prints the result and writes nothing.
 
 ## L. Repository and hosting names
 
-Release assets are named by channel. A stable manifest is `bwc-stable.json` with
-`bwc-stable.json.minisig`. A beta manifest is `bwc-beta.json` with `bwc-beta.json.minisig`. The
+Release assets are named by channel. Since 0.1.2 a stable manifest is `bwc-stable-v2.json` with
+`bwc-stable-v2.json.minisig`. A beta manifest is `bwc-beta-v2.json` with `bwc-beta-v2.json.minisig`. The
 installers keep their versioned names, so no two releases share an asset name. The
-Hub reads the stable manifest from `https://github.com/BurntToasters/better-windows-config/releases/latest/download/bwc-stable.json`.
-The beta URL is empty until a beta channel is published.
+Hub reads the stable manifest from `https://github.com/BurntToasters/better-windows-config/releases/latest/download/bwc-stable-v2.json`.
+The beta URL is empty until a beta channel is published (it will be `bwc-beta-v2.json` beside the beta release).
 
 | ID | Case | Risk | Required result |
 |----|------|------|-----------------|
@@ -207,10 +207,19 @@ The beta URL is empty until a beta channel is published.
 | L2 | Resolved repository is not `owner/name` with safe characters | Malformed API path | Refuse `repo-invalid`. Exit 2. |
 | L3 | `--download-base-url` is not https, or carries a query or fragment | Installer URLs point outside the release | Refuse `url-rejected` (manifest) or exit 2 (dry run). The default is `https://github.com/<owner>/<repo>/releases/download/v<version>`. |
 | L4 | Stable manifest is published as the beta asset (or the reverse) | A stable manifest offered to beta users | The signed `channel:` and the validator decide (`channel-mismatch`, V26). The file name is not trusted. |
-| L5 | Draft exists for `v<version>` | Draft assets become visible to the Hub | Drafts are invisible to `releases/latest/download`. The Hub sees a release only after publish, which is the only point at which `bwc-stable.json` changes. |
+| L5 | Draft exists for `v<version>` | Draft assets become visible to the Hub | Drafts are invisible to `releases/latest/download`. The Hub sees a release only after publish, which is the only point at which `bwc-stable-v2.json` change. |
 | L6 | Beta publish | A prerelease changes the stable manifest URL | `releases/latest` ignores prereleases, so the stable URL is unchanged by a beta. |
 | L7 | Installer URL file name is not an asset of the release | The Hub downloads a 404 | Draft and verify refuse `asset-missing` (G10). The installer URL file name is the asset name. |
 | L8 | Notes URL for a version | A broken notes link | `notesUrl` defaults to `https://github.com/<owner>/<repo>/releases/tag/v<version>`, and `--notes-url` overrides it. |
+
+## LF. No legacy feed (0.1.2)
+
+0.1.x carries no migration code. Written before the tests and the code, per AGENTS.md. The only 0.1.1 install is removed
+by hand, so a release writes no old-name feed file. 0.1.2 and later read `bwc-<channel>-v2.json` only.
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| LF1 | A stable run or assembly, with no legacy option. A draft already holds a `bwc-stable.json` asset | A stale old-name file is served by `releases/latest/download/` or published | No legacy file is written and `assembly.json` has no legacy field. The assembly and the run take no legacy option, so a stale `--legacy-feed` or `--legacy-source` is refused as an unknown option. A `bwc-stable.json` on a reused draft is refused `asset-unexpected`, naming it, and is never deleted by the tools |
 
 ## F. Not enforced here (user duties)
 

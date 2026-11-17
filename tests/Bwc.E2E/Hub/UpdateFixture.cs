@@ -160,7 +160,7 @@ internal sealed class UpdateFixture : IDisposable
             path,
             _keyDir,
             "--trusted-comment",
-            "timestamp:1794102823 version:" + version + " arch:" + architecture);
+            "timestamp:1794102823 version:" + version + " arch:" + architecture + " product:bwc channel:stable");
 
         // The manifest carries the base64 envelope of the installer's minisign text.
         return File.ReadAllText(path + ".sig").Trim();

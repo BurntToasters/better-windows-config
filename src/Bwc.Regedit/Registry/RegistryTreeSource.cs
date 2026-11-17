@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Bwc.Core;
 using Bwc.Registry;
 using Bwc.UI.Tree;
@@ -12,14 +13,8 @@ namespace Bwc.Regedit.Registry;
 /// </summary>
 public sealed class RegistryTreeSource : ITreeNodeSource
 {
-    /// <summary>Win32 ERROR_ACCESS_DENIED and ERROR_PRIVILEGE_NOT_HELD: a key the user cannot enumerate.</summary>
-    private const int AccessDeniedError = 5;
-    private const int PrivilegeNotHeldError = 1314;
-
-    /// <summary>Longest key name component the registry accepts, in characters.</summary>
-    private const int MaxKeyNameLength = 255;
-
-    private static readonly StringComparer NameComparer = StringComparer.CurrentCultureIgnoreCase;
+    // The classic display order (NLS, case ignored). See RegistryNameOrder and VIEW-009.
+    private static readonly IComparer<string> NameComparer = RegistryNameOrder.Comparer;
     private static readonly IReadOnlyList<TreeNode> NoChildren = Array.Empty<TreeNode>();
 
     private static readonly RegistryRoot[] RootOrder =
@@ -110,7 +105,7 @@ public sealed class RegistryTreeSource : ITreeNodeSource
             return Task.FromResult(node.Children);
         }
 
-        if (!RegistryPath.TryParse(displayPath, out RegistryPath? path))
+        if (!TryParseNodePath(displayPath, out RegistryPath? path))
         {
             Log.Warn($"Registry tree node '{node.Name}' has an invalid path '{displayPath}'.");
             return Task.FromResult(NoChildren);
@@ -137,7 +132,12 @@ public sealed class RegistryTreeSource : ITreeNodeSource
             return Computer;
         }
 
-        if (!RegistryPath.TryParse(displayPath, out RegistryPath? path))
+        if (displayPath.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return await FindRemotePathAsync(displayPath);
+        }
+
+        if (!TryParseNodePath(displayPath, out RegistryPath? path))
         {
             Log.Warn($"Registry tree could not restore '{displayPath}': the path is not valid.");
             return null;
@@ -178,6 +178,48 @@ public sealed class RegistryTreeSource : ITreeNodeSource
         }
     }
 
+    /// <summary>
+    /// Walks a remote display path, <c>\\COMPUTER\HKEY...\name</c>, from the connected computer's node. Null when
+    /// the computer is not connected or a name is missing. Each level is loaded on the way down.
+    /// </summary>
+    private async Task<TreeNode?> FindRemotePathAsync(string displayPath)
+    {
+        int separator = displayPath.IndexOf('\\', 2);
+        string computerName = separator < 0 ? displayPath : displayPath[..separator];
+        TreeNode? current = FindChild(Computer, computerName);
+        if (current is null)
+        {
+            Log.Warn($"Registry tree has no computer node '{computerName}' for '{displayPath}'.");
+            return null;
+        }
+
+        if (separator < 0)
+        {
+            return current;
+        }
+
+        foreach (string component in displayPath[(separator + 1)..].Split('\\', StringSplitOptions.RemoveEmptyEntries))
+        {
+            _ = await current.LoadChildrenAsync(CancellationToken.None).ConfigureAwait(true);
+            TreeNode? next = FindChild(current, component);
+            if (next is null)
+            {
+                Log.Warn($"Registry tree found no '{component}' under '{current.Name}' on the way to '{displayPath}'.");
+                return null;
+            }
+
+            current.IsExpanded = true;
+            current = next;
+        }
+
+        for (TreeNode? ancestor = current.Parent; ancestor is not null; ancestor = ancestor.Parent)
+        {
+            ancestor.IsExpanded = true;
+        }
+
+        return current;
+    }
+
     private IReadOnlyList<TreeNode> LoadChildren(RegistryPath path, CancellationToken cancellationToken)
     {
         IReadOnlyList<string> names;
@@ -185,19 +227,13 @@ public sealed class RegistryTreeSource : ITreeNodeSource
         {
             names = _reader.EnumerateSubKeyNames(path, cancellationToken);
         }
-        catch (RegistryOperationException ex) when (ex.Win32Error is AccessDeniedError or PrivilegeNotHeldError)
-        {
-            // The expand fails with the classic message. The tree raises ExpandFailed for it, so the
-            // error is not turned into an empty list here.
-            Log.Warn(
-                $"Registry tree could not open '{path.ToDisplayString()}': Win32 {ex.Win32Error} ({ex.Message}).");
-            throw;
-        }
         catch (RegistryOperationException ex)
         {
+            // Every enumeration error propagates, as on the remote tree. The tree raises ExpandFailed, which shows
+            // the classic "cannot be opened" message and collapses the node. An empty list would hide the error.
             Log.Warn(
                 $"Registry tree could not enumerate '{path.ToDisplayString()}': Win32 {ex.Win32Error} ({ex.Message}).");
-            return NoChildren;
+            throw;
         }
 
         // The contract asks for the native linguistic order. The managed culture comparer is
@@ -209,19 +245,19 @@ public sealed class RegistryTreeSource : ITreeNodeSource
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!IsRepresentable(name))
+            // AppendEnumeratedName accepts '.' and '..', which the registry lists as keys. The other names it refuses
+            // (empty, overlong, NUL, separator) cannot come from the registry, so they are logged and skipped.
+            RegistryPath childKey;
+            try
             {
-                // RegistryPath cannot name '.' or '..'. The key is still listed, under a display
-                // path built from its parent. It has no children and no values to read.
-                children.Add(new TreeNode(
-                    name,
-                    path.ToDisplayString() + @"\" + name,
-                    hasChildren: false,
-                    source: this));
+                childKey = path.AppendEnumeratedName(name);
+            }
+            catch (ArgumentException ex)
+            {
+                Log.Warn($"Registry tree skipped the child '{name}' of '{path.ToDisplayString()}': {ex.Message}");
                 continue;
             }
 
-            RegistryPath childKey = path.Append(name);
             children.Add(new TreeNode(
                 name,
                 childKey.ToDisplayString(),
@@ -233,13 +269,40 @@ public sealed class RegistryTreeSource : ITreeNodeSource
     }
 
     /// <summary>
-    /// True when <see cref="RegistryPath.Append"/> accepts the name. The path type rejects '.' and '..',
-    /// which a real key can still have.
+    /// Parses the display path of a tree node into a key path. Unlike <see cref="RegistryPath.TryParse"/>, a
+    /// component may be "." or "..", because the registry lists keys with those names. The root and the optional
+    /// "Computer" prefix parse as before. A component that is empty or holds a separator or NUL still fails.
     /// </summary>
-    private static bool IsRepresentable(string name) =>
-        name.Length is > 0 and <= MaxKeyNameLength &&
-        name is not ("." or "..") &&
-        name.IndexOf('\0') < 0;
+    public static bool TryParseNodePath(string? displayPath, [NotNullWhen(true)] out RegistryPath? path)
+    {
+        path = null;
+        if (string.IsNullOrEmpty(displayPath))
+        {
+            return false;
+        }
+
+        string[] segments = displayPath.Split('\\');
+        int index = segments[0].Equals("Computer", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        if (index >= segments.Length || !RegistryPath.TryParse(segments[index], out RegistryPath? current))
+        {
+            return false;
+        }
+
+        for (int componentIndex = index + 1; componentIndex < segments.Length; componentIndex++)
+        {
+            try
+            {
+                current = current.AppendEnumeratedName(segments[componentIndex]);
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+
+        path = current;
+        return true;
+    }
 
     /// <summary>
     /// True when the key has at least one subkey, from RegQueryInfoKey. A key that cannot be opened

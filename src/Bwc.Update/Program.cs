@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.Json;
 using Bwc.Core;
 
 namespace Bwc.Update;
@@ -41,26 +40,45 @@ internal static class Program
                 Console.Error.WriteLine("BwcUpdate: " + parsed.Error);
                 Console.Error.WriteLine(UpdateArguments.UsageText);
                 return 2;
+        }
+
+        // An elevated process never opens the file log: its folder comes from BWC_DATA_ROOT, which a caller can aim at
+        // a junction.
+        if (UpdateLogging.ShouldInitialize(parsed.Mode, ProcessIdentity.IsElevatedOrHighIntegrity()))
+        {
+            Log.Initialize(ToolId);
+        }
+
+        switch (parsed.Mode)
+        {
             case UpdateMode.Check:
-                Log.Initialize(ToolId);
                 return await RunCheckAsync(parsed);
             case UpdateMode.Download:
-                Log.Initialize(ToolId);
                 return await RunDownloadAsync(parsed);
             case UpdateMode.CloseRunning:
-                Log.Initialize(ToolId);
                 return RunCloseRunning(parsed);
             case UpdateMode.WaitPid:
-                Log.Initialize(ToolId);
                 return RunWaitPid(parsed);
+            case UpdateMode.ApplyElevated:
+                return RunApplyElevated(parsed);
+            case UpdateMode.LaunchHub:
+                return RunLaunchHub(parsed);
+            case UpdateMode.SetAumid:
+                return RunSetAumid(parsed);
             default:
-                Log.Initialize(ToolId);
                 return await RunApplyAsync(parsed);
         }
     }
 
     private static async Task<int> RunCheckAsync(UpdateArguments parsed)
     {
+        // A check reads the network and writes the staging root, a folder that medium processes can write. It never
+        // runs elevated (HK1).
+        if (ElevationPolicy.RefusesElevated(parsed.Mode) && ProcessIdentity.IsElevatedOrHighIntegrity())
+        {
+            return WriteCheck(UpdateFailure.RunningElevated, ElevationPolicy.RefusalDetail, null, null, 1);
+        }
+
         var architecture = Architectures.Current();
         if (architecture is null)
         {
@@ -104,6 +122,11 @@ internal static class Program
 
     private static async Task<int> RunDownloadAsync(UpdateArguments parsed)
     {
+        if (ElevationPolicy.RefusesElevated(parsed.Mode) && ProcessIdentity.IsElevatedOrHighIntegrity())
+        {
+            return WriteDownload(UpdateFailure.RunningElevated, ElevationPolicy.RefusalDetail, null, null, null, 1);
+        }
+
         var architecture = Architectures.Current();
         if (architecture is null)
         {
@@ -180,6 +203,100 @@ internal static class Program
         return WriteApply(outcome, ExitCodeFor(outcome));
     }
 
+    private static int RunApplyElevated(UpdateArguments parsed)
+    {
+        var architecture = Architectures.Current();
+        if (architecture is null)
+        {
+            return WriteApply(new ApplyOutcome(UpdateFailure.InvalidOptions, "unsupported architecture", false, false), 2);
+        }
+
+        // The elevated helper does not pass on a startup hook, a profiler, or a host trace to what it starts (HE3).
+        // This exe is NativeAOT, so none of them ran before Main either (HE5).
+        _ = ChildEnvironment.RemoveRuntimeVariables();
+
+        var options = new UpdateOptions();
+        var stagingRoot = UpdatePaths.DefaultStagingRoot;
+        string? protectedRoot = null;
+#if BWC_E2E
+        options = UpdateE2ESeam.ApplyCheckOverrides(options);
+        protectedRoot = UpdateE2ESeam.ProtectedRoot(stagingRoot);
+
+        // The sandbox root is protected by the same rules, with the current user in place of Administrators (HP).
+        if (protectedRoot is not null)
+        {
+            options = options with { ProtectedAcl = ProtectedAcl.ForCurrentUser() };
+        }
+#endif
+
+        // Only the staging folder comes from the command line. The install dir and the current version are this
+        // helper's own.
+        var host = new WindowsUpdateProcessHost();
+        var request = new ElevatedApplyRequest(
+            parsed.Single("--apply-elevated")!,
+            stagingRoot,
+            host.HelperDirectory,
+            HelperVersion.Read(typeof(Program).Assembly) ?? string.Empty,
+            architecture,
+            protectedRoot);
+        var outcome = new ElevatedApplier(options, host).Apply(request);
+        return WriteApply(outcome, ExitCodeFor(outcome));
+    }
+
+    private static int RunLaunchHub(UpdateArguments parsed)
+    {
+        UpdateFailure? updateResult = null;
+        if (parsed.Single("--update-result") is { } text && UpdateArguments.TryParseUpdateResult(text, out var failure))
+        {
+            updateResult = failure;
+        }
+
+        var host = new WindowsUpdateProcessHost();
+        var launched = HubLauncher.Launch(host, host.HelperDirectory, updateResult);
+        Console.WriteLine(StdoutJson.Simple(launched.Failure, launched.Ok ? "Hub started" : launched.Detail));
+        return launched.Failure switch
+        {
+            UpdateFailure.None => 0,
+            UpdateFailure.HubMissing => 6,
+            UpdateFailure.DeElevationFailed => 8,
+            _ => UnexpectedExitCode,
+        };
+    }
+
+    /// <summary> <c>--set-aumid</c> (update-elevation.md SA): refuses a shortcut that is not one of the two of this
+    /// product in the folder the installer wrote them to, or that is a link, then sets and reads back the
+    /// AppUserModelID. It starts nothing.
+    /// </summary>
+    private static int RunSetAumid(UpdateArguments parsed)
+    {
+        var shortcut = parsed.Single("--set-aumid")!;
+        var appId = parsed.Single("--app-id")!;
+        var commonPrograms = Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms);
+        var scope = ShortcutAumidRules.ShipScope(commonPrograms);
+#if BWC_E2E
+        scope = ShortcutAumidE2EScope.For(
+            Path.GetTempPath(),
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            commonPrograms);
+#endif
+        var problem = ShortcutAumidRules.ScopeProblem(shortcut, appId, scope) ?? ShortcutAumidRules.FileProblem(shortcut);
+        if (problem is not null)
+        {
+            return WriteSimple(UpdateFailure.PathRejected, problem, 3);
+        }
+
+        var written = ShortcutAumid.Write(shortcut, appId);
+        return written.Ok
+            ? WriteSimple(UpdateFailure.None, "AppUserModelID set and read back", 0)
+            : WriteSimple(written.Failure, written.Detail, 4);
+    }
+
+    private static int WriteSimple(UpdateFailure failure, string detail, int exitCode)
+    {
+        Console.WriteLine(StdoutJson.Simple(failure, detail));
+        return exitCode;
+    }
+
     private static int RunCloseRunning(UpdateArguments parsed)
     {
         var installDir = parsed.Single("--install-dir")!;
@@ -215,7 +332,7 @@ internal static class Program
     /// </summary>
     private static int WriteUnexpected(UpdateArguments? parsed, Exception ex)
     {
-        Log.Exception("unexpected error in BwcUpdate", ex);
+        Log.Exception("unexpected error in BwcUpdate (" + BuildFlavor.Marker + ")", ex);
         var detail = "unexpected " + ex.GetType().Name + "; see the log";
         switch (parsed?.Mode)
         {
@@ -228,7 +345,7 @@ internal static class Program
                 var hubLaunched = installDir is not null && StartHubAfterUnexpected(installDir);
                 return WriteApply(new ApplyOutcome(UpdateFailure.Unexpected, detail, InstallerStarted: false, HubLaunched: hubLaunched), UnexpectedExitCode);
             default:
-                Console.WriteLine(JsonSerializer.Serialize(new { ok = false, failure = UpdateFailure.Unexpected.ToString(), detail }));
+                Console.WriteLine(StdoutJson.Simple(UpdateFailure.Unexpected, detail));
                 return UnexpectedExitCode;
         }
     }
@@ -251,41 +368,19 @@ internal static class Program
 
     private static int WriteCheck(UpdateFailure failure, string detail, string? version, string? notesUrl, int exitCode)
     {
-        Console.WriteLine(JsonSerializer.Serialize(new
-        {
-            ok = failure == UpdateFailure.None,
-            failure = failure.ToString(),
-            detail,
-            version,
-            notesUrl,
-        }));
+        Console.WriteLine(StdoutJson.Check(failure, detail, version, notesUrl));
         return exitCode;
     }
 
     private static int WriteDownload(UpdateFailure failure, string detail, string? version, string? notesUrl, string? stagingFolder, int exitCode)
     {
-        Console.WriteLine(JsonSerializer.Serialize(new
-        {
-            ok = failure == UpdateFailure.None,
-            failure = failure.ToString(),
-            detail,
-            version,
-            notesUrl,
-            stagingFolder,
-        }));
+        Console.WriteLine(StdoutJson.Download(failure, detail, version, notesUrl, stagingFolder));
         return exitCode;
     }
 
     private static int WriteApply(ApplyOutcome outcome, int exitCode)
     {
-        Console.WriteLine(JsonSerializer.Serialize(new
-        {
-            ok = outcome.Failure == UpdateFailure.None,
-            failure = outcome.Failure.ToString(),
-            detail = outcome.Detail,
-            installerStarted = outcome.InstallerStarted,
-            hubLaunched = outcome.HubLaunched,
-        }));
+        Console.WriteLine(StdoutJson.Apply(outcome));
         return exitCode;
     }
 
@@ -305,10 +400,7 @@ internal static class Program
             }
 
             _lastWritten = value.Received;
-            Console.WriteLine(JsonSerializer.Serialize(new
-            {
-                progress = new { received = value.Received, total = value.Total },
-            }));
+            Console.WriteLine(StdoutJson.Progress(value.Received, value.Total));
             Console.Out.Flush();
         }
     }

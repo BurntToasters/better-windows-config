@@ -84,7 +84,7 @@ public sealed class MenuTests
         string[] parts = key.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (parts.Length == 1)
         {
-            Keyboard.Press(Enum.Parse<VirtualKeyShort>(parts[0], ignoreCase: true));
+            Keyboard.Type(Enum.Parse<VirtualKeyShort>(parts[0], ignoreCase: true));
             return;
         }
 

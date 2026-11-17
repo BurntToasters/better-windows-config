@@ -151,3 +151,50 @@ The default value is not a favorite and is ignored on load with a log entry. Tes
 Failure mode: the add prompt accepted a name made only of spaces. `Remove` skips whitespace names,
 so the entry could be seen but never deleted. Add now refuses a whitespace-only name with the
 same message as an empty name, so no such value is written. Test: `FavoritesFixes_WhitespaceNameIsRefused`.
+
+## Add to Favorites template (DLG-024, DLG-025, K1b)
+
+The prompt is classic RT_DIALOG 112: caption "Add to Favorites", 191 x 65 DLU, one static
+"&Favorite name:", the edit 1190, OK (1, default), and Cancel (2). The measured rectangles are in
+`docs/parity/oracle/regedit-dialog-rects.json` ("add-favorite"). Test:
+`AddFavoriteDialog_ClassicLayoutTabOrderAndDuplicateError` and the rect check in
+`SmallDialogs_RectsMatchClassicMeasurements`.
+
+### Load Hive geometry reused
+
+Failure mode: Add to Favorites kept the Load Hive template (RT_DIALOG 104, 252 x 53 DLU). The window
+is the wrong size, the edit and buttons sit in other places, and the rectangles drift from the
+classic measurement. The Add dialog must use its own template.
+
+### Duplicate name shown under the dialog title
+
+Failure mode: a duplicate name showed RT_STRING 171 in a box captioned with the dialog title. Classic
+captions that box RT_STRING 172, "Error Adding Favorite". Test: the duplicate check in
+`AddFavoriteDialog_ClassicLayoutTabOrderAndDuplicateError` reads the error caption.
+
+### Empty or whitespace name taking the duplicate caption
+
+Failure mode: the empty-name and invalid-name messages moved to caption 172 along with the duplicate.
+Only the duplicate uses 172. The empty-name and invalid-name messages keep the dialog title as their
+caption, as before this change. Classic's caption for these two cases is not in the oracle, so
+this is a declared difference until a measurement exists.
+
+### Rejected name loses the typed text
+
+Failure mode: after a rejected name the edit is cleared, so the user cannot correct a typo. The
+rejected text stays in the edit and is selected, and the dialog stays open.
+
+### Tab order differs from the template
+
+Failure mode: Tab from the edit reaches Cancel before OK, or a static label takes a tab stop. The tab
+order is 1190, OK, Cancel, and the static label is not a tab stop.
+
+### Suggested name changed
+
+Failure mode: the suggested name is not the selected key's last component (the root display name for
+a predefined root). The suggestion rule is unchanged from before this change.
+
+### Enter and Escape
+
+Failure mode: Enter in the edit does not press OK, or Escape does not press Cancel. Enter presses OK
+(the default button) and Escape presses Cancel.

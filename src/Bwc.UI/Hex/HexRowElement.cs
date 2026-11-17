@@ -221,7 +221,8 @@ internal sealed class HexRowElement : Panel
 
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (Owner is null || _index < 0)
+        // A right press is left for the right tap that opens the edit menu, so it keeps the caret where it is.
+        if (Owner is null || _index < 0 || e.GetCurrentPoint(this).Properties.IsRightButtonPressed)
         {
             return;
         }

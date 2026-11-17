@@ -301,7 +301,7 @@ public sealed class AppSession : IDisposable
         {
             if (TryParseKey(parts[0], out var single))
             {
-                Keyboard.Press(single);
+                Keyboard.Type(single);
             }
             else
             {

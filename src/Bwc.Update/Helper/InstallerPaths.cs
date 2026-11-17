@@ -76,6 +76,56 @@ public static partial class InstallerPaths
         return Outcome<string>.Success(folder);
     }
 
+    /// <summary>
+    /// The same checks for a staging folder given on its own (the argument of <c>--apply-elevated</c>): an absolute path whose
+    /// last part is 32 lowercase hex digits, directly under <paramref name="stagingRoot"/>, with no link on the way. The
+    /// installer and the receipt are the fixed names inside it. Returns the normalized folder.
+    /// </summary>
+    public static Outcome<string> CheckFolder(string stagingFolder, string stagingRoot)
+    {
+        if (string.IsNullOrEmpty(stagingFolder) || !Path.IsPathFullyQualified(stagingFolder))
+        {
+            return Refuse("staging folder must be an absolute path");
+        }
+
+        string folder;
+        try
+        {
+            folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(stagingFolder));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return Refuse("staging folder cannot be normalized");
+        }
+
+        var checkedFolder = Check(Path.Combine(folder, InstallerName), Path.Combine(folder, UpdateReceipt.FileName), stagingRoot);
+        return checkedFolder.Ok ? Outcome<string>.Success(folder) : checkedFolder;
+    }
+
+    /// <summary>
+    /// True when any entry directly inside <paramref name="folder"/> is a link or junction, or an entry cannot be inspected.
+    /// A staging folder holds only the installer and its receipt, so any link there is refused.
+    /// </summary>
+    public static bool HasLinkInside(string folder)
+    {
+        try
+        {
+            foreach (var entry in Directory.EnumerateFileSystemEntries(folder))
+            {
+                if (IsLinkOrJunction(entry))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
     // File.Exists and Directory.Exists answer false when access is denied, so they cannot prove a path is absent.
     // Only a not-found error counts as absent. Any other failure is unknown, and unknown counts as a link.
     private static bool IsLinkOrJunction(string path)

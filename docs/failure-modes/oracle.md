@@ -70,6 +70,14 @@ regedit or test window has focus would record the wrong window or drive the wron
 - Input uses `PostMessage` and `SendMessage` to the target window. The tools never call
   `SendInput`, `SetForegroundWindow` or `keybd_event`, so the user's keyboard and cursor are not
   taken over.
+- Exception (0.1.2 `remote` capture, authorized by the manager): the Connect picker's computer name is typed with
+  `SendInput` (KEYEVENTF_UNICODE characters), and the picker is brought to the foreground with
+  `SetForegroundWindow` first. Both are used for that one dialog only. Before each character,
+  `GetForegroundWindow` must be the picker's top-level window and the keyboard focus of regedit's GUI thread must be
+  the name box. If either check fails, typing stops, the picker is cancelled with IDCANCEL, and the record says
+  `not measured: focus lost`. The whole step holds the GUI mutex. The user's cursor is not moved. The picker is
+  cancelled at the end, and the foreground returns to whatever the user had active only as far as Windows does it
+  for the closed dialog.
 
 ## 6. Clicking OK or changing a value
 
@@ -82,6 +90,8 @@ writes to the registry. Dialog captures only cancel.
   seeded tree, which is deleted afterwards.
 - Inline Rename is cancelled with Escape on the edit control. Its text is never committed.
 - Import (`regedit /s`) is the only capture that writes data, and it is limited to section 1.
+- Exception (0.1.2 `remote` capture only): the Select Computer dialog's OK connects to 127.0.0.1, and the disconnect
+  dialog's OK drops the connection. Neither writes to a registry. Section 18 lists the checks that gate them.
 
 ## 7. Modal dialog left open
 
@@ -220,3 +230,161 @@ Applies-to choices of one entry editor, and cancels every window. The ways it ca
 - **Cleanup fails.** The key has explicit ACEs for other SIDs but the user owns it and inherits full control,
   so `DeleteSubKeyTree` succeeds. If it fails, `OracleSession` reports the error and the run fails. The next run
   deletes the tree first, and that delete is checked the same way.
+
+## 18. Key, command and context captures (keys, context, binary, print, security, remote, manifest)
+
+Added for release 0.1.2. These captures open classic menus, dialogs and the Advanced Security Settings
+window, read them, and cancel them. They never change a value outside BWC-Oracle. The remote capture is
+the only one that connects to another registry, and it writes nothing to it.
+
+- **Key delivered by message, modifier not seen.** Accelerators are matched by TranslateAccelerator, which
+  reads the modifier state of the thread's keyboard queue. A posted WM_KEYDOWN does not set that state. The
+  `keys` capture attaches its input queue to regedit's GUI thread (AttachThreadInput), sets the Shift, Ctrl and
+  Alt bits with SetKeyboardState, posts the key, then clears the state and detaches in a `finally`. Alt keys are
+  posted as WM_SYSKEYDOWN. A key whose attach fails is recorded as `measured: false` with the Win32 error.
+- **Key not delivered, read as "no effect".** Each key's accelerator command id comes from the resource dump
+  (VK_F4 to 642, Alt+1 to 689 through Alt+9 to 697, Alt+Up to 698, Shift+F10 to 896). The record carries
+  `deliveryMismatch: true` when the key changed nothing but the same command id posted with WM_COMMAND did
+  change something. Such a key is not reported as ignored by classic.
+- **Command id that writes.** The WM_COMMAND ids (642, 689 to 698, 896) are posted with the seeded key under
+  BWC-Oracle selected, and the tree is deleted afterwards. None of these ids is a menu item that writes a value
+  (Delete 913, Rename 914, New 663 to 677 are not in the list). Each command runs in a fresh process.
+- **Popup or dialog left open.** Every new top-level window of the started process is closed after it is
+  measured: popups with Escape then WM_CANCELMODE, dialogs with IDCANCEL then WM_CLOSE. A window that does not
+  close fails the step and the process is killed.
+- **Value context menu opened on the wrong item.** A posted right click takes its position from the real
+  cursor when the context menu is generated (WM_RBUTTONUP becomes WM_CONTEXTMENU at GetMessagePos), and a
+  WM_CONTEXTMENU with a point may be ignored in the same way. The `context` capture opens a value's menu with
+  Shift+F10 with the value selected and the list focused. The point and right-button methods were tried
+  first and depend on the real cursor position (one run opened RT_MENU 105, another RT_MENU 106), so the
+  capture no longer uses them for values. A popup is accepted only when its leaf ids equal RT_MENU 105
+  (Modify, Modify Binary Data, Delete, Rename). A popup that matches RT_MENU 106 (the list background, New)
+  is never accepted as a value menu. If Shift+F10 does not reach RT_MENU 105, the value is recorded as
+  `measured: false`. It is never guessed from position.
+- **Text edit menu attributed to the wrong control.** RT_MENU 108 (Cut, Copy, Paste, Delete, Select All) and the
+  system edit menu (ids 768 to 772 for Cut, Copy, Paste, Clear and Undo, plus the Unicode control entries) have
+  different ids. Each popup is attributed by its item ids, not by where the click landed. Each text control is
+  recorded with every method tried (`attempts`), and a popup that matches neither is recorded as no template.
+- **Binary Data variant misidentified.** The variant is read from the live control ids, not from the caption.
+  Template 2020 has 8 controls and template 2021 has 10, including id 2026 (the "Value Type:" label). A dialog
+  whose control ids match neither is recorded as `unknown` and the step fails for that value type.
+- **Print dialog not found.** The Print dialog's owner is not guaranteed to be the main window (the earlier
+  `dialogs` run saw nothing owned by it). `PrintCapture` looks for new top-level windows of the started process
+  of any owner. The run never sends IDOK to the Print dialog, so no job is submitted, and the dialog is closed
+  with IDCANCEL. A physical printer is never used.
+- **Print to PDF not measured.** Printing needs IDOK on the Print dialog and then a save-path dialog, which
+  this capture does not drive. The record says `measured: false` with that reason. Only the printer list
+  (installed or not, as a boolean) is read, through `System.Drawing.Printing`.
+- **Permissions sheet and Advanced window cancelled wrongly.** The security capture reuses the Permissions
+  helpers from `PermissionsCapture` and presses the Advanced button by BM_CLICK, as that capture does. It never
+  presses any other button on those windows. Every window is closed with IDCANCEL. "Disable inheritance" and
+  "Replace all child object permission entries" are read only, never toggled.
+- **Remote connect writes to the registry.** Connecting to 127.0.0.1 is a read-only tree attach. It is the one
+  place where this tool posts IDOK (the Select Computer dialog's OK), which is an exception to section 6. The
+  exception applies only when the edit control reads back exactly `127.0.0.1` before the OK is posted. Otherwise
+  the dialog is cancelled. The remote capture never posts a command to a remote key other than menu reads.
+- **Wrong computer connected.** The only target is the loopback address. The tree node that appears must carry
+  `127.0.0.1` in its text before its children are read. Any other new node stops the step.
+- **Message box from a failed connect.** A message box owned by the started process is closed with IDCANCEL
+  and its text is recorded, as in section 7. Remote measurements are then recorded as `measured: false` with the
+  message.
+- **Import picker chooses a file.** File > Import first opens a computer picker. The picker is identified by its
+  control ids, not by the template number alone. The capture cancels it and never reaches the file dialog. If the
+  first window opened is a file dialog, it is closed with IDCANCEL.
+- **Disconnect dialog chooses the wrong entry.** The disconnect dialog (template 107) is set to the entry whose
+  text contains `127.0.0.1`. OK is posted only after that entry is selected and read back. Otherwise the dialog
+  is cancelled and the record says so.
+- **Redaction.** The current user's SID and the machine name are replaced by `<SID>` and `<COMPUTER>` in every
+  text that leaves the capture, tracked or untracked. Redaction runs before the JSON is written.
+- **Personal data in tracked output.** Tracked JSON carries ids, flags, control classes and geometry. Item
+  text, captions and titles go to `docs/parity/oracle/local/`, which is untracked.
+- **Manifest read wrong.** The manifest is read with LoadLibraryEx (LOAD_LIBRARY_AS_IMAGE_RESOURCE) and
+  FindResource on RT_MANIFEST. A missing resource or an XML parse error fails the step. The manifest is not
+  executed and regedit is not started for it.
+
+## 19. String parity check (scripts/check-regedit-strings.js)
+
+`scripts/check-regedit-strings.js` compares each RT_STRING of the regedit.exe dump with BWC's strings. It runs in
+`npm run validate`. It must skip cleanly on CI, where the dump is absent.
+
+- **Dump absent.** The script prints a skip note and exits 0. It never writes `string-parity.json` in that case.
+- **Dump of another schema.** A missing `modules[0].stringTables` or a missing `id` or `text` fails with exit 1.
+- **Partial output.** The output is written to a temporary file and renamed into place, so a reader never sees a
+  partial file.
+- **Oracle text in tracked output.** The output holds ids and statuses only, sorted by id. No text, no timestamp,
+  no machine name.
+- **Template misread as equal.** Text with `%%u` or `%1!...!` tokens is reported as `template` and not compared.
+  `%1` and `%2` are converted to `{0}` and `{1}` before comparison.
+- **False "absent".** A resource that BWC builds by concatenation or interpolation is not found. The check reports
+  it as `absent`. The status means "text not found by exact match", not "BWC lacks the feature".
+- **Line endings.** Decoded XML entities (`&#13;&#10;` and the like) are compared with CRLF converted to LF on
+  both sides, so a line break encoded differently does not read as a difference.
+- **Comment misattribution.** An id is attributed to a resw entry only when the comment immediately before the
+  `<data>` element cites `Oracle <id>` (the ids after "Oracle" are parsed from that comment). Ids in other
+  comments are ignored.
+- **Source scan too broad or too narrow.** The C# literal search reads only `.cs` files under `src/`, skipping
+  `bin` and `obj`, and matches the escaped literal form. Verbatim strings and raw literals are not matched.
+
+## 20. Text typed into a dialog by message (remote connect)
+
+The Select Computer dialog's name box ignored WM_SETTEXT and WM_CHAR posted to it (0.1.2 run). The `remote`
+capture types the name by message to a control that it first gives keyboard focus, so no keyboard state of
+the user is used and no window is brought to the foreground.
+
+- **Typing into the wrong window.** Focus is set with SetFocus on this thread's input queue, after
+  AttachThreadInput to regedit's GUI thread. The focus change stays inside regedit's queue. The keys are
+  posted with PostMessage to the focused control. Nothing is sent with SendInput or keybd_event, so
+  the user's physical keyboard and the foreground window are not used. The manager's request for SendInput is
+  not followed, because section 5 forbids it and it would type into whatever window the user has active.
+- **Name box that rejects input.** A control that reads back the empty string after WM_SETTEXT and after
+  typing is recorded with its class, id and whether it has ES_READONLY (0x0800). Rich edit controls
+  (RICHEDIT50W) are candidates too. If no candidate accepts `127.0.0.1`, the step is `measured: false` and
+  the dialog is cancelled with IDCANCEL. OK is not pressed.
+- **Text accepted but wrong.** The text must read back exactly `127.0.0.1` before OK is posted. Any other text
+  cancels the dialog.
+- **Connect starts the service.** The RemoteRegistry service is trigger started. The tool does not start,
+  stop or configure it. The connect is the only action that starts it, and the tool does not touch it.
+
+## 21. Print dialog outside regedit (print capture)
+
+On Windows 11 the Print dialog can open as a top-level window that is not owned by regedit's process. The
+`print` capture therefore looks at every new visible top-level window on the desktop after File > Print, for up
+to 60 seconds, not only at windows of the started process.
+
+- **Foreign window identified by process.** Each new window is recorded with its class and the name of its
+  owning process. Titles go to the local text file. A window is interacted with only when its owning process is
+  one of the print hosts (its process name contains "Print", or it is an ApplicationFrameWindow whose title
+  contains "Print"). Any other new window is recorded and not touched, because it may belong to the user.
+- **Printer not verified.** The XAML print dialog's controls cannot be read through Win32. Reading its printer
+  selection needs UI Automation, which this tool does not reference (a new package would need a version in
+  Directory.Packages.props, which is outside this piece's file list). Without a verified selection of exactly
+  `Microsoft Print to PDF`, the dialog is cancelled and the record says `printed: false`. Print and OK are never
+  posted, and the physical printers on this machine are never used.
+- **Cancel by message.** Escape is posted to the dialog with PostMessage, then WM_CLOSE if it stays visible for
+  3 seconds. The record says whether it closed.
+- **PDF not produced.** No PDF is produced by this tool, so no file is written under artifacts/oracle/. The
+  record says `measured: false` for the PDF page count and size, with the reason.
+
+## 22. Print dialog read with UI Automation (print capture)
+
+The Windows print host (a CoreWindow of PrintDialog, or an application frame) cannot be read through Win32. The
+`print` capture reads it with UI Automation (System.Windows.Automation from Microsoft.WindowsDesktop.App). UI Automation
+reads properties and patterns. It does not send input.
+
+- **Reading changes the dialog.** Only read patterns are used: Name, ControlType, IsEnabled, the Toggle and Value
+  patterns for state and text, and Selection for the selected item. The one exception, authorized by the manager, is
+  the hyperlink named "More settings" (ControlType Hyperlink, exact name): it is expanded with ExpandCollapse.Expand
+  when it has that pattern, or invoked with Invoke.Invoke when it has only that. This changes the display so that the
+  page range controls become visible. No other Invoke, Select, SetValue or Expand is called on the print dialog, and
+  nothing is printed.
+- **Wrong printer chosen.** The printer is read from the printer selector's value. No printer is changed. A selector
+  whose value is not exactly `Microsoft Print to PDF` is recorded as is, and the dialog is cancelled.
+- **PDF printed to a physical printer.** Print is pressed only when UI Automation confirms the selector value is
+  exactly `Microsoft Print to PDF`. Otherwise the dialog is cancelled and nothing is printed. The PDF path is not
+  implemented in this pass: the save-path dialog would need its file name set, which this capture does not do, so the
+  record says `measured: false` with that reason.
+- **Range panel not in the tree.** Whether regedit's template 108 panel appears inside the host is recorded as a
+  boolean from the element names (the words "branch" and "range", case-insensitive). The names themselves go to the
+  local text, not the tracked file.
+- **Element tree too large.** The walk stops at depth 12 or 800 elements, and the record says so.
+- **Print host not found.** The 60 second search and the cancel in section 21 still apply.

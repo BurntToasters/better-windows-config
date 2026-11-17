@@ -21,6 +21,8 @@ public sealed class UpdateArgumentsTests
         StringAssert.Contains(UpdateArguments.UsageText, "--apply");
         StringAssert.Contains(UpdateArguments.UsageText, "--close-running");
         StringAssert.Contains(UpdateArguments.UsageText, "--wait-pid");
+        StringAssert.Contains(UpdateArguments.UsageText, "--apply-elevated");
+        StringAssert.Contains(UpdateArguments.UsageText, "--launch-hub");
     }
 
     [TestMethod]

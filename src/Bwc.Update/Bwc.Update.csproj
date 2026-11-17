@@ -8,6 +8,15 @@
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <SelfContained>true</SelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- NativeAOT in both flavors (update-elevation.md HE5, HN). The elevated helper has no .NET host and no CoreCLR, so a
+         profiler, a host trace, or a startup hook that the user's environment names is never read. The publish folder gets
+         BwcUpdate.exe and its symbols only: no BwcUpdate.dll, deps.json, or runtimeconfig.json. -->
+    <PublishAot>true</PublishAot>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- The native symbols (BwcUpdate.pdb, about 30 MB) stay in obj and out of the shared publish folder and the installer. -->
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    <!-- Kept although a NativeAOT exe has no startup hook provider: harmless, and it keeps the JIT build the same. -->
+    <StartupHookSupport>false</StartupHookSupport>
   </PropertyGroup>
 
   <!-- The E2E flavor never elevates. Ship keeps app.manifest, which is also asInvoker: the updater never asks for elevation. -->

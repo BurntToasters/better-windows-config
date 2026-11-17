@@ -1,6 +1,6 @@
 # Installer failure modes
 
-Scope: `installer/bwc.nsi`, `installer/include/*.nsh`, `installer/scripts/*.ps1`,
+Scope: `installer/bwc.nsi`, `installer/include/*.nsh`,
 `scripts/build-installer.js`, and `scripts/generate-nuget-licenses.js`. Written before the
 code, per AGENTS.md. Each entry states the failure and the intended behavior. The E2E flavor
 compiles with NSIS 3.13 and was installed, reinstalled over, upgraded from a leftover backup, and
@@ -90,7 +90,7 @@ classic 260-character limit.
 ### Reserved payload names
 
 The publish folder contains a file named `LICENSE`, `THIRD-PARTY-NOTICES.txt`,
-`installed-files.txt`, `Uninstall.exe`, or `upgrade-cleanup-pending`, or anything under `bwc-tools\`. Or a payload file
+`installed-files.txt`, `Uninstall.exe`, or `upgrade-cleanup-pending`. Or a payload file
 name contains `"`, `$`, or a line break.
 
 - Intended: exit `1` before makensis runs. The name would collide with an installer-owned
@@ -309,17 +309,14 @@ ships. Lines can be missing, empty, or malicious.
 
 ### Shortcut AUMID not written
 
-`bwc-set-aumid.ps1` cannot set `System.AppUserModel.ID` on the new `.lnk` (for example, the
-COM call fails, the shortcut is locked, or PowerShell runs in Constrained Language Mode, which
-blocks the `Add-Type` the helper uses).
+`BwcUpdate.exe --set-aumid` (M45) cannot set `System.AppUserModel.ID` on the new `.lnk` (for example, the
+COM call fails, the shortcut is locked, or the command refuses the path, update-elevation.md SA).
 
 - Intended: non-fatal. The shortcut is still created and the installer logs a warning. The
   running apps still set their own AUMIDs at startup, so only taskbar grouping of a pinned
   shortcut can differ.
-- The helper runs `%WINDIR%\Sysnative\WindowsPowerShell\v1.0\powershell.exe` when that path
-  exists, so a 32-bit installer uses the 64-bit PowerShell. It falls back to `%SYSDIR%`.
-- `Add-Type` is kept, because a shell-property write needs a compiled COM interop type. Under
-  Constrained Language Mode the helper exits `4` and the installer continues.
+- There is no PowerShell and no script any more: the earlier `installer/scripts/bwc-set-aumid.ps1` ran in an elevated
+  PowerShell that loads the user modules and compiles in `%TEMP%` (M45).
 
 ### E2E environment fallback for the run id and shortcut folder
 
@@ -398,8 +395,7 @@ An older install wrote `InstallLocation`, or a user cleared it.
   stops before anything is removed. Reinstall, then uninstall.
 - It deletes the payload files listed at build time (generated `BWC_PAYLOAD_DELETE`), the two
   shortcuts recorded in the uninstall key, `LICENSE`, `THIRD-PARTY-NOTICES.txt`,
-  `installed-files.txt`, `upgrade-cleanup-pending`, `Uninstall.exe`, and the old
-  `bwc-tools\bwc-close-apps.ps1` if an earlier version left it. It removes a folder only when it is
+  `installed-files.txt`, `upgrade-cleanup-pending`, and `Uninstall.exe`. It removes a folder only when it is
   empty, so user files in the folder stay. The uninstall key is removed last, and only when its
   `InstallLocation` is this folder.
 - The DLLs that `BwcUpdate.exe` loaded for the close step can stay locked for a moment after it exits.
@@ -579,11 +575,11 @@ The file is already signed (a rebuild of the same publish folder).
 
 `scripts/build-installer.js` signs the BWC-built files in the publish folder root before the payload
 is listed: `BetterWindowsConfig.exe`, `BwcRegedit.exe`, `BwcUpdate.exe`, `BetterWindowsConfig.dll`,
-`BwcRegedit.dll`, `BwcUpdate.dll`, and `Bwc.*.dll`. The match is case-insensitive, root only, and
+`BwcRegedit.dll`, and `Bwc.*.dll` (`BwcUpdate` is NativeAOT: its exe is the only file). The match is case-insensitive, root only, and
 limited to `.dll` and `.exe`.
 
 - Intended: no other file is signed. Microsoft and third-party runtime files (for example
-  `Microsoft.*.dll`, `hostfxr.dll`, `coreclr.dll`, and the self-contained runtime of `BwcUpdate`)
+  `Microsoft.*.dll`, `hostfxr.dll`, and `coreclr.dll`)
   and any file in a subfolder keep their original signature or none. The self-test checks the exact
   list for a fixture folder.
 
@@ -667,3 +663,97 @@ PowerShell refusals, the override paths, the dry-run exit codes, and the verify 
 - The unsigned-exe check uses a BWC-built file from `publish/<rid>` when one exists. Otherwise it
   uses a minimal unsigned PE image that the self-test writes to its temp folder, and the result says
   which one it used.
+
+## Per-machine install (0.1.2)
+
+From 0.1.2 the ship installer is per machine: it asks for administrator rights (`RequestExecutionLevel admin`), installs
+into `%ProgramFiles%\Better Windows Config`, writes its uninstall entry to HKLM (64-bit view), and puts the two shortcuts
+in the all-users Start menu. The design is in the Fable audit `install-design.md` (items M1 to M30 below are its failure
+list) and the user's decisions: all-users shortcuts and option B for the in-app update (protected copy in
+`<install dir>.upd`). 0.1.x carries no migration code: the setup never detects, closes, or removes a 0.1.1 install.
+M9 and M13 to M17 (and the Hub rows M41 to M44) were migration rows and are gone; the numbers are not reused.
+Written before the code, per AGENTS.md.
+
+This section replaces the older text above where it describes a per-user ship install: the HKCU uninstall key, the
+default `%LOCALAPPDATA%\Programs` folder, `InstallDirRegKey`, the directory page, `/D=` as the install folder,
+`ShortcutDir`, `RMDir /r "$TEMP\BWC-Update"`, and `/RELAUNCH` starting the Hub with `Exec`. The E2E per-user sandbox
+still follows the older text, except that it too starts the Hub through `BwcUpdate.exe --launch-hub`, has no
+directory page, refuses to go over a newer version, and removes the empty sandbox keys on uninstall.
+
+What the decisions change in the original list:
+
+- The updater still passes `/D=<install dir>`, so `/D=` is accepted on the command line, but it is never the target
+  (M5, M6). A `/D=` that names another folder is ignored with one log line.
+- `<install dir>.upd` is the protected root of the elevated helper (`docs/contracts/update-cli.md`). The installer runs
+  from `<install dir>.upd\<32 hex>\installer.exe` during an update, so it must never remove the folder it runs from.
+
+Flavors. Ship is per machine only. The E2E flavor keeps today's per-user sandbox (`HKCU\Software\BWC-E2E\<RUNID>\Uninstall`,
+a temp folder, `/SHORTCUTS=`), manifest level `asInvoker`, so no test build can prompt. It adds an E2E-only `/MACHINE` switch
+that uses the machine layout in a sandbox: `%ProgramFiles%\BWC-E2E\<RUNID>`, `HKLM\Software\BWC-E2E\<RUNID>\Uninstall\...`
+(64-bit view), all-users shortcuts in a `BWC-E2E-<RUNID>` folder of the Start menu. It needs a token that is already
+elevated and never asks for elevation. Only the elevated runner (I4) runs it to the end.
+
+Proof column: **E2E** = the unelevated installer E2E (`scripts/test-installer-e2e.js`, user flavor, or the `/MACHINE`
+refusal); **Build** = `scripts/build-installer.js`; **Elevated** = the elevated runner tests of I4 (never run by the
+build or by the unelevated E2E); **Hub** = the Hub piece (I3); **Doc** = a documented duty that only a person or a VM run shows.
+
+| ID | Case | Required result | Proof |
+|----|------|-----------------|-------|
+| M1 | The user declines the consent prompt (ship setup started by hand or by the elevated helper) | Windows never starts the setup. Nothing changes. The caller sees a launch failure (the helper maps 1223 to `ElevationDeclined`) | Doc |
+| M2 | E2E `/MACHINE` without an elevated token (install or uninstall) | `.onInit` aborts: the exit code is not 0, and no folder, key, or shortcut is written. It never asks for elevation | E2E (`Installer_MachineMode_UnelevatedAbortsWithoutChanges`) |
+| M3 | A ship setup built `asInvoker`, or an E2E setup built `requireAdministrator` | The build audit reads the manifest level of the built setup EXE and fails (exit 1, the EXE is removed). `--dry-run` also checks that `bwc.nsi` picks the level by flavor | Build |
+| M4 | HKLM written through the 32-bit view (the stub is a 32-bit program) | `SetRegView 64` before every HKLM access, in the installer and the uninstaller. The Elevated test reads the native view | Elevated |
+| M5 | `/D=` names a folder other than the target | Never the target. The ship target is always the HKLM `InstallLocation` (when valid) or `%ProgramFiles%\Better Windows Config`. The folder that `/D=` names is left unchanged | E2E (`InstallerMachine_RawDirNamingAnotherFolderIsIgnored`), Elevated |
+| M6 | `/D=` is not a Better Windows Config install (no `installed-files.txt` or no `BetterWindowsConfig.exe`), is not a plain `X:\...` path, or has `..`, `/` or a quote | The value is ignored, with a log line. Nothing is closed, changed or removed there. A `/D=` that is a drive or share root is still refused, as before | Doc, Elevated |
+| M7 | HKLM `InstallLocation` is empty, relative, has `..`, is outside `%ProgramFiles%`, or is `%ProgramFiles%` itself | The default folder is used. Only the folder rules of M8 apply after that | Elevated |
+| M8 | The target exists, is not empty and has no `installed-files.txt` | Refuse before any change (`BwcCheckInstDir`), exit 2 when silent. There is no directory page, so the text says to move the folder | E2E (existing rules), Elevated |
+| M10 | An elevated Registry Editor is open in this session | The close step runs elevated, so it sees and closes it. A save prompt that keeps it open ends in exit 3: Retry or Cancel, silent exit code 2, nothing changed | Elevated |
+| M11 | BWC runs in another Windows session (`--close-running` exit 4) | Abort before any installed file changes, with a message that BWC runs in another session (the helper's lines above it name the session). Silent exit code 4. With `/RELAUNCH` the installed Hub is started with `--update-result InstallerFailed` | Doc, Elevated |
+| M12 | The install fails after staging (swap, shortcuts, uninstall entry) | Rollback (`BwcRollback`): the previous version is back, a first install leaves no shortcut and no entry. With `/RELAUNCH` the installed Hub (if any) is started with `--update-result InstallerFailed` through `--launch-hub` | E2E (update path), Elevated |
+| M18 | This setup has the same version as HKLM `DisplayVersion` | A repair: it runs as an upgrade over the same version and ends the same way | E2E (`Installer_SameVersion_RepairsAndOlderIsRefused`) |
+| M19 | This setup is older than HKLM `DisplayVersion` (semantic order: `0.1.2` is newer than `0.1.2-beta.3`, `0.1.10` is newer than `0.1.9`) | Refuse in `.onInit`, before any change. A version that cannot be read is not "newer" (no refusal) | E2E (`Installer_SameVersion_RepairsAndOlderIsRefused`) |
+| M20 | Over-the-shoulder elevation (a standard user types an administrator's credentials) | The setup reads no HKCU and no `%LOCALAPPDATA%`, and writes no per-user Start menu entry. The all-users shortcut and HKLM paths are used. The update hand-off needs the signed-in user to be an administrator (see `update-elevation.md`, EA33) | Doc, Elevated |
+| M21 | The Hub cannot be started unelevated (`--launch-hub` exit 8) | No Hub starts. The helper logs why. The install result is not changed | Elevated |
+| M22 | The finish page "Start" option | Calls `BwcUpdate.exe --launch-hub`, never the Hub itself, so the Hub never starts elevated. When the setup is not elevated (E2E user flavor) the same call is a normal start | E2E (the update path uses the same call), Elevated |
+| M23 | An all-users shortcut cannot be written | The install fails and rolls back (M12). It is not a warning | Elevated |
+| M24 | Uninstall | Ship prompts for elevation (the uninstaller has the same level). It removes the HKLM key (only when `InstallLocation` is this folder), the all-users shortcuts, the payload, and `<install dir>.upd` (only 32-hex folders, never through a link). It never touches a data root or `%TEMP%` (the Hub prunes its own staging) | E2E (user flavor), Elevated |
+| M25 | `<install dir>.upd` left by a crashed update | Removed at install start: only direct subfolders named with 32 hex digits, only plain folders that hold plain files, never through a link or junction, never the folder the setup itself runs from. A folder that holds a subfolder or a link stays | Elevated |
+| M26 | The elevated helper meets a link, a junction, an oversize file, or a file that changes during the copy | The helper refuses (see `update-elevation.md`, EA9 to EA12). The installer then does not start | Doc |
+| M27 | The elevated helper is the same or an older version than the staged one | The helper refuses whatever the arguments say (EA4, EA5). The installer's own check of M19 is the second line | Doc |
+| M28 | The elevated helper writes a file log | It never does (NL1). The installer starts the close and relaunch steps with the same rule (the helper's elevated modes skip the log) | Doc |
+| M29 | An x64 setup runs on an Arm64 PC over an Arm64 install | Same folder and key, handled as an upgrade by M19 and M18. The key does not store the architecture is not stored there (the file version and the payload show it) | Doc |
+| M30 | A custom install folder | Not supported in 0.1.2. There is no directory page and `/D=` is not the target (M5) | Doc |
+
+Rows added by the implementation:
+
+| ID | Case | Required result | Proof |
+|----|------|-----------------|-------|
+| M31 | The ship setup runs without an elevated token (`__COMPAT_LAYER=RunAsInvoker`, or an old shell) | `.onInit` checks the token and aborts, nothing written. The E2E `/MACHINE` mode uses the same check (M2) | Elevated, E2E (E2E flavor) |
+| M32 | The AUMID helper script runs from `%TEMP%` while elevated | Replaced by M45: there is no script and no PowerShell any more. (First version: the script was written into `<install dir>.new` and run by an elevated PowerShell, which still reads the user's modules and compiles in `%TEMP%`) | Superseded by M45 |
+| M33 | An elevated child starts with a user-writable working directory | After the swap the setup moves its working directory to `%WINDIR%`, so `BwcUpdate.exe` (close and launch steps) never inherits `%TEMP%` or the staging folder | Doc |
+| M34 | `/RELAUNCH` and the Hub is missing, or `BwcUpdate.exe` is missing (a rollback that did not finish) | The launch is skipped with a log line. The exit code does not change | Doc |
+| M35 | The uninstall entry write fails after the swap | Same as M23: rollback, and a first install leaves no key | Elevated |
+| M36 | A refusal in `.onInit` (not elevated, newer version installed, bad folder) | The setup exits before `.onInstFailed`, so no Hub is started by the installer. The helper's own refusals (EA4, EA5) make this case unreachable from an update | Doc |
+| M37 | The uninstaller copies itself to `%TEMP%` and runs from there (the NSIS default) while it is elevated | Replaced in I2b. `UninstallString` is `"$INSTDIRUninstall.exe" _?=$INSTDIR` and `QuietUninstallString` is `"$INSTDIRUninstall.exe" /S _?=$INSTDIR`, in the ship setup and the E2E `/MACHINE` setup, so the uninstaller runs in place from the admin-only install folder and no copy of it is ever run from a user-writable folder. A run without `_?=` (the E2E per-user sandbox, which starts `Uninstall.exe /S /RUNID=<id>` itself) keeps the copy behavior. The build requires NSIS 3.10 or newer | Build (the strings in the generated key), E2E (per-user sandbox uninstall), Elevated |
+| M38 | The uninstaller runs in place, so it cannot delete itself or the folder it runs from | `Delete "$INSTDIRUninstall.exe"` and `RMDir "$INSTDIR"` are tried first and are removed when the run was a copy (no `_?=`). When they fail, the same deletes are repeated with `/REBOOTOK`, so Windows removes them at the next restart. Only then. The working directory is moved to `%WINDIR%` before the folder is removed, so the folder is not held by the uninstaller's own current directory. The retry loop for payload files is unchanged | E2E (per-user: files and folder are gone), Elevated (in place: reboot-pending list) |
+| M39 | The uninstaller still unpacks its plugins folder (`$PLUGINSDIR`, for the System plugin) in `%TEMP%` while elevated | Not closed, and not closable from the script: NSIS creates that folder before the first script instruction, under a random `ns<hex>.tmp` name, with `CreateDirectory` (it must not exist). Recorded as an open risk for the user. The update path closes it for the installer (update-elevation.md HT1); a setup or uninstaller the user starts by hand does not have that protection. The environment of that hand-run setup is cleared by M48 and M49 records what is still open. When `System.dll` is still held at exit, NSIS queues that folder and the file for deletion at the next restart (seen in the first elevated run). The Elevated uninstall test accepts only `\??\%TEMP%
+s<letter><hex>.tmp` and the files directly in it, and records them as evidence | Doc, Elevated (restart queue) |
+| M40 | `_?=$INSTDIR` names a folder other than the one the uninstall entry says | NSIS sets `$INSTDIR` to the `_?=` value. The existing rule applies: the uninstall key is removed only when its `InstallLocation` is this folder (case-insensitive), and the payload lists are the ones built into this uninstaller | Elevated |
+
+Rows added by the second security review (I5). Written before the tests and the code, per AGENTS.md. The cases that need
+HKLM or Program Files are proved only by the elevated runner; the rest by `Bwc.Update.Tests`, the release selftests, and the
+unelevated installer E2E.
+
+| ID | Case | Required result | Proof |
+|----|------|-----------------|-------|
+| M45 | The AUMID is written by an elevated PowerShell (finding 1) | PowerShell autoloads modules from the user's `Documents\WindowsPowerShell\Modules` (`PSModulePath`) and `Add-Type` compiles with `csc` in `%TEMP%`: user-writable code in an elevated process. There is no PowerShell and no script in the installer now. After the shortcuts are written the setup runs `"$INSTDIR\BwcUpdate.exe" --set-aumid "<lnk>" <id>` for each shortcut. The updater is the self-contained copy just moved into the admin-only install folder (the same bytes as the staged copy, which the move has emptied), started with the working directory `%WINDIR%` and the cleaned environment of M48. It sets `System.AppUserModel.ID` through `IPropertyStore` (manual COM, as the rest of `BwcUpdate` does COM) and reads it back. Its rules, refusals, and the no-log rule are update-elevation.md SA1 to SA12. `installer/scripts/bwc-set-aumid.ps1` is deleted and the `BWC_SCRIPTS_DIR` define is gone. A failure is still only a warning (the apps set their own AUMID at startup) | Update tests (SA), E2E (the user sandbox shortcuts carry both AUMIDs, `update.install.aumid`), Elevated (`fresh.shortcuts.*Aumid`) |
+| M46 | `--set-aumid` fails (a refusal, a locked shortcut, COM failure, a read-back that differs) | The setup logs `WARNING: AppUserModelID ... was not written` with the exit code and goes on. It never fails the install | Doc |
+| M47 | The uninstaller is started by hand as `Uninstall.exe _?=<a folder the user can write>` (finding 2) | The uninstaller trusts `_?=` for `$INSTDIR`, then runs `BwcUpdate.exe` from it elevated and deletes the payload names there. `un.onInit` (the ship uninstaller, and the E2E `/MACHINE` uninstaller) aborts, nothing changed, unless `$INSTDIR` is a plain absolute path (`BwcPlainAbsPath`), is inside the machine root (`BwcUnderMachineRoot`: `%ProgramFiles%`, for E2E `%ProgramFiles%\BWC-E2E`), and equals the HKLM `InstallLocation` of this run's key (case-insensitive, trailing backslash ignored). A missing key or value aborts too. The E2E per-user sandbox is not per-machine and keeps its own rules: its `InstallLocation` comes from the sandbox HKCU key, it runs with no `_?=`, and it needs no check | E2E (per-user sandbox uninstall still works), Elevated (`_?=` naming another folder is refused, the install folder and key untouched) |
+| M48 | A hand-run setup or uninstaller passes the user's environment to the elevated `BwcUpdate` children (finding 3) | In a per-machine run, before the first child starts (`BwcInitMode` for the setup, `un.onInit` for the uninstaller), the setup enumerates its environment block (`GetEnvironmentStringsW`) and removes every variable whose name starts with `DOTNET_`, `COREHOST_`, `CORECLR_`, or `COMPlus_` (case-insensitive, so `CORECLR_PROFILER*`, `COREHOST_TRACE*`, `DOTNET_STARTUP_HOOKS`, `DOTNET_ADDITIONAL_DEPS`, `DOTNET_SHARED_STORE`, `DOTNET_ROOT*`, `DOTNET_gcServer`, `DOTNET_EnableEventPipe`, `DOTNET_DiagnosticPorts` and their `COMPlus_*` forms are all covered), and `__COMPAT_LAYER`. The same prefix rule as `ChildEnvironment` in `BwcUpdate` (update-elevation.md HE4). The E2E per-user sandbox keeps its environment | Elevated (a variable set before the setup is absent in the children: the stand-in record), Doc |
+| M49 | What M48 cannot close | A runtime switch that was honored before the first script instruction stays: the setup's own start (a compatibility layer applies to the setup process itself), and the profiler or host trace of the children only if they are read from somewhere other than the environment. The children run after the clean-up, so they never see the variables. Recorded as the residual of M39 and of update-elevation.md HE5 | Doc |
+| M50 | `<install dir>.upd` is never removed after an update (finding 6) | Each copy folder `<32 hex>` holds the verified installer and the installer's own `tmp` folder (HT1), so the "only plain files" rule kept every copy, and the uninstall and the M25 stale cleanup left `<install dir>.upd` behind. The rule now allows exactly one child folder in a copy folder: a plain (non-link) folder named `tmp` whose entries are all plain files. Its files are deleted, then the folder, then the copy folder. A `tmp` that holds a folder, a link, or an unreadable entry, any other folder, a link as `tmp`, and a copy folder that is the folder the setup runs from, all stay | Elevated (test 76 plants a copy with `tmp` and a plain file; the stale-cleanup test plants one too) |
+| M51 | A reinstall before the restart that follows an uninstall (finding 7) | The in-place uninstaller queued `Delete /REBOOTOK Uninstall.exe` (M38). A setup run before the restart would put a new `Uninstall.exe` there, and Windows would delete it at the restart. `.onInit` (per machine) reads `PendingFileRenameOperations` (`REG_MULTI_SZ`, 64-bit view) and aborts, nothing changed, with "restart Windows first" when an entry names `\??\<install dir>\Uninstall.exe` (case-insensitive). Abort, not strip: the setup never edits a system value. An unreadable value is not a refusal | Elevated (the uninstall test runs the setup again while the queue names the file, and expects the refusal) |
+
+Known limits of the unelevated proof: nothing in this section that writes under Program Files, HKLM, or the all-users
+Start menu is run by `scripts/test-installer-e2e.js`. The `Elevated` rows are proved only by the elevated runner
+(`tests/Bwc.E2E/Installer`, category `Elevated`, I4), which a person installs and starts.

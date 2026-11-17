@@ -26,7 +26,8 @@ public sealed partial class RegistryWriter
 
         const string Operation = nameof(RegistryWriteOperation.LoadHive);
         ValidateHiveMountTarget(path);
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.LoadHive);
+        Authorize(path, RegistryWriteOperation.LoadHive);
+        RejectRemote(path, nameof(RegistryWriteOperation.LoadHive));
 
         lock (HiveOperationLock)
         {
@@ -45,7 +46,8 @@ public sealed partial class RegistryWriter
 
         const string Operation = nameof(RegistryWriteOperation.UnloadHive);
         ValidateHiveMountTarget(path);
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.UnloadHive);
+        Authorize(path, RegistryWriteOperation.UnloadHive);
+        RejectRemote(path, nameof(RegistryWriteOperation.UnloadHive));
 
         lock (HiveOperationLock)
         {
@@ -64,7 +66,8 @@ public sealed partial class RegistryWriter
 
         const string Operation = nameof(RegistryWriteOperation.SaveKey);
         RejectRoot(path, "A predefined registry root cannot be saved to a hive file.");
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.SaveKey);
+        Authorize(path, RegistryWriteOperation.SaveKey);
+        RejectRemote(path, nameof(RegistryWriteOperation.SaveKey));
 
         lock (HiveOperationLock)
         {
@@ -96,7 +99,8 @@ public sealed partial class RegistryWriter
 
         const string Operation = nameof(RegistryWriteOperation.ReplaceKey);
         RejectRoot(path, "A predefined registry root cannot be replaced from a hive file.");
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.ReplaceKey);
+        Authorize(path, RegistryWriteOperation.ReplaceKey);
+        RejectRemote(path, nameof(RegistryWriteOperation.ReplaceKey));
 
         lock (HiveOperationLock)
         {
@@ -146,7 +150,8 @@ public sealed partial class RegistryWriter
 
         const string Operation = nameof(RegistryWriteOperation.RestoreKey);
         RejectRoot(path, "A predefined registry root cannot be restored from a hive file.");
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.RestoreKey);
+        Authorize(path, RegistryWriteOperation.RestoreKey);
+        RejectRemote(path, nameof(RegistryWriteOperation.RestoreKey));
 
         lock (HiveOperationLock)
         {

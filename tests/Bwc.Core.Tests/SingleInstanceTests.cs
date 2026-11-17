@@ -105,13 +105,20 @@ public sealed class SingleInstanceTests
     }
 
     [TestMethod]
-    public void PipeNameTakenDoesNotSpinTheCpuAndDisposeReturns()
+    public void PipeNameTakenBacksOffTheAcceptLoop()
     {
+        // The schedule is 50, 100, 200, 400, 800 and 1000 ms (capped). Attempts fall at 0, 50, 150, 350, 750 and
+        // 1550 ms, so at most five fall inside the 1.5 s window and one more with timer slack. A spinning loop
+        // makes thousands. The bound is an attempt count, not CPU time, so JIT and GC cannot move it. See
+        // docs/failure-modes/core.md, "Accept attempts bound".
+        const int MaxAttemptsInWindow = 7;
+        const int MinAttemptsInWindow = 2;
+
         string toolId = NewToolId();
         string pipeName = LearnPipeName(toolId);
 
-        // Hold the pipe the mutex-owning instance will try to create. The instance must
-        // back off instead of retrying in a tight loop.
+        // Hold the pipe the mutex-owning instance will try to create. The instance must back off instead of
+        // retrying in a tight loop.
         using var hostile = new NamedPipeServerStream(
             pipeName,
             PipeDirection.In,
@@ -122,21 +129,23 @@ public sealed class SingleInstanceTests
         using var loser = SingleInstance.Create(toolId);
         Assert.IsTrue(loser.IsFirstInstance);
 
-        Process process = Process.GetCurrentProcess();
-        TimeSpan before = process.TotalProcessorTime;
         var wall = Stopwatch.StartNew();
         Thread.Sleep(1500);
         wall.Stop();
-        process.Refresh();
-        TimeSpan used = process.TotalProcessorTime - before;
-
         Assert.IsTrue(
             wall.Elapsed < TimeSpan.FromSeconds(5),
             "the observation window should stay bounded.");
+
+        int attempts = loser.AcceptAttempts;
         Assert.IsTrue(
-            used < TimeSpan.FromMilliseconds(900),
-            "the accept loop used " + used.TotalMilliseconds.ToString("0") +
-            " ms of CPU in 1500 ms while the pipe name was taken; it must back off.");
+            attempts <= MaxAttemptsInWindow,
+            "the accept loop made " + attempts.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+            " attempts in 1500 ms while the pipe name was taken; the backoff allows at most " +
+            MaxAttemptsInWindow.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".");
+        Assert.IsTrue(
+            attempts >= MinAttemptsInWindow,
+            "the accept loop made " + attempts.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+            " attempts in 1500 ms; it should retry while the pipe name is taken.");
 
         var disposal = Stopwatch.StartNew();
         loser.Dispose();
@@ -144,6 +153,10 @@ public sealed class SingleInstanceTests
         Assert.IsTrue(
             disposal.Elapsed < TimeSpan.FromSeconds(3),
             "dispose must cancel the retry delay and return promptly.");
+
+        int afterDispose = loser.AcceptAttempts;
+        Thread.Sleep(300);
+        Assert.AreEqual(afterDispose, loser.AcceptAttempts, "the accept loop must not retry after disposal.");
 
         hostile.Dispose();
         using var recreated = SingleInstance.Create(toolId);

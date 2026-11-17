@@ -18,9 +18,17 @@
 ; Must match Bwc.Core AppIdentity (HubAppUserModelId, RegeditAppUserModelId).
 !define BWC_HUB_AUMID "BetterWindowsConfig.Hub"
 !define BWC_REGEDIT_AUMID "BetterWindowsConfig.Regedit"
-; Per-user uninstall key for ship builds. E2E builds use a key under BWC-E2E\<RUNID>.
+; Uninstall key of ship builds (HKLM, 64-bit view). E2E builds use a key under BWC-E2E\<RUNID>, in HKCU for the
+; per-user sandbox and in HKLM for the E2E-only /MACHINE mode. Registry code uses SHCTX, so SetShellVarContext
+; picks the hive.
 !define BWC_UNINSTALL_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\BetterWindowsConfig"
 !define BWC_E2E_ROOT "Software\BWC-E2E"
+; E2E /MACHINE mode: the folder under Program Files and the prefix of the all-users Start menu folder.
+!define BWC_E2E_FOLDER "BWC-E2E"
+!define BWC_E2E_START_PREFIX "BWC-E2E-"
+; The elevated updater copies the verified installer into <install folder>.upd\<32 hex>\ (docs/contracts/update-cli.md).
+!define BWC_PROTECTED_SUFFIX ".upd"
+!define BWC_HEX "0123456789abcdef"
 !define BWC_MANIFEST "installed-files.txt"
 !define BWC_UNINSTALLER "Uninstall.exe"
 ; Upgrade staging and backup folders sit next to the install folder. They hold the only copy of
@@ -30,10 +38,6 @@
 ; Written in the install folder before the backup is removed. Both present at the next run means the
 ; upgrade finished, so the backup is removed. The uninstaller deletes it. Not in the payload.
 !define BWC_CLEANUP_MARKER "upgrade-cleanup-pending"
-; Folder from versions before 0.2.0. Its PowerShell helper is removed on upgrade and uninstall.
-!define BWC_LEGACY_TOOLS_DIR "bwc-tools"
-!define BWC_LEGACY_CLOSE_HELPER "bwc-close-apps.ps1"
-!define BWC_AUMID_HELPER "bwc-set-aumid.ps1"
 ; Windows 10 2004 (19041) is TargetPlatformMinVersion in build/Bwc.WinUIApp.props.
 !define BWC_MIN_BUILD 19041
 !define BWC_RUNID_CHARS "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
@@ -44,7 +48,6 @@ Var BwcRunId
 Var BwcShortcutDir
 Var BwcUninstallKey
 Var BwcParentPid
-Var BwcPowerShell
 Var BwcCloseArgs
 Var BwcCommitStarted
 Var BwcMovedIn
@@ -52,6 +55,16 @@ Var BwcOutFailed
 Var BwcRestoreFailed
 ; "1" once the section has confirmed that <install folder>.new is free to use (absent, empty, or ours).
 Var BwcStageOwned
+; "1" for a per-machine run: every ship run, and the E2E flavor with /MACHINE. "0" is the E2E per-user sandbox.
+Var BwcMachine
+; Per-machine target rules. The root is what a recorded InstallLocation must be inside, and the default is the folder
+; used when nothing valid is recorded.
+Var BwcMachineRoot
+Var BwcDefaultDir
+; The raw /D= value (NSIS drops it from the command line). BwcHintNote carries a log line for the section when the value
+; is ignored.
+Var BwcRawDir
+Var BwcHintNote
 
 ; ---------------------------------------------------------------------------
 ; Host checks (install only). Both run in .onInit, before any file is touched.
@@ -105,7 +118,7 @@ FunctionEnd
 !macroend
 
 ; Removes every trailing backslash from $INSTDIR, so the quoted --install-dir argument stays intact.
-Function BwcTrimInstDir
+!macro BWC_TRIM_INSTDIR_BODY
   BwcTrim_loop:
   StrLen $R1 $INSTDIR
   StrCmp $R1 "0" BwcTrim_done 0
@@ -114,6 +127,14 @@ Function BwcTrimInstDir
   StrCpy $INSTDIR $INSTDIR -1
   Goto BwcTrim_loop
   BwcTrim_done:
+!macroend
+
+Function BwcTrimInstDir
+  !insertmacro BWC_TRIM_INSTDIR_BODY
+FunctionEnd
+
+Function un.BwcTrimInstDir
+  !insertmacro BWC_TRIM_INSTDIR_BODY
 FunctionEnd
 
 ; NSIS drops /D= from $CMDLINE and replaces a root given to /D= with the default folder before .onInit runs.
@@ -141,6 +162,7 @@ Function BwcCheckRawDir
   StrCpy $R9 $R9 -1
   Goto BwcRaw_trim
   BwcRaw_checked:
+  StrCpy $BwcRawDir $R9
   StrCmp $R9 "" BwcRaw_done 0
   StrCpy $R8 $INSTDIR
   StrCpy $INSTDIR $R9
@@ -231,26 +253,17 @@ Function BwcCheckInstDir
   IfFileExists "$INSTDIR" 0 BwcDir_free
   IfFileExists "$INSTDIR\*.*" BwcDir_isdir BwcDir_isfile
   BwcDir_isfile:
-  !insertmacro BWC_DIR_REFUSE "$INSTDIR is a file, not a folder. Choose another folder. Nothing was changed."
+  !insertmacro BWC_DIR_REFUSE "$INSTDIR is a file, not a folder. Move it, then run the installer again. Nothing was changed."
   BwcDir_isdir:
   IfFileExists "$INSTDIR\${BWC_MANIFEST}" BwcDir_free 0
   StrCpy $R7 "$INSTDIR"
   Call BwcFolderIsEmpty
   StrCmp $R0 "1" BwcDir_free 0
-  !insertmacro BWC_DIR_REFUSE "$INSTDIR is not empty and is not a Better Windows Config install (no ${BWC_MANIFEST}). Choose another folder. Nothing was changed."
+  !insertmacro BWC_DIR_REFUSE "$INSTDIR is not empty and is not a Better Windows Config install (no ${BWC_MANIFEST}). Move it, then run the installer again. Nothing was changed."
   BwcDir_root:
-  !insertmacro BWC_DIR_REFUSE "$INSTDIR is the root of a drive or a network share. Choose a folder inside it. Nothing was changed."
+  !insertmacro BWC_DIR_REFUSE "$INSTDIR is the root of a drive or a network share. Nothing was changed."
   BwcDir_free:
   Call BwcCheckStageFree
-FunctionEnd
-
-; Picks the 64-bit PowerShell when it exists. A 32-bit process sees System32 as SysWOW64, so the
-; Sysnative alias is the only way to reach the native host. Used only by the AUMID helper.
-Function BwcFindPowerShell
-  IfFileExists "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" +2 0
-  StrCpy $BwcPowerShell "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe"
-  IfFileExists "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" 0 +2
-  StrCpy $BwcPowerShell "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
 FunctionEnd
 
 ; ---------------------------------------------------------------------------
@@ -287,25 +300,37 @@ FunctionEnd
 ; ---------------------------------------------------------------------------
 ; Close running BWC processes with the copy of BwcUpdate.exe that is being installed. The body is
 ; shared by the install and uninstall functions. ID keeps labels unique. EXE is the helper's path.
+; DIR is the folder whose apps are closed: the install folder.
 ; $BwcCloseArgs holds the optional "--exclude-pid <n>" (the updater that launched this setup).
 ;
 ; Exit 0 continues. Exit 3 means a process is still running: interactive runs offer Retry or
-; Cancel, silent runs abort with exit code 2. Any other exit (bad arguments, a missing or
-; unrunnable helper) aborts. Nothing is changed before this step succeeds.
+; Cancel, silent runs abort with exit code 2. Exit 4 means a BWC process runs in another Windows
+; session: the setup aborts at once (no retry can close it from here), silent runs with exit code 4.
+; Any other exit (bad arguments, a missing or unrunnable helper) aborts. Nothing is changed before
+; this step succeeds.
 ; ---------------------------------------------------------------------------
 
-!macro BWC_CLOSE_APPS_BODY ID EXE
+!macro BWC_CLOSE_APPS_BODY ID EXE DIR
   BwcClose_${ID}_run:
-  nsExec::ExecToLog '"${EXE}" --close-running --install-dir "$INSTDIR" $BwcCloseArgs --timeout-seconds 30'
+  nsExec::ExecToLog '"${EXE}" --close-running --install-dir "${DIR}" $BwcCloseArgs --timeout-seconds 30'
   Pop $0
   StrCmp $0 "0" BwcClose_${ID}_done 0
   StrCmp $0 "3" BwcClose_${ID}_busy 0
+  StrCmp $0 "4" BwcClose_${ID}_session 0
   DetailPrint "The close step failed (exit $0). Nothing was changed."
   Abort "Stopped: the close step failed (exit $0). Nothing was changed."
+  BwcClose_${ID}_session:
+  DetailPrint "Better Windows Config runs in another Windows session (see the lines above). It was not closed."
+  IfSilent BwcClose_${ID}_sessionSilent 0
+  MessageBox MB_OK|MB_ICONSTOP "${BWC_PRODUCT} or Registry Editor (BWC) is running in another Windows session, for example for another signed-in user. Sign that user out or close the apps there, then run setup again. Nothing was changed."
+  Abort "Stopped: Better Windows Config runs in another Windows session. Nothing was changed."
+  BwcClose_${ID}_sessionSilent:
+  SetErrorLevel 4
+  Abort "Stopped: Better Windows Config runs in another Windows session. Nothing was changed."
   BwcClose_${ID}_busy:
-  DetailPrint "Better Windows Config is still running from $INSTDIR."
+  DetailPrint "Better Windows Config is still running from ${DIR}."
   IfSilent BwcClose_${ID}_silent 0
-  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${BWC_PRODUCT} or Registry Editor (BWC) is still running from $INSTDIR.$\r$\n$\r$\nClose those windows, then click Retry. Click Cancel to stop without changing anything." IDRETRY BwcClose_${ID}_run
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${BWC_PRODUCT} or Registry Editor (BWC) is still running from ${DIR}.$\r$\n$\r$\nClose those windows, then click Retry. Click Cancel to stop without changing anything." IDRETRY BwcClose_${ID}_run
   Abort "Stopped: Better Windows Config is still running. Nothing was changed."
   BwcClose_${ID}_silent:
   SetErrorLevel 2
@@ -342,12 +367,15 @@ FunctionEnd
 !macroend
 
 ; ---------------------------------------------------------------------------
-; Write System.AppUserModel.ID to a shortcut. Non-fatal: a warning is logged and the install
-; continues. The running apps still set their own AUMID at startup.
+; Write System.AppUserModel.ID to a shortcut with the installed BwcUpdate.exe --set-aumid (installer.md M45,
+; update-elevation.md SA). No PowerShell: an elevated PowerShell loads the user's modules and compiles in %TEMP%.
+; The updater is the self-contained copy in the install folder, which a standard user cannot write in a per-machine
+; install. Non-fatal: a warning is logged and the install continues. The running apps still set their own AUMID at
+; startup. Uses $0.
 ; ---------------------------------------------------------------------------
 
-!macro BWC_SET_AUMID_BODY HELPER SHORTCUT APPID
-  nsExec::ExecToLog '"$BwcPowerShell" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${HELPER}" -ShortcutPath "${SHORTCUT}" -AppUserModelId "${APPID}"'
+!macro BWC_SET_AUMID_BODY SHORTCUT APPID
+  nsExec::ExecToLog '"$INSTDIR\${BWC_UPDATER_EXE}" --set-aumid "${SHORTCUT}" ${APPID}'
   Pop $0
   StrCmp $0 "0" +2 0
   DetailPrint "WARNING: AppUserModelID ${APPID} was not written to ${SHORTCUT} (helper exit $0). Taskbar grouping of a pinned shortcut may differ."
@@ -468,9 +496,565 @@ FunctionEnd
 !macroend
 
 ; ---------------------------------------------------------------------------
-; E2E switch handling. Release builds never call these. Both switches are required so that a
-; test run cannot write to the real Start menu or the real Uninstall key by accident.
-; RUNID must be 1 to 64 letters, digits, dash, or underscore. The harness controls it.
+; Per-machine rules. They run for every ship build, and for the E2E flavor with /MACHINE. See
+; docs/failure-modes/installer.md, "Per-machine install and migration (0.1.2)".
+; ---------------------------------------------------------------------------
+
+; Sets RESULT to "1" when the process token is elevated, otherwise "0". A token that cannot be read counts as not
+; elevated. TokenElevation is information class 20. Uses $1 to $6. ID keeps the labels unique.
+!macro BWC_IS_ELEVATED_BODY ID RESULT
+  StrCpy ${RESULT} "0"
+  System::Call 'kernel32::GetCurrentProcess() p .r1'
+  System::Call 'advapi32::OpenProcessToken(p r1, i 8, *p .r2) i .r3'
+  StrCmp $3 "0" BwcElev_${ID}_done 0
+  System::Call 'advapi32::GetTokenInformation(p r2, i 20, *i .r4, i 4, *i .r5) i .r6'
+  System::Call 'kernel32::CloseHandle(p r2)'
+  StrCmp $6 "0" BwcElev_${ID}_done 0
+  StrCmp $4 "0" BwcElev_${ID}_done 0
+  StrCpy ${RESULT} "1"
+  BwcElev_${ID}_done:
+!macroend
+
+; The per-machine install writes Program Files, HKLM, and the all-users Start menu. The ship setup asks for
+; elevation in its manifest, so this only catches a token that was lowered (for example by RunAsInvoker). The E2E
+; flavor never asks: with /MACHINE it needs a shell that is already elevated, and refuses otherwise.
+Function BwcRequireElevated
+  !insertmacro BWC_IS_ELEVATED_BODY "in" $R1
+  StrCmp $R1 "1" BwcRequire_ok 0
+  !ifdef BWC_E2E
+    !insertmacro BWC_DIR_REFUSE "The E2E /MACHINE mode needs a shell that is already elevated, and it never asks for elevation. Nothing was changed."
+  !else
+    !insertmacro BWC_DIR_REFUSE "${BWC_PRODUCT} must be installed by an administrator, and this setup is not elevated. Nothing was changed."
+  !endif
+  BwcRequire_ok:
+FunctionEnd
+
+Function un.BwcRequireElevated
+  !insertmacro BWC_IS_ELEVATED_BODY "un" $R1
+  StrCmp $R1 "1" BwcRequireUn_ok 0
+  !ifdef BWC_E2E
+    !insertmacro BWC_DIR_REFUSE "The E2E /MACHINE mode needs a shell that is already elevated, and it never asks for elevation. Nothing was changed."
+  !else
+    !insertmacro BWC_DIR_REFUSE "${BWC_PRODUCT} must be uninstalled by an administrator, and this uninstaller is not elevated. Nothing was changed."
+  !endif
+  BwcRequireUn_ok:
+FunctionEnd
+
+; Per-machine runs use the 64-bit registry view and the all-users shell folders. The per-user E2E sandbox keeps the
+; defaults it always had. SHCTX in the registry code follows SetShellVarContext (HKLM for all, HKCU for current).
+Function BwcApplyContext
+  StrCmp $BwcMachine "1" BwcCtx_machine 0
+  SetShellVarContext current
+  Return
+  BwcCtx_machine:
+  SetRegView 64
+  SetShellVarContext all
+FunctionEnd
+
+Function un.BwcApplyContext
+  StrCmp $BwcMachine "1" BwcCtxUn_machine 0
+  SetShellVarContext current
+  Return
+  BwcCtxUn_machine:
+  SetRegView 64
+  SetShellVarContext all
+FunctionEnd
+
+; $R1 = "1" when $R0 is a plain absolute drive path: "X:\" and more, with no "..", no "/", and no double quote
+; (it goes into quoted command lines). A UNC path is not plain. Uses $R2 to $R5.
+!macro BWC_PLAIN_ABS_BODY
+  StrCpy $R1 "0"
+  StrLen $R2 $R0
+  IntCmp $R2 4 BwcPlain_len BwcPlain_done BwcPlain_len
+  BwcPlain_len:
+  StrCpy $R3 $R0 1 1
+  StrCmp $R3 ":" 0 BwcPlain_done
+  StrCpy $R3 $R0 1 2
+  StrCmp $R3 "\" 0 BwcPlain_done
+  StrCpy $R4 0
+  BwcPlain_scan:
+  IntCmp $R4 $R2 BwcPlain_ok BwcPlain_char BwcPlain_ok
+  BwcPlain_char:
+  StrCpy $R3 $R0 1 $R4
+  StrCmp $R3 "/" BwcPlain_done 0
+  StrCmp $R3 '"' BwcPlain_done 0
+  StrCmp $R3 "." 0 BwcPlain_next
+  IntOp $R5 $R4 + 1
+  StrCpy $R5 $R0 1 $R5
+  StrCmp $R5 "." BwcPlain_done 0
+  BwcPlain_next:
+  IntOp $R4 $R4 + 1
+  Goto BwcPlain_scan
+  BwcPlain_ok:
+  StrCpy $R1 "1"
+  BwcPlain_done:
+!macroend
+
+Function BwcPlainAbsPath
+  !insertmacro BWC_PLAIN_ABS_BODY
+FunctionEnd
+
+Function un.BwcPlainAbsPath
+  !insertmacro BWC_PLAIN_ABS_BODY
+FunctionEnd
+
+; $R1 = "1" when $R0 is inside $BwcMachineRoot (a folder below it, compared without regard to case). The root itself
+; is not inside it. Uses $R2 to $R5.
+!macro BWC_UNDER_ROOT_BODY
+  StrCpy $R1 "0"
+  StrLen $R2 $BwcMachineRoot
+  StrCpy $R3 $R0 $R2
+  System::Call 'kernel32::lstrcmpiW(t "$R3", t "$BwcMachineRoot") i .R4'
+  StrCmp $R4 "0" 0 BwcUnder_done
+  StrCpy $R3 $R0 1 $R2
+  StrCmp $R3 "\" 0 BwcUnder_done
+  IntOp $R2 $R2 + 1
+  StrLen $R5 $R0
+  IntCmp $R5 $R2 BwcUnder_done BwcUnder_done BwcUnder_yes
+  BwcUnder_yes:
+  StrCpy $R1 "1"
+  BwcUnder_done:
+!macroend
+
+Function BwcUnderMachineRoot
+  !insertmacro BWC_UNDER_ROOT_BODY
+FunctionEnd
+
+Function un.BwcUnderMachineRoot
+  !insertmacro BWC_UNDER_ROOT_BODY
+FunctionEnd
+
+; The per-machine target is the recorded InstallLocation when it is a plain path inside $BwcMachineRoot, otherwise
+; the default folder. Nothing else chooses it: not /D=, and not the current user's registry. The folder rules
+; (BwcCheckInstDir) still apply after this.
+Function BwcPickMachineTarget
+  StrCpy $INSTDIR $BwcDefaultDir
+  ReadRegStr $R0 SHCTX "$BwcUninstallKey" "InstallLocation"
+  StrCmp $R0 "" BwcPick_done 0
+  Call BwcPlainAbsPath
+  StrCmp $R1 "1" 0 BwcPick_done
+  Call BwcUnderMachineRoot
+  StrCmp $R1 "1" 0 BwcPick_done
+  StrCpy $INSTDIR $R0
+  BwcPick_done:
+FunctionEnd
+
+; NSIS applies /D= to $INSTDIR before .onInit, and BwcCheckRawDir kept the raw value. A per-machine run never installs
+; there (the updater still passes the install folder, so /D= is accepted). A value that names another folder is ignored
+; and the section logs one note. Nothing in that folder is read, closed, or changed.
+Function BwcNoteRawDir
+  StrCpy $BwcHintNote ""
+  StrCmp $BwcRawDir "" BwcHint_done 0
+  StrCpy $R0 $BwcRawDir
+  Call BwcPlainAbsPath
+  StrCmp $R1 "1" BwcHint_plain 0
+  StrCpy $BwcHintNote "Ignored /D=$BwcRawDir: it is not a plain folder path. The setup chooses the install folder."
+  Goto BwcHint_done
+  BwcHint_plain:
+  StrCpy $R8 $INSTDIR
+  StrCpy $INSTDIR $BwcRawDir
+  Call BwcTrimInstDir
+  StrCpy $R0 $INSTDIR
+  StrCpy $INSTDIR $R8
+  System::Call 'kernel32::lstrcmpiW(t "$R0", t "$INSTDIR") i .R1'
+  StrCmp $R1 "0" BwcHint_done 0
+  StrCpy $BwcHintNote "Ignored /D=$R0: the setup chooses the install folder."
+  BwcHint_done:
+FunctionEnd
+
+; ---------------------------------------------------------------------------
+; Version order for "refuse to install over a newer version". Versions are X.Y.Z or X.Y.Z-beta.N (what the build
+; accepts). A prerelease is older than its release, and N orders the betas. Text that is not in this form is not valid.
+; ---------------------------------------------------------------------------
+
+; Reads decimal digits of $R0 starting at position $R6. $R1 = the value, $R2 = how many digits (0 when none, or more
+; than 9). Moves $R6 past them. Uses $R3 to $R5. A single character that is not 0 to 9 reads as 0 in IntOp, so only
+; "0" needs its own test.
+Function BwcReadVerNum
+  StrCpy $R1 0
+  StrCpy $R2 0
+  BwcNum_loop:
+  StrCpy $R3 $R0 1 $R6
+  StrCmp $R3 "" BwcNum_done 0
+  StrCmp $R3 "0" BwcNum_digit 0
+  IntOp $R5 $R3 + 0
+  IntCmp $R5 0 BwcNum_done BwcNum_digit BwcNum_digit
+  BwcNum_digit:
+  IntOp $R5 $R3 + 0
+  IntOp $R1 $R1 * 10
+  IntOp $R1 $R1 + $R5
+  IntOp $R2 $R2 + 1
+  IntOp $R6 $R6 + 1
+  Goto BwcNum_loop
+  BwcNum_done:
+  IntCmp $R2 9 BwcNum_end BwcNum_end 0
+  StrCpy $R2 0
+  BwcNum_end:
+FunctionEnd
+
+; Parses the version in $R0. Pushes, last pushed = first popped: valid ("1" or "0"), major, minor, patch, stable
+; ("1" for a release, "0" for -beta.N), N. Clobbers $1 to $6 and $R1 to $R6.
+Function BwcParseVersion
+  StrCpy $1 0
+  StrCpy $2 0
+  StrCpy $3 0
+  StrCpy $4 1
+  StrCpy $5 0
+  StrCpy $6 0
+  StrCpy $R6 0
+  Call BwcReadVerNum
+  StrCmp $R2 "0" BwcPv_out 0
+  StrCpy $1 $R1
+  StrCpy $R3 $R0 1 $R6
+  StrCmp $R3 "." 0 BwcPv_out
+  IntOp $R6 $R6 + 1
+  Call BwcReadVerNum
+  StrCmp $R2 "0" BwcPv_out 0
+  StrCpy $2 $R1
+  StrCpy $R3 $R0 1 $R6
+  StrCmp $R3 "." 0 BwcPv_out
+  IntOp $R6 $R6 + 1
+  Call BwcReadVerNum
+  StrCmp $R2 "0" BwcPv_out 0
+  StrCpy $3 $R1
+  StrCpy $R3 $R0 1 $R6
+  StrCmp $R3 "" BwcPv_valid 0
+  StrCpy $R3 $R0 6 $R6
+  StrCmp $R3 "-beta." 0 BwcPv_out
+  IntOp $R6 $R6 + 6
+  Call BwcReadVerNum
+  StrCmp $R2 "0" BwcPv_out 0
+  StrCpy $R3 $R0 1 $R6
+  StrCmp $R3 "" 0 BwcPv_out
+  StrCpy $4 0
+  StrCpy $5 $R1
+  BwcPv_valid:
+  StrCpy $6 1
+  BwcPv_out:
+  Push $5
+  Push $4
+  Push $3
+  Push $2
+  Push $1
+  Push $6
+FunctionEnd
+
+; $R9 = a version text (an installed DisplayVersion). $R1 = "1" when it is a valid version that is newer than
+; ${BWC_VERSION}, otherwise "0". A text that is not a version is never newer, so a damaged value cannot block a repair.
+Function BwcInstalledIsNewer
+  StrCpy $R0 $R9
+  Call BwcParseVersion
+  StrCpy $R0 "${BWC_VERSION}"
+  Call BwcParseVersion
+  Pop $R7
+  Pop $4
+  Pop $3
+  Pop $2
+  Pop $1
+  Pop $0
+  Pop $R8
+  Pop $9
+  Pop $8
+  Pop $7
+  Pop $6
+  Pop $5
+  StrCpy $R1 "0"
+  StrCmp $R8 "1" 0 BwcNewer_done
+  StrCmp $R7 "1" 0 BwcNewer_done
+  IntCmp $9 $4 BwcNewer_minor BwcNewer_done BwcNewer_yes
+  BwcNewer_minor:
+  IntCmp $8 $3 BwcNewer_patch BwcNewer_done BwcNewer_yes
+  BwcNewer_patch:
+  IntCmp $7 $2 BwcNewer_stable BwcNewer_done BwcNewer_yes
+  BwcNewer_stable:
+  IntCmp $6 $1 BwcNewer_beta BwcNewer_done BwcNewer_yes
+  BwcNewer_beta:
+  IntCmp $5 $0 BwcNewer_done BwcNewer_done BwcNewer_yes
+  BwcNewer_yes:
+  StrCpy $R1 "1"
+  BwcNewer_done:
+FunctionEnd
+
+; Refuses, before any change, to install over a newer version. The same version is a repair. Reads the key of this run
+; (HKLM in a per-machine run, the sandbox key in the per-user E2E flavor).
+Function BwcRefuseNewer
+  ReadRegStr $R9 SHCTX "$BwcUninstallKey" "DisplayVersion"
+  StrCmp $R9 "" BwcRefuse_ok 0
+  Call BwcInstalledIsNewer
+  StrCmp $R1 "1" 0 BwcRefuse_ok
+  !insertmacro BWC_DIR_REFUSE "A newer version ($R9) of ${BWC_PRODUCT} is installed, and this setup installs ${BWC_VERSION}. Nothing was changed."
+  BwcRefuse_ok:
+FunctionEnd
+
+; ---------------------------------------------------------------------------
+; <install folder>.upd is where the elevated updater puts the verified copy of the installer it runs, in a
+; <32 hex> folder. A crashed update can leave such folders. This removes them: only direct subfolders named with 32 hex
+; digits, only a plain folder that holds plain files, never through a link or junction (a reparse point or an
+; unreadable attribute keeps the folder), never the folder this setup runs from ($EXEDIR). A folder that holds a
+; subfolder stays, except one plain "tmp" folder of plain files (the installer's own temp, installer.md M50). The
+; .upd folder itself must not be a link. Uses $0, $1, $9 and $R0 to $R9. ID keeps labels unique.
+; ---------------------------------------------------------------------------
+
+!macro BWC_PROTECTED_CLEAN_BODY ID
+  IfFileExists "$INSTDIR${BWC_PROTECTED_SUFFIX}\*.*" 0 BwcUpd_${ID}_end
+  System::Call 'kernel32::GetFileAttributesW(t "$INSTDIR${BWC_PROTECTED_SUFFIX}") i .R0'
+  IntOp $R0 $R0 & 1040
+  StrCmp $R0 "16" 0 BwcUpd_${ID}_end
+  FindFirst $R1 $R2 "$INSTDIR${BWC_PROTECTED_SUFFIX}\*.*"
+  BwcUpd_${ID}_next:
+  StrCmp $R2 "" BwcUpd_${ID}_close 0
+  StrCmp $R2 "." BwcUpd_${ID}_more 0
+  StrCmp $R2 ".." BwcUpd_${ID}_more 0
+  StrLen $R3 $R2
+  StrCmp $R3 "32" 0 BwcUpd_${ID}_more
+  !insertmacro BWC_CHARS_OK "upd_${ID}" "$R2" "${BWC_HEX}" $R9
+  StrCmp $R9 "1" 0 BwcUpd_${ID}_more
+  StrCpy $R5 "$INSTDIR${BWC_PROTECTED_SUFFIX}\$R2"
+  System::Call 'kernel32::lstrcmpiW(t "$EXEDIR", t "$R5") i .R3'
+  StrCmp $R3 "0" BwcUpd_${ID}_more 0
+  System::Call 'kernel32::GetFileAttributesW(t "$R5") i .R3'
+  IntOp $R4 $R3 & 1040
+  StrCmp $R4 "16" 0 BwcUpd_${ID}_more
+  StrCpy $R8 "1"
+  FindFirst $R6 $R7 "$R5\*.*"
+  BwcUpd_${ID}_inner:
+  StrCmp $R7 "" BwcUpd_${ID}_innerdone 0
+  StrCmp $R7 "." BwcUpd_${ID}_innernext 0
+  StrCmp $R7 ".." BwcUpd_${ID}_innernext 0
+  System::Call 'kernel32::GetFileAttributesW(t "$R5\$R7") i .R3'
+  IntOp $R4 $R3 & 1040
+  StrCmp $R4 "0" BwcUpd_${ID}_innerfile 0
+  StrCmp $R4 "16" 0 BwcUpd_${ID}_keep
+  StrCmp $R7 "tmp" BwcUpd_${ID}_tmp 0
+  BwcUpd_${ID}_keep:
+  StrCpy $R8 "0"
+  Goto BwcUpd_${ID}_innernext
+  ; The installer's own temp folder (update-elevation.md HT1): plain files only. A folder or a link inside it keeps it.
+  BwcUpd_${ID}_tmp:
+  StrCpy $9 "1"
+  FindFirst $0 $1 "$R5\tmp\*.*"
+  BwcUpd_${ID}_tmploop:
+  StrCmp $1 "" BwcUpd_${ID}_tmpdone 0
+  StrCmp $1 "." BwcUpd_${ID}_tmpnext 0
+  StrCmp $1 ".." BwcUpd_${ID}_tmpnext 0
+  System::Call 'kernel32::GetFileAttributesW(t "$R5\tmp\$1") i .R3'
+  IntOp $R4 $R3 & 1040
+  StrCmp $R4 "0" BwcUpd_${ID}_tmpfile 0
+  StrCpy $9 "0"
+  Goto BwcUpd_${ID}_tmpnext
+  BwcUpd_${ID}_tmpfile:
+  Delete "$R5\tmp\$1"
+  BwcUpd_${ID}_tmpnext:
+  FindNext $0 $1
+  Goto BwcUpd_${ID}_tmploop
+  BwcUpd_${ID}_tmpdone:
+  FindClose $0
+  StrCmp $9 "1" 0 BwcUpd_${ID}_tmpkept
+  RMDir "$R5\tmp"
+  BwcUpd_${ID}_tmpkept:
+  IfFileExists "$R5\tmp" 0 BwcUpd_${ID}_innernext
+  StrCpy $R8 "0"
+  Goto BwcUpd_${ID}_innernext
+  BwcUpd_${ID}_innerfile:
+  Delete "$R5\$R7"
+  BwcUpd_${ID}_innernext:
+  FindNext $R6 $R7
+  Goto BwcUpd_${ID}_inner
+  BwcUpd_${ID}_innerdone:
+  FindClose $R6
+  StrCmp $R8 "1" 0 BwcUpd_${ID}_more
+  RMDir "$R5"
+  BwcUpd_${ID}_more:
+  FindNext $R1 $R2
+  Goto BwcUpd_${ID}_next
+  BwcUpd_${ID}_close:
+  FindClose $R1
+  BwcUpd_${ID}_end:
+!macroend
+
+Function BwcClearStaleProtected
+  !insertmacro BWC_PROTECTED_CLEAN_BODY "in"
+FunctionEnd
+
+Function un.BwcRemoveProtected
+  !insertmacro BWC_PROTECTED_CLEAN_BODY "un"
+FunctionEnd
+
+; ---------------------------------------------------------------------------
+; Environment clean-up (installer.md M48, M49). A setup or uninstaller that the user starts by hand passes its environment
+; to the elevated BwcUpdate children it starts. This removes, from the process environment, every variable whose name
+; starts with DOTNET_, COREHOST_, CORECLR_, or COMPlus_ (the same rule as ChildEnvironment in BwcUpdate), and
+; __COMPAT_LAYER. It reads the whole block (GetEnvironmentStringsW), so no name has to be listed. NSIS compares names
+; without regard to case, as Windows does. It runs before the first child starts. Uses $0 to $9. ID keeps labels unique.
+; ---------------------------------------------------------------------------
+
+!macro BWC_CLEAR_RUNTIME_ENV_BODY ID
+  System::Call 'kernel32::GetEnvironmentStringsW() p .r1'
+  StrCmp $1 "0" BwcEnv_${ID}_end 0
+  StrCpy $2 $1
+  BwcEnv_${ID}_next:
+  System::Call 'kernel32::lstrlenW(p $2) i .r3'
+  StrCmp $3 "0" BwcEnv_${ID}_free 0
+  System::Call 'kernel32::lstrcpynW(t .r4, p $2, i 1000) i .r5'
+  StrCpy $5 $4 7
+  StrCmp $5 "DOTNET_" BwcEnv_${ID}_clear 0
+  StrCpy $5 $4 9
+  StrCmp $5 "COREHOST_" BwcEnv_${ID}_clear 0
+  StrCpy $5 $4 8
+  StrCmp $5 "CORECLR_" BwcEnv_${ID}_clear 0
+  StrCmp $5 "COMPlus_" BwcEnv_${ID}_clear 0
+  StrCpy $5 $4 15
+  StrCmp $5 "__COMPAT_LAYER=" BwcEnv_${ID}_clear BwcEnv_${ID}_advance
+  BwcEnv_${ID}_clear:
+  StrCpy $7 0
+  BwcEnv_${ID}_eq:
+  StrCpy $8 $4 1 $7
+  StrCmp $8 "" BwcEnv_${ID}_advance 0
+  StrCmp $8 "=" BwcEnv_${ID}_named 0
+  IntOp $7 $7 + 1
+  Goto BwcEnv_${ID}_eq
+  BwcEnv_${ID}_named:
+  StrCpy $8 $4 $7
+  System::Call 'kernel32::SetEnvironmentVariableW(t "$8", p 0) i .r9'
+  BwcEnv_${ID}_advance:
+  IntOp $3 $3 + 1
+  IntOp $3 $3 * 2
+  IntOp $2 $2 + $3
+  Goto BwcEnv_${ID}_next
+  BwcEnv_${ID}_free:
+  System::Call 'kernel32::FreeEnvironmentStringsW(p $1) i .r9'
+  BwcEnv_${ID}_end:
+!macroend
+
+Function BwcClearRuntimeEnvironment
+  !insertmacro BWC_CLEAR_RUNTIME_ENV_BODY "in"
+FunctionEnd
+
+Function un.BwcClearRuntimeEnvironment
+  !insertmacro BWC_CLEAR_RUNTIME_ENV_BODY "un"
+FunctionEnd
+
+; ---------------------------------------------------------------------------
+; The uninstaller of a per-machine install trusts nothing the command line says (installer.md M47). NSIS sets $INSTDIR from
+; _?=<dir>, and a hand-run `Uninstall.exe _?=<a folder the user can write>` would otherwise run BwcUpdate.exe from there
+; elevated and delete the payload names there. Runs in un.onInit after the elevated-token check, so it needs
+; $BwcUninstallKey and the registry view (un.BwcApplyContext). $INSTDIR must be a plain absolute path inside the machine
+; root and equal to the HKLM InstallLocation of this run's key. Nothing is changed before this passes.
+; ---------------------------------------------------------------------------
+
+Function un.BwcCheckInstallLocation
+  !ifdef BWC_E2E
+    StrCpy $BwcMachineRoot "$PROGRAMFILES64\${BWC_E2E_FOLDER}"
+  !else
+    StrCpy $BwcMachineRoot "$PROGRAMFILES64"
+  !endif
+  Call un.BwcTrimInstDir
+  StrCpy $R0 $INSTDIR
+  Call un.BwcPlainAbsPath
+  StrCmp $R1 "1" 0 BwcUnLoc_refuse
+  StrCpy $R0 $INSTDIR
+  Call un.BwcUnderMachineRoot
+  StrCmp $R1 "1" 0 BwcUnLoc_refuse
+  ReadRegStr $R2 SHCTX "$BwcUninstallKey" "InstallLocation"
+  StrCmp $R2 "" BwcUnLoc_refuse 0
+  StrCpy $R3 $R2 1 -1
+  StrCmp $R3 "\" 0 +2
+  StrCpy $R2 $R2 -1
+  System::Call 'kernel32::lstrcmpiW(t "$R2", t "$INSTDIR") i .R4'
+  StrCmp $R4 "0" BwcUnLoc_ok 0
+  BwcUnLoc_refuse:
+  !insertmacro BWC_DIR_REFUSE "This uninstaller was not started from the folder that the uninstall entry names, so it stops. Use Apps and Features, or the uninstall entry of ${BWC_PRODUCT}. Nothing was changed."
+  BwcUnLoc_ok:
+FunctionEnd
+
+; ---------------------------------------------------------------------------
+; A reinstall before the restart that follows an uninstall (installer.md M51). The in-place uninstaller queued
+; "Delete /REBOOTOK <install dir>\Uninstall.exe", and a new Uninstall.exe written now would be deleted at the restart.
+; PendingFileRenameOperations is a REG_MULTI_SZ of pairs (source, destination), and a delete has an empty destination. The
+; value is read whole with the System plugin (ReadRegStr returns only its first string). An entry that names this
+; install's Uninstall.exe aborts with "restart first". An unreadable value is not a refusal. Uses $R0 to $R9.
+; ---------------------------------------------------------------------------
+
+Function BwcRefusePendingUninstall
+  StrCpy $R3 "\??\$INSTDIR\${BWC_UNINSTALLER}"
+  System::Call 'advapi32::RegOpenKeyExW(p 0x80000002, t "SYSTEM\CurrentControlSet\Control\Session Manager", i 0, i 0x20119, *p .R1) i .R2'
+  StrCmp $R2 "0" 0 BwcPend_end
+  System::Alloc 4
+  Pop $R6
+  System::Call '*$R6(i 0)'
+  System::Call 'advapi32::RegQueryValueExW(p $R1, t "PendingFileRenameOperations", p 0, p 0, p 0, p $R6) i .R2'
+  System::Call '*$R6(i .R4)'
+  StrCmp $R2 "0" 0 BwcPend_freeCell
+  IntCmp $R4 4194304 BwcPend_sizeOk BwcPend_sizeOk BwcPend_freeCell
+  BwcPend_sizeOk:
+  IntOp $R5 $R4 + 4
+  System::Alloc $R5
+  Pop $R5
+  StrCmp $R5 "0" BwcPend_freeCell 0
+  System::Call 'advapi32::RegQueryValueExW(p $R1, t "PendingFileRenameOperations", p 0, p 0, p $R5, p $R6) i .R2'
+  StrCmp $R2 "0" 0 BwcPend_freeData
+  IntOp $R8 $R5 + $R4
+  StrCpy $R7 $R5
+  BwcPend_next:
+  IntCmpU $R7 $R8 BwcPend_freeData BwcPend_entry BwcPend_freeData
+  BwcPend_entry:
+  System::Call 'kernel32::lstrlenW(p $R7) i .R9'
+  System::Call 'kernel32::lstrcpynW(t .R0, p $R7, i 1000) i .R2'
+  System::Call 'kernel32::lstrcmpiW(t "$R0", t "$R3") i .R2'
+  StrCmp $R2 "0" BwcPend_found 0
+  IntOp $R9 $R9 + 1
+  IntOp $R9 $R9 * 2
+  IntOp $R7 $R7 + $R9
+  Goto BwcPend_next
+  BwcPend_found:
+  System::Free $R5
+  System::Free $R6
+  System::Call 'advapi32::RegCloseKey(p $R1) i .R2'
+  !insertmacro BWC_DIR_REFUSE "Windows has to restart first: an earlier uninstall of ${BWC_PRODUCT} left $INSTDIR\${BWC_UNINSTALLER} to be removed at the next restart, and a new install would lose it. Restart Windows, then run the installer again. Nothing was changed."
+  BwcPend_freeData:
+  System::Free $R5
+  BwcPend_freeCell:
+  System::Free $R6
+  System::Call 'advapi32::RegCloseKey(p $R1) i .R2'
+  BwcPend_end:
+FunctionEnd
+
+; ---------------------------------------------------------------------------
+; Mode setup, the first step of .onInit. Ship builds are always per machine. The E2E flavor is a per-user sandbox
+; unless /MACHINE is given. After this, $BwcMachine, $BwcUninstallKey, and $BwcShortcutDir are set, the registry view
+; and shell context are applied, and a per-machine run has been checked for an elevated token.
+; ---------------------------------------------------------------------------
+
+Function BwcInitMode
+  !ifdef BWC_E2E
+    Call BwcReadE2eSwitches
+  !else
+    StrCpy $BwcMachine "1"
+    StrCpy $BwcUninstallKey "${BWC_UNINSTALL_SUBKEY}"
+  !endif
+  StrCmp $BwcMachine "1" 0 +2
+  Call BwcClearRuntimeEnvironment
+  Call BwcApplyContext
+  StrCmp $BwcMachine "1" BwcMode_machine 0
+  Return
+  BwcMode_machine:
+  Call BwcRequireElevated
+  !ifdef BWC_E2E
+    StrCpy $BwcMachineRoot "$PROGRAMFILES64\${BWC_E2E_FOLDER}"
+    StrCpy $BwcDefaultDir "$BwcMachineRoot\$BwcRunId"
+    StrCpy $BwcShortcutDir "$SMPROGRAMS\${BWC_E2E_START_PREFIX}$BwcRunId"
+  !else
+    StrCpy $BwcMachineRoot "$PROGRAMFILES64"
+    StrCpy $BwcDefaultDir "$PROGRAMFILES64\${BWC_PRODUCT}"
+    StrCpy $BwcShortcutDir "$SMPROGRAMS"
+  !endif
+FunctionEnd
+
+; ---------------------------------------------------------------------------
+; E2E switch handling. Release builds never call these. /RUNID is required, and so is /SHORTCUTS unless /MACHINE is
+; given, so that a test run cannot write to the real Start menu or the real Uninstall key by accident. /MACHINE is the
+; per-machine layout in a sandbox (Program Files\BWC-E2E\<RUNID>, HKLM\Software\BWC-E2E\<RUNID>); it never asks for
+; elevation (BwcRequireElevated). RUNID must be 1 to 64 letters, digits, dash, or underscore. The harness controls it.
 ; ---------------------------------------------------------------------------
 
 !ifdef BWC_E2E
@@ -480,12 +1064,19 @@ Function BwcReadE2eSwitches
   ${GetOptions} $R0 "/RUNID=" $BwcRunId
   IfErrors 0 +2
   ReadEnvStr $BwcRunId "BWC_E2E_INSTALLER_RUNID"
+  StrCpy $BwcMachine "0"
+  ClearErrors
+  ${GetOptions} $R0 "/MACHINE" $R1
+  IfErrors +2 0
+  StrCpy $BwcMachine "1"
   ClearErrors
   ${GetOptions} $R0 "/SHORTCUTS=" $BwcShortcutDir
   IfErrors 0 +2
   ReadEnvStr $BwcShortcutDir "BWC_E2E_INSTALLER_SHORTCUTS"
   StrCmp $BwcRunId "" BwcE2e_missing 0
+  StrCmp $BwcMachine "1" BwcE2e_shortcutsok 0
   StrCmp $BwcShortcutDir "" BwcE2e_missing 0
+  BwcE2e_shortcutsok:
   StrLen $R3 $BwcRunId
   IntCmp $R3 64 BwcE2e_lenok BwcE2e_lenok BwcE2e_missing
   BwcE2e_lenok:
@@ -496,7 +1087,7 @@ Function BwcReadE2eSwitches
   StrCpy $BwcUninstallKey "${BWC_E2E_ROOT}\$BwcRunId\Uninstall\BetterWindowsConfig"
   Return
   BwcE2e_missing:
-  Abort "The E2E installer needs /RUNID=<id> and /SHORTCUTS=<folder>. Nothing was changed."
+  Abort "The E2E installer needs /RUNID=<id> and /SHORTCUTS=<folder> (or /MACHINE). Nothing was changed."
 FunctionEnd
 
 Function un.BwcReadE2eSwitches
@@ -505,6 +1096,11 @@ Function un.BwcReadE2eSwitches
   ${un.GetOptions} $R0 "/RUNID=" $BwcRunId
   IfErrors 0 +2
   ReadEnvStr $BwcRunId "BWC_E2E_INSTALLER_RUNID"
+  StrCpy $BwcMachine "0"
+  ClearErrors
+  ${un.GetOptions} $R0 "/MACHINE" $R1
+  IfErrors +2 0
+  StrCpy $BwcMachine "1"
   StrCmp $BwcRunId "" BwcE2eUn_missing 0
   StrLen $R3 $BwcRunId
   IntCmp $R3 64 BwcE2eUn_lenok BwcE2eUn_lenok BwcE2eUn_missing

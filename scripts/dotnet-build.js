@@ -8,7 +8,10 @@ import { fileURLToPath } from "node:url";
 import {
   checkPublishFlavor,
   formatFlavorReport,
+  missingRuntimeFiles,
 } from "./flavor-metadata.js";
+import { buildEnvironment } from "./lib/build-environment.js";
+import { installUpdateOutputs, removeStaleFileLists, updateStagingDir } from "./lib/update-publish.js";
 
 const SCRIPT = "scripts/dotnet-build.js";
 const REPO_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -23,7 +26,8 @@ const FLAVORS = new Set(["ship", "e2e"]);
 const PROJECTS = [
   { name: "Bwc.Hub", project: "src/Bwc.Hub/Bwc.Hub.csproj" },
   { name: "Bwc.Regedit.App", project: "src/Bwc.Regedit.App/Bwc.Regedit.App.csproj" },
-  { name: "Bwc.Update", project: "src/Bwc.Update/Bwc.Update.csproj" },
+  // NativeAOT: published into its own folder, never the shared one (update-elevation.md HN25).
+  { name: "Bwc.Update", project: "src/Bwc.Update/Bwc.Update.csproj", staged: true },
 ];
 
 const WARNING_LINE = /\bwarning\b/i;
@@ -36,14 +40,22 @@ function printHelp() {
   node ${SCRIPT} --rid win-x64|win-arm64 [--flavor ship|e2e]
 
 Publishes Bwc.Hub, Bwc.Regedit.App, then Bwc.Update into
-publish/<rid> (ship) or publish/<rid>-e2e (e2e).
+publish/<rid> (ship) or publish/<rid>-e2e (e2e). Bwc.Update is NativeAOT: it is published
+into publish/<rid>[-e2e]-bwcupdate-aot, and only BwcUpdate.exe is copied into the shared
+folder (a publish with -o set to the shared folder deleted the Hub's runtime files).
+After every project the folder must still hold hostfxr.dll, hostpolicy.dll, coreclr.dll,
+System.Private.CoreLib.dll and BetterWindowsConfig.runtimeconfig.json, or the build fails.
 
 Before each project publishes, its stale ReadyToRun intermediates
-(obj/<platform>/Release/<tfm>/<rid>/R2R) are deleted and logged.
+(obj/<platform>/Release/<tfm>/<rid>/R2R) and its rid-specific copy-local output
+(bin/<platform>/Release/<tfm>/<rid>) are deleted and logged.
 
 After the publish, every managed Bwc* and BetterWindowsConfig* assembly in the
 folder root must carry BwcFlavor=ship (ship) or BwcFlavor=E2E (e2e). A missing or
-mismatched value exits 1. The result is recorded as flavorCheck in artifacts/build.
+mismatched value exits 1. BwcUpdate.exe is NativeAOT: it must pass the native check
+and carry the folder's BwcUpdateFlavor marker (scripts/flavor-metadata.js). The result
+is recorded as flavorCheck in artifacts/build. The NativeAOT link needs the C++ build
+tools of Visual Studio; vswhere.exe is added to the PATH of the build process only.
 
 Options:
   --rid <rid>        Required. win-x64 or win-arm64.
@@ -203,7 +215,7 @@ function invokeDotnet(args) {
     // spawnSync waits for the pipe to close, so node reuse turns a finished publish into a
     // hung build step.
     env: {
-      ...process.env,
+      ...buildEnvironment(process.env),
       MSBUILDDISABLENODEREUSE: "1",
       DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: "1",
     },
@@ -235,6 +247,27 @@ function removeStaleReadyToRun({ project, rid, platform }) {
     if (!fs.existsSync(r2rDir)) continue;
     fs.rmSync(r2rDir, { recursive: true, force: true });
     removed.push(path.relative(REPO_ROOT, r2rDir).split(path.sep).join("/"));
+  }
+  return removed;
+}
+
+/**
+ * Deletes the rid-specific copy-local output in bin/<platform>/Release/<tfm>/<rid>. Copy-local skips a file
+ * whose size and timestamp match, so a Bwc.UI.dll left by a ship build (BwcFlavor=ship) could survive in
+ * Bwc.Hub's bin and differ from the E2E copy in Bwc.Regedit.App, which the shared-folder check then refuses.
+ * The publish copies every referenced assembly again. Returns the repo-relative folders it removed.
+ */
+function removeStaleCopyLocalOutput({ project, rid, platform }) {
+  const projectDir = path.dirname(path.join(REPO_ROOT, project));
+  const releaseDir = path.join(projectDir, "bin", platform, "Release");
+  if (!fs.existsSync(releaseDir)) return [];
+  const removed = [];
+  for (const entry of fs.readdirSync(releaseDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const ridDir = path.join(releaseDir, entry.name, rid);
+    if (!fs.existsSync(ridDir)) continue;
+    fs.rmSync(ridDir, { recursive: true, force: true });
+    removed.push(path.relative(REPO_ROOT, ridDir).split(path.sep).join("/"));
   }
   return removed;
 }
@@ -357,14 +390,20 @@ function main(argv = process.argv) {
   if (!errorMessage) {
     for (const project of PROJECTS) {
       let r2rRemoved = [];
+      let copyLocalRemoved = [];
       try {
         r2rRemoved = removeStaleReadyToRun({
           project: project.project,
           rid,
           platform,
         });
+        copyLocalRemoved = removeStaleCopyLocalOutput({
+          project: project.project,
+          rid,
+          platform,
+        });
       } catch (error) {
-        errorMessage = `${project.name}: could not remove stale ReadyToRun output: ${error instanceof Error ? error.message : String(error)}`;
+        errorMessage = `${project.name}: could not remove stale build output: ${error instanceof Error ? error.message : String(error)}`;
         break;
       }
       console.log(
@@ -375,13 +414,42 @@ function main(argv = process.argv) {
       for (const removedPath of r2rRemoved) {
         console.log(`  removed ${removedPath}`);
       }
+      console.log(
+        copyLocalRemoved.length === 0
+          ? `${project.name}: no stale copy-local output to remove`
+          : `${project.name}: removed ${copyLocalRemoved.length} stale copy-local folder(s)`,
+      );
+      for (const removedPath of copyLocalRemoved) {
+        console.log(`  removed ${removedPath}`);
+      }
+
+      // The helper is published away from the shared folder. Its previous file list is removed first, so that
+      // IncrementalClean has nothing to delete (HN25).
+      const stagingDir = project.staged ? updateStagingDir(outDir) : null;
+      if (stagingDir !== null) {
+        try {
+          fs.rmSync(stagingDir, { recursive: true, force: true });
+          const lists = removeStaleFileLists({
+            projectDir: path.dirname(path.join(REPO_ROOT, project.project)),
+            projectFile: path.basename(project.project),
+            platform,
+            rid,
+          });
+          for (const list of lists) {
+            console.log(`  removed ${path.relative(REPO_ROOT, list).split(path.sep).join("/")}`);
+          }
+        } catch (error) {
+          errorMessage = `${project.name}: could not prepare ${relativeOutputPath(stagingDir)}: ${error instanceof Error ? error.message : String(error)}`;
+          break;
+        }
+      }
 
       const result = publishProject({
         project: project.project,
         rid,
         platform,
         flavor,
-        outDir,
+        outDir: stagingDir ?? outDir,
       });
 
       projects.push({
@@ -389,6 +457,7 @@ function main(argv = process.argv) {
         exitCode: result.exitCode,
         warnings: result.warnings,
         staleReadyToRunRemoved: r2rRemoved,
+        staleCopyLocalRemoved: copyLocalRemoved,
       });
 
       const status =
@@ -418,6 +487,26 @@ function main(argv = process.argv) {
         errorMessage = `${project.name} produced ${result.warnings.length} build warning(s)`;
       }
 
+      if (stagingDir !== null && errorMessage === null) {
+        try {
+          const installed = installUpdateOutputs(stagingDir, outDir);
+          console.log(
+            `${project.name}: copied ${installed.copied.join(", ")} into ${displayOutDir}` +
+              (installed.removed.length > 0 ? `, removed stale ${installed.removed.join(", ")}` : ""),
+          );
+        } catch (error) {
+          errorMessage = `${project.name}: ${error instanceof Error ? error.message : String(error)}`;
+        }
+      }
+
+      // HN26: a publish that lost a runtime file is refused at once, naming the project that did it.
+      if (errorMessage === null) {
+        const lost = missingRuntimeFiles(fs.readdirSync(outDir));
+        if (lost.length > 0) {
+          errorMessage = `${project.name}: after its publish ${displayOutDir} lacks ${lost.join(", ")}`;
+        }
+      }
+
       const current = snapshotOutput(outDir);
       mergeSnapshot(knownFiles, current, project.name, collisions);
       fileCount = current.size;
@@ -442,6 +531,11 @@ function main(argv = process.argv) {
       if (!flavorCheck.ok) {
         errorMessage = `flavor check failed: ${flavorCheck.problems[0]}`;
       }
+    }
+
+    if (!errorMessage) {
+      // The helper's staging folder has done its job. A failed build keeps it for diagnosis.
+      fs.rmSync(updateStagingDir(outDir), { recursive: true, force: true });
     }
   }
 

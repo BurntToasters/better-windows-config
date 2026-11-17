@@ -62,6 +62,11 @@ public static class RegeditCommandLine
 
             if (IsSwitch(argument, "/s"))
             {
+                if (operation == Operation.None && index + 1 >= arguments.Count)
+                {
+                    return MissingFilenameError(out exitCode);
+                }
+
                 if (operation != Operation.None || index + 1 >= arguments.Count)
                 {
                     return UsageError(out exitCode);
@@ -75,6 +80,11 @@ public static class RegeditCommandLine
 
             if (IsSwitch(argument, "/e") || IsSwitch(argument, "/a"))
             {
+                if (operation == Operation.None && index + 1 >= arguments.Count)
+                {
+                    return MissingFilenameError(out exitCode);
+                }
+
                 if (operation != Operation.None || index + 1 >= arguments.Count)
                 {
                     return UsageError(out exitCode);
@@ -253,6 +263,13 @@ public static class RegeditCommandLine
             file);
         WriteStandardError("BwcRegedit: " + text);
         return 1;
+    }
+
+    /// <summary>A switch that takes a filename was the last argument. Classic string 43 goes before the usage line.</summary>
+    private static bool MissingFilenameError(out int exitCode)
+    {
+        WriteStandardError("BwcRegedit: " + RegeditStrings.Get("MsgCommandLineMissingFilename"));
+        return UsageError(out exitCode);
     }
 
     private static bool UsageError(out int exitCode)

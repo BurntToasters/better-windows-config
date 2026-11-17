@@ -46,7 +46,7 @@ internal static class DialogContrast
     /// The capture is a verified, settled screen copy of the dialog (see <see cref="WindowCapture"/>), so a window that
     /// covers the dialog makes the check not judged instead of changing the sample, and nothing is raised or activated for it.
     /// </summary>
-    internal static void Check(string checkId, AutomationElement window, IntPtr hwnd, Color expectedFace)
+    internal static void Check(string checkId, AutomationElement window, IntPtr hwnd, Color expectedFace, Color? expectedWindow = null)
     {
         if (!GetClientRect(hwnd, out Win32.NativeRect client) || client.Right <= 0 || client.Bottom <= 0)
         {
@@ -80,7 +80,7 @@ internal static class DialogContrast
 
         List<Rectangle> edits = EditRectangles(window, origin, width, height);
         CheckFace(checkId, pixels, width, height, expectedFace, edits);
-        CheckEdits(checkId, pixels, width, edits, expectedFace);
+        CheckEdits(checkId, pixels, width, edits, expectedFace, expectedWindow);
         CheckText(checkId, window, pixels, width, height, origin);
     }
 
@@ -100,9 +100,9 @@ internal static class DialogContrast
     }
 
     /// <summary>Each edit box must be painted in the palette window color (COLOR_WINDOW on the light palette).</summary>
-    private static void CheckEdits(string checkId, int[] pixels, int width, List<Rectangle> edits, Color expectedFace)
+    private static void CheckEdits(string checkId, int[] pixels, int width, List<Rectangle> edits, Color expectedFace, Color? windowOverride)
     {
-        Color expectedWindow = expectedFace == DarkFace ? DarkWindow : SystemWindow();
+        Color expectedWindow = windowOverride ?? (expectedFace == DarkFace ? DarkWindow : SystemWindow());
         var problems = new List<string>();
         foreach (Rectangle edit in edits)
         {

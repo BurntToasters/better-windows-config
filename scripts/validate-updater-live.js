@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Read-only check of the published stable update feed. It fetches bwc-stable.json and its .minisig
+ * Read-only check of the published stable update feed. It fetches bwc-stable-v2.json and its .minisig
  * from releases/latest/download, verifies the signature against the keys embedded in
  * src/Bwc.Update/Signing/TrustedKeys.cs, checks version, channel, expiry, and each architecture, then
  * downloads every installer and checks its size, SHA-256, and installer signature. No write, no gh.
@@ -190,7 +190,7 @@ function printHelp() {
   node ${SCRIPT} [--expected-version <semver|current>] [--repo <owner/name>] [--root <repo>]
                  [--require-arch <win-x64|win-arm64>]... [--json] [--help]
 
-Checks the published stable update feed (releases/latest/download/bwc-stable.json). It verifies the
+Checks the published stable update feed (releases/latest/download/bwc-stable-v2.json, the 0.1.2 feed). It verifies the
 manifest signature against the keys embedded in src/Bwc.Update/Signing/TrustedKeys.cs, the version,
 the channel, the signed expiry, and each required architecture. It then downloads each installer and
 checks its size, SHA-256, and installer signature. Read-only; no gh; no write.

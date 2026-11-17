@@ -310,8 +310,9 @@ export function main(argv = process.argv.slice(2), runner = null, { root = REPO_
   if (!keys.ok) {
     throw usageError(keys.detail, keys.reason === "missing-trusted-key-source" ? EXIT.MISSING : EXIT.REFUSED);
   }
+  const steps = releaseSteps(options.mode, { version, env, from: options.from });
   const run = runner ?? npmRunner(root, version);
-  for (const step of releaseSteps(options.mode, { version, env, from: options.from })) {
+  for (const step of steps) {
     run(step.name, step.args);
   }
   return EXIT.OK;

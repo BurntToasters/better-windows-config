@@ -5,7 +5,7 @@ using WinRT.Interop;
 namespace Bwc.Regedit.Dialogs;
 
 /// <summary>
-/// Disconnect Network Registry (RT_DIALOG 107, DLG-013). A single-select list of connected remote
+/// Disconnect Network Registry (RT_DIALOG 107, DLG-013). A multi-select list of connected remote
 /// computers under a "Computer name:" label, with OK and Cancel. The template is 250 x 111 DLU. OK
 /// with nothing selected shows the message and keeps the dialog open.
 /// </summary>
@@ -30,6 +30,8 @@ public sealed class RemoteComputerListDialog : ClassicDialog
 
         _emptySelectionMessage = emptySelectionMessage;
         _list = RequireControl<ListBox>(ListAutomationId);
+        // Classic list 1175 has no LVS_SINGLESEL, so several computers can be selected and disconnected at once.
+        _list.SelectionMode = Microsoft.UI.Xaml.Controls.SelectionMode.Multiple;
 
         foreach (string name in names
             .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -41,8 +43,8 @@ public sealed class RemoteComputerListDialog : ClassicDialog
 
     private const string ListAutomationId = "RemoteComputerList";
 
-    /// <summary>The name selected when the primary action completed.</summary>
-    public string? SelectedName { get; private set; }
+    /// <summary>The names selected when the primary action completed, in list order.</summary>
+    public IReadOnlyList<string> SelectedNames { get; private set; } = Array.Empty<string>();
 
     protected override void OnDialogLoaded()
     {
@@ -51,13 +53,14 @@ public sealed class RemoteComputerListDialog : ClassicDialog
 
     protected override bool TryAccept()
     {
-        if (_list.SelectedItem is not string name || string.IsNullOrWhiteSpace(name))
+        string[] names = _list.SelectedItems.OfType<string>().Where(name => !string.IsNullOrWhiteSpace(name)).ToArray();
+        if (names.Length == 0)
         {
             _ = ShowEmptySelectionAsync();
             return false;
         }
 
-        SelectedName = name;
+        SelectedNames = names;
         return true;
     }
 

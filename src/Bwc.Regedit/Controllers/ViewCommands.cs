@@ -79,6 +79,9 @@ internal sealed class ViewCommands
         string displayPath = node.RegistryPath ?? node.Name;
         _context.Shell.CurrentPath = displayPath;
         _context.Settings.LastKey = displayPath;
+
+        // The list leaves the old key's rows at once, so no list command can act on them while the new key loads.
+        _context.BindList(_context.TryGetLocationForNode(node, out KeyLocation location) ? location : null);
         _context.UpdateCommandStates();
         _ = _context.LoadValuesAsync(node);
     }
@@ -94,31 +97,6 @@ internal sealed class ViewCommands
     /// positions are kept. Bound to F5 and View &gt; Refresh.
     /// </summary>
     public void Refresh() => _context.StartCommand(_context.RefreshViewAsync);
-
-    public void GoToLocalMachine()
-    {
-        _context.StartCommand(async () =>
-        {
-            TreeNode? target;
-            try
-            {
-                target = await _context.TreeSource.FindPathAsync("Computer\\HKEY_LOCAL_MACHINE");
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                Log.Warn("Registry Editor could not resolve HKEY_LOCAL_MACHINE: " + ex.Message);
-                target = null;
-            }
-
-            if (target is null)
-            {
-                await _context.ShowMessageAsync(Get("DialogAddressBarKeyNotFound"));
-                return;
-            }
-
-            _context.ApplyNavigation(target);
-        });
-    }
 
     /// <summary>Walks to the saved last key. A key that no longer resolves leaves Computer selected.</summary>
     public async Task RestoreLastKeyAsync(string displayPath)
@@ -185,7 +163,17 @@ internal sealed class ViewCommands
             return;
         }
 
-        if (!RegistryPath.TryParse(candidate, out RegistryPath? parsed) || parsed is null)
+        // A path that starts with \\ names a remote computer, \\COMPUTER\HKEY_...; the tree decides whether it is connected.
+        string displayPath;
+        if (candidate.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            displayPath = candidate;
+        }
+        else if (RegistryPath.TryParse(candidate, out RegistryPath? parsed) && parsed is not null)
+        {
+            displayPath = parsed.ToDisplayString();
+        }
+        else
         {
             await FailAddressNavigationAsync(generation, attempted, Get("DialogAddressBarInvalidPath"));
             return;
@@ -194,7 +182,7 @@ internal sealed class ViewCommands
         TreeNode? target;
         try
         {
-            target = await _context.TreeSource.FindPathAsync(parsed.ToDisplayString());
+            target = await _context.TreeSource.FindPathAsync(displayPath);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -4,6 +4,8 @@
     <OutputType>Exe</OutputType>
     <!-- Brings System.Drawing from the in-box Windows Desktop shared framework; no NuGet package, so CPM needs no version. -->
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- UIAutomationClient (System.Windows.Automation) ships with the WPF part of Microsoft.WindowsDesktop.App. Used read-only. -->
+    <UseWPF>true</UseWPF>
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

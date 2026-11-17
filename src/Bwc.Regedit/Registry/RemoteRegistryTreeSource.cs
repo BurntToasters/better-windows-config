@@ -11,7 +11,8 @@ namespace Bwc.Regedit.Registry;
 /// </summary>
 public sealed class RemoteRegistryTreeSource : ITreeNodeSource
 {
-    private static readonly StringComparer NameComparer = StringComparer.CurrentCultureIgnoreCase;
+    // The classic display order (NLS, case ignored). See RegistryNameOrder and VIEW-009.
+    private static readonly IComparer<string> NameComparer = RegistryNameOrder.Comparer;
     private static readonly IReadOnlyList<TreeNode> NoChildren = Array.Empty<TreeNode>();
 
     private readonly RegistryReader _reader;
@@ -61,15 +62,13 @@ public sealed class RemoteRegistryTreeSource : ITreeNodeSource
             return false;
         }
 
-        try
-        {
-            path = RegistryPath.Parse(remainder);
-        }
-        catch (FormatException)
+        // Keys named '.' or '..' parse as enumerated names, as they are listed in the tree.
+        if (!RegistryTreeSource.TryParseNodePath(remainder, out RegistryPath? parsed))
         {
             return false;
         }
 
+        path = parsed;
         return path.Root is RegistryRoot.LocalMachine or RegistryRoot.Users;
     }
 
@@ -135,12 +134,11 @@ public sealed class RemoteRegistryTreeSource : ITreeNodeSource
                 RegistryPath childPath;
                 try
                 {
-                    childPath = path.Append(name);
+                    // A key can be named '.' or '..'. AppendEnumeratedName accepts those names, as the local tree does.
+                    childPath = path.AppendEnumeratedName(name);
                 }
                 catch (ArgumentException ex)
                 {
-                    // A real registry key can be named '.' or '..', which RegistryPath rejects
-                    // because the same string is ambiguous in a display path.
                     Log.Warn(
                         $"Remote registry tree skipped the child '{name}' of '{path.ToDisplayString()}': {ex.Message}");
                     continue;
@@ -163,11 +161,14 @@ public sealed class RemoteRegistryTreeSource : ITreeNodeSource
         }
     }
 
-    private string ToRemoteDisplayPath(RegistryPath path)
+    private string ToRemoteDisplayPath(RegistryPath path) => DisplayPathOf(_prefix, path);
+
+    /// <summary>The remote display path of a key, with a prefix from <see cref="DisplayPrefix"/>.</summary>
+    public static string DisplayPathOf(string prefix, RegistryPath path)
     {
         string root = path.Root.DisplayName();
         return path.Components.Count == 0
-            ? _prefix + "\\" + root
-            : _prefix + "\\" + root + "\\" + string.Join('\\', path.Components);
+            ? prefix + "\\" + root
+            : prefix + "\\" + root + "\\" + string.Join('\\', path.Components);
     }
 }

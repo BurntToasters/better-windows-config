@@ -245,6 +245,9 @@ Error code: {1} (0x{1:X8})
   <data name="DialogFavoriteComputer" xml:space="preserve">
     <value>Computer cannot be added to favorites. Select a key first.</value>
   </data>
+  <data name="DialogFavoriteRemote" xml:space="preserve">
+    <value>A key on a connected computer cannot be added to favorites yet. Select a key on this computer.</value>
+  </data>
   <data name="DialogFavoriteNone" xml:space="preserve">
     <value>There are no favorites to remove.</value>
   </data>
@@ -333,6 +336,10 @@ Error code: {1} (0x{1:X8})
   <data name="DialogAddressBarKeyNotFound" xml:space="preserve">
     <value>The selected branch does not exist. Make sure that the correct path is given.</value>
   </data>
+  <!-- Caption of the Export message box for a missing branch. Oracle 301 until the measured caption of 148 is known (OQ-15). -->
+  <data name="DialogExportBranchCaption" xml:space="preserve">
+    <value>Export Registry File</value>
+  </data>
   <data name="DialogFindTitle" xml:space="preserve">
     <value>Find</value>
   </data>
@@ -384,8 +391,14 @@ Error code: {1} (0x{1:X8})
   <data name="DialogHexTitle" xml:space="preserve">
     <value>Binary Data</value>
   </data>
+  <!-- The caption of the Data... viewer for a device specific partial. No classic string id has this text (the classic
+       Resources dialog 1305 static reads "Device Specific Data:"). -->
+  <data name="DialogDeviceSpecificData" xml:space="preserve">
+    <value>Device Specific Data</value>
+  </data>
+  <!-- Oracle DLG-005 (RT_DIALOG 103 caption). The Edit Binary dialog shows this caption. -->
   <data name="DialogHexEditTitle" xml:space="preserve">
-    <value>Edit Binary Data</value>
+    <value>Edit Binary Value</value>
   </data>
   <data name="DialogHexClose" xml:space="preserve">
     <value>Close</value>
@@ -412,7 +425,8 @@ Error code: {1} (0x{1:X8})
     <value>Load Hive</value>
   </data>
   <data name="DialogLoadHiveNameLabel" xml:space="preserve">
-    <value>Key name under HKEY_LOCAL_MACHINE:</value>
+    <!-- RT_DIALOG 104 control 65535 (oracle). The hive loads under the selected root (HKLM or HKU). -->
+    <value>&amp;Key Name:</value>
   </data>
   <data name="DialogLoadHiveNameInvalid" xml:space="preserve">
     <value>Enter a single key name without separators. The name cannot be empty, cannot be "." or "..", cannot contain NUL characters, and cannot be longer than 255 characters.</value>
@@ -447,11 +461,20 @@ Error code: {1} (0x{1:X8})
   <data name="DialogConnectFailedTitle" xml:space="preserve">
     <value>Error Connecting Network Registry</value>
   </data>
+  <data name="ImportComputerLabel" xml:space="preserve">
+    <value>Select Computer:</value>
+  </data>
   <data name="DialogDisconnectTitle" xml:space="preserve">
     <value>Disconnect Network Registry</value>
   </data>
   <data name="DialogDisconnectLabel" xml:space="preserve">
     <value>Select a connected computer:</value>
+  </data>
+  <data name="DialogDisconnectComputerLabel" xml:space="preserve">
+    <value>Computer name:</value>
+  </data>
+  <data name="DialogExportRemoteFormat" xml:space="preserve">
+    <value>The registry of a connected computer exports as a Registration file. Choose Registration Files (.reg).</value>
   </data>
   <data name="DialogDisconnectEmpty" xml:space="preserve">
     <value>No remote computer is connected.</value>
@@ -620,9 +643,30 @@ Details: {1}</value>
     <!-- Oracle 133 -->
     <value>Cannot import {0}: The specified file is not a registry file. You can import only registry files.</value>
   </data>
+  <data name="MsgImportBinaryFile" xml:space="preserve">
+    <!-- Oracle 123. A binary registry hive is not a registry script. {0} is the file the user named. -->
+    <value>Cannot import {0}: The specified file is not a registry script.
+You can only import binary registry files from within the registry editor.</value>
+  </data>
+  <data name="MsgCommandLineMissingFilename" xml:space="preserve">
+    <!-- Oracle 43. A switch that takes a filename (/s, /e, /a) was given without one. -->
+    <value>Command line argument requires a filename and none was specified.</value>
+  </data>
   <data name="MsgImportFileMissing" xml:space="preserve">
     <!-- Oracle 235 -->
     <value>Cannot import {0}: The file specified does not exist.</value>
+  </data>
+  <data name="MsgImportRemoteAccess" xml:space="preserve">
+    <!-- Oracle 131 -->
+    <value>Cannot import {0}: Error accessing the registry on {1}.</value>
+  </data>
+  <data name="MsgImportRemoteFileMissing" xml:space="preserve">
+    <!-- Oracle 135 -->
+    <value>Cannot import {0}: The file specified does not exist on {1}.</value>
+  </data>
+  <data name="MsgImportRemoteSucceeded" xml:space="preserve">
+    <!-- Oracle 128 -->
+    <value>The keys and values contained in {0} have been successfully added to the registry on {1}.</value>
   </data>
   <data name="MsgExportOpenFailed" xml:space="preserve">
     <!-- Oracle 138 -->
@@ -718,27 +762,51 @@ Details: {1}</value>
   </data>
   <data name="MsgSecurityRetrieveDenied" xml:space="preserve">
     <!-- Oracle 7050 -->
-    <value>Registry Editor could not retrieve the security information.
+    <value>Registry Editor could not retrieve the security information. 
 The key currently selected does not give you access to retrieve such information.</value>
   </data>
   <data name="MsgSecurityRetrieveDeleted" xml:space="preserve">
     <!-- Oracle 7051 -->
-    <value>Registry Editor could not retrieve the security information.
+    <value>Registry Editor could not retrieve the security information. 
 The key currently selected is marked for deletion.</value>
   </data>
   <data name="MsgSecurityRetrieveFailed" xml:space="preserve">
     <!-- Oracle 7052 -->
-    <value>Registry Editor could not retrieve the security information.
+    <value>Registry Editor could not retrieve the security information. 
 The key currently selected is not accessible.</value>
   </data>
   <data name="MsgSecuritySaveDenied" xml:space="preserve">
-    <!-- Oracle 7070 (MSG-184) -->
-    <value>Registry Editor could not save the security information.
+    <!-- Oracle 7070 -->
+    <value>Registry Editor could not save the security information. 
 The key currently selected does not give you access to save such information.</value>
   </data>
+  <data name="MsgSecuritySaveDeleted" xml:space="preserve">
+    <!-- Oracle 7071 -->
+    <value>Registry Editor could not save the security information. 
+The key currently selected is marked for deletion.</value>
+  </data>
   <data name="MsgSecuritySetFailed" xml:space="preserve">
-    <!-- Oracle 7072 (MSG-186). The oracle text ends with a space. -->
+    <!-- Oracle 7072 -->
     <value>Registry Editor could not set security in the key currently selected, or some of its subkeys. </value>
+  </data>
+  <data name="MsgOwnerSetFailed" xml:space="preserve">
+    <!-- Oracle 7073 -->
+    <value>Registry Editor could not set owner on the key currently selected, or some of its subkeys. </value>
+  </data>
+  <data name="MsgSecuritySubkeysDenied" xml:space="preserve">
+    <!-- Oracle 7074 -->
+    <value>Registry Editor could not set security in the key currently selected, or some of its subkeys. 
+These keys do not give you access to change security information.</value>
+  </data>
+  <data name="MsgSecuritySubkeysDeleted" xml:space="preserve">
+    <!-- Oracle 7075 -->
+    <value>Registry Editor could not set security in all subkeys. 
+The key currently selected contains one or more subkeys marked for deletion.</value>
+  </data>
+  <data name="MsgSecuritySubkeysFailed" xml:space="preserve">
+    <!-- Oracle 7076 -->
+    <value>Registry Editor could not set security in all subkeys. 
+The key currently selected contains one or more inaccessible subkeys.</value>
   </data>
   <data name="MsgReplaceSubkeysConfirm" xml:space="preserve">
     <!-- Oracle 7017 (MSG-178). {0} is the key path. -->
@@ -831,6 +899,13 @@ The key currently selected does not give you access to save such information.</v
   <data name="PrintNoDevice" xml:space="preserve">
     <value>The Windows print dialog returned no printer device.</value>
   </data>
+  <!-- Written for this product: the progress dialog for the print job (RT_DIALOG 105 caption and text). -->
+  <data name="PrintProgressTitle" xml:space="preserve">
+    <value>Print</value>
+  </data>
+  <data name="PrintProgressText" xml:space="preserve">
+    <value>Printing the registry...</value>
+  </data>
   <!-- Oracle 23 (New Key #%u). The index follows the prefix. -->
   <data name="NewKeyNamePrefix" xml:space="preserve">
     <value>New Key #</value>
@@ -904,6 +979,10 @@ Do you want to continue the operation?</value>
   <!-- Oracle 8110. -->
   <data name="PrintNoClass" xml:space="preserve">
     <value>&lt;NO CLASS&gt;</value>
+  </data>
+  <!-- Oracle menu 768 (RT_MENU 107, "&amp;Disconnect"). Used by the Computer root and remote menus. -->
+  <data name="ContextDisconnect" xml:space="preserve">
+    <value>&amp;Disconnect</value>
   </data>
 </root>
 

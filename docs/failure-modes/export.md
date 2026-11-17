@@ -3,8 +3,8 @@
 This document covers `RegistryExportService`, `RegFileExporter`, `RegFileWriter`,
 `RegistryTextExporter`, and `RegistryHiveExporter`. The three files in
 `docs/parity/oracle/exports` remain the byte-level specification for `.reg` output. Classic
-regedit has no captured text-export golden, so section 2 fixes the stable text format BWC writes
-until an oracle capture replaces it. The package E5 contract is in
+regedit has a captured *Text Files* golden, so section 2 pins the classic text layout that BWC writes.
+The package E5 contract is in
 `docs/contracts/registry-engine.md`.
 
 ## 1. Entry points
@@ -26,72 +26,171 @@ until an oracle capture replaces it. The package E5 contract is in
 - `RegFileFormat.V5` is the default on every API. `RegFileFormat.Regedit4` selects the older
   header and ANSI encoding described in `reg-files.md`.
 
-## 2. Stable text format
+## 2. Classic text format (Text Files *.txt)
 
-Classic regedit's *Text Files* export has no tracked oracle golden (inventory row EXP-032 and
-OQ-34). BWC therefore fixes this format so the output is deterministic across machines:
+The golden is `docs/parity/oracle/exports/bwc-oracle-text.txt`. It is a real classic regedit *Text Files*
+export of `HKCU\Software\BWC-Oracle`, written from the seed `bwc-oracle-text-seed.reg`. It is UTF-16LE
+with a BOM and CRLF line ends, and every `Last Write Time:` value is masked as `<TIME>`. The golden test
+(`tests/Bwc.Registry.Tests/RegistryTextGoldenTests.cs`) imports the seed under a sandbox run key, exports
+it with `RegistryTextExporter`, masks and rewrites the path, and compares the bytes. The golden wins over
+The golden test needs one policy exception: the sandbox refuses REG_LINK values, and the seed has one (open point 9).
+Any other statement in this document is secondary to the golden.
+
+Shape (`<NO CLASS>` and `<NO NAME>` are the empty-name forms):
 
 ```
-Key Name:          HKEY_CURRENT_USER\Software\Bwc\Test
+Key Name:          HKEY_CURRENT_USER\Software\BWC-Oracle
 Class Name:        <NO CLASS>
-Last Write Time:   2026-11-11 12:34:56 UTC
-
+Last Write Time:   <TIME>
 Value 0
   Name:            <NO NAME>
   Type:            REG_SZ
-  Data:            default text
+  Data:            Default value set
 
 Value 1
-  Name:            Text
+  Name:            Other
   Type:            REG_SZ
-  Data:            hello
+  Data:            non-default sibling
 
-Key Name:          HKEY_CURRENT_USER\Software\Bwc\Test\Child
-...
+
+Key Name:          HKEY_CURRENT_USER\Software\BWC-Oracle\dotted.key.name
 ```
 
 Rules:
 
-- The file is UTF-16 little-endian with a `FF FE` byte order mark and CRLF line endings, the
-  same encoding as the v5 `.reg` format.
-- `Key Name:`, `Class Name:`, and `Last Write Time:` start in column one. Their values start at
-  column 20. `Value N` starts in column one, and `Name:`, `Type:`, and `Data:` are indented two
-  spaces with their values starting at column 20.
-- Key paths use the registry-style spelling, without `Computer\`. The writer removes one leading
-  `Computer\` prefix in any casing.
-- A key with an empty class name prints `<NO CLASS>`. A value with an empty name prints
-  `<NO NAME>`.
-- The last write time is the key's `LastWriteTimeUtc` formatted as
-  `yyyy-MM-dd HH:mm:ss` followed by ` UTC`. It is the UTC time, not the local time classic shows.
-- One blank line follows the three key metadata lines. Every value block is followed by one
-  blank line. A key with no values therefore has one blank line between its metadata and the next
-  key.
-- Values appear in registry enumeration order and keys are written depth first in pre-order. The
-  exporter never sorts. This is the same order as `.reg` export, not the tree's linguistic order.
-- A text export is a readable snapshot, not an import format. Use `.reg` or a hive file when the
-  data must be applied again.
+- Key block: three header lines (`Key Name:`, `Class Name:`, `Last Write Time:`, each label padded to
+  19 characters), no blank line after them, then the value blocks, then one blank line. A key with no
+  values is the three header lines and one blank line.
+- Keys are written depth first in pre-order, subkeys in registry enumeration order. The exporter never
+  sorts and never hoists the default value. Values are numbered `Value 0`, `Value 1`, ... in enumeration
+  order.
+- Value block: `Value n`, then `  Name:            ` (19 characters), `  Type:            `, and
+  `  Data:            ` (padded to 19 characters even when the data is empty), then the data lines, then
+  one blank line.
+- No `Data Size:` line. No escaping: names, class names, and string data are written as stored.
+- An empty value name prints `<NO NAME>`. An empty class name prints `<NO CLASS>`.
+- Type names: `REG_NONE`, `REG_SZ`, `REG_EXPAND_SZ`, `REG_BINARY`, `REG_DWORD`, `REG_LINK`,
+  `REG_MULTI_SZ`, `REG_RESOURCE_LIST`, `REG_FULL_RESOURCE_DESCRIPTOR`,
+  `REG_RESOURCE_REQUIREMENTS_LIST`, `REG_QWORD`. Every other type, including 5
+  (`REG_DWORD_BIG_ENDIAN`), prints `REG_UNKNOWN`.
+- `Last Write Time:` is the key's last write time in local time, written as the current culture's short
+  date, then ` - `, then the short time without seconds. en-US gives `11/14/2026 - 7:25 PM`. The golden
+  masks this value, so the rule is not measured for other cultures (open point 1).
+- The file ends after the last key's blank line, so it ends in `CRLF CRLF CRLF`.
 
-## 3. Text data rendering and lossiness
+Data lines by type. The first line goes after `  Data:            `; later lines are whole lines.
 
-The text format is deliberately display-oriented and is lossy in these cases:
+- `REG_SZ`, `REG_EXPAND_SZ`: the text up to the first NUL. Empty text leaves the label alone.
+- `REG_MULTI_SZ`: split on NUL. Trailing empty strings (the terminators) are dropped. The first string goes
+  on the Data line, and each later string goes on its own line indented 19 spaces. An empty middle string
+  is a line of exactly 19 spaces. `one\0\0three\0\0` prints `one`, 19 spaces, `three`. An empty list
+  (`00 00`) leaves the label alone.
+- `REG_DWORD`: C `%#x`. Zero prints `0`; anything else prints `0x` and lowercase hex with no padding
+  (`0x1234`, `0xffffffff`). Data shorter than four bytes is zero-extended: `01 02 03` prints `0x30201`.
+- `REG_BINARY`, `REG_NONE`, `REG_LINK`, `REG_QWORD`, `REG_DWORD_BIG_ENDIAN`, and unknown types: a hex dump.
+  Empty data leaves the label alone and has no rows.
+- Hex dump rows start at column 0 and have 16 bytes each. A row is an 8-digit lowercase offset, three
+  spaces, then `xx ` for each byte (lowercase). After the 8th byte of the row an extra `- ` is written, even
+  when the row has exactly 8 bytes, and never for fewer. The hex field is padded with spaces to 50
+  characters (columns 11 to 60), then one space, then the ASCII column at column 62, which is not padded.
+  ASCII: bytes 0x00 to 0x08, 0x0A to 0x1F, and 0x7F to 0x9F print `.`; 0x09 prints a TAB; every other byte
+  prints the character with the same code point (0x20 to 0x7E and 0xA0 to 0xFF).
+- Resource types 8, 9, and 10 leave the Data label alone and print the structure below. If the parse
+  fails, the whole value is a hex dump instead (open point 4).
 
-- `REG_SZ`, `REG_EXPAND_SZ`, and `REG_LINK` stop at the first NUL, as the Data column does. Bytes
-  after that NUL are not shown.
-- Backslash, NUL, carriage return, line feed, and tab in a value name or string are escaped as
-  `\\`, `\0`, `\r`, `\n`, and `\t`. Other characters are written literally.
-- `REG_MULTI_SZ` is shown as a comma-separated list of quoted items, for example
-  `"one", "", "two"`. This preserves empty items but not the exact terminator byte count.
-- A valid four-byte `REG_DWORD` and an eight-byte `REG_QWORD` use the Data-column rendering:
-  `0x%08x (%u)` with lowercase hex and an unsigned decimal value.
-- A DWORD or QWORD of the wrong length, `REG_DWORD_BIG_ENDIAN`, `REG_NONE`, the resource types,
-  and unknown types show uppercase hex bytes in stored order, separated by spaces.
-- Empty string-like data prints `(value not set)`. Empty binary-like data prints
-  `(zero-length binary value)`.
-- Registry security descriptors, key class names beyond the string, volatile state, and the
-  distinction between a missing default value and a zero-length default value are not part of
-  the text format.
-- A value name with an embedded NUL is representable in text because the NUL is escaped. It is
-  not representable in a `.reg` file (section 7).
+Resource layouts (`REG_RESOURCE_LIST` is 8, `REG_FULL_RESOURCE_DESCRIPTOR` is 9,
+`REG_RESOURCE_REQUIREMENTS_LIST` is 10). Interface type names are the classic bus names, and any value
+above 11 prints `Invalid`. Bus and slot numbers are signed decimal, as the UI viewers show them.
+
+- Full descriptor fields at column 21, labels padded to 19: `Interface Type:`, `Bus Number:`, `Version:`,
+  `Revision:`. A resource list puts `Full Resource Descriptor n` at column 19 before them.
+- Partial descriptor: `Partial Descriptor n` at column 21, its fields at column 23 with labels padded to
+  17: `Resource:` and `Disposition:` (share disposition name), then:
+  - Memory: `Start:` as `0x%08x`, `Length:` as bare hex, `Type:` as `Read / Write`, `Read Only`, or
+    `Write Only` from the flags.
+  - Interrupt: `Vector:` and `Level:` as decimal, `Affinity:` as `0x%08x`, `Type:` as `Latched` or
+    `Level Sensitive` from the flags.
+- Requirements list: header fields at column 19, labels padded to 21: `Interface Type:`, `Bus Number:`,
+  `Slot Number:`. `List n` at column 19, `Descriptor n` at column 21, and descriptor fields at column 23,
+  labels padded to 17: `Resource:`, `Option:` (`0x%08x`), `Disposition:`, `Type:`, then:
+  - Port: `Length:` and `Alignment:` as `%#x`, `Minimum Address:` and `Maximum Address:` as `0x%08x`,
+    `Type:` as `Port` or `Memory` from the flags.
+  - Memory: `Length:` and `Alignment:` as bare hex, `Minimum Address:` and `Maximum Address:` as
+    `0x%08x` (open point 2), `Type:` as `Read / Write` and so on.
+  - Interrupt: `Minimum Vector:` and `Maximum Vector:` as `%#x`, `Type:` as `Latched` or `Level Sensitive`.
+- A blank line follows each partial descriptor, each full descriptor, each requirement descriptor, and each
+  list. The value's own blank line follows after that.
+
+Open points. The golden does not measure these, so the rule shown is BWC's own:
+
+1. Time format outside en-US. The golden masks the time. The `d - t` rule comes from the string table and
+   the spec, and the separator and AM/PM text for other cultures are not measured.
+2. Memory requirement Minimum. In the seed, Length equals Alignment (0x1000), so the golden cannot tell
+   whether classic's `Minimum Address:` shows Length or Alignment. BWC assumes Minimum is the DWORD at
+   offset 4 of the union (Alignment) and Maximum is the low DWORD at offset 8. The golden's Maximum is
+   `0xfed00000`, the low DWORD of the minimum and not the maximum `0xfed00fff`, so BWC keeps that
+   quirk. Port requirements use the plain fields (Minimum at 8, Maximum at 16) and match the golden.
+3. Port, DMA, device-specific, bus-number, and large-memory layouts are not in the golden. A partial
+   descriptor follows the field list of the matching UI viewer (`ResourceDescriptorDialog`): Port prints
+   Start, Length, Type; DMA prints Channel and Port; Device Specific prints Reserved1, Reserved2, and Data
+   (F2b, section 2.1: the labels are classic strings, the position and the data bytes are extrapolated);
+   large memory and bus number print Resource and Disposition only. A requirement of any type other than
+   Port, Memory, Interrupt, or DMA prints Resource, Option, and Disposition only. A DMA requirement prints
+   Minimum Channel and Maximum Channel (F2b).
+4. A resource value that does not parse prints as a hex dump of the whole value. Bytes after the last
+   declared structure are ignored. Both are unmeasured.
+5. A DWORD of length 0 or more than 4 bytes is unmeasured. BWC zero-extends the first four bytes. The
+   golden only has the 3-byte case.
+6. A raw CR or LF inside string data is written as stored and so starts a new line. The golden has no such
+   case.
+7. String 8107 in `src/Bwc.Regedit/Strings/en-US/Resources.resw` is `  Data Size:       `. It contradicts the
+   golden. The golden wins, and the text format no longer uses the string.
+8. The resource names (bus names, share dispositions, partial types, memory access, interrupt and port
+   types) are English constants in `src/Bwc.Registry/Resources/ResourceNames.cs`. They are not localized.
+   `Bwc.UI` keeps its own copy in `ResourceText`. `Bwc.UI` has no project reference to `Bwc.Registry`, and the
+   two tables must be kept equal by hand.
+9. The sandbox write policy (`SandboxWritePolicy`) refuses REG_LINK values, because `AllowsLinkValues` is
+   false. The golden seed has one (`OddTypes\Link6`). `RegistryTextGoldenTests` wraps `SandboxWritePolicy` in
+   a policy that allows that one value type, and every path is still decided by `SandboxWritePolicy`. The
+   product policy is unchanged, and the manager should decide whether the test-only exception stays.
+10. The device-specific data line (`Data:`) is extrapolated (F2b, section 2.1). RT_STRING 8172 is `    Data:`
+    with no padding, so the bytes follow one space after it as lowercase hex pairs. Not measured.
+
+### 2.1 DMA, device-specific, and DMA requirement labels (F2b)
+
+Written before the change to `ResourceTextFormatter` and before its E2E check. The labels are the classic
+RT_STRING texts 8168, 8169, 8170, 8171, 8172, 8191, and 8192 (regedit-resources.json), so each label has the classic
+padding. The layout around them is extrapolated (open point 3); no classic text export holds these descriptors.
+
+- E1 DMA partial: `Channel:` (8168) and `Port:` (8169) padded to 17 at column 23, values in decimal. Failure: a label
+  printed without the padding, or the line dropped for channel 0. Check: `text.dma.labels` (exact lines).
+- E2 Device-specific partial: `Reserved1:` (8170) and `Reserved2:` (8171) padded to 17, then `Data:` (8172), which is
+  not padded. The data bytes follow after one space as lowercase hex pairs, one space apart. A partial with zero data
+  bytes prints the bare `Data:` label with no trailing space. Failure: `Data Size:` printed (string 8107 contradicts
+  the golden), or the bytes lost. Check: `text.device.labels`.
+- E3 DMA requirement: `Resource:`, `Option:`, `Disposition:`, then `Minimum Channel:` (8191) and `Maximum Channel:`
+  (8192), both padded to 17. No `Type:` line, because the DMA viewer (1900) has no Type field. Failure: a Type line, or
+  the Port and Interrupt fields printed for a DMA row. Check: `text.requirement.dma`.
+- E4 A label that is not the classic text (a retyped word, a different colon) fails, because the test compares each
+  line's label with the dump's string text. Check: `text.dma.labels` and `text.device.labels`.
+- E5 Layout: every line keeps the golden's column layout (field indent 23, label width 17). The layout of DMA and
+  device-specific partials is not measured. Check: the exact-line compare in the same checks.
+- E6 Print: the print report is the export text (MSG-245 to MSG-274), so E1 to E3 reach the print report too. No check
+  prints (print guard and PDF rule). Not checked here.
+
+## 3. Text lossiness
+
+The text format is for reading, and it loses information in these cases:
+
+- `REG_SZ` and `REG_EXPAND_SZ` stop at the first NUL, so bytes after it are not shown.
+- `REG_MULTI_SZ` drops its trailing terminators, so the exact byte count is not recoverable.
+- A short `REG_DWORD` is zero-extended, so its stored length is not shown.
+- Binary-like data is shown as hex, so the type of a value that stores text as bytes is not shown beyond
+  its `Type:` line.
+- Registry security descriptors, volatile state, and the difference between a missing default value and
+  a zero-length default value are not part of the text format.
+- A value name or string with an embedded NUL, tab, or line break is written as stored. Such a value is not
+  representable in a `.reg` file (section 7).
 
 ## 4. Streaming, cancellation, and partial text files
 
@@ -157,7 +256,7 @@ same per-key rules as a subtree export:
   not treated as a skip.
 - A value whose name contains an embedded NUL aborts a `.reg` whole-registry export with
   operation `ExportValueName` and Win32 error 123, exactly as a subtree export does. Text export
-  escapes the NUL instead.
+  writes the name as stored, NUL included.
 - `HKEY_CLASSES_ROOT` is the merged view Windows presents, so its export repeats the content of
   `HKEY_LOCAL_MACHINE\Software\Classes` and `HKEY_CURRENT_USER\Software\Classes`. Classic
   regedit exports the merged view, and BWC does the same. The registry's symbolic link keys are
@@ -166,6 +265,21 @@ same per-key rules as a subtree export:
 Whole-registry `.reg` output is one document, not one file per root. It starts with one v5 or
 REGEDIT4 header and then every key section in root order. Duplicate key paths cannot occur across
 roots because every path includes its root.
+
+### Whole-computer export of a connected computer (remote)
+
+File > Export with the Computer node of a connected computer selected writes `HKEY_LOCAL_MACHINE` and
+`HKEY_USERS` in one document, through the same streaming writer as the local whole-registry export.
+Before the fix, the remote path built every section in memory first, and it exported each root as a
+selection, so an unreadable `HKEY_USERS` root failed the whole export.
+
+Rule: the two remote roots use the local whole-registry rules. An inaccessible root or key is skipped
+with its subtree (access denied, file not found, key deleted), the rest of the document is written, and
+any other read failure still throws. Each key section is written as it is read.
+
+Check: no automated check. Measuring it needs a whole `HKEY_LOCAL_MACHINE` read over loopback, which the
+E2E budget does not allow, and a second computer is needed to make `HKEY_USERS` unreadable. The path is
+reviewed against `RegFileExporter.ExportRootKeys`, which the local path also uses.
 
 ## 7. What classic `.reg` files cannot represent
 
@@ -204,13 +318,24 @@ the process has the privileges, reproduces the saved subtree. The unit test suit
 restore inside `HKCU\Software\BWC-E2E`; the mount half runs only in the elevated suite because it
 needs the hive privileges and a mount point outside the sandbox.
 
+Hive export is local only. A remote store refuses hive operations with `ERROR_NOT_SUPPORTED` (50),
+which the export used to show as a raw error. Now a remote key whose export format is Registry Hive
+Files is refused before any write, with the classic remote text `DialogExportRemoteFormat` ("The
+registry of a connected computer exports as a Registration file. Choose Registration Files (.reg)."),
+and no file is written. Text and Registration exports of a remote key still work.
+
+Check: `Remote_ExportHiveOfRemoteKeyIsRefused` in `tests/Bwc.E2E/Remote/RemoteCommandTests.cs` connects
+to loopback, selects a remote key, chooses the Registry Hive Files filter in the save dialog, and checks
+the message and that no file exists. It runs only while RemoteRegistry is Running; otherwise it is the
+existing not-run rule (`RemoteRegistryService.RefusedConnect`).
+
 ## 9. Tests and repeatable artifact
 
 `tests/Bwc.Registry.Tests` proves:
 
 - the two v5 goldens and the REGEDIT4 golden are reproduced byte for byte, including the v5
   default;
-- the text format's key, value, type, and escaping rules;
+- the text format's key, value, type, data, and resource rules (section 2);
 - whole-registry output covers all five classic roots;
 - cancellation stops before native work and progress reports every exported key and value;
 - hive save and restore round trip inside the sandbox in an elevated test, with a non-elevated

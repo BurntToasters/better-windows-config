@@ -49,7 +49,8 @@ const DUMMY_VALUES = {
   AZURE_ARTIFACT_SIGNING_PUBLISHER: "Selftest Publisher",
   AZURE_ARTIFACT_SIGNING_PUBLISHER_DN: "CN=Selftest Publisher, O=Selftest, C=US",
 };
-// The root-level BWC binaries of a publish folder, as dotnet-build produces them.
+// The root-level BWC binaries of a publish folder, as dotnet-build produces them. BwcUpdate is NativeAOT: an exe, no
+// dll.
 const PUBLISH_FIXTURE = [
   "BetterWindowsConfig.exe",
   "BetterWindowsConfig.dll",
@@ -58,7 +59,6 @@ const PUBLISH_FIXTURE = [
   "BwcRegedit.exe",
   "BwcRegedit.dll",
   "BwcUpdate.exe",
-  "BwcUpdate.dll",
   "Bwc.Core.dll",
   "Bwc.Registry.dll",
   "Bwc.Regedit.dll",
@@ -79,12 +79,11 @@ const EXPECTED_TARGETS = [
   "Bwc.UI.dll",
   "BwcRegedit.dll",
   "BwcRegedit.exe",
-  "BwcUpdate.dll",
   "BwcUpdate.exe",
 ];
 const NSIS_REQUIRED_DEFINES = [
   "BWC_VERSION", "BWC_FILE_VERSION", "BWC_RID", "BWC_ARCH", "BWC_OUTPUT", "BWC_PAYLOAD_NSH",
-  "BWC_SCRIPTS_DIR", "BWC_UPDATER_SRC", "BWC_LICENSE", "BWC_NOTICES", "BWC_ICON", "BWC_ESTIMATED_KB",
+  "BWC_UPDATER_SRC", "BWC_LICENSE", "BWC_NOTICES", "BWC_ICON", "BWC_ESTIMATED_KB",
 ];
 
 const results = [];

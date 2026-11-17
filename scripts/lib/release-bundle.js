@@ -58,6 +58,32 @@ function keySummary(loadedPaths, texts, embeddedTexts) {
 }
 
 /**
+ * The asset names a release of this bundle may hold: the manifest and its signature, and the setups. Nothing else is
+ * expected, so nothing else is uploaded.
+ */
+export function expectedAssetNames(bundle) {
+  return [
+    path.basename(bundle.manifestPath),
+    path.basename(bundle.signaturePath),
+    ...bundle.installers.map((installer) => installer.fileName),
+  ];
+}
+
+/**
+ * The assets of a release that are outside the expected set (release.md LF1). A GPG signature `<expected name>.asc` is a
+ * sidecar of an expected asset and is allowed. Names compare exactly, so a stray file of any name is never ignored.
+ */
+export function unexpectedAssets(release, expectedNames) {
+  const allowed = new Set(expectedNames);
+  return (release?.assets ?? []).filter((asset) => {
+    const name = asset?.name;
+    if (typeof name !== "string") return true;
+    if (allowed.has(name)) return false;
+    return !(name.endsWith(".asc") && allowed.has(name.slice(0, -4)));
+  });
+}
+
+/**
  * Loads a D5 artifact folder and validates it with the D4 validator. It never contacts
  * the network. The caller decides whether a dry-run test key or stand-in installer is
  * acceptable for the operation.

@@ -20,7 +20,6 @@ internal sealed class ContextMenuController
     private readonly HiveRemoteCommands _hiveRemote;
     private readonly KeyCommands _keys;
     private readonly ValueCommands _values;
-    private readonly Action _goToRoot;
     private MenuFlyout? _contextFlyout;
 
     public ContextMenuController(
@@ -29,8 +28,7 @@ internal sealed class ContextMenuController
         ImportExportCommands importExport,
         HiveRemoteCommands hiveRemote,
         KeyCommands keys,
-        ValueCommands values,
-        Action goToRoot)
+        ValueCommands values)
     {
         _context = context;
         _editCommands = editCommands;
@@ -38,7 +36,6 @@ internal sealed class ContextMenuController
         _hiveRemote = hiveRemote;
         _keys = keys;
         _values = values;
-        _goToRoot = goToRoot;
     }
 
     private string Get(string key) => _context.Messages.Get(key);
@@ -61,9 +58,9 @@ internal sealed class ContextMenuController
             return;
         }
 
-        // A remote computer has the classic RT_MENU 107 menu. It is read-only, so none of its items writes.
-        MenuFlyout flyout = IsRemoteNode(e.Node)
-            ? CreateRemoteTreeContextMenu(e.Node)
+        // A connected computer has the classic RT_MENU 107 menu. A remote hive or key has the key menu, as local ones do.
+        MenuFlyout flyout = IsRemoteComputerNode(e.Node)
+            ? CreateRemoteComputerContextMenu(e.Node)
             : CreateTreeContextMenu(e.Node);
         ShowContextFlyout(flyout, e.Element, e.Point);
     }
@@ -82,14 +79,46 @@ internal sealed class ContextMenuController
         ShowContextFlyout(flyout, e.Element, e.Point);
     }
 
-    private static bool IsRemoteNode(TreeNode node) =>
-        node.RegistryPath is { Length: > 0 } displayPath && displayPath.StartsWith(@"\\", StringComparison.Ordinal);
+    /// <summary>True for a connected computer node, <c>\\COMPUTER</c>, which has no key of its own.</summary>
+    private static bool IsRemoteComputerNode(TreeNode node) =>
+        node.RegistryPath is { Length: > 0 } displayPath &&
+        displayPath.StartsWith(@"\\", StringComparison.Ordinal) &&
+        displayPath.IndexOf('\\', 2) < 0;
 
+    /// <summary>
+    /// The classic RT_MENU 107 menu for the Computer root: Expand (or Collapse), Export, and Disconnect. Export
+    /// is the whole-registry export. Disconnect is disabled, because the local computer has no connection to end.
+    /// </summary>
+    private MenuFlyout CreateComputerContextMenu(TreeNode node)
+    {
+        var items = new List<ClassicCommandItem>
+        {
+            node.IsExpanded
+                ? MenuCommand(915, "ContextCollapse", node.HasChildren, _context.Shell.TreeContent.CollapseSelected)
+                : MenuCommand(915, "ContextExpand", node.HasChildren, _context.Shell.TreeContent.ExpandSelected),
+            ClassicCommandItem.Separator,
+            MenuCommand(659, "ContextExport", isEnabled: true, _importExport.Export),
+            ClassicCommandItem.Separator,
+            MenuCommand(768, "ContextDisconnect", isEnabled: false),
+        };
+
+        return CreateContextFlyout(items);
+    }
+
+    /// <summary>
+    /// The classic RT_MENU 104 menu for a hive root or a key, as measured. Go to HKEY_LOCAL_MACHINE is not in
+    /// it; Ctrl+T still goes there.
+    /// </summary>
     private MenuFlyout CreateTreeContextMenu(TreeNode node)
     {
-        bool hasKey = _context.TryGetSelectedKeyPath(out RegistryPath key);
-        bool mutableKey = hasKey && !key.IsRoot;
-        string goToResource = IsUnderLocalMachine(_context) ? "ContextGoToHkcu" : "ContextGoToHklm";
+        if (ReferenceEquals(node, _context.TreeSource.Computer))
+        {
+            return CreateComputerContextMenu(node);
+        }
+
+        // A remote hive or key has the same key menu as a local one. Its location decides the enable rules.
+        bool hasKey = _context.TryGetLocationForNode(node, out KeyLocation location);
+        bool mutableKey = hasKey && !location.Path.IsRoot;
 
         // Expand (915) becomes Collapse (RT_STRING 25) while the node is expanded, and then collapses it.
         var items = new List<ClassicCommandItem>
@@ -103,23 +132,20 @@ internal sealed class ContextMenuController
             MenuCommand(913, "ContextDelete", mutableKey, _keys.DeleteKey),
             MenuCommand(914, "ContextRename", mutableKey, BeginTreeRenameFromMenu),
             ClassicCommandItem.Separator,
-            // Export at Computer is the whole-registry export, as on the main menu.
-            MenuCommand(659, "ContextExport", hasKey || _context.IsComputerSelected, _importExport.Export),
+            MenuCommand(659, "ContextExport", hasKey, _importExport.Export),
             MenuCommand(678, "ContextPermissions", hasKey, () => _hiveRemote.PermissionsForNode(node)),
             ClassicCommandItem.Separator,
             MenuCommand(675, "ContextCopyKeyName", hasKey, _keys.CopySelectedKeyName),
-            MenuCommand(918, goToResource, isEnabled: true, invoke: _goToRoot),
         };
 
         return CreateContextFlyout(items);
     }
 
     /// <summary>
-    /// The classic RT_MENU 107 menu for a remote computer: Expand (or Collapse), Export, and Disconnect.
-    /// Export is disabled because there is no remote export in this version. Disconnect opens the
-    /// Disconnect Network Registry list.
+    /// The classic RT_MENU 107 menu for a connected computer: Expand (or Collapse), Export, and Disconnect. Export
+    /// is the whole-computer export, and Disconnect closes this computer's connection, without a list.
     /// </summary>
-    private MenuFlyout CreateRemoteTreeContextMenu(TreeNode node)
+    private MenuFlyout CreateRemoteComputerContextMenu(TreeNode node)
     {
         var items = new List<ClassicCommandItem>
         {
@@ -127,9 +153,9 @@ internal sealed class ContextMenuController
                 ? MenuCommand(915, "ContextCollapse", node.HasChildren, _context.Shell.TreeContent.CollapseSelected)
                 : MenuCommand(915, "ContextExpand", node.HasChildren, _context.Shell.TreeContent.ExpandSelected),
             ClassicCommandItem.Separator,
-            MenuCommand(659, "ContextExport", isEnabled: false),
+            MenuCommand(659, "ContextExport", isEnabled: true, _importExport.Export),
             ClassicCommandItem.Separator,
-            MenuCommand(768, "ContextDisconnect", _context.RemoteConnections.Count > 0, _hiveRemote.DisconnectNetworkRegistry),
+            MenuCommand(768, "ContextDisconnect", isEnabled: true, () => _hiveRemote.DisconnectComputer(node)),
         };
 
         return CreateContextFlyout(items);
@@ -139,15 +165,15 @@ internal sealed class ContextMenuController
     {
         IReadOnlyList<DetailsRow> rows = _context.Shell.ListContent.SelectedRows;
 
-        // Values under a remote computer are read-only, so every value command is disabled there.
-        bool writable = !RegeditSelectionGuards.IsRemoteSelected(_context);
-        bool single = writable && rows.Count == 1;
+        // Remote values take the same commands as local values, through the connection's store.
+        bool single = rows.Count == 1;
         bool canRename = single && row.Renameable;
 
         // Modify is enabled for every single value. Binary and unknown types open the hex editor from it.
         // Modify Binary Data and Delete need a value behind the row, so the synthetic (Default) row
         // does not enable them.
-        int realValues = writable ? _context.SelectedRealValueCount() : 0;
+        int realValues = _context.SelectedRealValueCount();
+        int selectedRows = _context.SelectedRowCount();
         var items = new List<ClassicCommandItem>
         {
             MenuCommand(912, "ContextModify", single, _values.ModifySelectedValue),
@@ -155,7 +181,7 @@ internal sealed class ContextMenuController
             ClassicCommandItem.Separator,
             // The value menu deletes values only. It does not go through the focused pane, which can be the
             // tree when the list did not take focus, and would delete the key.
-            MenuCommand(913, "ContextDelete", realValues > 0, _values.DeleteValues),
+            MenuCommand(913, "ContextDelete", selectedRows > 0, _values.DeleteValues),
             MenuCommand(914, "ContextRename", canRename, BeginListRenameFromMenu),
         };
 
@@ -164,7 +190,7 @@ internal sealed class ContextMenuController
 
     private MenuFlyout CreateBackgroundContextMenu()
     {
-        bool hasKey = _context.TryGetSelectedKeyPath(out _) && !RegeditSelectionGuards.IsRemoteSelected(_context);
+        bool hasKey = _context.TryGetSelectedLocation(out _);
         var items = new List<ClassicCommandItem>
         {
             MenuCommand(516, "MenuEditNew", hasKey, children: BuildNewSubmenu(hasKey)),

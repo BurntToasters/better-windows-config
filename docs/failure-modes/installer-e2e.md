@@ -132,3 +132,186 @@ code is in `tests/Bwc.E2E/Installer/`. Its output is `artifacts/e2e/installer-up
     then runs `choco install nsis -y` only when both are missing. The script finds NSIS through `NSIS_HOME`.
 42. **Result file written by a crashed test.** The script treats a missing file, a schema other than 1, or
     `pass: false` as a failure.
+
+## Machine mode and the Elevated tests (I4)
+
+The per-machine install (docs/failure-modes/installer.md, "Per-machine install (0.1.2)") writes
+Program Files, HKLM, and the all-users Start menu. The unelevated flow above never runs it. The Elevated tests do, only
+through the user's elevated runner (`docs/elevated-runner.md`), which starts exactly
+`node scripts/test-e2e.js --rid <host> --flavor e2e --filter "TestCategory=Elevated"` with no arguments and no environment.
+They are in `tests/Bwc.E2E/Installer/InstallerMachineTests.cs` and write `artifacts/e2e/installer-machine.json`.
+
+The only places they may write: `%ProgramFiles%\BWC-E2E\<run-id>`, `HKLM\Software\BWC-E2E\<run-id>` (64-bit view), the
+all-users Start menu folder `BWC-E2E-<run-id>`, and the existing hive mount `HKEY_USERS\BWC-E2E-<run-id>` (not used here).
+The installer itself also makes the siblings `<run-id>.new`, `<run-id>.old`, and `<run-id>.upd` next to the run folder, and
+its in-place uninstaller may queue `Uninstall.exe` and the run folder for deletion at the next restart (installer.md M38).
+Those are the installer's own names, removed in `finally` (the queue entry in `HKLM\SYSTEM` is not ours to remove).
+
+### Prepare step (`scripts/test-installer-e2e.js --prepare --rid <rid>`)
+
+43. **`--prepare` runs elevated.** The same refusal as the normal run (exit 2): the E2E Hub and the build must never
+    run elevated, and the inputs must come from the user's own unelevated build.
+44. **A build fails during `--prepare`.** Exit 1 and no inputs file. The old inputs file is removed before the build, so a
+    failed prepare never leaves inputs that look current.
+45. **Inputs file missing.** The Elevated installer tests report Inconclusive (NOT RUN) with the message
+    "run `node scripts/test-installer-e2e.js --prepare --rid <rid>`". They never build and never guess a path.
+46. **Inputs stale.** A setup file is gone, or its size or SHA-256 differs from the file (a later build replaced it, or it
+    was edited after the prepare). NOT RUN, same message. The hash is the staleness check, not a signature.
+47. **Inputs for another rid, unreadable JSON, wrong schema, or a missing field.** NOT RUN with the reason. A rid
+    mismatch names both rids.
+48. **The normal `test-installer-e2e.js` run rebuilds the installers.** It does not write the inputs file, and a rebuild
+    can change the bytes, so the user runs `--prepare` last before the runner (docs/elevated-runner.md). A stale result is
+    caught by 46, never trusted.
+
+### Gates (every Elevated installer test)
+
+49. **Not elevated.** Checked first, from the process token (`TokenElevation`). Inconclusive "not run", like the existing
+    Permissions and Hive tests. A normal `dotnet test` shows them as skipped, never as passed or failed.
+50. **Not the E2E flavor.** `RequireE2EOnlyFlavor` fails the test before any install, because the ship setup would ask for
+    elevation (`requireAdministrator`) and the ship publish has no `/MACHINE` mode.
+51. **A UAC prompt.** The E2E setup is `asInvoker`, the tests pass `/S`, and the helper chain is started with a plain
+    start in the E2E flavor, so no step shows a prompt. A step that waits for a prompt hits its timeout (setup 3 minutes,
+    helper 2 minutes), the test records the step name, and only the process this test started is stopped.
+
+### Machine run (`InstallerRun` machine mode)
+
+52. **Run id.** `mach-<10 hex>-<case>`, 64 characters at most, letters, digits, `-`. A new id for every run, so a left-over
+    from a crashed run never collides, and the force cleanup can match names exactly.
+53. **A path outside the three locations.** The run folder is built from `ProgramW6432` and the run id, the Start menu
+    folder from the all-users Programs folder and the run id, and the key from the run id. Every delete first checks that the
+    path is the run folder, `<run folder>.new`, `.old`, or `.upd`, the run's Start menu folder, or the run's key. Nothing else
+    is ever removed. A folder that is a link is removed as a link and never entered.
+54. **Cleanup order.** `finally` stops the processes this run started (by pid and by image under the run folder), runs the
+    registered uninstall string once, then removes what remains. `<PF>\BWC-E2E` and `HKLM\Software\BWC-E2E` are removed only
+    when empty. A cleanup that cannot finish (a locked file) is a failed check that names the path, so the user can remove it
+    by hand.
+55. **HKLM written through the 32-bit view (`WOW6432Node`).** The fresh install test reads the 64-bit view and also checks
+    that `Software\WOW6432Node\BWC-E2E\<run-id>` is absent. If a broken setup wrote it there, the check fails and names the
+    key. The test does not delete it (outside the allowed locations): remove it by hand.
+56. **Uninstall strings.** `UninstallString` must be `"<dir>\Uninstall.exe" _?=<dir>` and `QuietUninstallString`
+    `"<dir>\Uninstall.exe" /S _?=<dir>`. Missing `_?=` means the uninstaller would run from a copy in `%TEMP%` (M37). The E2E
+    setup writes no `/RUNID` into them, so the test adds `/MACHINE /RUNID=<id>` before `_?=` when it runs the string.
+57. **Shortcuts.** Two `.lnk` files in the all-users `BWC-E2E-<run-id>` folder, none for the run in the current user's Start
+    menu, and the AUMIDs `BetterWindowsConfig.Hub` and `BetterWindowsConfig.Regedit` read back through the shell property
+    store. A missing AUMID is only a warning in the installer (installer.md), but here it is a failed check.
+58. **Folder ACL.** The run folder inherits from Program Files (the DACL is not protected and has inherited entries), and
+    no allow entry for Users, Authenticated Users, or Everyone grants a write right on the folder. `icacls` output and the SDDL
+    go into the artifact (`evidence`). A protected or Users-writable folder fails.
+
+### `/D=` naming another folder
+
+0.1.x carries no migration code, so there is no test of an upgrade over a 0.1.1 install. The one claim that stays is
+installer.md M5 and M6. Numbers 60 and 62 belonged to the 0.1.1 test and are not reused.
+
+59. **The installer changes the other folder.** The test makes a folder of its own below its run folder in the admin-only
+    work folder (85) and puts a few files in it. A name, size, or write time in it that differs from the snapshot taken before
+    the machine setup is a fail.
+61. **`/D=` becomes the target.** The machine setup is started with that other folder as `/D=`. The target must still be the
+    run's Program Files folder: `InstallLocation` of the HKLM key is the machine folder, the other folder is not the install
+    folder, and the other folder holds no B file.
+
+### Elevated update through the real helper chain
+
+63. **A protected-root override is set.** The E2E seam `BWC_E2E_UPDATE_PROTECTED_ROOT` would run the helper unelevated in a
+    temp folder. The test removes it from the helper's environment and asserts it is not set, so the real `<install dir>.upd`
+    path and the real elevated token are what is tested.
+64. **The staging folder is in the real `%TEMP%`.** The helper is started with `TEMP` and `TMP` of a scoped folder under the
+    run's data root, like the Hub E2E, so the real staging root of the user's Hub is never used or pruned.
+65. **The stand-in installer is not what the helper verified.** The copy's SHA-256 (from the stand-in's own record) must equal
+    the signed one, and the stand-in's path must be `<run folder>.upd\<32 hex>\installer.exe`.
+66. **The `.upd` ACL.** The root, the copy folder, and its `tmp` folder: owner Administrators, DACL protected (no
+    inheritance), allow entries only for SYSTEM and Administrators with full control, no deny entry. SDDL is recorded.
+67. **The installer's TEMP.** The stand-in records `TEMP` and `TMP`. Both must be `<copy folder>\tmp` (installer.md M32,
+    update-elevation.md HT1). The command line must be `/S /RELAUNCH /PARENTPID=<helper pid> /D=<run folder>` and the stand-in
+    must be elevated (it inherits the helper's token; no verb).
+68. **Stale `.upd` folders.** After the first apply the test adds a stale 32-hex folder, an upper-case 32-hex folder, and a
+    folder named `keepme`. The second apply removes the first copy and the stale hex folder, and leaves the other two (EA22).
+69. **The stand-in starts the Hub.** The chain test sets `BWC_E2E_INSTALLER_NO_RELAUNCH=1` for the stand-in, so no Hub is
+    started from the helper's elevated process. Starting the Hub at medium integrity is its own test (71).
+70. **The stand-in installer record is missing.** The helper reported ok but no record appears within 60 s: fail with the
+    helper's stdout and exit code. The record is `CreateNew`, so a second run never reuses the first.
+
+### `--launch-hub` and `--close-running` from the elevated test
+
+71. **The Hub is started elevated, or not at all.** The test replaces `BetterWindowsConfig.exe` in its own machine folder
+    with the stand-in (the stand-in is a harmless process: no window, no file, it only waits; it is the self-contained x64 build, because the
+    framework-dependent ARM64 one picks up the app's `hostfxr.dll` beside it and exits 0x80008096). It runs
+    `BwcUpdate.exe --launch-hub`, reads the started process's integrity level (`TokenIntegrityLevel`), and requires medium
+    (0x2000), while its own token is high (0x3000). A real Hub is never started because a shell-started Hub would not get
+    the test's data root and would write the user's real settings folder.
+72. **No desktop shell.** `--launch-hub` exits 8 (`DeElevationFailed`, M21). The test records exit code and stdout and
+    fails (the runner is meant to run in a logged-on desktop session). Nothing is started, so nothing needs to be stopped.
+73. **The wrong process is stopped.** Only the pid from the stand-in's own record is stopped, and only when its image is the
+    stand-in in the run folder.
+74. **The elevated Regedit stays open.** The test starts `BwcRegedit.exe` from the run folder with a scoped data root, checks
+    that its token is elevated (otherwise the test proves nothing and fails), and runs
+    `--close-running --install-dir <run folder>`. Exit 0 and the Regedit gone. Exit 3 means it did not close.
+75. **SeDebugPrivilege.** The helper prints nothing about it, so the test reads the helper's own token while it runs. A second
+    stand-in named `BwcRegedit.exe` in a sub folder never closes, which keeps the helper alive for its 8 s timeout. The test
+    samples the helper's `TokenPrivileges` until `SeDebugPrivilege` is enabled. The helper exits 3 and names that pid. If the
+    test's own token does not hold the privilege (a group policy), the check records "not held" and does not claim enabled.
+    The test never enables the privilege in its own process, so a child inherits it disabled.
+
+### Machine uninstall, version order
+
+76. **Uninstall through the string.** `Uninstall.exe /S /MACHINE /RUNID=<id> _?=<dir>` runs in place and the test waits for the
+    process (120 s). Exit code, then: HKLM key gone (and the empty `BWC-E2E\<id>` parents), shortcut folder gone, payload files
+    gone, `<dir>.upd` gone (a plain copy folder is planted first), no `<dir>.new` or `.old`.
+77. **Leftovers.** The uninstaller cannot delete itself or the folder it runs from, so `Uninstall.exe` (and the folder) may
+    stay and be queued for the next restart (M38). Allowed: nothing but `Uninstall.exe` left in the folder, and every new entry
+    of `PendingFileRenameOperations` (read before and after) names `Uninstall.exe` or the run folder. Anything else is a fail
+    ("undocumented reboot-pending leftover"). The test then removes the file and folder itself. The queue entries stay in
+    `HKLM\SYSTEM` and Windows ignores them at the restart because the paths no longer exist.
+78. **Downgrade accepted against HKLM.** After B is installed, setup A must exit non-zero, leave the key at B and the Hub exe
+    at B, and leave no `.new` or `.old` (M19).
+79. **Same version does not repair.** Setup B over B must exit 0, leave key and file at B, and leave no `.new` or `.old` (M18).
+
+### Security review 2 (I5): the Elevated tests and the sandbox AUMID check
+
+Written before the tests and the code. The Elevated tests run as administrator, so everything they run or delete must come
+from a place a standard user cannot change. These rows are enforced by code that compiles in every run and executes only
+in the elevated runner (the unelevated run reports them as not run).
+
+82. **The setup path comes from a user-writable file (finding 5).** `installer-inputs.json` is in the checkout, so any path
+    in it (a UNC path, another folder) with its own size and hash would be accepted. The inputs are used only when each
+    setup is a plain file inside `<repo>\artifacts\installer` (the output folder of `build-installer.js`), is named
+    `BetterWindowsConfig-<semver>-<rid>-e2e-setup.exe` with the run's rid, is not a link, and its manifest requests only
+    `asInvoker` (the E2E setup; a ship setup, which asks for elevation, is refused). Otherwise NOT RUN with the reason.
+83. **The hash is checked once and the file is run later.** The test copies each setup into an admin-only run folder,
+    `%ProgramFiles%\BWC-E2E\work-<id>\inputs`, hashes the copy against the inputs file (and the size), and runs the copy.
+    A copy that differs is NOT RUN. The original is never run.
+84. **Program Files from the environment.** `ProgramW6432` is a variable the caller controls. The 64-bit Program Files folder
+    is `SHGetKnownFolderPath(FOLDERID_ProgramFiles)`. An existing `%ProgramFiles%\BWC-E2E` that is a link, or is not owned by
+    Administrators, SYSTEM, or TrustedInstaller, or that standard users can write, is refused: the Elevated tests are NOT RUN
+    (they would otherwise create and delete inside a folder a user controls).
+85. **The run's working folder is in `%TEMP%`.** An Elevated run that kept its working folder in `%TEMP%\bwc-installer-e2e-<id>`
+    would start elevated children with that folder as the working directory and delete it recursively as administrator. It
+    lives in `%ProgramFiles%\BWC-E2E\work-<id>\<run id>` instead, with the inputs. The folder that test 59 and 61 name in
+    `/D=` is inside it too.
+86. **The recursive delete.** The only recursive deletes of the Elevated tests are of folders inside the work folder, and
+    the work folder itself, each checked to be below `%ProgramFiles%\BWC-E2E` by name and not a link. A work folder that
+    cannot be removed is a failed cleanup check naming the path, never a silent leftover.
+87. **The unelevated run.** None of 82 to 86 runs without an elevated token. `RequireReady` returns NOT RUN first, so the work
+    folder is never created, and the unelevated installer E2E (`test-installer-e2e.js`) is unchanged: its sandbox stays in
+    `%TEMP%`, because it is unelevated.
+88. **The shortcut AUMID (finding 1, installer.md M45) is not checked in the unelevated run.** The user-sandbox install in
+    `Installer_Update_HubInstallsRealNewerInstaller` reads both shortcuts back through the shell property store: `<case>.a.aumid` (for example `update.a.aumid`) passes
+    only when the Hub shortcut carries `BetterWindowsConfig.Hub` and the Registry Editor shortcut `BetterWindowsConfig.Regedit`.
+    A missing AUMID is only a warning in the installer, but here it is a failed check, so a broken `--set-aumid` cannot pass.
+89. **Reinstall before the restart (installer.md M51).** After the uninstall of test 76, when the queue now names this run's
+    `Uninstall.exe`, the test runs the setup again and requires a non-zero exit, no `installed-files.txt`, and no key. When the
+    queue does not name it (the uninstaller deleted itself), the check records that it did not apply.
+90. **`_?=` names another folder (installer.md M47).** The Elevated test runs the uninstaller with `_?=` set to a folder in the
+    work folder that holds a copy of a BWC payload name. It must exit non-zero, and that folder and the real install and key
+    must be untouched.
+91. **A `.upd` copy with a `tmp` child (installer.md M50).** Test 76 plants `<dir>.upd\<32 hex>\installer.exe` and
+    `<dir>.upd\<32 hex>\tmp\x.dat` (what an update leaves), and the uninstall must remove `.upd` completely.
+
+### Result file
+
+80. **`artifacts/e2e/installer-machine.json`.** Written when at least one machine test passed its gates: every check, the run
+    id, the rid, the versions, the evidence text (`icacls`, SDDL, helper output), and `pass`. The old file is deleted when the
+    first test passes its gates, so a crashed run leaves none. A run where every test is Inconclusive writes nothing.
+81. **A run killed halfway.** Leftovers stay under the three locations. The run id is in the folder name, so the user removes
+    `%ProgramFiles%\BWC-E2E\<id>*`, `HKLM\Software\BWC-E2E\<id>`, and the Start menu folder `BWC-E2E-<id>` by hand. The next run
+    does not touch them (its id is new).

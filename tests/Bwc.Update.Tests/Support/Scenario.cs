@@ -70,7 +70,7 @@ internal sealed class Scenario : IAsyncDisposable
         var routePath = path ?? $"/bwc/{architecture}.exe";
         var payloadBytes = bytes ?? Payloads.Pattern(size, seed: architecture.Length);
         var file = Dir.Write($"{architecture}-{Guid.NewGuid():N}.bin", payloadBytes);
-        var trusted = comment ?? $"timestamp:1794102823\tfile:installer.exe\tversion:{Version}\tarch:{architecture}";
+        var trusted = comment ?? $"timestamp:1794102823\tfile:installer.exe\tversion:{Version}\tarch:{architecture}\tproduct:bwc\tchannel:{Channel}";
         var signed = Signing.Sign(file, signer ?? Key, trusted);
         var envelope = Sig.Envelope(signed.Raw);
         var payload = new InstallerPayload(file, payloadBytes, Payloads.Sha256Hex(payloadBytes), envelope, trusted);

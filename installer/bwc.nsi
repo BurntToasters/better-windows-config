@@ -3,16 +3,26 @@
 ; Built by scripts/build-installer.js. Compile by hand only for debugging; the script expects every
 ; define below. Failure modes and intended behavior: docs/failure-modes/installer.md.
 ;
+; Per machine (0.1.2). The ship setup asks for administrator rights, installs to %ProgramFiles%\Better Windows Config,
+; writes its uninstall entry to HKLM (64-bit view), and puts the shortcuts in the all-users Start menu. The E2E flavor
+; stays a per-user sandbox (asInvoker), plus the E2E-only /MACHINE switch.
+;
 ; Command line:
-;   (none)             interactive install, per user, to %LOCALAPPDATA%\Programs\Better Windows Config
+;   (none)             interactive install to %ProgramFiles%\Better Windows Config
 ;   /S                 silent install or uninstall
-;   /D=<dir>           install folder; must be the last switch and unquoted (NSIS rule)
-;   /RELAUNCH          start the Hub when the run ends: the new Hub after success, or the installed Hub
-;                      with --update-result InstallerFailed after failure. Without it no Hub starts.
+;   /D=<dir>           ship: never the install folder. Accepted (the updater passes it) and ignored; nothing there is
+;                      read, closed, or changed. Must be last and unquoted (NSIS rule).
+;                      E2E per-user sandbox: the install folder, as before.
+;   /RELAUNCH          start the Hub when the run ends, through BwcUpdate.exe --launch-hub (never directly, so an
+;                      elevated setup does not start an elevated Hub): the new Hub after success, or the installed
+;                      Hub with --update-result InstallerFailed after failure. Without it no Hub starts.
 ;   /PARENTPID=<n>     the updater that launched this setup. The setup waits for it to exit, then
 ;                      excludes it from the close step.
-;   /RUNID=<id>        E2E builds only (required). Uninstall key under HKCU\Software\BWC-E2E\<id>.
-;   /SHORTCUTS=<dir>   E2E builds only (required). Folder for the two Start menu shortcuts.
+;   /RUNID=<id>        E2E builds only (required). Uninstall key under BWC-E2E\<id> (HKCU, or HKLM with /MACHINE).
+;   /SHORTCUTS=<dir>   E2E builds only (required unless /MACHINE). Folder for the two Start menu shortcuts.
+;   /MACHINE           E2E builds only. The per-machine layout in a sandbox: %ProgramFiles%\BWC-E2E\<id>,
+;                      HKLM\Software\BWC-E2E\<id>, shortcuts in the all-users Start menu folder BWC-E2E-<id>.
+;                      Needs a shell that is already elevated. It never asks for elevation.
 ;
 ; Defines (all passed by scripts/build-installer.js with /D):
 ;   BWC_VERSION        display version, for example 0.2.0-beta.3
@@ -21,7 +31,6 @@
 ;   BWC_ARCH           x64 or arm64
 ;   BWC_OUTPUT         absolute path of the setup EXE to write
 ;   BWC_PAYLOAD_NSH    generated file with the payload macros (file list, moves, deletes, rmdirs)
-;   BWC_SCRIPTS_DIR    installer\scripts, which holds the AUMID helper
 ;   BWC_UPDATER_SRC    absolute path of the BwcUpdate.exe that is installed (runs the close step)
 ;   BWC_LICENSE        absolute path of the repo LICENSE file
 ;   BWC_NOTICES        absolute path of the generated THIRD-PARTY-NOTICES.txt
@@ -49,9 +58,6 @@
 !endif
 !ifndef BWC_PAYLOAD_NSH
   !error "BWC_PAYLOAD_NSH is not defined. Run scripts/build-installer.js."
-!endif
-!ifndef BWC_SCRIPTS_DIR
-  !error "BWC_SCRIPTS_DIR is not defined. Run scripts/build-installer.js."
 !endif
 !ifndef BWC_UPDATER_SRC
   !error "BWC_UPDATER_SRC is not defined. Run scripts/build-installer.js."
@@ -86,7 +92,13 @@
 Unicode true
 SetCompressor /SOLID lzma
 ManifestDPIAware true
-RequestExecutionLevel user
+; Ship asks for elevation. The E2E flavor never does, so no test or dev build can show a prompt.
+; scripts/build-installer.js checks the manifest of the built EXE against the flavor.
+!ifdef BWC_E2E
+  RequestExecutionLevel user
+!else
+  RequestExecutionLevel admin
+!endif
 ShowInstDetails show
 ShowUninstDetails show
 
@@ -113,13 +125,10 @@ ShowUninstDetails show
 
 Name "${BWC_PRODUCT}"
 OutFile "${BWC_OUTPUT}"
-; Per-user default. /D= overrides it. No per-machine mode in this version (see docs/installer.md).
+; Ship and /MACHINE: a per-machine run sets $INSTDIR itself in .onInit (BwcPickMachineTarget), so this default is not
+; used. There is no InstallDirRegKey: the recorded folder is read and checked by hand. E2E per-user sandbox: /D= or
+; this default, as before; a run without /D= never reads a real uninstall key.
 InstallDir "$LOCALAPPDATA\Programs\${BWC_PRODUCT}"
-; The release installer finds the folder of an earlier install through its uninstall key. The E2E
-; flavor never reads the real key, so an E2E run without /D= cannot pick up a real install.
-!ifndef BWC_E2E
-  InstallDirRegKey HKCU "${BWC_UNINSTALL_SUBKEY}" "InstallLocation"
-!endif
 BrandingText "${BWC_PRODUCT}"
 
 VIProductVersion "${BWC_FILE_VERSION}"
@@ -137,12 +146,15 @@ VIAddVersionKey "LegalCopyright" "Copyright (c) Better Windows Config contributo
 !define MUI_ABORTWARNING
 !define MUI_ICON "${BWC_ICON}"
 !define MUI_UNICON "${BWC_ICON}"
-!define MUI_FINISHPAGE_RUN "$INSTDIR\${BWC_HUB_EXE}"
+; The finish page option runs a function instead of the Hub: it calls BwcUpdate.exe --launch-hub, which starts
+; the Hub at the shell integrity level, so an elevated setup never leaves an elevated Hub behind.
+!define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_FUNCTION BwcLaunchFromFinish
 !define MUI_FINISHPAGE_RUN_TEXT "Start ${BWC_PRODUCT}"
 
+; No directory page: the install folder is not a choice (see docs/installer.md).
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "${BWC_LICENSE}"
-!insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -153,39 +165,42 @@ VIAddVersionKey "LegalCopyright" "Copyright (c) Better Windows Config contributo
 ; Initialization
 ; ---------------------------------------------------------------------------
 
+; Order: mode (registry view, shell context, elevated token), raw /D=, target folder, host checks, folder rules, newer
+; version. Everything here runs before any file or registry value changes. There is no directory page, so the folder is
+; always checked here.
 Function .onInit
-  SetShellVarContext current
+  Call BwcInitMode
   Call BwcCheckRawDir
+  StrCmp $BwcMachine "1" 0 BwcInit_target
+  Call BwcPickMachineTarget
+  Call BwcNoteRawDir
+  BwcInit_target:
   Call BwcTrimInstDir
   Call BwcCheckHost
   Call BwcCheckArchitecture
-  ; Silent installs never reach .onVerifyInstDir, so the folder is checked here. Interactive runs check
-  ; the folder when the directory page is left.
-  IfSilent 0 +2
   Call BwcCheckInstDir
-  Call BwcFindPowerShell
+  Call BwcRefuseNewer
+  StrCmp $BwcMachine "1" 0 +2
+  Call BwcRefusePendingUninstall
   Call BwcReadParentPid
-  !ifdef BWC_E2E
-    Call BwcReadE2eSwitches
-  !else
-    StrCpy $BwcUninstallKey "${BWC_UNINSTALL_SUBKEY}"
-    StrCpy $BwcShortcutDir "$SMPROGRAMS"
-  !endif
-FunctionEnd
-
-; Interactive only. Runs when the user leaves the directory page, so a refused folder keeps the page open.
-Function .onVerifyInstDir
-  Call BwcTrimInstDir
-  Call BwcCheckInstDir
 FunctionEnd
 
 Function un.onInit
-  SetShellVarContext current
   !ifdef BWC_E2E
     Call un.BwcReadE2eSwitches
   !else
+    StrCpy $BwcMachine "1"
     StrCpy $BwcUninstallKey "${BWC_UNINSTALL_SUBKEY}"
   !endif
+  ; A per-machine run first drops the runtime variables, so no child inherits them (installer.md M48). The folder the
+  ; uninstaller was started for is then checked against the uninstall entry (M47) before anything runs or is deleted.
+  StrCmp $BwcMachine "1" 0 +2
+  Call un.BwcClearRuntimeEnvironment
+  Call un.BwcApplyContext
+  StrCmp $BwcMachine "1" 0 BwcUnInit_done
+  Call un.BwcRequireElevated
+  Call un.BwcCheckInstallLocation
+  BwcUnInit_done:
 FunctionEnd
 
 ; /PARENTPID=<n> is optional. When it is present it must be 1 to 10 decimal digits, or the setup
@@ -212,14 +227,35 @@ Function BwcReadParentPid
   Abort "/PARENTPID must be the numeric process id of the updater. Nothing was changed."
 FunctionEnd
 
-; /RELAUNCH starts the Hub after a successful silent or interactive install. A failed launch is
-; not an installer failure, so Exec's result is ignored.
+; Starts the Hub through BwcUpdate.exe --launch-hub, never directly: an elevated setup that started the Hub itself would
+; leave an elevated Hub. The helper starts it at the shell's integrity level (a normal start when it is not elevated,
+; which is the E2E per-user flavor). $R5 = the extra arguments ("" or "--update-result InstallerFailed"). The helper
+; starts from %WINDIR%, never from a folder that a standard user can write. A missing helper or Hub is a log line, and
+; a failed start never changes the exit code.
+Function BwcLaunchHub
+  IfFileExists "$INSTDIR\${BWC_UPDATER_EXE}" 0 BwcLaunch_missing
+  IfFileExists "$INSTDIR\${BWC_HUB_EXE}" 0 BwcLaunch_missing
+  SetOutPath "$WINDIR"
+  Exec '"$INSTDIR\${BWC_UPDATER_EXE}" --launch-hub $R5'
+  Return
+  BwcLaunch_missing:
+  DetailPrint "The Hub was not started: ${BWC_UPDATER_EXE} or ${BWC_HUB_EXE} is missing from $INSTDIR."
+FunctionEnd
+
+; The finish page "Start" option.
+Function BwcLaunchFromFinish
+  StrCpy $R5 ""
+  Call BwcLaunchHub
+FunctionEnd
+
+; /RELAUNCH starts the Hub after a successful silent or interactive install.
 Function .onInstSuccess
   ${GetParameters} $R0
   ClearErrors
   ${GetOptions} $R0 "/RELAUNCH" $R1
   IfErrors BwcRelaunch_skip 0
-  Exec '"$INSTDIR\${BWC_HUB_EXE}"'
+  StrCpy $R5 ""
+  Call BwcLaunchHub
   BwcRelaunch_skip:
 FunctionEnd
 
@@ -231,35 +267,32 @@ Function .onInstFailed
   StrCmp $BwcCommitStarted "1" BwcFailed_relaunch 0
   StrCmp $BwcStageOwned "1" 0 BwcFailed_relaunch
   ; SetOutPath made the staging folder the working directory, and Windows cannot remove that folder.
-  SetOutPath "$TEMP"
+  SetOutPath "$WINDIR"
   RMDir /r "$INSTDIR${BWC_STAGE_SUFFIX}"
   BwcFailed_relaunch:
   ${GetParameters} $R0
   ClearErrors
   ${GetOptions} $R0 "/RELAUNCH" $R1
   IfErrors BwcFailed_done 0
-  IfFileExists "$INSTDIR\${BWC_HUB_EXE}" 0 BwcFailed_done
-  Exec '"$INSTDIR\${BWC_HUB_EXE}" --update-result InstallerFailed'
+  StrCpy $R5 "--update-result InstallerFailed"
+  Call BwcLaunchHub
   BwcFailed_done:
 FunctionEnd
 
-; Close step for the install. It runs the BwcUpdate.exe in the staging folder, which has its .NET
-; runtime beside it and is the version being installed. The payload is staged before this runs.
-; It runs only when an earlier version is present, because a first install has nothing to close.
+; Close step for the install. It runs the BwcUpdate.exe in the staging folder, which is the version being installed
+; and is a standalone NativeAOT exe (no .NET runtime beside it). The payload is staged before this runs.
+; The target's apps are closed only when an earlier version is present (a first install has nothing to close).
 Function BwcCloseRunningApps
-  IfFileExists "$INSTDIR\${BWC_UPDATER_EXE}" BwcCloseInst_update BwcCloseInst_first
-  BwcCloseInst_first:
-  Return
-  BwcCloseInst_update:
   ; The updater that launched this setup exits right after it starts the setup. Wait for it first, so
   ; no file is replaced while its copy of BwcUpdate.exe is still in use. Then close the apps, excluding it.
-  StrCmp $BwcParentPid "" BwcCloseInst_noparent 0
-  !insertmacro BWC_WAIT_PARENT_BODY "install" "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_UPDATER_EXE}"
-  BwcCloseInst_noparent:
   StrCpy $BwcCloseArgs ""
-  StrCmp $BwcParentPid "" +2 0
+  StrCmp $BwcParentPid "" BwcCloseInst_args 0
+  !insertmacro BWC_WAIT_PARENT_BODY "install" "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_UPDATER_EXE}"
   StrCpy $BwcCloseArgs "--exclude-pid $BwcParentPid"
-  !insertmacro BWC_CLOSE_APPS_BODY "install" "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_UPDATER_EXE}"
+  BwcCloseInst_args:
+  IfFileExists "$INSTDIR\${BWC_UPDATER_EXE}" 0 BwcCloseInst_end
+  !insertmacro BWC_CLOSE_APPS_BODY "install" "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_UPDATER_EXE}" "$INSTDIR"
+  BwcCloseInst_end:
 FunctionEnd
 
 ; Close step for the uninstall. The uninstaller cannot embed files, so it runs the BwcUpdate.exe
@@ -269,7 +302,7 @@ Function un.BwcCloseRunningApps
   IfFileExists "$INSTDIR\${BWC_UPDATER_EXE}" +2 0
   Abort "Stopped: ${BWC_UPDATER_EXE} is missing from $INSTDIR, so the running apps cannot be closed. Nothing was changed. Reinstall, then uninstall."
   StrCpy $BwcCloseArgs ""
-  !insertmacro BWC_CLOSE_APPS_BODY "uninstall" "$INSTDIR\${BWC_UPDATER_EXE}"
+  !insertmacro BWC_CLOSE_APPS_BODY "uninstall" "$INSTDIR\${BWC_UPDATER_EXE}" "$INSTDIR"
 FunctionEnd
 
 ; ---------------------------------------------------------------------------
@@ -318,7 +351,7 @@ FunctionEnd
 ; staging and backup folders are removed only when every file is back in place.
 Function BwcRollback
   DetailPrint "The upgrade failed. Putting the previous version back."
-  SetOutPath "$TEMP"
+  SetOutPath "$WINDIR"
   StrCmp $BwcMovedIn "1" BwcRb_removeNew BwcRb_restore
   BwcRb_removeNew:
   !insertmacro BWC_PAYLOAD_DELETE
@@ -350,6 +383,19 @@ Function BwcRollback
   Abort "The upgrade failed and the rollback did not finish. The previous files are in $INSTDIR${BWC_BACKUP_SUFFIX}. Restore them by hand, see docs/installer.md, then run the installer again."
 FunctionEnd
 
+; A shortcut or the uninstall entry could not be written. The install is rolled back as a whole (BwcRollback ends in
+; Abort). A first install also loses what was written here. An upgrade keeps the previous entry and shortcuts: they
+; have the same names and point at the files that the rollback puts back.
+Function BwcWriteFailed
+  DetailPrint "A shortcut or the uninstall entry could not be written (see above)."
+  IfFileExists "$INSTDIR${BWC_BACKUP_SUFFIX}\${BWC_MANIFEST}" BwcWf_upgrade 0
+  Delete "$BwcShortcutDir\${BWC_HUB_SHORTCUT}"
+  Delete "$BwcShortcutDir\${BWC_REGEDIT_SHORTCUT}"
+  DeleteRegKey SHCTX "$BwcUninstallKey"
+  BwcWf_upgrade:
+  Call BwcRollback
+FunctionEnd
+
 ; Runs after the registry and shortcuts are written. The upgrade is complete, so the backup of the
 ; previous version is removed. The marker is written first: if the backup stays (a locked file), the
 ; next run finds the marker and removes it. A failed cleanup is a warning, not a rollback, because
@@ -370,7 +416,7 @@ Function BwcFinishUpgrade
   BwcFinish_nomarker:
   DetailPrint "WARNING: could not write the cleanup marker. $INSTDIR${BWC_BACKUP_SUFFIX} is kept."
   BwcFinish_stage:
-  SetOutPath "$TEMP"
+  SetOutPath "$WINDIR"
   RMDir /r "$INSTDIR${BWC_STAGE_SUFFIX}"
 FunctionEnd
 
@@ -399,9 +445,19 @@ FunctionEnd
 
 Section "Better Windows Config" SecMain
   SectionIn RO
-  SetShellVarContext current
+
+  ; The registry view and shell folders were applied in .onInit. Applying them here too costs nothing and keeps the
+  ; section independent of that call.
+  Call BwcApplyContext
+  StrCmp $BwcHintNote "" +2 0
+  DetailPrint "$BwcHintNote"
 
   ; 0. Abort before any change when <install folder>.new is a file or a folder that is not a staging folder.
+  ;    A per-machine run first removes what a crashed update left in <install folder>.upd (only 32-hex folders, never
+  ;    through a link, never the folder this setup runs from).
+  StrCmp $BwcMachine "1" 0 BwcSec_noUpd
+  Call BwcClearStaleProtected
+  BwcSec_noUpd:
   Call BwcCheckStageFree
   StrCpy $BwcStageOwned "1"
 
@@ -431,28 +487,46 @@ Section "Better Windows Config" SecMain
   ; 4. Swap the files in. A failure restores the previous version (see BwcCommit and BwcRollback).
   Call BwcCommit
 
-  ; 5. Uninstall entry, shortcuts, and the AppUserModelID the apps set at startup. The AUMID write is
-  ;    non-fatal: the shortcut still works without it.
-  WriteRegStr HKCU "$BwcUninstallKey" "DisplayName" "${BWC_PRODUCT}"
-  WriteRegStr HKCU "$BwcUninstallKey" "DisplayVersion" "${BWC_VERSION}"
-  WriteRegStr HKCU "$BwcUninstallKey" "Publisher" "${BWC_PUBLISHER}"
-  WriteRegStr HKCU "$BwcUninstallKey" "DisplayIcon" "$INSTDIR\${BWC_HUB_EXE}"
-  WriteRegStr HKCU "$BwcUninstallKey" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "$BwcUninstallKey" "UninstallString" '"$INSTDIR\${BWC_UNINSTALLER}"'
-  WriteRegStr HKCU "$BwcUninstallKey" "QuietUninstallString" '"$INSTDIR\${BWC_UNINSTALLER}" /S'
-  WriteRegDWORD HKCU "$BwcUninstallKey" "EstimatedSize" ${BWC_ESTIMATED_KB}
-  WriteRegDWORD HKCU "$BwcUninstallKey" "NoModify" 1
-  WriteRegDWORD HKCU "$BwcUninstallKey" "NoRepair" 1
-  ; Not a standard value. The uninstaller reads it to find the shortcuts it created.
-  WriteRegStr HKCU "$BwcUninstallKey" "ShortcutDir" "$BwcShortcutDir"
-
+  ; 5. Shortcuts, the uninstall entry, and the AppUserModelID the apps set at startup. The shortcuts are all-users in a
+  ;    per-machine run. A shortcut or entry that cannot be written is fatal: the install is rolled back as a whole
+  ;    (BwcWriteFailed). Only the AUMID write is non-fatal: the shortcut still works without it.
+  ClearErrors
   CreateDirectory "$BwcShortcutDir"
+  IfErrors BwcSec_writeFailed 0
   CreateShortCut "$BwcShortcutDir\${BWC_HUB_SHORTCUT}" "$INSTDIR\${BWC_HUB_EXE}" "" "$INSTDIR\${BWC_HUB_EXE}" 0
+  IfErrors BwcSec_writeFailed 0
   CreateShortCut "$BwcShortcutDir\${BWC_REGEDIT_SHORTCUT}" "$INSTDIR\${BWC_REGEDIT_EXE}" "" "$INSTDIR\${BWC_REGEDIT_EXE}" 0
-  InitPluginsDir
-  File "/oname=$PLUGINSDIR\${BWC_AUMID_HELPER}" "${BWC_SCRIPTS_DIR}\${BWC_AUMID_HELPER}"
-  !insertmacro BWC_SET_AUMID_BODY "$PLUGINSDIR\${BWC_AUMID_HELPER}" "$BwcShortcutDir\${BWC_HUB_SHORTCUT}" "${BWC_HUB_AUMID}"
-  !insertmacro BWC_SET_AUMID_BODY "$PLUGINSDIR\${BWC_AUMID_HELPER}" "$BwcShortcutDir\${BWC_REGEDIT_SHORTCUT}" "${BWC_REGEDIT_AUMID}"
+  IfErrors BwcSec_writeFailed 0
+
+  WriteRegStr SHCTX "$BwcUninstallKey" "DisplayName" "${BWC_PRODUCT}"
+  WriteRegStr SHCTX "$BwcUninstallKey" "DisplayVersion" "${BWC_VERSION}"
+  WriteRegStr SHCTX "$BwcUninstallKey" "Publisher" "${BWC_PUBLISHER}"
+  WriteRegStr SHCTX "$BwcUninstallKey" "DisplayIcon" "$INSTDIR\${BWC_HUB_EXE}"
+  WriteRegStr SHCTX "$BwcUninstallKey" "InstallLocation" "$INSTDIR"
+  ; _?=$INSTDIR makes the uninstaller run in place from the install folder (admin-only in a per-machine install)
+  ; instead of from a copy in %TEMP%, which an elevated process must not run (installer.md M37). The uninstaller then
+  ; cannot delete itself: Section Uninstall removes it and the folder at the next restart when it cannot (M38).
+  WriteRegStr SHCTX "$BwcUninstallKey" "UninstallString" '"$INSTDIR\${BWC_UNINSTALLER}" _?=$INSTDIR'
+  WriteRegStr SHCTX "$BwcUninstallKey" "QuietUninstallString" '"$INSTDIR\${BWC_UNINSTALLER}" /S _?=$INSTDIR'
+  WriteRegDWORD SHCTX "$BwcUninstallKey" "EstimatedSize" ${BWC_ESTIMATED_KB}
+  WriteRegDWORD SHCTX "$BwcUninstallKey" "NoModify" 1
+  WriteRegDWORD SHCTX "$BwcUninstallKey" "NoRepair" 1
+  !ifdef BWC_E2E
+    ; Not a standard value, E2E only. The E2E uninstaller reads it to find the shortcuts it created. The ship
+    ; uninstaller knows its shortcut folder (the all-users Start menu).
+    WriteRegStr SHCTX "$BwcUninstallKey" "ShortcutDir" "$BwcShortcutDir"
+  !endif
+  IfErrors BwcSec_writeFailed 0
+
+  ; The AUMID is written by the installed BwcUpdate.exe (--set-aumid), never by PowerShell (installer.md M45). The working
+  ; folder is moved out of the staging folder first, so the child never inherits a folder the install is about to remove.
+  SetOutPath "$WINDIR"
+  !insertmacro BWC_SET_AUMID_BODY "$BwcShortcutDir\${BWC_HUB_SHORTCUT}" "${BWC_HUB_AUMID}"
+  !insertmacro BWC_SET_AUMID_BODY "$BwcShortcutDir\${BWC_REGEDIT_SHORTCUT}" "${BWC_REGEDIT_AUMID}"
+  Goto BwcSec_written
+  BwcSec_writeFailed:
+  Call BwcWriteFailed
+  BwcSec_written:
 
   ; 6. The upgrade is complete. Remove the backup of the previous version and the staging folder.
   Call BwcFinishUpgrade
@@ -463,16 +537,26 @@ SectionEnd
 ; ---------------------------------------------------------------------------
 
 Section "Uninstall"
-  SetShellVarContext current
+  Call un.BwcApplyContext
 
   ; Stop the apps first. Abort, with nothing removed, when they stay.
   Call un.BwcCloseRunningApps
 
-  ; Shortcuts recorded at install time. Release builds record $SMPROGRAMS.
-  ReadRegStr $R0 HKCU "$BwcUninstallKey" "ShortcutDir"
+  ; Shortcuts. Ship: the two all-users shortcuts, in the folder the installer used ($SMPROGRAMS with the all-users
+  ; context). E2E: the folder that the install recorded; the /MACHINE sandbox also removes its own Start menu folder
+  ; when it is empty.
+  !ifdef BWC_E2E
+    ReadRegStr $R0 SHCTX "$BwcUninstallKey" "ShortcutDir"
+  !else
+    StrCpy $R0 "$SMPROGRAMS"
+  !endif
   StrCmp $R0 "" BwcUn_noShortcuts 0
   Delete "$R0\${BWC_HUB_SHORTCUT}"
   Delete "$R0\${BWC_REGEDIT_SHORTCUT}"
+  !ifdef BWC_E2E
+    StrCmp $BwcMachine "1" 0 BwcUn_noShortcuts
+    RMDir "$R0"
+  !endif
   BwcUn_noShortcuts:
 
   ; Payload. The lists come from this version's build, and the uninstaller is written by the same
@@ -489,35 +573,57 @@ Section "Uninstall"
   Delete "$INSTDIR\THIRD-PARTY-NOTICES.txt"
   Delete "$INSTDIR\${BWC_MANIFEST}"
   Delete "$INSTDIR\${BWC_CLEANUP_MARKER}"
-  ; Helper from versions before 0.2.0. It is removed when present.
-  Delete "$INSTDIR\${BWC_LEGACY_TOOLS_DIR}\${BWC_LEGACY_CLOSE_HELPER}"
   IfErrors 0 BwcUn_filesDeleted
   IntOp $R9 $R9 + 1
   IntCmp $R9 20 BwcUn_filesDeleted 0 BwcUn_filesDeleted
   Sleep 500
   Goto BwcUn_deleteFiles
   BwcUn_filesDeleted:
-  RMDir "$INSTDIR\${BWC_LEGACY_TOOLS_DIR}"
   !insertmacro BWC_PAYLOAD_RMDIRS
 
-  ; The updater's download and staging folder. A file still in use stays and does not stop the uninstall.
-  ; The E2E flavor never touches the real %TEMP% folder of the updater.
-  !ifndef BWC_E2E
-    RMDir /r "$TEMP\BWC-Update"
-  !endif
+  ; The folders of the elevated updater: the protected copies of the installer in <install folder>.upd (only 32-hex
+  ; folders, never through a link), then the .upd folder itself when it is empty. The staging folder in the user's
+  ; %TEMP% is not touched here: an elevated recursive delete in a user-writable folder is not safe, and the Hub
+  ; prunes its own staging. No user's data folder is touched either.
+  StrCmp $BwcMachine "1" 0 BwcUn_noUpd
+  Call un.BwcRemoveProtected
+  RMDir "$INSTDIR${BWC_PROTECTED_SUFFIX}"
+  BwcUn_noUpd:
 
-  ; Remove the folder only when it is empty. User files in it stay.
+  ; Remove the folder only when it is empty. User files in it stay. A copy of the uninstaller (no _?=) deletes the
+  ; original at once. An uninstaller that runs in place cannot delete itself or the folder it runs from, so the deletes
+  ; are repeated with /REBOOTOK, and only then (M38). The working folder moves out of the install folder first, so the
+  ; uninstaller's own current directory does not hold it.
+  SetOutPath "$WINDIR"
+  ClearErrors
   Delete "$INSTDIR\${BWC_UNINSTALLER}"
+  IfErrors 0 BwcUn_uninstallerGone
+  Delete /REBOOTOK "$INSTDIR\${BWC_UNINSTALLER}"
+  BwcUn_uninstallerGone:
+  ClearErrors
   RMDir "$INSTDIR"
+  IfErrors 0 BwcUn_folderDone
+  RMDir /REBOOTOK "$INSTDIR"
+  BwcUn_folderDone:
+  !ifdef BWC_E2E
+    StrCmp $BwcMachine "1" 0 BwcUn_noE2eRoot
+    RMDir "$PROGRAMFILES64\${BWC_E2E_FOLDER}"
+    BwcUn_noE2eRoot:
+  !endif
 
   ; The uninstall entry is removed only when its InstallLocation is this folder (case-insensitive). An
   ; entry that names another folder belongs to another install, so it stays.
-  ReadRegStr $R0 HKCU "$BwcUninstallKey" "InstallLocation"
+  ReadRegStr $R0 SHCTX "$BwcUninstallKey" "InstallLocation"
   System::Call 'kernel32::lstrcmpiW(t "$R0", t "$INSTDIR") i .R1'
   StrCmp $R1 "0" BwcUn_keyOwn 0
   DetailPrint "Kept the uninstall entry $BwcUninstallKey: its InstallLocation is $R0, not $INSTDIR."
   Goto BwcUn_keyDone
   BwcUn_keyOwn:
-  DeleteRegKey HKCU "$BwcUninstallKey"
+  DeleteRegKey SHCTX "$BwcUninstallKey"
+  !ifdef BWC_E2E
+    ; The sandbox parents go when they are empty, so a finished run leaves nothing under BWC-E2E\<RUNID>.
+    DeleteRegKey /ifempty SHCTX "${BWC_E2E_ROOT}\$BwcRunId\Uninstall"
+    DeleteRegKey /ifempty SHCTX "${BWC_E2E_ROOT}\$BwcRunId"
+  !endif
   BwcUn_keyDone:
 SectionEnd

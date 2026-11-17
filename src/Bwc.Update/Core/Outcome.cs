@@ -41,6 +41,18 @@ public enum UpdateFailure
     InstallerFailed,
     HubMissing,
     RunningElevated,
+
+    /// <summary>The consent prompt for the elevated helper was declined (Win32 error 1223).</summary>
+    ElevationDeclined,
+
+    /// <summary><c>--apply-elevated</c> ran without an elevated token.</summary>
+    NotElevated,
+
+    /// <summary>A BWC process from the install folder runs in another session.</summary>
+    RunningInOtherSession,
+
+    /// <summary>The Hub cannot be started at the shell's integrity level, so it was not started.</summary>
+    DeElevationFailed,
     Unexpected,
 }
 

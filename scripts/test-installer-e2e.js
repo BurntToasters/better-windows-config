@@ -7,13 +7,17 @@
  * files are never changed. Then runs the Installer tests (tests/Bwc.E2E/Installer) with the paths in the environment.
  * Those tests install A silently, press Download and Install in the Hub, and check the update.
  *
- * Usage: node scripts/test-installer-e2e.js --rid win-arm64|win-x64
+ * Usage: node scripts/test-installer-e2e.js --rid win-arm64|win-x64 [--prepare]
  *
- * Output: artifacts/e2e/installer-update.json. Exit 0 only when that file says pass. Failure modes:
+ * --prepare builds A and B the same way and stops: it writes artifacts/e2e/installer-inputs.json (paths, versions,
+ * sizes, SHA-256, rid) for the Elevated machine-mode tests (docs/elevated-runner.md) and runs no test. Those tests read
+ * the file and report NOT RUN when it is missing, stale, or for another rid.
+ *
+ * Output: artifacts/e2e/installer-update.json. Exit 0 only when it says pass. Failure modes:
  * docs/failure-modes/installer-e2e.md. Needs NSIS (makensis) and must run unelevated.
  */
 import { spawnSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,7 +35,9 @@ import {
   buildPayloadNsh,
 } from "./build-installer.js";
 import { generateNugetNotices } from "./generate-nuget-licenses.js";
-import { checkPublishFlavor, formatFlavorReport } from "./flavor-metadata.js";
+import { checkPublishFlavor, checkSetupManifestLevel, formatFlavorReport } from "./flavor-metadata.js";
+import { buildEnvironment } from "./lib/build-environment.js";
+import { installUpdateOutputs, removeStaleFileLists, updateStagingDir } from "./lib/update-publish.js";
 import { parsePackageVersion } from "./sync-version-helpers.js";
 
 const SCRIPT = "scripts/test-installer-e2e.js";
@@ -49,38 +55,48 @@ const PUBLISH_PROJECTS = [
   "src/Bwc.Regedit.App/Bwc.Regedit.App.csproj",
   "src/Bwc.Update/Bwc.Update.csproj",
 ];
+const UPDATE_PROJECT = "src/Bwc.Update/Bwc.Update.csproj";
 const REQUIRED_PUBLISH_FILES = ["BetterWindowsConfig.dll", "BetterWindowsConfig.exe", "BwcUpdate.exe"];
 const NSIS_SCRIPT = path.join(REPO_ROOT, "installer", "bwc.nsi");
-const SCRIPTS_DIR = path.join(REPO_ROOT, "installer", "scripts");
 const LICENSE_FILE = path.join(REPO_ROOT, "LICENSE");
 const ICON_FILE = path.join(REPO_ROOT, "resources", "bwc.ico");
 const INSTALLER_DIR = path.join(REPO_ROOT, "artifacts", "installer");
 const E2E_DIR = path.join(REPO_ROOT, "artifacts", "e2e");
 const RESULT_PATH = path.join(E2E_DIR, "installer-update.json");
+const INPUTS_PATH = path.join(E2E_DIR, "installer-inputs.json");
+const INPUTS_SCHEMA = 1;
 const DOTNET_FALLBACK = "C:\\Program Files\\dotnet\\dotnet.exe";
 const NSIS_X86_HOME = path.join(process.env["ProgramFiles(x86)"] ?? "", "NSIS");
 const EXIT_USAGE = 2;
 const EXIT_NSIS_MISSING = 3;
 
-const usage = `Usage: node ${SCRIPT} --rid win-arm64|win-x64
+const usage = `Usage: node ${SCRIPT} --rid win-arm64|win-x64 [--prepare]
 
 Builds unsigned E2E installers A (package.json version) and B (next patch), then runs the Installer E2E tests:
-an in-app update from A to B through the Hub, a case with BwcRegedit open, and an uninstall.
+an in-app update from A to B through the Hub, a case with BwcRegedit open, an uninstall, the refusal to install
+over a newer version, and the refusal of the E2E /MACHINE switch without an elevated token. The E2E installer is the
+per-user sandbox, so everything here runs unelevated; the per-machine proof is the elevated runner (docs/installer.md).
 
 Options:
   --rid win-x64|win-arm64   Required. The app runtime identifier.
+  --prepare                 Build A and B, write artifacts/e2e/installer-inputs.json, run no test. Run this
+                            (unelevated) right before the elevated runner: the Elevated installer tests read the file.
   --help                    Show this help.
 
-Output: artifacts/e2e/installer-update.json
+Output: artifacts/e2e/installer-update.json (--prepare: artifacts/e2e/installer-inputs.json)
 Exit codes: 0 pass, 1 fail, 2 usage or environment error, ${EXIT_NSIS_MISSING} NSIS (makensis) missing.
 `;
 
 function parseArgs(argv) {
-  const options = { rid: undefined, help: false };
+  const options = { rid: undefined, help: false, prepare: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") {
       options.help = true;
+      continue;
+    }
+    if (arg === "--prepare") {
+      options.prepare = true;
       continue;
     }
     if (arg === "--rid") {
@@ -166,6 +182,19 @@ function publishB(rid, version, outDir) {
   const dotnet = dotnetCommand();
   for (const project of PUBLISH_PROJECTS) {
     console.log(`installer-e2e: publishing ${project} as ${version} into ${path.relative(REPO_ROOT, outDir)}`);
+    // The NativeAOT helper is published away from the shared folder: a publish with -o set to it deletes the runtime
+    // files of the Hub that an earlier CoreCLR publish of the helper had written (update-elevation.md HN25).
+    const staged = project === UPDATE_PROJECT;
+    const target = staged ? updateStagingDir(outDir) : outDir;
+    if (staged) {
+      rmSync(target, { recursive: true, force: true });
+      removeStaleFileLists({
+        projectDir: path.dirname(path.join(REPO_ROOT, project)),
+        projectFile: path.basename(project),
+        platform,
+        rid,
+      });
+    }
     runOrFail(
       dotnet,
       [
@@ -181,16 +210,21 @@ function publishB(rid, version, outDir) {
         `-p:Version=${version}`,
         `-p:FileVersion=${fileVersion}`,
         "-o",
-        outDir,
+        target,
         "--nologo",
       ],
       {
         cwd: REPO_ROOT,
         stdio: "inherit",
-        env: { ...process.env, MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: "1" },
+        // vswhere.exe on PATH, for the NativeAOT link of BwcUpdate (update-elevation.md HN23).
+        env: { ...buildEnvironment(process.env), MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: "1" },
       },
       `publishing ${project}`,
     );
+    if (staged) {
+      installUpdateOutputs(target, outDir);
+      rmSync(target, { recursive: true, force: true });
+    }
   }
 
   const flavor = checkPublishFlavor(outDir, "e2e");
@@ -247,7 +281,6 @@ function buildInstallerB(rid, version, publishDir, makensis) {
     ["BWC_ARCH", RID_ARCH.get(rid)],
     ["BWC_OUTPUT", setup],
     ["BWC_PAYLOAD_NSH", payloadPath],
-    ["BWC_SCRIPTS_DIR", SCRIPTS_DIR],
     ["BWC_UPDATER_SRC", path.join(publishDir, "BwcUpdate.exe")],
     ["BWC_LICENSE", LICENSE_FILE],
     ["BWC_NOTICES", noticesPath],
@@ -276,6 +309,12 @@ function buildInstallerB(rid, version, publishDir, makensis) {
   if (result.error || result.status !== 0 || !existsSync(setup)) {
     const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.split(/\r?\n/).slice(-40).join("\n");
     throw new Error(`makensis failed for installer B: ${result.error?.message ?? `exit ${result.status}`}\n${output}`);
+  }
+  // B is an E2E setup like A, so it must never ask for elevation (the same audit build-installer.js runs).
+  const manifest = checkSetupManifestLevel(readFileSync(setup), "e2e");
+  if (!manifest.ok) {
+    rmSync(setup, { force: true });
+    throw new Error(`installer B: ${manifest.problem}`);
   }
   return setup;
 }
@@ -329,6 +368,35 @@ function readVerdict() {
   return document;
 }
 
+/** Size and SHA-256 of one setup, for the inputs file. */
+function describeSetup(file, version) {
+  const bytes = readFileSync(file);
+  return {
+    path: file,
+    version,
+    size: bytes.length,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+  };
+}
+
+/**
+ * Writes artifacts/e2e/installer-inputs.json for the Elevated tests. It is written last, after both builds passed, and
+ * the old file is removed before the build starts, so a failed prepare never leaves inputs that look current.
+ */
+function writeInputs({ rid, setupA, setupB, versionA, versionB }) {
+  const document = {
+    schema: INPUTS_SCHEMA,
+    rid,
+    createdUtc: new Date().toISOString(),
+    installerA: describeSetup(setupA, versionA),
+    installerB: describeSetup(setupB, versionB),
+  };
+  mkdirSync(E2E_DIR, { recursive: true });
+  writeFileSync(INPUTS_PATH, `${JSON.stringify(document, null, 2)}
+`, "utf8");
+  return document;
+}
+
 function main(argv = process.argv.slice(2)) {
   let options;
   try {
@@ -377,6 +445,10 @@ function main(argv = process.argv.slice(2)) {
   const runId = `${stamp(new Date())}-${randomBytes(4).toString("hex")}`;
   console.log(`installer-e2e: rid=${rid} A=${versionA} B=${versionB} runId=${runId}`);
 
+  if (options.prepare) {
+    rmSync(INPUTS_PATH, { force: true });
+  }
+
   let setupA;
   let setupB;
   try {
@@ -390,6 +462,16 @@ function main(argv = process.argv.slice(2)) {
   } catch (error) {
     console.error(`installer-e2e: FAIL while building: ${error.message}`);
     return 1;
+  }
+
+  if (options.prepare) {
+    const written = writeInputs({ rid, setupA, setupB, versionA, versionB });
+    console.log(`installer-e2e: prepared ${rid} A=${versionA} B=${versionB}`);
+    console.log(`installer-e2e:   A ${written.installerA.size} bytes sha256 ${written.installerA.sha256}`);
+    console.log(`installer-e2e:   B ${written.installerB.size} bytes sha256 ${written.installerB.sha256}`);
+    console.log(`installer-e2e: inputs ${path.relative(REPO_ROOT, INPUTS_PATH)}`);
+    console.log("installer-e2e: run the elevated runner next (docs/elevated-runner.md). A later build makes these inputs stale.");
+    return 0;
   }
 
   mkdirSync(E2E_DIR, { recursive: true });

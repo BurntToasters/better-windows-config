@@ -1,4 +1,6 @@
 using System.Security.AccessControl;
+using System.Security.Principal;
+using Bwc.Registry.Privileges;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Security;
@@ -50,7 +52,7 @@ public sealed partial class RegistryWriter
         cancellationToken.ThrowIfCancellationRequested();
 
         const string Operation = nameof(RegistryWriteOperation.SetKeySecurity);
-        _policy.EnsureWriteAllowed(path, RegistryWriteOperation.SetKeySecurity);
+        Authorize(path, RegistryWriteOperation.SetKeySecurity);
         ValidateSecurityArguments(information, securityDescriptor);
 
         if (!propagateToSubkeys)
@@ -102,7 +104,168 @@ public sealed partial class RegistryWriter
         }
 
         rootNames ??= ListSubkeyNames(path, Operation);
-        PropagateToChildren(path, parentEffective, rootNames, childInformation, progress, cancellationToken, ref changed, depth: 0);
+        var failures = new List<RegistryOperationException>();
+        PropagateToChildren(path, parentEffective, rootNames, childInformation, progress, cancellationToken, ref changed, failures, depth: 0);
+        if (failures.Count > 0)
+        {
+            throw new RegistrySecurityWalkException(failures);
+        }
+    }
+
+    /// <summary>
+    /// Sets the owner of <paramref name="path"/> and of every key below it to the owner in
+    /// <paramref name="securityDescriptor"/> (classic "Replace owner on subcontainers and objects"). Each key is
+    /// opened with WRITE_OWNER alone and receives only the owner. A key that fails is recorded and the walk
+    /// continues with the keys below it and with its siblings. The root is written first, and a root failure throws
+    /// at once. When any subkey failed, <see cref="RegistrySecurityWalkException"/> lists them after the walk.
+    /// </summary>
+    public void SetKeyOwnerTree(
+        RegistryPath path,
+        ReadOnlySpan<byte> securityDescriptor,
+        IProgress<KeySecurityProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        const string Operation = nameof(RegistryWriteOperation.SetKeySecurity);
+        Authorize(path, RegistryWriteOperation.SetKeySecurity);
+        ValidateSecurityArguments(RegistrySecurityInformation.Owner, securityDescriptor);
+
+        // SeTakeOwnershipPrivilege, when the token holds it, is on for the whole walk and put back after.
+        using OptionalPrivilegeScope privileges = OptionalPrivilegeScope.Enable(OptionalPrivilegeScope.TakeOwnershipPrivilege);
+
+        byte[] descriptor = securityDescriptor.ToArray();
+        if (_policy.RejectsSymbolicLinks)
+        {
+            using SafeRegistryKeyHandle root = OpenKey(path, REG_SAM_FLAGS.KEY_READ, Operation, path);
+            EnsureSubtreeHasNoSymbolicLinks(root, path.ToAbbreviatedString(), Operation, path, depth: 0);
+        }
+
+        IReadOnlyList<string>? rootNames = TryListSubkeyNames(path, Operation);
+        SetKeySecurity(path, RegistrySecurityInformation.Owner, descriptor);
+        int changed = 1;
+        progress?.Report(new KeySecurityProgress(path, changed));
+
+        rootNames ??= ListSubkeyNames(path, Operation);
+        var failures = new List<RegistryOperationException>();
+        OwnerWalk(path, rootNames, descriptor, progress, cancellationToken, failures, ref changed, depth: 0);
+        if (failures.Count > 0)
+        {
+            throw new RegistrySecurityWalkException(failures);
+        }
+    }
+
+    private void OwnerWalk(
+        RegistryPath path,
+        IReadOnlyList<string> names,
+        byte[] descriptor,
+        IProgress<KeySecurityProgress>? progress,
+        CancellationToken cancellationToken,
+        List<RegistryOperationException> failures,
+        ref int changed,
+        int depth)
+    {
+        const string Operation = nameof(RegistryWriteOperation.SetKeySecurity);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (depth >= MaxSubtreeDepth)
+        {
+            throw new RegistryOperationException(
+                Operation,
+                path,
+                ErrorAccessDenied,
+                $"The owner walk stops at '{path.ToAbbreviatedString()}' because it is nested {MaxSubtreeDepth} levels deep.");
+        }
+
+        foreach (string name in names)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // The names come from the registry, which allows "." and "..", so the safe append is used (writer section K).
+            RegistryPath child = path.AppendEnumeratedName(name);
+            IReadOnlyList<string>? childNames = null;
+            try
+            {
+                Authorize(child, RegistryWriteOperation.SetKeySecurity);
+                childNames = TryListSubkeyNames(child, Operation);
+                using (SafeRegistryKeyHandle handle = OpenKey(child, (REG_SAM_FLAGS)WriteOwnerStandardRight, Operation, child))
+                {
+                    WriteSecurityDescriptor(handle, RegistrySecurityInformation.Owner, descriptor, Operation, child);
+                }
+
+                changed += 1;
+                progress?.Report(new KeySecurityProgress(child, changed));
+            }
+            catch (RegistryOperationException error)
+            {
+                // The owner of this key is unchanged. The keys below it are still walked, because their owners
+                // do not depend on this key's security.
+                failures.Add(error);
+            }
+
+            try
+            {
+                childNames ??= ListSubkeyNames(child, Operation);
+            }
+            catch (RegistryOperationException error)
+            {
+                failures.Add(error);
+                continue;
+            }
+
+            OwnerWalk(child, childNames, descriptor, progress, cancellationToken, failures, ref changed, depth + 1);
+        }
+    }
+
+    /// <summary>
+    /// Reads the parent's DACL and returns the request with the parent's inheritable entries appended. A parent that
+    /// cannot be read fails the write with the native error: falling back to the explicit-only descriptor would drop
+    /// the key's inherited entries.
+    /// </summary>
+    private byte[] MergeParentEntries(
+        RegistryPath path,
+        RegistryPath parentPath,
+        ReadOnlySpan<byte> request,
+        string operation)
+    {
+        byte[] parent;
+        using (SafeRegistryKeyHandle handle = OpenKey(parentPath, (REG_SAM_FLAGS)ReadControlStandardRight, operation, path))
+        {
+            parent = ReadSecurityDescriptor(handle, RegistrySecurityInformation.Dacl, operation, path);
+        }
+
+        // The key's own owner and group stand in for CREATOR OWNER and CREATOR GROUP when the request has none. A key
+        // that cannot be read for them keeps the creator entries as inherit-only copies.
+        SecurityIdentifier? owner = null;
+        SecurityIdentifier? group = null;
+        try
+        {
+            using SafeRegistryKeyHandle own = OpenKey(path, (REG_SAM_FLAGS)ReadControlStandardRight, operation, path);
+            var key = new RawSecurityDescriptor(
+                ReadSecurityDescriptor(
+                    own,
+                    RegistrySecurityInformation.Owner | RegistrySecurityInformation.Group,
+                    operation,
+                    path),
+                0);
+            owner = key.Owner;
+            group = key.Group;
+        }
+        catch (RegistryOperationException)
+        {
+            // The merge goes on without them.
+        }
+
+        try
+        {
+            return RegistrySecurityInheritance.MergeInheritedEntries(request, parent, owner, group);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new RegistryOperationException(operation, path, ErrorInvalidSecurityDescriptor, ex.Message);
+        }
     }
 
     private void PropagateToChildren(
@@ -113,6 +276,7 @@ public sealed partial class RegistryWriter
         IProgress<KeySecurityProgress>? progress,
         CancellationToken cancellationToken,
         ref int changed,
+        List<RegistryOperationException> failures,
         int depth)
     {
         const string Operation = nameof(RegistryWriteOperation.SetKeySecurity);
@@ -132,20 +296,34 @@ public sealed partial class RegistryWriter
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            RegistryPath child = path.Append(name);
-            _policy.EnsureWriteAllowed(child, RegistryWriteOperation.SetKeySecurity);
+            // The names come from the registry, which allows "." and "..", so the safe append is used (writer section K).
+            RegistryPath child = path.AppendEnumeratedName(name);
+            byte[] childEffective;
+            IReadOnlyList<string>? childNames;
+            try
+            {
+                Authorize(child, RegistryWriteOperation.SetKeySecurity);
 
-            // The child's own subkeys are listed before the child's DACL changes. The new DACL may deny the
-            // owner KEY_ENUMERATE_SUB_KEYS, which would stop the walk below the child.
-            IReadOnlyList<string>? childNames = TryListSubkeyNames(child, Operation);
+                // The child's own subkeys are listed before the child's DACL changes. The new DACL may deny the
+                // owner KEY_ENUMERATE_SUB_KEYS, which would stop the walk below the child.
+                childNames = TryListSubkeyNames(child, Operation);
 
-            byte[] childEffective = ReplaceWithInheritedEntries(child, parentEffective, childInformation);
+                childEffective = ReplaceWithInheritedEntries(child, parentEffective, childInformation);
 
-            changed += 1;
-            progress?.Report(new KeySecurityProgress(child, changed));
+                changed += 1;
+                progress?.Report(new KeySecurityProgress(child, changed));
 
-            childNames ??= ListSubkeyNames(child, Operation);
-            PropagateToChildren(child, childEffective, childNames, childInformation, progress, cancellationToken, ref changed, depth + 1);
+                childNames ??= ListSubkeyNames(child, Operation);
+            }
+            catch (RegistryOperationException error)
+            {
+                // The walk continues with the next sibling. The keys below this one keep their entries, because
+                // their inherited entries cannot be computed from this key's new DACL.
+                failures.Add(error);
+                continue;
+            }
+
+            PropagateToChildren(child, childEffective, childNames, childInformation, progress, cancellationToken, ref changed, failures, depth + 1);
         }
     }
 
@@ -336,7 +514,10 @@ public sealed partial class RegistryWriter
                 nameof(information));
         }
 
-        if (!RegistrySecurityDescriptor.TryGetLength(securityDescriptor, out int declaredLength) ||
+        // The layout is checked first, so the Win32 validity check never reads past the buffer. Both run
+        // before any registry call, for local and remote writes.
+        if (!RegistrySecurityDescriptor.HasSelfRelativeLayout(securityDescriptor) ||
+            !RegistrySecurityDescriptor.TryGetLength(securityDescriptor, out int declaredLength) ||
             declaredLength != securityDescriptor.Length)
         {
             throw new ArgumentException(

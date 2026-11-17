@@ -5,6 +5,7 @@ using Bwc.Regedit.Registry;
 using Bwc.Registry;
 using Bwc.UI.Dialogs;
 using Bwc.Regedit.Dialogs;
+using WinRT.Interop;
 using Bwc.UI.List;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -44,25 +45,38 @@ internal sealed class ValueCommands
     /// <summary>Applies an inline rename that the list committed for one of its rows.</summary>
     public void RenameFromList(DetailsRow row, string newName)
     {
+        // The key is read here, before the command starts, so it is the key the edit began in. A row that is no
+        // longer in the bound list was cancelled by a key change, and nothing is written.
+        if (!_context.TryGetListKey(out RegistryPath key, out RegistryStore store) ||
+            _context.Shell.ListContent.DisplayIndexOf(row) < 0)
+        {
+            Log.Info("Registry Editor cancelled a rename whose value is no longer in the list.");
+            return;
+        }
+
         _context.StartCommand(async () =>
         {
-            if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
-            {
-                await _context.ShowMessageAsync(Get("DialogNoSelection"));
-                return;
-            }
-
-            if (string.Equals(row.Name, MessageCatalog.DefaultValueLabel, StringComparison.Ordinal) ||
-                !_context.TryGetRawValueName(row, out string oldName) ||
-                oldName.Length == 0)
+            if (row.IsDefault || !_context.TryGetRawValueName(row, out string oldName))
             {
                 await _context.ShowMessageAsync(Get("DialogDefaultValueLocked"));
                 return;
             }
 
-            await RenameValueCoreAsync(key, oldName, newName);
+            if (IsNotAddressable(oldName))
+            {
+                await _context.ShowMessageAsync(Get("DialogInvalidValueName"));
+                return;
+            }
+
+            await RenameValueCoreAsync(key, store, oldName, newName);
         });
     }
+
+    /// <summary>
+    /// True for a value name that no name-based call can address: one with an embedded NUL. The list still shows
+    /// such a value, and every command on it is refused with the classic invalid-name text (list.md section 11).
+    /// </summary>
+    private static bool IsNotAddressable(string rawName) => rawName.Contains('\0');
 
     /// <summary>Opens the read-only binary viewer for the single selected value.</summary>
     public void DisplayBinaryData() => _context.StartCommand(ShowBinaryDataAsync);
@@ -73,12 +87,6 @@ internal sealed class ValueCommands
 
     private async Task ShowBinaryDataAsync()
     {
-        if (RegeditSelectionGuards.IsRemoteSelected(_context))
-        {
-            // Values under a remote computer are read-only in this version, so the binary viewer does nothing.
-            return;
-        }
-
         if (_context.DialogOpen || _context.WindowHwnd == 0)
         {
             Log.Warn(
@@ -86,7 +94,7 @@ internal sealed class ValueCommands
             return;
         }
 
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
+        if (!_context.TryGetListKey(out RegistryPath key, out RegistryStore store))
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
@@ -99,10 +107,16 @@ internal sealed class ValueCommands
             return;
         }
 
+        if (IsNotAddressable(rawName))
+        {
+            await _context.ShowMessageAsync(Get("DialogInvalidValueName"));
+            return;
+        }
+
         RegistryValueInfo? value;
         try
         {
-            value = await _context.RunRegistryAsync(() => _context.Store.Reader.ReadValue(key, rawName));
+            value = await _context.RunRegistryAsync(() => store.Reader.ReadValue(key, rawName));
         }
         catch (RegistryOperationException ex)
         {
@@ -143,6 +157,44 @@ internal sealed class ValueCommands
             or (uint)RegistryValueType.FullResourceDescriptor
             or (uint)RegistryValueType.ResourceRequirementsList;
 
+    /// <summary>Opens the Device Specific Data bytes (Data...) in the binary viewer, owned by the resource viewer.</summary>
+    private async Task ShowDeviceDataAsync(nint owner, byte[] data)
+    {
+        var viewer = new HexViewerDialog(Get("DialogHexTitle"));
+        viewer.SetValue(Get("DialogDeviceSpecificData"), string.Empty, data, null);
+        _ = await viewer.ShowAsync(owner);
+    }
+
+    /// <summary>
+    /// Shows the classic viewer for a resource value. Malformed data opens the viewer with the rows that parsed (classic
+    /// crashes or opens nothing here), and the value error is then owned by that viewer. The viewer is read-only.
+    /// </summary>
+    private async Task ShowResourceViewerAsync(string rawName, RegistryValueInfo value)
+    {
+        ModalDialogWindow dialog = ResourceViewerFactory.Create(value.Type, value.Data, ShowDeviceDataAsync, out bool malformed);
+        if (!malformed)
+        {
+            _ = await _context.ShowDialogAsync(dialog);
+            return;
+        }
+
+        // The error waits for the viewer to become active, so no other app can take the foreground in between.
+        ErrorDialog error = ValueReadError(rawName, forEdit: false);
+        void OnFirstActivation(object sender, WindowActivatedEventArgs args)
+        {
+            if (args.WindowActivationState == WindowActivationState.Deactivated)
+            {
+                return;
+            }
+
+            dialog.Activated -= OnFirstActivation;
+            _ = dialog.DispatcherQueue.TryEnqueue(() => error.ShowAsync(WindowNative.GetWindowHandle(dialog)));
+        }
+
+        dialog.Activated += OnFirstActivation;
+        _ = await _context.ShowDialogAsync(dialog);
+    }
+
     /// <summary>
     /// Opens the hex editor for a value whose type has no typed editor, or for Modify Binary Data. The
     /// value is read on the thread pool and written back with its original type when the dialog accepts.
@@ -162,16 +214,22 @@ internal sealed class ValueCommands
             return;
         }
 
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath key) ||
+        if (!_context.TryGetListKey(out RegistryPath key, out RegistryStore store) ||
             !_context.TryGetRawValueName(activatedRow, out string rawName))
         {
+            return;
+        }
+
+        if (IsNotAddressable(rawName))
+        {
+            await _context.ShowMessageAsync(Get("DialogInvalidValueName"));
             return;
         }
 
         RegistryValueInfo? value;
         try
         {
-            value = await _context.RunRegistryAsync(() => _context.Store.Reader.ReadValue(key, rawName));
+            value = await _context.RunRegistryAsync(() => store.Reader.ReadValue(key, rawName));
         }
         catch (RegistryOperationException ex)
         {
@@ -187,8 +245,8 @@ internal sealed class ValueCommands
 
         if (IsReadOnlyResourceType(value.Type))
         {
-            // Hardware resource data is shown read-only, so a typed edit cannot change device resources.
-            await ShowReadOnlyViewerAsync(activatedRow.Name, key, value);
+            // Hardware resource data opens its classic viewer read-only, so a typed edit cannot change device resources.
+            await ShowResourceViewerAsync(rawName, value);
             _ = _context.Shell.ListContent.Focus(FocusState.Programmatic);
             return;
         }
@@ -209,7 +267,7 @@ internal sealed class ValueCommands
 
         try
         {
-            _context.Store.SetValue(key, rawName, (RegistryValueType)value.Type, dialog.Data);
+            store.SetValue(key, rawName, (RegistryValueType)value.Type, dialog.Data);
         }
         catch (RegistryOperationException ex)
         {
@@ -217,16 +275,11 @@ internal sealed class ValueCommands
             return;
         }
 
-        await _context.RefreshValuesAsync(activatedRow.Name);
+        await _context.RefreshWrittenValuesAsync(key, store, rawName);
     }
 
     private async Task ModifyBinaryDataAsync()
     {
-        if (RegeditSelectionGuards.IsRemoteSelected(_context))
-        {
-            return;
-        }
-
         if (_context.DialogOpen || _context.WindowHwnd == 0)
         {
             Log.Warn(
@@ -274,12 +327,6 @@ internal sealed class ValueCommands
 
     private async Task ModifyValueCoreAsync(DetailsRow? activated)
     {
-        if (RegeditSelectionGuards.IsRemoteSelected(_context))
-        {
-            // Values under a remote computer are read-only in this version, so Modify does nothing.
-            return;
-        }
-
         if (_context.DialogOpen || _context.WindowHwnd == 0)
         {
             Log.Warn(
@@ -303,7 +350,7 @@ internal sealed class ValueCommands
         }
 
         DetailsRow row = rows[0];
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
+        if (!_context.TryGetListKey(out RegistryPath key, out RegistryStore store))
         {
             if (activated is null)
             {
@@ -313,9 +360,9 @@ internal sealed class ValueCommands
             return;
         }
 
-        if (_context.IsSyntheticDefault(row))
+        if (row.IsSynthetic)
         {
-            await EditSyntheticDefaultAsync(key);
+            await EditSyntheticDefaultAsync(key, store);
             return;
         }
 
@@ -324,10 +371,16 @@ internal sealed class ValueCommands
             return;
         }
 
+        if (IsNotAddressable(rawName))
+        {
+            await _context.ShowMessageAsync(Get("DialogInvalidValueName"));
+            return;
+        }
+
         RegistryValueInfo? value;
         try
         {
-            value = await _context.RunRegistryAsync(() => _context.Store.Reader.ReadValue(key, rawName));
+            value = await _context.RunRegistryAsync(() => store.Reader.ReadValue(key, rawName));
         }
         catch (RegistryOperationException ex)
         {
@@ -345,10 +398,10 @@ internal sealed class ValueCommands
         switch ((RegistryValueType)value.Type)
         {
             case RegistryValueType.String:
-                saved = await EditStringValueAsync(key, rawName, value, expandable: false);
+                saved = await EditStringValueAsync(key, store, rawName, value, expandable: false);
                 break;
             case RegistryValueType.ExpandString:
-                saved = await EditStringValueAsync(key, rawName, value, expandable: true);
+                saved = await EditStringValueAsync(key, store, rawName, value, expandable: true);
                 break;
             case RegistryValueType.Dword when !RegistryValueCodec.IsValidDword(value.Data):
             case RegistryValueType.Qword when !RegistryValueCodec.IsValidQword(value.Data):
@@ -357,13 +410,13 @@ internal sealed class ValueCommands
                 await EditValueHexAsync(row);
                 return;
             case RegistryValueType.Dword:
-                saved = await EditDwordValueAsync(key, rawName, value);
+                saved = await EditDwordValueAsync(key, store, rawName, value);
                 break;
             case RegistryValueType.Qword:
-                saved = await EditQwordValueAsync(key, rawName, value);
+                saved = await EditQwordValueAsync(key, store, rawName, value);
                 break;
             case RegistryValueType.MultiString:
-                saved = await EditMultiStringValueAsync(key, rawName, value);
+                saved = await EditMultiStringValueAsync(key, store, rawName, value);
                 break;
             default:
                 // Every other type has no typed editor. The hex editor keeps the bytes and the type.
@@ -373,7 +426,7 @@ internal sealed class ValueCommands
 
         if (saved)
         {
-            await _context.RefreshValuesAsync(row.Name);
+            await _context.RefreshWrittenValuesAsync(key, store, rawName);
         }
     }
 
@@ -381,7 +434,7 @@ internal sealed class ValueCommands
     /// Edit String for the synthetic (Default) row, which has no value behind it. Accepting the dialog
     /// writes the default value, as classic regedit does.
     /// </summary>
-    private async Task EditSyntheticDefaultAsync(RegistryPath key)
+    private async Task EditSyntheticDefaultAsync(RegistryPath key, RegistryStore store)
     {
         var dialog = new StringValueDialog(
             Get("DialogEditStringTitle"),
@@ -396,7 +449,7 @@ internal sealed class ValueCommands
 
         try
         {
-            _context.Store.SetString(key, string.Empty, dialog.Value);
+            store.SetString(key, string.Empty, dialog.Value);
         }
         catch (RegistryOperationException ex)
         {
@@ -404,11 +457,11 @@ internal sealed class ValueCommands
             return;
         }
 
-        await _context.RefreshValuesAsync(MessageCatalog.DefaultValueLabel);
+        await _context.RefreshWrittenValuesAsync(key, store, string.Empty);
     }
 
     private async Task<bool> EditStringValueAsync(
-        RegistryPath key,
+        RegistryPath key, RegistryStore store,
         string rawName,
         RegistryValueInfo value,
         bool expandable)
@@ -428,11 +481,11 @@ internal sealed class ValueCommands
         {
             if (expandable)
             {
-                _context.Store.SetExpandString(key, rawName, dialog.Value);
+                store.SetExpandString(key, rawName, dialog.Value);
             }
             else
             {
-                _context.Store.SetString(key, rawName, dialog.Value);
+                store.SetString(key, rawName, dialog.Value);
             }
 
             return true;
@@ -445,7 +498,7 @@ internal sealed class ValueCommands
     }
 
     private async Task<bool> EditDwordValueAsync(
-        RegistryPath key,
+        RegistryPath key, RegistryStore store,
         string rawName,
         RegistryValueInfo value)
     {
@@ -465,7 +518,7 @@ internal sealed class ValueCommands
 
         try
         {
-            _context.Store.SetDword(key, rawName, dialog.Value);
+            store.SetDword(key, rawName, dialog.Value);
             return true;
         }
         catch (RegistryOperationException ex)
@@ -476,7 +529,7 @@ internal sealed class ValueCommands
     }
 
     private async Task<bool> EditQwordValueAsync(
-        RegistryPath key,
+        RegistryPath key, RegistryStore store,
         string rawName,
         RegistryValueInfo value)
     {
@@ -496,7 +549,7 @@ internal sealed class ValueCommands
 
         try
         {
-            _context.Store.SetQword(key, rawName, dialog.Value);
+            store.SetQword(key, rawName, dialog.Value);
             return true;
         }
         catch (RegistryOperationException ex)
@@ -507,7 +560,7 @@ internal sealed class ValueCommands
     }
 
     private async Task<bool> EditMultiStringValueAsync(
-        RegistryPath key,
+        RegistryPath key, RegistryStore store,
         string rawName,
         RegistryValueInfo value)
     {
@@ -524,7 +577,7 @@ internal sealed class ValueCommands
         {
             // Encoding against the bytes that were read keeps an odd trailing byte, and an unchanged edit
             // writes the original data back exactly.
-            _context.Store.SetValue(
+            store.SetValue(
                 key,
                 rawName,
                 RegistryValueType.MultiString,
@@ -539,10 +592,13 @@ internal sealed class ValueCommands
     }
 
     /// <summary>Shows the classic read error for a value whose data cannot be read.</summary>
-    private Task ShowValueReadErrorAsync(string rawName, bool forEdit)
+    private Task ShowValueReadErrorAsync(string rawName, bool forEdit) =>
+        _context.ShowErrorAsync(ValueReadError(rawName, forEdit));
+
+    private ErrorDialog ValueReadError(string rawName, bool forEdit)
     {
         Log.Warn($"Registry Editor could not read the data of value '{ValueLabel(rawName)}'.");
-        return _context.ShowErrorAsync(_context.Messages.ForValueRead(ValueLabel(rawName), forEdit).ToErrorDialog());
+        return _context.Messages.ForValueRead(ValueLabel(rawName), forEdit).ToErrorDialog();
     }
 
     /// <summary>The name a value message names: the display name, or the default value label.</summary>
@@ -555,16 +611,16 @@ internal sealed class ValueCommands
     /// </summary>
     private async Task NewValueAsync(NewValueKind kind)
     {
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
+        if (!_context.TryGetListKey(out RegistryPath key, out RegistryStore store))
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
         }
 
-        string valueName = NextUniqueValueName(key);
+        string valueName = NextUniqueValueName(key, store);
         try
         {
-            WriteDefaultValue(key, valueName, kind);
+            WriteDefaultValue(key, store, valueName, kind);
         }
         catch (RegistryOperationException ex)
         {
@@ -572,7 +628,7 @@ internal sealed class ValueCommands
             return;
         }
 
-        await _context.RefreshValuesAsync(RegistryValueDisplay.FormatName(valueName));
+        await _context.RefreshWrittenValuesAsync(key, store, valueName);
         BeginListRenameSoon();
     }
 
@@ -580,27 +636,27 @@ internal sealed class ValueCommands
     /// The classic default data of a new value: empty strings for the text types, zero-length binary,
     /// zero for the numbers, and the empty multi-string list (the double NUL terminator).
     /// </summary>
-    private void WriteDefaultValue(RegistryPath key, string valueName, NewValueKind kind)
+    private void WriteDefaultValue(RegistryPath key, RegistryStore store, string valueName, NewValueKind kind)
     {
         switch (kind)
         {
             case NewValueKind.String:
-                _context.Store.SetString(key, valueName, string.Empty);
+                store.SetString(key, valueName, string.Empty);
                 break;
             case NewValueKind.ExpandableString:
-                _context.Store.SetExpandString(key, valueName, string.Empty);
+                store.SetExpandString(key, valueName, string.Empty);
                 break;
             case NewValueKind.Binary:
-                _context.Store.SetBinary(key, valueName, ReadOnlySpan<byte>.Empty);
+                store.SetBinary(key, valueName, ReadOnlySpan<byte>.Empty);
                 break;
             case NewValueKind.Dword:
-                _context.Store.SetDword(key, valueName, 0);
+                store.SetDword(key, valueName, 0);
                 break;
             case NewValueKind.Qword:
-                _context.Store.SetQword(key, valueName, 0);
+                store.SetQword(key, valueName, 0);
                 break;
             case NewValueKind.MultiString:
-                _context.Store.SetMultiString(key, valueName, Array.Empty<string>());
+                store.SetMultiString(key, valueName, Array.Empty<string>());
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind));
@@ -623,7 +679,7 @@ internal sealed class ValueCommands
 
     private async Task DeleteValuesAsync()
     {
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
+        if (!_context.TryGetListKey(out RegistryPath key, out RegistryStore store))
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
@@ -633,22 +689,25 @@ internal sealed class ValueCommands
         var rawNames = new List<string>(rows.Count);
         foreach (DetailsRow row in rows)
         {
+            // The synthetic (Default) row has no value behind it, so it is never a raw name and never deletes the literal.
             if (_context.TryGetRawValueName(row, out string rawName))
             {
                 rawNames.Add(rawName);
             }
         }
 
-        if (rawNames.Count == 0)
+        bool syntheticSelected = rows.Any(row => row.IsSynthetic);
+        if (rawNames.Count == 0 && !syntheticSelected)
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
         }
 
         // Several values use the plural text, one value the singular text. Both use the same caption.
+        int valueCount = rawNames.Count + (syntheticSelected ? 1 : 0);
         var dialog = new ConfirmDialog(
             Get("MsgCaptionConfirmValueDelete"),
-            Get(rawNames.Count > 1 ? "MsgDeleteValuesConfirm" : "MsgDeleteValueConfirm"),
+            Get(valueCount > 1 ? "MsgDeleteValuesConfirm" : "MsgDeleteValueConfirm"),
             Get("DialogYes"),
             Get("DialogNo"));
 
@@ -659,21 +718,35 @@ internal sealed class ValueCommands
 
         // Every value is attempted. A failure does not stop the rest, and the first failure is shown once,
         // after the work, with the classic text. The list is refreshed in every case.
+        // A value whose name has an embedded NUL is refused without a call, and the other values are still deleted.
         RegistryOperationException? first = null;
         string? firstName = null;
+        bool refusedName = false;
         await _context.RunRegistryWriteAsync(() =>
         {
             foreach (string rawName in rawNames)
             {
+                if (IsNotAddressable(rawName))
+                {
+                    Log.Warn($"Registry Editor refused to delete a value whose name contains NUL ({rawName.Length} characters).");
+                    refusedName = true;
+                    continue;
+                }
+
                 try
                 {
-                    _context.Store.DeleteValue(key, rawName);
+                    store.DeleteValue(key, rawName);
                 }
                 catch (RegistryOperationException ex)
                 {
                     Log.Warn($"Registry Editor could not delete value '{ValueLabel(rawName)}': Win32 {ex.Win32Error} ({ex.Message}).");
                     first ??= ex;
                     firstName ??= ValueLabel(rawName);
+                }
+                catch (ArgumentException ex)
+                {
+                    Log.Warn($"Registry Editor refused to delete value '{ValueLabel(rawName)}': {ex.Message}");
+                    refusedName = true;
                 }
             }
         });
@@ -682,18 +755,28 @@ internal sealed class ValueCommands
         {
             await _context.ShowRegistryErrorAsync(first, RegistryAction.DeleteValues, firstName);
         }
+        else if (refusedName)
+        {
+            await _context.ShowMessageAsync(Get("DialogInvalidValueName"));
+        }
+        else if (syntheticSelected)
+        {
+            // Classic regedit refuses the (Default) row that has no value, after the confirmation, with this text.
+            await _context.ShowErrorAsync(
+                new ClassicMessage(Get("MsgCaptionDeleteValuesError"), Get("MsgDeleteValuesFailed")).ToErrorDialog());
+        }
 
-        await _context.RefreshValuesAsync(selectDisplayName: null);
+        await _context.RefreshWrittenValuesAsync(key, store, selectRawName: null);
     }
 
-    private async Task RenameValueCoreAsync(RegistryPath key, string oldName, string newName)
+    private async Task RenameValueCoreAsync(RegistryPath key, RegistryStore store, string oldName, string newName)
     {
         if (string.Equals(oldName, newName, StringComparison.Ordinal))
         {
             return;
         }
 
-        string? error = ValidateRenameValue(key, oldName, newName);
+        string? error = await ValidateRenameValueAsync(key, store, oldName, newName);
         if (error is not null)
         {
             await _context.ShowMessageAsync(Get("MsgCaptionRenameValueError"), error);
@@ -702,7 +785,8 @@ internal sealed class ValueCommands
 
         try
         {
-            _context.Store.RenameValue(key, oldName, newName);
+            // The rename is a registry write, so it runs off the UI thread. A remote key makes a network call.
+            await _context.RunRegistryWriteAsync(() => store.RenameValue(key, oldName, newName));
         }
         catch (RegistryOperationException ex)
         {
@@ -710,14 +794,14 @@ internal sealed class ValueCommands
             return;
         }
 
-        await _context.RefreshValuesAsync(newName);
+        await _context.RefreshWrittenValuesAsync(key, store, newName);
     }
 
     /// <summary>
     /// The text for a rename that cannot proceed. The classic rename texts name the old value, so the
     /// subject is the current name. Null when the new name is acceptable.
     /// </summary>
-    private string? ValidateRenameValue(RegistryPath key, string oldName, string newName)
+    private async Task<string?> ValidateRenameValueAsync(RegistryPath key, RegistryStore store, string oldName, string newName)
     {
         string subject = ValueLabel(oldName);
         if (newName.Length == 0)
@@ -738,9 +822,9 @@ internal sealed class ValueCommands
 
         try
         {
-            return _context.Store.Reader.ValueExists(key, newName)
-                ? string.Format(CultureInfo.CurrentCulture, Get("MsgRenameValueExists"), subject)
-                : null;
+            // The probe is a registry read, so it runs off the UI thread. A remote key makes a network call.
+            bool exists = await _context.RunRegistryAsync(() => store.Reader.ValueExists(key, newName));
+            return exists ? string.Format(CultureInfo.CurrentCulture, Get("MsgRenameValueExists"), subject) : null;
         }
         catch (RegistryOperationException ex)
         {
@@ -766,12 +850,12 @@ internal sealed class ValueCommands
         return _context.Messages.ForRegistryError(action, ex, subject).Text;
     }
 
-    private string NextUniqueValueName(RegistryPath key)
+    private string NextUniqueValueName(RegistryPath key, RegistryStore store)
     {
         for (var index = 1; index < 10000; index += 1)
         {
             string candidate = MessageCatalog.NewValueNamePrefix + index.ToString(CultureInfo.InvariantCulture);
-            if (!_context.Store.Reader.ValueExists(key, candidate))
+            if (!store.Reader.ValueExists(key, candidate))
             {
                 return candidate;
             }

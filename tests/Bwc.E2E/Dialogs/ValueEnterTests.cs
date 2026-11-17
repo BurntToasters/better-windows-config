@@ -68,7 +68,11 @@ public sealed class ValueEnterTests
             using var driver = new EditingDriver(session);
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
             E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "valueenter.sandbox.navigate");
-            AutomationElement? row = navigated
+            // The list fills after the key is selected, so the row is awaited before it is looked up.
+            bool rowListed = navigated && ControlTestSupport.WaitUntil(
+                () => ClassicDialogTests.RowExists(session, ValueName),
+                TimeSpan.FromSeconds(10));
+            AutomationElement? row = rowListed
                 ? ClassicDialogTests.OpenValueRow(session, sandbox, ValueName, "valueenter.row")
                 : null;
             if (row is null)
@@ -82,8 +86,8 @@ public sealed class ValueEnterTests
             Record("valueenter.before", before == 0, $"edit windows before Enter={before}.");
 
             _ = ControlTestSupport.EnsureForeground(session);
-            Keyboard.Press(VirtualKeyShort.RETURN);
-            Keyboard.Press(VirtualKeyShort.RETURN);
+            Keyboard.Type(VirtualKeyShort.RETURN);
+            Keyboard.Type(VirtualKeyShort.RETURN);
             bool opened = ControlTestSupport.WaitUntil(() => CountEditWindows(pid) >= 1, UiTimeout);
             Thread.Sleep(1500);
             int after = CountEditWindows(pid);

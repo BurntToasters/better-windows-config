@@ -15,6 +15,9 @@ public sealed class E2EConfig
     public const string RegeditExeName = "BwcRegedit.exe";
     public const string DataRootEnvironmentVariable = "BWC_DATA_ROOT";
 
+    /// <summary>Set by scripts/test-e2e.js: "full" when the run has no user filter, otherwise "filtered".</summary>
+    public const string RunScopeEnvironmentVariable = "BWC_RUN_SCOPE";
+
     private const string SolutionFileName = "BetterWindowsConfig.slnx";
     private const string SandboxParentPath = @"HKCU\Software\BWC-E2E";
 
@@ -27,10 +30,20 @@ public sealed class E2EConfig
         Rid = ReadRid();
         Flavor = ReadFlavor();
         RunId = ReadRunId();
+        IsFullRun = string.Equals(
+            Environment.GetEnvironmentVariable(RunScopeEnvironmentVariable),
+            "full",
+            StringComparison.Ordinal);
         PublishDir = ResolvePublishDir();
     }
 
     public string PublishDir { get; }
+
+    /// <summary>
+    /// True only when the launcher says the run has no user filter. A host started any other way is treated as
+    /// filtered, so it never writes the full-run artifact.
+    /// </summary>
+    public bool IsFullRun { get; }
 
     /// <summary>
     /// When this test run began. A Registry Editor or Hub is the run's own only when it started after this time

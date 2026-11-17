@@ -158,13 +158,15 @@ public sealed class RobustnessTests
                     Thread.Sleep(2);
                 }
 
-                bool deleted = !sandbox.Exists("Wide");
                 E2EResults.Record(
                     "robust.busygate.disabled",
                     confirmed && sawDisabled,
                     $"confirmed={confirmed}, owner disabled during the delete={sawDisabled}, close posted={closeSent}.");
 
-                bool exited = WaitForProcessExit(session.ProcessId, ProcessTimeout);
+                // The window closes only after the write, so the key is checked once the process is gone. Under x64
+                // emulation the delete can outlast the polling loop above.
+                bool exited = WaitForProcessExit(session.ProcessId, ProcessTimeout + ProcessTimeout);
+                bool deleted = !sandbox.Exists("Wide");
                 E2EResults.Record(
                     "robust.busygate.heldclose",
                     deleted && exited,
@@ -250,11 +252,13 @@ public sealed class RobustnessTests
             _ = SelectListRow(session, "Resources");
             E2EGuards.RequireListRowSelected(session, "Resources", "robust.resource.row");
             driver.OpenMenu(MenuEdit, MenuEditModify);
-            // The viewer is the classic Binary Data dialog, identified by its read-only list (HexViewerList). The
-            // writable editor has the HexEditor control and no list, so it must be absent for the value to be read-only.
-            bool viewer = driver.WaitForElement("HexViewerList") is not null;
+            // Modify on a resource list opens the classic Resource Lists viewer (RT_DIALOG 116, commit a08301b,
+            // docs/parity/oracle/regedit-resource-viewers.json), identified by its read-only column list
+            // (ResourceListColumns). The writable editor has the HexEditor control and no column list, so it must be
+            // absent for the value to be read-only.
+            bool viewer = driver.WaitForElement("ResourceListColumns") is not null;
             bool writable = driver.WaitForElement("HexEditor", TimeSpan.FromSeconds(1)) is not null;
-            Keyboard.Press(VirtualKeyShort.ESCAPE);
+            Keyboard.Type(VirtualKeyShort.ESCAPE);
             bool closed = viewer && driver.WaitForNoDialog();
             E2EResults.Record(
                 "robust.resource.readonly",

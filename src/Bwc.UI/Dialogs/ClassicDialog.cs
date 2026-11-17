@@ -82,6 +82,9 @@ public class ClassicDialog : ModalDialogWindow
             FontFamily = new FontFamily(font.Face),
             FontSize = font.DipSize,
         };
+        // The Fluent parts of the controls read theme keys. Those keys map to the palette here, so the dialog paints from
+        // the palette under high contrast too (see BwcDialogResources).
+        _root.Resources = BwcDialogResources.Create();
         AutomationProperties.SetAutomationId(_root, "DialogRoot");
         _root.Style = StyleFor("BwcClassicRootStyle") ?? _root.Style;
         ApplyPalette();
@@ -614,6 +617,12 @@ public class ClassicDialog : ModalDialogWindow
                 return;
 
             case ClassicControlKind.Button:
+                // A disabled button does not take its mnemonic (Find Next while the search text is empty).
+                if (hosted.Element is Control { IsEnabled: false })
+                {
+                    return;
+                }
+
                 _ = hosted.Element.Focus(FocusState.Keyboard);
                 OnCommand(hosted.Definition.Id, hosted.Definition.AutomationId);
                 return;
@@ -662,6 +671,14 @@ public class ClassicDialog : ModalDialogWindow
         if (fallback is not null)
         {
             OnCommand(fallback.Definition.Id, fallback.Definition.AutomationId);
+            return;
+        }
+
+        // No cancel and no default button (the Resource Lists and Requirements List viewers have only OK). Classic
+        // DefDlgProc ends the dialog on IDCANCEL, so Escape closes it with no result. Without this the key did nothing.
+        if (_controls.Any(hosted => hosted.Definition.Kind == ClassicControlKind.Button))
+        {
+            Cancel();
         }
     }
 

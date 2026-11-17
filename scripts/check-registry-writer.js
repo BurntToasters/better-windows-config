@@ -61,12 +61,24 @@ const scriptProcessLaunch =
 // Files that may call native write APIs. Each entry records why it is exempt.
 const nativeWriteAllowlist = new Map([
   [
+    "tests/Bwc.E2E/Harness/SandboxRegistry.cs",
+    "Restores a DACL on a sandbox key under the run root through RegSetKeySecurity with WRITE_DAC alone. A managed writable open needs the read rights that the test's deny ACE removes.",
+  ],
+  [
     "tests/Bwc.Registry.Tests/RegistryLinkFixture.cs",
     "Creates and removes symbolic link keys for the guard tests. The writer never creates links, so the test fixture is the only source of link inputs.",
   ],
   [
+    "tests/Bwc.E2E/List/ListKeyIdentityTests.cs",
+    "Creates one NUL-named value under the run root with NtSetValueKey, the only API that takes a counted name. The run key is removed in finally.",
+  ],
+  [
     "tools/Bwc.Oracle.Capture/RegistryGuard.cs",
     "Writes only HKCU/Software/BWC-Oracle and the Applets/Regedit key, through the guarded native call.",
+  ],
+  [
+    "tests/Bwc.E2E/Hives/HiveMountNative.cs",
+    "Calls RegUnLoadKey once, from the finally block of the elevated hive test, on the mount plus run id under HKEY_USERS. The managed handles of the test are closed first.",
   ],
   [
     "tools/Bwc.Oracle.Capture/RegistryNative.cs",
@@ -92,6 +104,7 @@ const managedWriteAllowlist = new Map([
   ["tests/Bwc.Registry.Tests/RegistryReaderTests.cs", "Seeds sandbox run keys with typed values for reader tests."],
   ["tests/Bwc.Registry.Tests/RegistrySecurityTests.cs", "Seeds and removes sandbox run keys for security tests."],
   ["tests/Bwc.Registry.Tests/RegistryStoreTests.cs", "Seeds and removes sandbox run keys for store tests."],
+  ["tests/Bwc.Registry.Tests/RegistryValueNulNameTests.cs", "Seeds sandbox run keys with typed and NUL-named values for NUL-name tests."],
   ["tests/Bwc.Registry.Tests/RegistryWriterSandboxTests.cs", "Seeds and removes sandbox run keys for writer tests."],
   ["tests/Bwc.E2E/CommandLine/CommandLineTests.cs", "Seeds E2E run keys through the harness for command-line tests."],
   ["tests/Bwc.E2E/ContextMenus/ContextMenuTests.cs", "Seeds E2E run keys through the harness for context-menu tests."],
@@ -101,19 +114,25 @@ const managedWriteAllowlist = new Map([
   ["tests/Bwc.E2E/Find/FindTests.cs", "Seeds E2E run keys through the harness for find tests."],
   ["tests/Bwc.E2E/Hex/HexEditingTests.cs", "Seeds E2E run keys through the harness for hex editing tests."],
   ["tests/Bwc.E2E/Hives/HiveTests.cs", "Seeds E2E run keys through the harness for hive tests."],
+  [
+    "tests/Bwc.E2E/Hives/HiveMountTests.cs",
+    "Seeds the sandbox key through SandboxRegistry for the elevated hive test. Its mount is never written by managed code.",
+  ],
   ["tests/Bwc.E2E/Remote/RemoteRegistryTests.cs", "Seeds E2E run keys through the harness for remote registry tests."],
   ["tests/Bwc.E2E/Hex/HexViewerTests.cs", "Seeds E2E run keys through the harness for hex viewer tests."],
   ["tests/Bwc.E2E/ImportExport/ImportExportTests.cs", "Seeds E2E run keys through the harness for import and export tests."],
   ["tests/Bwc.E2E/Permissions/PermissionsTests.cs", "Seeds E2E run keys through the harness for permissions tests."],
   [
     "tests/Bwc.E2E/Installer/InstallerRun.cs",
-    "Deletes only its own run key, Software/BWC-E2E/<run-id>, after the installer test finishes.",
+    "Deletes only its own run key, Software/BWC-E2E/<run-id>: HKCU for the per-user sandbox, " +
+      "and HKLM (64-bit view) for the elevated machine-mode tests, where only cleanup deletes it and its empty BWC-E2E parent.",
   ],
   [
     "tools/Bwc.Oracle.Capture/RegistryGuard.cs",
     "Writes only HKCU/Software/BWC-Oracle and the Applets/Regedit key, which OracleSession snapshots and restores.",
   ],
   ["tests/Bwc.E2E/Print/PrintTests.cs", "Seeds E2E run keys through the harness for print tests."],
+  ["tests/Bwc.E2E/Print/PrintTestSupport.cs", "Seeds E2E run keys through the harness for the print guard and PDF tests."],
 ]);
 
 // Seeds made through the E2E harness's SandboxRegistry, which accepts only paths under the run root.
@@ -133,10 +152,15 @@ const unnamedCallAllowlist = new Map([
     "src/Bwc.Registry/RegistryStore.cs",
     "The product store. It calls RegistryWriter, the only native writer, and the writer checks every path.",
   ],
+  [
+    "src/Bwc.Update/Helper/ShortcutAumid.cs",
+    "IPropertyStore.SetValue of a shortcut's AppUserModelID (a COM property store of a .lnk file, not the registry).",
+  ],
   ["tests/Bwc.E2E/ContextMenus/ContextMenuTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/Favorites/FavoritesFixesTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/Hex/HexEditingFixesTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/List/ListRenameFocusTests.cs", sandboxedSeedReason],
+  ["tests/Bwc.E2E/List/ListKeyIdentityTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/Dialogs/BinaryViewerTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/Dialogs/ClassicDialogTests.cs", sandboxedSeedReason],
   ["tests/Bwc.E2E/HarnessTests.cs", sandboxedSeedReason],
@@ -149,6 +173,10 @@ const unnamedCallAllowlist = new Map([
   [
     "tests/Bwc.Registry.Tests/RegistryWriterGuardTests.cs",
     "Calls RegistryWriter under test with a policy rooted at the run's own Software/BWC-E2E/<run-id> key.",
+  ],
+  [
+    "tests/Bwc.Registry.Tests/RegistryValueNulNameTests.cs",
+    "Seeds through RegistryWriter with a SandboxWritePolicy rooted at the run's own Software/BWC-E2E/<run-id> key.",
   ],
   [
     "tests/Bwc.Registry.Tests/RegistryWriterHardeningTests.cs",

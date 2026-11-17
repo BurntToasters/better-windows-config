@@ -368,6 +368,10 @@ public sealed partial class MainWindow
         {
             "ProcessesStillRunning" => HubStrings.Format("UpdateResultRunning", version),
             "RunningElevated" => HubStrings.Format("UpdateResultElevated", version),
+            "ElevationDeclined" => HubStrings.Format("UpdateResultElevationDeclined", version),
+            "NotElevated" => HubStrings.Format("UpdateResultNotElevated", version),
+            "RunningInOtherSession" => HubStrings.Format("UpdateResultOtherSession", version),
+            "DeElevationFailed" => HubStrings.Format("UpdateResultDeElevation", version),
             "InstallerFailed" => HubStrings.Format("UpdateResultInstallerFailed", version),
             "Unexpected" => HubStrings.Format("UpdateResultUnexpected", version),
             _ => HubStrings.Format("UpdateResultNotInstalled", version),

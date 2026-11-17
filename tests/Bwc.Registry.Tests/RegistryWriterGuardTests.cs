@@ -567,13 +567,13 @@ public sealed class RegistryWriterGuardTests
 
         foreach (string text in allowed)
         {
-            policy.EnsureWriteAllowed(RegistryPath.Parse(text), RegistryWriteOperation.SetValue);
+            policy.EnsureWriteAllowed(null, RegistryPath.Parse(text), RegistryWriteOperation.SetValue);
         }
 
         foreach (string text in denied)
         {
             AssertDenied(
-                () => policy.EnsureWriteAllowed(RegistryPath.Parse(text), RegistryWriteOperation.SetValue),
+                () => policy.EnsureWriteAllowed(null, RegistryPath.Parse(text), RegistryWriteOperation.SetValue),
                 "SetValue",
                 "sandbox",
                 text);

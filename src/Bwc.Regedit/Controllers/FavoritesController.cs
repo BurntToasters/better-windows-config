@@ -46,6 +46,13 @@ internal sealed class FavoritesController
             return;
         }
 
+        // Favorites store local key paths only. A remote key is refused with a classic-style message, not stored.
+        if (_context.TryGetSelectedLocation(out KeyLocation remoteLocation) && remoteLocation.IsRemote)
+        {
+            await _context.ShowMessageAsync(Get("DialogFavoriteRemote"));
+            return;
+        }
+
         if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
         {
             TreeNode? selected = _context.Shell.TreeContent.SelectedNode;
@@ -61,7 +68,7 @@ internal sealed class FavoritesController
             ? key.Root.DisplayName()
             : key.Components[^1];
 
-        var dialog = new TextPromptDialog(
+        var dialog = new FavoriteNameDialog(
             Get("DialogFavoriteAddTitle"),
             Get("DialogFavoriteNameLabel"),
             suggested,
@@ -94,20 +101,27 @@ internal sealed class FavoritesController
         _context.FocusTreeAfterDialog();
     }
 
-    private string? ValidateFavoriteName(string name)
+    /// <summary>
+    /// The prompt's rule for a typed name. A duplicate is RT_STRING 171 in a box captioned RT_STRING 172 (DLG-025).
+    /// The other rejections keep the prompt title as their caption.
+    /// </summary>
+    private FavoriteNameRejection? ValidateFavoriteName(string name)
     {
+        string title = Get("DialogFavoriteAddTitle");
         string candidate = name.Trim();
         if (candidate.Length == 0)
         {
-            return Get("DialogFavoriteEmptyName");
+            return new FavoriteNameRejection(title, Get("DialogFavoriteEmptyName"));
         }
 
         if (candidate.Length > RegeditContext.MaxValueNameLength || candidate.Contains('\0'))
         {
-            return Get("DialogInvalidValueName");
+            return new FavoriteNameRejection(title, Get("DialogInvalidValueName"));
         }
 
-        return _context.Favorites.ContainsName(candidate) ? Get("DialogFavoriteDuplicate") : null;
+        return _context.Favorites.ContainsName(candidate)
+            ? new FavoriteNameRejection(Get("DialogErrorAddingFavorite"), Get("DialogFavoriteDuplicate"))
+            : null;
     }
 
     private async Task RemoveFavoriteAsync()

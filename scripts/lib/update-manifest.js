@@ -16,19 +16,32 @@ const PUBDATE_PATTERN = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(
 const EXPIRES_PATTERN = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/;
 
 /**
- * The release asset name of a channel's manifest: bwc-stable.json or bwc-beta.json. The signature is
- * this name plus ".minisig". Each channel has its own name, so both can live in one GitHub release list.
+ * The release asset name of a channel's manifest: bwc-stable-v2.json or bwc-beta-v2.json. The signature is
+ * this name plus ".minisig". Each channel has its own name, so both can live in one GitHub release list. The v2 suffix
+ * is the 0.1.2 feed.
  */
 export function manifestFileName(channel) {
   if (channel !== "stable" && channel !== "beta") {
     throw new Error(`no manifest file name for channel ${String(channel)}`);
   }
-  return `bwc-${channel}.json`;
+  return `bwc-${channel}-v2.json`;
 }
 
 /** The exact manifest trusted comment. Signing and validation both build it from the manifest fields. */
 export function manifestTrustedComment({ version, channel, expires }) {
   return `version:${version} channel:${channel} expires:${expires}`;
+}
+
+/**
+ * The installer trusted comment the signer writes (update-manifest.md): version, arch, product, and the manifest channel.
+ * The 0.1.2 updater requires product:bwc and the manifest's channel; a 0.1.1 updater reads version and arch and ignores
+ * the rest.
+ */
+export function installerTrustedComment({ version, architecture, channel }) {
+  if (channel !== "stable" && channel !== "beta") {
+    throw new Error(`no installer comment for channel ${String(channel)}`);
+  }
+  return `version:${version} arch:${architecture} product:bwc channel:${channel}`;
 }
 
 export function buildManifest({ version, channel, pubDate, notesUrl, installers }) {
@@ -340,6 +353,16 @@ export async function validateManifestBuffer(bytes, options = {}) {
     const signedVersion = comment.fields.get("version");
     const signedArch = comment.fields.get("arch");
     const signedFile = comment.fields.get("file");
+    const signedProduct = comment.fields.get("product");
+    const signedChannel = comment.fields.get("channel");
+    if (signedProduct !== "bwc") {
+      result.add("installer-product-mismatch", `${architecture}: installer is not signed for product bwc`);
+    }
+    if (!signedChannel) {
+      result.add("trusted-comment-invalid", `${architecture}: installer trusted comment has no channel field`);
+    } else if (channelText && signedChannel !== channelText) {
+      result.add("installer-channel-mismatch", `${architecture}: installer signed for channel ${signedChannel}, not ${channelText}`);
+    }
     if (!signedVersion) {
       result.add("trusted-comment-invalid", `${architecture}: installer trusted comment has no version field`);
     } else if (versionText && signedVersion !== versionText) {

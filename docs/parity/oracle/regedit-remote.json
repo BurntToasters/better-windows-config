@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture remote",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26300",
+    "ubr": 9974,
+    "displayVersion": "26H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "target": "127.0.0.1",
+  "note": "Connected to the loopback address only. Nothing was written to any registry. Titles, item text and the address bar are in local/remote-text.json, redacted.",
+  "measurements": {
+    "connect": {
+      "measured": false,
+      "reason": "the name box did not answer WM_GETTEXT (failed or timed out)."
+    }
+  },
+  "notMeasured": [
+    {
+      "name": "connect",
+      "reason": "the name box did not answer WM_GETTEXT (failed or timed out)."
+    },
+    {
+      "name": "remote-node",
+      "reason": "no remote node: the connect did not succeed."
+    },
+    {
+      "name": "remote-subkey",
+      "reason": "no remote node: the connect did not succeed."
+    },
+    {
+      "name": "file-menu",
+      "reason": "no remote node: the connect did not succeed."
+    },
+    {
+      "name": "import-picker",
+      "reason": "no remote node: the connect did not succeed."
+    },
+    {
+      "name": "disconnect",
+      "reason": "no remote node: the connect did not succeed."
+    }
+  ]
+}

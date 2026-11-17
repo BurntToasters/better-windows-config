@@ -91,15 +91,12 @@ internal sealed class ImportExportCommands
         await ImportFileAsync(filePath);
     }
 
+    /// <summary>
+    /// File > Import. The file is chosen first. A .reg file asks dialog 115 for its computer when at least one computer
+    /// is connected. A binary hive restores locally, because hive operations are refused on a remote store.
+    /// </summary>
     private async Task ImportAsync()
     {
-        if (RegeditSelectionGuards.IsRemoteSelected(_context))
-        {
-            // Remote computers are read-only in this version, so an import never targets one.
-            await _context.ShowMessageAsync(Get("DialogRemoteReadOnly"));
-            return;
-        }
-
         ImportFileDialogResult? choice = RegeditFileDialogs.ShowImport(_context);
         if (choice is null)
         {
@@ -108,11 +105,69 @@ internal sealed class ImportExportCommands
 
         if (choice.Format == ImportFileFormat.Hive)
         {
+            if (RegeditSelectionGuards.IsRemoteSelected(_context))
+            {
+                // A hive restore runs onto a local key. The remote store refuses hive operations (section 15.4).
+                await _context.ShowMessageAsync(Get("DialogRemoteReadOnly"));
+                return;
+            }
+
             await RestoreHiveAsync(choice.FilePath);
             return;
         }
 
-        await ImportFileAsync(choice.FilePath);
+        RemoteRegistryConnection? target = null;
+        if (_context.RemoteConnections.Count > 0)
+        {
+            (bool chosen, RemoteRegistryConnection? connection) = await ChooseImportTargetAsync();
+            if (!chosen)
+            {
+                return;
+            }
+
+            target = connection;
+        }
+
+        await ImportFileAsync(choice.FilePath, target);
+    }
+
+    /// <summary>
+    /// Dialog 115: the computer a .reg file is imported into. The local computer is first and selected. Returns
+    /// chosen false when the user cancelled. The connection is null for the local computer.
+    /// </summary>
+    private async Task<(bool Chosen, RemoteRegistryConnection? Connection)> ChooseImportTargetAsync()
+    {
+        string localName = Environment.MachineName;
+        var names = new List<string> { localName };
+        names.AddRange(_context.RemoteConnections.Select(open => open.ComputerName));
+
+        var dialog = new ImportComputerDialog(
+            Get("MsgImportRegistryFileCaption"),
+            Get("ImportComputerLabel"),
+            names,
+            Get("DialogOk"),
+            Get("DialogCancel"));
+
+        if (!await _context.ShowDialogAsync(dialog))
+        {
+            return (false, null);
+        }
+
+        string selected = dialog.SelectedName;
+        if (string.Equals(selected, localName, StringComparison.OrdinalIgnoreCase))
+        {
+            return (true, null);
+        }
+
+        RemoteRegistryConnection? connection = _context.RemoteConnections.FirstOrDefault(candidate =>
+            string.Equals(candidate.ComputerName, selected, StringComparison.OrdinalIgnoreCase));
+        if (connection is null)
+        {
+            Log.Warn($"Registry Editor could not find the selected import target '{selected}'.");
+            return (false, null);
+        }
+
+        return (true, connection);
     }
 
     /// <summary>
@@ -170,12 +225,22 @@ internal sealed class ImportExportCommands
     /// Cancel button and no close box, so the import always runs to the end. The importer runs on the
     /// thread pool and reports sections to the window. A skipped line does not change the result. A
     /// refused file shows its own text, and a rejected write shows string 132. The import keeps going
-    /// after a rejected write, as classic regedit does.
+    /// after a rejected write, as classic regedit does. A remote target writes through its connection. A missing file
+    /// shows string 135, and a registry that cannot be read shows string 131, both with the computer name.
     /// </summary>
-    private async Task ImportFileAsync(string filePath)
+    private async Task ImportFileAsync(string filePath, RemoteRegistryConnection? target = null)
     {
         string caption = Get("MsgCaptionRegistryEditor");
         string? selectedPath = _context.Shell.TreeContent.SelectedNode?.RegistryPath;
+
+        if (target is not null && !File.Exists(filePath))
+        {
+            Log.Warn($"Registry Editor could not import '{filePath}' into '{target.ComputerName}': the file does not exist.");
+            await _context.ShowMessageAsync(
+                caption,
+                string.Format(CultureInfo.CurrentCulture, Get("MsgImportRemoteFileMissing"), filePath, target.ComputerName));
+            return;
+        }
 
         RegeditContext.Pane focusBefore = _context.FocusedPane();
         ImportProgressDialog? progress = OpenImportProgress(filePath);
@@ -184,12 +249,18 @@ internal sealed class ImportExportCommands
             new Progress<ImportProgress>(update => progress?.SetProgress(update.CompletedSections, update.TotalSections)));
 
         // The import runs under the write gate: the owner is disabled and a close request is held until it ends.
-        Task<RegFileImportResult> importTask = _context.RunRegistryWriteAsync(
-            () => RegFileImporter.ApplyFile(
-                RegeditWritePolicy.CreateStore(),
-                filePath,
-                CancellationToken.None,
-                progressSink));
+        RegistryStore store = target is null ? RegeditWritePolicy.CreateStore() : _context.StoreFor(target);
+        Task<RegFileImportResult> importTask = _context.RunRegistryWriteAsync(() =>
+        {
+            if (target is not null)
+            {
+                // Reading HKEY_USERS first makes a connection that cannot be read fail before any write (string 131).
+                // GetKeyInfo queries the remote key. KeyExists on a root only pins the handle and makes no call.
+                _ = store.Reader.GetKeyInfo(RegistryPath.Parse("HKEY_USERS"));
+            }
+
+            return RegFileImporter.ApplyFile(store, filePath, CancellationToken.None, progressSink);
+        });
 
         RegFileImportResult? result = null;
         Exception? error = null;
@@ -210,6 +281,15 @@ internal sealed class ImportExportCommands
 
         if (error is not null)
         {
+            if (target is not null && IsRemoteAccessFailure(error))
+            {
+                Log.Warn($"Registry Editor could not import '{filePath}' into '{target.ComputerName}': {error.GetType().Name}: {error.Message}");
+                await _context.ShowErrorAsync(new ClassicMessage(
+                    caption,
+                    string.Format(CultureInfo.CurrentCulture, Get("MsgImportRemoteAccess"), filePath, target.ComputerName)).ToErrorDialog());
+                return;
+            }
+
             if (IsFileOperationFailure(error))
             {
                 LogFileOperationFailure("import", filePath, error);
@@ -223,10 +303,20 @@ internal sealed class ImportExportCommands
 
         RegFileImportReport.LogOutcome(filePath, result!);
         await RefreshAfterImportAsync(selectedPath);
-        await _context.ShowMessageAsync(
-            caption,
-            string.Format(CultureInfo.CurrentCulture, Get(RegFileImportReport.MessageKey(result!)), filePath));
+
+        // A remote import that succeeded names the computer (string 128). Every other outcome uses the local text.
+        string message = target is not null && !RegFileImportReport.IsFailure(result!)
+            ? string.Format(CultureInfo.CurrentCulture, Get("MsgImportRemoteSucceeded"), filePath, target.ComputerName)
+            : string.Format(CultureInfo.CurrentCulture, Get(RegFileImportReport.MessageKey(result!)), filePath);
+        await _context.ShowMessageAsync(caption, message);
     }
+
+    /// <summary>
+    /// True when a remote import could not reach the registry: a failed read of the connection
+    /// (RegistryOperationException) or a disposed connection (ObjectDisposedException). Both come before any write.
+    /// </summary>
+    private static bool IsRemoteAccessFailure(Exception exception) =>
+        exception is RegistryOperationException or ObjectDisposedException;
 
     /// <summary>
     /// Shows the DLG-019 window and marks a dialog open, as ShowDialogAsync does for a modal dialog. When the
@@ -292,21 +382,36 @@ internal sealed class ImportExportCommands
     private async Task RefreshAfterImportAsync(string? selectedPath)
     {
         await _context.RefreshTreeAsync(selectedPath);
-        await _context.RefreshValuesAsync(selectDisplayName: null);
+        await _context.RefreshValuesAsync(selectRawName: null);
+    }
+
+    /// <summary>The connection of a selected connected-computer node, <c>\\COMPUTER</c>. Null for any other node.</summary>
+    private RemoteRegistryConnection? ConnectionOfSelectedComputerNode()
+    {
+        string? displayPath = _context.Shell.TreeContent.SelectedNode?.RegistryPath;
+        if (displayPath is not { Length: > 0 } || !displayPath.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return _context.RemoteConnections.FirstOrDefault(connection =>
+            string.Equals(
+                RemoteRegistryTreeSource.DisplayPrefix(connection.ComputerName),
+                displayPath,
+                StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task ExportAsync()
     {
-        if (RegeditSelectionGuards.IsRemoteSelected(_context))
-        {
-            // Remote export is not in this version. The menu keeps Export disabled for a remote node.
-            await _context.ShowMessageAsync(Get("DialogExportNoSelection"));
-            return;
-        }
+        bool hasSelectedKey = _context.TryGetSelectedLocation(out KeyLocation location);
+        RegistryPath selectedPath = hasSelectedKey ? location.Path : null!;
 
-        bool hasSelectedKey = _context.TryGetSelectedKeyPath(out RegistryPath selectedPath);
+        // A key or a computer node on a connected computer exports from that computer. Null for the local registry.
+        RemoteRegistryConnection? remote = hasSelectedKey ? location.Connection : ConnectionOfSelectedComputerNode();
+        RegistryStore store = hasSelectedKey ? location.Store : _context.StoreFor(remote);
+        RegistryReader reader = store.Reader;
         bool computerSelected = _context.IsComputerSelected;
-        if (!hasSelectedKey && !computerSelected)
+        if (!hasSelectedKey && !computerSelected && remote is null)
         {
             await _context.ShowMessageAsync(Get("DialogExportNoSelection"));
             return;
@@ -315,7 +420,10 @@ internal sealed class ImportExportCommands
         string defaultFileName = hasSelectedKey
             ? BuildDefaultExportFileName(selectedPath)
             : BuildDefaultExportFileName("Computer");
-        ExportFileDialogResult? choice = RegeditFileDialogs.ShowExport(_context, defaultFileName, hasSelectedKey);
+        ExportBranchRules branch = BranchRules(hasSelectedKey ? selectedPath : null, reader);
+        ExportFileDialogResult? choice = RegeditFileDialogs.Run(
+            _context,
+            () => CommonFileDialogs.ShowExportSave(_context.WindowHwnd, defaultFileName, hasSelectedKey, branch));
         if (choice is null)
         {
             return;
@@ -324,13 +432,40 @@ internal sealed class ImportExportCommands
         // A hive file is one key saved with RegSaveKey, so the hive format needs a selected key, and
         // the whole registry from Computer is only available through the .reg and text writers.
         bool hive = choice.Format == ExportFileFormat.Hive;
+
+        // The whole registry of a connected computer is HKEY_LOCAL_MACHINE and HKEY_USERS in one .reg document.
+        RemoteRegistryConnection? wholeRemote =
+            remote is not null && choice.Range == ExportFileRange.WholeRegistry ? remote : null;
+        // Hive export is local only. A remote key or the whole computer refuses it before any write, with the classic
+        // remote text. The whole computer also refuses text, as before.
+        bool remoteKeyHive = remote is not null && hasSelectedKey && hive;
+        if ((wholeRemote is not null && choice.Format is ExportFileFormat.Hive or ExportFileFormat.Text) || remoteKeyHive)
+        {
+            await _context.ShowMessageAsync(Get("DialogExportRemoteFormat"));
+            return;
+        }
         if ((choice.Range == ExportFileRange.SelectedBranch || hive) && !hasSelectedKey)
         {
             await _context.ShowMessageAsync(Get("DialogExportNoSelection"));
             return;
         }
 
-        RegistryPath? startKey = choice.Range == ExportFileRange.SelectedBranch || hive ? selectedPath : null;
+        // Selected branch exports the key typed in the branch edit. OK already checked that it exists, so the
+        // tree selection is not used. A hive export of All still saves the selected key.
+        RegistryPath? startKey = null;
+        if (choice.Range == ExportFileRange.SelectedBranch)
+        {
+            if (!TryParseBranch(choice.BranchText, out startKey))
+            {
+                await _context.ShowMessageAsync(Get("DialogExportBranchCaption"), Get("DialogAddressBarKeyNotFound"));
+                return;
+            }
+        }
+        else if (hive)
+        {
+            startKey = selectedPath;
+        }
+
         RegistryExportScope scope = choice.Range == ExportFileRange.WholeRegistry
             ? RegistryExportScope.WholeRegistry
             : RegistryExportScope.Selection;
@@ -348,7 +483,7 @@ internal sealed class ImportExportCommands
 
         Task<bool> dialogTask = _context.ShowDialogAsync(progress);
         Task exportTask = _context.RunRegistryAsync(
-            () => ExportToFile(choice, startKey, scope, cancellation.Token, progressSink),
+            () => ExportToFile(choice, startKey, scope, store, reader, wholeRemote, cancellation.Token, progressSink),
             cancellation.Token);
 
         Exception? error = null;
@@ -407,6 +542,71 @@ internal sealed class ImportExportCommands
         Log.Info($"Registry Editor export of '{choice.FilePath}' completed.");
     }
 
+    /// <summary>The branch edit's rules: the selected key in classic form, the key check, and the missing-key box.</summary>
+    private ExportBranchRules BranchRules(RegistryPath? selectedKey, RegistryReader reader) => new(
+        selectedKey is null ? string.Empty : ClassicPath(selectedKey),
+        text => BranchKeyExists(text, reader),
+        Get("DialogExportBranchCaption"),
+        Get("DialogAddressBarKeyNotFound"));
+
+    /// <summary>A key in the classic form the branch edit shows: no Computer prefix.</summary>
+    private static string ClassicPath(RegistryPath key)
+    {
+        string display = key.ToDisplayString();
+        return display.StartsWith(ComputerPrefix, StringComparison.OrdinalIgnoreCase)
+            ? display[ComputerPrefix.Length..]
+            : display;
+    }
+
+    private const string ComputerPrefix = @"Computer\";
+
+    /// <summary>
+    /// Parses a typed branch path. The Computer prefix and trailing backslashes are removed, and the path is
+    /// parsed as a registry path, which compares names without regard to case.
+    /// </summary>
+    private static bool TryParseBranch(string text, out RegistryPath? key)
+    {
+        string trimmed = text.Trim();
+        if (trimmed.StartsWith(ComputerPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = trimmed[ComputerPrefix.Length..];
+        }
+
+        trimmed = trimmed.TrimEnd('\\');
+        if (trimmed.Length > 0 && RegistryPath.TryParse(trimmed, out RegistryPath? parsed) && parsed is not null)
+        {
+            key = parsed;
+            return true;
+        }
+
+        key = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Whether a typed branch path names an existing key. Runs on the UI thread from the dialog's OK. A key that exists
+    /// but cannot be read throws the classic "cannot be opened" box for that key, which the dialog shows and stays open.
+    /// </summary>
+    private bool BranchKeyExists(string text, RegistryReader reader)
+    {
+        if (!TryParseBranch(text, out RegistryPath? key) || key is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return reader.KeyExists(key);
+        }
+        catch (RegistryOperationException ex)
+        {
+            string display = key.ToDisplayString();
+            Log.Warn($"Registry Editor could not check the export branch '{display}': Win32 {ex.Win32Error} ({ex.Message}).");
+            ClassicMessage message = _context.Messages.ForUnreadableKey(display, ex.Win32Error);
+            throw new ExportBranchUnreadableException(message.Caption, message.Text);
+        }
+    }
+
     /// <summary>
     /// Writes the export to a temporary file in the destination folder and moves it into place only
     /// after the writer finished. The temporary file is deleted on cancel or failure, so a canceled
@@ -417,6 +617,9 @@ internal sealed class ImportExportCommands
         ExportFileDialogResult choice,
         RegistryPath? startKey,
         RegistryExportScope scope,
+        RegistryStore store,
+        RegistryReader reader,
+        RemoteRegistryConnection? wholeRemote,
         CancellationToken cancellationToken,
         IProgress<ExportProgress> progress)
     {
@@ -429,14 +632,46 @@ internal sealed class ImportExportCommands
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 progress.Report(new ExportProgress(ExportPhase.Starting, startKey!, null, 0, 0, 0));
-                _context.Store.SaveKey(startKey!, tempPath);
+                store.SaveKey(startKey!, tempPath);
                 cancellationToken.ThrowIfCancellationRequested();
                 File.Move(tempPath, choice.FilePath, overwrite: true);
                 moved = true;
                 return;
             }
 
-            RegistryExportService service = CreateExportService(choice.Range);
+            if (wholeRemote is not null)
+            {
+                // HKEY_LOCAL_MACHINE and HKEY_USERS of the connected computer, merged into one document with one header.
+                RegFileFormat remoteFormat = choice.Format == ExportFileFormat.RegistrationRegedit4
+                    ? RegFileFormat.Regedit4
+                    : RegFileFormat.V5;
+                // Each key section streams to the temporary file as it is read, as the local whole-registry export does.
+                var remoteService = new RegistryExportService(reader);
+                IReadOnlyList<RegistryPath> remoteRoots =
+                [
+                    RegistryPath.Parse(RegistryRoot.LocalMachine.DisplayName()),
+                    RegistryPath.Parse(RegistryRoot.Users.DisplayName()),
+                ];
+
+                using (var remoteStream = new FileStream(
+                    tempPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: 64 * 1024,
+                    FileOptions.SequentialScan))
+                {
+                    remoteService.WriteRegFileRoots(remoteRoots, remoteStream, remoteFormat, cancellationToken, progress);
+                    remoteStream.Flush(flushToDisk: true);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                File.Move(tempPath, choice.FilePath, overwrite: true);
+                moved = true;
+                return;
+            }
+
+            RegistryExportService service = CreateExportService(choice.Range, reader);
             using (var stream = new FileStream(
                 tempPath,
                 FileMode.CreateNew,
@@ -476,7 +711,7 @@ internal sealed class ImportExportCommands
         }
     }
 
-    private RegistryExportService CreateExportService(ExportFileRange range)
+    private RegistryExportService CreateExportService(ExportFileRange range, RegistryReader reader)
     {
 #if BWC_E2E
         IRegistryExportSource? source = null;
@@ -487,13 +722,13 @@ internal sealed class ImportExportCommands
             // roots are still exported through RegFileExporter.ExportWholeRegistry, but HKCU is
             // mapped to the run sandbox and the other roots are empty. The ship build uses the live
             // reader.
-            source = new SandboxWholeRegistrySource(_context.Store.Reader, sandboxRoot);
+            source = new SandboxWholeRegistrySource(reader, sandboxRoot);
         }
 
         int pauseMs = E2EPauseMs(SlowExportVariable);
         if (pauseMs > 0)
         {
-            source = new PacedExportSource(source ?? new ReaderExportSource(_context.Store.Reader), pauseMs);
+            source = new PacedExportSource(source ?? new ReaderExportSource(reader), pauseMs);
         }
 
         if (source is not null)
@@ -502,7 +737,7 @@ internal sealed class ImportExportCommands
         }
 #endif
 
-        return new RegistryExportService(_context.Store.Reader);
+        return new RegistryExportService(reader);
     }
 
 #if BWC_E2E

@@ -26,6 +26,18 @@ public sealed class AddressBarSubmittedEventArgs : EventArgs
     public string Text { get; }
 }
 
+/// <summary>Raised when the address bar text changes or F4 asks for suggestions.</summary>
+public sealed class AddressSuggestionRequestedEventArgs : EventArgs
+{
+    public AddressSuggestionRequestedEventArgs(string text)
+    {
+        Text = text ?? string.Empty;
+    }
+
+    /// <summary>The address bar text when the suggestions were asked for.</summary>
+    public string Text { get; }
+}
+
 /// <summary>
 /// Classic Registry Editor window chrome: menu bar, optional address bar, tree pane, splitter,
 /// and list pane with a header. The shell carries no status bar, matching the oracle.
@@ -47,6 +59,9 @@ public sealed partial class ClassicWindowShell : UserControl
     private bool _splitterDragging;
     private double _splitterDragStartWidth;
     private string _currentPath = "Computer";
+
+    // Set while the shell writes the address text itself, so the write does not ask for suggestions.
+    private bool _suppressSuggestions;
 
     // The pane that held the focus last, and the tree width when keyboard split mode began. Enter and
     // Escape return the focus to that pane, and Escape puts back the width.
@@ -76,6 +91,12 @@ public sealed partial class ClassicWindowShell : UserControl
         _currentPath = AddressBox.Text;
         ApplyAddressBarPalette();
         ApplyMetrics();
+        TextEditMenu.Attach(AddressBox);
+        AddressBox.TextChanged += OnAddressBoxTextChanged;
+        AddressBox.LostFocus += OnAddressBoxLostFocus;
+        AddressSuggestList.Background = BwcBrushes.Window;
+        AddressSuggestList.BorderBrush = BwcBrushes.Shadow;
+        AddressSuggestList.Tapped += OnAddressSuggestionTapped;
 
         // The palette is applied here on the UI thread, after the Dense.xaml brushes exist.
         BwcTheme.EnsureInitialized();
@@ -187,13 +208,110 @@ public sealed partial class ClassicWindowShell : UserControl
             _currentPath = value ?? string.Empty;
             if (!string.Equals(AddressBox.Text, _currentPath, StringComparison.Ordinal))
             {
-                AddressBox.Text = _currentPath;
+                SetAddressText(_currentPath);
             }
         }
     }
 
     /// <summary>Raised when Enter is pressed in the address bar. The shell does not navigate.</summary>
     public event EventHandler<AddressBarSubmittedEventArgs>? AddressBarSubmitted;
+
+    /// <summary>Raised when the typed address changes or F4 asks for suggestions. The host answers the request.</summary>
+    public event EventHandler<AddressSuggestionRequestedEventArgs>? AddressSuggestionsRequested;
+
+    /// <summary>True while the auto-suggest list under the address bar is open.</summary>
+    public bool IsAddressSuggestionsOpen => AddressSuggestList.Visibility == Visibility.Visible;
+
+    /// <summary>
+    /// Opens the auto-suggest list with these entries, or closes it when there are none. The list is shown only
+    /// while the address bar has keyboard focus, so a late answer does not open it after focus has moved.
+    /// </summary>
+    public void ShowAddressSuggestions(IReadOnlyList<string> suggestions)
+    {
+        if (suggestions.Count == 0 || !IsWithin(FocusedElement(), AddressBox))
+        {
+            HideAddressSuggestions();
+            return;
+        }
+
+        AddressSuggestList.ItemsSource = suggestions.ToArray();
+        AddressSuggestList.SelectedIndex = -1;
+        AddressSuggestList.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Closes the auto-suggest list. Safe when it is already closed.</summary>
+    public void HideAddressSuggestions()
+    {
+        AddressSuggestList.Visibility = Visibility.Collapsed;
+        AddressSuggestList.ItemsSource = null;
+    }
+
+    /// <summary>
+    /// F4 (command 642): shows the address bar when it is hidden, puts the keyboard focus in it, and asks for the
+    /// suggestions of the text that is there.
+    /// </summary>
+    public void FocusAddressSuggestions()
+    {
+        if (!IsAddressBarVisible)
+        {
+            SetAddressBarVisible(true);
+        }
+
+        _ = AddressBox.Focus(FocusState.Keyboard);
+        AddressSuggestionsRequested?.Invoke(this, new AddressSuggestionRequestedEventArgs(AddressBox.Text));
+    }
+
+    private void SetAddressText(string text)
+    {
+        _suppressSuggestions = true;
+        try
+        {
+            AddressBox.Text = text;
+        }
+        finally
+        {
+            _suppressSuggestions = false;
+        }
+    }
+
+    private void OnAddressBoxTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_suppressSuggestions || !IsWithin(FocusedElement(), AddressBox))
+        {
+            return;
+        }
+
+        AddressSuggestionsRequested?.Invoke(this, new AddressSuggestionRequestedEventArgs(AddressBox.Text));
+    }
+
+    /// <summary>Closes the list when focus leaves both the address bar and the list, so a click on an entry works.</summary>
+    private void OnAddressBoxLostFocus(object sender, RoutedEventArgs e)
+    {
+        _ = DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!IsWithin(FocusedElement(), AddressSuggestList) && !IsWithin(FocusedElement(), AddressBox))
+            {
+                HideAddressSuggestions();
+            }
+        });
+    }
+
+    private void OnAddressSuggestionTapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (AddressSuggestList.SelectedItem is string chosen)
+        {
+            CommitAddress(chosen);
+        }
+    }
+
+    /// <summary>Puts a chosen suggestion in the address bar and submits it, as Enter does.</summary>
+    private void CommitAddress(string text)
+    {
+        HideAddressSuggestions();
+        SetAddressText(text);
+        _ = AddressBox.Focus(FocusState.Programmatic);
+        AddressBarSubmitted?.Invoke(this, new AddressBarSubmittedEventArgs(text));
+    }
 
     /// <summary>The tree pane container.</summary>
     public FrameworkElement TreeHost => TreePaneBorder;
@@ -382,6 +500,8 @@ public sealed partial class ClassicWindowShell : UserControl
         AddressBox.MinHeight = DenseMetrics.AddressBarHeight;
         AddressBox.FontSize = DenseMetrics.FontSize;
         AddressBox.FontFamily = DenseMetrics.FontFamily;
+        AddressSuggestList.FontSize = DenseMetrics.FontSize;
+        AddressSuggestList.FontFamily = DenseMetrics.FontFamily;
 
         TreeControl.ApplyMetrics();
         ListControl.ApplyMetrics();
@@ -598,19 +718,62 @@ public sealed partial class ClassicWindowShell : UserControl
     /// </summary>
     private void OnAddressBarKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        // While the suggestion list is open, Up and Down move through it, and Escape closes it before anything else.
+        if (IsAddressSuggestionsOpen && !IsAltDown())
+        {
+            switch (e.Key)
+            {
+                case VirtualKey.Down:
+                    MoveSuggestion(1);
+                    e.Handled = true;
+                    return;
+                case VirtualKey.Up:
+                    MoveSuggestion(-1);
+                    e.Handled = true;
+                    return;
+                case VirtualKey.Escape:
+                    HideAddressSuggestions();
+                    e.Handled = true;
+                    return;
+                case VirtualKey.Enter when AddressSuggestList.SelectedItem is string chosen:
+                    e.Handled = true;
+                    CommitAddress(chosen);
+                    return;
+            }
+        }
+
         switch (e.Key)
         {
             case VirtualKey.Enter:
                 e.Handled = true;
+                HideAddressSuggestions();
                 AddressBarSubmitted?.Invoke(this, new AddressBarSubmittedEventArgs(AddressBox.Text));
                 break;
             case VirtualKey.Escape:
                 e.Handled = true;
-                AddressBox.Text = _currentPath;
+                SetAddressText(_currentPath);
                 _ = TreeControl.Focus(FocusState.Keyboard);
                 break;
         }
     }
+
+    private void MoveSuggestion(int step)
+    {
+        int count = AddressSuggestList.Items.Count;
+        if (count == 0)
+        {
+            return;
+        }
+
+        int index = AddressSuggestList.SelectedIndex < 0
+            ? (step > 0 ? 0 : count - 1)
+            : Math.Clamp(AddressSuggestList.SelectedIndex + step, 0, count - 1);
+        AddressSuggestList.SelectedIndex = index;
+        AddressSuggestList.ScrollIntoView(AddressSuggestList.Items[index]);
+    }
+
+    private static bool IsAltDown() =>
+        InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu).HasFlag(CoreVirtualKeyStates.Down);
 
     /// <summary>
     /// Tab and F6 move through the panes in the classic order: tree, list, and the address bar when it is
@@ -632,6 +795,12 @@ public sealed partial class ClassicWindowShell : UserControl
         }
 
         if (e.Key != VirtualKey.Tab && e.Key != VirtualKey.F6)
+        {
+            return;
+        }
+
+        // Shift+F6 has no accelerator in classic (measured, command table 100), so it does nothing.
+        if (e.Key == VirtualKey.F6 && IsShiftDown())
         {
             return;
         }

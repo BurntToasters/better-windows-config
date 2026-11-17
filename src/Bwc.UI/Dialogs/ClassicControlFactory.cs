@@ -78,7 +78,7 @@ internal static class ClassicControlFactory
         {
             case ClassicControlKind.Label:
                 textView = TextFor(RequireText(mnemonic, definition), font, styles, "BwcClassicLabelStyle");
-                element = textView;
+                element = definition.Disabled ? new ClassicDisabledText(textView) : textView;
                 break;
 
             case ClassicControlKind.Button:
@@ -158,6 +158,14 @@ internal static class ClassicControlFactory
                 };
                 break;
 
+            case ClassicControlKind.ColumnList:
+                var columns = new ClassicColumnList(font);
+                columns.SetColumns(definition.Columns);
+                columns.SetListAutomationId(definition.AutomationId);
+                columns.SetListName(name);
+                element = columns;
+                break;
+
             case ClassicControlKind.ComboBox:
                 element = new ComboBox
                 {
@@ -225,7 +233,19 @@ internal static class ClassicControlFactory
             ScrollViewer.SetVerticalScrollBarVisibility(box, ScrollBarVisibility.Auto);
         }
 
+        // Every edit of a classic dialog (values, Find what, rename) has the system edit menu.
+        Bwc.UI.Menu.TextEditMenu.Attach(box);
         return box;
+    }
+
+    /// <summary>Fills a static text field. Its UI Automation Name follows the text, so the field reads as filled.</summary>
+    internal static void SetStaticText(FrameworkElement element, string text)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        TextBlock block = element as TextBlock ?? (element as ClassicDisabledText)?.View
+            ?? throw new InvalidOperationException("The control is not a static text.");
+        block.Text = text;
+        AutomationProperties.SetName(element, text);
     }
 
     internal static Style? StyleOf(ResourceDictionary styles, string key) =>
@@ -266,6 +286,27 @@ internal static class ClassicGlyph
     }
 }
 #endif
+
+/// <summary>
+/// A static text that the template disables. It hosts the text block, which is sealed and has no IsEnabled, so
+/// UI Automation reports the template state through this control. The text is drawn as usual.
+/// </summary>
+internal sealed class ClassicDisabledText : ContentControl
+{
+    internal ClassicDisabledText(TextBlock view)
+    {
+        View = view;
+        Content = view;
+        IsEnabled = false;
+        IsTabStop = false;
+        Padding = new Thickness(0);
+        HorizontalContentAlignment = HorizontalAlignment.Left;
+        VerticalContentAlignment = VerticalAlignment.Top;
+    }
+
+    /// <summary>The text block that shows the text.</summary>
+    internal TextBlock View { get; }
+}
 
 /// <summary>
 /// The etched frame of a classic group box. The frame is five line segments and the caption. The top

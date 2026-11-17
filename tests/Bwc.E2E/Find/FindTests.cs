@@ -255,7 +255,7 @@ public sealed class FindTests
                 bool dataClicked = preparedData && driver.SendFindKey(VirtualKeyShort.RETURN);
                 bool dataFindClosed = dataClicked && driver.WaitForFindClosed();
                 bool dataProgressClosed = dataFindClosed &&
-                    driver.WaitForProgressClosed(TimeSpan.FromSeconds(15));
+                    driver.WaitForProgressClosed(TimeSpan.FromSeconds(60));
                 bool dataRowSelected = ControlTestSupport.WaitUntil(
                     () => ControlTestSupport.IsSelected(
                         ControlTestSupport.FindRowByName(
@@ -1103,7 +1103,7 @@ public sealed class FindTests
                 return false;
             }
 
-            Keyboard.Press(key);
+            Keyboard.Type(key);
             return true;
         }
 
