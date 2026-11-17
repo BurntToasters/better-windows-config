@@ -33,7 +33,7 @@ internal static class HiveMountNative
     {
         var titles = new List<string>();
         _ = EnumWindows(
-            (hwnd, _) =>
+            (hwnd, lParam) =>
             {
                 _ = GetWindowThreadProcessId(hwnd, out uint owner);
                 if (owner == (uint)processId && hwnd != main && IsWindowVisible(hwnd))
