@@ -854,6 +854,7 @@ public sealed class HubTests
         string installProtected = InstallEvidence.ProtectedRoot(config, InstallScope);
         HashSet<string> protectedBefore = InstallEvidence.StagingFolders(installProtected);
         string recordPath = Path.Combine(config.DataRootFor(InstallScope), InstallEvidence.RecordFileName);
+        DateTime testStartUtc = DateTime.UtcNow;
 
         try
         {
@@ -874,6 +875,13 @@ public sealed class HubTests
         }
         finally
         {
+            // Also on a throw: a relaunched Hub left running makes every later run refuse to install.
+            int leftover = InstallEvidence.StopStartedProcesses(HubProcessName, config.HubExePath, testStartUtc);
+            if (leftover > 0)
+            {
+                E2EResults.Note("hub.install.leftoverHubs", $"Stopped {leftover} Hub process(es) this test started.");
+            }
+
             InstallEvidence.RemoveStagingSince(installStaging, stagingBefore);
             InstallEvidence.RemoveStagingSince(installProtected, protectedBefore);
         }
