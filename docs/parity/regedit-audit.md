@@ -25,22 +25,21 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 
 | Section | pass | declared-difference | gap |
 | --- | --- | --- | --- |
-| MENU | 35 | 0 | 2 |
+| MENU | 37 | 0 | 0 |
 | CTX | 41 | 0 | 0 |
-| DLG | 42 | 7 | 2 |
+| DLG | 44 | 7 | 0 |
 | ACC | 28 | 0 | 0 |
 | MSG | 221 | 54 | 1 |
 | VIEW | 19 | 2 | 0 |
 | BEH | 43 | 6 | 0 |
 | EXP | 32 | 0 | 0 |
-| All (535) | 461 | 69 | 5 |
+| All (535) | 465 | 69 | 1 |
 
 ## Gaps by piece
 
 | Piece | Rows |
 | --- | --- |
 | S1b | MSG-175 |
-| Elevated | MENU-005, MENU-006, DLG-007, DLG-008 |
 
 ## Rows
 
@@ -52,8 +51,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | MENU-002 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
 | MENU-003 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
 | MENU-004 | pass | Shell_MenuTableMatchesCommandStates; ImportExport_UsesOwnedDialogsAndRefreshesTheSandbox; Hives_LoadDialogIsOwnedAndCancelLeavesNoMountedKey; AppServices_HiveRulesEnableLoadAndUnloadByRoot |  |
-| MENU-005 | gap | Owned Load Hive file dialog opens only with SeRestorePrivilege. Load is enabled only at HKLM and HKU (AppServices_HiveRulesEnableLoadAndUnloadByRoot); Hives_LoadHiveRefusesWithoutPrivilegeBeforeAskingForFile shows the refusal. Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu opens it at HKEY_USERS. Elevated, pending the user's elevated run (not run here) | Elevated |
-| MENU-006 | gap | Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu invokes Unload Hive on the mount and confirms it (hives.md section 14). Enable rule: AppServices_HiveRulesEnableLoadAndUnloadByRoot. Elevated, pending the user's elevated run (not run here) | Elevated |
+| MENU-005 | pass | Owned Load Hive file dialog opens only with SeRestorePrivilege. Load is enabled only at HKLM and HKU (AppServices_HiveRulesEnableLoadAndUnloadByRoot); Hives_LoadHiveRefusesWithoutPrivilegeBeforeAskingForFile shows the refusal. Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu opens it at HKEY_USERS. Passed in the elevated run 20261117T020958Z-af792f85, 158 of 158 checks |  |
+| MENU-006 | pass | Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu invokes Unload Hive on the mount and confirms it (hives.md section 14). Enable rule: AppServices_HiveRulesEnableLoadAndUnloadByRoot. Passed in the elevated run 20261117T020958Z-af792f85, 158 of 158 checks |  |
 | MENU-007 | pass | Shell_MenuTableMatchesCommandStates; Remote_ConnectDialogIsOwnedAndCancelLeavesNoConnection (dialog content is DLG-031, R2) |  |
 | MENU-008 | pass | Remote_DisconnectDialogRemovesComputer (loopback connection to 127.0.0.1); Shell_MenuTableMatchesCommandStates |  |
 | MENU-009 | pass | Print_OwnedDialogCancelsAndCommandStateFollowsSelection (Print enabled at Computer, a hive and a key) |  |
@@ -142,8 +141,8 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 | DLG-004 | pass | ClassicDialogs_EditStringAndDwordFollowTheTemplate; ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates |  |
 | DLG-005 | pass | ClassicValueEditors_MultiStringWarningAndBinaryFollowTheTemplates (caption Edit Binary Value); HexContextMenu_HasTheRt108ItemsAndStates |  |
 | DLG-006 | pass | HexEditing_EditsCancelsAndCopies; HexEditingFixes_TypeBackspaceAndPasteUseRealKeys |  |
-| DLG-007 | gap | Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu checks caption, label, tab order and the 252 x 53 DLU geometry against RT_DIALOG 104. The label was 'Key name under HKEY_LOCAL_MACHINE:' and is now the classic '&Key Name:'. Elevated, pending the user's elevated run (not run here) | Elevated |
-| DLG-008 | gap | Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu types the key name into control 1001, reads it back, and OK loads the hive under HKEY_USERS. Elevated, pending the user's elevated run (not run here) | Elevated |
+| DLG-007 | pass | Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu checks caption, label, tab order and the 252 x 53 DLU geometry against RT_DIALOG 104. The label was 'Key name under HKEY_LOCAL_MACHINE:' and is now the classic '&Key Name:'. Passed in the elevated run 20261117T020958Z-af792f85, 158 of 158 checks |  |
+| DLG-008 | pass | Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu types the key name into control 1001, reads it back, and OK loads the hive under HKEY_USERS. Passed in the elevated run 20261117T020958Z-af792f85, 158 of 158 checks |  |
 | DLG-009 | pass | Print_ProgressCancelStopsJobAndLeavesNoOutput (progress text, Cancel, main window disabled while it runs; records not run without Microsoft Print to PDF); built from template 105 (ClassicDialogTemplates.cs) |  |
 | DLG-010 | pass | Find_FollowsTheClassicTwoDialogSequence; find-sequence.json |  |
 | DLG-011 | pass | Find_FollowsTheClassicTwoDialogSequence; find-sequence.json |  |
