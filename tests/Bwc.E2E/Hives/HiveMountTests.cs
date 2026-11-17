@@ -241,7 +241,7 @@ public sealed class HiveMountTests
             return false;
         }
 
-        // The item is invoked in the menu that is still open. Closing the menu and opening it again raced the close
+        // The item is activated in the menu that is still open. Closing the menu and opening it again raced the close
         // animation: the old item was found while it closed and had no clickable point.
         InvokeMenuItem(loadItem!);
         IntPtr fileDialog = dialogs.WaitForDialog(TimeSpan.FromSeconds(10));
@@ -370,7 +370,7 @@ public sealed class HiveMountTests
             return false;
         }
 
-        // The item is invoked in the menu that is still open. Closing the menu and opening it again raced the close
+        // The item is activated in the menu that is still open. Closing the menu and opening it again raced the close
         // animation: the old item was found while it closed and had no clickable point.
         InvokeMenuItem(unloadItem!);
         AutomationElement? confirm = driver.WaitForElement(PromptRootId, TimeSpan.FromSeconds(10));
@@ -494,16 +494,16 @@ public sealed class HiveMountTests
         return ControlTestSupport.WaitForTreeSelection(session, rootName, TimeSpan.FromSeconds(10));
     }
 
+    /// <summary>
+    /// Focus, then Enter, as the export step does (ExportRangeTests.InvokeFileCommand). UIA Invoke does not return
+    /// while the command's modal dialog is open: Load Hive opens the system file dialog inside the handler, so Invoke
+    /// timed out.
+    /// </summary>
     private static void InvokeMenuItem(AutomationElement item)
     {
-        if (item.Patterns.Invoke.IsSupported)
-        {
-            item.Patterns.Invoke.Pattern.Invoke();
-        }
-        else
-        {
-            item.Click();
-        }
+        item.Focus();
+        Thread.Sleep(150);
+        Keyboard.Type(VirtualKeyShort.RETURN);
     }
 
     private static bool IsEnabled(AutomationElement? element)
