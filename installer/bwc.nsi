@@ -10,8 +10,8 @@
 ; Command line:
 ;   (none)             interactive install to %ProgramFiles%\Better Windows Config
 ;   /S                 silent install or uninstall
-;   /D=<dir>           ship: never the install folder. Only a hint: when it is an earlier per-user install, its running
-;                      apps are closed (nothing there is removed). Must be last and unquoted (NSIS rule).
+;   /D=<dir>           ship: never the install folder. Accepted (the updater passes it) and ignored; nothing there is
+;                      read, closed, or changed. Must be last and unquoted (NSIS rule).
 ;                      E2E per-user sandbox: the install folder, as before.
 ;   /RELAUNCH          start the Hub when the run ends, through BwcUpdate.exe --launch-hub (never directly, so an
 ;                      elevated setup does not start an elevated Hub): the new Hub after success, or the installed
@@ -173,7 +173,7 @@ Function .onInit
   Call BwcCheckRawDir
   StrCmp $BwcMachine "1" 0 BwcInit_target
   Call BwcPickMachineTarget
-  Call BwcReadLegacyHint
+  Call BwcNoteRawDir
   BwcInit_target:
   Call BwcTrimInstDir
   Call BwcCheckHost
@@ -282,8 +282,6 @@ FunctionEnd
 ; Close step for the install. It runs the BwcUpdate.exe in the staging folder, which is the version being installed
 ; and is a standalone NativeAOT exe (no .NET runtime beside it). The payload is staged before this runs.
 ; The target's apps are closed only when an earlier version is present (a first install has nothing to close).
-; An earlier per-user install named by the /D= hint is closed too, on a first install as well: its apps are
-; closed and nothing there is changed.
 Function BwcCloseRunningApps
   ; The updater that launched this setup exits right after it starts the setup. Wait for it first, so
   ; no file is replaced while its copy of BwcUpdate.exe is still in use. Then close the apps, excluding it.
@@ -292,12 +290,8 @@ Function BwcCloseRunningApps
   !insertmacro BWC_WAIT_PARENT_BODY "install" "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_UPDATER_EXE}"
   StrCpy $BwcCloseArgs "--exclude-pid $BwcParentPid"
   BwcCloseInst_args:
-  IfFileExists "$INSTDIR\${BWC_UPDATER_EXE}" 0 BwcCloseInst_legacy
+  IfFileExists "$INSTDIR\${BWC_UPDATER_EXE}" 0 BwcCloseInst_end
   !insertmacro BWC_CLOSE_APPS_BODY "install" "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_UPDATER_EXE}" "$INSTDIR"
-  BwcCloseInst_legacy:
-  StrCmp $BwcLegacyDir "" BwcCloseInst_end 0
-  DetailPrint "Closing the apps of the earlier install in $BwcLegacyDir. Nothing there is removed."
-  !insertmacro BWC_CLOSE_APPS_BODY "legacy" "$INSTDIR${BWC_STAGE_SUFFIX}\${BWC_UPDATER_EXE}" "$BwcLegacyDir"
   BwcCloseInst_end:
 FunctionEnd
 
@@ -549,8 +543,8 @@ Section "Uninstall"
   Call un.BwcCloseRunningApps
 
   ; Shortcuts. Ship: the two all-users shortcuts, in the folder the installer used ($SMPROGRAMS with the all-users
-  ; context). A per-user shortcut of an earlier install is not ours to remove. E2E: the folder that the install
-  ; recorded; the /MACHINE sandbox also removes its own Start menu folder when it is empty.
+  ; context). E2E: the folder that the install recorded; the /MACHINE sandbox also removes its own Start menu folder
+  ; when it is empty.
   !ifdef BWC_E2E
     ReadRegStr $R0 SHCTX "$BwcUninstallKey" "ShortcutDir"
   !else
@@ -579,15 +573,12 @@ Section "Uninstall"
   Delete "$INSTDIR\THIRD-PARTY-NOTICES.txt"
   Delete "$INSTDIR\${BWC_MANIFEST}"
   Delete "$INSTDIR\${BWC_CLEANUP_MARKER}"
-  ; Helper from versions before 0.2.0. It is removed when present.
-  Delete "$INSTDIR\${BWC_LEGACY_TOOLS_DIR}\${BWC_LEGACY_CLOSE_HELPER}"
   IfErrors 0 BwcUn_filesDeleted
   IntOp $R9 $R9 + 1
   IntCmp $R9 20 BwcUn_filesDeleted 0 BwcUn_filesDeleted
   Sleep 500
   Goto BwcUn_deleteFiles
   BwcUn_filesDeleted:
-  RMDir "$INSTDIR\${BWC_LEGACY_TOOLS_DIR}"
   !insertmacro BWC_PAYLOAD_RMDIRS
 
   ; The folders of the elevated updater: the protected copies of the installer in <install folder>.upd (only 32-hex

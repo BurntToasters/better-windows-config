@@ -135,7 +135,7 @@ code is in `tests/Bwc.E2E/Installer/`. Its output is `artifacts/e2e/installer-up
 
 ## Machine mode and the Elevated tests (I4)
 
-The per-machine install (docs/failure-modes/installer.md, "Per-machine install and migration (0.1.2)") writes
+The per-machine install (docs/failure-modes/installer.md, "Per-machine install (0.1.2)") writes
 Program Files, HKLM, and the all-users Start menu. The unelevated flow above never runs it. The Elevated tests do, only
 through the user's elevated runner (`docs/elevated-runner.md`), which starts exactly
 `node scripts/test-e2e.js --rid <host> --flavor e2e --filter "TestCategory=Elevated"` with no arguments and no environment.
@@ -145,8 +145,7 @@ The only places they may write: `%ProgramFiles%\BWC-E2E\<run-id>`, `HKLM\Softwar
 all-users Start menu folder `BWC-E2E-<run-id>`, and the existing hive mount `HKEY_USERS\BWC-E2E-<run-id>` (not used here).
 The installer itself also makes the siblings `<run-id>.new`, `<run-id>.old`, and `<run-id>.upd` next to the run folder, and
 its in-place uninstaller may queue `Uninstall.exe` and the run folder for deletion at the next restart (installer.md M38).
-Those are the installer's own names, removed in `finally` (the queue entry in `HKLM\SYSTEM` is not ours to remove). The
-per-user A of the upgrade test uses the usual E2E temp folder and `HKCU\Software\BWC-E2E\<run-id>`.
+Those are the installer's own names, removed in `finally` (the queue entry in `HKLM\SYSTEM` is not ours to remove).
 
 ### Prepare step (`scripts/test-installer-e2e.js --prepare --rid <rid>`)
 
@@ -185,7 +184,7 @@ per-user A of the upgrade test uses the usual E2E temp folder and `HKCU\Software
 54. **Cleanup order.** `finally` stops the processes this run started (by pid and by image under the run folder), runs the
     registered uninstall string once, then removes what remains. `<PF>\BWC-E2E` and `HKLM\Software\BWC-E2E` are removed only
     when empty. A cleanup that cannot finish (a locked file) is a failed check that names the path, so the user can remove it
-    by hand. The per-user A of the upgrade test is cleaned the way the per-user flow always was.
+    by hand.
 55. **HKLM written through the 32-bit view (`WOW6432Node`).** The fresh install test reads the 64-bit view and also checks
     that `Software\WOW6432Node\BWC-E2E\<run-id>` is absent. If a broken setup wrote it there, the check fails and names the
     key. The test does not delete it (outside the allowed locations): remove it by hand.
@@ -199,17 +198,17 @@ per-user A of the upgrade test uses the usual E2E temp folder and `HKCU\Software
     no allow entry for Users, Authenticated Users, or Everyone grants a write right on the folder. `icacls` output and the SDDL
     go into the artifact (`evidence`). A protected or Users-writable folder fails.
 
-### Upgrade from a per-user A
+### `/D=` naming another folder
 
-59. **The installer changes the legacy folder.** A name, size, or write time of the legacy folder differs from the snapshot
-    taken before the machine setup. Fail. (The Hub's cleanup of that folder is the migration test, I3.)
-60. **The legacy app stays open.** The test starts `BwcRegedit.exe` from the legacy folder (elevated, because the test
-    is). The machine setup must close it through the elevated close step (installer.md M9, M10). Still running after the setup
-    exits is a fail, and the test kills only that pid in `finally`.
-61. **`/D=` becomes the target.** The machine setup is started with the legacy folder as `/D=`. The target must still be the
-    run's Program Files folder: `InstallLocation` of the HKLM key is the machine folder, and the legacy folder holds no B file.
-62. **The legacy per-user uninstall key is removed by the machine setup.** It must stay (M13): the test reads the run's HKCU
-    key after the setup and expects `DisplayVersion` A.
+0.1.x carries no migration code, so there is no test of an upgrade over a 0.1.1 install. The one claim that stays is
+installer.md M5 and M6. Numbers 60 and 62 belonged to the 0.1.1 test and are not reused.
+
+59. **The installer changes the other folder.** The test makes a folder of its own below its run folder in the admin-only
+    work folder (85) and puts a few files in it. A name, size, or write time in it that differs from the snapshot taken before
+    the machine setup is a fail.
+61. **`/D=` becomes the target.** The machine setup is started with that other folder as `/D=`. The target must still be the
+    run's Program Files folder: `InstallLocation` of the HKLM key is the machine folder, the other folder is not the install
+    folder, and the other folder holds no B file.
 
 ### Elevated update through the real helper chain
 
@@ -285,12 +284,10 @@ in the elevated runner (the unelevated run reports them as not run).
     is `SHGetKnownFolderPath(FOLDERID_ProgramFiles)`. An existing `%ProgramFiles%\BWC-E2E` that is a link, or is not owned by
     Administrators, SYSTEM, or TrustedInstaller, or that standard users can write, is refused: the Elevated tests are NOT RUN
     (they would otherwise create and delete inside a folder a user controls).
-85. **The legacy per-user sandbox and the run's working folder are in `%TEMP%`.** The upgrade test ran the per-user A elevated
-    in `%TEMP%\bwc-installer-e2e-<id>`, started elevated children with that folder as the working directory, and deleted it
-    recursively as administrator. All of it now lives in `%ProgramFiles%\BWC-E2E\work-<id>\<run id>`: the legacy sandbox
-    (its install folder, shortcut folder, and uninstaller), the working folder of every Elevated run, and the inputs. The
-    per-user A there only has to look like a legacy install to the `/D=` hint (M6, M9). The path has a space, so the sandbox
-    shortcut folder reaches the setup through `BWC_E2E_INSTALLER_SHORTCUTS`, not through the unquoted `/SHORTCUTS=`.
+85. **The run's working folder is in `%TEMP%`.** An Elevated run that kept its working folder in `%TEMP%\bwc-installer-e2e-<id>`
+    would start elevated children with that folder as the working directory and delete it recursively as administrator. It
+    lives in `%ProgramFiles%\BWC-E2E\work-<id>\<run id>` instead, with the inputs. The folder that test 59 and 61 name in
+    `/D=` is inside it too.
 86. **The recursive delete.** The only recursive deletes of the Elevated tests are of folders inside the work folder, and
     the work folder itself, each checked to be below `%ProgramFiles%\BWC-E2E` by name and not a link. A work folder that
     cannot be removed is a failed cleanup check naming the path, never a silent leftover.

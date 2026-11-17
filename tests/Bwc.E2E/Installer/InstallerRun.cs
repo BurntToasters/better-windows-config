@@ -19,7 +19,6 @@ internal sealed class InstallerRun : IDisposable
     public const string RegeditExeName = "BwcRegedit.exe";
     public const string UpdaterExeName = "BwcUpdate.exe";
     public const string UninstallerName = "Uninstall.exe";
-    private const string ShortcutsVariable = "BWC_E2E_INSTALLER_SHORTCUTS";
     private const string RegistryParent = @"Software\BWC-E2E";
     private const string UninstallSubkey = @"Uninstall\BetterWindowsConfig";
     private const string MachineParentName = "BWC-E2E";
@@ -94,20 +93,19 @@ internal sealed class InstallerRun : IDisposable
     private string RunKey => RegistryParent + @"\" + RunId;
 
     /// <summary>
-    /// Creates the folders for one per-user run. Without <paramref name="work"/> they are in %TEMP% (the unelevated installer
-    /// E2E), and the path must have no space because /SHORTCUTS= is passed unquoted. With it (the legacy sandbox of an Elevated
-    /// test) they are inside the admin-only work folder, and the shortcut folder reaches the setup through the environment.
+    /// Creates the folders for one per-user run in %TEMP% (the unelevated installer E2E). The path must have no space because
+    /// /SHORTCUTS= is passed unquoted.
     /// </summary>
-    public static InstallerRun Create(E2EConfig config, string caseId, MachineWorkRoot? work = null)
+    public static InstallerRun Create(E2EConfig config, string caseId)
     {
         string runId = "inst-" + Guid.NewGuid().ToString("N")[..10] + "-" + caseId;
-        string root = work is null ? Path.Combine(Path.GetTempPath(), "bwc-installer-e2e-" + runId) : Path.Combine(work.Path, runId);
-        if (work is null && root.Contains(' ', StringComparison.Ordinal))
+        string root = Path.Combine(Path.GetTempPath(), "bwc-installer-e2e-" + runId);
+        if (root.Contains(' ', StringComparison.Ordinal))
         {
             throw new InvalidOperationException("The temp folder path has a space, which the unquoted /SHORTCUTS= cannot carry: " + root);
         }
 
-        var run = new InstallerRun(config, runId, root, machine: false, work);
+        var run = new InstallerRun(config, runId, root, machine: false, work: null);
         Directory.CreateDirectory(run.ShortcutDir);
         return run;
     }
@@ -133,21 +131,15 @@ internal sealed class InstallerRun : IDisposable
 
     /// <summary>
     /// Runs the E2E setup silently into this run's folders. Returns the exit code, or -1 after a timeout. The machine mode
-    /// passes /MACHINE and no folder: the setup picks the Program Files folder itself. <paramref name="legacyHint"/> is the
-    /// folder of an earlier per-user install, passed as /D= (last, unquoted) the way an old helper would; the setup only
-    /// closes that install's apps and never uses it as the target.
+    /// passes /MACHINE and no folder: the setup picks the Program Files folder itself. <paramref name="rawDir"/> is a folder
+    /// passed as /D= (last, unquoted) the way the updater does; the setup ignores it and never changes that folder.
     /// </summary>
-    public int RunSetup(string setupPath, TimeSpan timeout, string? legacyHint = null)
+    public int RunSetup(string setupPath, TimeSpan timeout, string? rawDir = null)
     {
-        // A shortcut folder with a space cannot ride on the unquoted /SHORTCUTS=, so the setup reads it from the environment.
-        bool shortcutsInEnvironment = !Machine && ShortcutDir.Contains(' ', StringComparison.Ordinal);
         string arguments = Machine
-            ? "/S /MACHINE /RUNID=" + RunId + (legacyHint is null ? string.Empty : " /D=" + legacyHint)
-            : "/S /RUNID=" + RunId + (shortcutsInEnvironment ? string.Empty : " /SHORTCUTS=" + ShortcutDir) + " /D=" + InstallDir;
-        using Process process = Start(
-            setupPath,
-            arguments,
-            shortcutsInEnvironment ? new Dictionary<string, string> { [ShortcutsVariable] = ShortcutDir } : null);
+            ? "/S /MACHINE /RUNID=" + RunId + (rawDir is null ? string.Empty : " /D=" + rawDir)
+            : "/S /RUNID=" + RunId + " /SHORTCUTS=" + ShortcutDir + " /D=" + InstallDir;
+        using Process process = Start(setupPath, arguments, environment: null);
         if (!process.WaitForExit(timeout))
         {
             process.Kill(entireProcessTree: true);
@@ -255,22 +247,6 @@ internal sealed class InstallerRun : IDisposable
         using RegistryKey hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
         using RegistryKey? key = hklm.OpenSubKey(@"Software\WOW6432Node\" + MachineParentName + @"\" + RunId);
         return key is not null;
-    }
-
-    /// <summary>
-    /// Writes a stand-in for an old per-user install to this run's sandbox uninstall key (never the real key): the
-    /// InstallLocation value only when one is given, and the ShortcutDir value of this run. For the migration E2E.
-    /// </summary>
-    public void SeedUninstallKey(string? installLocation)
-    {
-        using RegistryKey key = Registry.CurrentUser.CreateSubKey(RunKey + @"\" + UninstallSubkey, writable: true);
-        if (installLocation is not null)
-        {
-            key.SetValue("InstallLocation", installLocation, RegistryValueKind.String);
-        }
-
-        key.SetValue("ShortcutDir", ShortcutDir, RegistryValueKind.String);
-        key.SetValue("DisplayName", "Better Windows Config (E2E stand-in)", RegistryValueKind.String);
     }
 
     /// <summary>The number of .lnk files the installer wrote to the shortcut folder.</summary>

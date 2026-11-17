@@ -7,7 +7,7 @@ namespace Bwc.E2E.Installer;
 /// The one folder the Elevated installer tests work in: <c>%ProgramFiles%\BWC-E2E\work-id</c>, a place a standard
 /// user cannot
 /// write (docs/failure-modes/installer-e2e.md, 82 to 87). It holds a hashed copy of each setup (<c>inputs</c>), the working
-/// folder of every run, and the legacy per-user sandbox of the upgrade test, so nothing the elevated tests run,
+/// folder of every run (and the folder a /D= test names), so nothing the elevated tests run,
 /// start in, or
 /// delete recursively sits in a folder the user controls. Program Files comes from the shell's known folder. A
 /// parent that is

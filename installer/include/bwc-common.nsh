@@ -38,9 +38,6 @@
 ; Written in the install folder before the backup is removed. Both present at the next run means the
 ; upgrade finished, so the backup is removed. The uninstaller deletes it. Not in the payload.
 !define BWC_CLEANUP_MARKER "upgrade-cleanup-pending"
-; Folder from versions before 0.2.0. Its PowerShell helper is removed on upgrade and uninstall.
-!define BWC_LEGACY_TOOLS_DIR "bwc-tools"
-!define BWC_LEGACY_CLOSE_HELPER "bwc-close-apps.ps1"
 ; Windows 10 2004 (19041) is TargetPlatformMinVersion in build/Bwc.WinUIApp.props.
 !define BWC_MIN_BUILD 19041
 !define BWC_RUNID_CHARS "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
@@ -64,10 +61,9 @@ Var BwcMachine
 ; used when nothing valid is recorded.
 Var BwcMachineRoot
 Var BwcDefaultDir
-; The raw /D= value (NSIS drops it from the command line), and the folder of an earlier per-user install that it names
-; when it is a Better Windows Config install other than the target. BwcHintNote carries a log line for the section.
+; The raw /D= value (NSIS drops it from the command line). BwcHintNote carries a log line for the section when the value
+; is ignored.
 Var BwcRawDir
-Var BwcLegacyDir
 Var BwcHintNote
 
 ; ---------------------------------------------------------------------------
@@ -304,7 +300,7 @@ FunctionEnd
 ; ---------------------------------------------------------------------------
 ; Close running BWC processes with the copy of BwcUpdate.exe that is being installed. The body is
 ; shared by the install and uninstall functions. ID keeps labels unique. EXE is the helper's path.
-; DIR is the folder whose apps are closed: the install folder, or a legacy per-user folder (the /D= hint).
+; DIR is the folder whose apps are closed: the install folder.
 ; $BwcCloseArgs holds the optional "--exclude-pid <n>" (the updater that launched this setup).
 ;
 ; Exit 0 continues. Exit 3 means a process is still running: interactive runs offer Retry or
@@ -644,11 +640,9 @@ Function BwcPickMachineTarget
 FunctionEnd
 
 ; NSIS applies /D= to $INSTDIR before .onInit, and BwcCheckRawDir kept the raw value. A per-machine run never installs
-; there. When the value is a plain path other than the target and holds installed-files.txt and the Hub exe, it is an
-; earlier (per-user) install, kept in $BwcLegacyDir only so that its running apps are closed. Anything else is ignored
-; and the section logs why. Nothing in that folder is ever changed.
-Function BwcReadLegacyHint
-  StrCpy $BwcLegacyDir ""
+; there (the updater still passes the install folder, so /D= is accepted). A value that names another folder is ignored
+; and the section logs one note. Nothing in that folder is read, closed, or changed.
+Function BwcNoteRawDir
   StrCpy $BwcHintNote ""
   StrCmp $BwcRawDir "" BwcHint_done 0
   StrCpy $R0 $BwcRawDir
@@ -664,12 +658,7 @@ Function BwcReadLegacyHint
   StrCpy $INSTDIR $R8
   System::Call 'kernel32::lstrcmpiW(t "$R0", t "$INSTDIR") i .R1'
   StrCmp $R1 "0" BwcHint_done 0
-  IfFileExists "$R0\${BWC_MANIFEST}" 0 BwcHint_notbwc
-  IfFileExists "$R0\${BWC_HUB_EXE}" 0 BwcHint_notbwc
-  StrCpy $BwcLegacyDir $R0
-  Goto BwcHint_done
-  BwcHint_notbwc:
-  StrCpy $BwcHintNote "Ignored /D=$R0: it is not a ${BWC_PRODUCT} install. The setup chooses the install folder."
+  StrCpy $BwcHintNote "Ignored /D=$R0: the setup chooses the install folder."
   BwcHint_done:
 FunctionEnd
 

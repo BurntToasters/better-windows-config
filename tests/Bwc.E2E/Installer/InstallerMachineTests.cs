@@ -16,7 +16,7 @@ namespace Bwc.E2E.Installer;
 /// (the user's elevated runner, docs/elevated-runner.md) and only when <c>scripts/test-installer-e2e.js --prepare</c> wrote
 /// artifacts/e2e/installer-inputs.json for this rid and the setups still match it. Otherwise it is Inconclusive (not run).
 /// The tests write only the run's own names: %ProgramFiles%\BWC-E2E\run id (and its .new, .old, .upd siblings), the Start
-/// menu folder BWC-E2E-run id, HKLM\Software\BWC-E2E\run id, and for the upgrade test a per-user sandbox install.
+/// menu folder BWC-E2E-run id, and HKLM\Software\BWC-E2E\run id, plus one test-owned folder inside the run's own folder.
 /// Everything is removed in <see cref="InstallerRun.Dispose"/>. Failure modes: docs/failure-modes/installer-e2e.md, 43-81.
 /// Output: artifacts/e2e/installer-machine.json.
 /// </summary>
@@ -89,23 +89,18 @@ public sealed class InstallerMachineTests
     [TestCategory("Installer-Machine")]
     [TestCategory("Elevated")]
     [TestCategory("E2EOnly")]
-    public void InstallerMachine_UpgradeFromPerUserAToMachineB()
+    public void InstallerMachine_RawDirNamingAnotherFolderIsIgnored()
     {
         (E2EConfig config, MachineInputs inputs) = RequireReady();
         int start = MachineChecks.Count;
         try
         {
-            using InstallerRun legacy = InstallerRun.Create(config, "upgl", MachineWorkRoot.Required)
-                .UseRecorder((id, pass, notes) => MachineChecks.Record(id, pass, notes));
-            using InstallerRun machine = InstallerRun.CreateMachine(config, "upgm");
-            if (InstallPerUser(legacy, inputs.A, "upg.legacy"))
-            {
-                RunUpgrade(config, inputs, legacy, machine);
-            }
+            using InstallerRun machine = InstallerRun.CreateMachine(config, "rawdir");
+            RunRawDir(inputs, machine);
         }
         catch (Exception ex)
         {
-            MachineChecks.Record("upg.exception", false, ex.GetType().Name + ": " + ex.Message);
+            MachineChecks.Record("rawdir.exception", false, ex.GetType().Name + ": " + ex.Message);
         }
 
         AssertNoFailures(start);
@@ -295,9 +290,9 @@ public sealed class InstallerMachineTests
     /// Silent /MACHINE install of one setup. Records the exit code, the Hub exe, and the HKLM DisplayVersion. Returns true
     /// only when the setup ran and the key shows the expected version.
     /// </summary>
-    private static bool InstallMachine(InstallerRun run, MachineInputs.SetupFile setup, string prefix, string? legacyHint = null)
+    private static bool InstallMachine(InstallerRun run, MachineInputs.SetupFile setup, string prefix, string? rawDir = null)
     {
-        int exitCode = run.RunSetup(setup.Path, SetupTimeout, legacyHint);
+        int exitCode = run.RunSetup(setup.Path, SetupTimeout, rawDir);
         bool hub = File.Exists(run.HubExe);
         bool ran = exitCode == 0 && hub;
         MachineChecks.Record(
@@ -311,19 +306,6 @@ public sealed class InstallerMachineTests
             same,
             $"HKLM (64-bit view) {run.RunId} shows DisplayVersion '{displayVersion}', expected {setup.Version}.");
         return ran && same;
-    }
-
-    private static bool InstallPerUser(InstallerRun run, MachineInputs.SetupFile setup, string prefix)
-    {
-        int exitCode = run.RunSetup(setup.Path, SetupTimeout);
-        bool hub = File.Exists(run.HubExe);
-        string? displayVersion = run.ReadUninstallValue("DisplayVersion");
-        bool ok = exitCode == 0 && hub && displayVersion == setup.Version;
-        MachineChecks.Record(
-            prefix + ".setup",
-            ok,
-            $"The per-user sandbox setup {setup.Version} exited {exitCode}; Hub exe {(hub ? "present" : "missing")}; HKCU key shows '{displayVersion}'.");
-        return ok;
     }
 
     private static void CheckInstalledFiles(InstallerRun run, string version, string prefix)
@@ -438,52 +420,48 @@ public sealed class InstallerMachineTests
     }
 
     // ------------------------------------------------------------------------------------------------------------------
-    // Upgrade from a per-user A
+    // /D= naming another folder
     // ------------------------------------------------------------------------------------------------------------------
 
-    private static void RunUpgrade(E2EConfig config, MachineInputs inputs, InstallerRun legacy, InstallerRun machine)
+    /// <summary>
+    /// A setup run with /D= naming another folder (docs/failure-modes/installer-e2e.md, 59 and 61): B installs to its own
+    /// Program Files folder, and the other folder, which the test owns inside the run's folder, is left unchanged.
+    /// </summary>
+    private static void RunRawDir(MachineInputs inputs, InstallerRun machine)
     {
-        string before = Snapshot(legacy.InstallDir);
-        Process regedit = legacy.StartTracked(legacy.RegeditExe, config.DataRootEnvironment("installer-machine-upgrade"));
-        Thread.Sleep(RegeditSettle);
-        MachineChecks.Record(
-            "upg.legacy.regedit.open",
-            !regedit.HasExited,
-            $"BwcRegedit.exe from the legacy folder runs (pid {regedit.Id}, integrity 0x{MachineNative.IntegrityRid(regedit.Id):X}) before the machine setup.");
+        string other = Path.Combine(machine.Root, "other-folder");
+        _ = Directory.CreateDirectory(Path.Combine(other, "sub"));
+        File.WriteAllText(Path.Combine(other, "keep.txt"), "Not an install.");
+        File.WriteAllText(Path.Combine(other, "sub", "keep-too.txt"), "Also not an install.");
+        string before = Snapshot(other);
 
-        bool installed = InstallMachine(machine, inputs.B, "upg.machine", legacy.InstallDir);
+        bool installed = InstallMachine(machine, inputs.B, "rawdir.machine", other);
         string? location = machine.ReadUninstallValue("InstallLocation");
         MachineChecks.Record(
-            "upg.machine.target",
+            "rawdir.machine.target",
             installed && string.Equals(location, machine.InstallDir, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(machine.InstallDir, legacy.InstallDir, StringComparison.OrdinalIgnoreCase),
-            $"B went to '{location}' (the machine folder), not to the /D= hint '{legacy.InstallDir}'.");
+                && !string.Equals(machine.InstallDir, other, StringComparison.OrdinalIgnoreCase),
+            $"B went to '{location}' (the machine folder), not to the /D= folder '{other}'.");
         MachineChecks.Record(
-            "upg.machine.version",
+            "rawdir.machine.version",
             InstallerRun.VersionOf(machine.HubExe) == inputs.B.Version,
             $"The machine Hub exe reports {InstallerRun.VersionOf(machine.HubExe)}, expected {inputs.B.Version}.");
         MachineChecks.Record(
-            "upg.machine.noStaging",
+            "rawdir.machine.noStaging",
             !Directory.Exists(machine.InstallDir + ".new") && !Directory.Exists(machine.InstallDir + ".old"),
             "The machine run left no .new or .old folder.");
 
-        string after = Directory.Exists(legacy.InstallDir) ? Snapshot(legacy.InstallDir) : "(folder gone)";
+        string after = Directory.Exists(other) ? Snapshot(other) : "(folder gone)";
+        bool same = string.Equals(before, after, StringComparison.Ordinal);
         MachineChecks.Record(
-            "upg.legacy.untouched",
-            string.Equals(before, after, StringComparison.Ordinal),
-            string.Equals(before, after, StringComparison.Ordinal)
-                ? "The legacy folder has the same files, sizes, and write times after the machine setup."
-                : "The legacy folder changed. " + FirstDifference(before, after));
-        string? legacyVersion = legacy.ReadUninstallValue("DisplayVersion");
-        MachineChecks.Record(
-            "upg.legacy.keyKept",
-            legacyVersion == inputs.A.Version,
-            $"The legacy per-user key still shows '{legacyVersion}' (the machine setup never removes it; the Hub does later).");
-        bool closed = regedit.WaitForExit(TimeSpan.FromSeconds(10));
-        MachineChecks.Record(
-            "upg.legacy.regedit.closed",
-            closed,
-            closed ? "The setup closed the Registry Editor that ran from the legacy folder." : "The Registry Editor of the legacy folder is still running after the setup.");
+            "rawdir.other.untouched",
+            same,
+            same
+                ? "The /D= folder has the same files, sizes, and write times after the machine setup."
+                : "The /D= folder changed. " + FirstDifference(before, after));
+        bool noInstall = !File.Exists(Path.Combine(other, InstallerRun.HubExeName))
+            && !File.Exists(Path.Combine(other, "installed-files.txt"));
+        MachineChecks.Record("rawdir.other.noInstall", noInstall, "The /D= folder holds no Hub exe and no installed-files.txt from B.");
     }
 
     // ------------------------------------------------------------------------------------------------------------------
