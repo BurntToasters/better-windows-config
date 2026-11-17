@@ -12,6 +12,21 @@ whose image cannot be read counts as running (fail closed). An exited process ne
 Failure cases and their tests are in `docs/failure-modes/update-verifier.md`, section P (and O for the rule), and
 for everything added in 0.1.2 (per-machine install) in `docs/failure-modes/update-elevation.md`.
 
+## The executable and its output (0.1.2)
+
+`BwcUpdate.exe` is a NativeAOT executable, in the ship and the E2E build, for x64 and Arm64. It is one standalone file: there
+is no `BwcUpdate.dll`, `BwcUpdate.deps.json`, or `BwcUpdate.runtimeconfig.json` beside it, and it starts no .NET host and no
+CoreCLR. So the .NET profiler, host trace, and startup hook variables (`CORECLR_ENABLE_PROFILING`, `CORECLR_PROFILER*`,
+`COREHOST_TRACE*`, `DOTNET_STARTUP_HOOKS`) are never read, also not in the elevated helper (update-elevation.md HE5). The
+publish audit proves this from the file (docs/build-setup.md, "Flavor verification").
+
+Every JSON line on stdout has the same bytes it had before: no spaces, the property names and their order as written in this
+file (`ok`, `failure`, `detail`, then the fields of the mode), `null` for a missing value (never left out), and the escaping of
+the `System.Text.Json` defaults (`"`, `<`, `>`, `&`, `'`, `+`, control characters, and every character outside ASCII as
+`\uXXXX` with upper-case hex; `\\` for a backslash). The lines are written from named record types through a
+source-generated serializer context (`src/Bwc.Update/Cli/StdoutJson.cs`), and `tests/Bwc.Update.Tests/StdoutJsonTests.cs`
+pins the exact text.
+
 ## Failure codes added in 0.1.2
 
 These are `UpdateFailure` names. They appear in the `failure` field of the JSON line and, for a refusal that relaunches
@@ -85,9 +100,12 @@ The installer calls this instead of starting the Hub itself (`Exec`), and the fi
   `None` (`InstallerFailed`, `ElevationDeclined`, ...). A number, another spelling, or text with a space or quote is a usage error.
 - The Hub starts at the integrity level of the desktop shell:
   - Not elevated: a normal start.
-  - Elevated: through the shell. The helper finds the desktop shell window (`IShellWindows.FindWindowSW`), asks its
-    active shell view for the desktop folder's automation object, and calls `IShellDispatch2.ShellExecute` on the shell's
-    own Application object. The Hub then runs as the signed-in user's normal token, not as administrator.
+  - Elevated: through the shell, with typed COM calls (no late binding, no `IDispatch::Invoke` by name). The helper finds the
+    desktop shell window (`IShellWindows.FindWindowSW`), asks `IServiceProvider.QueryService(SID_STopLevelBrowser)` for the
+    `IShellBrowser`, takes its `QueryActiveShellView`, asks `GetItemObject(SVGIO_BACKGROUND)` for the desktop folder's
+    automation object, queries `IShellFolderViewDual`, takes its `get_Application` (the shell's own `IShellDispatch2`), and
+    calls `ShellExecute` on it. The Hub then runs as the signed-in user's normal token, not as administrator. Every
+    interface pointer is released before the call returns (update-elevation.md HN8 to HN10).
 - There is no fallback. When it is elevated and the shell cannot be used (no Explorer, a COM failure), it starts nothing
   and exits `8`.
 - When it is elevated it writes no log file. Stdout is one JSON line: `{"ok":true|false,"failure":"<UpdateFailure>","detail":"..."}`.
@@ -112,7 +130,8 @@ The installer calls this for each Start menu shortcut instead of running PowerSh
 positional and required. The app id is exactly `BetterWindowsConfig.Hub` (for `Better Windows Config.lnk`) or
 `BetterWindowsConfig.Regedit` (for `Registry Editor (BWC).lnk`).
 
-- Sets `System.AppUserModel.ID` through `IPropertyStore`, saves the shortcut, loads it again, and compares.
+- Sets `System.AppUserModel.ID` through `IPropertyStore` (typed COM calls on a `CoCreateInstance` shell link), saves the
+  shortcut, loads it again through a second instance, and compares.
 - The shortcut must be directly in the all-users Programs folder (`FOLDERID_CommonPrograms`). The E2E flavor also accepts its
   sandbox folders (update-elevation.md SA5). A path that is not in its normal form, a link, or a missing file is refused.
 - It starts no process and, when elevated, writes no log file. Stdout is one JSON line: `{"ok":...,"failure":"...","detail":"..."}`.

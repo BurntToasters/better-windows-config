@@ -30,6 +30,7 @@ Better Windows Config! Faithful, modern re-implementations of the classic Window
   - After an update, the Hub reopens at normal rights, not as administrator.
   - Installing and updating need administrator rights. If Better Windows Config is running in another Windows session, the update stops and says so.
   - The update dialog says when Windows will ask for permission.
+  - The update helper is a native program that starts no .NET host, so .NET profiler, trace, and startup hook settings in the user's environment can't reach the administrator step.
 - **Registry Editor:**
   - Remote registry editing: Connect Network Registry opens the Select Computer picker, and every command works on a connected computer.
   - Permissions: owner, auditing, and effective access. Apply keeps inherited entries.

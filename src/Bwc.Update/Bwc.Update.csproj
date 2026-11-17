@@ -8,8 +8,14 @@
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <SelfContained>true</SelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- The elevated helper never loads a DOTNET_STARTUP_HOOKS assembly: this writes
-         System.StartupHookProvider.IsSupported=false into BwcUpdate.runtimeconfig.json (update-elevation.md, HE1). -->
+    <!-- NativeAOT in both flavors (update-elevation.md HE5, HN). The elevated helper has no .NET host and no CoreCLR, so a
+         profiler, a host trace, or a startup hook that the user's environment names is never read. The publish folder gets
+         BwcUpdate.exe and its symbols only: no BwcUpdate.dll, deps.json, or runtimeconfig.json. -->
+    <PublishAot>true</PublishAot>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- The native symbols (BwcUpdate.pdb, about 30 MB) stay in obj and out of the shared publish folder and the installer. -->
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    <!-- Kept although a NativeAOT exe has no startup hook provider: harmless, and it keeps the JIT build the same. -->
     <StartupHookSupport>false</StartupHookSupport>
   </PropertyGroup>
 

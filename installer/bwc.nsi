@@ -279,8 +279,8 @@ Function .onInstFailed
   BwcFailed_done:
 FunctionEnd
 
-; Close step for the install. It runs the BwcUpdate.exe in the staging folder, which has its .NET
-; runtime beside it and is the version being installed. The payload is staged before this runs.
+; Close step for the install. It runs the BwcUpdate.exe in the staging folder, which is the version being installed
+; and is a standalone NativeAOT exe (no .NET runtime beside it). The payload is staged before this runs.
 ; The target's apps are closed only when an earlier version is present (a first install has nothing to close).
 ; An earlier per-user install named by the /D= hint is closed too, on a first install as well: its apps are
 ; closed and nothing there is changed.

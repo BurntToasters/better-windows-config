@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.Json;
 using Bwc.Core;
 
 namespace Bwc.Update;
@@ -43,7 +42,8 @@ internal static class Program
                 return 2;
         }
 
-        // An elevated process never opens the file log: its folder comes from BWC_DATA_ROOT, which a caller can aim at a junction.
+        // An elevated process never opens the file log: its folder comes from BWC_DATA_ROOT, which a caller can aim at
+        // a junction.
         if (UpdateLogging.ShouldInitialize(parsed.Mode, ProcessIdentity.IsElevatedOrHighIntegrity()))
         {
             Log.Initialize(ToolId);
@@ -72,8 +72,8 @@ internal static class Program
 
     private static async Task<int> RunCheckAsync(UpdateArguments parsed)
     {
-        // A check reads the network and writes the staging root, a folder that medium processes can write. It never runs
-        // elevated (HK1).
+        // A check reads the network and writes the staging root, a folder that medium processes can write. It never
+        // runs elevated (HK1).
         if (ElevationPolicy.RefusesElevated(parsed.Mode) && ProcessIdentity.IsElevatedOrHighIntegrity())
         {
             return WriteCheck(UpdateFailure.RunningElevated, ElevationPolicy.RefusalDetail, null, null, 1);
@@ -211,8 +211,8 @@ internal static class Program
             return WriteApply(new ApplyOutcome(UpdateFailure.InvalidOptions, "unsupported architecture", false, false), 2);
         }
 
-        // The elevated helper does not pass on a startup hook, a profiler, or a host trace to what it starts (HE3). What
-        // already ran before Main is out of reach (HE5).
+        // The elevated helper does not pass on a startup hook, a profiler, or a host trace to what it starts (HE3).
+        // This exe is NativeAOT, so none of them ran before Main either (HE5).
         _ = ChildEnvironment.RemoveRuntimeVariables();
 
         var options = new UpdateOptions();
@@ -229,7 +229,8 @@ internal static class Program
         }
 #endif
 
-        // Only the staging folder comes from the command line. The install dir and the current version are this helper's own.
+        // Only the staging folder comes from the command line. The install dir and the current version are this
+        // helper's own.
         var host = new WindowsUpdateProcessHost();
         var request = new ElevatedApplyRequest(
             parsed.Single("--apply-elevated")!,
@@ -252,12 +253,7 @@ internal static class Program
 
         var host = new WindowsUpdateProcessHost();
         var launched = HubLauncher.Launch(host, host.HelperDirectory, updateResult);
-        Console.WriteLine(JsonSerializer.Serialize(new
-        {
-            ok = launched.Ok,
-            failure = launched.Failure.ToString(),
-            detail = launched.Ok ? "Hub started" : launched.Detail,
-        }));
+        Console.WriteLine(StdoutJson.Simple(launched.Failure, launched.Ok ? "Hub started" : launched.Detail));
         return launched.Failure switch
         {
             UpdateFailure.None => 0,
@@ -267,9 +263,9 @@ internal static class Program
         };
     }
 
-    /// <summary>
-    /// <c>--set-aumid</c> (update-elevation.md SA): refuses a shortcut that is not one of the two of this product in the folder
-    /// the installer wrote them to, or that is a link, then sets and reads back the AppUserModelID. It starts nothing.
+    /// <summary> <c>--set-aumid</c> (update-elevation.md SA): refuses a shortcut that is not one of the two of this
+    /// product in the folder the installer wrote them to, or that is a link, then sets and reads back the
+    /// AppUserModelID. It starts nothing.
     /// </summary>
     private static int RunSetAumid(UpdateArguments parsed)
     {
@@ -297,7 +293,7 @@ internal static class Program
 
     private static int WriteSimple(UpdateFailure failure, string detail, int exitCode)
     {
-        Console.WriteLine(JsonSerializer.Serialize(new { ok = failure == UpdateFailure.None, failure = failure.ToString(), detail }));
+        Console.WriteLine(StdoutJson.Simple(failure, detail));
         return exitCode;
     }
 
@@ -336,7 +332,7 @@ internal static class Program
     /// </summary>
     private static int WriteUnexpected(UpdateArguments? parsed, Exception ex)
     {
-        Log.Exception("unexpected error in BwcUpdate", ex);
+        Log.Exception("unexpected error in BwcUpdate (" + BuildFlavor.Marker + ")", ex);
         var detail = "unexpected " + ex.GetType().Name + "; see the log";
         switch (parsed?.Mode)
         {
@@ -349,7 +345,7 @@ internal static class Program
                 var hubLaunched = installDir is not null && StartHubAfterUnexpected(installDir);
                 return WriteApply(new ApplyOutcome(UpdateFailure.Unexpected, detail, InstallerStarted: false, HubLaunched: hubLaunched), UnexpectedExitCode);
             default:
-                Console.WriteLine(JsonSerializer.Serialize(new { ok = false, failure = UpdateFailure.Unexpected.ToString(), detail }));
+                Console.WriteLine(StdoutJson.Simple(UpdateFailure.Unexpected, detail));
                 return UnexpectedExitCode;
         }
     }
@@ -372,42 +368,19 @@ internal static class Program
 
     private static int WriteCheck(UpdateFailure failure, string detail, string? version, string? notesUrl, int exitCode)
     {
-        Console.WriteLine(JsonSerializer.Serialize(new
-        {
-            ok = failure == UpdateFailure.None,
-            failure = failure.ToString(),
-            detail,
-            version,
-            notesUrl,
-        }));
+        Console.WriteLine(StdoutJson.Check(failure, detail, version, notesUrl));
         return exitCode;
     }
 
     private static int WriteDownload(UpdateFailure failure, string detail, string? version, string? notesUrl, string? stagingFolder, int exitCode)
     {
-        Console.WriteLine(JsonSerializer.Serialize(new
-        {
-            ok = failure == UpdateFailure.None,
-            failure = failure.ToString(),
-            detail,
-            version,
-            notesUrl,
-            stagingFolder,
-        }));
+        Console.WriteLine(StdoutJson.Download(failure, detail, version, notesUrl, stagingFolder));
         return exitCode;
     }
 
     private static int WriteApply(ApplyOutcome outcome, int exitCode)
     {
-        Console.WriteLine(JsonSerializer.Serialize(new
-        {
-            ok = outcome.Failure == UpdateFailure.None,
-            failure = outcome.Failure.ToString(),
-            detail = outcome.Detail,
-            installerStarted = outcome.InstallerStarted,
-            elevatedHelperStarted = outcome.ElevatedHelperStarted,
-            hubLaunched = outcome.HubLaunched,
-        }));
+        Console.WriteLine(StdoutJson.Apply(outcome));
         return exitCode;
     }
 
@@ -427,10 +400,7 @@ internal static class Program
             }
 
             _lastWritten = value.Received;
-            Console.WriteLine(JsonSerializer.Serialize(new
-            {
-                progress = new { received = value.Received, total = value.Total },
-            }));
+            Console.WriteLine(StdoutJson.Progress(value.Received, value.Total));
             Console.Out.Flush();
         }
     }

@@ -702,7 +702,7 @@ The installer's Windows files are Authenticode-signed with Azure Artifact Signin
 Zinnia signs them. The build signs these files, and nothing else:
 
 - The BWC binaries in the publish folder root: `BetterWindowsConfig.exe`, `BwcRegedit.exe`,
-  `BwcUpdate.exe`, `BetterWindowsConfig.dll`, `BwcRegedit.dll`, `BwcUpdate.dll`, and `Bwc.*.dll`.
+  `BwcUpdate.exe` (NativeAOT, so there is no `BwcUpdate.dll`), `BetterWindowsConfig.dll`, `BwcRegedit.dll`, and `Bwc.*.dll`.
   Microsoft and third-party runtime files are not touched.
 - The setup EXE (NSIS `!finalize`) and the uninstaller (NSIS `!uninstfinalize`, signed before it is
   embedded, so the setup signature covers it).

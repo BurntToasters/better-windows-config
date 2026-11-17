@@ -45,6 +45,18 @@ size, the SHA-256 of the EXE and of the notices, the payload file count, the NSI
 level (`manifestLevel`), and the list of signed files. Signing is described in "Signing and what remains"
 below and in `docs/RELEASE.md`.
 
+**`BwcUpdate.exe` is NativeAOT.** The publish folder holds `BwcUpdate.exe` and nothing else of the helper: no
+`BwcUpdate.dll`, `BwcUpdate.deps.json`, `BwcUpdate.runtimeconfig.json`, and no `BwcUpdate.pdb` (the 30 MB native symbols stay
+in `obj`). The helper is published into its own folder (`publish/<rid>[-e2e]-bwcupdate-aot`) and only `BwcUpdate.exe` is copied into the shared
+publish folder: publishing it straight into that folder made MSBuild delete the Hub's runtime files (update-elevation.md HN25), and every
+publish audit now refuses a folder without `hostfxr.dll`, `hostpolicy.dll`, `coreclr.dll`, `System.Private.CoreLib.dll`, or
+`BetterWindowsConfig.runtimeconfig.json` (HN26). The payload list (`installed-files.txt` and the NSIS include) is built from the files in the folder, so it
+names only the exe for the helper. The exe is a standalone file: the staged copy that runs the close step needs nothing
+beside it. `REQUIRED_PUBLISH_FILES` still names `BwcUpdate.exe`. The publish audit refuses a folder where the exe is not
+NativeAOT or has the other flavor (`scripts/flavor-metadata.js`, update-elevation.md HN13 to HN15), and the Authenticode
+signing list covers the exe like any other `Bwc*` exe. Building it needs the C++ x64 and ARM64 build tools of Visual Studio;
+`scripts/dotnet-build.js` puts the Visual Studio installer folder (`vswhere.exe`) on the PATH of the build process only.
+
 **Execution level by flavor.** `installer/bwc.nsi` sets `RequestExecutionLevel admin` for the ship flavor
 and `user` for the E2E flavor (`BWC_E2E`), so no test or dev build can show a UAC prompt. After
 `makensis`, the build reads the embedded manifest of the setup EXE (`checkSetupManifestLevel` in
@@ -169,8 +181,8 @@ new version is complete on disk, and a failure puts the old version back.
    folder is not touched in this step. A failure here removes the staging folder (only if this run
    confirmed it is ours). A leftover `<install folder>.old` without the upgrade marker (see below) stops
    the install before any change, because it may hold the only copy of the old files.
-2. **Close.** The installer runs the copy of `BwcUpdate.exe` in the staging folder. That copy has its
-   .NET runtime beside it, so it starts there. With `/PARENTPID=` first it runs
+2. **Close.** The installer runs the copy of `BwcUpdate.exe` in the staging folder. The helper is
+   NativeAOT, a standalone exe, so that copy starts there with nothing beside it. With `/PARENTPID=` first it runs
    `BwcUpdate.exe --wait-pid <PARENTPID> --timeout-seconds 30`, so the updater that launched the setup
    has exited before any file is replaced. When `BwcUpdate.exe` is already in the install folder (an
    earlier version), it then runs

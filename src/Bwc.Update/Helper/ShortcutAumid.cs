@@ -1,128 +1,169 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
 namespace Bwc.Update;
 
-/// <summary>
-/// Writes <c>System.AppUserModel.ID</c> (PKEY_AppUserModel_ID) into a Start menu shortcut through
-/// <c>IPropertyStore</c>, then
-/// loads the file again and compares. Manual COM, like <see cref="ShellLaunch"/>. The caller has already checked the path
-/// (<see cref="ShortcutAumidRules"/>). Nothing here starts a process, reads an environment variable, or writes a log.
+/// <summary> Writes <c>System.AppUserModel.ID</c> (PKEY_AppUserModel_ID) into a Start menu shortcut through
+/// <c>IPropertyStore</c>, then loads the file again and compares. Typed vtable calls, like <see cref="ShellChain"/>.
+/// The caller has already checked the path (<see cref="ShortcutAumidRules"/>). Nothing here starts a process, reads an
+/// environment variable, or writes a log (update-elevation.md SA, HN11).
 /// </summary>
 [SupportedOSPlatform("windows")]
-internal static class ShortcutAumid
+internal static unsafe class ShortcutAumid
 {
     private const ushort VtLpwstr = 31;
     private const uint StgmRead = 0;
     private const uint StgmReadWrite = 2;
-    private const int PropertyId = 5;
+    private const uint PropertyId = 5;
 
     // PKEY_AppUserModel_ID is { 9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3 }, 5.
     private static readonly Guid AppIdFormat = new("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3");
-    private static readonly Guid ClsidShellLink = new("00021401-0000-0000-C000-000000000046");
 
     /// <summary>
     /// Success, or <see cref="UpdateFailure.Io"/> with the step that failed. The shortcut is written in place.
     /// </summary>
     public static Outcome<string> Write(string shortcut, string appId)
     {
-        var releases = new List<object>();
-        try
+        using var apartment = ComApartment.EnterSta();
+        if (!apartment.Usable)
         {
-            var linkType = Type.GetTypeFromCLSID(ClsidShellLink);
-            if (linkType is null || Activator.CreateInstance(linkType) is not { } link)
-            {
-                return Outcome<string>.Fail(UpdateFailure.Io, "the shell link object could not be created");
-            }
+            return Outcome<string>.Fail(UpdateFailure.Io, "COM could not be initialized");
+        }
 
-            releases.Add(link);
-            if (link is not IPersistFile file || link is not IPropertyStore store)
-            {
-                return Outcome<string>.Fail(UpdateFailure.Io, "the shell link object lacks the property interfaces");
-            }
+        (ComObject? file, ComObject? store, string? error) = OpenLink();
+        if (file is null || store is null)
+        {
+            return Outcome<string>.Fail(UpdateFailure.Io, error ?? "the shell link object could not be created");
+        }
 
-            var hr = file.Load(shortcut, StgmReadWrite);
+        using (file)
+        using (store)
+        {
+            int hr = Load(file, shortcut, StgmReadWrite);
             if (hr != 0)
             {
-                return Outcome<string>.Fail(UpdateFailure.Io, "the shortcut could not be loaded, HRESULT 0x" + hr.ToString("X8", System.Globalization.CultureInfo.InvariantCulture));
+                return Outcome<string>.Fail(UpdateFailure.Io, "the shortcut could not be loaded, HRESULT 0x" + Hex(hr));
+            }
+
+            hr = SetAppId(file, store, shortcut, appId);
+            if (hr != 0)
+            {
+                return Outcome<string>.Fail(UpdateFailure.Io, "the property could not be written, HRESULT 0x" + Hex(hr));
+            }
+        }
+
+        var readBack = ReadAppId(shortcut);
+        return string.Equals(readBack, appId, StringComparison.Ordinal)
+            ? Outcome<string>.Success(appId)
+            : Outcome<string>.Fail(UpdateFailure.Io, "the shortcut reads back '" + (readBack ?? "(nothing)") + "' instead of the app id");
+    }
+
+    /// <summary>The app id of the shortcut, read through a new link object. Null when it has none or is
+    /// unreadable.</summary>
+    public static string? ReadAppId(string shortcut)
+    {
+        using var apartment = ComApartment.EnterSta();
+        if (!apartment.Usable)
+        {
+            return null;
+        }
+
+        (ComObject? file, ComObject? store, _) = OpenLink();
+        if (file is null || store is null)
+        {
+            return null;
+        }
+
+        using (file)
+        using (store)
+        {
+            if (Load(file, shortcut, StgmRead) != 0)
+            {
+                return null;
             }
 
             var key = new PropertyKey { Format = AppIdFormat, Id = PropertyId };
-            var value = new PropVariant { Type = VtLpwstr, Pointer = Marshal.StringToCoTaskMemUni(appId) };
+            ComVariant read = default;
+            if (((delegate* unmanaged<nint, PropertyKey*, ComVariant*, int>)ComObject.Slot(store.Pointer, ComSlots.PropertyStoreGetValue))(
+                store.Pointer, &key, &read) != 0)
+            {
+                return null;
+            }
+
             try
             {
-                hr = store.SetValue(ref key, ref value);
-                if (hr == 0)
-                {
-                    hr = store.Commit();
-                }
-
-                if (hr == 0)
-                {
-                    hr = file.Save(shortcut, true);
-                }
+                return read.Vt == VtLpwstr && read.Value != 0 ? Marshal.PtrToStringUni(read.Value) : null;
             }
             finally
             {
-                Marshal.FreeCoTaskMem(value.Pointer);
-            }
-
-            if (hr != 0)
-            {
-                return Outcome<string>.Fail(UpdateFailure.Io, "the property could not be written, HRESULT 0x" + hr.ToString("X8", System.Globalization.CultureInfo.InvariantCulture));
-            }
-
-            var readBack = ReadBack(shortcut, releases);
-            return string.Equals(readBack, appId, StringComparison.Ordinal)
-                ? Outcome<string>.Success(appId)
-                : Outcome<string>.Fail(UpdateFailure.Io, "the shortcut reads back '" + (readBack ?? "(nothing)") + "' instead of the app id");
-        }
-        catch (Exception ex) when (ex is COMException or InvalidCastException or InvalidComObjectException or NotSupportedException
-            or ArgumentException or UnauthorizedAccessException or IOException)
-        {
-            return Outcome<string>.Fail(UpdateFailure.Io, "the shell call failed: " + ex.GetType().Name);
-        }
-        finally
-        {
-            foreach (var released in releases)
-            {
-                if (Marshal.IsComObject(released))
-                {
-                    _ = Marshal.ReleaseComObject(released);
-                }
+                _ = ComNative.PropVariantClear(&read);
             }
         }
     }
 
-    private static string? ReadBack(string shortcut, List<object> releases)
+    // A new shell link object seen through IPersistFile and through IPropertyStore (two owners of two references).
+    private static (ComObject? File, ComObject? Store, string? Error) OpenLink()
     {
-        var linkType = Type.GetTypeFromCLSID(ClsidShellLink);
-        if (linkType is null || Activator.CreateInstance(linkType) is not { } link)
+        int hr = ComNative.CoCreateInstance(ComIds.ShellLinkClass, 0, ComNative.ClsctxInprocServer, ComIds.PersistFile, out nint pointer);
+        ComObject? file = ComObject.Own(pointer);
+        if (hr != 0 || file is null)
         {
-            return null;
+            file?.Dispose();
+            return (null, null, "the shell link object could not be created");
         }
 
-        releases.Add(link);
-        if (link is not IPersistFile file || link is not IPropertyStore store || file.Load(shortcut, StgmRead) != 0)
+        hr = file.QueryInterface(ComIds.PropertyStore, out ComObject? store);
+        if (hr != 0 || store is null)
         {
-            return null;
+            store?.Dispose();
+            file.Dispose();
+            return (null, null, "the shell link object lacks the property interfaces");
         }
 
+        return (file, store, null);
+    }
+
+    private static int Load(ComObject file, string shortcut, uint mode)
+    {
+        fixed (char* path = shortcut)
+        {
+            return ((delegate* unmanaged<nint, char*, uint, int>)ComObject.Slot(file.Pointer, ComSlots.PersistFileLoad))(file.Pointer, path, mode);
+        }
+    }
+
+    // SetValue, Commit, and Save. The string for the value is COM task memory that is freed after the call (the store
+    // copies it), and the result is the first HRESULT that is not S_OK.
+    private static int SetAppId(ComObject file, ComObject store, string shortcut, string appId)
+    {
         var key = new PropertyKey { Format = AppIdFormat, Id = PropertyId };
-        if (store.GetValue(ref key, out var read) != 0)
-        {
-            return null;
-        }
-
+        var value = new ComVariant { Vt = VtLpwstr, Value = Marshal.StringToCoTaskMemUni(appId) };
         try
         {
-            return read.Type == VtLpwstr && read.Pointer != IntPtr.Zero ? Marshal.PtrToStringUni(read.Pointer) : null;
+            int hr = ((delegate* unmanaged<nint, PropertyKey*, ComVariant*, int>)ComObject.Slot(store.Pointer, ComSlots.PropertyStoreSetValue))(
+                store.Pointer, &key, &value);
+            if (hr == 0)
+            {
+                hr = ((delegate* unmanaged<nint, int>)ComObject.Slot(store.Pointer, ComSlots.PropertyStoreCommit))(store.Pointer);
+            }
+
+            if (hr == 0)
+            {
+                fixed (char* path = shortcut)
+                {
+                    hr = ((delegate* unmanaged<nint, char*, int, int>)ComObject.Slot(file.Pointer, ComSlots.PersistFileSave))(file.Pointer, path, 1);
+                }
+            }
+
+            return hr;
         }
         finally
         {
-            _ = PropVariantClear(ref read);
+            Marshal.FreeCoTaskMem(value.Value);
         }
     }
+
+    private static string Hex(int hr) => hr.ToString("X8", CultureInfo.InvariantCulture);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct PropertyKey
@@ -130,69 +171,4 @@ internal static class ShortcutAumid
         public Guid Format;
         public uint Id;
     }
-
-    // PROPVARIANT: vt, three reserved words, and a 16-byte union (24 bytes on 64-bit Windows).
-    [StructLayout(LayoutKind.Sequential)]
-    private struct PropVariant
-    {
-        public ushort Type;
-        public ushort Reserved1;
-        public ushort Reserved2;
-        public ushort Reserved3;
-        public IntPtr Pointer;
-        public IntPtr Reserved4;
-    }
-
-#pragma warning disable SYSLIB1096 // Classic COM interop, as in ShellLaunch.
-    [ComImport]
-    [Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IPropertyStore
-    {
-        [PreserveSig]
-        int GetCount(out uint count);
-
-        [PreserveSig]
-        int GetAt(uint index, out PropertyKey key);
-
-        [PreserveSig]
-        int GetValue(ref PropertyKey key, out PropVariant value);
-
-        [PreserveSig]
-        int SetValue(ref PropertyKey key, ref PropVariant value);
-
-        [PreserveSig]
-        int Commit();
-    }
-
-    [ComImport]
-    [Guid("0000010B-0000-0000-C000-000000000046")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IPersistFile
-    {
-        // IPersist.GetClassID, then the IPersistFile members.
-        [PreserveSig]
-        int GetClassID(out Guid classId);
-
-        [PreserveSig]
-        int IsDirty();
-
-        [PreserveSig]
-        int Load([MarshalAs(UnmanagedType.LPWStr)] string fileName, uint mode);
-
-        [PreserveSig]
-        int Save([MarshalAs(UnmanagedType.LPWStr)] string fileName, [MarshalAs(UnmanagedType.Bool)] bool remember);
-
-        [PreserveSig]
-        int SaveCompleted([MarshalAs(UnmanagedType.LPWStr)] string fileName);
-
-        [PreserveSig]
-        int GetCurFile([MarshalAs(UnmanagedType.LPWStr)] out string fileName);
-    }
-#pragma warning restore SYSLIB1096
-
-#pragma warning disable SYSLIB1054 // One read-only call does not justify LibraryImport plumbing.
-    [DllImport("ole32.dll")]
-    private static extern int PropVariantClear(ref PropVariant value);
-#pragma warning restore SYSLIB1054
 }

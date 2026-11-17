@@ -10,9 +10,9 @@
  *
  * Usage: node scripts/test-installer-e2e.js --rid win-arm64|win-x64 [--prepare]
  *
- * --prepare builds A and B the same way and stops: it writes artifacts/e2e/installer-inputs.json (paths, versions, sizes,
- * SHA-256, rid) for the Elevated machine-mode tests (docs/elevated-runner.md) and runs no test. Those tests read the
- * file and report NOT RUN when it is missing, stale, or for another rid.
+ * --prepare builds A and B the same way and stops: it writes artifacts/e2e/installer-inputs.json (paths, versions,
+ * sizes, SHA-256, rid) for the Elevated machine-mode tests (docs/elevated-runner.md) and runs no test. Those tests read
+ * the file and report NOT RUN when it is missing, stale, or for another rid.
  *
  * Output: artifacts/e2e/installer-update.json and artifacts/e2e/migration-<rid>.json. Exit 0 only when both say pass,
  * and the migration file says the real old install case ran. Failure modes:
@@ -38,6 +38,8 @@ import {
 } from "./build-installer.js";
 import { generateNugetNotices } from "./generate-nuget-licenses.js";
 import { checkPublishFlavor, checkSetupManifestLevel, formatFlavorReport } from "./flavor-metadata.js";
+import { buildEnvironment } from "./lib/build-environment.js";
+import { installUpdateOutputs, removeStaleFileLists, updateStagingDir } from "./lib/update-publish.js";
 import { parsePackageVersion } from "./sync-version-helpers.js";
 
 const SCRIPT = "scripts/test-installer-e2e.js";
@@ -55,6 +57,7 @@ const PUBLISH_PROJECTS = [
   "src/Bwc.Regedit.App/Bwc.Regedit.App.csproj",
   "src/Bwc.Update/Bwc.Update.csproj",
 ];
+const UPDATE_PROJECT = "src/Bwc.Update/Bwc.Update.csproj";
 const REQUIRED_PUBLISH_FILES = ["BetterWindowsConfig.dll", "BetterWindowsConfig.exe", "BwcUpdate.exe"];
 const NSIS_SCRIPT = path.join(REPO_ROOT, "installer", "bwc.nsi");
 const LICENSE_FILE = path.join(REPO_ROOT, "LICENSE");
@@ -181,6 +184,19 @@ function publishB(rid, version, outDir) {
   const dotnet = dotnetCommand();
   for (const project of PUBLISH_PROJECTS) {
     console.log(`installer-e2e: publishing ${project} as ${version} into ${path.relative(REPO_ROOT, outDir)}`);
+    // The NativeAOT helper is published away from the shared folder: a publish with -o set to it deletes the runtime
+    // files of the Hub that an earlier CoreCLR publish of the helper had written (update-elevation.md HN25).
+    const staged = project === UPDATE_PROJECT;
+    const target = staged ? updateStagingDir(outDir) : outDir;
+    if (staged) {
+      rmSync(target, { recursive: true, force: true });
+      removeStaleFileLists({
+        projectDir: path.dirname(path.join(REPO_ROOT, project)),
+        projectFile: path.basename(project),
+        platform,
+        rid,
+      });
+    }
     runOrFail(
       dotnet,
       [
@@ -196,16 +212,21 @@ function publishB(rid, version, outDir) {
         `-p:Version=${version}`,
         `-p:FileVersion=${fileVersion}`,
         "-o",
-        outDir,
+        target,
         "--nologo",
       ],
       {
         cwd: REPO_ROOT,
         stdio: "inherit",
-        env: { ...process.env, MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: "1" },
+        // vswhere.exe on PATH, for the NativeAOT link of BwcUpdate (update-elevation.md HN23).
+        env: { ...buildEnvironment(process.env), MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: "1" },
       },
       `publishing ${project}`,
     );
+    if (staged) {
+      installUpdateOutputs(target, outDir);
+      rmSync(target, { recursive: true, force: true });
+    }
   }
 
   const flavor = checkPublishFlavor(outDir, "e2e");

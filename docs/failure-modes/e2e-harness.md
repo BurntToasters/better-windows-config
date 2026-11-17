@@ -419,9 +419,11 @@ therefore did not fail because a process was forwarded to an older instance.
 
 The e2e flavor guard used to read the `BWC_FLAVOR` value, which the harness itself sets. An e2e test could run
 against a ship folder when the environment said e2e. `RequireE2EFlavor` now reads the `BwcFlavor`
-`AssemblyMetadata` attribute from `BetterWindowsConfig.dll`, `BwcRegedit.dll` and `BwcUpdate.dll` in the
-publish folder with `System.Reflection.Metadata`. The assemblies are never loaded or executed. A missing
-attribute, a missing assembly, or a value other than `E2E` fails the mutating or E2E-only test.
+`AssemblyMetadata` attribute from `BetterWindowsConfig.dll` and `BwcRegedit.dll` in the
+publish folder with `System.Reflection.Metadata`. The assemblies are never loaded or executed. `BwcUpdate.exe` is
+NativeAOT and has no assembly, so its flavor is the marker string `BwcUpdateFlavor=<value>` that the exe uses,
+read from the file bytes as UTF-16LE or UTF-8 (update-elevation.md HN14). A missing
+attribute, a missing assembly or exe, a missing marker, or a value other than `E2E` fails the mutating or E2E-only test.
 
 ## 32. Classic Registry Editor state changed by a test
 
