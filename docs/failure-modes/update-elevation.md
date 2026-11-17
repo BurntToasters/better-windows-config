@@ -5,7 +5,7 @@ helper (`--apply`) verifies the staged installer as before, then asks Windows fo
 (`--apply-elevated`). The elevated helper copies the installer into a protected folder, verifies the copy, and
 starts it. `--launch-hub` starts the Hub at the shell's integrity level. `--close-running` also looks at other
 sessions. Design: `install-design.md` (Fable audit) items 25 to 28, and the user's decisions: option B for the
-apply, manual download for 0.1.1 users, all-users shortcuts.
+apply, all-users shortcuts. 0.1.2 has no 0.1.1 migration: a 0.1.1 install is uninstalled by hand.
 
 Written before the tests and before the code, per AGENTS.md ("FIRST write all the ways it could fail, THEN
 write the code"). Contract: `docs/contracts/update-cli.md`. The older rows (sections A to S) are in

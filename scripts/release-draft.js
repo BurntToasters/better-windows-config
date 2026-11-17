@@ -39,7 +39,7 @@ import {
   ghRequestDir,
   writeGhBody,
 } from "./lib/github-release.js";
-import { expectedAssetNames, staleLegacyAssets, unexpectedAssets } from "./lib/release-bundle.js";
+import { expectedAssetNames, unexpectedAssets } from "./lib/release-bundle.js";
 import { prepareReleaseContext } from "./lib/release-context.js";
 import { git } from "./lib/release-policy.js";
 
@@ -158,15 +158,11 @@ function resolveCommitish(root, value) {
  * the dry-run reports are never uploaded.
  */
 function uniqueAssetPaths(bundle) {
-  // The 0.1.1 feed (bwc-stable.json) is a public asset too, when the release chose frozen or no-installer.
-  const legacy = bundle.legacy?.assets?.length > 0 ? [bundle.legacy.manifestPath] : [];
-  const primary = [bundle.manifestPath, ...legacy, ...bundle.installers.map((installer) => installer.file)];
+  const primary = [bundle.manifestPath, ...bundle.installers.map((installer) => installer.file)];
   const withSidecars = primary.flatMap((file) => [file, `${file}.minisig`, `${file}.sig`]);
   const paths = [bundle.signaturePath, ...withSidecars].flatMap((file) => [file, `${file}.asc`]);
   const required = new Set(
-    [bundle.manifestPath, bundle.signaturePath, ...primary, ...legacy.map((file) => `${file}.minisig`)].map((file) =>
-      path.resolve(file),
-    ),
+    [bundle.manifestPath, bundle.signaturePath, ...primary].map((file) => path.resolve(file)),
   );
   return [...new Set(paths.map((file) => path.resolve(file)))].filter(
     (file) => required.has(file) || fs.existsSync(file),
@@ -265,17 +261,7 @@ async function applyDraft(context, options, bodyFiles) {
     }
 
     const fresh = getRelease(context.repo, release.id, { cwd: context.root });
-    // A reused draft may still hold bwc-stable.json from an earlier run. With --legacy-feed none the bundle has no such file,
-    // so the stale one (and its signature) is deleted from this draft, which is not an asset replacement (release.md LF18).
-    // Any other asset outside the bundle is refused and left for the user (LF17).
-    let remaining = fresh.assets ?? [];
-    for (const asset of staleLegacyAssets(fresh, context.bundle)) {
-      const deleteArgs = ghDeleteAssetArgs(context.repo, asset.id);
-      console.log(`release-draft: running ${displayGh(deleteArgs)}  # stale legacy asset ${asset.name}`);
-      runGhJson(deleteArgs, { cwd: context.root });
-      remaining = remaining.filter((other) => other.id !== asset.id);
-    }
-    fresh.assets = remaining;
+    // An asset outside the bundle (a stray file from an earlier run, for one) is refused and left for the user.
     const unexpected = unexpectedAssets(fresh, expectedAssetNames(context.bundle));
     if (unexpected.length > 0) {
       for (const asset of unexpected) {

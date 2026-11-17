@@ -1,9 +1,8 @@
 # Installer
 
-Better Windows Config ships as one per-machine setup EXE per architecture (since 0.1.2; 0.1.1 and
-earlier were per user). The EXE is built with NSIS from the published app folder and asks for
+Better Windows Config ships as one per-machine setup EXE per architecture (since 0.1.2). The EXE is built with NSIS from the published app folder and asks for
 administrator rights. The failure modes and the intended behavior of every step are in
-`docs/failure-modes/installer.md`, and the section "Per-machine install and migration (0.1.2)" there
+`docs/failure-modes/installer.md`, and the section "Per-machine install (0.1.2)" there
 lists every case of the per-machine layout.
 
 ## Install NSIS (once)
@@ -106,10 +105,9 @@ or a build first.
   `.onInit` the setup reads HKLM `InstallLocation`: when it is a plain absolute path (`X:\...`, no
   `..`, no `/`, no quote) strictly inside `%ProgramFiles%`, that is the folder (so a reinstall lands
   where the last one did); when it is missing, invalid, or outside Program Files, the default folder
-  is used. `/D=` is never the target. A `/D=` that differs from the target is only a legacy hint: when it
-  names a Better Windows Config install (`installed-files.txt` and `BetterWindowsConfig.exe`), the
-  setup closes the apps that run from it (see "Update in place") and changes nothing there. Any other
-  value is ignored and logged. A custom folder is not supported in 0.1.2.
+  is used. `/D=` is never the target. A `/D=` that differs from the target is ignored and logged (the
+  updater passes the install folder, so `/D=` is still accepted). Nothing is closed or changed in that
+  folder. A custom folder is not supported in 0.1.2.
 - Checks the folder before any change (see "Install folder rules" below), and refuses to install over
   a newer version recorded in HKLM `DisplayVersion` (semantic order, `0.1.2` newer than `0.1.2-beta.3`).
   The same version is a repair and installs again. A recorded version that is not `X.Y.Z` or
@@ -144,18 +142,16 @@ Command line:
 | Switch | Effect |
 | --- | --- |
 | `/S` | Silent install or uninstall. |
-| `/D=<dir>` | Never the install folder in ship. A legacy hint only (see above). Must be last and unquoted (an NSIS rule). A drive or share root is still refused. |
+| `/D=<dir>` | Never the install folder in ship. Ignored when it names another folder (see above). Must be last and unquoted (an NSIS rule). A drive or share root is still refused. |
 | `/RELAUNCH` | Start the Hub when the run ends, through `BwcUpdate.exe --launch-hub`. On success it starts the new Hub. On failure it starts the Hub that is still installed with `--launch-hub --update-result InstallerFailed`. Without this switch no Hub starts. The updater passes it. |
 | `/PARENTPID=<n>` | The updater process that started this setup (the elevated helper). The setup waits for it to exit, then never asks it to close. Digits only. The updater passes it. |
 
 Uninstall runs from **Apps > Installed apps** or `Uninstall.exe` in the install folder. It asks for
 administrator rights too, removes what the install placed, and leaves files the user added.
 
-Coming from 0.1.1 (a per-user install): 0.1.1 does not apply 0.1.2 in the app. The user downloads this
-setup and starts it. The setup does not look at the per-user install (it never reads HKCU, because an
-over-the-shoulder administrator has another profile). The Hub removes the old per-user copy at its
-next start (`docs/failure-modes/hub.md`). User settings and data stay: they live in the data root, not in
-the install folder. Windows may show two entries until then.
+0.1.2 does not remove a 0.1.1 install (0.1.1 installed per user). Neither the setup nor the Hub detects, closes,
+or uninstalls it, so uninstall 0.1.1 from Settings (Apps > Installed apps) first. The setup never reads HKCU.
+User settings and data live in the data root, not in the install folder.
 
 ## Install folder rules
 
@@ -239,15 +235,13 @@ The uninstaller closes running BWC processes with the `BwcUpdate.exe` in the ins
 same exit-code rules. If that copy is missing, the uninstall stops and changes nothing.
 
 It deletes the installed files listed at build time, the two all-users shortcuts, `LICENSE`,
-`THIRD-PARTY-NOTICES.txt`, `installed-files.txt`, `upgrade-cleanup-pending`, `Uninstall.exe`, and the
-helper that version 0.1 left in `bwc-tools`. It removes folders only when they are empty. It removes the
+`THIRD-PARTY-NOTICES.txt`, `installed-files.txt`, `upgrade-cleanup-pending`, and `Uninstall.exe`. It removes folders only when they are empty. It removes the
 protected folder of the elevated updater, `<install folder>.upd`: only the `<32 hex>` folders in it, never
 through a link or junction, then the folder itself when it is empty. It no longer removes `%TEMP%\BWC-Update`
 (an elevated recursive delete in a folder that a standard user writes; the Hub prunes its own staging), and it
 never touches a user's data folder (`%LOCALAPPDATA%\BetterWindowsConfig`). The uninstall entry is removed last.
 The entry is removed only when its `InstallLocation` is the folder being uninstalled (compared without case).
-An entry that names another folder is kept, and the log says why. The files are still removed. A per-user
-shortcut of an older per-user install, or its HKCU entry, is not ours to remove here.
+An entry that names another folder is kept, and the log says why. The files are still removed.
 
 ## E2E variant
 
@@ -264,14 +258,14 @@ or dev build can show a prompt (the build audit checks this). It never writes to
   the setup reads `BWC_E2E_INSTALLER_RUNID` or `BWC_E2E_INSTALLER_SHORTCUTS` from the environment instead,
   so an in-app update (the helper starts the setup without the switches) can use the same run. A switch
   on the command line always wins. The release build never reads these variables.
-- The default (per-user sandbox, the layout of 0.1.1) puts the uninstall entry in
+- The default (per-user sandbox) puts the uninstall entry in
   `HKCU\Software\BWC-E2E\<id>\Uninstall\BetterWindowsConfig`, the shortcuts in `<dir>`, and the files in `/D=`.
   It writes `ShortcutDir` into the entry (E2E only), and removes the empty `Uninstall` and `<id>` keys on
   uninstall. Refusing to install over a newer version works here too, against this sandbox entry.
 - `/MACHINE` is the per-machine layout in a sandbox, for the elevated runner tests (I4): files in
   `%ProgramFiles%\BWC-E2E\<id>`, entry in `HKLM\Software\BWC-E2E\<id>\Uninstall\BetterWindowsConfig` (64-bit
   view), shortcuts in the all-users Start menu folder `BWC-E2E-<id>`, `<install folder>.upd` as in ship.
-  `/D=` is a legacy hint, as in ship. It needs a token that is already elevated and **never asks for
+  `/D=` is never the target, as in ship. It needs a token that is already elevated and **never asks for
   elevation**: without one, `.onInit` aborts with a non-zero exit before anything is written. The uninstaller
   takes `/MACHINE` too, with the same rule. Only the elevated runner runs it to the end.
 - The uninstaller requires `/RUNID=<id>` to find the same entry, and applies the same `<id>` rule.
@@ -321,7 +315,7 @@ silent uninstall. The steps below are still open.
    Administrator), then build a signed installer and confirm the verify step passes. The minisign
    signatures of the manifest and the installer are separate (D8, `docs/RELEASE.md`).
 6. Run the per-machine installer on a disposable VM by hand once (docs/RELEASE.md checklist): the real
-   consent prompt, an install and an update as a standard user over the shoulder, and 0.1.1 to 0.1.2.
+   consent prompt, an install and an update as a standard user over the shoulder.
 7. Test the updater end to end against a real installer, including the case where an app stays
    open (done in the per-user sandbox by `scripts/test-installer-e2e.js`; the per-machine run needs the
    elevated runner).

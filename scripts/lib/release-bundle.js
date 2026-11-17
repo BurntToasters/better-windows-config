@@ -7,7 +7,6 @@ import {
   loadPublicKeys,
   parsePublicKeyText,
 } from "./minisign.js";
-import { isLegacyMode, LEGACY_MANIFEST_NAME, validateLegacyManifest } from "./legacy-feed.js";
 import { matchEmbeddedKey } from "./trusted-keys.js";
 import { validateUrl } from "./url-policy.js";
 import { KNOWN_ARCHES, manifestFileName, validateManifestBuffer } from "./update-manifest.js";
@@ -59,80 +58,20 @@ function keySummary(loadedPaths, texts, embeddedTexts) {
 }
 
 /**
- * The 0.1.1 feed of a stable bundle (release.md, section LF). assembly.json records which mode the release chose. The
- * files must agree with it: none has no bwc-stable.json, the other two have it and its signature, and the manifest
- * passes the legacy validator (which refuses any installer for a version above 0.1.1). A beta has no legacy feed.
- */
-async function checkLegacyFeed({ artifactDir, channel, version, trustedTexts, errors }) {
-  const manifestPath = path.join(artifactDir, LEGACY_MANIFEST_NAME);
-  const signaturePath = `${manifestPath}.minisig`;
-  const none = { mode: "none", manifestPath, signaturePath, assets: [] };
-  if (channel !== "stable") return none;
-
-  let mode;
-  try {
-    mode = JSON.parse(fs.readFileSync(path.join(artifactDir, "assembly.json"), "utf8"))?.legacyFeed?.mode;
-  } catch {
-    mode = undefined;
-  }
-  if (!isLegacyMode(mode)) {
-    errors.push({
-      reason: "legacy-feed-missing",
-      detail: "assembly.json does not record a legacy feed mode; assemble the stable bundle with --legacy-feed <frozen|no-installer|none>",
-      exitCode: EXIT.REFUSED,
-    });
-    return { ...none, mode: null };
-  }
-
-  const manifestThere = fs.existsSync(manifestPath) && fs.statSync(manifestPath).isFile();
-  if (mode === "none") {
-    if (manifestThere) {
-      errors.push({
-        reason: "legacy-feed-invalid",
-        detail: `assembly.json says the legacy feed is none, but ${LEGACY_MANIFEST_NAME} is in the folder`,
-        exitCode: EXIT.REFUSED,
-      });
-    }
-    return none;
-  }
-
-  const signatureThere = fs.existsSync(signaturePath) && fs.statSync(signaturePath).isFile();
-  for (const [there, file] of [[manifestThere, manifestPath], [signatureThere, signaturePath]]) {
-    if (!there) {
-      errors.push({ reason: "asset-missing", detail: `legacy feed file is missing: ${path.basename(file)}`, exitCode: EXIT.MISSING });
-    }
-  }
-  if (!manifestThere || !signatureThere) return { ...none, mode };
-
-  if (trustedTexts.length > 0) {
-    const validation = await validateLegacyManifest(fs.readFileSync(manifestPath), {
-      mode,
-      version,
-      signature: fs.readFileSync(signaturePath, "utf8"),
-      trustedKeys: trustedTexts,
-    });
-    errors.push(...validation.errors);
-  }
-  return { mode, manifestPath, signaturePath, assets: [path.basename(manifestPath), path.basename(signaturePath)] };
-}
-
-/**
- * The asset names a release of this bundle may hold: the manifest and its signature, the legacy pair only when the legacy
- * mode has one, and the setups (release.md LF17). Nothing else is expected, so nothing else is uploaded.
+ * The asset names a release of this bundle may hold: the manifest and its signature, and the setups. Nothing else is
+ * expected, so nothing else is uploaded.
  */
 export function expectedAssetNames(bundle) {
   return [
     path.basename(bundle.manifestPath),
     path.basename(bundle.signaturePath),
-    ...(bundle.legacy?.assets ?? []),
     ...bundle.installers.map((installer) => installer.fileName),
   ];
 }
 
 /**
- * The assets of a release that are outside the expected set (LF17). A GPG signature `<expected name>.asc` is a sidecar of
- * an expected asset and is allowed. Names compare exactly: a stale `bwc-stable.json` offers a 0.1.2 installer to 0.1.1 when
- * releases/latest/download serves it, so it is never ignored.
+ * The assets of a release that are outside the expected set (release.md LF1). A GPG signature `<expected name>.asc` is a
+ * sidecar of an expected asset and is allowed. Names compare exactly, so a stray file of any name is never ignored.
  */
 export function unexpectedAssets(release, expectedNames) {
   const allowed = new Set(expectedNames);
@@ -142,16 +81,6 @@ export function unexpectedAssets(release, expectedNames) {
     if (allowed.has(name)) return false;
     return !(name.endsWith(".asc") && allowed.has(name.slice(0, -4)));
   });
-}
-
-/**
- * The assets of a reused draft that are the legacy manifest or its signature while this bundle has no legacy feed (LF18).
- * Only these are deleted by the draft step. Any other unexpected asset is refused and left for the user.
- */
-export function staleLegacyAssets(release, bundle) {
-  if ((bundle.legacy?.assets ?? []).length > 0) return [];
-  const stale = new Set([LEGACY_MANIFEST_NAME, `${LEGACY_MANIFEST_NAME}.minisig`]);
-  return (release?.assets ?? []).filter((asset) => stale.has(asset?.name));
 }
 
 /**
@@ -280,14 +209,6 @@ export async function loadReleaseBundle(options) {
   }
   installers.sort((left, right) => (left.rid < right.rid ? -1 : left.rid > right.rid ? 1 : 0));
 
-  const legacy = await checkLegacyFeed({
-    artifactDir,
-    channel: options.channel,
-    version: options.version ?? manifest?.version,
-    trustedTexts,
-    errors,
-  });
-
   const trustedKeys = keySummary(trustedPaths, trustedTexts, options.embeddedKeys);
   const testKey = trustedKeys.some((key) => key.testKey);
   const placeholder = trustedKeys.some((key) => key.placeholder);
@@ -302,7 +223,6 @@ export async function loadReleaseBundle(options) {
   const requiredAssets = [
     path.basename(manifestPath),
     path.basename(signaturePath),
-    ...legacy.assets,
     ...installers.map((installer) => installer.fileName),
   ];
 
@@ -321,7 +241,6 @@ export async function loadReleaseBundle(options) {
     testKey,
     placeholder,
     dryRun,
-    legacy,
     requiredAssets,
   };
 }

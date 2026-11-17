@@ -21,8 +21,8 @@ Better Windows Config! Faithful, modern re-implementations of the classic Window
 
 > [!IMPORTANT]
 > **Coming from 0.1.1?** Download the 0.1.2 setup EXE above and run it. 0.1.2 installs for all users in Program Files and asks for administrator permission.
+> 0.1.2 does not remove a 0.1.1 install, so uninstall 0.1.1 from Settings (Apps > Installed apps) first. Your settings are kept.
 > 0.1.1 won't offer this update in the app.
-> Your settings are kept, and the old per-user copy and its shortcuts are removed the first time the new Hub starts.
 > From 0.1.2 on, in-app updates ask Windows for permission once per update.
 
 - **Installer and updater:** Installs for all users in Program Files, with Start menu shortcuts for everyone.

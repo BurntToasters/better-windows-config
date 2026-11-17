@@ -8,10 +8,6 @@
  * installer with its .minisig and .sig, and assembly.json (a summary with no secret material).
  * One manifest per channel: the channel is part of the folder, the file name, and the signed comment.
  *
- * A stable release also decides what 0.1.1 clients see. They read bwc-stable.json (per-user install), and must never
- * be offered a per-machine installer. --legacy-feed is required for stable: frozen (the re-signed 0.1.1 manifest, from
- * --legacy-source), no-installer (the new version, no installers), or none (no bwc-stable.json). See lib/legacy-feed.js.
- *
  * Signed comments (exact):
  *   manifest:  version:<semver> channel:<stable|beta> expires:<yyyy-MM-ddTHH:mm:ssZ>
  *   installer: version:<semver> arch:<win-x64|win-arm64>
@@ -38,14 +34,6 @@ import {
   validateManifestBuffer,
 } from "./lib/update-manifest.js";
 import { matchEmbeddedKey, readTrustedKeysFile } from "./lib/trusted-keys.js";
-import {
-  buildLegacyManifest,
-  isLegacyMode,
-  LEGACY_MANIFEST_NAME,
-  LEGACY_MODES,
-  validateLegacyManifest,
-  validateLegacySource,
-} from "./lib/legacy-feed.js";
 import { validateUrl } from "./lib/url-policy.js";
 import { parsePackageVersion } from "./sync-version-helpers.js";
 import { resolveKeyPassword, resolveSigningKey } from "./sign-update-manifest.js";
@@ -65,8 +53,7 @@ function printHelp() {
   node ${SCRIPT} --version <semver> --installer-win-x64 <file> [--installer-win-arm64 <file>]
                  [--secret-key <dir|file>] [--password-env <NAME>] [--root <repo>] [--out <dir>]
                  [--pub-date <utc>] [--expires-hours <n>] [--download-base-url <url>]
-                 [--notes-url <url>] [--legacy-feed <frozen|no-installer|none>] [--legacy-source <file>]
-                 [--dry-run] [--json]
+                 [--notes-url <url>] [--dry-run] [--json]
 
 Options:
   --version <semver>           Required. X.Y.Z or X.Y.Z-beta.N. The channel follows from it.
@@ -87,12 +74,6 @@ Options:
                                repository from GH_REPO, GH_REPO_OWNER, and GH_REPO_NAME (see resolveRepo).
   --notes-url <url>            Release notes page. Must be https. Default
                                https://github.com/<owner>/<repo>/releases/tag/v<version>.
-  --legacy-feed <mode>         Required for a stable version. What 0.1.1 clients (per-user install) read at
-                               bwc-stable.json: frozen = the signed 0.1.1 manifest re-signed with this release's expiry
-                               (0.1.1 reads "up to date"), no-installer = this version with no installers (0.1.1 reads
-                               "No update is available for this type of computer yet."), none = no file (0.1.1 shows a
-                               download failure). A legacy file never lists an installer newer than 0.1.1. Beta: none.
-  --legacy-source <file>       With frozen only. The published 0.1.1 bwc-stable.json; its .minisig must be beside it.
   --dry-run                    Allow a key that is not embedded (a test key). The output is labelled.
   --json                       Print one JSON line.
   --help                       Show this help.
@@ -145,116 +126,6 @@ function fail(errors, reason, detail, exitCode = EXIT.REFUSED) {
 }
 
 /**
- * The legacy mode for this run, or null after recording why not. Stable needs the option (the choice is the user's, at
- * release time, so there is no default). A beta never has a 0.1.1 feed: only none is accepted for it.
- */
-function legacyModeFor(options, channel, errors) {
-  const given = options.legacyFeed;
-  if (channel === "beta") {
-    if (given !== undefined && given !== "none") {
-      fail(errors, "legacy-feed-beta", "a beta release never writes the 0.1.1 feed; use --legacy-feed none or leave it out", EXIT.USAGE);
-      return null;
-    }
-    if (options.legacySource !== undefined) {
-      fail(errors, "legacy-source-unused", "--legacy-source is only for --legacy-feed frozen", EXIT.USAGE);
-      return null;
-    }
-    return "none";
-  }
-  if (given === undefined) {
-    fail(
-      errors,
-      "legacy-feed-missing",
-      `a stable release needs --legacy-feed <${LEGACY_MODES.join("|")}>: it decides what 0.1.1 clients see (docs/RELEASE.md)`,
-      EXIT.USAGE,
-    );
-    return null;
-  }
-  if (!isLegacyMode(given)) {
-    fail(errors, "legacy-feed-invalid", `--legacy-feed is ${JSON.stringify(given)}, expected ${LEGACY_MODES.join(", ")}`, EXIT.USAGE);
-    return null;
-  }
-  if (given === "frozen") {
-    if (!options.legacySource) {
-      fail(errors, "legacy-source-missing", "--legacy-feed frozen needs --legacy-source <the published 0.1.1 bwc-stable.json>", EXIT.USAGE);
-      return null;
-    }
-  } else if (options.legacySource !== undefined) {
-    fail(errors, "legacy-source-unused", `--legacy-source is only for --legacy-feed frozen, not ${given}`, EXIT.USAGE);
-    return null;
-  }
-  return given;
-}
-
-/** Reads the published 0.1.1 manifest and its signature and validates them. Returns the parsed manifest, or null. */
-async function readLegacySource(file, trustedKeys, errors) {
-  const manifestPath = path.resolve(file);
-  const signaturePath = `${manifestPath}.minisig`;
-  for (const [label, target] of [["manifest", manifestPath], ["signature", signaturePath]]) {
-    if (!fs.existsSync(target) || !fs.statSync(target).isFile()) {
-      fail(errors, "legacy-source-missing", `the 0.1.1 ${label} is missing: ${target}`, EXIT.MISSING);
-      return null;
-    }
-  }
-  const bytes = fs.readFileSync(manifestPath);
-  const checked = await validateLegacySource(bytes, { signature: fs.readFileSync(signaturePath, "utf8"), trustedKeys });
-  if (!checked.ok) {
-    errors.push(...checked.errors);
-    return null;
-  }
-  return { ...checked.manifest, sha256: await sha256FileStream(manifestPath) };
-}
-
-/**
- * Writes bwc-stable.json (the 0.1.1 feed) beside the v2 manifest, signed with this release's expiry, or removes a
- * leftover one for none. Returns the summary that assembly.json records.
- */
-async function writeLegacyFeed({ mode, channelDir, keyText, password, publicText, version, pubDate, expires, source, errors, checks }) {
-  const legacyPath = path.join(channelDir, LEGACY_MANIFEST_NAME);
-  const sidecars = [legacyPath, `${legacyPath}.minisig`, `${legacyPath}.sig`];
-  if (mode === "none") {
-    for (const file of sidecars) fs.rmSync(file, { force: true });
-    return { mode };
-  }
-
-  let manifest;
-  try {
-    manifest = buildLegacyManifest({ mode, version, pubDate, source });
-  } catch (error) {
-    fail(errors, String(error.message).split(":")[0], describeError(error));
-    return { mode };
-  }
-  const bytes = serializeManifest(manifest);
-  fs.writeFileSync(legacyPath, bytes);
-  const signature = await signFile(
-    legacyPath,
-    keyText,
-    manifestTrustedComment({ version: manifest.version, channel: "stable", expires }),
-    { password },
-  );
-  fs.writeFileSync(`${legacyPath}.minisig`, signature, "utf8");
-  fs.writeFileSync(`${legacyPath}.sig`, envelope(signature), "utf8");
-
-  const validation = await validateLegacyManifest(bytes, {
-    mode,
-    version,
-    signature,
-    trustedKeys: [publicText],
-    expires,
-    source: source ?? undefined,
-  });
-  checks.push({ name: "legacy-feed", pass: validation.ok, detail: `${mode} ${manifest.version}` });
-  errors.push(...validation.errors);
-  return {
-    mode,
-    file: LEGACY_MANIFEST_NAME,
-    version: manifest.version,
-    installerArches: Object.keys(manifest.installers),
-    ...(source ? { sourceSha256: source.sha256 } : {}),
-  };
-}
-
-/**
  * Assembles and validates one channel's bundle. Returns { ok, errors, checks, ... }. Nothing is
  * published here; the caller decides what to do with the folder.
  */
@@ -289,11 +160,6 @@ export async function assembleBundle(options) {
   const hours = options.expiresHours ?? DEFAULT_EXPIRES_HOURS;
   if (!Number.isInteger(hours) || hours < 1 || hours > MAX_EXPIRES_HOURS) {
     fail(errors, "usage", `--expires-hours must be 1 to ${MAX_EXPIRES_HOURS}`, EXIT.USAGE);
-    return result;
-  }
-
-  const legacyMode = legacyModeFor(options, channel, errors);
-  if (legacyMode === null) {
     return result;
   }
 
@@ -341,16 +207,6 @@ export async function assembleBundle(options) {
   }
   if (testKey) {
     checks.push({ name: "test-key", pass: true, detail: "not an embedded key; dry run only" });
-  }
-
-  // The frozen source is read and checked before any file is written, so a refused run leaves no bundle behind.
-  let legacySource = null;
-  if (legacyMode === "frozen") {
-    const trusted = [...new Set([...(source.ok ? source.embedded : []), publicText])];
-    legacySource = await readLegacySource(options.legacySource, trusted, errors);
-    if (legacySource === null) {
-      return result;
-    }
   }
 
   fs.mkdirSync(channelDir, { recursive: true });
@@ -405,20 +261,6 @@ export async function assembleBundle(options) {
   fs.writeFileSync(`${manifestPath}.minisig`, manifestSignature, "utf8");
   fs.writeFileSync(`${manifestPath}.sig`, envelope(manifestSignature), "utf8");
 
-  const legacy = await writeLegacyFeed({
-    mode: legacyMode,
-    channelDir,
-    keyText,
-    password: options.password,
-    publicText,
-    version,
-    pubDate,
-    expires,
-    source: legacySource,
-    errors,
-    checks,
-  });
-
   // The bundle must pass the validator the updater's contract describes, with the signing key only.
   const validation = await validateManifestBuffer(manifestBytes, {
     signature: manifestSignature,
@@ -445,7 +287,6 @@ export async function assembleBundle(options) {
     dryRun: Boolean(options.dryRun),
     network: "none",
     manifest: relativeTo(REPO_ROOT, manifestPath),
-    legacyFeed: legacy,
     installers: Object.fromEntries(
       Object.entries(installers).map(([architecture, entry]) => [
         architecture,
@@ -464,7 +305,6 @@ export async function assembleBundle(options) {
   result.manifestPath = manifestPath;
   result.signaturePath = `${manifestPath}.minisig`;
   result.installers = installers;
-  result.legacy = legacy;
   result.testKey = testKey;
   result.keyIdHex = keyIdHex;
   result.fingerprint = fingerprint;
@@ -486,8 +326,6 @@ function parseOptions(argv) {
       "out",
       "installer-win-x64",
       "installer-win-arm64",
-      "legacy-feed",
-      "legacy-source",
     ],
     flags: ["dry-run", "json", "help"],
   });
@@ -529,8 +367,6 @@ function parseOptions(argv) {
     notesUrl: notesUrl.url.toString(),
     out: path.resolve(REPO_ROOT, parsed.get("out") ?? path.join("artifacts", "release", version)),
     installers,
-    legacyFeed: parsed.get("legacy-feed"),
-    legacySource: parsed.get("legacy-source"),
     dryRun: parsed.has("dry-run"),
     json: parsed.has("json"),
   };
@@ -586,7 +422,6 @@ async function main(argv = process.argv.slice(2)) {
   } else {
     console.log(`${SCRIPT}: PASS ${result.version} (${result.channel}) signed by ${result.keyIdHex}${result.testKey ? " (TEST KEY, dry run)" : ""}`);
     console.log(`  manifest: ${relativeTo(REPO_ROOT, result.manifestPath)}`);
-    console.log(`  legacy feed (0.1.1 clients): ${result.legacy.mode}${result.legacy.file ? ` (${result.legacy.file}, version ${result.legacy.version})` : ""}`);
     console.log(`  expires: ${result.expires}`);
     for (const architecture of Object.keys(result.installers)) {
       console.log(`  ${architecture}: ${result.installers[architecture].fileName} (${result.installers[architecture].size} bytes)`);

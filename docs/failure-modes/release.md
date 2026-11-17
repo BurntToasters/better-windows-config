@@ -199,8 +199,7 @@ Release assets are named by channel. Since 0.1.2 a stable manifest is `bwc-stabl
 `bwc-stable-v2.json.minisig`. A beta manifest is `bwc-beta-v2.json` with `bwc-beta-v2.json.minisig`. The
 installers keep their versioned names, so no two releases share an asset name. The
 Hub reads the stable manifest from `https://github.com/BurntToasters/better-windows-config/releases/latest/download/bwc-stable-v2.json`.
-The beta URL is empty until a beta channel is published (it will be `bwc-beta-v2.json` beside the beta release). The
-0.1.1 Hub reads `bwc-stable.json` (the old name), which section LF below keeps for it.
+The beta URL is empty until a beta channel is published (it will be `bwc-beta-v2.json` beside the beta release).
 
 | ID | Case | Risk | Required result |
 |----|------|------|-----------------|
@@ -208,63 +207,19 @@ The beta URL is empty until a beta channel is published (it will be `bwc-beta-v2
 | L2 | Resolved repository is not `owner/name` with safe characters | Malformed API path | Refuse `repo-invalid`. Exit 2. |
 | L3 | `--download-base-url` is not https, or carries a query or fragment | Installer URLs point outside the release | Refuse `url-rejected` (manifest) or exit 2 (dry run). The default is `https://github.com/<owner>/<repo>/releases/download/v<version>`. |
 | L4 | Stable manifest is published as the beta asset (or the reverse) | A stable manifest offered to beta users | The signed `channel:` and the validator decide (`channel-mismatch`, V26). The file name is not trusted. |
-| L5 | Draft exists for `v<version>` | Draft assets become visible to the Hub | Drafts are invisible to `releases/latest/download`. The Hub sees a release only after publish, which is the only point at which `bwc-stable-v2.json` (and the legacy `bwc-stable.json`) change. |
+| L5 | Draft exists for `v<version>` | Draft assets become visible to the Hub | Drafts are invisible to `releases/latest/download`. The Hub sees a release only after publish, which is the only point at which `bwc-stable-v2.json` change. |
 | L6 | Beta publish | A prerelease changes the stable manifest URL | `releases/latest` ignores prereleases, so the stable URL is unchanged by a beta. |
 | L7 | Installer URL file name is not an asset of the release | The Hub downloads a 404 | Draft and verify refuse `asset-missing` (G10). The installer URL file name is the asset name. |
 | L8 | Notes URL for a version | A broken notes link | `notesUrl` defaults to `https://github.com/<owner>/<repo>/releases/tag/v<version>`, and `--notes-url` overrides it. |
 
-## LF. Feed names and the legacy feed for 0.1.1 clients (0.1.2)
+## LF. No legacy feed (0.1.2)
 
-Written before the tests and the code of the Hub and release piece (I3), per AGENTS.md. User decision: 0.1.1 users update
-by MANUAL download. A 0.1.1 client must never auto-apply 0.1.2: its helper starts an installer through the shell
-(`WindowsUpdateProcessHost.cs`, `UseShellExecute`), so a manifest that offered a 0.1.2 installer to 0.1.1 would run the
-per-machine setup from `%TEMP%` after a consent prompt, which is the one hop the design avoids.
-
-How the two feeds work:
-
-- 0.1.2 and later read `bwc-<channel>-v2.json` (`releases/latest/download/bwc-stable-v2.json`). The file format is unchanged
-  (schema 1); only the name is new, so a 0.1.1 client never sees it.
-- 0.1.1 reads `bwc-stable.json`. `releases/latest/download/` always serves the LATEST release's asset of that name, so
-  every future stable release decides what 0.1.1 sees. The release therefore takes a required option
-  `--legacy-feed <frozen|no-installer|none>`. The release run refuses to start without it, so the choice is made at every release.
-- `frozen`: a re-signed schema 1 manifest for `0.1.1` (the last per-user version) with the installer entries copied
-  unchanged from 0.1.1's own published manifest (`--legacy-source <that bwc-stable.json>`, with its `.minisig` beside it
-  for verification). 0.1.1 compares 0.1.1 with 0.1.1: `SameVersion`, so the Hub says "Better Windows Config 0.1.1 is up
-  to date." The signed expiry is fresh (same hours as the primary manifest), which keeps a frozen file valid after the
-  old manifest's own expiry has passed.
-- `no-installer`: a schema 1 manifest for the new version with `"installers": {}`. The 0.1.1 parser accepts an empty map
-  (`UpdateManifestParser.Parse` reads only the two known architecture keys), `UpdatePolicy.SelectInstaller` finds no entry
-  and returns `NoInstallerForArchitecture`, which the 0.1.1 Hub shows as "No update is available for this type of computer
-  yet." (`UpdateFailNoInstaller`). It does not tell the user that a manual download exists; the release notes and the
-  README must.
-- `none`: no `bwc-stable.json` asset. `releases/latest/download/bwc-stable.json` answers 404. 0.1.1 maps that to
-  `ManifestDownload`, which its `FriendlyFailureKey` does not list, so it shows the generic sentence "Update Check Failed.
-  The update check did not finish. The update could not be verified, so it was not installed. Your installed tools have
-  not been changed. Try again later." The startup check is silent, so that appears only after Help > Check for Updates.
-- Never an installer entry for a version newer than 0.1.1 in a legacy manifest. Enforced in the builder, in the validator
-  that the draft, verify, and publish gates run, and for the copied source.
+0.1.x carries no migration code. Written before the tests and the code, per AGENTS.md. The only 0.1.1 install is removed
+by hand, so a release writes no old-name feed file. 0.1.2 and later read `bwc-<channel>-v2.json` only.
 
 | ID | Case | Risk | Required result |
 |----|------|------|-----------------|
-| LF1 | Stable run without `--legacy-feed` (`assemble-bundle.js`, `run-release.js`, `release-dry-run.js` for a stable version) | A release silently leaves 0.1.1 with a 404, or with an old file | Refuse `legacy-feed-missing`. Exit 2. Nothing is written. In `run-release.js` it is refused before the first step |
-| LF2 | `--legacy-feed` has another value, or is given twice | A typo picks a default | Refuse `legacy-feed-invalid`. Exit 2 |
-| LF3 | Beta version with `--legacy-feed` other than `none` | A prerelease changes what 0.1.1 sees (it cannot: GitHub's `latest` ignores prereleases, and 0.1.1 has no beta URL) | Refuse `legacy-feed-beta`. A beta needs no option, and `none` is accepted |
-| LF4 | `frozen` without `--legacy-source`, or the file is missing or unreadable | A frozen manifest made up from nothing | Refuse `legacy-source-missing`. Exit 3 |
-| LF5 | The source manifest is not signed by an embedded key, its `.minisig` is missing, the signature or trusted comment does not verify, the manifest is not schema 1, not `stable`, not version `0.1.1`, has duplicate properties, or has no installer entry | A forged or wrong source is re-signed with the release key | Refuse `legacy-source-invalid` with the reason. Nothing is written |
-| LF6 | `frozen` output | The copied entries differ from the source, or the version is not 0.1.1 | `version` is `0.1.1`, `channel` is `stable`, `pubDate` and `notesUrl` are the source's, each installer entry (`url`, `size`, `sha256`, `signature`) is identical to the source's, and the manifest is re-signed with the exact comment `version:0.1.1 channel:stable expires:<e>`. The installers are not re-verified (the files are 0.1.1's and are not part of this release) |
-| LF7 | `no-installer` output | An installer entry reaches 0.1.1, or the map is refused by the 0.1.1 parser | `version` is the release version, `installers` is exactly `{}`, signed with `version:<v> channel:stable expires:<e>`. The 0.1.1 source (`UpdateManifestParser`, `UpdatePolicy`) accepts it and answers `NoInstallerForArchitecture` |
-| LF8 | Any legacy manifest with a version above 0.1.1 and an installer entry | 0.1.1 auto-applies a per-machine setup | Refuse `legacy-newer-installer` in the builder, in `validateLegacyManifest`, and so at draft, verify, and publish. Not overridable |
-| LF9 | `none` output | A stale `bwc-stable.json` from an earlier run in the folder | No legacy file is written, and an old one in the output folder is removed. `assembly.json` records `legacyFeed: none` |
-| LF10 | The legacy manifest expiry | 0.1.1 refuses an expired file (`ManifestExpired`) | The expiry is the primary manifest's expiry (one year in the release flow, `RELEASE_EXPIRES_HOURS`). A release re-signs the legacy file each time, so it is always fresh |
-| LF11 | Draft, verify, mirror, and publish do not know the legacy file | It is never uploaded, or `latest` serves an older release's file | `assembly.json` carries `legacyFeed`. For `frozen` and `no-installer` the draft uploads `bwc-stable.json` with its `.minisig`, `.sig` and `.asc`, `release-verify` requires and compares them, and the publish comparison includes them. A bundle for a stable version whose `assembly.json` has no `legacyFeed` is refused `legacy-feed-missing` |
-| LF12 | The v2 manifest and the legacy manifest | One file name serves both clients | The names never collide: `bwc-stable-v2.json` and `bwc-stable.json` |
-| LF13 | A channel mismatch between the two names | A stable manifest served as beta | Unchanged (L4): the signed `channel:` decides, not the name |
-| LF14 | The legacy file signed with a key outside `TrustedKeys.cs` | 0.1.1 refuses it, and so does the draft check | The same embedded-key rule as the primary manifest (K9) |
-| LF15 | Run flow | The option does not reach `release:assemble` | `release:win` and `release:win:continue` take `--legacy-feed` and `--legacy-source` and pass them to `release:assemble`. A `--from` step after `release:assemble` does not need them |
-| LF16 | Live checks | They read the old name | `validate-updater-live.js` and `updater-client-live.js` read `bwc-stable-v2.json`. The legacy file is not read by them: draft verification covers it |
-| LF17 | A draft holds an asset outside the expected set (I5, security review 2, finding 4). Expected: the manifest and its `.minisig`, the legacy pair only when the mode has one, the setups, and `<expected name>.asc` sidecars | `--legacy-feed none` on a reused draft that still holds a `bwc-stable.json` from an earlier run publishes a manifest that offers 0.1.2 to 0.1.1 (`releases/latest/download/` serves the latest release's asset of that name), the one hop LF8 forbids | `release-verify.js --apply` refuses `asset-unexpected` for each such asset, naming it, before it downloads anything. `release-publish.js` runs the verify step first, so a publish and a publish rerun refuse too | `release-selftest` (`unexpectedAssets`) |
-| LF18 | `--legacy-feed none` and the reused draft holds `bwc-stable.json` or `bwc-stable.json.minisig` | The stale file is on the draft, not on a published release | `release-draft.js --apply` deletes those two assets (a draft only, and not a replacement: the local bundle has no such file, so `--replace-assets` is not needed and is never involved) and logs each. Any other unexpected asset is not deleted: the draft step refuses `asset-unexpected` and the user removes it | `release-selftest` (`staleLegacyAssets`) |
-| LF19 | A frozen or no-installer draft holds a `bwc-stable.json` that differs from the local file | A stale legacy manifest | Unchanged: the SHA-256 compare refuses `asset-conflict` (a stable release never replaces it) | Existing (draft conflict rule) |
+| LF1 | A stable run or assembly, with no legacy option. A draft already holds a `bwc-stable.json` asset | A stale old-name file is served by `releases/latest/download/` or published | No legacy file is written and `assembly.json` has no legacy field. The assembly and the run take no legacy option, so a stale `--legacy-feed` or `--legacy-source` is refused as an unknown option. A `bwc-stable.json` on a reused draft is refused `asset-unexpected`, naming it, and is never deleted by the tools |
 
 ## F. Not enforced here (user duties)
 

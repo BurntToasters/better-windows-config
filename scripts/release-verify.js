@@ -160,12 +160,6 @@ async function applyVerify(context, options) {
   const expected = [
     { name: path.basename(context.bundle.manifestPath), file: context.bundle.manifestPath },
     { name: path.basename(context.bundle.signaturePath), file: context.bundle.signaturePath },
-    ...(context.bundle.legacy?.assets?.length > 0
-      ? [
-          { name: path.basename(context.bundle.legacy.manifestPath), file: context.bundle.legacy.manifestPath },
-          { name: path.basename(context.bundle.legacy.signaturePath), file: context.bundle.legacy.signaturePath },
-        ]
-      : []),
     ...context.bundle.installers.map((installer) => ({ name: installer.fileName, file: installer.file })),
   ];
   const missing = expected.filter((entry) => !assetByName(release, entry.name));
@@ -176,7 +170,7 @@ async function applyVerify(context, options) {
     return EXIT.REFUSED;
   }
 
-  // An asset outside the expected set is refused (release.md LF17): a stale bwc-stable.json would offer 0.1.2 to 0.1.1.
+  // An asset outside the expected set is refused (release.md LF1), such as a stray old-name feed file.
   const unexpected = unexpectedAssets(release, expectedAssetNames(context.bundle));
   if (unexpected.length > 0) {
     for (const asset of unexpected) {

@@ -29,7 +29,6 @@ import { envelope, generateKeyPair, signFile } from "./lib/minisign.js";
 import { buildEnvironment } from "./lib/build-environment.js";
 import {
   containsSeamName,
-  HUB_SEAM_PREFIX,
   missingRuntimeFiles,
   nativeAotProblems,
   NATIVE_AOT_EXPORT,
@@ -42,13 +41,7 @@ import {
 } from "./flavor-metadata.js";
 import { installUpdateOutputs, removeStaleFileLists, updateStagingDir } from "./lib/update-publish.js";
 import { buildManifest, installerTrustedComment, manifestFileName, serializeManifest } from "./lib/update-manifest.js";
-import {
-  buildLegacyManifest,
-  LAST_PER_USER_VERSION,
-  LEGACY_MANIFEST_NAME,
-  validateLegacyManifest,
-} from "./lib/legacy-feed.js";
-import { expectedAssetNames, loadReleaseBundle, staleLegacyAssets, unexpectedAssets } from "./lib/release-bundle.js";
+import { expectedAssetNames, loadReleaseBundle, unexpectedAssets } from "./lib/release-bundle.js";
 import { SIGNING_REQUIRED_VARIABLES } from "./release-policy.js";
 import { publishedReleaseMismatch } from "./release-publish.js";
 
@@ -869,18 +862,6 @@ async function runHardeningCases(temp, fixture, cases) {
   const seamUtf8 = Buffer.from("zz BWC_E2E_UPDATE_ROOT zz", "utf8");
   expectCheck("ship_e2e_strings", containsSeamName(seam) && containsSeamName(seamUtf8) && !containsSeamName(Buffer.from("BWC_E2E_THEME")), "seam names found as UTF-16 and UTF-8, nothing else", cases);
 
-  const hubSeam = Buffer.concat([Buffer.from("xx"), Buffer.from("BWC_E2E_LEGACY_RUNID", "utf16le"), Buffer.from("yy")]);
-  expectCheck(
-    "ship_e2e_strings hub seam",
-    HUB_SEAM_PREFIX === "BWC_E2E_LEGACY_" &&
-      containsSeamName(hubSeam, HUB_SEAM_PREFIX) &&
-      containsSeamName(Buffer.from("zz BWC_E2E_LEGACY_SHORTCUTS zz"), HUB_SEAM_PREFIX) &&
-      !containsSeamName(hubSeam) &&
-      !containsSeamName(Buffer.from("BWC_E2E_THEME"), HUB_SEAM_PREFIX),
-    "the Hub seam prefix is found as UTF-16 and UTF-8, and is not the updater prefix",
-    cases,
-  );
-
   // A minimal PE32+ image with one section that holds an export table naming the given symbols, then the extra bytes.
   const makePe = (exports, extra = Buffer.alloc(0)) => {
     const names = Buffer.concat(exports.map((name) => Buffer.from(`${name}\0`, "latin1")));
@@ -1206,58 +1187,30 @@ async function runEnvironmentKeyCases(temp, fixture, cases) {
 }
 
 /**
- * Legacy feed cases (release.md, section LF). 0.1.1 clients read bwc-stable.json, 0.1.2 reads bwc-stable-v2.json. The
- * release takes --legacy-feed frozen|no-installer|none, and a legacy manifest never carries an installer entry for a
- * version above 0.1.1. The stable bundles here are signed with the encrypted test key that the repo embeds.
+ * No legacy feed cases (release.md, section LF). 0.1.x carries no migration code: a release writes bwc-stable-v2.json
+ * only, takes no legacy option, and a bwc-stable.json asset on a reused draft is outside the expected set. The stable
+ * bundles here are signed with the encrypted test key that the repo embeds.
  */
-async function runLegacyFeedCases(temp, fixture, cases) {
-  const LEGACY_VERSION = "0.1.2";
+async function runNoLegacyFeedCases(temp, fixture, cases) {
+  const VERSION_UNDER_TEST = "0.1.2";
   const HOURS = 87600;
-  const repo = path.join(temp, "legacy-repo");
+  const STRAY_NAME = "bwc-stable.json";
+  const repo = path.join(temp, "nolegacy-repo");
   writeRepository(repo, { embedded: [fixture.keyEPublic] });
-  const publicPath = path.join(temp, "legacy-key.pub");
+  const publicPath = path.join(temp, "nolegacy-key.pub");
   writeText(publicPath, fixture.keyEPublic);
-  const keyEText = fs.readFileSync(path.join(fixture.encryptedDir, "minisign.key"), "utf8");
 
-  const installerPath = path.join(temp, "legacy-fixtures", `BetterWindowsConfig-${LEGACY_VERSION}-win-x64-setup.exe`);
+  const installerPath = path.join(temp, "nolegacy-fixtures", `BetterWindowsConfig-${VERSION_UNDER_TEST}-win-x64-setup.exe`);
   write(installerPath, Buffer.from(Array.from({ length: 2048 }, (_, index) => (index * 17 + 3) & 0xff)));
 
   expectCheck(
-    "feed names carry the v2 suffix and the legacy name is the 0.1.1 name",
-    manifestFileName("stable") === "bwc-stable-v2.json" &&
-      manifestFileName("beta") === "bwc-beta-v2.json" &&
-      LEGACY_MANIFEST_NAME === "bwc-stable.json" &&
-      LAST_PER_USER_VERSION === "0.1.1",
-    `${manifestFileName("stable")}, ${manifestFileName("beta")}, ${LEGACY_MANIFEST_NAME}, ${LAST_PER_USER_VERSION}`,
+    "feed names carry the v2 suffix",
+    manifestFileName("stable") === "bwc-stable-v2.json" && manifestFileName("beta") === "bwc-beta-v2.json",
+    `${manifestFileName("stable")}, ${manifestFileName("beta")}`,
     cases,
   );
 
-  // The published 0.1.1 manifest, as the frozen mode reads it: schema 1, version 0.1.1, signed by the release key, with
-  // an expiry that has passed (the real one will have by the time a later release is cut).
-  const oldEntry = (arch) => ({
-    url: `https://github.com/${DEFAULT_REPO}/releases/download/v0.1.1/BetterWindowsConfig-0.1.1-${arch}-setup.exe`,
-    size: 4096,
-    sha256: sha256(Buffer.from(`old ${arch}`)),
-    signature: envelope(fixture.installerSignature),
-  });
-  async function writeSource(name, { version = "0.1.1", channel = "stable", key = keyEText, password = PASSWORD, withSignature = true, installers } = {}) {
-    const folder = path.join(temp, "legacy-source", name);
-    const manifest = buildManifest({
-      version,
-      channel,
-      pubDate: "2026-10-01T00:00:00Z",
-      notesUrl: `https://github.com/${DEFAULT_REPO}/releases/tag/v${version}`,
-      installers: installers ?? { "win-x64": oldEntry("win-x64"), "win-arm64": oldEntry("win-arm64") },
-    });
-    const manifestPath = path.join(folder, LEGACY_MANIFEST_NAME);
-    write(manifestPath, serializeManifest(manifest));
-    if (withSignature) {
-      writeText(`${manifestPath}.minisig`, await signFile(manifestPath, key, manifestComment(version, channel, PAST_EXPIRES), { password }));
-    }
-    return { manifestPath, manifest };
-  }
-
-  const assemble = (name, extra, { version = LEGACY_VERSION, pubDate = PUBDATE } = {}) =>
+  const assemble = (name, extra, { version = VERSION_UNDER_TEST } = {}) =>
     run(
       "scripts/assemble-bundle.js",
       [
@@ -1266,7 +1219,7 @@ async function runLegacyFeedCases(temp, fixture, cases) {
         "--installer-win-x64", installerPath,
         "--secret-key", fixture.encryptedDir,
         "--password-env", PASSWORD_ENV,
-        "--pub-date", pubDate,
+        "--pub-date", PUBDATE,
         "--expires-hours", String(HOURS),
         "--out", path.join(temp, name),
         ...extra,
@@ -1274,341 +1227,95 @@ async function runLegacyFeedCases(temp, fixture, cases) {
       { env: { [PASSWORD_ENV]: PASSWORD } },
     );
 
-  // LF1, LF2: the option is required for a stable version, and only the three modes exist.
-  expectRefusal("LF1 stable release without --legacy-feed refused", assemble("legacy-none-given", []), ["legacy-feed-missing"], cases);
+  // LF1: a stable assembly with no legacy option succeeds and writes the v2 files only.
+  expectPass("LF1 stable assembly with no legacy option assembles", assemble("nolegacy-stable", []), cases);
+  const stableDir = path.join(temp, "nolegacy-stable", "stable");
   expectCheck(
-    "LF1 the refused run wrote no bundle",
-    !fs.existsSync(path.join(temp, "legacy-none-given", "stable")),
-    "no stable folder",
+    "LF1 a stable assembly writes bwc-stable-v2.json and no bwc-stable.json",
+    fs.existsSync(path.join(stableDir, "bwc-stable-v2.json")) &&
+      fs.existsSync(path.join(stableDir, "bwc-stable-v2.json.minisig")) &&
+      !fs.existsSync(path.join(stableDir, STRAY_NAME)) &&
+      !fs.existsSync(path.join(stableDir, `${STRAY_NAME}.minisig`)),
+    fs.existsSync(stableDir) ? fs.readdirSync(stableDir).join(", ") : "(no folder)",
     cases,
   );
-  expectRefusal("LF2 unknown --legacy-feed value refused", assemble("legacy-bogus", ["--legacy-feed", "notice"]), ["legacy-feed-invalid"], cases);
-  const twice = assemble("legacy-twice", ["--legacy-feed", "none", "--legacy-feed", "frozen"]);
+  const stableAssembly = fs.existsSync(path.join(stableDir, "assembly.json"))
+    ? JSON.parse(fs.readFileSync(path.join(stableDir, "assembly.json"), "utf8"))
+    : {};
   expectCheck(
-    "LF2 --legacy-feed given twice refused",
-    twice.status === EXIT.USAGE && twice.stderr.includes("more than once"),
-    twice.stderr.split("\n")[0].trim(),
+    "LF1 assembly.json has no legacy field",
+    stableAssembly.ok === true && !Object.keys(stableAssembly).some((key) => /legacy/i.test(key)),
+    Object.keys(stableAssembly).join(", "),
     cases,
   );
 
-  // LF3: a beta never writes the 0.1.1 feed.
-  expectRefusal(
-    "LF3 beta with a legacy mode other than none refused",
-    assemble("legacy-beta-frozen", ["--legacy-feed", "frozen"], { version: "0.1.2-beta.1" }),
-    ["legacy-feed-beta"],
-    cases,
-  );
-
-  // none: no legacy file, and the v2 name is used.
-  const noneOut = path.join(temp, "legacy-none");
-  expectPass("LF9 --legacy-feed none assembles the v2 bundle only", assemble("legacy-none", ["--legacy-feed", "none"]), cases);
-  const noneDir = path.join(noneOut, "stable");
-  expectCheck(
-    "LF9 none writes bwc-stable-v2.json and no bwc-stable.json",
-    fs.existsSync(path.join(noneDir, "bwc-stable-v2.json")) &&
-      fs.existsSync(path.join(noneDir, "bwc-stable-v2.json.minisig")) &&
-      !fs.existsSync(path.join(noneDir, LEGACY_MANIFEST_NAME)),
-    fs.existsSync(noneDir) ? fs.readdirSync(noneDir).join(", ") : "(no folder)",
-    cases,
-  );
-  const noneAssembly = JSON.parse(fs.readFileSync(path.join(noneDir, "assembly.json"), "utf8"));
-  expectCheck("LF9 assembly.json records legacyFeed none", noneAssembly.legacyFeed?.mode === "none", JSON.stringify(noneAssembly.legacyFeed), cases);
-
-  // A stale legacy file from an earlier run is removed by none.
-  const staleOut = path.join(temp, "legacy-stale");
-  write(path.join(staleOut, "stable", LEGACY_MANIFEST_NAME), "{}\n");
-  write(path.join(staleOut, "stable", `${LEGACY_MANIFEST_NAME}.minisig`), "stale\n");
-  expectPass("LF9 --legacy-feed none over a folder with an old legacy file", assemble("legacy-stale", ["--legacy-feed", "none"]), cases);
-  expectCheck(
-    "LF9 none removes an old legacy file and its signatures",
-    !fs.existsSync(path.join(staleOut, "stable", LEGACY_MANIFEST_NAME)) &&
-      !fs.existsSync(path.join(staleOut, "stable", `${LEGACY_MANIFEST_NAME}.minisig`)),
-    "the stale files are gone",
-    cases,
-  );
-
-  // no-installer: the new version, no installer entry.
-  expectPass("LF7 --legacy-feed no-installer assembles", assemble("legacy-noinst", ["--legacy-feed", "no-installer"]), cases);
-  const noinstDir = path.join(temp, "legacy-noinst", "stable");
-  const noinstPath = path.join(noinstDir, LEGACY_MANIFEST_NAME);
-  const noinst = fs.existsSync(noinstPath) ? JSON.parse(fs.readFileSync(noinstPath, "utf8")) : {};
-  const expectedExpires = expiresAfter(PUBDATE, HOURS);
-  expectCheck(
-    "LF7 no-installer manifest: schema 1, stable, the release version, installers is exactly {}",
-    noinst.schema === 1 &&
-      noinst.channel === "stable" &&
-      noinst.version === LEGACY_VERSION &&
-      JSON.stringify(noinst.installers) === "{}",
-    JSON.stringify(noinst),
-    cases,
-  );
-  const noinstLines = fs.existsSync(`${noinstPath}.minisig`) ? fs.readFileSync(`${noinstPath}.minisig`, "utf8").split("\n") : [];
-  expectCheck(
-    "LF7 no-installer signed comment is exactly version, channel stable, and the primary expiry",
-    noinstLines[2] === `trusted comment: ${manifestComment(LEGACY_VERSION, "stable", expectedExpires)}`,
-    noinstLines[2] ?? "(missing)",
-    cases,
-  );
-  const noinstCheck = await validateLegacyManifest(fs.readFileSync(noinstPath), {
-    signature: fs.readFileSync(`${noinstPath}.minisig`, "utf8"),
-    trustedKeys: [fixture.keyEPublic],
-    mode: "no-installer",
-    version: LEGACY_VERSION,
-  });
-  expectCheck("LF7 the legacy validator accepts the no-installer file", noinstCheck.ok, JSON.stringify(noinstCheck.errors), cases);
-  expectCheck(
-    "LF12 the v2 manifest still lists the installer and the legacy file does not",
-    JSON.parse(fs.readFileSync(path.join(noinstDir, "bwc-stable-v2.json"), "utf8")).installers?.["win-x64"] !== undefined &&
-      !fs.readFileSync(noinstPath, "utf8").includes("win-x64"),
-    "v2 has win-x64, legacy has none",
-    cases,
-  );
-
-  // frozen: refusals first (LF4, LF5).
-  expectRefusal("LF4 frozen without --legacy-source refused", assemble("legacy-frozen-nosrc", ["--legacy-feed", "frozen"]), ["legacy-source-missing"], cases);
-  expectRefusal(
-    "LF4 frozen with a missing source file refused",
-    assemble("legacy-frozen-gone", ["--legacy-feed", "frozen", "--legacy-source", path.join(temp, "legacy-source", "gone.json")]),
-    ["legacy-source-missing"],
-    cases,
-  );
-  expectRefusal(
-    "LF4 --legacy-source with another mode refused",
-    assemble("legacy-source-unused", ["--legacy-feed", "none", "--legacy-source", path.join(temp, "legacy-source", "gone.json")]),
-    ["legacy-source-unused"],
-    cases,
-  );
-  const unsigned = await writeSource("unsigned", { withSignature: false });
-  expectRefusal(
-    "LF5 source without a signature refused",
-    assemble("legacy-frozen-unsigned", ["--legacy-feed", "frozen", "--legacy-source", unsigned.manifestPath]),
-    ["legacy-source-missing", "legacy-source-invalid"],
-    cases,
-  );
-  const foreign = await writeSource("foreign", { key: fixture.keyA.secretKeyText, password: undefined });
-  expectRefusal(
-    "LF5 source signed by a key outside TrustedKeys.cs refused",
-    assemble("legacy-frozen-foreign", ["--legacy-feed", "frozen", "--legacy-source", foreign.manifestPath]),
-    ["legacy-source-invalid"],
-    cases,
-  );
-  const wrongVersion = await writeSource("wrong-version", { version: "0.1.2" });
-  expectRefusal(
-    "LF5 source that is not version 0.1.1 refused",
-    assemble("legacy-frozen-version", ["--legacy-feed", "frozen", "--legacy-source", wrongVersion.manifestPath]),
-    ["legacy-source-invalid"],
-    cases,
-  );
-  const wrongChannel = await writeSource("wrong-channel", { channel: "beta" });
-  expectRefusal(
-    "LF5 source that is not stable refused",
-    assemble("legacy-frozen-channel", ["--legacy-feed", "frozen", "--legacy-source", wrongChannel.manifestPath]),
-    ["legacy-source-invalid"],
-    cases,
-  );
-  const noEntries = await writeSource("no-entries", { installers: {} });
-  expectRefusal(
-    "LF5 source with no installer entry refused",
-    assemble("legacy-frozen-empty", ["--legacy-feed", "frozen", "--legacy-source", noEntries.manifestPath]),
-    ["legacy-source-invalid"],
-    cases,
-  );
-  const tampered = await writeSource("tampered");
-  fs.appendFileSync(tampered.manifestPath, " ");
-  expectRefusal(
-    "LF5 source changed after signing refused",
-    assemble("legacy-frozen-tampered", ["--legacy-feed", "frozen", "--legacy-source", tampered.manifestPath]),
-    ["legacy-source-invalid"],
-    cases,
-  );
-
-  // frozen: the output (LF6).
-  const source = await writeSource("good");
-  expectPass(
-    "LF6 --legacy-feed frozen with the signed 0.1.1 manifest assembles",
-    assemble("legacy-frozen", ["--legacy-feed", "frozen", "--legacy-source", source.manifestPath]),
-    cases,
-  );
-  const frozenDir = path.join(temp, "legacy-frozen", "stable");
-  const frozenPath = path.join(frozenDir, LEGACY_MANIFEST_NAME);
-  const frozen = fs.existsSync(frozenPath) ? JSON.parse(fs.readFileSync(frozenPath, "utf8")) : {};
-  expectCheck(
-    "LF6 frozen manifest is version 0.1.1, stable, with the source's installer entries unchanged",
-    frozen.schema === 1 &&
-      frozen.version === "0.1.1" &&
-      frozen.channel === "stable" &&
-      frozen.pubDate === source.manifest.pubDate &&
-      frozen.notesUrl === source.manifest.notesUrl &&
-      JSON.stringify(frozen.installers) === JSON.stringify(source.manifest.installers),
-    JSON.stringify(frozen).slice(0, 300),
-    cases,
-  );
-  const frozenLines = fs.existsSync(`${frozenPath}.minisig`) ? fs.readFileSync(`${frozenPath}.minisig`, "utf8").split("\n") : [];
-  expectCheck(
-    "LF6 frozen signed comment is exactly 0.1.1, stable, and a fresh expiry (the source's own expiry had passed)",
-    frozenLines[2] === `trusted comment: ${manifestComment("0.1.1", "stable", expectedExpires)}`,
-    frozenLines[2] ?? "(missing)",
-    cases,
-  );
-  expectCheck(
-    "LF6 frozen mode never lists an installer for the new version",
-    !fs.readFileSync(frozenPath, "utf8").includes(LEGACY_VERSION),
-    "no 0.1.2 text in the frozen file",
-    cases,
-  );
-  const frozenCheck = await validateLegacyManifest(fs.readFileSync(frozenPath), {
-    signature: fs.readFileSync(`${frozenPath}.minisig`, "utf8"),
-    trustedKeys: [fixture.keyEPublic],
-    mode: "frozen",
-    version: LEGACY_VERSION,
-    source: source.manifest,
-  });
-  expectCheck("LF6 the legacy validator accepts the frozen file", frozenCheck.ok, JSON.stringify(frozenCheck.errors), cases);
-
-  // LF8: no legacy manifest may carry an installer for a version above 0.1.1.
-  const hasReason = (result, reason) => result.errors.some((error) => error.reason === reason);
-  const newerInstallers = { "win-x64": oldEntry("win-x64") };
-  const newerManifest = buildManifest({ version: LEGACY_VERSION, channel: "stable", pubDate: PUBDATE, installers: newerInstallers });
-  const newerPath = path.join(temp, "legacy-newer", LEGACY_MANIFEST_NAME);
-  write(newerPath, serializeManifest(newerManifest));
-  writeText(`${newerPath}.minisig`, await signFile(newerPath, keyEText, manifestComment(LEGACY_VERSION, "stable", FUTURE_EXPIRES), { password: PASSWORD }));
-  for (const mode of ["no-installer", "frozen"]) {
-    const newer = await validateLegacyManifest(fs.readFileSync(newerPath), {
-      signature: fs.readFileSync(`${newerPath}.minisig`, "utf8"),
-      trustedKeys: [fixture.keyEPublic],
-      mode,
-      version: LEGACY_VERSION,
-    });
-    expectCheck(`LF8 a signed ${mode} file with a 0.1.2 installer entry is refused (legacy-newer-installer)`, !newer.ok && hasReason(newer, "legacy-newer-installer"), JSON.stringify(newer.errors), cases);
+  // LF1: a stale option is an unknown option now, so it fails loudly and writes nothing.
+  for (const stale of [["--legacy-feed", "none"], ["--legacy-source", path.join(temp, "gone.json")]]) {
+    const outName = `nolegacy-stale-${stale[0].slice(2)}`;
+    const refused = assemble(outName, stale);
+    expectCheck(
+      `LF1 stale ${stale[0]} is refused as an unknown option`,
+      refused.status === EXIT.USAGE && refused.stderr.includes(stale[0]),
+      `status ${refused.status}: ${refused.stderr.split("\n")[0].trim()}`,
+      cases,
+    );
+    expectCheck(
+      `LF1 the refused ${stale[0]} run wrote no bundle`,
+      !fs.existsSync(path.join(temp, outName, "stable")),
+      "no stable folder",
+      cases,
+    );
   }
-  let builderRefused = false;
-  try {
-    buildLegacyManifest({ mode: "frozen", version: LEGACY_VERSION, pubDate: PUBDATE, source: { version: LEGACY_VERSION, pubDate: PUBDATE, installers: newerInstallers } });
-  } catch (error) {
-    builderRefused = /legacy-newer-installer/.test(String(error.message));
-  }
-  expectCheck("LF8 the builder refuses a frozen source above 0.1.1", builderRefused, "legacy-newer-installer", cases);
-  const flipped = JSON.parse(fs.readFileSync(frozenPath, "utf8"));
-  flipped.installers["win-x64"].sha256 = "0".repeat(64);
-  const flippedPath = path.join(temp, "legacy-flipped", LEGACY_MANIFEST_NAME);
-  write(flippedPath, serializeManifest(flipped));
-  writeText(`${flippedPath}.minisig`, await signFile(flippedPath, keyEText, manifestComment("0.1.1", "stable", FUTURE_EXPIRES), { password: PASSWORD }));
-  const flippedCheck = await validateLegacyManifest(fs.readFileSync(flippedPath), {
-    signature: fs.readFileSync(`${flippedPath}.minisig`, "utf8"),
-    trustedKeys: [fixture.keyEPublic],
-    mode: "frozen",
-    version: LEGACY_VERSION,
-    source: source.manifest,
-  });
-  expectCheck("LF6 a frozen file whose installer entry differs from the source is refused", !flippedCheck.ok && hasReason(flippedCheck, "legacy-frozen-mismatch"), JSON.stringify(flippedCheck.errors), cases);
 
-  // LF14: the legacy file must verify under an embedded key.
-  const wrongKey = await validateLegacyManifest(fs.readFileSync(frozenPath), {
-    signature: fs.readFileSync(`${frozenPath}.minisig`, "utf8"),
-    trustedKeys: [fixture.keyA.publicKeyText],
-    mode: "frozen",
-    version: LEGACY_VERSION,
+  // LF1: the gate that draft, verify, and publish share loads the bundle with no legacy asset in the set.
+  const bundle = await loadReleaseBundle({
+    dir: stableDir,
+    channel: "stable",
+    version: VERSION_UNDER_TEST,
+    trustedKeys: [publicPath],
+    requireArches: ["win-x64"],
   });
-  expectCheck("LF14 a legacy file signed by another key is refused", !wrongKey.ok, JSON.stringify(wrongKey.errors), cases);
-
-  // LF11: the draft, verify, and publish gates read the legacy file through loadReleaseBundle.
-  const bundleOptions = (dir) => ({ dir, channel: "stable", version: LEGACY_VERSION, trustedKeys: [publicPath], requireArches: ["win-x64"] });
-  const frozenBundle = await loadReleaseBundle(bundleOptions(frozenDir));
   expectCheck(
-    "LF11 a frozen bundle loads and lists the legacy manifest and signature as required assets",
-    frozenBundle.ok &&
-      frozenBundle.legacy?.mode === "frozen" &&
-      frozenBundle.requiredAssets.includes(LEGACY_MANIFEST_NAME) &&
-      frozenBundle.requiredAssets.includes(`${LEGACY_MANIFEST_NAME}.minisig`),
-    JSON.stringify(frozenBundle.errors),
+    "LF1 a stable bundle with no legacy record loads, and no bwc-stable.json is required",
+    bundle.ok && !bundle.requiredAssets.includes(STRAY_NAME) && !bundle.requiredAssets.includes(`${STRAY_NAME}.minisig`),
+    JSON.stringify(bundle.errors),
     cases,
   );
-  const noneBundle = await loadReleaseBundle(bundleOptions(noneDir));
-  expectCheck(
-    "LF11 a none bundle loads with no legacy asset",
-    noneBundle.ok && noneBundle.legacy?.mode === "none" && !noneBundle.requiredAssets.includes(LEGACY_MANIFEST_NAME),
-    JSON.stringify(noneBundle.errors),
-    cases,
-  );
-  // LF17, LF18: the asset set of a release. A stale bwc-stable.json is the one that reaches 0.1.1 through
-  // releases/latest.
+
+  // LF1: a draft that already holds bwc-stable.json is refused asset-unexpected (release-draft and release-verify print
+  // that reason for each name that unexpectedAssets returns).
   const asset = (name, id) => ({ id, name, state: "uploaded" });
-  const frozenNames = expectedAssetNames(frozenBundle);
-  const noneNames = expectedAssetNames(noneBundle);
-  const frozenRelease = { assets: frozenNames.map((name, index) => asset(name, index + 1)) };
-  const noneRelease = { assets: noneNames.map((name, index) => asset(name, index + 1)) };
+  const names = expectedAssetNames(bundle);
+  const release = { assets: names.map((name, index) => asset(name, index + 1)) };
   expectCheck(
-    "LF17 the expected set lists the v2 manifest, its signature, the setups, and the legacy pair only in the frozen mode",
-    frozenNames.includes(LEGACY_MANIFEST_NAME) &&
-      frozenNames.includes(`${LEGACY_MANIFEST_NAME}.minisig`) &&
-      !noneNames.includes(LEGACY_MANIFEST_NAME) &&
-      noneNames.includes(manifestFileName("stable")) &&
-      noneNames.some((name) => name.endsWith("-setup.exe")),
-    JSON.stringify({ frozenNames, noneNames }),
+    "LF1 the expected set lists the v2 manifest, its signature, and the setups, and no bwc-stable.json",
+    names.includes(manifestFileName("stable")) &&
+      names.includes(`${manifestFileName("stable")}.minisig`) &&
+      names.some((name) => name.endsWith("-setup.exe")) &&
+      !names.includes(STRAY_NAME),
+    JSON.stringify(names),
     cases,
   );
   expectCheck(
-    "LF17 a release that holds exactly the expected assets has nothing unexpected",
-    unexpectedAssets(frozenRelease, frozenNames).length === 0 && unexpectedAssets(noneRelease, noneNames).length === 0,
+    "LF1 a release that holds exactly the expected assets has nothing unexpected",
+    unexpectedAssets(release, names).length === 0,
     "an unexpected asset was reported",
     cases,
   );
-  const withStale = { assets: [...noneRelease.assets, asset(LEGACY_MANIFEST_NAME, 90), asset(`${LEGACY_MANIFEST_NAME}.minisig`, 91)] };
+  const withStray = { assets: [...release.assets, asset(STRAY_NAME, 90), asset(`${STRAY_NAME}.minisig`, 91)] };
   expectCheck(
-    "LF17 a stale bwc-stable.json and its signature in a none release are unexpected",
-    unexpectedAssets(withStale, noneNames).map((entry) => entry.name).join(",") === `${LEGACY_MANIFEST_NAME},${LEGACY_MANIFEST_NAME}.minisig`,
-    JSON.stringify(unexpectedAssets(withStale, noneNames)),
+    "LF1 a draft that holds bwc-stable.json is refused asset-unexpected, naming it and its signature",
+    unexpectedAssets(withStray, names).map((entry) => entry.name).join(",") === `${STRAY_NAME},${STRAY_NAME}.minisig`,
+    JSON.stringify(unexpectedAssets(withStray, names)),
     cases,
   );
   expectCheck(
-    "LF17 any other extra asset is unexpected, and a GPG .asc of an expected asset is a sidecar",
-    unexpectedAssets({ assets: [...noneRelease.assets, asset("notes.txt", 92), asset("evil.exe", 93)] }, noneNames).length === 2 &&
-      unexpectedAssets({ assets: [...noneRelease.assets, asset(`${noneNames[0]}.asc`, 94)] }, noneNames).length === 0 &&
-      unexpectedAssets({ assets: [...noneRelease.assets, asset("stray.asc", 95)] }, noneNames).length === 1 &&
-      unexpectedAssets({ assets: [...noneRelease.assets, asset(`${noneNames[0]}.ASC.exe`, 96)] }, noneNames).length === 1,
+    "LF1 any other extra asset is unexpected, and a GPG .asc of an expected asset is a sidecar",
+    unexpectedAssets({ assets: [...release.assets, asset("notes.txt", 92), asset("evil.exe", 93)] }, names).length === 2 &&
+      unexpectedAssets({ assets: [...release.assets, asset(`${names[0]}.asc`, 94)] }, names).length === 0 &&
+      unexpectedAssets({ assets: [...release.assets, asset("stray.asc", 95)] }, names).length === 1 &&
+      unexpectedAssets({ assets: [...release.assets, asset(`${names[0]}.ASC.exe`, 96)] }, names).length === 1,
     "an extra asset was accepted or a sidecar refused",
-    cases,
-  );
-  expectCheck(
-    "LF18 only the legacy manifest and its signature are deleted from a none draft, and never in the frozen mode",
-    staleLegacyAssets(withStale, noneBundle).map((entry) => entry.id).join(",") === "90,91" &&
-      staleLegacyAssets({ assets: [...noneRelease.assets, asset("notes.txt", 92)] }, noneBundle).length === 0 &&
-      staleLegacyAssets({ assets: [...frozenRelease.assets] }, frozenBundle).length === 0,
-    JSON.stringify(staleLegacyAssets(withStale, noneBundle)),
-    cases,
-  );
-  const missingLegacyDir = path.join(temp, "legacy-missing-file");
-  fs.cpSync(frozenDir, missingLegacyDir, { recursive: true });
-  fs.rmSync(path.join(missingLegacyDir, LEGACY_MANIFEST_NAME));
-  const missingLegacy = await loadReleaseBundle(bundleOptions(missingLegacyDir));
-  expectCheck(
-    "LF11 a frozen bundle whose legacy manifest was removed is refused",
-    !missingLegacy.ok && missingLegacy.errors.some((error) => /missing/.test(error.reason)),
-    JSON.stringify(missingLegacy.errors),
-    cases,
-  );
-  const noModeDir = path.join(temp, "legacy-no-mode");
-  fs.cpSync(noneDir, noModeDir, { recursive: true });
-  const noModeAssembly = JSON.parse(fs.readFileSync(path.join(noModeDir, "assembly.json"), "utf8"));
-  delete noModeAssembly.legacyFeed;
-  fs.writeFileSync(path.join(noModeDir, "assembly.json"), `${JSON.stringify(noModeAssembly)}\n`);
-  const noMode = await loadReleaseBundle(bundleOptions(noModeDir));
-  expectCheck(
-    "LF11 a stable bundle with no legacyFeed record is refused (legacy-feed-missing)",
-    !noMode.ok && noMode.errors.some((error) => error.reason === "legacy-feed-missing"),
-    JSON.stringify(noMode.errors),
-    cases,
-  );
-  const tamperedDir = path.join(temp, "legacy-tampered-bundle");
-  fs.cpSync(noinstDir, tamperedDir, { recursive: true });
-  const tamperedLegacy = JSON.parse(fs.readFileSync(path.join(tamperedDir, LEGACY_MANIFEST_NAME), "utf8"));
-  tamperedLegacy.installers = { "win-x64": oldEntry("win-x64") };
-  fs.writeFileSync(path.join(tamperedDir, LEGACY_MANIFEST_NAME), serializeManifest(tamperedLegacy));
-  const tamperedBundle = await loadReleaseBundle(bundleOptions(tamperedDir));
-  expectCheck(
-    "LF8 a no-installer bundle whose legacy file gained an installer entry is refused at the gate",
-    !tamperedBundle.ok && tamperedBundle.errors.some((error) => error.reason === "legacy-newer-installer"),
-    JSON.stringify(tamperedBundle.errors),
     cases,
   );
 }
@@ -2200,7 +1907,7 @@ async function main() {
     const fixture = await buildFixture(temp);
     await runValidatorCases(temp, fixture, cases);
     await runAssembleCases(temp, fixture, cases);
-    await runLegacyFeedCases(temp, fixture, cases);
+    await runNoLegacyFeedCases(temp, fixture, cases);
     await runEnvironmentKeyCases(temp, fixture, cases);
     await runHardeningCases(temp, fixture, cases);
     await runPolicyCases(temp, fixture, cases);

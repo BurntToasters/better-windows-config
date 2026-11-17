@@ -61,7 +61,6 @@ const RESERVED_ROOT_NAMES = new Set([
   "uninstall.exe",
   "upgrade-cleanup-pending",
 ]);
-const RESERVED_DIRECTORY = "bwc-tools";
 const SIGN_SCRIPT = path.join(REPO_ROOT, "scripts", "windows-artifact-sign.ps1");
 const VERIFY_SCRIPT = path.join(REPO_ROOT, "scripts", "verify-windows-authenticode.ps1");
 const SETUP_COMMAND = "npm run setup:win:artifact-signing";
@@ -233,9 +232,6 @@ export function validatePayload(files) {
     const lower = file.rel.toLowerCase();
     if (!lower.includes("/") && RESERVED_ROOT_NAMES.has(lower)) {
       throw new Error(`payload file ${file.rel} collides with an installer-owned file`);
-    }
-    if (lower === RESERVED_DIRECTORY || lower.startsWith(`${RESERVED_DIRECTORY}/`)) {
-      throw new Error(`payload file ${file.rel} is inside the reserved folder ${RESERVED_DIRECTORY}`);
     }
   }
 }

@@ -18,7 +18,7 @@ const EXPIRES_PATTERN = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z
 /**
  * The release asset name of a channel's manifest: bwc-stable-v2.json or bwc-beta-v2.json. The signature is
  * this name plus ".minisig". Each channel has its own name, so both can live in one GitHub release list. The v2 suffix
- * is the 0.1.2 feed. 0.1.1 reads bwc-stable.json, which lib/legacy-feed.js owns (the per-user to per-machine move).
+ * is the 0.1.2 feed.
  */
 export function manifestFileName(channel) {
   if (channel !== "stable" && channel !== "beta") {

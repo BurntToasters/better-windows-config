@@ -149,9 +149,8 @@ The E2E tests (`tests/Bwc.E2E`) are run by `run.js` through `test-e2e.js --filte
   - `InstallerMachine_FreshInstallOfB`: installs B. Checks the files, the HKLM key (64-bit view, nothing under
     WOW6432Node), the `_?=` uninstall strings, the two all-users shortcuts and their AppUserModelIDs, and that the
     folder inherits from Program Files with no write access for Users.
-  - `InstallerMachine_UpgradeFromPerUserAToMachineB`: a per-user A sandbox install (HKCU only) is open in Registry
-    Editor, then B is installed per machine with the A folder as the `/D=` hint. B goes to Program Files, the A folder
-    and key are untouched, and the open Registry Editor is closed.
+  - `InstallerMachine_RawDirNamingAnotherFolderIsIgnored`: B is installed per machine with `/D=` naming a folder the
+    test owns inside its run folder. B goes to Program Files and that folder is unchanged.
   - `InstallerMachine_ElevatedUpdateThroughHelperChain`: the real `BwcUpdate.exe --apply-elevated` starts a signed
     stand-in installer from `<install dir>.upd<32 hex>`. Checks the hash, the command line, the elevated token, TEMP
     and TMP in the copy, the protected ACLs (SYSTEM and Administrators only), and the removal of stale copies.
