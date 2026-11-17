@@ -344,6 +344,16 @@ internal sealed class UpdateService
         "InstallerDownload" or "InstallerDownloadInterrupted" or "DownloadFailed" or "ManifestSignatureDownload" or "Timeout"
             => "UpdateFailDownload",
         "Unexpected" => "UpdateFailUnexpected",
+
+        // The helper refuses --check and --download with an elevated token. An elevated Hub cannot update: it says so
+        // plainly. (--apply with an elevated token relaunches the Hub with RunningElevated, which has its own text.)
+        "RunningElevated" => "UpdateFailElevated",
+
+        // The per-machine (0.1.2) apply path: Windows asks for permission, and the helper checks the other sessions.
+        "ElevationDeclined" => "UpdateFailElevationDeclined",
+        "NotElevated" => "UpdateFailNotElevated",
+        "RunningInOtherSession" => "UpdateFailOtherSession",
+        "DeElevationFailed" => "UpdateFailDeElevation",
         _ => "UpdateFailGeneric",
     };
 

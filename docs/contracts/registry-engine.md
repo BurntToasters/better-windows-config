@@ -145,6 +145,35 @@ the owning package records the observed behavior as a golden before implementing
 - Hive operations run one at a time under one lock in `RegistryWriter`, because the hive privileges
   are process-wide.
 
+## Remote writes (package R1)
+
+- `RemoteRegistryConnection.CreateStore(policy)` returns a `RegistryStore` whose writer and reader use the
+  connection's HKEY_LOCAL_MACHINE and HKEY_USERS roots. Each native open pins its root for that call. Any other
+  root (HKCU, HKCR, HKCC) throws `ArgumentException` before any native call. A disposed connection throws
+  `ObjectDisposedException` before any native call.
+- `IRegistryWritePolicy.EnsureWriteAllowed(string? computerName, RegistryPath path, RegistryWriteOperation op)`.
+  `computerName` is null for the local registry and the connection's computer name for a remote store. Every
+  write, local or remote, passes the policy before native code runs.
+- `ShippingWritePolicy` allows remote writes and `DenyAllWritePolicy` refuses them. `SandboxWritePolicy` allows a
+  remote write only to a loopback computer (`127.0.0.1` or `::1`), and only under
+  `HKEY_USERS\<current SID>\Software\BWC-E2E\`, which is the same key as the local sandbox. It refuses `.` and `..`
+  components on that path. Its local rules are unchanged.
+- Remote writes support CreateKey, SetValue (all types), DeleteValue, DeleteKey (recursive or not), RenameKey,
+  CopyTree, GetKeySecurity and SetKeySecurity, and every read.
+- Measured on loopback: `RegRenameKey` and `RegCopyTree` both fail with `ERROR_INVALID_HANDLE` (6) on a remote handle,
+  while `RegDeleteTree` and the key security calls work. So `RenameKey` on a remote root tries `RegRenameKey` first and
+  runs a managed copy-then-delete fallback for 6, 50, 120 and 1. Any other code throws. `CopyTree` on a remote root is
+  always managed (values, children, then the owner and the DACL, with the class name set at create). The new key must
+  not exist (183). A case-only remote rename is refused with 50. A copy that fails for any reason removes the
+  destination it created and rethrows. A failed delete of the original keeps the copy, and the error says that both
+  keys exist and names both.
+- Hive operations (`LoadHive`, `UnloadHive`, `SaveKey`, `ReplaceKey`, `RestoreKey`) on a remote store throw
+  `RegistryOperationException` with `ERROR_NOT_SUPPORTED` (50) after the policy check and before any native call.
+  The E2E counted-name value seam is refused the same way.
+- `SetKeySecurity` checks the descriptor before any native call, for local and remote writes: the self-relative
+  layout and the `SE_SELF_RELATIVE` bit, `IsValidSecurityDescriptor`, and an exact declared length.
+- Failure modes and the tests that cover them: `failure-modes/remote-registry.md` section 15.
+
 ## Find (package B7 and R9)
 
 - Search starts after the current selection: the selected value if one is selected in the

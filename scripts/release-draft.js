@@ -39,6 +39,7 @@ import {
   ghRequestDir,
   writeGhBody,
 } from "./lib/github-release.js";
+import { expectedAssetNames, unexpectedAssets } from "./lib/release-bundle.js";
 import { prepareReleaseContext } from "./lib/release-context.js";
 import { git } from "./lib/release-policy.js";
 
@@ -160,7 +161,9 @@ function uniqueAssetPaths(bundle) {
   const primary = [bundle.manifestPath, ...bundle.installers.map((installer) => installer.file)];
   const withSidecars = primary.flatMap((file) => [file, `${file}.minisig`, `${file}.sig`]);
   const paths = [bundle.signaturePath, ...withSidecars].flatMap((file) => [file, `${file}.asc`]);
-  const required = new Set([bundle.manifestPath, bundle.signaturePath, ...primary].map((file) => path.resolve(file)));
+  const required = new Set(
+    [bundle.manifestPath, bundle.signaturePath, ...primary].map((file) => path.resolve(file)),
+  );
   return [...new Set(paths.map((file) => path.resolve(file)))].filter(
     (file) => required.has(file) || fs.existsSync(file),
   );
@@ -258,6 +261,16 @@ async function applyDraft(context, options, bodyFiles) {
     }
 
     const fresh = getRelease(context.repo, release.id, { cwd: context.root });
+    // An asset outside the bundle (a stray file from an earlier run, for one) is refused and left for the user.
+    const unexpected = unexpectedAssets(fresh, expectedAssetNames(context.bundle));
+    if (unexpected.length > 0) {
+      for (const asset of unexpected) {
+        console.error(`${SCRIPT}: REFUSED [asset-unexpected]: the draft holds ${asset?.name ?? "(unnamed)"}, which is not part of this bundle`);
+      }
+      console.error("release-draft: remove those assets from the draft by hand, then run the step again.");
+      return EXIT.REFUSED;
+    }
+
     const assetPaths = uniqueAssetPaths(context.bundle);
     const localByName = new Map();
     for (const assetPath of assetPaths) {

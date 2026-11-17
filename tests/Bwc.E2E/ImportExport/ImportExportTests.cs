@@ -342,7 +342,8 @@ public sealed class ImportExportTests
             $"set={set}, cancelled={cancelled}, closed={closed}, enabledAgain={enabledAgain}, noFile={noFile}.");
     }
 
-    private static bool InvokeFileCommand(
+    /// <summary>Opens File and invokes one file command with Enter. Shared with the remote import test.</summary>
+    internal static bool InvokeFileCommand(
         EditingDriver driver,
         SystemFileDialogDriver dialogs,
         int commandId,

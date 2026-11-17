@@ -107,6 +107,12 @@ Tests: `RegistryReaderTests.EnumerationReturnsEmbeddedNulNamesWithTheirOwnData` 
 value is seeded through the E2E-only writer seam, because `RegSetValueExW` cannot pass an embedded
 NUL), `RegistryWriterSandboxTests` (name guard).
 
+Reader guard (0.1.2): `RegistryReader.ReadValue` and `ValueExists` read the name through `RegQueryValueExW`,
+which truncates at the NUL. `ReadValue("abc\0def")` returned `abc`'s data, so Modify and the binary viewer
+showed another value. The reader now refuses a NUL name with `ArgumentException` before any native call,
+as the writer does. Enumeration is unchanged and still returns the NUL-named value with its own data.
+Tests: `tests/Bwc.Registry.Tests/RegistryValueNulNameTests.cs`.
+
 ## 8. Names longer than 16,383 characters
 
 The platform limits value names to 16,383 characters. Windows does not create longer names, but
@@ -213,3 +219,56 @@ enumeration failure can be driven with real input. The ship build never reads th
 Check: `AppServices_ValueEnumerationFailureShowsClassicError` sets the variable to the run's sandbox key,
 navigates to it, and checks the `Error Opening Key` message with the key path and the system text, and
 an empty list. It writes nothing.
+
+## 18. The list Data column follows classic regedit (0.1.2)
+
+The Value list (`RegistryValueSource`) renders Name, Type, and Data the way classic regedit's list
+does. The rules below were read from classic regedit with UI Automation on this machine
+(`SysListView32` subitems, Edit elements named Name, Type, Data). They override sections 3, 4, 5, and 6
+for the list only. `RegistryValueDisplay.FormatData` keeps its shared contract for export, print, and
+Find, and `RegistryValueDisplayTests` pin that contract, so the list has its own formatter.
+
+Failure modes, each with the classic rule the list must match:
+
+- **Empty REG_SZ shows nothing, not `(value not set)`.** A zero-length or NUL-only REG_SZ shows an
+  empty Data cell. `(value not set)` is only the synthetic (Default) row of a key that has no default
+  value. Classic: `EmptySz` (0 bytes) and `NulSz` (00 00) both show an empty cell.
+- **REG_MULTI_SZ stops at the first empty string.** Classic appends each string followed by one space,
+  and stops when it reaches an empty string. `one`, empty, `two` shows `one ` (trailing space), and
+  zero-length data shows an empty cell. Joining every string with one space shows `one  two` and is wrong.
+- **REG_LINK cannot be seeded in the sandbox.** `SandboxWritePolicy.AllowsLinkValues` is false, so both the
+  API and the silent import refuse hex(6). The E2E therefore does not compare REG_LINK rows; the rule below is
+  from the one-off classic read on this machine. Classic shows the stored bytes as lowercase hex, including the UTF-16
+  terminator: `\Registry\Machine` shows `5c 00 52 00 ... 00 00`. It is not text.
+- **REG_DWORD_BIG_ENDIAN is a number.** Type name `REG_DWORD_BIG_ENDIAN`. The four bytes are read
+  big-endian: `11 22 33 44` shows `0x11223344 (287454020)`. Section 3 (REG_UNKNOWN, hex) is wrong for
+  the list.
+- **Hex bytes are lowercase and space-separated.** `01 ab`, `0a de ad`, and the resource-list bytes
+  `01 00 00 00 02 00 ...`. Upper case (section 4) is wrong for the list.
+- **Zero-length binary data shows `(zero-length binary value)`.** Measured for REG_BINARY (`BinEmpty`),
+  REG_NONE (`NoneEmpty`), and each of the resource types and unknown types in the E2E import matrix.
+  The list gets this text from `RegistryValueDisplay.FormatData` (oracle string 22), not a copy.
+- **Unknown type numbers print as hex, not REG_UNKNOWN.** Type name `0x1234` for 0x1234 and `0xabcd`
+  for 0xABCD (lowercase, `0x` prefix). Section 4 (REG_UNKNOWN) is wrong for the list. The minimum digit
+  width for values below 0x1000 is not measured; the E2E check uses 0x0C and records the result.
+- **Strings and binary: cut at 192 characters, then `...`.** Classic showed a string of 192 characters
+  in full, and any longer string (193, 194, 200, 300, 1100, 2500 characters) as its first 192 characters
+  and `...` (195 in total). A binary value whose 192-character cut ends in a space (`... 3f `) shows the
+  cut without that space (`... 3f...`), so the trailing space is trimmed first. The 1024-character budget
+  (section 6) is wrong for the list.
+- **REG_MULTI_SZ: whole strings, no `...`.** Classic adds each string with its space while the text fits
+  in 192 characters, then stops. Sixty strings `s00` to `s59` show `s00 ... s47 ` (192 characters) with
+  no ellipsis. Classic does not cut a string in the middle here.
+- **A 16,383-character value name is not listed by classic.** Classic shows only the synthetic (Default)
+  row for a key whose only value has that name, so the case is recorded as a note
+  (`valuedisplay.longname`), not a pass. The BWC row keeps the full name.
+- **Strings stop at the first NUL.** Unchanged from section 5 (text after the first NUL is not shown).
+- **Numbers keep the oracle widths.** DWORD and QWORD use `0x%08x (%u)` (section 1 and 2), and an
+  invalid length uses the oracle invalid-length strings. Classic's invalid-length display is not
+  measured; the E2E check records it as a note when the row differs.
+- **Name column.** The default value shows `(Default)`. A literal `(Default)` shows its own name. Both
+  rows exist when both exist (see `list.md`, section 8).
+
+Tests: `tests/Bwc.E2E/ValueDisplay/ValueDisplayTests.cs` (`ValueDisplay_ListMatchesClassicForEveryValueType`,
+`ValueDisplay_ListMatchesClassicForLongNameAndData`, `ValueDisplay_ListMatchesClassicForLongestValueName`).
+Each run writes its compared rows, from both lists, to `artifacts/e2e/value-display/classic-compare-<case>-<rid>.json`.

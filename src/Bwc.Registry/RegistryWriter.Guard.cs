@@ -35,7 +35,7 @@ public sealed partial class RegistryWriter
 
         try
         {
-            WIN32_ERROR error = NativeLinkGuard.TryOpenRoot(path.Root, out current);
+            WIN32_ERROR error = TryOpenWalkRoot(path.Root, out current);
             ThrowIfFailed(error, operation, errorPath);
 
             IReadOnlyList<string> components = path.Components;
@@ -68,6 +68,22 @@ public sealed partial class RegistryWriter
             current?.Dispose();
             throw;
         }
+    }
+
+    /// <summary>
+    /// Opens the walk's base handle. A local root is opened for real, as before. A remote root hands out its own
+    /// pin, which the walk closes like any other handle. Pinning throws before any native call for a root the
+    /// remote connection does not serve.
+    /// </summary>
+    private WIN32_ERROR TryOpenWalkRoot(RegistryRoot root, out SafeRegistryKeyHandle? handle)
+    {
+        if (!_roots.IsRemote)
+        {
+            return NativeLinkGuard.TryOpenRoot(root, out handle);
+        }
+
+        handle = _roots.Pin(root);
+        return WIN32_ERROR.ERROR_SUCCESS;
     }
 
     /// <summary>

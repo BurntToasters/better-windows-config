@@ -390,7 +390,7 @@ internal static class AppServicesSupport
                 break;
             }
 
-            Keyboard.Press(VirtualKeyShort.ENTER);
+            Keyboard.Type(VirtualKeyShort.ENTER);
             if (WaitUntil(() => !IsWindow(message), TimeSpan.FromSeconds(2)))
             {
                 break;

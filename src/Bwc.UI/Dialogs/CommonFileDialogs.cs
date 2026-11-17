@@ -47,11 +47,28 @@ public enum ExportFileRange
     SelectedBranch,
 }
 
-/// <summary>The path, writer, and range approved in the Export save dialog.</summary>
+/// <summary>
+/// The path, writer, and range approved in the Export save dialog. <paramref name="BranchText"/> is the branch
+/// path that OK approved (classic control 1282), empty unless <paramref name="Range"/> is SelectedBranch.
+/// </summary>
 public sealed record ExportFileDialogResult(
     string FilePath,
     ExportFileFormat Format,
-    ExportFileRange Range);
+    ExportFileRange Range,
+    string BranchText = "");
+
+/// <summary>
+/// The rules the Export dialog applies to its branch path edit (classic control 1282, DLG-001, BEH-021).
+/// </summary>
+/// <param name="Prefill">The text the edit starts with, in the classic form (HKEY_CURRENT_USER\Software).</param>
+/// <param name="BranchExists">Whether a typed branch path names an existing key. Called on the UI thread.</param>
+/// <param name="MissingCaption">The caption of the box shown for a branch path that does not exist.</param>
+/// <param name="MissingMessage">The box text for a branch path that does not exist (RT_STRING 148).</param>
+public sealed record ExportBranchRules(
+    string Prefill,
+    Func<string, bool> BranchExists,
+    string MissingCaption,
+    string MissingMessage);
 
 /// <summary>
 /// Common item dialogs through COM IFileOpenDialog and IFileSaveDialog. The WinRT
@@ -66,15 +83,18 @@ public static unsafe class CommonFileDialogs
 
     // IDs for the IFileDialogCustomize controls. They are outside the range the shell uses.
     private const uint ExportRangeGroupId = 2000;
-    private const uint ExportRangeListId = 2001;
+    internal const uint ExportRangeListId = 2001;
     private const uint ExportRangeAllId = 2002;
-    private const uint ExportRangeBranchId = 2003;
+    internal const uint ExportRangeBranchId = 2003;
     private const uint ExportRangeBranchListId = 2004;
     private const uint ExportRangeBranchOnlyItemId = 2005;
 
+    /// <summary>The branch path edit (classic control 1282). Classic keeps it enabled whatever range is chosen.</summary>
+    internal const uint ExportRangeBranchEditId = 2006;
+
     // CDCONTROLSTATEF bits. A control is enabled and visible when both are set.
-    private const uint ControlEnabled = 0x00000001;
-    private const uint ControlVisible = 0x00000002;
+    internal const uint ControlEnabled = 0x00000001;
+    internal const uint ControlVisible = 0x00000002;
 
     /// <summary>The Import filters in the order of oracle string 302. Index 1 is the default.</summary>
     private static (string Name, string Spec)[] ImportFilters() =>
@@ -107,7 +127,14 @@ public static unsafe class CommonFileDialogs
     public static ImportFileDialogResult? ShowImportOpen(nint ownerHwnd)
     {
         var dialog = (IFileOpenDialog)new FileOpenDialog();
-        string? path = ShowCore(dialog, ownerHwnd, defaultFileName: null, save: false, ImportFilters(), defaultExtension: null);
+        string? path = ShowCore(
+            dialog,
+            ownerHwnd,
+            defaultFileName: null,
+            save: false,
+            ImportFilters(),
+            defaultExtension: null,
+            title: BwcStrings.Get("FileDialogImportTitle"));
         if (path is null)
         {
             return null;
@@ -130,20 +157,46 @@ public static unsafe class CommonFileDialogs
     }
 
     /// <summary>
-    /// Shows the Export save dialog with the classic "Export range" group and the three export
-    /// filters. The range group defaults to Selected branch. When the tree selection is Computer,
-    /// <paramref name="hasSelectedKey"/> is false: All is selected and Selected branch is disabled.
-    /// The caller receives the approved path, writer, and range, or null when the user cancelled.
+    /// Shows the Export save dialog with the classic "Export range" group, its branch path edit, and the
+    /// three export filters. The range group defaults to Selected branch. When the tree selection is Computer,
+    /// <paramref name="hasSelectedKey"/> is false: All is selected and Selected branch is disabled. OK with
+    /// Selected branch and a branch path that does not exist keeps the dialog open
+    /// (see <see cref="ExportRangeEvents"/>).
+    /// The caller receives the approved path, writer, range, and branch text, or null when the user cancelled.
     /// </summary>
     public static ExportFileDialogResult? ShowExportSave(
         nint ownerHwnd,
         string? defaultFileName,
-        bool hasSelectedKey)
+        bool hasSelectedKey,
+        ExportBranchRules branch)
     {
-        var dialog = (IFileSaveDialog)new FileSaveDialog();
-        AddExportRange(dialog, hasSelectedKey);
+        ArgumentNullException.ThrowIfNull(branch);
 
-        string? path = ShowCore(dialog, ownerHwnd, defaultFileName, save: true, ExportFilters(), defaultExtension: "reg");
+        var dialog = (IFileSaveDialog)new FileSaveDialog();
+        AddExportRange(dialog, hasSelectedKey, branch.Prefill);
+
+        var events = new ExportRangeEvents((IFileDialogCustomize)dialog, branch, hasSelectedKey, dialog);
+        var advise = (IFileDialogAdvise)dialog;
+        Check(advise.Advise(events, out uint cookie));
+        events.StartAnnotation();
+        string? path;
+        try
+        {
+            path = ShowCore(
+                dialog,
+                ownerHwnd,
+                defaultFileName,
+                save: true,
+                ExportFilters(),
+                defaultExtension: BwcStrings.Get("FileDialogDefaultExtension"),
+                title: BwcStrings.Get("FileDialogExportTitle"));
+        }
+        finally
+        {
+            events.ReleaseAnnotation();
+            _ = advise.Unadvise(cookie);
+        }
+
         if (path is null)
         {
             return null;
@@ -151,7 +204,7 @@ public static unsafe class CommonFileDialogs
 
         ExportFileFormat format = ReadFormat(dialog);
         ExportFileRange range = ReadRange(dialog, hasSelectedKey);
-        return new ExportFileDialogResult(path, format, range);
+        return new ExportFileDialogResult(path, format, range, events.ApprovedBranch);
     }
 
     private static string? ShowCore(
@@ -160,8 +213,17 @@ public static unsafe class CommonFileDialogs
         string? defaultFileName,
         bool save,
         (string Name, string Spec)[] filters,
-        string? defaultExtension)
+        string? defaultExtension,
+        string? title = null)
     {
+        if (!string.IsNullOrEmpty(title))
+        {
+            fixed (char* dialogTitle = title)
+            {
+                dialog.SetTitle(dialogTitle);
+            }
+        }
+
         using var filterSpecs = new FilterSpecifications(filters);
         filterSpecs.Apply(dialog);
         dialog.SetFileTypeIndex(1);
@@ -215,7 +277,7 @@ public static unsafe class CommonFileDialogs
     /// Adds the classic Export range panel through IFileDialogCustomize. The dialog stays the
     /// system dialog; the controls are the ones the shell hosts for custom file dialog clients.
     /// </summary>
-    private static void AddExportRange(IFileDialog dialog, bool hasSelectedKey)
+    private static void AddExportRange(IFileDialog dialog, bool hasSelectedKey, string prefill)
     {
         var customize = (IFileDialogCustomize)dialog;
         Check(customize.StartVisualGroup(ExportRangeGroupId, BwcStrings.Get("FileDialogExportRangeGroup")));
@@ -253,6 +315,13 @@ public static unsafe class CommonFileDialogs
                 BwcStrings.Get("FileDialogExportRangeSelectedBranch")));
             Check(customize.SetControlState(ExportRangeBranchListId, ControlVisible));
         }
+
+        // Classic control 1282, the branch path. It starts with the classic form of the tree selection, is enabled
+        // only with Selected branch, and is empty at Computer (DLG-001, DLG-002).
+        Check(customize.AddEditBox(ExportRangeBranchEditId, hasSelectedKey ? prefill : string.Empty));
+        Check(customize.SetControlState(
+            ExportRangeBranchEditId,
+            ControlVisible | (hasSelectedKey ? ControlEnabled : 0u)));
 
         Check(customize.EndVisualGroup());
     }
@@ -347,7 +416,7 @@ public static unsafe class CommonFileDialogs
     [ComImport]
     [Guid("e6fdd21a-163f-4975-9c8c-a69f1ba37034")]
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IFileDialogCustomize
+    internal interface IFileDialogCustomize
     {
         [PreserveSig]
         int EnableOpenDropDown(uint id);

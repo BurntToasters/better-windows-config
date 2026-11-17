@@ -127,13 +127,25 @@ public static class RegFileExporter
         IRegistryExportSource source,
         CancellationToken cancellationToken,
         IProgress<ExportProgress>? progress,
+        Action<RegFileKey> emit) =>
+        ExportRootKeys(source, RegistryExportRoots.Classic, cancellationToken, progress, emit);
+
+    /// <summary>
+    /// Passes each key section of the given roots to <paramref name="emit"/>, in the order given. A root that cannot be
+    /// read is skipped with its subtree, as a subkey is, so the other roots are still written.
+    /// </summary>
+    internal static void ExportRootKeys(
+        IRegistryExportSource source,
+        IReadOnlyList<RegistryPath> roots,
+        CancellationToken cancellationToken,
+        IProgress<ExportProgress>? progress,
         Action<RegFileKey> emit)
     {
+        ArgumentOutOfRangeException.ThrowIfZero(roots.Count);
         cancellationToken.ThrowIfCancellationRequested();
 
         var state = new ExportState();
         var gate = new ExportProgressGate(progress);
-        IReadOnlyList<RegistryPath> roots = RegistryExportRoots.Classic;
         gate.Always(Starting(roots[0], state));
 
         foreach (RegistryPath root in roots)

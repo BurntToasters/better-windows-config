@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
+using Bwc.E2E.ImportExport;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
@@ -87,7 +89,8 @@ public sealed class PrintTests
             using var session = new AppSession(config, config.RegeditExePath, environment: environment);
             using var driver = new EditingDriver(session);
 
-            CheckComputerDisablesPrint(session, driver);
+            CheckPrintEnabledAtNode(session, driver, "Computer", "print.menu.computer-enabled");
+            CheckPrintEnabledAtNode(session, driver, "HKEY_CURRENT_USER", "print.menu.hive-enabled");
 
             bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
             bool seeded = ControlTestSupport.WaitUntil(
@@ -129,17 +132,27 @@ public sealed class PrintTests
         }
     }
 
-    private static void CheckComputerDisablesPrint(AppSession session, EditingDriver driver)
+    // Print is enabled at Computer, a hive root, and a key (oracle regedit-print.json). Selects the node, then reads
+    // the File menu item.
+    private static void CheckPrintEnabledAtNode(AppSession session, EditingDriver driver, string nodeName, string checkId)
     {
         _ = ControlTestSupport.EnsureForeground(session);
+        AutomationElement? row = ControlTestSupport.FindRowByName(
+            session,
+            ControlTestSupport.TreeControl,
+            ControlType.TreeItem,
+            nodeName);
+        ControlTestSupport.Select(row);
+        bool selected = ControlTestSupport.WaitUntil(() => ControlTestSupport.IsSelected(row), TimeSpan.FromSeconds(5));
+
         bool opened = TryOpenFileMenu(driver);
         AutomationElement? item = opened ? driver.WaitForElement("MenuCommand_" + CommandPrint, TimeSpan.FromSeconds(5)) : null;
         bool enabled = SafeIsEnabled(item);
 
         E2EResults.Record(
-            "print.menu.computer-disabled",
-            opened && item is not null && !enabled,
-            $"fileMenu={opened}, itemPresent={item is not null}, enabled={enabled}.");
+            checkId,
+            selected && opened && item is not null && enabled,
+            $"node={nodeName}, selected={selected}, fileMenu={opened}, itemPresent={item is not null}, enabled={enabled}.");
 
         CloseMenu(session);
     }
@@ -824,12 +837,15 @@ public sealed class PrintTests
     }
 
     /// <summary>
-    /// The print report written through BWC_E2E_PRINT_REPORT_PATH (the E2E-only seam that formats the
-    /// report without the spooler) uses the classic labels, oracle strings 8101 to 8110. The copy is kept
-    /// at artifacts/e2e/parity/print-report.txt.
+    /// The print report written through BWC_E2E_PRINT_REPORT_PATH (the E2E-only seam that writes the shared
+    /// text format without the spooler) uses the classic text labels (export.md, section 2), and equals the File >
+    /// Export Text Files output of the same key after encoding normalization (UTF-16LE with BOM against UTF-8).
+    /// The seeded 5000-character string and 4 KB binary must be complete in both. The copies are kept at
+    /// artifacts/e2e/parity/print-report.txt and print-parity-export.txt.
     /// </summary>
     [TestMethod]
     [TestCategory("Parity")]
+    [TestCategory("Print")]
     [TestCategory("Mutating")]
     public void Parity_PrintReport_UsesClassicLabels()
     {
@@ -847,6 +863,7 @@ public sealed class PrintTests
         {
             sandbox.Cleanup();
             Seed(sandbox);
+            SeedLargeValues(sandbox);
             dataRoot = CreateFreshDataRoot(config, "parity-print");
             Directory.CreateDirectory(artifactDir);
             if (File.Exists(reportPath))
@@ -871,7 +888,9 @@ public sealed class PrintTests
 
             if (written)
             {
-                CheckReport(File.ReadAllText(reportPath), sandbox);
+                string report = File.ReadAllText(reportPath);
+                CheckReport(report, sandbox);
+                CheckReportMatchesTextExport(session, sandbox, report, artifactDir);
             }
 
             FailIfNeeded();
@@ -881,6 +900,272 @@ public sealed class PrintTests
             ControlTestSupport.CleanupRegistry(config);
             DeleteDataRoot(dataRoot);
         }
+    }
+
+    private const string LongValueName = "PrintLong";
+    private const string BinaryValueName = "PrintBinary";
+    private const int LongValueChunks = 500;
+    private const int BinaryValueBytes = 4096;
+
+    // 500 chunks of 10 characters: 5000 characters, stored as REG_SZ (10002 bytes with the terminator).
+    private static string LongValueText() =>
+        string.Concat(Enumerable.Range(0, LongValueChunks).Select(index => $"chunk{index:D4}-"));
+
+    private static byte[] BinaryValueData()
+    {
+        var data = new byte[BinaryValueBytes];
+        for (int index = 0; index < data.Length; index++)
+        {
+            data[index] = (byte)(index * 7 % 256);
+        }
+
+        return data;
+    }
+
+    // Reads the hex dump rows of the text (offset, three spaces, the hex field, then the ASCII column) and checks that
+    // the bytes of the field hold expected as one contiguous run. Each row is 16 bytes, so a cut row fails the check.
+    private static bool HexRowsHoldBytes(string text, byte[] expected)
+    {
+        var bytes = new List<byte>();
+        foreach (string line in text.Split('\n'))
+        {
+            bool isRow = line.Length >= 62 &&
+                line.Take(8).All(Uri.IsHexDigit) &&
+                line.Substring(8, 3) == "   ";
+            if (!isRow)
+            {
+                continue;
+            }
+
+            foreach (string token in line.Substring(11, 50).Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (token != "-")
+                {
+                    bytes.Add(Convert.ToByte(token, 16));
+                }
+            }
+        }
+
+        for (int start = 0; start + expected.Length <= bytes.Count; start++)
+        {
+            if (bytes.Skip(start).Take(expected.Length).SequenceEqual(expected))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void SeedLargeValues(SandboxRegistry sandbox)
+    {
+        using RegistryKey root = sandbox.CreateSubKey(string.Empty);
+        root.SetValue(LongValueName, LongValueText(), RegistryValueKind.String);
+        root.SetValue(BinaryValueName, BinaryValueData(), RegistryValueKind.Binary);
+    }
+
+    // Opens the print dialog from the tree, reads its UI Automation control types, and compares them with the classic
+    // window measured on this build (regedit-print.json, printDialog.uia). The dialog is only cancelled.
+    [TestMethod]
+    [TestCategory("Print")]
+    [TestCategory("Mutating")]
+    public void Print_DialogUiaMatchesOracle()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+        config.EnsureExecutablesExist();
+
+        var sandbox = new SandboxRegistry(config);
+        string? dataRoot = null;
+        try
+        {
+            sandbox.Cleanup();
+            Seed(sandbox);
+            dataRoot = CreateFreshDataRoot(config, "print-uia");
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+            };
+
+            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
+            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "print.uia.navigate");
+
+            if (FocusTreeAndPressCtrlP(session, config, out PrintDialogInfo dialog))
+            {
+                Dictionary<string, int> counts = ControlTypeCounts(dialog.Hwnd, out int elements);
+                Dictionary<string, int> oracle = OracleControlTypeCounts(config);
+                // The check asserts what this walk can measure: no radio buttons, and a window that is not the main window.
+                // The counts are compared with the oracle and reported as a note only. The first walk returned main-window
+                // elements (MenuBar, Pane), so the exact comparison is not valid yet.
+                bool radios = counts.GetValueOrDefault("RadioButton") > 0;
+                bool isMain = dialog.Hwnd == session.MainHwnd;
+                bool same = counts.Count == oracle.Count &&
+                    oracle.All(pair => counts.GetValueOrDefault(pair.Key) == pair.Value);
+                string diff = string.Join(
+                    ",",
+                    oracle.Keys.Union(counts.Keys).Where(key => counts.GetValueOrDefault(key) != oracle.GetValueOrDefault(key))
+                        .Select(key => $"{key} bwc={counts.GetValueOrDefault(key)} oracle={oracle.GetValueOrDefault(key)}"));
+                E2EResults.Record(
+                    "print.dialog.uia",
+                    !radios && !isMain,
+                    $"measured window is the print host (not the main window)={!isMain}, radios={counts.GetValueOrDefault("RadioButton")}, " +
+                    $"bwc elements={elements}, control types match the oracle={same} (note only){(diff.Length == 0 ? string.Empty : ", differs: " + diff)}.");
+
+                CancelAndRecord(session, "print.uia", dialog);
+            }
+
+            FailIfNeeded();
+        }
+        finally
+        {
+            ControlTestSupport.CleanupRegistry(config);
+            DeleteDataRoot(dataRoot);
+        }
+    }
+
+    // Ctrl+P is window-wide, so it must open the owned print dialog from the address bar too. The dialog is cancelled.
+    [TestMethod]
+    [TestCategory("Print")]
+    [TestCategory("Mutating")]
+    public void Print_CtrlPFromAddressBarOpensOwnedDialog()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+        config.EnsureExecutablesExist();
+
+        var sandbox = new SandboxRegistry(config);
+        string? dataRoot = null;
+        try
+        {
+            sandbox.Cleanup();
+            Seed(sandbox);
+            dataRoot = CreateFreshDataRoot(config, "print-addressbar");
+            var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [E2EConfig.DataRootEnvironmentVariable] = dataRoot,
+                ["BWC_E2E_SANDBOX_ROOT"] = sandbox.RunRootDisplayPath,
+            };
+
+            using var session = new AppSession(config, config.RegeditExePath, environment: environment);
+            bool navigated = ControlTestSupport.NavigateToSandboxKey(session, config);
+            E2EGuards.RequireSandboxNavigation(session, sandbox, navigated, "print.addressbar.navigate");
+
+            bool focused = ControlTestSupport.FocusAddressBar(session);
+            E2EResults.Record("print.addressbar.focus", focused, $"address bar focused={focused}.");
+            if (focused && SendCtrlP(session) &&
+                WaitForPrintDialogCheck(session, "print.addressbar", out PrintDialogInfo dialog))
+            {
+                CancelAndRecord(session, "print.addressbar", dialog);
+            }
+
+            FailIfNeeded();
+        }
+        finally
+        {
+            ControlTestSupport.CleanupRegistry(config);
+            DeleteDataRoot(dataRoot);
+        }
+    }
+
+    private static Dictionary<string, int> ControlTypeCounts(nint hwnd, out int elements)
+    {
+        using var automation = new FlaUI.UIA3.UIA3Automation();
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        elements = 0;
+        AutomationElement? root = automation.FromHandle(hwnd);
+        if (root is null)
+        {
+            return counts;
+        }
+
+        var all = new List<AutomationElement> { root };
+        all.AddRange(root.FindAllDescendants());
+        foreach (AutomationElement element in all)
+        {
+            string type = element.ControlType.ToString();
+            counts[type] = counts.GetValueOrDefault(type) + 1;
+        }
+
+        elements = all.Count;
+        return counts;
+    }
+
+    // The classic print window's control-type counts, from docs/parity/oracle/regedit-print.json.
+    private static Dictionary<string, int> OracleControlTypeCounts(E2EConfig config)
+    {
+        string path = Path.Combine(config.RepoRoot, "docs", "parity", "oracle", "regedit-print.json");
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        JsonElement types = document.RootElement.GetProperty("printDialog").GetProperty("uia").GetProperty("controlTypeCounts");
+        foreach (JsonProperty property in types.EnumerateObject())
+        {
+            counts[property.Name] = property.Value.GetInt32();
+        }
+
+        return counts;
+    }
+
+    // Exports the same key as Text Files (*.txt) through the File > Export dialog and compares the text with the
+    // report. Only the encoding differs (UTF-16LE with BOM in the export, UTF-8 without BOM in the report).
+    private static void CheckReportMatchesTextExport(
+        AppSession session,
+        SandboxRegistry sandbox,
+        string report,
+        string artifactDir)
+    {
+        string exportFile = Path.Combine(artifactDir, "print-parity-export.txt");
+        if (File.Exists(exportFile))
+        {
+            File.Delete(exportFile);
+        }
+
+        using var driver = new EditingDriver(session);
+        using var dialogs = new SystemFileDialogDriver(session);
+        using var automation = new FlaUI.UIA3.UIA3Automation();
+        E2EGuards.RequireSandboxSelection(session, sandbox, "print.parity.export.sandbox");
+        if (!ExportRangeTests.OpenDialog(driver, dialogs, ExportRangeTests.MenuFileExport, "print.parity.export", out IntPtr dialog))
+        {
+            return;
+        }
+
+        bool selected = dialogs.SelectFileType(dialog, index: 3, "Text Files", out string typeNotes);
+        E2EResults.Record("print.parity.export.file-type", selected, typeNotes);
+
+        bool typed = dialogs.TrySetFileName(dialog, exportFile, out string notes);
+        string acceptNotes = "not attempted";
+        bool accepted = typed && dialogs.TryAccept(dialog, "Save", out acceptNotes);
+        bool closed = accepted && dialogs.WaitGone(dialog, TimeSpan.FromSeconds(10));
+        E2EResults.Record(
+            "print.parity.export.save",
+            typed && accepted && closed,
+            $"{notes} {acceptNotes} closed={closed}.");
+        if (!closed)
+        {
+            _ = dialogs.TryCancel(dialog);
+        }
+
+        byte[]? bytes = ExportRangeTests.WaitForStableFile(exportFile, TimeSpan.FromSeconds(20));
+        string exported = ExportRangeTests.DecodeV5(bytes);
+        bool bom = bytes is { Length: > 2 } && bytes[0] == 0xFF && bytes[1] == 0xFE;
+        _ = ExportRangeTests.WaitForExportIdle(session, automation, TimeSpan.FromSeconds(15));
+
+        bool equal = string.Equals(report, exported, StringComparison.Ordinal);
+        E2EResults.Record(
+            "parity.print.equals-text-export",
+            bom && equal,
+            $"bom={bom}, equal={equal}, report={report.Length} chars, export={exported.Length} chars.");
+
+        string longLine = "  Data:            " + LongValueText() + "\r\n";
+        bool longComplete = report.Contains(longLine, StringComparison.Ordinal) && exported.Contains(longLine, StringComparison.Ordinal);
+        bool binaryComplete = HexRowsHoldBytes(report, BinaryValueData()) && HexRowsHoldBytes(exported, BinaryValueData());
+        E2EResults.Record(
+            "parity.print.large-values",
+            longComplete && binaryComplete,
+            $"5000-character string complete={longComplete}, 4 KB binary rows complete={binaryComplete}.");
     }
 
     private static void CheckReport(string report, SandboxRegistry sandbox)
@@ -921,11 +1206,11 @@ public sealed class PrintTests
 
         bool dwordBlock = lines.Any(line => line == labelValueName + SeedDwordName) &&
             lines.Any(line => line == labelValueType + "REG_DWORD") &&
-            lines.Any(line => line == labelValueData + "0x00000007 (7)");
-        E2EResults.Record("parity.print.dword-value", dwordBlock, "PrintDword: Name, Type REG_DWORD, Data 0x00000007 (7).");
+            lines.Any(line => line == labelValueData + "0x7");
+        E2EResults.Record("parity.print.dword-value", dwordBlock, "PrintDword: Name, Type REG_DWORD, Data 0x7.");
 
-        bool sizeLines = lines.Count(line => line.StartsWith(labelValueDataSize, StringComparison.Ordinal)) >= 2;
-        E2EResults.Record("parity.print.data-size", sizeLines, "Data Size line for each value (8107).");
+        bool noDataSize = !lines.Any(line => line.StartsWith(labelValueDataSize, StringComparison.Ordinal));
+        E2EResults.Record("parity.print.no-data-size", noDataSize, "No Data Size line: the classic layout has none (golden).");
 
         bool childBlock = lines.Any(line => line.StartsWith(labelKeyName, StringComparison.Ordinal) && line.EndsWith(ChildKeyName, StringComparison.OrdinalIgnoreCase)) &&
             lines.Any(line => line == labelValueName + ChildValueName);

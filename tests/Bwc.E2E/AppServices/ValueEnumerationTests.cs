@@ -105,7 +105,7 @@ public sealed class ValueEnumerationTests
 
         address.Focus();
         address.AsTextBox().Text = path;
-        Keyboard.Press(VirtualKeyShort.ENTER);
+        Keyboard.Type(VirtualKeyShort.ENTER);
         Thread.Sleep(300);
     }
 

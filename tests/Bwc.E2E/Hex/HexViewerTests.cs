@@ -215,7 +215,7 @@ public sealed class HexViewerTests
         CheckRows(list, "hex.string.viewer", ExpectedRows(stringBytes, 1), selected: true);
         E2EResults.Record("hex.string.type", type == "REG_SZ", $"Value Type='{type}'.");
 
-        Keyboard.Press(VirtualKeyShort.ESCAPE);
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
         bool closed = driver.WaitForNoDialog();
         bool valueUnchanged = sandbox.ReadString(string.Empty, StringValueName) == StringText;
         E2EResults.Record("hex.string.close", closed && valueUnchanged, $"Escape closed={closed}, valueUnchanged={valueUnchanged}.");

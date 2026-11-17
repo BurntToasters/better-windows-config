@@ -99,12 +99,12 @@ existing editor accepts an initial value: string, expandable string, DWORD, QWOR
 Binary and unknown types keep Modify disabled and use Modify Binary Data instead. This matches the
 main menu state where the same command ids overlap.
 
-### Expand and Go to HKEY_LOCAL_MACHINE
+### Expand and the measured key menus
 
-Expand acts on the selected node and does nothing when the node is a leaf or already expanded. Go to
-HKEY_LOCAL_MACHINE resolves the predefined root through the tree source, rebuilds the roots, and
-selects the root. If the root cannot be resolved, the host shows the address bar key-not-found
-message and leaves the current selection in place.
+Expand acts on the selected node and does nothing when the node is a leaf or already expanded. The hive and
+key menus (RT_MENU 104) and the Computer root menu (RT_MENU 107) are the measured ones in
+`docs/failure-modes/keyboard.md`. Go to HKEY_LOCAL_MACHINE is not in those menus; Ctrl+T still resolves the root
+through the tree source, and reports the address bar key-not-found message when it cannot.
 
 ## Clipboard
 

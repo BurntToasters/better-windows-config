@@ -67,6 +67,16 @@ public static class RegFileReader
     {
         string text;
 
+        // A binary hive starts with the lowercase signature "regf". It is not a script, so it is refused before decoding.
+        if (bytes.Length >= 4 && bytes[0] == (byte)'r' && bytes[1] == (byte)'e' && bytes[2] == (byte)'g' && bytes[3] == (byte)'f')
+        {
+            throw new RegFileParseException(
+                "The file is a binary registry hive, not a registry script.",
+                1,
+                1,
+                RegFileRefusal.BinaryHive);
+        }
+
         if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
         {
             int length = bytes.Length - 2;

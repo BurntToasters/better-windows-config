@@ -27,6 +27,7 @@ internal static class RegFileImportReport
         return result.Refusal switch
         {
             RegFileRefusal.NotRegistryFile => "MsgImportNotRegistryFile",
+            RegFileRefusal.BinaryHive => "MsgImportBinaryFile",
             RegFileRefusal.InvalidKeyPath => "MsgImportInvalidKey",
             RegFileRefusal.ReadFailed => "MsgImportOpenFailed",
             _ => result.HasWriteFailures ? "MsgImportPartial" : "MsgImportSucceeded",

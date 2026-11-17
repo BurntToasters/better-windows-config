@@ -96,12 +96,37 @@ public sealed class RegistryExportService
         writer.Finish();
     }
 
+    /// <summary>
+    /// Writes the given roots, in order, as one .reg document, key section by key section, with the whole-registry
+    /// skip rules: a root or subkey that cannot be read is skipped with its subtree. A connected computer's
+    /// HKEY_LOCAL_MACHINE and HKEY_USERS use it, so the remote export streams like the local one.
+    /// </summary>
+    public void WriteRegFileRoots(
+        IReadOnlyList<RegistryPath> roots,
+        Stream stream,
+        RegFileFormat format = RegFileFormat.V5,
+        CancellationToken cancellationToken = default,
+        IProgress<ExportProgress>? progress = null)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        ArgumentNullException.ThrowIfNull(stream);
+
+        var writer = new RegFileStreamWriter(stream, format);
+        RegFileExporter.ExportRootKeys(_source, roots, cancellationToken, progress, writer.WriteKey);
+        writer.Finish();
+    }
+
+    /// <summary>
+    /// Writes the text layout. <paramref name="keyDisplay"/> names each key in its Key Name line; null is the local form.
+    /// The whole-registry scope always uses the local form.
+    /// </summary>
     public void ExportTextFile(
         RegistryPath? startKey,
         TextWriter writer,
         RegistryExportScope scope = RegistryExportScope.Selection,
         CancellationToken cancellationToken = default,
-        IProgress<ExportProgress>? progress = null)
+        IProgress<ExportProgress>? progress = null,
+        Func<RegistryPath, string>? keyDisplay = null)
     {
         ArgumentNullException.ThrowIfNull(writer);
 
@@ -116,7 +141,8 @@ public sealed class RegistryExportService
             RequireStartKey(startKey),
             writer,
             cancellationToken,
-            progress);
+            progress,
+            keyDisplay);
     }
 
     /// <summary>

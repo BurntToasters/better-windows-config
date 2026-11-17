@@ -106,9 +106,23 @@ Every assembly carries `BwcFlavor` from `Directory.Build.props`: `ship` in ship 
 - Every managed `Bwc*` and `BetterWindowsConfig*` `.dll` or `.exe` must carry exactly the
   folder's value: `publish/<rid>` expects `ship`, and `publish/<rid>-e2e` expects `E2E`.
   A missing value, a value from the other flavor, or two values fails the check.
-- The three project main assemblies (`BetterWindowsConfig.dll`, `BwcRegedit.dll`,
-  `BwcUpdate.dll`) must be present.
+- The two managed project main assemblies (`BetterWindowsConfig.dll`, `BwcRegedit.dll`) must be
+  present.
 - Native apphost `.exe` files have no managed metadata and are listed as skipped.
+- The self-contained runtime must be there: `hostfxr.dll`, `hostpolicy.dll`, `coreclr.dll`, `System.Private.CoreLib.dll`, and
+  `BetterWindowsConfig.runtimeconfig.json` are required in the folder root (update-elevation.md HN26). `dotnet-build.js` also
+  checks after each project, so the message names the project whose publish removed one. `BwcUpdate` is published into
+  `publish/<rid>[-e2e]-bwcupdate-aot` and only `BwcUpdate.exe` is copied over (HN25).
+- `BwcUpdate.exe` is NativeAOT (update-elevation.md HN13 to HN15), so it has no assembly. The check
+  proves three things from the file itself: no `BwcUpdate.dll`, `BwcUpdate.deps.json`, or
+  `BwcUpdate.runtimeconfig.json` beside it; the PE export table names `DotNetRuntimeDebugHeader`
+  (every NativeAOT image exports it, a CoreCLR apphost never does); and none of the strings of the
+  .NET host and loaders (`hostfxr`, `hostpolicy`, `coreclr`, `DOTNET_ROOT`, `CORECLR_ENABLE_PROFILING`,
+  `COREHOST_TRACE`, `DOTNET_STARTUP_HOOKS`, `GC_Initialize`, `GC_VersionInfo`) in UTF-8 or UTF-16LE.
+  Its flavor is the string `BwcUpdateFlavor=ship` or `BwcUpdateFlavor=E2E`, which the exe uses in its
+  unexpected-error log line (`src/Bwc.Update/Cli/BuildFlavor.cs`), so the trimmer keeps it. The folder
+  must hold exactly its own value. In a ship folder the exe is also searched for `BWC_E2E_UPDATE_` as
+  UTF-8 and UTF-16LE.
 - Each exe head's embedded manifest (`BwcRegedit.exe`, `BetterWindowsConfig.exe`,
   `BwcUpdate.exe`) must declare one `requestedExecutionLevel`. In `publish/<rid>-e2e` it must be
   `asInvoker`. In `publish/<rid>` it must be the level in that project's source manifest:
@@ -140,7 +154,9 @@ node scripts/flavor-metadata.js --rid win-arm64 --flavor e2e
 
 The E2E flavor must not raise UAC when an agent or developer starts an exe directly.
 `src/Bwc.Regedit.App/Bwc.Regedit.App.csproj` and `src/Bwc.Update/Bwc.Update.csproj` select
-`app.e2e.manifest` (asInvoker) instead of their ship manifest when `BwcFlavor` is `E2E`.
+`app.e2e.manifest` (asInvoker) instead of their ship manifest when `BwcFlavor` is `E2E`. The NativeAOT
+linker copies the manifest from the managed build output into `BwcUpdate.exe`, and the manifest check
+below reads it back from the exe.
 `src/Bwc.Hub` needs no override because its ship manifest is already asInvoker. The flavor
 check above enforces these levels.
 

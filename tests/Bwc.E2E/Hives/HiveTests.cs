@@ -242,7 +242,7 @@ public sealed class HiveTests
 
             address.Focus();
             address.AsTextBox().Text = "HKEY_LOCAL_MACHINE";
-            Keyboard.Press(VirtualKeyShort.ENTER);
+            Keyboard.Type(VirtualKeyShort.ENTER);
             Thread.Sleep(500);
 
             app.InvokeMenu(MenuFile, CommandLoadHive);
@@ -374,7 +374,7 @@ public sealed class HiveTests
                 return false;
             }
 
-            Keyboard.Press(VirtualKeyShort.ESCAPE);
+            Keyboard.Type(VirtualKeyShort.ESCAPE);
             return ControlTestSupport.WaitUntil(() => !IsWindow(dialog), TimeSpan.FromSeconds(3));
         }
         catch (Exception)

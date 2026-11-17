@@ -242,8 +242,8 @@ public sealed class RegistryWriterSandboxTests
 
         Assert.IsFalse(policy.AllowsLinkValues);
         Assert.AreEqual(runRoot, policy.SandboxRoot);
-        policy.EnsureWriteAllowed(runRoot, RegistryWriteOperation.CreateKey);
-        policy.EnsureWriteAllowed(runRoot.Append("Child"), RegistryWriteOperation.SetValue);
+        policy.EnsureWriteAllowed(null, runRoot, RegistryWriteOperation.CreateKey);
+        policy.EnsureWriteAllowed(null, runRoot.Append("Child"), RegistryWriteOperation.SetValue);
 
         RegistryPath[] denied =
         {
@@ -257,7 +257,7 @@ public sealed class RegistryWriterSandboxTests
         foreach (RegistryPath path in denied)
         {
             var error = Assert.ThrowsExactly<RegistryOperationException>(
-                () => policy.EnsureWriteAllowed(path, RegistryWriteOperation.DeleteKey));
+                () => policy.EnsureWriteAllowed(null, path, RegistryWriteOperation.DeleteKey));
 
             Assert.AreEqual(5, error.Win32Error);
             Assert.AreEqual("DeleteKey", error.Operation);

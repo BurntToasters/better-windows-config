@@ -24,7 +24,15 @@ const ELEVATED_SELECTOR = /TestCategory=Elevated(?![A-Za-z0-9_])/;
 
 // Variables a shell may have left set that would redirect the test host: the test harness sets its own
 // BWC_E2E_* and data root, and NODE_OPTIONS would change how this runner's child processes start.
-const DROPPED_INHERITED_NAMES = new Set(["BWC_PUBLISH_DIR", "BWC_DATA_ROOT", "BWC_RID", "BWC_FLAVOR", "BWC_RUN_ID", "NODE_OPTIONS"]);
+const DROPPED_INHERITED_NAMES = new Set([
+  "BWC_PUBLISH_DIR",
+  "BWC_DATA_ROOT",
+  "BWC_RID",
+  "BWC_FLAVOR",
+  "BWC_RUN_ID",
+  "BWC_RUN_SCOPE",
+  "NODE_OPTIONS",
+]);
 // Developer switches the harness reads on purpose. BWC_E2E_KEEP_DATA=1 keeps a failed run's data folder.
 const KEPT_E2E_NAMES = new Set(["BWC_E2E_KEEP_DATA"]);
 
@@ -68,12 +76,18 @@ not elevated, or a run with no Elevated tests, exits ${NOT_RUN_EXIT_CODE} and re
 Environment:
   BWC_PUBLISH_DIR           Override the publish folder (relative to the repo root)
 
-Output: artifacts/e2e/result-<rid>-<flavor>.json
+Output: artifacts/e2e/result-<rid>-<flavor>.json (overwritten by every run), plus
+result-<rid>-<flavor>-<runId>.json for this run, and result-<rid>-<flavor>-full.json
+when the run has no --filter.
 Exit codes: 0 pass, 1 fail, 2 usage error, ${NOT_RUN_EXIT_CODE} not run.
 `;
 
 function resultPathFor(rid, flavor) {
   return path.join(artifactsDir, `result-${rid}-${flavor}.json`);
+}
+
+function runResultPathFor(rid, flavor, runId) {
+  return path.join(artifactsDir, `result-${rid}-${flavor}-${runId}.json`);
 }
 
 function parseArgs(argv) {
@@ -251,6 +265,7 @@ function printResult(result, verdict = result.pass === true) {
   }
 
   console.log(`artifact: ${resultPath}`);
+  console.log(`run artifact: ${runResultPath}`);
 }
 
 function groupedWorkPackages(knownGaps) {
@@ -303,6 +318,7 @@ const publishDir = configuredPublish
   : path.join(repoRoot, "publish", defaultFolder);
 
 const runId = `${stamp(new Date())}-${randomBytes(4).toString("hex")}`;
+const runResultPath = runResultPathFor(rid, flavor, runId);
 
 // Elevated tests never run in a process that is not elevated. They report NOT RUN instead.
 const elevatedRun = options.filter !== undefined && ELEVATED_SELECTOR.test(options.filter);
@@ -402,6 +418,8 @@ const childEnv = {
   BWC_RID: rid,
   BWC_FLAVOR: flavor,
   BWC_RUN_ID: runId,
+  // "full" only when the user gave no --filter. The host writes result-<rid>-<flavor>-full.json for it.
+  BWC_RUN_SCOPE: options.filter === undefined ? "full" : "filtered",
 };
 
 console.log("");
@@ -435,6 +453,14 @@ if (result.schema !== 2) {
 }
 
 printResult(result, testRun.code === 0 && result.pass === true);
+
+// The artifact is the evidence. A mismatch with dotnet's exit code means one of them is wrong, so say so.
+if ((testRun.code === 0) !== (result.pass === true)) {
+  console.error(
+    `MISMATCH: dotnet test exited with code ${testRun.code}, but the artifact has pass=${result.pass}. ` +
+      "Neither result is trusted until the failed checks above are explained.",
+  );
+}
 
 if (testRun.code !== 0) {
   console.error(`dotnet test exited with code ${testRun.code}.`);

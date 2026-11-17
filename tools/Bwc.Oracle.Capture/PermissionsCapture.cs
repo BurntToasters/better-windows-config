@@ -202,7 +202,7 @@ internal static class PermissionsCapture
 
     // ---- Opening the windows ----
 
-    private static IntPtr OpenPermissions(RegeditWindow w)
+    internal static IntPtr OpenPermissions(RegeditWindow w)
     {
         (IntPtr menu, int pos) = w.Find("&Edit", "&Permissions...");
         if (w.IsGrayed(menu, pos))
@@ -220,7 +220,7 @@ internal static class PermissionsCapture
         return WaitForDialogOwnedBy(w, w.Main, new HashSet<IntPtr>(), "the Permissions sheet");
     }
 
-    private static IntPtr OpenAdvanced(RegeditWindow w, IntPtr sheet)
+    internal static IntPtr OpenAdvanced(RegeditWindow w, IntPtr sheet)
     {
         List<Button> buttons = Buttons(w, sheet);
         List<Button> advanced = buttons.Where(b => b.Text == "Advanced").ToList();
@@ -244,7 +244,7 @@ internal static class PermissionsCapture
             "the Permission Entry window");
     }
 
-    private static IntPtr WaitForDialogOwnedBy(RegeditWindow w, IntPtr owner, HashSet<IntPtr> known, string what)
+    internal static IntPtr WaitForDialogOwnedBy(RegeditWindow w, IntPtr owner, HashSet<IntPtr> known, string what)
     {
         return RegeditWindow.WaitForNewWindow(
             () => w.TopLevel(RegeditWindow.DialogClass).FirstOrDefault(h => h != owner && !known.Contains(h) && OwnerOf(h) == owner),
@@ -503,9 +503,9 @@ internal static class PermissionsCapture
 
     // ---- Buttons and dialog checks ----
 
-    private sealed record Button(IntPtr Hwnd, string Text, bool Enabled);
+    internal sealed record Button(IntPtr Hwnd, string Text, bool Enabled);
 
-    private static List<Button> Buttons(RegeditWindow w, IntPtr dialog)
+    internal static List<Button> Buttons(RegeditWindow w, IntPtr dialog)
     {
         return w.ChildrenOf(dialog)
             .Where(c => RegeditWindow.ClassOf(c) == "Button" && Win32.IsWindowVisible(c))

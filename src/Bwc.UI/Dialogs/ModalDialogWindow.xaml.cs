@@ -311,6 +311,14 @@ public partial class ModalDialogWindow : Window
             return;
         }
 
+        // Auto-repeat, and a key that was already down when the dialog opened, never acts. Only a fresh key-down
+        // that this dialog receives does. The opening press is not one of them (classic-dialog.md 3.11).
+        bool keyWasAlreadyDown = e.KeyStatus.WasKeyDown;
+        if ((e.Key == VirtualKey.Enter || e.Key == VirtualKey.Escape) && keyWasAlreadyDown)
+        {
+            return;
+        }
+
         if (e.Key == VirtualKey.Escape)
         {
             e.Handled = true;

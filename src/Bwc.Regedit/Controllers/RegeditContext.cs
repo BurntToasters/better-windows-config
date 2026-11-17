@@ -40,15 +40,14 @@ internal sealed partial class RegeditContext
     }
 
     /// <summary>
-    /// List rows and scroll position to restore after a refresh. The rows are applied when the
-    /// value list for the new tree selection arrives.
+    /// List rows and scroll position to restore after a refresh. The rows are identified by raw value name (empty
+    /// for the unnamed default value), so a literal (Default) and the default value are told apart. The rows are
+    /// applied when the value list for the new tree selection arrives.
     /// </summary>
-    public sealed record PendingListView(IReadOnlyList<string> RowNames, double ListOffset);
+    public sealed record PendingListView(IReadOnlyList<string> RawNames, double ListOffset);
 
-    /// <summary>The listing of a key that cannot be read: no rows and no names.</summary>
-    private static readonly RegistryValueListing EmptyListing = new(
-        Array.Empty<DetailsRow>(),
-        new Dictionary<string, string>(StringComparer.Ordinal));
+    /// <summary>The listing of a key that cannot be read: no rows.</summary>
+    private static readonly RegistryValueListing EmptyListing = new(Array.Empty<DetailsRow>());
 
     public RegeditContext(
         ClassicWindowShell shell,
@@ -91,6 +90,9 @@ internal sealed partial class RegeditContext
 
     public List<RemoteRegistryConnection> RemoteConnections { get; } = new();
 
+    /// <summary>One write-capable store per connected remote computer. See <see cref="StoreFor"/>.</summary>
+    private readonly Dictionary<RemoteRegistryConnection, RegistryStore> _remoteStores = new();
+
     public RegistryTreeSource TreeSource { get; set; }
 
     /// <summary>The owner window handle. Zero until the window attaches.</summary>
@@ -111,6 +113,13 @@ internal sealed partial class RegeditContext
     public int ValueGeneration { get; set; }
 
     public CancellationTokenSource? ValueLoad { get; set; }
+
+    /// <summary>
+    /// The key the value list is bound to: the key of the rows shown, or of the rows being loaded. Every list command
+    /// acts on this key and on the list rows, never on the live tree selection. Null for Computer and for a node
+    /// without a key.
+    /// </summary>
+    public KeyLocation? ListKey { get; private set; }
 
     /// <summary>The pane that most recently had keyboard focus. Menu commands use it while the menu bar has focus.</summary>
     public Pane LastFocusedPane { get; set; } = Pane.Tree;
@@ -134,13 +143,8 @@ internal sealed partial class RegeditContext
         return LastFocusedPane;
     }
 
-    /// <summary>
-    /// The list row for the synthetic (Default) row: the registry has no default value, so the row has
-    /// no raw name. It is listed for every key, as classic regedit does.
-    /// </summary>
-    public bool IsSyntheticDefault(DetailsRow row) =>
-        string.Equals(row.Name, MessageCatalog.DefaultValueLabel, StringComparison.Ordinal) &&
-        !ValueSource.RawNamesByName.ContainsKey(MessageCatalog.DefaultValueLabel);
+    /// <summary>Number of selected list rows, including the synthetic (Default) row. Delete acts on these.</summary>
+    public int SelectedRowCount() => Shell.ListContent.SelectedRows.Count;
 
     /// <summary>Number of selected rows that have a registry value behind them.</summary>
     public int SelectedRealValueCount()
@@ -148,7 +152,7 @@ internal sealed partial class RegeditContext
         int count = 0;
         foreach (DetailsRow row in Shell.ListContent.SelectedRows)
         {
-            if (!IsSyntheticDefault(row))
+            if (!row.IsSynthetic)
             {
                 count++;
             }
@@ -458,12 +462,13 @@ internal sealed partial class RegeditContext
         Shell.TreeContent.SelectedNode is { Parent: null } node &&
         string.Equals(node.Name, "Computer", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>The local key of the selected tree node. False for a remote node, which has its own location.</summary>
     public bool TryGetSelectedKeyPath(out RegistryPath path)
     {
         path = null!;
         TreeNode? node = Shell.TreeContent.SelectedNode;
         if (node?.RegistryPath is not { Length: > 0 } displayPath ||
-            !RegistryPath.TryParse(displayPath, out RegistryPath? parsed) ||
+            !RegistryTreeSource.TryParseNodePath(displayPath, out RegistryPath? parsed) ||
             parsed is null)
         {
             return false;
@@ -474,25 +479,90 @@ internal sealed partial class RegeditContext
     }
 
     /// <summary>
-    /// The registry value name behind a list row. False for the synthetic (Default) row, which has no
-    /// value behind it.
+    /// The key of the selected tree node, local or remote. False for Computer and for a remote computer node,
+    /// which have no key.
     /// </summary>
-    public bool TryGetRawValueName(DetailsRow row, out string rawName)
+    public bool TryGetSelectedLocation(out KeyLocation location) =>
+        TryGetLocationForNode(Shell.TreeContent.SelectedNode, out location);
+
+    /// <summary>The selected key and the store that its commands must write through. Local or remote.</summary>
+    public bool TryGetSelectedKey(out RegistryPath path, out RegistryStore store)
     {
-        if (ValueSource.RawNamesByName.TryGetValue(row.Name, out string? mapped) && mapped is not null)
+        if (TryGetSelectedLocation(out KeyLocation location))
         {
-            rawName = mapped;
+            path = location.Path;
+            store = location.Store;
             return true;
         }
 
-        if (string.Equals(row.Name, MessageCatalog.DefaultValueLabel, StringComparison.Ordinal))
+        path = null!;
+        store = null!;
+        return false;
+    }
+
+    /// <summary>The key location of one tree node, local or remote. False for Computer and a remote computer node.</summary>
+    public bool TryGetLocationForNode(TreeNode? node, out KeyLocation location)
+    {
+        location = null!;
+        if (node?.RegistryPath is not { Length: > 0 } displayPath)
         {
-            rawName = string.Empty;
             return false;
         }
 
-        rawName = row.Name;
+        if (displayPath.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            if (!TryResolveRemoteNode(node, out RemoteRegistryConnection connection, out RegistryPath remotePath))
+            {
+                return false;
+            }
+
+            location = new KeyLocation(remotePath, StoreFor(connection), connection);
+            return true;
+        }
+
+        if (!RegistryTreeSource.TryParseNodePath(displayPath, out RegistryPath? parsed) || parsed is null)
+        {
+            return false;
+        }
+
+        location = new KeyLocation(parsed, Store, null);
         return true;
+    }
+
+    /// <summary>
+    /// The store for a connection. The local store for null. A remote store is created once per connection with
+    /// the same write policy as the local store, and is dropped when the connection is disconnected.
+    /// </summary>
+    public RegistryStore StoreFor(RemoteRegistryConnection? connection)
+    {
+        if (connection is null)
+        {
+            return Store;
+        }
+
+        if (!_remoteStores.TryGetValue(connection, out RegistryStore? store))
+        {
+            store = connection.CreateStore(RegeditWritePolicy.CreatePolicy());
+            _remoteStores[connection] = store;
+        }
+
+        return store;
+    }
+
+    /// <summary>Forgets the store of a connection that is being disconnected.</summary>
+    public void ForgetRemoteStore(RemoteRegistryConnection connection) => _remoteStores.Remove(connection);
+
+    /// <summary>Forgets every remote store. Called when the view unloads and every connection is disposed.</summary>
+    public void ForgetAllRemoteStores() => _remoteStores.Clear();
+
+    /// <summary>
+    /// The registry value name behind a list row. False for the synthetic (Default) row, which has no value behind it.
+    /// The name comes from the row itself, never from its display text.
+    /// </summary>
+    public bool TryGetRawValueName(DetailsRow row, out string rawName)
+    {
+        rawName = row.RawName;
+        return !row.IsSynthetic;
     }
 
     /// <summary>True for a direct child of HKLM or HKU, the only keys that Load Hive and Unload Hive accept.</summary>
@@ -532,7 +602,10 @@ internal sealed partial class RegeditContext
     /// <summary>Refreshes the enabled state of every command that depends on the selection.</summary>
     public void UpdateCommandStates()
     {
-        bool hasKey = TryGetSelectedKeyPath(out RegistryPath key);
+        // A remote key takes the key and value commands and Print. Load Hive and Unload Hive stay local-only.
+        bool hasKey = TryGetSelectedLocation(out KeyLocation location);
+        RegistryPath key = hasKey ? location.Path : null!;
+        bool localKey = hasKey && !location.IsRemote;
         bool mutableKey = hasKey && !key.IsRoot;
         IReadOnlyList<DetailsRow> rows = Shell.ListContent.SelectedRows;
         bool hasRows = rows.Count > 0;
@@ -549,27 +622,26 @@ internal sealed partial class RegeditContext
             RegeditMenu.SetCommandEnabled(Shell.MenuBar, id, hasKey);
         }
 
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 913, treeTarget ? mutableKey : realValues > 0);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 913, treeTarget ? mutableKey : SelectedRowCount() > 0);
         // Export on Computer is the classic whole-registry export; every other key is a branch.
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 659, hasKey || IsComputerSelected);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 660, hasKey);
-        // Values under a remote computer are read-only, so Display and Modify Binary Data stay disabled there.
-        bool remoteValue = RegeditSelectionGuards.IsRemoteSelected(this);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 679, singleRealValue && !remoteValue);
+        // Print is enabled at Computer, at a hive root, and at a key, local or remote (oracle regedit-print.json).
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 660, hasKey || IsComputerSelected);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 679, singleRealValue);
         // Permissions and Unload Hive act on the key of the pane with focus. A value selected in the list
         // blocks them only when the list is the target.
         bool keyTarget = treeTarget || !hasRows;
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 678, hasKey && keyTarget);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 675, hasKey);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 680, hasKey && IsLoadHiveRoot(key));
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 680, localKey && IsLoadHiveRoot(key));
         RegeditMenu.SetCommandEnabled(
             Shell.MenuBar,
             681,
-            hasKey && keyTarget && IsUnloadableHiveRoot(key));
+            localKey && keyTarget && IsUnloadableHiveRoot(key));
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 657, true);
         RegeditMenu.SetCommandEnabled(Shell.MenuBar, 768, RemoteConnections.Count > 0);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 912, singleRow && !remoteValue);
-        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 917, singleRealValue && !remoteValue);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 912, singleRow);
+        RegeditMenu.SetCommandEnabled(Shell.MenuBar, 917, singleRealValue);
         RegeditMenu.SetValueCommandsVisible(Shell.MenuBar, hasRows);
 
         bool canRename = treeTarget || !hasRows ? mutableKey : singleRow && rows[0].Renameable;
@@ -613,8 +685,8 @@ internal sealed partial class RegeditContext
         IReadOnlyList<string> expanded = CollectExpandedPaths(TreeSource.Roots);
         double treeOffset = FindDescendant<ScrollViewer>(Shell.TreeContent)?.VerticalOffset ?? 0;
         double listOffset = FindDescendant<ScrollViewer>(Shell.ListContent)?.VerticalOffset ?? 0;
-        string[] listRowNames = keepView
-            ? Shell.ListContent.SelectedRows.Select(row => row.Name).ToArray()
+        string[] listRawNames = keepView
+            ? Shell.ListContent.SelectedRows.Select(row => row.RawName).ToArray()
             : Array.Empty<string>();
 
         var source = new RegistryTreeSource(Store.Reader, RemoteConnections);
@@ -653,7 +725,7 @@ internal sealed partial class RegeditContext
         if (keepView)
         {
             // Set before the selection, because the selection starts the value load that applies it.
-            PendingList = new PendingListView(listRowNames, listOffset);
+            PendingList = new PendingListView(listRawNames, listOffset);
         }
 
         Shell.TreeContent.SetRoots(source.Roots);
@@ -717,6 +789,7 @@ internal sealed partial class RegeditContext
 
             if (next is null)
             {
+                Log.Warn($"Registry Editor tree walk found no '{name}' on the way to '{displayPath}'.");
                 return null;
             }
 
@@ -781,29 +854,97 @@ internal sealed partial class RegeditContext
         });
     }
 
-    /// <summary>Reloads the list rows for the selected key. Stale results are dropped by generation.</summary>
-    public async Task RefreshValuesAsync(string? selectDisplayName)
+    /// <summary>
+    /// Binds the list to the key of a tree node that was selected. A different key first commits a rename in progress
+    /// to the key it started in, then drops every load still running and clears the rows, so no command can act on
+    /// rows of another key. The same key keeps its rows until its load replaces them.
+    /// </summary>
+    public void BindList(KeyLocation? key)
+    {
+        if (SameKey(ListKey, key))
+        {
+            return;
+        }
+
+        Shell.ListContent.CommitPendingRename();
+        ValueLoad?.Cancel();
+        ValueLoad = null;
+        ValueGeneration++;
+        ListKey = key;
+        Shell.ListContent.SetRows(Array.Empty<DetailsRow>());
+    }
+
+    /// <summary>The key of the bound list and its store. False when no key is bound.</summary>
+    public bool TryGetListKey(out RegistryPath path, out RegistryStore store)
+    {
+        if (ListKey is { } location)
+        {
+            path = location.Path;
+            store = location.Store;
+            return true;
+        }
+
+        path = null!;
+        store = null!;
+        return false;
+    }
+
+    /// <summary>
+    /// True when the list is bound to this key on this store. A remote store is one object per connection,
+    /// and the local store is one object, so the store identifies the computer.
+    /// </summary>
+    public bool IsListBoundTo(RegistryPath key, RegistryStore store) =>
+        ListKey is { } bound &&
+        ReferenceEquals(bound.Store, store) &&
+        string.Equals(bound.Path.ToDisplayString(), key.ToDisplayString(), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Refreshes the list after a write to <paramref name="key"/>. The list reloads only while it is still bound
+    /// to that key. A rename committed after the tree moved on writes to a key that is no longer shown.
+    /// </summary>
+    public Task RefreshWrittenValuesAsync(RegistryPath key, RegistryStore store, string? selectRawName) =>
+        IsListBoundTo(key, store) ? RefreshValuesAsync(selectRawName) : Task.CompletedTask;
+
+    /// <summary>True when two locations name the same key on one computer. Two null locations are the same.</summary>
+    public static bool SameKey(KeyLocation? a, KeyLocation? b)
+    {
+        if (a is null || b is null)
+        {
+            return a is null && b is null;
+        }
+
+        return ReferenceEquals(a.Connection, b.Connection) &&
+            string.Equals(a.Path.ToDisplayString(), b.Path.ToDisplayString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Reloads the list rows of the bound key. Stale results are dropped by generation. selectRawName is the raw
+    /// value name to select (empty for the unnamed default value), or null to select nothing.
+    /// </summary>
+    public async Task RefreshValuesAsync(string? selectRawName)
     {
         ValueLoad?.Cancel();
         ValueLoad = null;
         int generation = ++ValueGeneration;
 
-        if (!TryGetSelectedKeyPath(out RegistryPath path))
+        if (ListKey is not { } location)
         {
             Shell.ListContent.SetRows(Array.Empty<DetailsRow>());
             UpdateCommandStates();
             return;
         }
 
+        RegistryPath path = location.Path;
+        RegistryValueSource source = location.IsRemote ? new RegistryValueSource(location.Reader) : ValueSource;
         RegistryValueListing listing = EmptyListing;
         RegistryOperationException? unreadable = null;
         Exception? failure = null;
         try
         {
-            unreadable = await RunRegistryAsync(() => ProbeKeyForRead(path));
+            unreadable = await RunRegistryAsync(() => ProbeKeyForRead(path, location.Reader));
             if (unreadable is null)
             {
-                listing = await ValueSource.ReadAsync(path, CancellationToken.None);
+                listing = await source.ReadAsync(path, CancellationToken.None);
                 unreadable = listing.Failure;
             }
         }
@@ -818,35 +959,38 @@ internal sealed partial class RegeditContext
         }
 
         IReadOnlyList<DetailsRow> rows = listing.Rows;
-        ValueSource.Apply(listing);
         Shell.ListContent.SetRows(rows);
         UpdateCommandStates();
 
         if (unreadable is not null)
         {
-            await ShowUnreadableKeyAsync(path, unreadable);
+            await ShowUnreadableKeyAsync(location.DisplayPath, unreadable);
             return;
         }
 
         if (failure is not null)
         {
-            await ShowUnreadableKeyWithoutDetailAsync(path.ToDisplayString(), failure);
+            await ShowUnreadableKeyWithoutDetailAsync(location.DisplayPath, failure);
             return;
         }
 
-        if (!string.IsNullOrEmpty(selectDisplayName))
+        if (selectRawName is not null)
         {
-            SelectListRow(rows, selectDisplayName);
+            SelectListRow(rows, selectRawName);
         }
     }
 
-    /// <summary>Loads the list rows for a tree node on the thread pool. Stale results are dropped by generation.</summary>
-    public async Task LoadValuesAsync(TreeNode node, string? selectDisplayName = null)
+    /// <summary>
+    /// Loads the list rows for a tree node on the thread pool. Stale results are dropped by generation. selectRawName
+    /// is the raw value name to select once the rows are applied, or null.
+    /// </summary>
+    public async Task LoadValuesAsync(TreeNode node, string? selectRawName = null)
     {
         ValueLoad?.Cancel();
         var tokenSource = new CancellationTokenSource();
         ValueLoad = tokenSource;
         int generation = ++ValueGeneration;
+        KeyLocation? loadedFrom = TryGetLocationForNode(node, out KeyLocation nodeLocation) ? nodeLocation : null;
         RegistryValueListing listing = EmptyListing;
         string? unreadablePath = null;
         RegistryOperationException? unreadable = null;
@@ -860,23 +1004,20 @@ internal sealed partial class RegeditContext
             }
             else if (TryResolveRemoteNode(node, out RemoteRegistryConnection? remote, out RegistryPath? remotePath))
             {
-                // Remote machine and root nodes have no values below the root itself. A remote
-                // reader only accepts HKEY_LOCAL_MACHINE and HKEY_USERS paths. The probe uses the remote
-                // reader, and a failed remote enumeration comes back in the listing's Failure, so it is shown.
-                if (!remotePath.IsRoot)
+                // A remote hive root lists its values like a local root. The remote computer node has no
+                // values of its own, so it is handled above by the Computer and remote-computer checks. The probe
+                // uses the connection's reader, and a failed enumeration comes back in the listing's Failure.
+                RegistryPath remoteKey = remotePath;
+                RegistryReader reader = remote.CreateReader();
+                unreadablePath = displayPath;
+                unreadable = await RunRegistryAsync(() => ProbeKeyForRead(remoteKey, reader), tokenSource.Token);
+                if (unreadable is null)
                 {
-                    RegistryPath remoteKey = remotePath;
-                    RegistryReader reader = remote.CreateReader();
-                    unreadablePath = displayPath;
-                    unreadable = await RunRegistryAsync(() => ProbeKeyForRead(remoteKey, reader), tokenSource.Token);
-                    if (unreadable is null)
-                    {
-                        listing = await new RegistryValueSource(reader).ReadAsync(remoteKey, tokenSource.Token);
-                        unreadable = listing.Failure;
-                    }
+                    listing = await new RegistryValueSource(reader).ReadAsync(remoteKey, tokenSource.Token);
+                    unreadable = listing.Failure;
                 }
             }
-            else if (RegistryPath.TryParse(displayPath, out RegistryPath? parsed) && parsed is not null)
+            else if (RegistryTreeSource.TryParseNodePath(displayPath, out RegistryPath? parsed) && parsed is not null)
             {
                 // A key that cannot be opened or enumerated shows the classic error and an empty list. The probe
                 // catches a failed open; a failed enumeration comes back in the listing's Failure.
@@ -918,7 +1059,7 @@ internal sealed partial class RegeditContext
             {
                 PendingListView? pending = PendingList;
                 PendingList = null;
-                ValueSource.Apply(listing);
+                ListKey = loadedFrom;
                 Shell.ListContent.SetRows(listing.Rows);
                 if (unreadablePath is not null && unreadable is not null)
                 {
@@ -934,12 +1075,12 @@ internal sealed partial class RegeditContext
 
                 if (pending is not null)
                 {
-                    SelectListRows(listing.Rows, pending.RowNames);
+                    SelectListRows(listing.Rows, pending.RawNames);
                     RestoreScrollOffset(Shell.ListContent, pending.ListOffset);
                 }
-                else if (!string.IsNullOrEmpty(selectDisplayName))
+                else if (selectRawName is not null)
                 {
-                    SelectListRow(listing.Rows, selectDisplayName);
+                    SelectListRow(listing.Rows, selectRawName);
                 }
             }
         });
@@ -964,28 +1105,32 @@ internal sealed partial class RegeditContext
     }
 
     /// <summary>
-    /// Selects a row by display name through the row peer. The list control has no public select
+    /// Selects the row with this raw value name through the row peer. The list control has no public select
     /// API, and the row peer's SelectionItem pattern is the supported path from another control.
     /// </summary>
-    private void SelectListRow(IReadOnlyList<DetailsRow> rows, string displayName) =>
-        SelectListRows(rows, new[] { displayName });
+    private void SelectListRow(IReadOnlyList<DetailsRow> rows, string rawName) =>
+        SelectListRows(rows, new[] { rawName });
 
     /// <summary>
-    /// Selects the rows with these display names, in the order given. The first row is selected alone
-    /// and the rest are added to the selection. Names that are no longer in the list are skipped.
+    /// Selects the rows with these raw value names, in the order given. The first row is selected alone and the rest
+    /// are added to the selection. Names that are no longer in the list are skipped.
     /// </summary>
-    private void SelectListRows(IReadOnlyList<DetailsRow> rows, IReadOnlyList<string> displayNames)
+    private void SelectListRows(IReadOnlyList<DetailsRow> rows, IReadOnlyList<string> rawNames)
     {
+        // The list shows its rows sorted, so a row is found at its displayed position, not its position in the listing.
         var indices = new List<int>();
-        foreach (string displayName in displayNames)
+        var names = new Dictionary<int, string>();
+        foreach (string rawName in rawNames)
         {
-            for (var i = 0; i < rows.Count; i += 1)
+            foreach (DetailsRow row in rows)
             {
-                if (string.Equals(rows[i].Name, displayName, StringComparison.Ordinal))
+                if (string.Equals(row.RawName, rawName, StringComparison.Ordinal))
                 {
-                    if (!indices.Contains(i))
+                    int displayed = Shell.ListContent.DisplayIndexOf(row);
+                    if (displayed >= 0 && !indices.Contains(displayed))
                     {
-                        indices.Add(i);
+                        indices.Add(displayed);
+                        names[displayed] = row.Name;
                     }
 
                     break;
@@ -1019,7 +1164,7 @@ internal sealed partial class RegeditContext
 
                     AutomationPeer? peer = FrameworkElementAutomationPeer.CreatePeerForElement(frameworkElement);
                     if (peer is not null &&
-                        string.Equals(peer.GetName(), rows[index].Name, StringComparison.Ordinal) &&
+                        string.Equals(peer.GetName(), names[index], StringComparison.Ordinal) &&
                         peer.GetPattern(PatternInterface.SelectionItem) is ISelectionItemProvider provider)
                     {
                         if (position == 0)

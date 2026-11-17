@@ -6,9 +6,9 @@ using Windows.Win32.System.Registry;
 namespace Bwc.Registry;
 
 /// <summary>
-/// Owns the read-only HKEY_LOCAL_MACHINE and HKEY_USERS handles for one remote computer.
-/// Readers created from this connection take a pin on those handles for each open and release it
-/// afterwards, so a Dispose cannot close a handle that an in-flight read still uses.
+/// Owns the HKEY_LOCAL_MACHINE and HKEY_USERS handles for one remote computer. Readers and stores created
+/// from this connection take a pin on those handles for each open and release it afterwards, so a Dispose
+/// cannot close a handle that an in-flight open still uses.
 /// </summary>
 public sealed class RemoteRegistryConnection : IDisposable
 {
@@ -73,7 +73,7 @@ public sealed class RemoteRegistryConnection : IDisposable
     }
 
     /// <summary>
-    /// Opens read-only HKEY_LOCAL_MACHINE and HKEY_USERS handles for a remote computer.
+    /// Opens HKEY_LOCAL_MACHINE and HKEY_USERS handles for a remote computer. Reads and writes use them.
     /// A name that identifies this computer is rejected before any native call.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="computerName"/> is null.</exception>
@@ -127,7 +127,7 @@ public sealed class RemoteRegistryConnection : IDisposable
             RegistryRoot.LocalMachine => _localMachine,
             RegistryRoot.Users => _users,
             _ => throw new ArgumentException(
-                "A remote registry reader supports only HKEY_LOCAL_MACHINE and HKEY_USERS.",
+                "A remote registry supports only HKEY_LOCAL_MACHINE and HKEY_USERS.",
                 nameof(root)),
         };
 
@@ -147,6 +147,21 @@ public sealed class RemoteRegistryConnection : IDisposable
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         return new RegistryReader(this);
+    }
+
+    /// <summary>
+    /// Creates a store whose reads and writes go to this computer. Every write passes <paramref name="policy"/>
+    /// with the computer name, and only HKEY_LOCAL_MACHINE and HKEY_USERS paths are accepted. Hive operations
+    /// are refused (ERROR_NOT_SUPPORTED). See docs/failure-modes/remote-registry.md, section 15.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">The connection is disposed.</exception>
+    public RegistryStore CreateStore(IRegistryWritePolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+
+        RegistryReader reader = CreateReader();
+        return new RegistryStore(new RegistryWriter(policy, new RegistryWriterRoots(this), reader), reader);
     }
 
     /// <summary>

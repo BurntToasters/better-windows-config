@@ -8,7 +8,10 @@ using Windows.ApplicationModel.DataTransfer;
 
 namespace Bwc.Regedit.Controllers;
 
-/// <summary>Key commands: New Key, Delete Key, Rename Key, and Copy Key Name.</summary>
+/// <summary>
+/// Key commands: New Key, Delete Key, Rename Key, and Copy Key Name. Each acts on the key location of the
+/// selection, so a remote key is written through its connection's store and never the local registry.
+/// </summary>
 internal sealed class KeyCommands
 {
     /// <summary>Longest key name component the registry accepts, in characters.</summary>
@@ -32,29 +35,29 @@ internal sealed class KeyCommands
     {
         _context.StartCommand(async () =>
         {
-            if (node.RegistryPath is not { Length: > 0 } displayPath ||
-                !RegistryPath.TryParse(displayPath, out RegistryPath? parsed) ||
-                parsed is null)
+            if (!_context.TryGetLocationForNode(node, out KeyLocation location))
             {
                 await _context.ShowMessageAsync(Get("DialogNoSelection"));
                 return;
             }
 
-            RegistryPath path = parsed;
-
-            if (path.IsRoot)
+            if (location.Path.IsRoot)
             {
                 await _context.ShowMessageAsync(Get("DialogRootKeyLocked"));
                 return;
             }
 
-            await RenameKeyCoreAsync(path, newName);
+            await RenameKeyCoreAsync(location, newName);
         });
     }
 
+    /// <summary>
+    /// Copies the display path of the selected key: <c>HKEY_...</c> locally and <c>\\COMPUTER\HKEY_...</c> for a
+    /// remote key, which is the classic form.
+    /// </summary>
     public void CopySelectedKeyName()
     {
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath key))
+        if (!_context.TryGetSelectedLocation(out KeyLocation location))
         {
             return;
         }
@@ -62,7 +65,7 @@ internal sealed class KeyCommands
         try
         {
             var package = new DataPackage();
-            package.SetText(key.ToDisplayString());
+            package.SetText(location.DisplayPath);
             Clipboard.SetContent(package);
         }
         catch (Exception ex)
@@ -78,17 +81,19 @@ internal sealed class KeyCommands
     /// </summary>
     private async Task NewKeyAsync()
     {
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath parent))
+        if (!_context.TryGetSelectedLocation(out KeyLocation parent))
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
         }
 
-        string name = NextUniqueKeyName(parent);
-        RegistryPath created = parent.Append(name);
+        // The name search and the create read and write the registry, so they run off the UI thread. A remote key
+        // makes a network call for each probe.
+        string name = await _context.RunRegistryAsync(() => NextUniqueKeyName(parent));
+        RegistryPath created = parent.Path.Append(name);
         try
         {
-            _context.Store.CreateKey(created);
+            await _context.RunRegistryWriteAsync(() => parent.Store.CreateKey(created));
         }
         catch (RegistryOperationException ex)
         {
@@ -96,7 +101,7 @@ internal sealed class KeyCommands
             return;
         }
 
-        await _context.RefreshTreeAsync(created.ToDisplayString());
+        await _context.RefreshTreeAsync(parent.DisplayOf(created));
         BeginTreeRenameSoon();
     }
 
@@ -116,12 +121,13 @@ internal sealed class KeyCommands
 
     private async Task DeleteKeyAsync()
     {
-        if (!_context.TryGetSelectedKeyPath(out RegistryPath path))
+        if (!_context.TryGetSelectedLocation(out KeyLocation location))
         {
             await _context.ShowMessageAsync(Get("DialogNoSelection"));
             return;
         }
 
+        RegistryPath path = location.Path;
         if (path.IsRoot)
         {
             await _context.ShowMessageAsync(Get("DialogRootKeyLocked"));
@@ -132,7 +138,7 @@ internal sealed class KeyCommands
         // subkey count is still read so that a key which cannot be read is reported before the prompt.
         try
         {
-            _ = _context.Store.Reader.GetKeyInfo(path);
+            _ = await _context.RunRegistryAsync(() => location.Reader.GetKeyInfo(path));
         }
         catch (RegistryOperationException ex)
         {
@@ -153,26 +159,30 @@ internal sealed class KeyCommands
 
         try
         {
-            await _context.RunRegistryWriteAsync(() => _context.Store.DeleteKey(path, recursive: true));
+            await _context.RunRegistryWriteAsync(() => location.Store.DeleteKey(path, recursive: true));
         }
         catch (RegistryOperationException ex)
         {
+            // RegDeleteTree can remove some subkeys and then fail on the key. Rebuild the tree from the registry first,
+            // with the failed key still selected, so no removed subkey stays on screen behind the error box.
+            await _context.RefreshTreeAsync(location.DisplayOf(path));
             await _context.ShowRegistryErrorAsync(ex, RegistryAction.DeleteKey, RegeditContext.DefaultSubject(path));
             return;
         }
 
-        string? parentPath = path.Parent?.ToDisplayString() ?? "Computer";
+        string parentPath = path.Parent is null ? "Computer" : location.DisplayOf(path.Parent);
         await _context.RefreshTreeAsync(parentPath);
     }
 
-    private async Task RenameKeyCoreAsync(RegistryPath path, string newName)
+    private async Task RenameKeyCoreAsync(KeyLocation location, string newName)
     {
+        RegistryPath path = location.Path;
         if (string.Equals(path.Components[^1], newName, StringComparison.Ordinal))
         {
             return;
         }
 
-        string? error = ValidateRenameKey(path, newName);
+        string? error = await ValidateRenameKeyAsync(location, newName);
         if (error is not null)
         {
             await _context.ShowMessageAsync(Get("MsgCaptionRenameKeyError"), error);
@@ -182,7 +192,7 @@ internal sealed class KeyCommands
         RegistryPath target = path.Parent!.Append(newName);
         try
         {
-            await _context.RunRegistryWriteAsync(() => _context.Store.RenameKey(path, newName));
+            await _context.RunRegistryWriteAsync(() => location.Store.RenameKey(path, newName));
         }
         catch (RegistryOperationException ex)
         {
@@ -190,15 +200,16 @@ internal sealed class KeyCommands
             return;
         }
 
-        await _context.RefreshTreeAsync(target.ToDisplayString());
+        await _context.RefreshTreeAsync(location.DisplayOf(target));
     }
 
     /// <summary>
     /// The text for a rename that cannot proceed. The classic rename texts name the old key, so the
     /// subject is the current leaf name. Null when the name is acceptable.
     /// </summary>
-    private string? ValidateRenameKey(RegistryPath path, string newName)
+    private async Task<string?> ValidateRenameKeyAsync(KeyLocation location, string newName)
     {
+        RegistryPath path = location.Path;
         if (string.Equals(path.Components[^1], newName, StringComparison.OrdinalIgnoreCase))
         {
             return null;
@@ -232,7 +243,9 @@ internal sealed class KeyCommands
 
         try
         {
-            return _context.Store.Reader.KeyExists(target) ? Format("MsgRenameKeyExists", subject) : null;
+            // The probe is a registry read, so it runs off the UI thread. A remote key makes a network call.
+            bool exists = await _context.RunRegistryAsync(() => location.Reader.KeyExists(target));
+            return exists ? Format("MsgRenameKeyExists", subject) : null;
         }
         catch (RegistryOperationException ex)
         {
@@ -250,12 +263,12 @@ internal sealed class KeyCommands
     private string Format(string key, string subject) =>
         string.Format(CultureInfo.CurrentCulture, Get(key), subject);
 
-    private string NextUniqueKeyName(RegistryPath parent)
+    private string NextUniqueKeyName(KeyLocation parent)
     {
         for (var index = 1; index < 10000; index += 1)
         {
             string candidate = MessageCatalog.NewKeyNamePrefix + index.ToString(CultureInfo.InvariantCulture);
-            if (!_context.Store.Reader.KeyExists(parent.Append(candidate)))
+            if (!parent.Reader.KeyExists(parent.Path.Append(candidate)))
             {
                 return candidate;
             }

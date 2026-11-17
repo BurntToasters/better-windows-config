@@ -252,7 +252,9 @@ public sealed class ShellTests
             ("unloadHive", "Unload Hive...", false),
             ("connectNetworkRegistry", "Connect Network Registry...", true),
             ("disconnectNetworkRegistry", "Disconnect Network Registry...", false),
-            ("print", "Print...", false),
+            // Classic regedit enables Print at Computer, at a hive root, and at a key (docs/parity/oracle/regedit-print.json,
+            // fileMenuPrint: printEnabled true for computer, hive-hkcu, and key-mixed). The print range is decided by BWC.
+            ("print", "Print...", true),
             ("exit", "Exit", true),
         };
 

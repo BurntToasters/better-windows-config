@@ -15,9 +15,10 @@ internal static class InstallEvidence
 {
     public const string RecordFileName = "installer-record.txt";
     public const string HubLogLine = "Update install started. Helper pid ";
-    public const string HelperStartedLine = "update installer started:";
+    public const string HelperStartedLine = "update elevated helper started:";
 
     private const string StagingFolderName = "BWC-Update";
+    private const string ProtectedFolderName = "BWC-Protected";
     private const string InstallerFileName = "installer.exe";
     private const string ReceiptFileName = "receipt.json";
 
@@ -28,6 +29,12 @@ internal static class InstallEvidence
     /// <see cref="E2EConfig.TempEnvironment"/>). It is inside the run's data folder, not the developer's %TEMP%.
     /// </summary>
     public static string StagingRoot(E2EConfig config, string scope) => Path.Combine(config.TempRootFor(scope), StagingFolderName);
+
+    /// <summary>
+    /// The protected root of the elevated helper in the E2E flavor (BWC_E2E_UPDATE_PROTECTED_ROOT): a folder inside the
+    /// scope's temp folder, beside the staging root. The elevated helper copies the installer into a 32-hex folder there.
+    /// </summary>
+    public static string ProtectedRoot(E2EConfig config, string scope) => Path.Combine(config.TempRootFor(scope), ProtectedFolderName);
 
     /// <summary>The names of the staging folders under the root that exist now.</summary>
     public static HashSet<string> StagingFolders(string root)
@@ -125,15 +132,34 @@ internal static class InstallEvidence
     public static bool HubLogContains(string dataRoot, string text) =>
         ReadLogLines(Path.Combine(dataRoot, "hub", "logs")).Any(line => line.Contains(text, StringComparison.Ordinal));
 
-    /// <summary>True when the helper's own log says it started the installer.</summary>
+    /// <summary>True when the medium helper's own log says it started the elevated helper.</summary>
     public static bool HelperStartedInstaller(string dataRoot) =>
         ReadLogLines(Path.Combine(dataRoot, "update", "logs")).Any(line => line.Contains(HelperStartedLine, StringComparison.Ordinal));
 
-    /// <summary>Reads a record of key=value lines. The first equals sign of a line separates key and value.</summary>
+    /// <summary>
+    /// Reads a record of key=value lines. The first equals sign of a line separates key and value. The file exists before
+    /// the stand-in has finished writing it, and the read share of ReadAllLines fails while the writer holds it open, so
+    /// the read is retried until the writer has closed it (a complete record), up to 30 s. Seen under x64 emulation.
+    /// </summary>
     public static Dictionary<string, string> ReadRecord(string path)
     {
+        string[] lines = [];
+        DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (true)
+        {
+            try
+            {
+                lines = File.ReadAllLines(path);
+                break;
+            }
+            catch (IOException) when (DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(100);
+            }
+        }
+
         var fields = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string line in File.ReadAllLines(path))
+        foreach (string line in lines)
         {
             int equals = line.IndexOf('=', StringComparison.Ordinal);
             if (equals > 0)
@@ -188,6 +214,29 @@ internal static class InstallEvidence
         while (DateTime.UtcNow < deadline);
 
         return null;
+    }
+
+    /// <summary>
+    /// Stops every process of that name and image that started at or after <paramref name="notBeforeUtc"/>: the processes
+    /// a test started, including a Hub the updater relaunched. A test that throws before its own cleanup would otherwise
+    /// leave one running, and the next run's updater then refuses to install (ProcessesStillRunning). Returns the count.
+    /// </summary>
+    public static int StopStartedProcesses(string processName, string exePath, DateTime notBeforeUtc)
+    {
+        int stopped = 0;
+        foreach (Process candidate in Process.GetProcessesByName(processName))
+        {
+            if (!IsStartedSince(candidate, notBeforeUtc) || !HasImage(candidate, exePath))
+            {
+                candidate.Dispose();
+                continue;
+            }
+
+            StopProcess(candidate);
+            stopped++;
+        }
+
+        return stopped;
     }
 
     /// <summary>True when the process's image file is the given path, compared without regard to case.</summary>

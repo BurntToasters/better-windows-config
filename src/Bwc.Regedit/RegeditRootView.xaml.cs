@@ -32,6 +32,7 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
     private readonly PrintController _printController;
     private readonly PersistenceController _persistence;
     private readonly ContextMenuController _contextMenus;
+    private int _suggestionGeneration;
 
     public RegeditRootView()
     {
@@ -69,8 +70,7 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
             _importExport,
             _hiveRemote,
             _keyCommands,
-            _valueCommands,
-            GoToRoot);
+            _valueCommands);
 
         var commands = RegeditMenu.Create(
             loader,
@@ -113,6 +113,7 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         Shell.ListContent.GotFocus += OnListGotFocus;
         _context.RestorePaneFocus = RestorePaneFocus;
         Shell.AddressBarSubmitted += OnAddressBarSubmitted;
+        Shell.AddressSuggestionsRequested += OnAddressSuggestionsRequested;
         Shell.TreeContent.SetRoots(_context.TreeSource.Roots);
         Shell.TreeContent.SelectNode(_context.TreeSource.Computer);
         _context.UpdateCommandStates();
@@ -398,8 +399,12 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
     private void OnListContextRequested(object? sender, DetailsRowContextRequestedEventArgs e) =>
         _contextMenus.ShowListContextMenu(e);
 
-    private void OnAddressBarSubmitted(object? sender, AddressBarSubmittedEventArgs e) =>
+    private void OnAddressBarSubmitted(object? sender, AddressBarSubmittedEventArgs e)
+    {
+        // An answer still on its way for the typed text must not reopen the list after Enter.
+        _suggestionGeneration++;
         _viewCommands.SubmitAddress(e.Text);
+    }
 
     private void OnRegeditRootViewUnloaded(object sender, RoutedEventArgs e)
     {
@@ -438,10 +443,27 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
             return;
         }
 
-        if (e.Key == VirtualKey.P && IsControlDown() && IsTreeOrListFocused())
+        // Ctrl+P (command 660) is window-wide, so it prints from the address bar too.
+        if (e.Key == VirtualKey.P && IsControlDown())
         {
             e.Handled = true;
             Print();
+            return;
+        }
+
+        // F4 (command 642) focuses the address bar and opens its auto-suggest list.
+        if (e.Key == VirtualKey.F4)
+        {
+            e.Handled = true;
+            Shell.FocusAddressSuggestions();
+            return;
+        }
+
+        // Alt+Up (command 698) selects the parent key, from the tree, the list, or the address bar.
+        if (e.Key == VirtualKey.Up && IsAltDown())
+        {
+            e.Handled = true;
+            Shell.TreeContent.GoToParentOfSelected();
         }
     }
 
@@ -449,6 +471,33 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) & CoreVirtualKeyStates.Down)
         == CoreVirtualKeyStates.Down;
 
-    private bool IsTreeOrListFocused() =>
-        _context.IsFocusWithin(Shell.TreeContent) || _context.IsFocusWithin(Shell.ListContent);
+    private static bool IsAltDown() =>
+        (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu) & CoreVirtualKeyStates.Down)
+        == CoreVirtualKeyStates.Down;
+
+    private void OnAddressSuggestionsRequested(object? sender, AddressSuggestionRequestedEventArgs e) =>
+        _ = ShowAddressSuggestionsAsync(e.Text);
+
+    /// <summary>
+    /// Computes the list for the text and shows it. A newer request makes this answer stale, so only the last one shows.
+    /// </summary>
+    private async Task ShowAddressSuggestionsAsync(string text)
+    {
+        int generation = ++_suggestionGeneration;
+        IReadOnlyList<string> entries;
+        try
+        {
+            entries = await AddressSuggestions.ComputeAsync(_context.TreeSource, text, CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Warn("Registry Editor could not list address suggestions: " + ex.Message);
+            return;
+        }
+
+        if (generation == _suggestionGeneration)
+        {
+            Shell.ShowAddressSuggestions(entries);
+        }
+    }
 }

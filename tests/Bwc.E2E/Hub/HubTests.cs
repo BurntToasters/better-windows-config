@@ -46,6 +46,7 @@ public sealed class HubTests
     private const string DownloadNotVerifiedText = "did not match the signed release";
     private const string NotInstalledTitle = "Update Not Installed";
     private const string InstallScope = "hub-install";
+    private const string ElevatedGateScope = "hub-elevated-gate";
     private const string RefuseScope = "hub-refuse";
     private const string MigrateScope = "hub-migrate";
     private const string KeepOffScope = "hub-keepoff";
@@ -356,9 +357,56 @@ public sealed class HubTests
         AssertNoFailures("Hub update result checks");
     }
 
-    /// <summary>Starts the Hub with --update-result code, then checks the window, the message, and OK.</summary>
-    private static void CheckUpdateResultMessage(string code, string checkId)
+    /// <summary>The per-machine update: the user pressed Cancel on the Windows permission prompt.
+    /// Nothing was changed.</summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateResult_ElevationDeclinedSaysCanceled()
     {
+        CheckUpdateResultMessage("ElevationDeclined", "hub.updateResult.elevationDeclined", "was canceled", "have not been changed");
+        AssertNoFailures("Hub update result checks");
+    }
+
+    /// <summary>The helper could not get administrator rights, so it did nothing.</summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateResult_NotElevatedSaysNoAdminRights()
+    {
+        CheckUpdateResultMessage("NotElevated", "hub.updateResult.notElevated", "did not install", "administrator rights", "still in place");
+        AssertNoFailures("Hub update result checks");
+    }
+
+    /// <summary>Another Windows session has Better Windows Config open, so the update stopped before it
+    /// changed anything.</summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateResult_RunningInOtherSessionSaysCloseThere()
+    {
+        CheckUpdateResultMessage("RunningInOtherSession", "hub.updateResult.otherSession", "did not install", "another Windows session", "still in place");
+        AssertNoFailures("Hub update result checks");
+    }
+
+    /// <summary>The safety net text for a helper that could not start the Hub again at the user's level.</summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateResult_DeElevationFailedSaysOpenFromStartMenu()
+    {
+        CheckUpdateResultMessage("DeElevationFailed", "hub.updateResult.deElevation", "could not be started again", "Start menu");
+        AssertNoFailures("Hub update result checks");
+    }
+
+    /// <summary>
+    /// Starts the Hub with --update-result code, then checks the window, the message, and OK. The message must hold every
+    /// phrase (by default the 'did not install ... still in place' pair), name the current version unless the text is the
+    /// canceled one, and never show the code name.
+    /// </summary>
+    private static void CheckUpdateResultMessage(string code, string checkId, params string[] phrases)
+    {
+        string[] required = phrases.Length > 0 ? phrases : ["did not install", "still in place"];
         _checkStart = E2EResults.CheckCount;
         var config = GuiGate.Config;
         E2EGuards.RequireE2EOnlyFlavor(config);
@@ -381,14 +429,13 @@ public sealed class HubTests
 
             AutomationElement? dialog = HubUi.FindWindowWithChild(automation, hubProcess.Id, NotInstalledTitle, "DialogMessage", DialogTimeout);
             string text = MessageText(dialog);
-            bool plain = text.Contains("did not install", StringComparison.Ordinal) &&
-                text.Contains("still in place", StringComparison.Ordinal) &&
+            bool plain = required.All(phrase => text.Contains(phrase, StringComparison.Ordinal)) &&
                 text.Contains(semVer, StringComparison.Ordinal) &&
                 !text.Contains(code, StringComparison.Ordinal);
             E2EResults.Record(
                 checkId,
                 plain,
-                $"The message was '{text}'. It must say the update did not install, name {semVer}, and not show {code}.");
+                $"The message was '{text}'. It must hold [{string.Join("; ", required)}], name {semVer}, and not show {code}.");
 
             if (dialog is not null)
             {
@@ -636,6 +683,10 @@ public sealed class HubTests
             bool offersNewer = text.Contains(UpdateFixture.NewerVersion, StringComparison.Ordinal) &&
                 text.Contains(installed, StringComparison.Ordinal);
             E2EResults.Record("hub.update.available.text", offersNewer, $"Update Available text was '{text}'.");
+            E2EResults.Record(
+                "hub.update.available.permission",
+                text.Contains("Windows will ask for permission to install", StringComparison.Ordinal),
+                $"Update Available text must say Windows will ask for permission to install. It was '{text}'.");
 
             AutomationElement? notes = HubUi.WaitWithin(available, "UpdateNotesLink", DialogTimeout);
             E2EResults.Record(
@@ -702,6 +753,89 @@ public sealed class HubTests
     }
 
     /// <summary>
+    /// The real helper, started with the E2E-only force-elevated seam, refuses --check and --download with RunningElevated
+    /// (update-elevation.md HK1, HB4): exit code 1, the failure in its JSON line, and no connection to the feed.
+    /// Nothing is elevated, and the seam does not exist in a ship build.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Helper_Check_Refuses_When_Forced_Elevated()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        string helperPath = Path.Combine(config.PublishDir, HelperExeName);
+
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+            string baseUrl = "http://127.0.0.1:" + port.ToString(CultureInfo.InvariantCulture);
+            foreach (string mode in new[] { "--check", "--download" })
+            {
+                var startInfo = new ProcessStartInfo(helperPath)
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    WorkingDirectory = config.PublishDir,
+                };
+                foreach (string argument in new[]
+                {
+                    mode, "--manifest-url", baseUrl + "/m.json", "--signature-url", baseUrl + "/m.json.minisig",
+                    "--channel", "stable", "--current-version", "0.1.0",
+                })
+                {
+                    startInfo.ArgumentList.Add(argument);
+                }
+
+                foreach (KeyValuePair<string, string> pair in config.DataRootEnvironment(ElevatedGateScope))
+                {
+                    startInfo.Environment[pair.Key] = pair.Value;
+                }
+
+                foreach (KeyValuePair<string, string> pair in config.TempEnvironment(ElevatedGateScope))
+                {
+                    startInfo.Environment[pair.Key] = pair.Value;
+                }
+
+                startInfo.Environment["BWC_E2E_UPDATE_FORCE_ELEVATED"] = "1";
+                startInfo.Environment["BWC_E2E_UPDATE_ALLOW_HTTP"] = "1";
+
+                using Process process = Process.Start(startInfo)!;
+                Task<string> output = process.StandardOutput.ReadToEndAsync();
+                bool exited = process.WaitForExit(30000);
+                if (!exited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+
+                string text = exited ? output.GetAwaiter().GetResult() : string.Empty;
+                E2EResults.Record($"hub.elevatedGate{mode}.exit", exited && process.ExitCode == 1, $"{mode} exited {(exited ? process.ExitCode.ToString(CultureInfo.InvariantCulture) : "never")}.");
+                E2EResults.Record(
+                    $"hub.elevatedGate{mode}.failure",
+                    text.Contains("\"failure\":\"RunningElevated\"", StringComparison.Ordinal),
+                    $"{mode} printed: {text.Trim()}");
+            }
+
+            E2EResults.Record(
+                "hub.elevatedGate.noConnection",
+                !listener.Pending(),
+                "The feed was never contacted by a helper that believes it is elevated.");
+        }
+        finally
+        {
+            listener.Stop();
+        }
+
+        AssertNoFailures("Elevated gate checks");
+    }
+
+    /// <summary>
     /// The whole install path from the Hub: Help > Check for Updates finds a newer signed version,
     /// Download and Install is pressed with the mouse, and the helper verifies the stand-in and starts it
     /// with the contract's command line. The stand-in then starts the Hub again, as the installer does.
@@ -717,7 +851,10 @@ public sealed class HubTests
         EnsureExecutables(config);
         string installStaging = InstallEvidence.StagingRoot(config, InstallScope);
         HashSet<string> stagingBefore = InstallEvidence.StagingFolders(installStaging);
+        string installProtected = InstallEvidence.ProtectedRoot(config, InstallScope);
+        HashSet<string> protectedBefore = InstallEvidence.StagingFolders(installProtected);
         string recordPath = Path.Combine(config.DataRootFor(InstallScope), InstallEvidence.RecordFileName);
+        DateTime testStartUtc = DateTime.UtcNow;
 
         try
         {
@@ -738,7 +875,15 @@ public sealed class HubTests
         }
         finally
         {
+            // Also on a throw: a relaunched Hub left running makes every later run refuse to install.
+            int leftover = InstallEvidence.StopStartedProcesses(HubProcessName, config.HubExePath, testStartUtc);
+            if (leftover > 0)
+            {
+                E2EResults.Note("hub.install.leftoverHubs", $"Stopped {leftover} Hub process(es) this test started.");
+            }
+
             InstallEvidence.RemoveStagingSince(installStaging, stagingBefore);
+            InstallEvidence.RemoveStagingSince(installProtected, protectedBefore);
         }
 
         AssertNoFailures("Hub install checks");
@@ -1288,7 +1433,7 @@ public sealed class HubTests
         }
 
         int helperPid = InstallEvidence.HelperPidFromHubLog(dataRoot);
-        CheckInstallerRecord(config, fixture, InstallEvidence.ReadRecord(recordPath), hubProcess, helperPid);
+        CheckInstallerRecord(config, fixture, InstallEvidence.ReadRecord(recordPath), hubProcess, helperPid, sampler);
         bool helperSeen = helperPid > 0 && sampler.Seen.ContainsKey(helperPid);
         E2EResults.Record(
             "hub.install.helperPath",
@@ -1346,15 +1491,17 @@ public sealed class HubTests
     }
 
     /// <summary>
-    /// Checks the stand-in's record: the exact command line, the bytes that ran (the signed bytes), the staging path,
-    /// and that the Hub had exited before the installer ran.
+    /// Checks the stand-in's record: the exact command line, the bytes that ran (the signed bytes), the protected copy
+    /// path, and that the Hub had exited before the installer ran. The installer's parent is the elevated helper that the
+    /// medium helper started, not the medium helper itself.
     /// </summary>
     private static void CheckInstallerRecord(
         E2EConfig config,
         UpdateFixture fixture,
         Dictionary<string, string> record,
         Process hubProcess,
-        int helperPid)
+        int helperPid,
+        ProcessSampler sampler)
     {
         string installDir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(config.PublishDir));
         string argc = RecordField(record, "argc");
@@ -1377,11 +1524,16 @@ public sealed class HubTests
             $"'{InstallArgumentSwitch} {InstallRelaunchSwitch} {InstallParentPidPrefix}<n> {InstallDirectoryArgumentPrefix}{installDir}', unquoted and last.");
 
         string parentText = arg2.Length >= InstallParentPidPrefix.Length ? arg2[InstallParentPidPrefix.Length..] : string.Empty;
-        bool parentIsHelper = helperPid > 0 && string.Equals(parentText, helperPid.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        bool parentIsElevatedHelper = helperPid > 0 &&
+            int.TryParse(parentText, NumberStyles.None, CultureInfo.InvariantCulture, out int parentId) &&
+            parentId > 0 &&
+            parentId != helperPid;
+        bool parentSeen = parentIsElevatedHelper && sampler.Seen.ContainsKey(int.Parse(parentText, CultureInfo.InvariantCulture));
         E2EResults.Record(
             "hub.install.parentPid",
-            parentIsHelper,
-            $"The installer's parent pid is '{parentText}'. The helper pid the Hub logged is {helperPid}.");
+            parentIsElevatedHelper,
+            $"The installer's parent pid is '{parentText}', the elevated helper, and not the medium helper pid {helperPid} " +
+            $"that the Hub logged. The sampler {(parentSeen ? "saw" : "did not catch")} it running from the publish folder.");
 
         string commandLine = RecordField(record, "commandLine");
         string tail = " " + InstallArgumentSwitch + " " + InstallRelaunchSwitch + " " + arg2 + " " + InstallDirectoryArgumentPrefix + installDir;
@@ -1399,9 +1551,9 @@ public sealed class HubTests
 
         string processPath = RecordField(record, "processPath");
         E2EResults.Record(
-            "hub.install.stagedPath",
-            InstallEvidence.IsStagedInstaller(processPath, InstallEvidence.StagingRoot(GuiGate.Config, InstallScope)),
-            $"The installer ran from '{processPath}'.");
+            "hub.install.protectedPath",
+            InstallEvidence.IsStagedInstaller(processPath, InstallEvidence.ProtectedRoot(GuiGate.Config, InstallScope)),
+            $"The installer ran from '{processPath}', a copy under the protected root, and not from the staging folder.");
 
         DateTime? hubExit = InstallEvidence.ExitTimeUtc(hubProcess);
         string stamp = RecordField(record, "timestampUtc");
@@ -1630,6 +1782,9 @@ public sealed class HubTests
             environment["BWC_E2E_UPDATE_MANIFEST_URL"] = server.ManifestUrl;
             environment["BWC_E2E_UPDATE_TRUSTED_KEY"] = fixture.PublicKeyBase64;
             environment["BWC_E2E_UPDATE_ALLOW_HTTP"] = "1";
+
+            // The elevated helper runs unelevated in this flavor, and copies the installer under this folder of the run's temp.
+            environment["BWC_E2E_UPDATE_PROTECTED_ROOT"] = InstallEvidence.ProtectedRoot(config, scope);
         }
         else
         {

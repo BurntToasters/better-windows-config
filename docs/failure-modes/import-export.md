@@ -307,3 +307,189 @@ value is in the sandbox. The file is inside the run's artifact folder and writes
 | E2E import test checks the cancel controls | Replaced: the test checks the classic window (caption `Import Registry File`; no push button in the body; Alt+F4 refused with the main window still disabled; progress bar read at least twice with a strict increase while the window is open; main window disabled while it runs; completion message; imported keys; the native class, size, and style). The caption Close box and `GWL_STYLE` are plain checks, not known gaps |
 | E2E progress check passes on the first partial value | The bar is read until two readings in the range 0 to maximum show an increase, so one reading at 1 of 1000 is not enough. The E2E pause is 10 ms per section, so the 1000-section import runs for about 10 s and stays open long enough to read |
 | Yes is pressed on the confirmation before it is under the pointer | The E2E harness presses only when the confirmation is foreground, its button is enabled and stable, and the window at the pointer is the confirmation; see `classic-dialog.md` 1.10 |
+
+## 17. Export range branch path (DLG-001, DLG-002, BEH-021, K1b)
+
+The Export save dialog has an edit (classic control 1282) under the "Export range" group that holds
+the branch path. It is added with `IFileDialogCustomize.AddEditBox`. Tests: `ExportDialogs_BranchPathEditRefusesMissingKey`
+and `ExportDialogs_BranchPathEditExportsTheTypedKey` in `tests/Bwc.E2E/ImportExport/ExportBranchPathTests.cs`.
+
+### Branch edit prefilled with the long display form
+
+Failure mode: the edit shows `ComputerHKEY_CURRENT_USERSoftware`. Classic starts the edit with the selected
+key in the classic form, `HKEY_CURRENT_USERSoftware` (oracle export-range, initial text, read with WM_GETTEXT).
+BWC prefills the same form, so the prefill is not the long display form.
+
+### Branch edit filled at Computer
+
+Failure mode: at the Computer node the edit holds text. The edit is empty at Computer, because
+Computer has no branch path, and All is selected.
+
+### Branch edit enabled while All is selected (measured)
+
+Measured on classic regedit (oracle capture `export-range`, `docs/parity/oracle/regedit-export-range.json`, runs
+with identical output): control 1282 is enabled with Selected branch chosen, stays enabled after All is chosen, and
+is enabled again after Selected branch is chosen. BWC does the same: the edit is enabled whatever radio is chosen
+when a key is selected. At Computer, where there is no branch, BWC keeps the edit disabled. Classic at Computer is
+not measured.
+
+### Missing branch path accepted
+
+Failure mode: OK with Selected branch and a path that does not exist closes the dialog and exports
+the tree selection, or nothing. Classic shows RT_STRING 148, "The selected branch does not exist.
+Make sure that the correct path is given.", and keeps the dialog open. The dialog stays open through
+`IFileDialogEvents.OnFileOk` returning S_FALSE. The message box caption is RT_STRING 301
+("Export Registry File"). The classic caption is measured as the same text (oracle export-range, local text file). Its text is not measured: the static text read returns empty, so the 148 text is the brief's, not confirmed from classic.
+
+### Typed path ignored in favor of the tree selection
+
+Failure mode: the export writes the key selected in the tree, not the key typed in the edit. The
+typed key is the one exported. A typed key that exists is exported with `RegistryExportScope.Selection`
+rooted at that key.
+
+### Empty branch path with Selected branch
+
+Failure mode: an empty path with Selected branch exports the tree selection. An empty path is a
+path that does not exist, so it gets the same message and the dialog stays open. This is a
+declared choice. Classic's behavior for an empty edit is not in the oracle.
+
+### Event sink leaked after the dialog closes
+
+Failure mode: the `IFileDialogEvents` sink is not unadvised after Show, so the dialog keeps a
+reference to a sink that runs after the owner is gone. The sink is unadvised in a `finally`.
+
+### Path parsing and case
+
+Failure mode: a typed path with a trailing backslash, in another case, or a predefined root alone
+(HKEY_CURRENT_USER) is not found. The leading `Computer\` prefix and the trailing backslashes are removed, and the rest is parsed
+with `RegistryPath.TryParse`. The comparison ignores case, as the tree does.
+
+### Branch path that exists but cannot be read
+
+Failure mode: a typed branch path that names an existing key the user cannot read (access denied on
+the key, error 5) made the existence check throw. `OnFileOk` caught the exception, returned S_FALSE, and
+logged a line. The dialog stayed open with no message, so OK seemed to do nothing.
+
+Rule: an unreadable typed key shows the classic "cannot be opened" box for that key, with the Win32
+text as details (`MsgOpenKeyFailed` / `MsgOpenKeyFailedDetails`, the same text the tree shows for an
+unreadable key). The dialog stays open, nothing is written, and the branch path is not approved. A
+missing key still shows RT_STRING 148 as before.
+
+Check: `ExportDialogs_BranchPathEditReportsAnUnreadableKey` in `tests/Bwc.E2E/ImportExport/ExportBranchPathTests.cs`.
+It denies query-values on a sandbox child key for the current user (so KEY_READ fails with access denied, and
+READ_CONTROL stays open for the restore), types its path, presses Save, and checks the
+box text and that the file dialog stays open with no file. The ACE is restored in a finally block.
+
+## 18. Text export format (Text Files *.txt) and print
+
+`RegistryTextExporter` writes the text format for File > Export with the *Text Files (\*.txt)* filter, and
+print writes the same text (`print.md`, "Report shape"). The layout is `export.md` section 2, pinned by the
+golden `docs/parity/oracle/exports/bwc-oracle-text.txt`. The table lists how the format can fail.
+
+| Way it could fail | Expected behavior |
+| --- | --- |
+| The file differs from classic regedit's Text Files output | `RegistryTextGoldenTests` compares the bytes, with the BOM and CRLF, after masking `Last Write Time:` and rewriting the sandbox path. A mismatch names the first differing line and both lines |
+| A `Data Size:` line is written | Not written. The golden has none. String 8107 in `Resources.resw` still reads `Data Size:`, but the text format does not use it |
+| A long string or binary value is cut or wrapped | Not cut. A string is one line, and a binary value is complete hex rows. A 5000-character REG_SZ and a 4 KB REG_BINARY are complete in the file and in the print report |
+| The export has a size cap | No cap. Text is streamed key by key to the TextWriter, with the cancellation token checked before each key, value, and subkey |
+| A backslash, tab, or NUL in a name or string is escaped | Not escaped. The golden writes names and strings as stored |
+| A REG_MULTI_SZ shows its terminators or loses empty items | Trailing empty strings are dropped. An empty middle string is a line of 19 spaces (golden) |
+| A REG_DWORD prints as `0x00001388 (5000)` or a DWORD as a number with a unit | `0x1388` in C `%#x` form, `0` for zero (golden). A short DWORD is zero-extended (golden: `01 02 03` is `0x30201`) |
+| A REG_QWORD, REG_LINK, REG_NONE, REG_BINARY, or REG_DWORD_BIG_ENDIAN prints as a number or a comma list | A hex dump with the classic row layout (golden). Type 5 prints as `REG_UNKNOWN` (golden) |
+| A resource value does not parse | The whole value prints as a hex dump. Not measured (`export.md` section 2, open point 4) |
+| The Last Write Time is UTC or ISO format | Local time as the short date, ` - `, and the short time of the current culture (en-US `11/14/2026 - 7:25 PM`). Not measured outside en-US (`export.md` section 2, open point 1) |
+| An unreadable subkey stops the file | It is skipped with its subtree, as in section 2. The file has no marker line for it |
+| The file is written as UTF-8 or with a different line ending | UTF-16LE with a BOM and CRLF through `RegistryExportService.ExportTextFile(Stream)`, as the golden is. Print writes the same text as UTF-8 without a BOM, and the E2E check compares them after that normalization |
+| Labels follow the Windows UI language | The labels are text constants with the en-US wording of the golden. The text format is not localized |
+
+## 18. Command line switch without its filename (MSG-022, F2a)
+
+`/s`, `/e` and `/a` each take a filename. Classic regedit reports a switch with no filename with string 43,
+"Command line argument requires a filename and none was specified." BWC writes that text to standard
+error with the usage line and exits 2, as it does for every bad argument shape. The text is the classic string
+exactly, and the exit code is unchanged.
+
+### 18.1 Missing filename prints only the usage line
+
+Failure mode: `BwcRegedit.exe /s` prints the usage line alone, so the classic text never reaches the user.
+Guard: `RegeditCommandLine` names the switch and writes string 43 before the usage line. E2E:
+`CommandLine_SwitchWithoutFilenameReportsStringFortyThree` runs `/s`, `/e` and `/a` alone.
+
+### 18.2 Missing filename changes exit code or writes a file
+
+Failure mode: a switch with no filename exits 0 or 1, or creates an empty export file in the working directory.
+Guard: the refusal is taken before any file is opened or any registry read starts. Exit 2. E2E: `CommandLine_SwitchWithoutFilenameReportsStringFortyThree` checks the exit code is 2 for each switch alone.
+
+### 18.3 Missing filename after a valid operation
+
+Failure mode: `/e file.reg /s` (a second operation after a valid one) is read as a silent import of a file named
+`/s` and the export runs. Guard: a second operation switch is a usage error (exit 2, usage only, string 43 not
+used), as before. E2E: the same test checks that the exit code is 2 and the export file is not written.
+
+## 19. Binary registry file on the silent import (MSG-062, MSG-071, F2a)
+
+A binary registry hive ("regf" signature at offset 0) is not a registry script. Classic regedit text 123 is "Cannot
+import %1: The specified file is not a registry script. You can only import binary registry files from within the
+registry editor." BWC reports a hive file given to `/s` with string 123 on standard error and exits 1, and it refuses
+the file before any write. A text file without the header keeps string 133 (MSG-071). The spec for the choice is the
+text of string 123: a binary file is imported from within the editor, not as a script. This is spec-based, because the
+`regedit /s` route in the oracle is silent and records no message.
+
+### 19.1 A hive file on /s reports string 133
+
+Failure mode: a hive passed to `/s` reports "not a registry file", which is the text for an unknown header. Guard:
+`RegFileReader` checks the four bytes "regf" first and raises `RegFileRefusal.BinaryHive`; `RegFileImportReport` maps it
+to `MsgImportBinaryFile` (string 123). E2E: `CommandLine_BinaryHiveRefusedWithStringOneTwentyThree` checks exit 1, the
+text with the file name, and that the sandbox is unchanged.
+
+### 19.2 Case of the signature
+
+Failure mode: a text file whose first bytes read "REGF" or "regf" text is treated as a hive, or a hive written with
+a different case is treated as text. Guard: the comparison is byte-exact against the lowercase "regf" and runs before
+the text decoding. A `.reg` file must start with its header, and a header is never "regf". E2E: only the lowercase
+signature is driven (19.1); the uppercase case is not driven.
+
+### 19.3 Hive refused in the window with the registration filter
+
+Failure mode: the window's Import with the "Registration Files" filter and a hive file shows string 133, or it runs
+the hive restore without the hive filter. Guard: with the registration filter the file goes through the `.reg` reader,
+which refuses it as 123 (same `RegFileRefusal.BinaryHive`). The hive filter still restores through `RestoreHiveAsync`.
+E2E: not driven. The window route needs the system file dialog and is not in the test set; 19.1 checks the same text.
+
+## 20. Hive export errors (MSG-109, MSG-110, MSG-111, F2a)
+
+The hive format of File > Export runs `RegistryWriter.SaveKey` (RegSaveKey) to a temporary file beside the destination and
+moves it over the destination at the end (`ImportExportCommands.ExportToFile`). Classic reports its failures with the
+save-subtree texts: 213 for a value that cannot be read, 214 for a write error, 215 for a file that cannot be opened.
+BWC reports every hive failure with the `.reg` export texts (138 and 141), which is a known difference, declared in
+`regedit-audit.md` for MSG-109, MSG-110 and MSG-111. The reason is below.
+
+### 20.1 Hive save needs SeBackupPrivilege, and the unelevated run is refused first
+
+Failure mode: `SaveKey` enables the hive privileges (`EnableHivePrivileges`) before it saves. Without SeBackupPrivilege the
+save is refused with `ErrorPrivilegeNotHeld`, and the export shows the privilege text (142) before any temporary file is
+written. The unelevated E2E run does not hold the privilege, so the save-subtree failures (213 to 215) cannot be produced
+unelevated, and the test runner never elevates (Registry Editor never self-elevates; the elevated runner is opt-in).
+
+### 20.2 Save-subtree texts are not built
+
+Failure mode: a locked destination, a write error, or a value that cannot be read would have to show 215, 214 or 213.
+BWC does not map those failures to the save-subtree texts. No E2E check drives them, and none is claimed. This is the
+reason MSG-109, MSG-110 and MSG-111 are declared in the audit, not passed.
+
+### 20.3 A failed hive save leaves a partial destination or a temporary file
+
+Failure mode: after a failed save the destination is replaced, truncated, or a `.bwc-*.tmp` file stays beside it.
+Guard: the move happens only after the save completes, and the temporary file is deleted on failure (the existing rule
+for every export). E2E: not driven unelevated (20.1); the rule is the same one the `.reg` export tests check.
+
+### 20.4 Privilege failure uses the export privilege text
+
+Failure mode: a hive save that is refused for privileges shows the export privilege text (142). Classic has no
+save-subtree privilege text in the dump, so this stays on string 142, and it is the one hive failure BWC shows in an
+unelevated run.
+
+### 20.5 Insufficient memory
+
+String 212 (insufficient memory) is a declared difference (MSG-108), not driven.
+

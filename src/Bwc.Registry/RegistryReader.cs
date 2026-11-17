@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices.ComTypes;
+using Bwc.Registry.Privileges;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Security;
@@ -19,6 +20,7 @@ public sealed class RegistryReader
     private const string QueryValueOperation = "QueryValue";
     private const string GetKeySecurityOperation = "GetKeySecurity";
     private const uint ReadControlStandardRight = 0x00020000;
+    private const uint AccessSystemSecurityRight = 0x01000000;
     private const int ErrorNotEnoughMemory = 8;
     private const int ErrorInvalidSecurityDescriptor = 1338;
     private const int MaxSecurityDescriptorAttempts = 8;
@@ -257,10 +259,23 @@ public sealed class RegistryReader
     {
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(valueName);
+        RejectEmbeddedNul(valueName);
         cancellationToken.ThrowIfCancellationRequested();
 
         using SafeRegistryKeyHandle handle = OpenKey(key, cancellationToken);
         return QueryValueData(handle, key, valueName, cancellationToken);
+    }
+
+    /// <summary>
+    /// A name-based call cannot address a value whose name has an embedded NUL: the Win32 call stops at the NUL and
+    /// reads another value. Enumeration still returns such a value with its own data.
+    /// </summary>
+    private static void RejectEmbeddedNul(string valueName)
+    {
+        if (valueName.Contains('\0'))
+        {
+            throw new ArgumentException("A value name with an embedded NUL cannot be read by name.", nameof(valueName));
+        }
     }
 
     public RegistryValueInfo? ReadDefaultValue(
@@ -282,7 +297,8 @@ public sealed class RegistryReader
                 return true;
             }
 
-            if (error == WIN32_ERROR.ERROR_FILE_NOT_FOUND)
+            // The writer's KeyExists treats the same two codes as missing (reader section 18).
+            if (error is WIN32_ERROR.ERROR_FILE_NOT_FOUND or WIN32_ERROR.ERROR_PATH_NOT_FOUND)
             {
                 return false;
             }
@@ -310,7 +326,14 @@ public sealed class RegistryReader
                 nameof(information));
         }
 
-        WIN32_ERROR error = TryOpen(path, (REG_SAM_FLAGS)ReadControlStandardRight, out SafeRegistryKeyHandle? handle);
+        // A SACL read needs ACCESS_SYSTEM_SECURITY, which the system grants only to a token that holds an enabled
+        // SeSecurityPrivilege. A token that holds it disabled gets it enabled for this read. Nothing is elevated, so an
+        // ordinary user is refused with ERROR_ACCESS_DENIED (permissions.md sections 4 and 42).
+        bool wantsSacl = (information & RegistrySecurityInformation.Sacl) != 0;
+        using OptionalPrivilegeScope privileges = OptionalPrivilegeScope.Enable(
+            wantsSacl ? [OptionalPrivilegeScope.SecurityPrivilege] : []);
+        uint access = ReadControlStandardRight | (wantsSacl ? AccessSystemSecurityRight : 0);
+        WIN32_ERROR error = TryOpen(path, (REG_SAM_FLAGS)access, out SafeRegistryKeyHandle? handle);
 
         if (error != WIN32_ERROR.ERROR_SUCCESS)
         {
@@ -410,6 +433,7 @@ public sealed class RegistryReader
     {
         ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(valueName);
+        RejectEmbeddedNul(valueName);
         cancellationToken.ThrowIfCancellationRequested();
 
         WIN32_ERROR openError = TryOpen(path, REG_SAM_FLAGS.KEY_READ, out SafeRegistryKeyHandle? handle);

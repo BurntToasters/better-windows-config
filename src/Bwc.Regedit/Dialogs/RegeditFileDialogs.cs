@@ -19,11 +19,11 @@ internal static class RegeditFileDialogs
     public static string? ShowLoadHive(RegeditContext context) =>
         Run(context, () => CommonFileDialogs.ShowLoadHiveOpen(context.WindowHwnd));
 
-    /// <summary>File > Export: the save dialog with the export range and the five classic filters.</summary>
-    public static ExportFileDialogResult? ShowExport(RegeditContext context, string? defaultFileName, bool hasSelectedKey) =>
-        Run(context, () => CommonFileDialogs.ShowExportSave(context.WindowHwnd, defaultFileName, hasSelectedKey));
-
-    private static T? Run<T>(RegeditContext context, Func<T?> show)
+    /// <summary>
+    /// The one guard every file dialog runs through: another modal, a missing window handle, or a failure
+    /// refuses or reports the request. File > Export passes its own dialog call here.
+    /// </summary>
+    internal static T? Run<T>(RegeditContext context, Func<T?> show)
         where T : class
     {
         if (context.DialogOpen || context.FileDialogOpen)

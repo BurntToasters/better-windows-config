@@ -22,6 +22,7 @@ internal sealed class InstallerFixture : IDisposable
     private readonly string _version;
     private readonly string _rid;
     private readonly string _installerEnvelope;
+    private readonly byte[] _installerBytes;
     private readonly long _installerSize;
     private readonly string _installerSha256;
 
@@ -32,6 +33,7 @@ internal sealed class InstallerFixture : IDisposable
         string version,
         string rid,
         string installerEnvelope,
+        byte[] installerBytes,
         long installerSize,
         string installerSha256,
         string publicKeyBase64)
@@ -42,6 +44,7 @@ internal sealed class InstallerFixture : IDisposable
         _version = version;
         _rid = rid;
         _installerEnvelope = installerEnvelope;
+        _installerBytes = installerBytes;
         _installerSize = installerSize;
         _installerSha256 = installerSha256;
         PublicKeyBase64 = publicKeyBase64;
@@ -75,7 +78,7 @@ internal sealed class InstallerFixture : IDisposable
                 installerPath,
                 keyDir,
                 "--trusted-comment",
-                "timestamp:" + TrustedCommentTimestamp + " version:" + version + " arch:" + rid);
+                TrustedComment(version, rid));
             string envelope = File.ReadAllText(installerPath + ".sig").Trim();
 
             return new InstallerFixture(
@@ -85,6 +88,7 @@ internal sealed class InstallerFixture : IDisposable
                 version,
                 rid,
                 envelope,
+                installer,
                 installer.LongLength,
                 Convert.ToHexString(SHA256.HashData(installer)).ToLowerInvariant(),
                 Convert.ToBase64String(Encoding.UTF8.GetBytes(publicKey)));
@@ -127,7 +131,37 @@ internal sealed class InstallerFixture : IDisposable
         return (File.ReadAllBytes(manifestPath), File.ReadAllBytes(manifestPath + ".minisig"));
     }
 
+    /// <summary>
+    /// Writes the staged update the helper reads, into a folder the test made as <c>&lt;temp&gt;BWC-Update&lt;32 hex&gt;</c>:
+    /// the signed installer bytes as <c>installer.exe</c> and the <c>receipt.json</c> the check would have written.
+    /// </summary>
+    public void WriteStagedUpdate(string folder)
+    {
+        File.WriteAllBytes(Path.Combine(folder, "installer.exe"), _installerBytes);
+        var receipt = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["schema"] = 1,
+            ["version"] = _version,
+            ["channel"] = "stable",
+            ["architecture"] = _rid,
+            ["size"] = _installerSize,
+            ["sha256"] = _installerSha256,
+            ["signature"] = _installerEnvelope,
+            ["trustedComment"] = TrustedComment(_version, _rid),
+        };
+        File.WriteAllText(
+            Path.Combine(folder, "receipt.json"),
+            JsonSerializer.Serialize(receipt),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
+    /// <summary>The SHA-256 (lower case hex) of the signed installer bytes.</summary>
+    public string InstallerSha256 => _installerSha256;
+
     public void Dispose() => DeleteFolder(_root);
+
+    private static string TrustedComment(string version, string rid) =>
+        "timestamp:" + TrustedCommentTimestamp + " version:" + version + " arch:" + rid + " product:bwc channel:stable";
 
     private static void DeleteFolder(string folder)
     {

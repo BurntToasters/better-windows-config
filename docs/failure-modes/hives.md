@@ -27,9 +27,28 @@ without mounting a real hive.
 `RegistryWriter` calls `EnsureWriteAllowed` before any file or privilege work. Under the E2E
 `SandboxWritePolicy`, a hive operation whose target is outside `HKCU\Software\BWC-E2E\<runId>`
 fails with `ERROR_ACCESS_DENIED` (5) and the operation name. The target comparison is component
-based, so a sibling whose name starts with the sandbox name is not authorized. The E2E
-application still cannot mount a hive because its target must be under HKLM or HKU and the sandbox
-policy allows only HKCU, which is the intended defense in depth.
+based, so a sibling whose name starts with the sandbox name is not authorized.
+
+One exception exists, for the elevated round trip of section 14: `SandboxWritePolicy` allows
+`LoadHive` and `UnloadHive` at exactly `HKEY_USERS\BWC-E2E-<runId>`, where `<runId>` is the last
+component of a sandbox root of the form `HKCU\Software\BWC-E2E\<runId>`. Before this rule the
+policy refused that mount, so the round trip failed with "Access is denied" in the first elevated
+runs. The exception is compiled into E2E builds only, like the whole policy. Failure modes of the
+exception, each refused with `ERROR_ACCESS_DENIED` (5) before any file, privilege, or native work:
+
+- Another operation at the mount path (create key, set value, delete key, rename, security, save,
+  restore, replace). Only `LoadHive` and `UnloadHive` are excepted.
+- A path below the mount (`HKU\BWC-E2E-<runId>\Sub`), for any operation, including the two hive
+  operations. The test reads the mounted values; nothing writes into the mounted hive.
+- The same name under another root (`HKLM\BWC-E2E-<runId>`).
+- Another run's name, a name with extra characters before or after (`BWC-E2E-<runId>x`,
+  `xBWC-E2E-<runId>`), or the bare prefix `BWC-E2E-`.
+- A sandbox root without a run id (`HKCU\Software\BWC-E2E` itself) or deeper than the run root
+  (`HKCU\Software\BWC-E2E\<runId>\Sub`): no hive operation is allowed at all.
+- A remote computer, loopback included: the exception applies only to the local registry
+  (`RegistryWriter` also refuses remote hive operations before the policy).
+- The name differs only in case: the registry compares names case-insensitively, so it names the same
+  key and is allowed.
 
 ## 3. Target path rules
 
@@ -143,7 +162,10 @@ The command is enabled at the HKLM and HKU roots. The flow is:
    check is refused by the message, not by the native call, and nothing is written.
 1. Show the owned `IFileOpenDialog` through `CommonFileDialogs.ShowOpen`.
 2. If the user cancels, return without prompting and without changing the registry.
-3. Show `TextPromptDialog` for the single key name under HKLM.
+3. Show `TextPromptDialog` for the single key name. Its label is the classic template text `&Key Name:`
+   (RT_DIALOG 104, oracle control 65535), so it does not name a root. The hive loads under the root that was
+   selected (HKLM or HKU). Before this fix the label read "Key name under HKEY_LOCAL_MACHINE:", which was wrong for a
+   load under HKU (section 14).
 4. Reject empty names, separators, NUL, `.`, `..`, names over 255 characters, and names that
    already exist under HKLM.
 5. Run `LoadHive(HKLM\<name>, file)` under the write gate (`RunRegistryWriteAsync`), so the window
@@ -204,8 +226,7 @@ cannot hold the restore privilege.
 
 The test records an informational check naming the elevation requirement and seed key. It cleans
 the run subtree and data root in `finally`, terminates the application, and leaves no HKLM key,
-hive file, temporary folder, or sandbox key behind. If a future elevated run loads a hive, that
-test must unload it and remove its own file in `finally` as well.
+hive file, temporary folder, or sandbox key behind. The elevated round trip that loads a hive is section 14.
 
 ## 13. Native calls and token changes
 
@@ -214,3 +235,50 @@ Hive calls are made only by `RegistryWriter`: `RegLoadKeyW`, `RegUnLoadKeyW`, `R
 `OpenProcessToken`, `LookupPrivilegeValueW`, `AdjustTokenPrivileges`, `GetTokenInformation`, and
 `CloseHandle` through the safe handle. No other module references a mutating registry API, which
 `scripts/check-registry-writer.js` enforces.
+
+## 14. Elevated round trip: Export, Load Hive, Unload Hive (E2E, Elevated)
+
+`Hives_ElevatedLoadAndUnloadRoundTripThroughTheMenu` (`tests/Bwc.E2E/Hives/HiveMountTests.cs`) is tagged
+`Hives` and `Elevated`. Normal runs exclude it (`scripts/test-e2e.js` adds `TestCategory!=Elevated`), so it runs
+only through the elevated runner. It covers MENU-005, MENU-006, DLG-007 and DLG-008. The flow is: seed a sandbox key
+under `HKCU\Software\BWC-E2E\<run-id>`, File > Export as the hive format to a file under the run's artifacts folder,
+select `HKEY_USERS`, File > Load Hive, pick the file, type `BWC-E2E-<run-id>` in the Key Name prompt, check the
+mounted values, select the mount, File > Unload Hive, confirm, and check that the mount is gone. `finally` removes
+any mount that is left and the hive file.
+
+Failure modes:
+
+- The process is not elevated, or `SeBackupPrivilege` or `SeRestorePrivilege` is missing from the token. The test
+  reports Inconclusive before any input. The check reads the token and changes nothing (no `AdjustTokenPrivileges`).
+- Load Hive is enabled only at HKLM and HKU. The test selects `HKEY_USERS` and checks that the command is enabled
+  there. It never invokes Load Hive at HKCU, where the command is disabled.
+- The mount name collides with an existing HKU key. The name carries the run id, so a key with that name can only come
+  from this run. The test checks the name is absent before the load and fails without loading if it is present. The
+  prompt also refuses an existing name (`DialogLoadHiveNameExists`).
+- The export writes something that is not a hive. The test checks that the file starts with the `regf` signature
+  before it loads the file. A file that is not a hive would fail in the native load, not in the test.
+- The file dialog reads back a different path than the one typed. The test checks the file name box before it accepts.
+  A wrong file would load the wrong data; the mounted values check catches that too.
+- The prompt has the wrong layout or wrong control ids. The test compares the prompt with RT_DIALOG 104 (252 x 53 DLU,
+  Static `&Key Name:`, Edit 1001, OK 1, Cancel 2, caption `Load Hive`, tab order Edit, OK, Cancel) with the geometry
+  check of `ClassicDialogTests`. It types the name into `DialogTextInput` (control 1001) and reads it back before OK.
+  Before this fix the label said HKEY_LOCAL_MACHINE for a load under HKU (section 9).
+- The mounted key does not show the seeded values. The test checks each seeded value name in the list and reads each
+  value through the managed API. Its handles are disposed before the unload.
+- Unload fails with access denied because a managed key handle is still open. The test disposes every handle it opened
+  on the mount before it presses Unload. The `finally` retries with `RegUnLoadKeyW` after the handles are gone.
+- Unload is invoked on a value row instead of the mount. Unload Hive needs the tree key selected and no value row
+  selected. The test selects the mount in the tree and checks the command state before it invokes it.
+- The mount stays loaded after a failed test. `finally` checks `HKEY_USERS\BWC-E2E-<run-id>` and unloads it with
+  `RegUnLoadKeyW`, with SeRestorePrivilege and SeBackupPrivilege enabled on the test's token for that call only (held
+  but disabled, the call returned 1314 and left the mount loaded in an elevated run) (`HiveMountNative.cs`, the one native unload call of the E2E project, allowlisted in
+  `scripts/check-registry-writer.js`). If that call fails the test records the Win32 code and fails.
+- The hive file is deleted while a mount holds it. `finally` deletes the file only after the mount check passes.
+- A write lands outside the two allowed places. The only registry writes of this test are the sandbox seed under
+  `HKCU\Software\BWC-E2E\<run-id>` and the mount `HKEY_USERS\BWC-E2E-<run-id>`, which the app itself makes. The test
+  never writes HKLM and never writes any other HKU key.
+- The run does not clean its sandbox. `finally` calls `ControlTestSupport.CleanupRegistry` and deletes the run's
+  artifact folder.
+
+Evidence: the test records `hives.elevated.*` checks in the E2E result artifact. A run that is not elevated is
+Inconclusive, so the artifact never shows a pass for a run that did not load a hive.

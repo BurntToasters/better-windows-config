@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Bwc.UI.Theme;
 using Bwc.UI.Tree;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 #if BWC_E2E
@@ -99,6 +100,14 @@ public sealed partial class DetailsList : UserControl
     private int _focus = -1;
     private int _renameIndex = -1;
     private bool _renaming;
+
+    // When the selection last changed to a single row, in ClickTiming ticks. A slow second click is measured from it.
+    private long _selectedAtTick;
+
+    // A slow click starts the rename after the double-click time, unless other input comes first (BEH-010).
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _renameTimer;
+    private int _pendingRenameIndex = -1;
+    private long _lastPressAt;
     private bool _listFocused;
     private int _sortVersion;
     private long _typeAheadTick;
@@ -165,6 +174,10 @@ public sealed partial class DetailsList : UserControl
         ActualThemeChanged += OnActualThemeChanged;
         RenameBox.KeyDown += OnRenameKeyDown;
         RenameBox.LostFocus += OnRenameLostFocus;
+        Bwc.UI.Menu.TextEditMenu.Attach(RenameBox);
+        LostFocus += (_, _) => CancelPendingRename();
+        // The column header is the classic button face (COLOR_BTNFACE), not a Fluent layer color, so it follows the palette.
+        HeaderHost.Background = BwcBrushes.Face;
 
         ApplyMetrics();
         UpdateHelpText();
@@ -287,6 +300,15 @@ public sealed partial class DetailsList : UserControl
 
     /// <summary>Starts the inline rename box for the focused or single selected row. F2 uses the same path.</summary>
     public void BeginRenameSelected() => BeginRename();
+
+    /// <summary>
+    /// Commits a rename in progress now, as focus loss would. The host calls it before it rebinds the list
+    /// to another key, so the rename reaches the row it started on. Does nothing when no rename is open.
+    /// </summary>
+    public void CommitPendingRename() => CommitRename();
+
+    /// <summary>The position of a row as displayed (after sorting), or -1 when the row is not in the list.</summary>
+    public int DisplayIndexOf(DetailsRow row) => _rows.IndexOf(row);
 
     internal int IndexOfRow(DetailsRow row) => _rows.IndexOf(row);
 
@@ -481,6 +503,12 @@ public sealed partial class DetailsList : UserControl
     /// </summary>
     internal void RowPressed(DetailsRowElement row, PointerRoutedEventArgs e)
     {
+        // The focus is read before this press moves it. A slow click needs the list to have had the focus.
+        bool hadFocus = ClickTiming.HasFocusWithin(this);
+        CancelPendingRename();
+        long now = ClickTiming.Now();
+        bool quiet = now - _lastPressAt >= ClickTiming.DoubleClickMilliseconds();
+        _lastPressAt = now;
         _ = Focus(FocusState.Pointer);
         e.Handled = true;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
@@ -497,6 +525,10 @@ public sealed partial class DetailsList : UserControl
 
         bool shift = IsShiftDown();
         bool control = IsKeyDown(VirtualKey.Control);
+
+        // BEH-010: a click on the only selected row that had the focus starts the rename after the double-click time.
+        bool slow = quiet && hadFocus && !shift && !control && _selected.Count == 1 && _selected.Contains(index) &&
+            ClickTiming.IsSlowSecondClick(_selectedAtTick);
         if (shift && _anchor >= 0)
         {
             SelectRange(_anchor, index, add: control);
@@ -512,6 +544,45 @@ public sealed partial class DetailsList : UserControl
 
         _focus = index;
         RefreshRealizedRows();
+        if (slow)
+        {
+            ArmRename(index);
+        }
+    }
+
+    /// <summary>Starts the inline rename of this row when the double-click time passes with no other input.</summary>
+    private void ArmRename(int index)
+    {
+        _pendingRenameIndex = index;
+        _renameTimer ??= CreateRenameTimer();
+        _renameTimer.Interval = TimeSpan.FromMilliseconds(ClickTiming.DoubleClickMilliseconds());
+        _renameTimer.Start();
+    }
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer CreateRenameTimer()
+    {
+        Microsoft.UI.Dispatching.DispatcherQueueTimer timer = DispatcherQueue.CreateTimer();
+        timer.IsRepeating = false;
+        timer.Tick += OnRenameTimerTick;
+        return timer;
+    }
+
+    private void CancelPendingRename()
+    {
+        _pendingRenameIndex = -1;
+        _renameTimer?.Stop();
+    }
+
+    private void OnRenameTimerTick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
+    {
+        sender.Stop();
+        int pending = _pendingRenameIndex;
+        _pendingRenameIndex = -1;
+        if (pending >= 0 && !_renaming && pending == _focus && _selected.Count == 1 && _selected.Contains(pending) &&
+            ClickTiming.HasFocusWithin(this))
+        {
+            BeginRename();
+        }
     }
 
     /// <summary>
@@ -545,6 +616,7 @@ public sealed partial class DetailsList : UserControl
     /// </summary>
     internal void RowDoubleTapped(DetailsRowElement row, DoubleTappedRoutedEventArgs e)
     {
+        CancelPendingRename();
         int index = row.Index;
         if (_renaming || index < 0 || index >= _rows.Count)
         {
@@ -610,7 +682,14 @@ public sealed partial class DetailsList : UserControl
 
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        CancelPendingRename();
         if (_renaming)
+        {
+            return;
+        }
+
+        // Alt+Up selects the parent key from either pane, so the window handles it (command 698).
+        if (e.Key == VirtualKey.Up && IsKeyDown(VirtualKey.Menu))
         {
             return;
         }
@@ -779,6 +858,10 @@ public sealed partial class DetailsList : UserControl
 
         if (index < 0 || index >= _rows.Count)
         {
+            // Nothing is selected, so the menu is the list background menu (measured for Shift+F10).
+            ContextRequested?.Invoke(
+                this,
+                new DetailsRowContextRequestedEventArgs(null, this, new Point(24, DenseMetrics.HeaderHeight + 4)));
             return;
         }
 
@@ -893,6 +976,12 @@ public sealed partial class DetailsList : UserControl
         _selected.Clear();
         _selected.Add(index);
         _anchor = index;
+        if (changed)
+        {
+            CancelPendingRename();
+            _selectedAtTick = ClickTiming.Now();
+        }
+
         RefreshRealizedRows();
         if (changed)
         {
@@ -1018,34 +1107,35 @@ public sealed partial class DetailsList : UserControl
     {
         bool InRange(int index) => index >= 0 && index < _rows.Count;
 
-        List<string> selectedNames = _selected.Where(InRange).Select(index => _rows[index].Name).ToList();
-        string? focusName = InRange(_focus) ? _rows[_focus].Name : null;
-        string? anchorName = InRange(_anchor) ? _rows[_anchor].Name : null;
-        string? renameName = _renaming && InRange(_renameIndex) ? _rows[_renameIndex].Name : null;
+        // Rows map by identity: two rows can show one name (the default value and a literal (Default)).
+        List<DetailsRow> selectedRows = _selected.Where(InRange).Select(index => _rows[index]).ToList();
+        DetailsRow? focusRow = InRange(_focus) ? _rows[_focus] : null;
+        DetailsRow? anchorRow = InRange(_anchor) ? _rows[_anchor] : null;
+        DetailsRow? renameRow = _renaming && InRange(_renameIndex) ? _rows[_renameIndex] : null;
 
-        var indexByName = new Dictionary<string, int>(StringComparer.Ordinal);
+        var indexByRow = new Dictionary<DetailsRow, int>(ReferenceEqualityComparer.Instance);
         for (var i = 0; i < sorted.Count; i++)
         {
-            _ = indexByName.TryAdd(sorted[i].Name, i);
+            _ = indexByRow.TryAdd(sorted[i], i);
         }
 
         _rows = sorted;
         _selected.Clear();
-        foreach (string name in selectedNames)
+        foreach (DetailsRow row in selectedRows)
         {
-            if (indexByName.TryGetValue(name, out int index))
+            if (indexByRow.TryGetValue(row, out int index))
             {
                 _ = _selected.Add(index);
             }
         }
 
-        _focus = focusName is not null && indexByName.TryGetValue(focusName, out int focus) ? focus : -1;
-        _anchor = anchorName is not null && indexByName.TryGetValue(anchorName, out int anchor) ? anchor : -1;
+        _focus = focusRow is not null && indexByRow.TryGetValue(focusRow, out int focus) ? focus : -1;
+        _anchor = anchorRow is not null && indexByRow.TryGetValue(anchorRow, out int anchor) ? anchor : -1;
         _typeAhead.Clear();
         Repeater.ItemsSource = null;
         Repeater.ItemsSource = _rows;
 
-        if (renameName is not null && indexByName.TryGetValue(renameName, out int renameIndex))
+        if (renameRow is not null && indexByRow.TryGetValue(renameRow, out int renameIndex))
         {
             _renameIndex = renameIndex;
             PositionRenameBox();
@@ -1059,12 +1149,15 @@ public sealed partial class DetailsList : UserControl
     }
 
     /// <summary>
-    /// Classic name order. The default value keys as empty and sorts first. OrderBy is stable, so
-    /// equal names keep their enumeration order.
+    /// Classic name order, the only sort of the list: the default row first (by IsDefault, not by its text), then the
+    /// native collation of the display names. OrderBy is stable, so equal names keep their order.
     /// </summary>
     private static List<DetailsRow> SortRows(IEnumerable<DetailsRow> rows)
     {
-        return rows.OrderBy(row => ListCollation.SortKey(row.Name), ListCollation.Comparer).ToList();
+        return rows
+            .OrderBy(row => row.IsDefault ? 0 : 1)
+            .ThenBy(row => row.Name, ListCollation.Comparer)
+            .ToList();
     }
 
     private int FindColumnIndex(string key)

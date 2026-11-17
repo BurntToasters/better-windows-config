@@ -26,7 +26,22 @@ import {
 } from "./lib/release-policy.js";
 import { publishIsGood } from "./build-installer.js";
 import { envelope, generateKeyPair, signFile } from "./lib/minisign.js";
-import { buildManifest, serializeManifest } from "./lib/update-manifest.js";
+import { buildEnvironment } from "./lib/build-environment.js";
+import {
+  containsSeamName,
+  missingRuntimeFiles,
+  nativeAotProblems,
+  NATIVE_AOT_EXPORT,
+  readExportNames,
+  readUpdateFlavorMarkers,
+  RUNTIME_FILES,
+  updateFlavorProblem,
+  UPDATE_FLAVOR_MARKER,
+  UPDATE_STALE_FILES,
+} from "./flavor-metadata.js";
+import { installUpdateOutputs, removeStaleFileLists, updateStagingDir } from "./lib/update-publish.js";
+import { buildManifest, installerTrustedComment, manifestFileName, serializeManifest } from "./lib/update-manifest.js";
+import { expectedAssetNames, loadReleaseBundle, unexpectedAssets } from "./lib/release-bundle.js";
 import { SIGNING_REQUIRED_VARIABLES } from "./release-policy.js";
 import { publishedReleaseMismatch } from "./release-publish.js";
 
@@ -167,7 +182,7 @@ async function buildFixture(temp) {
   const installerSignature = await signFile(
     installerPath,
     keyA.secretKeyText,
-    `version:${VERSION} arch:win-x64`,
+    `version:${VERSION} arch:win-x64 product:bwc channel:beta`,
   );
 
   const installers = {
@@ -696,11 +711,11 @@ async function runAssembleCases(temp, fixture, cases) {
     "bundle signed by an embedded encrypted key is assembled",
     assembled,
     cases,
-    "beta/bwc-beta.json and installer signatures",
+    "beta/bwc-beta-v2.json and installer signatures",
   );
 
   const channelDir = path.join(outDir, "beta");
-  const manifestPath = path.join(channelDir, "bwc-beta.json");
+  const manifestPath = path.join(channelDir, "bwc-beta-v2.json");
   const installerName = path.basename(fixture.installerPath);
   const installerCopy = path.join(channelDir, installerName);
   const expectedManifestComment = `trusted comment: ${manifestComment(VERSION, "beta", expiresAfter(PUBDATE, hours))}`;
@@ -728,8 +743,8 @@ async function runAssembleCases(temp, fixture, cases) {
     ? fs.readFileSync(`${installerCopy}.minisig`, "utf8").split("\n")
     : [];
   expectCheck(
-    "installer trusted comment is exactly version and arch",
-    installerLines[2] === `trusted comment: version:${VERSION} arch:win-x64`,
+    "installer trusted comment is exactly version, arch, product, and channel",
+    installerLines[2] === `trusted comment: version:${VERSION} arch:win-x64 product:bwc channel:beta`,
     `${installerLines[2] ?? "(missing)"}`,
     cases,
   );
@@ -759,6 +774,267 @@ async function runAssembleCases(temp, fixture, cases) {
  * TAURI_SIGNING_PRIVATE_KEY cases: the `tauri signer generate` form (base64 of the key file), a key
  * folder path, the refusals, and a check that a failing run prints neither the key nor the password.
  */
+/**
+ * I2b hardening cases (update-elevation.md HI, HB, HE): the signed installer comment must carry product:bwc and the
+ * manifest channel, the MSBuild environment drops DefineConstants, a ship binary may not hold the E2E seam names, and
+ * BwcUpdate.exe must be proven NativeAOT with the folder's flavor marker (HN13, HN14).
+ */
+async function runHardeningCases(temp, fixture, cases) {
+  expectCheck(
+    "installer comment is version, arch, product, channel",
+    installerTrustedComment({ version: VERSION, architecture: "win-x64", channel: "beta" }) ===
+      `version:${VERSION} arch:win-x64 product:bwc channel:beta`,
+    installerTrustedComment({ version: VERSION, architecture: "win-x64", channel: "beta" }),
+    cases,
+  );
+  expectCheck(
+    "installer comment refuses a channel that is not stable or beta",
+    (() => {
+      try {
+        installerTrustedComment({ version: VERSION, architecture: "win-x64", channel: "nightly" });
+        return false;
+      } catch {
+        return true;
+      }
+    })(),
+    "a nightly comment was produced",
+    cases,
+  );
+
+  const variants = [
+    ["installer without product rejected", `version:${VERSION} arch:win-x64 channel:beta`, "installer-product-mismatch"],
+    ["installer for another product rejected", `version:${VERSION} arch:win-x64 product:other channel:beta`, "installer-product-mismatch"],
+    ["installer without channel rejected", `version:${VERSION} arch:win-x64 product:bwc`, "trusted-comment-invalid"],
+    ["installer for another channel rejected", `version:${VERSION} arch:win-x64 product:bwc channel:stable`, "installer-channel-mismatch"],
+  ];
+  for (const [name, comment, reason] of variants) {
+    const dir = path.join(temp, "fixtures", "hardening", reason + "-" + variants.findIndex((v) => v[0] === name));
+    fs.mkdirSync(dir, { recursive: true });
+    const installerFile = path.join(dir, "installer.exe");
+    fs.copyFileSync(fixture.installerPath, installerFile);
+    const signature = envelope(await signFile(installerFile, fixture.keyA.secretKeyText, comment));
+    const entry = { ...fixture.manifest.installers["win-x64"], signature };
+    const manifest = buildManifest({
+      version: VERSION,
+      channel: "beta",
+      pubDate: PUBDATE,
+      notesUrl: fixture.manifest.notesUrl,
+      installers: { "win-x64": entry },
+    });
+    const manifestPath = path.join(dir, "manifest.json");
+    fs.writeFileSync(manifestPath, serializeManifest(manifest));
+    const manifestSig = await signFile(manifestPath, fixture.keyA.secretKeyText, manifestComment(VERSION, "beta", FUTURE_EXPIRES));
+    fs.writeFileSync(`${manifestPath}.minisig`, manifestSig, "utf8");
+    expectRefusal(
+      name,
+      run("scripts/validate-updater-manifest.js", [
+        ...validatorArgs(fixture, { manifest: manifestPath, signature: `${manifestPath}.minisig` }),
+        "--installer",
+        `win-x64=${installerFile}`,
+      ]),
+      [reason],
+      cases,
+    );
+  }
+
+  const scrubbed = buildEnvironment({ DefineConstants: "BWC_E2E", defineconstants: "X", DEFINECONSTANTS: "Y", Path: "p", KEEP: "1" });
+  expectCheck(
+    "msbuild_environment_scrubbed",
+    Object.keys(scrubbed).sort().join(",") === "KEEP,Path",
+    Object.keys(scrubbed).join(","),
+    cases,
+  );
+
+  const vswhereDir = "C:\\PF86\\Microsoft Visual Studio\\Installer";
+  const withVswhere = buildEnvironment({ Path: "C:\\x", "ProgramFiles(x86)": "C:\\PF86" }, () => true);
+  const alreadyThere = buildEnvironment({ Path: `C:\\x;${vswhereDir}\\`, "ProgramFiles(x86)": "C:\\PF86" }, () => true);
+  const noVswhere = buildEnvironment({ Path: "C:\\x", "ProgramFiles(x86)": "C:\\PF86" }, () => false);
+  expectCheck(
+    "vswhere_on_path",
+    withVswhere.Path === `C:\\x;${vswhereDir}` &&
+      alreadyThere.Path === `C:\\x;${vswhereDir}\\` &&
+      noVswhere.Path === "C:\\x" &&
+      Object.keys(withVswhere).sort().join(",") === "Path,ProgramFiles(x86)",
+    "the Visual Studio installer folder is added to this build's PATH only when vswhere.exe is there and PATH lacks it",
+    cases,
+  );
+  const seam = Buffer.concat([Buffer.from("xx"), Buffer.from("BWC_E2E_UPDATE_ROOT", "utf16le"), Buffer.from("yy")]);
+  const seamUtf8 = Buffer.from("zz BWC_E2E_UPDATE_ROOT zz", "utf8");
+  expectCheck("ship_e2e_strings", containsSeamName(seam) && containsSeamName(seamUtf8) && !containsSeamName(Buffer.from("BWC_E2E_THEME")), "seam names found as UTF-16 and UTF-8, nothing else", cases);
+
+  // A minimal PE32+ image with one section that holds an export table naming the given symbols, then the extra bytes.
+  const makePe = (exports, extra = Buffer.alloc(0)) => {
+    const names = Buffer.concat(exports.map((name) => Buffer.from(`${name}\0`, "latin1")));
+    const table = Buffer.alloc(40 + exports.length * 8);
+    const sectionRva = 0x1000;
+    const sectionRaw = 0x200;
+    const namesRva = sectionRva + table.length;
+    const pointersRva = sectionRva + 40;
+    table.writeUInt32LE(exports.length, 24); // number of names
+    table.writeUInt32LE(pointersRva, 32); // address of names
+    let at = 0;
+    exports.forEach((name, index) => {
+      table.writeUInt32LE(namesRva + at, 40 + index * 4);
+      at += Buffer.byteLength(name) + 1;
+    });
+    const section = Buffer.concat([table, names, extra]);
+    const image = Buffer.alloc(sectionRaw + section.length);
+    image.writeUInt16LE(0x5a4d, 0);
+    image.writeUInt32LE(0x80, 0x3c);
+    image.writeUInt32LE(0x00004550, 0x80);
+    image.writeUInt16LE(1, 0x80 + 6); // sections
+    image.writeUInt16LE(240, 0x80 + 20); // optional header size
+    image.writeUInt16LE(0x20b, 0x80 + 24); // PE32+
+    if (exports.length > 0) {
+      image.writeUInt32LE(sectionRva, 0x80 + 24 + 112); // export directory rva
+      image.writeUInt32LE(table.length, 0x80 + 24 + 116);
+    }
+    const sectionAt = 0x80 + 24 + 240;
+    image.write(".rdata", sectionAt, "latin1");
+    image.writeUInt32LE(section.length, sectionAt + 8);
+    image.writeUInt32LE(sectionRva, sectionAt + 12);
+    image.writeUInt32LE(section.length, sectionAt + 16);
+    image.writeUInt32LE(sectionRaw, sectionAt + 20);
+    section.copy(image, sectionRaw);
+    return image;
+  };
+  const marker = (value) => Buffer.from(`unexpected error in BwcUpdate (${UPDATE_FLAVOR_MARKER}${value})`, "utf16le");
+  const aotImage = makePe(["other", NATIVE_AOT_EXPORT], marker("ship"));
+  const apphost = makePe([], Buffer.from("hostfxr.dll", "utf16le"));
+  expectCheck(
+    "native_aot_probe",
+    readExportNames(aotImage).join(",") === `other,${NATIVE_AOT_EXPORT}` &&
+      readExportNames(apphost).length === 0 &&
+      readExportNames(Buffer.from("not a pe file")).length === 0 &&
+      nativeAotProblems(aotImage, ["BwcUpdate.exe", "BwcRegedit.dll", "BwcUpdate.pdb"]).length === 0 &&
+      nativeAotProblems(apphost, ["BwcUpdate.exe"]).length === 2 &&
+      nativeAotProblems(aotImage, ["BwcUpdate.exe", "BwcUpdate.dll"]).length === 1 &&
+      nativeAotProblems(aotImage, ["BwcUpdate.exe", "bwcupdate.runtimeconfig.json"]).length === 1 &&
+      nativeAotProblems(aotImage, ["BwcUpdate.exe", "BwcUpdate.deps.json"]).length === 1 &&
+      nativeAotProblems(makePe([NATIVE_AOT_EXPORT], Buffer.from("coreclr", "utf8")), []).length === 1 &&
+      nativeAotProblems(makePe([NATIVE_AOT_EXPORT], Buffer.from("CORECLR_ENABLE_PROFILING", "utf16le")), []).length === 1 &&
+      nativeAotProblems(makePe([NATIVE_AOT_EXPORT], Buffer.from("DOTNET_STARTUP_HOOKS")), []).length === 1,
+    "an image that exports the NativeAOT symbol and has no host or loader strings passes; an apphost, a managed file beside the exe, or a loader string fails",
+    cases,
+  );
+
+  const markerUtf8 = Buffer.from(`xx ${UPDATE_FLAVOR_MARKER}E2E yy`, "utf8");
+  expectCheck(
+    "native_flavor_marker",
+    readUpdateFlavorMarkers(marker("ship")).join(",") === "ship" &&
+      readUpdateFlavorMarkers(markerUtf8).join(",") === "E2E" &&
+      readUpdateFlavorMarkers(Buffer.concat([marker("ship"), markerUtf8])).join(",") === "E2E,ship" &&
+      readUpdateFlavorMarkers(Buffer.from("nothing here")).length === 0 &&
+      updateFlavorProblem(marker("ship"), "ship").problem === null &&
+      updateFlavorProblem(marker("E2E"), "ship").problem !== null &&
+      updateFlavorProblem(Buffer.concat([marker("ship"), markerUtf8]), "ship").problem !== null &&
+      updateFlavorProblem(Buffer.from("nothing here"), "E2E").problem !== null,
+    "exactly the folder's marker passes; a missing, other, or mixed marker fails (UTF-16LE and UTF-8)",
+    cases,
+  );
+
+  // HN26: a folder without the runtime of the self-contained apps is refused.
+  const everyRuntimeFile = [...RUNTIME_FILES, "BetterWindowsConfig.exe", "Bwc.UI.dll"];
+  expectCheck(
+    "runtime_files_guard",
+    RUNTIME_FILES.join(",") ===
+      "hostfxr.dll,hostpolicy.dll,coreclr.dll,System.Private.CoreLib.dll,BetterWindowsConfig.runtimeconfig.json" &&
+      missingRuntimeFiles(everyRuntimeFile).length === 0 &&
+      missingRuntimeFiles(everyRuntimeFile.map((name) => name.toUpperCase())).length === 0 &&
+      RUNTIME_FILES.every(
+        (gone) => missingRuntimeFiles(everyRuntimeFile.filter((name) => name !== gone)).join(",") === gone,
+      ) &&
+      missingRuntimeFiles([]).length === RUNTIME_FILES.length,
+    "each of the five runtime files is required, by name and without regard to case, and a missing one is named",
+    cases,
+  );
+
+  // HN17 and HN25: the staged helper adds only its exe; only the three stale managed names are removed.
+  const publishTemp = path.join(temp, "update-publish");
+  const staging = path.join(publishTemp, "staging");
+  const shared = path.join(publishTemp, "shared");
+  fs.mkdirSync(staging, { recursive: true });
+  fs.mkdirSync(path.join(shared, "sub"), { recursive: true });
+  const putFile = (folder, name, text) => fs.writeFileSync(path.join(folder, name), text);
+  const readFile = (folder, name) => (fs.existsSync(path.join(folder, name)) ? fs.readFileSync(path.join(folder, name), "utf8") : null);
+  putFile(staging, "BwcUpdate.exe", "aot");
+  putFile(staging, "BwcUpdate.pdb", "symbols");
+  putFile(staging, "Bwc.Core.pdb", "core-symbols");
+  putFile(staging, "Bwc.Core.dll", "must-not-copy");
+  for (const name of RUNTIME_FILES) {
+    putFile(shared, name, `runtime ${name}`);
+  }
+  putFile(shared, "BetterWindowsConfig.exe", "hub");
+  putFile(shared, "Bwc.Core.dll", "hub-core");
+  putFile(shared, "sub\\keep.txt", "keep");
+  putFile(shared, "BwcUpdate.exe", "old-coreclr-apphost");
+  for (const name of UPDATE_STALE_FILES) {
+    putFile(shared, name, "stale");
+  }
+  const installed = installUpdateOutputs(staging, shared);
+  const before = RUNTIME_FILES.every((name) => readFile(shared, name) === `runtime ${name}`);
+  expectCheck(
+    "update_publish_install",
+    installed.copied.join(",") === "BwcUpdate.exe,BwcUpdate.pdb" &&
+      installed.removed.join(",") === UPDATE_STALE_FILES.join(",") &&
+      readFile(shared, "BwcUpdate.exe") === "aot" &&
+      readFile(shared, "BwcUpdate.pdb") === "symbols" &&
+      UPDATE_STALE_FILES.every((name) => readFile(shared, name) === null) &&
+      before &&
+      readFile(shared, "BetterWindowsConfig.exe") === "hub" &&
+      readFile(shared, "Bwc.Core.dll") === "hub-core" &&
+      readFile(shared, "Bwc.Core.pdb") === null &&
+      readFile(shared, "sub\\keep.txt") === "keep" &&
+      fs.readdirSync(shared).length === RUNTIME_FILES.length + 5 &&
+      updateStagingDir("C:\\r\\publish\\win-x64-e2e") === "C:\\r\\publish\\win-x64-e2e-bwcupdate-aot",
+    "only BwcUpdate.exe (and its symbols) is copied in, exactly the three stale managed names are removed, nothing else changes",
+    cases,
+  );
+  fs.rmSync(path.join(staging, "BwcUpdate.exe"));
+  let missingExeError = null;
+  try {
+    installUpdateOutputs(staging, shared);
+  } catch (error) {
+    missingExeError = error;
+  }
+  expectCheck(
+    "update_publish_missing_exe",
+    missingExeError !== null && readFile(shared, "BwcUpdate.exe") === "aot" && readFile(shared, "hostfxr.dll") === "runtime hostfxr.dll",
+    "a staging folder without BwcUpdate.exe is an error and changes nothing in the shared folder",
+    cases,
+  );
+
+  // HN25: the previous publish's file list is what let the NativeAOT publish delete the runtime files.
+  const projectDir = path.join(publishTemp, "project");
+  const listName = "Bwc.Update.csproj.FileListAbsolute.txt";
+  const listFolders = [
+    path.join(projectDir, "obj", "x64", "Release", "net10.0-windows", "win-x64"),
+    path.join(projectDir, "obj", "Release", "net10.0-windows", "win-x64"),
+    path.join(projectDir, "obj", "x64", "Release", "net10.0-windows", "win-arm64"),
+    path.join(projectDir, "obj", "ARM64", "Release", "net10.0-windows", "win-arm64"),
+  ];
+  for (const folder of listFolders) {
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(path.join(folder, listName), "C:\\publish\\hostfxr.dll\n");
+    fs.writeFileSync(path.join(folder, "Other.csproj.FileListAbsolute.txt"), "x");
+    fs.writeFileSync(path.join(folder, "BwcUpdate.dll"), "x");
+  }
+  const removedLists = removeStaleFileLists({ projectDir, projectFile: "Bwc.Update.csproj", platform: "x64", rid: "win-x64" });
+  const exists = (folder, name) => fs.existsSync(path.join(folder, name));
+  expectCheck(
+    "update_publish_stale_list",
+    removedLists.length === 2 &&
+      !exists(listFolders[0], listName) &&
+      !exists(listFolders[1], listName) &&
+      exists(listFolders[2], listName) &&
+      exists(listFolders[3], listName) &&
+      listFolders.every((folder) => exists(folder, "Other.csproj.FileListAbsolute.txt") && exists(folder, "BwcUpdate.dll")) &&
+      removeStaleFileLists({ projectDir: path.join(publishTemp, "none"), projectFile: "Bwc.Update.csproj", platform: "x64", rid: "win-x64" })
+        .length === 0,
+    "only this project's file list for this platform and rid is removed, from the project's own obj folder",
+    cases,
+  );
+}
 async function runEnvironmentKeyCases(temp, fixture, cases) {
   const encryptedKeyText = fs.readFileSync(path.join(fixture.encryptedDir, "minisign.key"), "utf8");
   const tauriValue = Buffer.from(encryptedKeyText, "utf8").toString("base64");
@@ -899,13 +1175,147 @@ async function runEnvironmentKeyCases(temp, fixture, cases) {
       envBundle,
     ], { env: { [TAURI_KEY_ENV]: tauriValue, [TAURI_PASSWORD_ENV]: PASSWORD } }),
     cases,
-    "beta/bwc-beta.json with its .minisig",
+    "beta/bwc-beta-v2.json with its .minisig",
   );
   expectCheck(
     "environment bundle is named by channel and carries the GitHub download URL",
-    fs.existsSync(path.join(envBundle, "beta", "bwc-beta.json.minisig")) &&
+    fs.existsSync(path.join(envBundle, "beta", "bwc-beta-v2.json.minisig")) &&
       !fs.existsSync(path.join(envBundle, "beta", "manifest.json")),
-    "bwc-beta.json.minisig present, manifest.json absent",
+    "bwc-beta-v2.json.minisig present, manifest.json absent",
+    cases,
+  );
+}
+
+/**
+ * No legacy feed cases (release.md, section LF). 0.1.x carries no migration code: a release writes bwc-stable-v2.json
+ * only, takes no legacy option, and a bwc-stable.json asset on a reused draft is outside the expected set. The stable
+ * bundles here are signed with the encrypted test key that the repo embeds.
+ */
+async function runNoLegacyFeedCases(temp, fixture, cases) {
+  const VERSION_UNDER_TEST = "0.1.2";
+  const HOURS = 87600;
+  const STRAY_NAME = "bwc-stable.json";
+  const repo = path.join(temp, "nolegacy-repo");
+  writeRepository(repo, { embedded: [fixture.keyEPublic] });
+  const publicPath = path.join(temp, "nolegacy-key.pub");
+  writeText(publicPath, fixture.keyEPublic);
+
+  const installerPath = path.join(temp, "nolegacy-fixtures", `BetterWindowsConfig-${VERSION_UNDER_TEST}-win-x64-setup.exe`);
+  write(installerPath, Buffer.from(Array.from({ length: 2048 }, (_, index) => (index * 17 + 3) & 0xff)));
+
+  expectCheck(
+    "feed names carry the v2 suffix",
+    manifestFileName("stable") === "bwc-stable-v2.json" && manifestFileName("beta") === "bwc-beta-v2.json",
+    `${manifestFileName("stable")}, ${manifestFileName("beta")}`,
+    cases,
+  );
+
+  const assemble = (name, extra, { version = VERSION_UNDER_TEST } = {}) =>
+    run(
+      "scripts/assemble-bundle.js",
+      [
+        "--root", repo,
+        "--version", version,
+        "--installer-win-x64", installerPath,
+        "--secret-key", fixture.encryptedDir,
+        "--password-env", PASSWORD_ENV,
+        "--pub-date", PUBDATE,
+        "--expires-hours", String(HOURS),
+        "--out", path.join(temp, name),
+        ...extra,
+      ],
+      { env: { [PASSWORD_ENV]: PASSWORD } },
+    );
+
+  // LF1: a stable assembly with no legacy option succeeds and writes the v2 files only.
+  expectPass("LF1 stable assembly with no legacy option assembles", assemble("nolegacy-stable", []), cases);
+  const stableDir = path.join(temp, "nolegacy-stable", "stable");
+  expectCheck(
+    "LF1 a stable assembly writes bwc-stable-v2.json and no bwc-stable.json",
+    fs.existsSync(path.join(stableDir, "bwc-stable-v2.json")) &&
+      fs.existsSync(path.join(stableDir, "bwc-stable-v2.json.minisig")) &&
+      !fs.existsSync(path.join(stableDir, STRAY_NAME)) &&
+      !fs.existsSync(path.join(stableDir, `${STRAY_NAME}.minisig`)),
+    fs.existsSync(stableDir) ? fs.readdirSync(stableDir).join(", ") : "(no folder)",
+    cases,
+  );
+  const stableAssembly = fs.existsSync(path.join(stableDir, "assembly.json"))
+    ? JSON.parse(fs.readFileSync(path.join(stableDir, "assembly.json"), "utf8"))
+    : {};
+  expectCheck(
+    "LF1 assembly.json has no legacy field",
+    stableAssembly.ok === true && !Object.keys(stableAssembly).some((key) => /legacy/i.test(key)),
+    Object.keys(stableAssembly).join(", "),
+    cases,
+  );
+
+  // LF1: a stale option is an unknown option now, so it fails loudly and writes nothing.
+  for (const stale of [["--legacy-feed", "none"], ["--legacy-source", path.join(temp, "gone.json")]]) {
+    const outName = `nolegacy-stale-${stale[0].slice(2)}`;
+    const refused = assemble(outName, stale);
+    expectCheck(
+      `LF1 stale ${stale[0]} is refused as an unknown option`,
+      refused.status === EXIT.USAGE && refused.stderr.includes(stale[0]),
+      `status ${refused.status}: ${refused.stderr.split("\n")[0].trim()}`,
+      cases,
+    );
+    expectCheck(
+      `LF1 the refused ${stale[0]} run wrote no bundle`,
+      !fs.existsSync(path.join(temp, outName, "stable")),
+      "no stable folder",
+      cases,
+    );
+  }
+
+  // LF1: the gate that draft, verify, and publish share loads the bundle with no legacy asset in the set.
+  const bundle = await loadReleaseBundle({
+    dir: stableDir,
+    channel: "stable",
+    version: VERSION_UNDER_TEST,
+    trustedKeys: [publicPath],
+    requireArches: ["win-x64"],
+  });
+  expectCheck(
+    "LF1 a stable bundle with no legacy record loads, and no bwc-stable.json is required",
+    bundle.ok && !bundle.requiredAssets.includes(STRAY_NAME) && !bundle.requiredAssets.includes(`${STRAY_NAME}.minisig`),
+    JSON.stringify(bundle.errors),
+    cases,
+  );
+
+  // LF1: a draft that already holds bwc-stable.json is refused asset-unexpected (release-draft and release-verify print
+  // that reason for each name that unexpectedAssets returns).
+  const asset = (name, id) => ({ id, name, state: "uploaded" });
+  const names = expectedAssetNames(bundle);
+  const release = { assets: names.map((name, index) => asset(name, index + 1)) };
+  expectCheck(
+    "LF1 the expected set lists the v2 manifest, its signature, and the setups, and no bwc-stable.json",
+    names.includes(manifestFileName("stable")) &&
+      names.includes(`${manifestFileName("stable")}.minisig`) &&
+      names.some((name) => name.endsWith("-setup.exe")) &&
+      !names.includes(STRAY_NAME),
+    JSON.stringify(names),
+    cases,
+  );
+  expectCheck(
+    "LF1 a release that holds exactly the expected assets has nothing unexpected",
+    unexpectedAssets(release, names).length === 0,
+    "an unexpected asset was reported",
+    cases,
+  );
+  const withStray = { assets: [...release.assets, asset(STRAY_NAME, 90), asset(`${STRAY_NAME}.minisig`, 91)] };
+  expectCheck(
+    "LF1 a draft that holds bwc-stable.json is refused asset-unexpected, naming it and its signature",
+    unexpectedAssets(withStray, names).map((entry) => entry.name).join(",") === `${STRAY_NAME},${STRAY_NAME}.minisig`,
+    JSON.stringify(unexpectedAssets(withStray, names)),
+    cases,
+  );
+  expectCheck(
+    "LF1 any other extra asset is unexpected, and a GPG .asc of an expected asset is a sidecar",
+    unexpectedAssets({ assets: [...release.assets, asset("notes.txt", 92), asset("evil.exe", 93)] }, names).length === 2 &&
+      unexpectedAssets({ assets: [...release.assets, asset(`${names[0]}.asc`, 94)] }, names).length === 0 &&
+      unexpectedAssets({ assets: [...release.assets, asset("stray.asc", 95)] }, names).length === 1 &&
+      unexpectedAssets({ assets: [...release.assets, asset(`${names[0]}.ASC.exe`, 96)] }, names).length === 1,
+    "an extra asset was accepted or a sidecar refused",
     cases,
   );
 }
@@ -1038,8 +1448,8 @@ async function runPolicyCases(temp, fixture, cases) {
 
   const x64Artifact = path.join(temp, "x64-artifact");
   fs.mkdirSync(x64Artifact, { recursive: true });
-  fs.copyFileSync(fixture.primary.manifestPath, path.join(x64Artifact, "bwc-beta.json"));
-  fs.copyFileSync(fixture.primary.signaturePath, path.join(x64Artifact, "bwc-beta.json.minisig"));
+  fs.copyFileSync(fixture.primary.manifestPath, path.join(x64Artifact, "bwc-beta-v2.json"));
+  fs.copyFileSync(fixture.primary.signaturePath, path.join(x64Artifact, "bwc-beta-v2.json.minisig"));
   fs.copyFileSync(
     fixture.installerPath,
     path.join(x64Artifact, "BetterWindowsConfig-0.1.0-beta.1-win-x64-setup.exe"),
@@ -1497,7 +1907,9 @@ async function main() {
     const fixture = await buildFixture(temp);
     await runValidatorCases(temp, fixture, cases);
     await runAssembleCases(temp, fixture, cases);
+    await runNoLegacyFeedCases(temp, fixture, cases);
     await runEnvironmentKeyCases(temp, fixture, cases);
+    await runHardeningCases(temp, fixture, cases);
     await runPolicyCases(temp, fixture, cases);
     await runSessionGateCases(temp, fixture, cases);
     runDetachedBranchCases(temp, cases);

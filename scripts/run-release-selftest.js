@@ -413,6 +413,55 @@ try {
     assertEqual(calls, releaseSteps("win", { version: VERSION, env: cleanEnv() }), "recorded");
   });
 
+  check("LF1 main: a stable run with no legacy option is not refused, from release:assemble on or from the start", () => {
+    for (const argv of [[], ["--continue"], ["--continue", "--from", "release:assemble"], ["--continue", "--from", "release:policy"]]) {
+      const calls = [];
+      main(argv, (name) => calls.push(name), { root: keyRepo, env: cleanEnv() });
+      if (calls.length === 0) throw new Error("nothing ran for " + (argv.join(" ") || "(no arguments)"));
+    }
+  });
+
+  check("LF1 parse: --legacy-feed and --legacy-source are unknown flags, in both forms (exit 2)", () => {
+    for (const argv of [
+      ["--legacy-feed", "none"],
+      ["--legacy-feed=none"],
+      ["--legacy-feed", "frozen", "--legacy-source", "x"],
+      ["--legacy-source", "x"],
+      ["--legacy-source=x"],
+      ["--continue", "--legacy-feed", "none"],
+    ]) {
+      try {
+        parseReleaseArgs(argv);
+      } catch (error) {
+        assertEqual(error.exitCode, EXIT.USAGE, "exit for " + argv.join(" "));
+        if (!/Unknown release flag: --legacy-/.test(error.message)) throw new Error("message: " + error.message);
+        continue;
+      }
+      throw new Error("accepted " + argv.join(" "));
+    }
+  });
+
+  check("LF1 main: a stale --legacy-feed is refused before any step", () => {
+    const calls = [];
+    assertThrows(
+      () => main(["--legacy-feed", "none"], (name) => calls.push(name), { root: keyRepo, env: cleanEnv() }),
+      /Unknown release flag: --legacy-feed/,
+      "stale option",
+    );
+    assertEqual(calls, [], "calls");
+  });
+
+  check("LF1 steps: no step carries a legacy argument", () => {
+    for (const mode of ["win", "continue"]) {
+      for (const step of releaseSteps(mode, { version: VERSION, env: cleanEnv() })) {
+        if (step.args.some((arg) => /legacy/i.test(arg))) throw new Error(mode + " " + step.name + ": " + step.args.join(" "));
+      }
+    }
+    const handoff = releaseSteps("win", { version: VERSION, env: cleanEnv() }).find((step) => step.name === "release:win:continue");
+    assertEqual(handoff.args, [], "continue args");
+  });
+
+
   check("main stops at the first failing step and starts no later step", () => {
     const calls = [];
     const failing = (name) => {

@@ -132,3 +132,35 @@ ones were checked on classic regedit.
 - PageUp and PageDown move by the page size computed from the live viewport and row height. They
   clamp at both ends and do not throw on an empty tree.
 - No keyboard path moves the selection while the rename box has focus.
+
+## Enumeration errors other than access denied
+
+Failure mode: the local tree listed no children when a key's subkeys could not be enumerated with a
+Win32 error other than access denied (5) or privilege not held (1314). The remote tree reported every
+code. A local node that failed in that way looked empty and had no error.
+
+Rule: the local and remote trees treat every enumeration error the same. The load throws, the node
+collapses, `ExpandFailed` raises the classic "cannot be opened" message (`MsgOpenKeyFailed`, with the
+Win32 text as details), and the log line names the key and the code. The next expand retries.
+
+Check: `Tree_EnumerationDeniedShowsCannotOpenKey` in `tests/Bwc.E2E/Editing/TreeEnumerationErrorTests.cs`
+denies enumeration on a sandbox key for the current user (error 5) and checks the message and the
+collapsed node. No sandbox ACE produces any other code, so the non-5 path has no automated check. It is
+reviewed in `RegistryTreeSource.LoadChildren`, which now has one catch for every registry error.
+
+## Key names "." and ".."
+
+Failure mode: the registry lists keys named `.` and `..`. Child paths were built with
+`RegistryPath.Append`, which refuses those names. The remote tree hid them. The local tree listed them
+with no commands and an empty value list, because the display path of the node did not parse back to a
+`RegistryPath`.
+
+Rule: tree child paths are built with `RegistryPath.AppendEnumeratedName`, and a node's display path is
+parsed back with `RegistryTreeSource.TryParseNodePath`, which also uses `AppendEnumeratedName`. A `.` or
+`..` key is listed, selects, shows its values, and has the same commands as any key, locally and remotely.
+User-typed paths keep using `Append`, which still refuses those names.
+
+Check: `Editing_DotNamedKeyShowsItsValue` in `tests/Bwc.E2E/Editing/DotNamedKeyTests.cs` writes a key named
+`.` with one value under a sandbox key, then checks that the tree lists `.` and the value list shows the
+value after the node is selected. Remote `.` keys have no automated check. They use the same child path
+and parse code, which is reviewed in `RemoteRegistryTreeSource`.

@@ -96,6 +96,16 @@ public sealed partial class DenseTree : UserControl
     private long _typeAheadTick;
     private bool _renaming;
     private TreeNode? _renameNode;
+
+    // When the selected key became selected, in ClickTiming ticks. A slow second click is measured from it.
+    private long _selectedAtTick;
+
+    // A slow click starts the rename after the double-click time, unless other input comes first (BEH-010).
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _renameTimer;
+    private TreeNode? _pendingRenameNode;
+    private TreeNode? _pressNode;
+    private bool _pressQualifies;
+    private long _lastPressAt;
     private bool _metricsSubscribed;
 
     public DenseTree()
@@ -115,6 +125,8 @@ public sealed partial class DenseTree : UserControl
 
         RenameBox.KeyDown += OnRenameKeyDown;
         RenameBox.LostFocus += OnRenameLostFocus;
+        Bwc.UI.Menu.TextEditMenu.Attach(RenameBox);
+        LostFocus += (_, _) => CancelPendingRename();
         UpdateHelpText();
     }
 
@@ -192,7 +204,9 @@ public sealed partial class DenseTree : UserControl
 
         if (!ReferenceEquals(SelectedNode, node))
         {
+            CancelPendingRename();
             SelectedNode = node;
+            _selectedAtTick = ClickTiming.Now();
             RefreshRealizedSelection();
             SelectionChanged?.Invoke(this, new TreeNodeEventArgs(node));
             UpdateHelpText();
@@ -247,8 +261,66 @@ public sealed partial class DenseTree : UserControl
             return;
         }
 
+        // BEH-010: the press qualified as a slow click. The rename starts only after the double-click time.
+        bool slow = _pressQualifies && ReferenceEquals(_pressNode, node) && ReferenceEquals(SelectedNode, node);
+        _pressQualifies = false;
         SelectNode(node, scroll: false);
         _ = Focus(FocusState.Pointer);
+        if (slow)
+        {
+            ArmRename(node);
+        }
+    }
+
+    /// <summary>
+    /// A left press on a row. It cancels a pending rename. The press qualifies for a slow click when the key was the
+    /// only selection, the tree had the focus before the press, no Shift or Ctrl is held, the key was selected for the
+    /// double-click time, and the previous press was more than that time ago.
+    /// </summary>
+    internal void RowLeftPressed(TreeRowElement row)
+    {
+        CancelPendingRename();
+        long now = ClickTiming.Now();
+        bool quiet = now - _lastPressAt >= ClickTiming.DoubleClickMilliseconds();
+        _lastPressAt = now;
+        bool modified = IsKeyDown(VirtualKey.Shift) || IsKeyDown(VirtualKey.Control);
+        _pressNode = row.Node;
+        _pressQualifies = quiet && !modified && row.Node is { } node && ReferenceEquals(SelectedNode, node) &&
+            ClickTiming.HasFocusWithin(this) && ClickTiming.IsSlowSecondClick(_selectedAtTick);
+    }
+
+    /// <summary>Starts the inline rename of this node when the double-click time passes with no other input.</summary>
+    private void ArmRename(TreeNode node)
+    {
+        _pendingRenameNode = node;
+        _renameTimer ??= CreateRenameTimer();
+        _renameTimer.Interval = TimeSpan.FromMilliseconds(ClickTiming.DoubleClickMilliseconds());
+        _renameTimer.Start();
+    }
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer CreateRenameTimer()
+    {
+        Microsoft.UI.Dispatching.DispatcherQueueTimer timer = DispatcherQueue.CreateTimer();
+        timer.IsRepeating = false;
+        timer.Tick += OnRenameTimerTick;
+        return timer;
+    }
+
+    private void CancelPendingRename()
+    {
+        _pendingRenameNode = null;
+        _renameTimer?.Stop();
+    }
+
+    private void OnRenameTimerTick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
+    {
+        sender.Stop();
+        TreeNode? pending = _pendingRenameNode;
+        _pendingRenameNode = null;
+        if (pending is not null && !_renaming && ReferenceEquals(pending, SelectedNode) && ClickTiming.HasFocusWithin(this))
+        {
+            BeginRename();
+        }
     }
 
     /// <summary>
@@ -257,6 +329,7 @@ public sealed partial class DenseTree : UserControl
     /// </summary>
     internal void RowDoubleTapped(TreeRowElement row)
     {
+        CancelPendingRename();
         if (row.Node is not { HasChildren: true } node)
         {
             return;
@@ -407,6 +480,9 @@ public sealed partial class DenseTree : UserControl
 
     /// <summary>Starts the inline rename box for the selected node. F2 uses the same path.</summary>
     public void BeginRenameSelected() => BeginRename();
+
+    /// <summary>Selects the parent of the selected key (Alt+Up and Backspace). The root has no parent.</summary>
+    public void GoToParentOfSelected() => GoToParent();
 
     internal void RowRightPressed(TreeRowElement row)
     {
@@ -734,7 +810,14 @@ public sealed partial class DenseTree : UserControl
 
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        CancelPendingRename();
         if (_renaming)
+        {
+            return;
+        }
+
+        // Alt+Up selects the parent key from either pane, so the window handles it (command 698).
+        if (e.Key == VirtualKey.Up && IsKeyDown(VirtualKey.Menu))
         {
             return;
         }

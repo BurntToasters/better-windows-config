@@ -8,6 +8,9 @@ public enum UpdateMode
     Apply,
     CloseRunning,
     WaitPid,
+    ApplyElevated,
+    LaunchHub,
+    SetAumid,
     Invalid,
 }
 
@@ -40,10 +43,31 @@ public sealed class UpdateArguments
             Exit: 0 installer started, 2 usage, 3 refused, 4 apps still running,
                   5 installer did not start, 6 refused and the Hub did not start.
 
+          BwcUpdate.exe --apply-elevated <staging folder>
+            Runs elevated, started by --apply. Needs an elevated token (NotElevated otherwise). The install dir is this
+            program's own folder and the current version is its own version: no other option exists. Copies the
+            installer into <install dir>.upd<32 hex>, verifies the copy, and starts it
+            (/S /RELAUNCH /PARENTPID=<this pid> /D=<install dir>). Writes no log file.
+            Exit: 0 installer started, 2 usage, 3 refused, 5 installer did not start,
+                  6 refused and the Hub did not start, 7 unexpected.
+
+          BwcUpdate.exe --launch-hub [--update-result <UpdateFailure>]
+            Starts BetterWindowsConfig.exe from this program's folder at the shell's integrity level.
+            Exit: 0 started, 2 usage, 6 no Hub exe or it did not start, 7 unexpected,
+                  8 elevated and the Hub cannot be started unelevated (nothing was started).
+
+          BwcUpdate.exe --set-aumid <absolute path of a .lnk> <app id>
+            Sets System.AppUserModel.ID on one of the two Start menu shortcuts of this product (app id
+            BetterWindowsConfig.Hub for "Better Windows Config.lnk", BetterWindowsConfig.Regedit for "Registry Editor (BWC).lnk"),
+            directly in the all-users Programs folder, and reads it back. Run by the installer. Writes no log when elevated.
+            Exit: 0 written, 2 usage, 3 refused (another folder, name, or a link), 4 not written, 7 unexpected.
+
           BwcUpdate.exe --close-running --install-dir <absolute folder>
                         [--exclude-pid <pid>]... [--timeout-seconds <1-3600>]
             Sends WM_CLOSE to BWC processes that run from the folder, then waits.
-            Exit: 0 none remain, 2 usage, 3 some remain (printed as name pid=n).
+            A BWC process from the folder in another session fails first, before anything is closed:
+            printed as RunningInOtherSession session=<id> <name> pid=<n>.
+            Exit: 0 none remain, 2 usage, 3 some remain (printed as name pid=n), 4 running in another session.
 
           BwcUpdate.exe --wait-pid <pid> [--timeout-seconds <1-3600>]
             Waits for the process to exit. Exit: 0 exited (or never existed), 2 usage, 3 timeout.
@@ -62,6 +86,10 @@ public sealed class UpdateArguments
     private static readonly HashSet<string> CloseRunningValues = ["--install-dir", "--exclude-pid", "--timeout-seconds"];
     private static readonly HashSet<string> CloseRunningRequired = ["--install-dir"];
     private static readonly HashSet<string> CloseRunningRepeatable = ["--exclude-pid"];
+
+    private static readonly HashSet<string> ApplyElevatedValues = ["--apply-elevated"];
+
+    private static readonly HashSet<string> LaunchHubValues = ["--update-result"];
 
     private static readonly HashSet<string> WaitPidValues = ["--wait-pid", "--timeout-seconds"];
     private static readonly HashSet<string> WaitPidRequired = ["--wait-pid"];
@@ -94,6 +122,11 @@ public sealed class UpdateArguments
         if (args.Count == 0 || args[0] is "--help" or "-h")
         {
             return new UpdateArguments(UpdateMode.Help, string.Empty);
+        }
+
+        if (args[0] == "--set-aumid")
+        {
+            return ParseSetAumid(args);
         }
 
         UpdateMode mode;
@@ -132,8 +165,21 @@ public sealed class UpdateArguments
                 required = WaitPidRequired;
                 repeatable = [];
                 break;
+            case "--apply-elevated":
+                mode = UpdateMode.ApplyElevated;
+                values = ApplyElevatedValues;
+                required = ApplyElevatedValues;
+                repeatable = [];
+                break;
+            case "--launch-hub":
+                mode = UpdateMode.LaunchHub;
+                values = LaunchHubValues;
+                required = [];
+                repeatable = [];
+                break;
             default:
-                return Invalid("the first argument must be --check, --download, --apply, --close-running, --wait-pid, or --help");
+                return Invalid(
+                    "the first argument must be --check, --download, --apply, --apply-elevated, --launch-hub, --set-aumid, --close-running, --wait-pid, or --help");
         }
 
         var parsed = new UpdateArguments(mode, string.Empty);
@@ -179,6 +225,30 @@ public sealed class UpdateArguments
         return problem is null ? parsed : Invalid(problem);
     }
 
+    /// <summary>
+    /// <c>--set-aumid &lt;shortcut&gt; &lt;app id&gt;</c> is positional: exactly two values, neither of them
+    /// option-like. The path and id
+    /// rules are <see cref="ShortcutAumidRules.ArgumentProblem"/>.
+    /// </summary>
+    private static UpdateArguments ParseSetAumid(IReadOnlyList<string> args)
+    {
+        if (args.Count != 3 || args[1].StartsWith("--", StringComparison.Ordinal) || args[2].StartsWith("--", StringComparison.Ordinal))
+        {
+            return Invalid("--set-aumid needs a shortcut path and an app id, and nothing else");
+        }
+
+        var problem = ShortcutAumidRules.ArgumentProblem(args[1], args[2]);
+        if (problem is not null)
+        {
+            return Invalid(problem);
+        }
+
+        var parsed = new UpdateArguments(UpdateMode.SetAumid, string.Empty);
+        parsed._values["--set-aumid"] = [args[1]];
+        parsed._values["--app-id"] = [args[2]];
+        return parsed;
+    }
+
     private static string? ValidateValues(UpdateArguments parsed)
     {
         switch (parsed.Mode)
@@ -216,6 +286,14 @@ public sealed class UpdateArguments
 
                 return TimeoutProblem(parsed);
 
+            case UpdateMode.ApplyElevated:
+                return IsCleanAbsolutePath(parsed.Single("--apply-elevated")!) ? null : "--apply-elevated must be an absolute folder";
+
+            case UpdateMode.LaunchHub:
+                return parsed.Single("--update-result") is { } result && !TryParseUpdateResult(result, out _)
+                    ? "--update-result must be the name of an UpdateFailure other than None"
+                    : null;
+
             default:
                 break;
         }
@@ -240,6 +318,41 @@ public sealed class UpdateArguments
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// True when <paramref name="text"/> is exactly the name of an <see cref="UpdateFailure"/> other than None. A number, a
+    /// different spelling, or text with a space or quote is not accepted, so it is safe on a command line.
+    /// </summary>
+    public static bool TryParseUpdateResult(string? text, out UpdateFailure failure)
+    {
+        failure = UpdateFailure.None;
+        if (string.IsNullOrEmpty(text) || !Enum.TryParse(text, ignoreCase: false, out UpdateFailure parsed)
+            || parsed == UpdateFailure.None || !string.Equals(parsed.ToString(), text, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        failure = parsed;
+        return true;
+    }
+
+    private static bool IsCleanAbsolutePath(string text)
+    {
+        if (!Path.IsPathFullyQualified(text))
+        {
+            return false;
+        }
+
+        foreach (var c in text)
+        {
+            if (c == '"' || c < 0x20)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string? TimeoutProblem(UpdateArguments parsed)

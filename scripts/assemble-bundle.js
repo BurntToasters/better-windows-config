@@ -3,8 +3,8 @@
  * Assembles one channel's update bundle: copies each installer, signs it, writes the manifest,
  * signs the manifest, and validates the result with the same validator the updater uses.
  *
- * Output: <out>/<channel>/ holds bwc-<channel>.json and bwc-<channel>.json.minisig (the GitHub
- * asset names; stable is bwc-stable.json), bwc-<channel>.json.sig (the base64 envelope), each
+ * Output: <out>/<channel>/ holds bwc-<channel>-v2.json and bwc-<channel>-v2.json.minisig (the GitHub
+ * asset names; stable is bwc-stable-v2.json), bwc-<channel>-v2.json.sig (the base64 envelope), each
  * installer with its .minisig and .sig, and assembly.json (a summary with no secret material).
  * One manifest per channel: the channel is part of the folder, the file name, and the signed comment.
  *
@@ -28,6 +28,7 @@ import { channelForVersion } from "./lib/semver.js";
 import {
   buildManifest,
   manifestFileName,
+  installerTrustedComment,
   manifestTrustedComment,
   serializeManifest,
   validateManifestBuffer,
@@ -221,7 +222,7 @@ export async function assembleBundle(options) {
     if (path.resolve(target) !== resolved) {
       fs.copyFileSync(resolved, target);
     }
-    const signatureText = await signFile(target, keyText, `version:${version} arch:${architecture}`, {
+    const signatureText = await signFile(target, keyText, installerTrustedComment({ version, architecture, channel }), {
       password: options.password,
     });
     fs.writeFileSync(`${target}.minisig`, signatureText, "utf8");
@@ -292,7 +293,7 @@ export async function assembleBundle(options) {
         { file: entry.fileName, size: entry.size, sha256: entry.sha256 },
       ]),
     ),
-    ok: validation.ok,
+    ok: validation.ok && errors.length === 0,
   };
   writeJson(path.join(channelDir, "assembly.json"), summary);
 

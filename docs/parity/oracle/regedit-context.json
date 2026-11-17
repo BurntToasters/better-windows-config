@@ -1,0 +1,3037 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture context",
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26300",
+    "ubr": 9974,
+    "displayVersion": "26H2",
+    "processArchitecture": "Arm64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 192,
+    "window": 192,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "note": "Each menu is matched to a resource menu by its leaf command ids. A value menu lists each method tried. Text is in local/context-text.json.",
+  "menus": [
+    {
+      "name": "tree-computer-root",
+      "kind": "tree",
+      "measured": true,
+      "menuTemplate": 107,
+      "items": [
+        {
+          "index": 0,
+          "id": 915,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 1,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 2,
+          "id": 659,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 3,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 4,
+          "id": 768,
+          "separator": false,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        }
+      ]
+    },
+    {
+      "name": "tree-hive-hkcu",
+      "kind": "tree",
+      "measured": true,
+      "menuTemplate": null,
+      "items": [
+        {
+          "index": 0,
+          "id": 915,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 1,
+          "id": null,
+          "separator": true,
+          "grayed": false,
+          "checked": false,
+          "submenu": true,
+          "children": [
+            {
+              "index": 0,
+              "id": 663,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": 664,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 665,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 674,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 688,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 6,
+              "id": 676,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 7,
+              "id": 677,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "id": 662,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 3,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 4,
+          "id": 913,
+          "separator": false,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 5,
+          "id": 914,
+          "separator": false,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 6,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 7,
+          "id": 659,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 8,
+          "id": 678,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 9,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 10,
+          "id": 675,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        }
+      ]
+    },
+    {
+      "name": "tree-key",
+      "kind": "tree",
+      "measured": true,
+      "menuTemplate": null,
+      "items": [
+        {
+          "index": 0,
+          "id": 915,
+          "separator": false,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 1,
+          "id": null,
+          "separator": true,
+          "grayed": false,
+          "checked": false,
+          "submenu": true,
+          "children": [
+            {
+              "index": 0,
+              "id": 663,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": 664,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 665,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 674,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 688,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 6,
+              "id": 676,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 7,
+              "id": 677,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "id": 662,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 3,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 4,
+          "id": 913,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 5,
+          "id": 914,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 6,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 7,
+          "id": 659,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 8,
+          "id": 678,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 9,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 10,
+          "id": 675,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        }
+      ]
+    },
+    {
+      "name": "value-reg-sz",
+      "kind": "value",
+      "measured": true,
+      "menuTemplate": 105,
+      "items": [
+        {
+          "index": 0,
+          "id": 912,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 1,
+          "id": 917,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 2,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 3,
+          "id": 913,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 4,
+          "id": 914,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        }
+      ],
+      "valueType": "REG_SZ",
+      "modifyEnabled": true,
+      "modifyBinaryDataEnabled": true,
+      "method": "shift-f10",
+      "attempts": [
+        {
+          "method": "shift-f10",
+          "popupOpened": true,
+          "menuTemplate": 105,
+          "items": [
+            {
+              "index": 0,
+              "id": 912,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": 917,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 913,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 914,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "value-reg-expand-sz",
+      "kind": "value",
+      "measured": true,
+      "menuTemplate": 105,
+      "items": [
+        {
+          "index": 0,
+          "id": 912,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 1,
+          "id": 917,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 2,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 3,
+          "id": 913,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 4,
+          "id": 914,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        }
+      ],
+      "valueType": "REG_EXPAND_SZ",
+      "modifyEnabled": true,
+      "modifyBinaryDataEnabled": true,
+      "method": "shift-f10",
+      "attempts": [
+        {
+          "method": "shift-f10",
+          "popupOpened": true,
+          "menuTemplate": 105,
+          "items": [
+            {
+              "index": 0,
+              "id": 912,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": 917,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 913,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 914,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "value-reg-binary",
+      "kind": "value",
+      "measured": true,
+      "menuTemplate": 105,
+      "items": [
+        {
+          "index": 0,
+          "id": 912,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 1,
+          "id": 917,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 2,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 3,
+          "id": 913,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 4,
+          "id": 914,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        }
+      ],
+      "valueType": "REG_BINARY",
+      "modifyEnabled": true,
+      "modifyBinaryDataEnabled": true,
+      "method": "shift-f10",
+      "attempts": [
+        {
+          "method": "shift-f10",
+          "popupOpened": true,
+          "menuTemplate": 105,
+          "items": [
+            {
+              "index": 0,
+              "id": 912,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": 917,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 913,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 914,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "value-reg-dword",
+      "kind": "value",
+      "measured": true,
+      "menuTemplate": 105,
+      "items": [
+        {
+          "index": 0,
+          "id": 912,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 1,
+          "id": 917,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 2,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 3,
+          "id": 913,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 4,
+          "id": 914,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        }
+      ],
+      "valueType": "REG_DWORD",
+      "modifyEnabled": true,
+      "modifyBinaryDataEnabled": true,
+      "method": "shift-f10",
+      "attempts": [
+        {
+          "method": "shift-f10",
+          "popupOpened": true,
+          "menuTemplate": 105,
+          "items": [
+            {
+              "index": 0,
+              "id": 912,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": 917,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 913,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 914,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "value-reg-qword",
+      "kind": "value",
+      "measured": true,
+      "menuTemplate": 105,
+      "items": [
+        {
+          "index": 0,
+          "id": 912,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 1,
+          "id": 917,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 2,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 3,
+          "id": 913,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 4,
+          "id": 914,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        }
+      ],
+      "valueType": "REG_QWORD",
+      "modifyEnabled": true,
+      "modifyBinaryDataEnabled": true,
+      "method": "shift-f10",
+      "attempts": [
+        {
+          "method": "shift-f10",
+          "popupOpened": true,
+          "menuTemplate": 105,
+          "items": [
+            {
+              "index": 0,
+              "id": 912,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": 917,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 913,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 914,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "value-reg-multi-sz",
+      "kind": "value",
+      "measured": true,
+      "menuTemplate": 105,
+      "items": [
+        {
+          "index": 0,
+          "id": 912,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 1,
+          "id": 917,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 2,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 3,
+          "id": 913,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 4,
+          "id": 914,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        }
+      ],
+      "valueType": "REG_MULTI_SZ",
+      "modifyEnabled": true,
+      "modifyBinaryDataEnabled": true,
+      "method": "shift-f10",
+      "attempts": [
+        {
+          "method": "shift-f10",
+          "popupOpened": true,
+          "menuTemplate": 105,
+          "items": [
+            {
+              "index": 0,
+              "id": 912,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": 917,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 913,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 914,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "value-reg-none",
+      "kind": "value",
+      "measured": true,
+      "menuTemplate": 105,
+      "items": [
+        {
+          "index": 0,
+          "id": 912,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 1,
+          "id": 917,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 2,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 3,
+          "id": 913,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 4,
+          "id": 914,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        }
+      ],
+      "valueType": "REG_NONE",
+      "modifyEnabled": true,
+      "modifyBinaryDataEnabled": true,
+      "method": "shift-f10",
+      "attempts": [
+        {
+          "method": "shift-f10",
+          "popupOpened": true,
+          "menuTemplate": 105,
+          "items": [
+            {
+              "index": 0,
+              "id": 912,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": 917,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 913,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 914,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "value-reg-resource-list",
+      "kind": "value",
+      "measured": true,
+      "menuTemplate": 105,
+      "items": [
+        {
+          "index": 0,
+          "id": 912,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 1,
+          "id": 917,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 2,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 3,
+          "id": 913,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 4,
+          "id": 914,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        }
+      ],
+      "valueType": "REG_RESOURCE_LIST",
+      "modifyEnabled": true,
+      "modifyBinaryDataEnabled": true,
+      "method": "shift-f10",
+      "attempts": [
+        {
+          "method": "shift-f10",
+          "popupOpened": true,
+          "menuTemplate": 105,
+          "items": [
+            {
+              "index": 0,
+              "id": 912,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": 917,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 913,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 914,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "list-background",
+      "kind": "list",
+      "measured": true,
+      "menuTemplate": 106,
+      "items": [
+        {
+          "index": 0,
+          "id": 663,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 1,
+          "id": null,
+          "separator": true,
+          "grayed": true,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 2,
+          "id": 664,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 3,
+          "id": 665,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 4,
+          "id": 674,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 5,
+          "id": 688,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 6,
+          "id": 676,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        },
+        {
+          "index": 7,
+          "id": 677,
+          "separator": false,
+          "grayed": false,
+          "checked": false,
+          "submenu": false
+        }
+      ]
+    },
+    {
+      "name": "text-edit-address-bar",
+      "kind": "text-edit",
+      "measured": true,
+      "targetClass": "Edit",
+      "targetId": 0,
+      "targetClientWidth": 2670,
+      "targetClientHeight": 34,
+      "matchesRtMenu108": false,
+      "attempts": [
+        {
+          "method": "context-message-at-point",
+          "popupOpened": true,
+          "menuTemplate": null,
+          "systemEditMenu": true,
+          "items": [
+            {
+              "index": 0,
+              "id": 772,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": 768,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 769,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 770,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 771,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 6,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 7,
+              "id": 177,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 8,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 9,
+              "id": 32768,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 10,
+              "id": 32769,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 11,
+              "id": -1,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": true,
+              "children": [
+                {
+                  "index": 0,
+                  "id": 32772,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 1,
+                  "id": 32773,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 2,
+                  "id": 32770,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 3,
+                  "id": 32771,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 4,
+                  "id": 32774,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 5,
+                  "id": 32775,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 6,
+                  "id": 32776,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 7,
+                  "id": 32777,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 8,
+                  "id": 32778,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 9,
+                  "id": 32779,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 10,
+                  "id": 32780,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 11,
+                  "id": 32781,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 12,
+                  "id": 32782,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 13,
+                  "id": 32783,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 14,
+                  "id": 32784,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 15,
+                  "id": 32785,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 16,
+                  "id": 32786,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                }
+              ]
+            },
+            {
+              "index": 12,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 13,
+              "id": 10001,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 14,
+              "id": 10003,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        },
+        {
+          "method": "right-button-at-point",
+          "popupOpened": true,
+          "menuTemplate": null,
+          "systemEditMenu": true,
+          "items": [
+            {
+              "index": 0,
+              "id": 772,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": 768,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 769,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 770,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 771,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 6,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 7,
+              "id": 177,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 8,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 9,
+              "id": 32768,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 10,
+              "id": 32769,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 11,
+              "id": -1,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": true,
+              "children": [
+                {
+                  "index": 0,
+                  "id": 32772,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 1,
+                  "id": 32773,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 2,
+                  "id": 32770,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 3,
+                  "id": 32771,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 4,
+                  "id": 32774,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 5,
+                  "id": 32775,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 6,
+                  "id": 32776,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 7,
+                  "id": 32777,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 8,
+                  "id": 32778,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 9,
+                  "id": 32779,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 10,
+                  "id": 32780,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 11,
+                  "id": 32781,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 12,
+                  "id": 32782,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 13,
+                  "id": 32783,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 14,
+                  "id": 32784,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 15,
+                  "id": 32785,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 16,
+                  "id": 32786,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                }
+              ]
+            },
+            {
+              "index": 12,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 13,
+              "id": 10001,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 14,
+              "id": 10003,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "text-edit-string-data",
+      "kind": "text-edit",
+      "measured": true,
+      "targetClass": "Edit",
+      "targetId": 1001,
+      "targetClientWidth": 716,
+      "targetClientHeight": 34,
+      "matchesRtMenu108": false,
+      "attempts": [
+        {
+          "method": "context-message-at-point",
+          "popupOpened": true,
+          "menuTemplate": null,
+          "systemEditMenu": true,
+          "items": [
+            {
+              "index": 0,
+              "id": 772,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": 768,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 769,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 770,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 771,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 6,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 7,
+              "id": 177,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 8,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 9,
+              "id": 32768,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 10,
+              "id": 32769,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 11,
+              "id": -1,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": true,
+              "children": [
+                {
+                  "index": 0,
+                  "id": 32772,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 1,
+                  "id": 32773,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 2,
+                  "id": 32770,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 3,
+                  "id": 32771,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 4,
+                  "id": 32774,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 5,
+                  "id": 32775,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 6,
+                  "id": 32776,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 7,
+                  "id": 32777,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 8,
+                  "id": 32778,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 9,
+                  "id": 32779,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 10,
+                  "id": 32780,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 11,
+                  "id": 32781,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 12,
+                  "id": 32782,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 13,
+                  "id": 32783,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 14,
+                  "id": 32784,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 15,
+                  "id": 32785,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 16,
+                  "id": 32786,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                }
+              ]
+            },
+            {
+              "index": 12,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 13,
+              "id": 10001,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 14,
+              "id": 10003,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        },
+        {
+          "method": "right-button-at-point",
+          "popupOpened": true,
+          "menuTemplate": null,
+          "systemEditMenu": true,
+          "items": [
+            {
+              "index": 0,
+              "id": 772,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": 768,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 769,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 770,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 771,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 6,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 7,
+              "id": 177,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 8,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 9,
+              "id": 32768,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 10,
+              "id": 32769,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 11,
+              "id": -1,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": true,
+              "children": [
+                {
+                  "index": 0,
+                  "id": 32772,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 1,
+                  "id": 32773,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 2,
+                  "id": 32770,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 3,
+                  "id": 32771,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 4,
+                  "id": 32774,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 5,
+                  "id": 32775,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 6,
+                  "id": 32776,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 7,
+                  "id": 32777,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 8,
+                  "id": 32778,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 9,
+                  "id": 32779,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 10,
+                  "id": 32780,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 11,
+                  "id": 32781,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 12,
+                  "id": 32782,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 13,
+                  "id": 32783,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 14,
+                  "id": 32784,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 15,
+                  "id": 32785,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 16,
+                  "id": 32786,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                }
+              ]
+            },
+            {
+              "index": 12,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 13,
+              "id": 10001,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 14,
+              "id": 10003,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ],
+      "dialogTemplate": 102
+    },
+    {
+      "name": "text-edit-binary-hex",
+      "kind": "text-edit",
+      "measured": true,
+      "targetClass": "HEX",
+      "targetId": 1001,
+      "targetClientWidth": 1193,
+      "targetClientHeight": 340,
+      "matchesRtMenu108": true,
+      "attempts": [
+        {
+          "method": "context-message-at-point",
+          "popupOpened": true,
+          "menuTemplate": 108,
+          "systemEditMenu": false,
+          "items": [
+            {
+              "index": 0,
+              "id": 24,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": 3,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": 22,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 46,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 1024,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        },
+        {
+          "method": "right-button-at-point",
+          "popupOpened": true,
+          "menuTemplate": 108,
+          "systemEditMenu": false,
+          "items": [
+            {
+              "index": 0,
+              "id": 24,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": 3,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": 22,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 46,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 1024,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ],
+      "dialogTemplate": 103
+    },
+    {
+      "name": "text-edit-find-what",
+      "kind": "text-edit",
+      "measured": true,
+      "targetClass": "Edit",
+      "targetId": 1150,
+      "targetClientWidth": 446,
+      "targetClientHeight": 40,
+      "matchesRtMenu108": false,
+      "attempts": [
+        {
+          "method": "context-message-at-point",
+          "popupOpened": true,
+          "menuTemplate": null,
+          "systemEditMenu": true,
+          "items": [
+            {
+              "index": 0,
+              "id": 772,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": 768,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 769,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 770,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 771,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 6,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 7,
+              "id": 177,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 8,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 9,
+              "id": 32768,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 10,
+              "id": 32769,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 11,
+              "id": -1,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": true,
+              "children": [
+                {
+                  "index": 0,
+                  "id": 32772,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 1,
+                  "id": 32773,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 2,
+                  "id": 32770,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 3,
+                  "id": 32771,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 4,
+                  "id": 32774,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 5,
+                  "id": 32775,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 6,
+                  "id": 32776,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 7,
+                  "id": 32777,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 8,
+                  "id": 32778,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 9,
+                  "id": 32779,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 10,
+                  "id": 32780,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 11,
+                  "id": 32781,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 12,
+                  "id": 32782,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 13,
+                  "id": 32783,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 14,
+                  "id": 32784,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 15,
+                  "id": 32785,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 16,
+                  "id": 32786,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                }
+              ]
+            },
+            {
+              "index": 12,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 13,
+              "id": 10001,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 14,
+              "id": 10003,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        },
+        {
+          "method": "right-button-at-point",
+          "popupOpened": true,
+          "menuTemplate": null,
+          "systemEditMenu": true,
+          "items": [
+            {
+              "index": 0,
+              "id": 772,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 1,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 2,
+              "id": 768,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 3,
+              "id": 769,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 4,
+              "id": 770,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 5,
+              "id": 771,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 6,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 7,
+              "id": 177,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 8,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 9,
+              "id": 32768,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 10,
+              "id": 32769,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 11,
+              "id": -1,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": true,
+              "children": [
+                {
+                  "index": 0,
+                  "id": 32772,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 1,
+                  "id": 32773,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 2,
+                  "id": 32770,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 3,
+                  "id": 32771,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 4,
+                  "id": 32774,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 5,
+                  "id": 32775,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 6,
+                  "id": 32776,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 7,
+                  "id": 32777,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 8,
+                  "id": 32778,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 9,
+                  "id": 32779,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 10,
+                  "id": 32780,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 11,
+                  "id": 32781,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 12,
+                  "id": 32782,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 13,
+                  "id": 32783,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 14,
+                  "id": 32784,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 15,
+                  "id": 32785,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                },
+                {
+                  "index": 16,
+                  "id": 32786,
+                  "separator": false,
+                  "grayed": false,
+                  "checked": false,
+                  "submenu": false
+                }
+              ]
+            },
+            {
+              "index": 12,
+              "id": null,
+              "separator": true,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 13,
+              "id": 10001,
+              "separator": false,
+              "grayed": false,
+              "checked": false,
+              "submenu": false
+            },
+            {
+              "index": 14,
+              "id": 10003,
+              "separator": false,
+              "grayed": true,
+              "checked": false,
+              "submenu": false
+            }
+          ]
+        }
+      ],
+      "dialogTemplate": 106
+    }
+  ],
+  "notMeasured": []
+}

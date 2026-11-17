@@ -28,7 +28,7 @@
             Height="20"
             AutomationProperties.AutomationId="ListHeader"
             AutomationProperties.Name="List header"
-            Background="{ThemeResource LayerFillColorAltBrush}">
+            Background="Transparent">
             <Grid x:Name="HeaderClip">
                 <local:DetailsHeaderPanel
                     x:Name="Header"

@@ -2,12 +2,22 @@ using System.Security.Cryptography;
 
 namespace Bwc.Update;
 
-/// <summary>What a receipt or manifest entry says an installer must be.</summary>
-public sealed record InstallerExpectation(string Version, string Architecture, long Size, string Sha256, string Signature);
+/// <summary>
+/// What a receipt or manifest entry says an installer must be. <see cref="Channel"/> is "stable" or "beta", the channel
+/// of the manifest that listed the installer.
+/// </summary>
+public sealed record InstallerExpectation(string Version, string Architecture, long Size, string Sha256, string Signature, string Channel);
+
+/// <summary>The product name the signed installer comment must carry (<c>product:bwc</c>).</summary>
+public static class InstallerProduct
+{
+    public const string Name = "bwc";
+}
 
 /// <summary>
 /// Checks an installer file against its manifest entry, in this order: size, SHA-256, minisign
-/// signature, then the signed trusted comment (version, architecture, and a plain file name).
+/// signature, then the signed trusted comment (version, architecture, product bwc, the manifest's channel, and a plain
+/// file name).
 /// Used by the check (after download) and by the helper (right before launch).
 /// </summary>
 public static class InstallerVerifier
@@ -65,6 +75,16 @@ public static class InstallerVerifier
         if (!fields.TryGetValue("arch", out var architecture) || architecture != expected.Architecture)
         {
             return Outcome<string>.Fail(UpdateFailure.InstallerCommentMismatch, "signed architecture does not match the manifest");
+        }
+
+        if (!fields.TryGetValue("product", out var product) || product != InstallerProduct.Name)
+        {
+            return Outcome<string>.Fail(UpdateFailure.InstallerCommentMismatch, "signed product is not bwc");
+        }
+
+        if (!fields.TryGetValue("channel", out var channel) || channel != expected.Channel)
+        {
+            return Outcome<string>.Fail(UpdateFailure.InstallerCommentMismatch, "signed channel does not match the manifest");
         }
 
         if (fields.TryGetValue("file", out var fileName) && !TrustedComment.IsPlainFileName(fileName))

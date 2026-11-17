@@ -419,6 +419,8 @@ public sealed class ClassicDialogTests
 
     internal static AutomationElement? OpenValueRow(AppSession session, SandboxRegistry sandbox, string name, string checkId)
     {
+        // The list fills after the key is selected, so the row is awaited before it is looked up.
+        _ = ControlTestSupport.WaitUntil(() => RowExists(session, name), UiTimeout);
         AutomationElement? row = ControlTestSupport.FindRowByName(
             session,
             ListControl,

@@ -24,7 +24,8 @@ Each channel has its own manifest URL. A manifest is signed for one channel, so 
 The updater never assumes a URL pattern. The Hub passes both URLs. Convention for the release
 tooling: the signature sits beside the manifest as `<manifest>.minisig`, and when the manifest URL has a
 query string, the `.minisig` suffix goes before the query (`beta.json.minisig?token=...`). The release
-asset names are `bwc-stable.json` and `bwc-beta.json`, with `.minisig` signatures beside them.
+asset names are `bwc-stable-v2.json` and `bwc-beta-v2.json`, with `.minisig` signatures beside them. No other feed file is
+published; a stray asset on a release is refused (`docs/failure-modes/release.md`, LF1).
 
 Every URL must be `https` (`http` is allowed only in tests), at most 4096 characters, with no user
 information and no fragment. The URL is split at its first `?`:
@@ -89,7 +90,7 @@ comment line is never displayed as authenticated; the verifier returns only the 
 | Signature | Trusted comment |
 |-----------|-----------------|
 | Manifest | Exactly `version:<semver> channel:<stable\|beta> expires:<yyyy-MM-ddTHH:mm:ssZ>`. One space between the fields, in this order, and nothing else. |
-| Installer | `version:<entry version>` and `arch:<win-x64 or win-arm64>`, as `key:value` fields separated by spaces or tabs. Optional `file:<plain file name>`, which may not contain a separator, a colon, or a dot name. Keys are lowercase letters, and a key may appear only once. |
+| Installer | `version:<entry version>`, `arch:<win-x64 or win-arm64>`, `product:bwc`, and `channel:<stable or beta>` (the manifest channel), as `key:value` fields separated by spaces or tabs. Optional `file:<plain file name>`, which may not contain a separator, a colon, or a dot name. Keys are lowercase letters, and a key may appear only once. Since 0.1.2 the updater requires `product` and `channel`; a 0.1.1 updater reads only `version`, `arch`, and `file` and ignores the rest. |
 
 The manifest comment binds three things:
 
@@ -103,7 +104,7 @@ Example manifest trusted comment:
 `version:0.2.0-beta.1 channel:beta expires:2026-11-18T00:00:00Z`
 
 Example installer trusted comment:
-`timestamp:1794102823 file:BetterWindowsConfig-Setup-0.2.0-beta.1-x64.exe version:0.2.0-beta.1 arch:win-x64`
+`timestamp:1794102823 file:BetterWindowsConfig-Setup-0.2.0-beta.1-x64.exe version:0.2.0-beta.1 arch:win-x64 product:bwc channel:beta`
 
 The release tooling (`scripts/assemble-bundle.js` with `scripts/sign-update-manifest.js`) builds the comment
 with `manifestTrustedComment` in `scripts/lib/update-manifest.js`, which writes exactly this comment.
@@ -150,7 +151,7 @@ staged under `%TEMP%\BWC-Update\<32 lowercase hex>\`:
    is downloaded. A folder whose installer no longer verifies is discarded.
 2. Otherwise a new folder is created, the installer is streamed to `installer.exe` with a 30 minute
    overall limit and a per-read stall limit, and it is verified (size, SHA-256, minisign signature, signed
-   `version:` and `arch:`). The receipt is written only after every check passes.
+   `version:`, `arch:`, `product:bwc`, and the manifest's `channel:`). The receipt is written only after every check passes.
 3. Every other staging folder is then removed.
 
 Progress goes to stdout as one line per few megabytes, before the result line:
@@ -181,6 +182,10 @@ against it, and against the installer's own signature.
 
 ## Helper (apply) command
 
+An update takes two helper steps (details and exit codes: `update-cli.md`, "Hand-off from the helper"; failure cases:
+`docs/failure-modes/update-elevation.md`). The medium-integrity step `--apply` checks everything and asks for elevation.
+The elevated step `--apply-elevated` copies the installer into a protected folder, verifies the copy, and starts it.
+
 ```
 BwcUpdate.exe --apply <installer.exe> --receipt <receipt.json> --current-version <semver>
               --install-dir <folder> [--wait-pid <pid>]... [--wait-timeout-ms <ms>]
@@ -190,57 +195,77 @@ BwcUpdate.exe --apply <installer.exe> --receipt <receipt.json> --current-version
 Order:
 
 1. The helper refuses when it runs elevated (administrator or high integrity). `%TEMP%` staging is
-   writable by medium-integrity processes, so an elevated helper could load a planted file.
+   writable by medium-integrity processes, so an elevated process of this mode could load a planted file.
 2. The installer must be `installer.exe` in a 32-hex-digit folder directly under
    `%TEMP%\BWC-Update`, with `receipt.json` beside it. No link or junction may be on that path.
 3. The receipt is read (strict, 16 KiB limit). Its architecture must match the helper's, and its
    version must be newer than `--current-version`.
-4. Wait until every `--wait-pid` process and every BWC process running from `--install-dir` has
+4. `--install-dir` must be the folder of the running `BwcUpdate.exe` (in the ship build, inside Program Files). The
+   switches are validated as before, but they are not forwarded.
+5. Wait until every `--wait-pid` process and every BWC process running from `--install-dir` has
    exited (the shared rule in `RunningImageRule`: fail closed, so an unreadable process counts as
    running). Default wait: 60 seconds. If they are still running, stop: nothing is installed.
-5. Open the installer with `FileShare.Read` only. Verify size, SHA-256, minisign signature, and the
-   signed `version:` and `arch:`. The file stays open until the installer has been started.
-6. Start the installer as `installer.exe` with the raw command line
-   `/S /RELAUNCH /PARENTPID=<helper pid> <switches> /D=<install-dir>`. `/RELAUNCH` and `/PARENTPID` are always
-   written by the helper, and a caller's copy of either is dropped. `/D=` is last and unquoted, as NSIS requires. The helper then returns at once. It does not wait for
-   the installer, and it does not start the Hub: the installer does both (see the notes below).
+6. Open the installer with `FileShare.Read` only. Verify size, SHA-256, minisign signature, and the
+   signed `version:`, `arch:`, `product:bwc`, and `channel:`. The file stays open while the elevated helper is started. That
+   is a check for the user's benefit (a bad file is refused before the consent prompt), not a guarantee for the elevated helper:
+   the handle is released when the start returns, so the elevated helper copies the file and verifies the copy.
+7. Start `<folder of BwcUpdate.exe>\BwcUpdate.exe --apply-elevated <staging folder>` with the `runas` verb. Windows shows
+   its consent prompt. The helper then returns at once. It does not start the installer and does not start the Hub.
+   Declining the prompt (Win32 error 1223) is the failure `ElevationDeclined`.
 
-Every refusal before step 6 starts the Hub again with one argument, `--update-result <UpdateFailure>`
-(for example `--update-result ProcessesStillRunning`). The Hub shows the reason. Before the Hub is
-started, the helper waits (up to the wait timeout) for the wait-pid processes to exit, so the single-instance
-gate does not hand the message to an old Hub. The argument carries only the failure code, never the detail.
+Every refusal before step 7 completes (including a declined prompt) starts the Hub again with one argument,
+`--update-result <UpdateFailure>` (for example `--update-result ProcessesStillRunning`). The Hub shows the reason.
+Before the Hub is started, the helper waits (up to the wait timeout) for the wait-pid processes to exit, so the
+single-instance gate does not hand the message to an old Hub. The argument carries only the failure code, never the detail.
 
-Installer switches: `/NAME` or `/NAME=value`. NAME is an uppercase letter followed by uppercase letters,
-digits, or underscores (at most 32 characters), and is never `S` or `D`. The value is 1 to 256
-characters of letters, digits, `_`, `.`, `-`, `:`, and `\`, with no `..`. Examples: `/ALLUSERS`,
-`/RUNID=abc-123`, `/INSTDIR=C:\Apps\BWC`. `RELAUNCH` and `PARENTPID` are reserved: the helper writes them.
+`--apply-elevated <staging folder>` (elevated; the only option is the folder) runs these steps:
 
-The helper removes `__COMPAT_LAYER` from its own environment before it starts any child, so the installer
-and the Hub do not inherit a compatibility layer. The helper never requests elevation (`asInvoker`).
-Whether the installer needs elevation is the installer's decision (per-user or per-machine, decided in D1).
-The installer runs through the shell, so Windows can show its own consent prompt.
+1. It needs an elevated token (`NotElevated` otherwise, and it does nothing). Its install dir is its own folder, and the
+   current version is its own assembly version. It ignores any other value. A staged version that is not newer is
+   refused (`SameVersion`, `Downgrade`).
+2. The folder must be `%TEMP%\BWC-Update\<32 hex>`, with no link on the path or inside it. The receipt is read as above.
+3. It removes older `<install dir>.upd\<32 hex>` folders, then copies `installer.exe` to
+   `<install dir>.upd\<new 32 hex>\installer.exe` (the source is held with `FileShare.Read`, and the copy stops one byte
+   over the receipt size). `<install dir>.upd` and the copy folder are created with an explicit protected DACL (SYSTEM and
+   Administrators only); an existing root with another owner, or one that others can write, is refused.
+4. It verifies the copy (size, SHA-256, minisign signature, signed `version:`, `arch:`, `product:bwc`, and `channel:`) with
+   the copy held open from the first write to the start of the installer.
+5. It starts the copy as `installer.exe` with the raw command line
+   `/S /RELAUNCH /PARENTPID=<this pid> /D=<install dir>`. `/D=` is last and unquoted, as NSIS requires. There is no verb,
+   no caller switch, and the working directory is the system folder. The installer's `TEMP` and `TMP` are a protected
+   `tmp` folder inside the copy folder, and its environment has no .NET runtime variable. It then exits.
+6. A refusal removes the copy and starts the Hub at the shell's integrity level with `--update-result <code>`.
 
-Exit codes: `0` installer started, `2` usage, `3` refused, `4` apps still running, `5` installer did not
-start, `6` refused and the Hub did not start. Stdout is one JSON line:
-`{"ok":true|false,"failure":"<UpdateFailure>","detail":"...","installerStarted":true|false,"hubLaunched":true|false}`.
-`installerStarted` is true when the installer runs. `hubLaunched` is true only when a refusal relaunched the Hub.
+The elevated helper writes no file log. The helper removes `__COMPAT_LAYER` from its own environment before it starts any
+child, so the installer and the Hub do not inherit a compatibility layer. Neither helper requests elevation in its manifest
+(`asInvoker`): the elevation comes from the `runas` start of `--apply-elevated`.
+
+Installer switches (`--installer-switch`, kept for the argument contract): `/NAME` or `/NAME=value`. NAME is an uppercase letter
+followed by uppercase letters, digits, or underscores (at most 32 characters), and is never `S` or `D`. The value is 1 to 256
+characters of letters, digits, `_`, `.`, `-`, `:`, and `\`, with no `..`. `RELAUNCH` and `PARENTPID` are reserved.
+
+Exit codes of `--apply`: `0` the elevated helper started, `2` usage, `3` refused (a declined prompt included), `4` apps still
+running, `5` the elevated helper did not start, `6` refused and the Hub did not start, `7` unexpected. Stdout is one JSON line:
+`{"ok":true|false,"failure":"<UpdateFailure>","detail":"...","installerStarted":false,"elevatedHelperStarted":true|false,"hubLaunched":true|false}`.
+`elevatedHelperStarted` is true when the prompt was accepted and the helper started. `installerStarted` is true only in the
+`--apply-elevated` result. `hubLaunched` is true only when a refusal relaunched the Hub.
 
 ## Notes for the release tooling and D1 (the installer)
 
 - Sign the manifest with `sign-manifest` (the exact trusted comment above) and each installer with the
   release key, never with a test key.
-- The installer must write the `BetterWindowsConfig.exe` and `BwcUpdate.exe` names unchanged.
+- The installer must write the `BetterWindowsConfig.exe` and `BwcUpdate.exe` names unchanged, and the install is per machine
+  (Program Files). The uninstaller should remove `<install dir>.upd`, where the elevated helper leaves its last installer copy.
 - The helper no longer copies the install folder. The installer replaces files in place, so it must:
   1. Start the BWC applications it finds running, by calling
      `BwcUpdate.exe --close-running --install-dir "<install folder>" --exclude-pid <pid>` (see
      `update-cli.md`).
-  2. Wait for the helper to exit, with `BwcUpdate.exe --wait-pid <helper pid> --timeout-seconds <n>` (the helper
-     pid is the `/PARENTPID` value),
-     because the helper's own `BwcUpdate.exe` is a locked file until it exits. The installer should run
-     its own copy of that file (for example from `$PLUGINSDIR`).
-  3. Replace the files. On success, start `BetterWindowsConfig.exe`: the installer relaunches the Hub, because
-     the helper does not, and `/RELAUNCH` asks for it. On failure, start the still-installed
-     `BetterWindowsConfig.exe` with `--update-result InstallerFailed`, so the user sees the reason (N16).
+  2. Wait for the elevated helper to exit, with `BwcUpdate.exe --wait-pid <helper pid> --timeout-seconds <n>` (the
+     pid is the `/PARENTPID` value, the elevated helper), because the helper's own `BwcUpdate.exe` is a locked file until
+     it exits. The installer should run its own copy of that file (for example from `$PLUGINSDIR`).
+  3. Replace the files. On success, start the Hub with `BwcUpdate.exe --launch-hub` from the install folder (never
+     `Exec`, which would start an elevated Hub); `/RELAUNCH` asks for it. On failure, call
+     `--launch-hub --update-result InstallerFailed`, so the user sees the reason (N16).
   4. Give up after its own time limit (30 minutes) and say so; the helper is not waiting for it.
 - Real keys are created by the user. Rotation: list the old and the new key during the overlap,
   then remove the old key once no release uses it.

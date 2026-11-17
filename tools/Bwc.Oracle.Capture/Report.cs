@@ -20,9 +20,28 @@ internal static class Report
 
     internal static void WriteJson(string path, JsonNode node)
     {
-        string json = node.ToJsonString(Options).Replace("\r\n", "\n") + "\n";
+        string json = Redact(node.ToJsonString(Options).Replace("\r\n", "\n")) + "\n";
         Util.WriteUtf8NoBom(path, json);
         Console.WriteLine($"wrote {path}");
+    }
+
+    // The user's SID and this machine's name never reach an output file, tracked or local. The SID is what the
+    // HKEY_USERS node is named after, and the machine name appears in the remote node's label.
+    internal static string Redact(string text)
+    {
+        string sid = System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value ?? string.Empty;
+        if (sid.Length > 0)
+        {
+            text = text.Replace(sid, "<SID>", StringComparison.Ordinal);
+        }
+
+        string machine = Environment.MachineName;
+        if (machine.Length > 0)
+        {
+            text = text.Replace(machine, "<COMPUTER>", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return text;
     }
 
     // Tracked reasons must not change between runs, so the process and window list that a timeout message carries

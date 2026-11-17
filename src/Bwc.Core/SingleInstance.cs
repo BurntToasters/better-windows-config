@@ -2,10 +2,14 @@ using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO.Pipes;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
+
+// The accept-attempt counter is the observable the backoff test checks (docs/failure-modes/core.md).
+[assembly: InternalsVisibleTo("Bwc.Core.Tests")]
 
 namespace Bwc.Core;
 
@@ -57,6 +61,7 @@ public sealed partial class SingleInstance : IDisposable
 
     private NamedPipeServerStream? _activeServer;
     private int _disposed;
+    private int _acceptAttempts;
 
     private SingleInstance(string instanceName, string pipeName, Mutex mutex, bool ownsMutex)
     {
@@ -78,6 +83,12 @@ public sealed partial class SingleInstance : IDisposable
     public bool IsFirstInstance => _ownsMutex;
 
     public string InstanceName { get; }
+
+    /// <summary>
+    /// The number of attempts the accept loop has made to create its pipe server, successful or not. Tests read it to
+    /// check the backoff. It is not a product signal.
+    /// </summary>
+    internal int AcceptAttempts => Volatile.Read(ref _acceptAttempts);
 
     public static SingleInstance Create(string toolId)
     {
@@ -229,14 +240,18 @@ public sealed partial class SingleInstance : IDisposable
             }
         }
 
+        // True when the accept loop has ended, or never ran. Only then may the cancellation source be disposed now.
+        bool acceptLoopEnded = _acceptTask is null;
         if (_acceptTask is not null)
         {
             try
             {
-                _acceptTask.Wait(TimeSpan.FromSeconds(2));
+                acceptLoopEnded = _acceptTask.Wait(TimeSpan.FromSeconds(2));
             }
             catch (Exception ex)
             {
+                // The task completed with a fault, so the loop has ended.
+                acceptLoopEnded = true;
                 SafeTrace.WriteLine("SingleInstance accept loop did not stop cleanly: " + ex.Message);
             }
         }
@@ -262,6 +277,24 @@ public sealed partial class SingleInstance : IDisposable
             SafeTrace.WriteLine("SingleInstance mutex dispose failed: " + ex.Message);
         }
 
+        if (acceptLoopEnded)
+        {
+            DisposeCancellationSource();
+        }
+        else
+        {
+            // The loop outlived the wait. Its token must stay valid until the loop returns, so the source is disposed
+            // by a continuation when the task ends (docs/failure-modes/core.md, "Dispose ordering").
+            _ = _acceptTask!.ContinueWith(
+                _ => DisposeCancellationSource(),
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
+        }
+    }
+
+    private void DisposeCancellationSource()
+    {
         try
         {
             _cancellation.Dispose();
@@ -277,6 +310,7 @@ public sealed partial class SingleInstance : IDisposable
         int retryDelay = AcceptRetryInitialDelayMilliseconds;
         while (!token.IsCancellationRequested)
         {
+            Interlocked.Increment(ref _acceptAttempts);
             NamedPipeServerStream? server = null;
             bool connectionAccepted = false;
             bool messageCompleted = false;

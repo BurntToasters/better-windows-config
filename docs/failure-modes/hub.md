@@ -303,6 +303,22 @@ and an unknown failure shows a generic sentence. The download and the check have
 | MS7 | A cancel reads as an error | Cancel looks like a failure | `hub.update.cancel.status` (existing check) reads the cancel wording, not a failure |
 | MS8 | `--update-result Unexpected` or a check/download failure with code `Unexpected` shows the generic sentence, or the code name | The user gets a vague message with no hint of an internal error | `hub.updateResult.unexpected`: the dialog says the update did not install because of an unexpected error, names the current version, and does not show `Unexpected` |
 
+## Update dialog and result texts (0.1.2)
+
+Written before the tests and the code of the Hub piece (I3), per AGENTS.md. The 0.1.2 install is per machine, so the
+in-app update asks Windows for permission (a consent prompt) after the user presses Download and Install. The Hub says
+so before the click, and it has a plain sentence for each new failure code of `update-elevation.md`.
+
+| ID | Failure | What the user sees | Detection (check id) |
+|----|---------|--------------------|----------------------|
+| UD1 | The Update Available text does not warn about the Windows permission prompt | The prompt after Download and Install is a surprise, and a Cancel reads as a failure | `hub.update.available.permission`: the text says that Windows will ask for permission to install |
+| UD2 | `--update-result ElevationDeclined` shows the generic "did not install" text, or the code name | The user thinks something broke after pressing Cancel on the prompt | `hub.updateResult.elevationDeclined`: the message says the update was canceled and that the installed tools were not changed, names the current version, and does not show `ElevationDeclined` |
+| UD3 | `--update-result NotElevated` | A vague text | `hub.updateResult.notElevated`: says the update did not install because it did not get administrator rights, names the current version, no code name |
+| UD4 | `--update-result RunningInOtherSession` | The user does not know why a closed Hub blocks the update | `hub.updateResult.otherSession`: says Better Windows Config is open in another Windows session, to close it there, names the current version, no code name |
+| UD5 | `--update-result DeElevationFailed` (the helper could not start the Hub at the user's level; in practice the Hub is not started at all in that case, so this text is a safety net) | A vague text | `hub.updateResult.deElevation`: says the Hub could not be started again after the update and to open it from the Start menu, no code name |
+| UD6 | A check or download that fails with one of the four codes shows the generic "could not be verified" sentence | A misleading reason | `FriendlyFailureKey` maps the four codes to their own `UpdateFail*` sentences. Code review of the switch and the resource keys (only the apply path produces these codes, so no check or download run reaches them) |
+| UD7 | Any other unknown code | A blank or technical text | Unchanged: the generic sentence (`UpdateResultNotInstalled`, `UpdateFailGeneric`) |
+
 ## Single instance race
 
 The first Hub instance creates the named mutex and starts the pipe server. A second instance opens

@@ -79,5 +79,17 @@
                 <list:DetailsList x:Name="ListControl" />
             </Border>
         </Grid>
+
+        <!-- The auto-suggest list of the address bar (F4 and typing). It opens under the bar and covers the panes. -->
+        <ListBox
+            x:Name="AddressSuggestList"
+            Grid.Row="2"
+            MaxHeight="240"
+            VerticalAlignment="Top"
+            AutomationProperties.AutomationId="AddressSuggestions"
+            BorderThickness="1"
+            IsTabStop="False"
+            Padding="0"
+            Visibility="Collapsed" />
     </Grid>
 </UserControl>
