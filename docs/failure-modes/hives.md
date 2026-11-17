@@ -270,7 +270,8 @@ Failure modes:
 - Unload is invoked on a value row instead of the mount. Unload Hive needs the tree key selected and no value row
   selected. The test selects the mount in the tree and checks the command state before it invokes it.
 - The mount stays loaded after a failed test. `finally` checks `HKEY_USERS\BWC-E2E-<run-id>` and unloads it with
-  `RegUnLoadKeyW` (`HiveMountNative.cs`, the one native unload call of the E2E project, allowlisted in
+  `RegUnLoadKeyW`, with SeRestorePrivilege and SeBackupPrivilege enabled on the test's token for that call only (held
+  but disabled, the call returned 1314 and left the mount loaded in an elevated run) (`HiveMountNative.cs`, the one native unload call of the E2E project, allowlisted in
   `scripts/check-registry-writer.js`). If that call fails the test records the Win32 code and fails.
 - The hive file is deleted while a mount holds it. `finally` deletes the file only after the mount check passes.
 - A write lands outside the two allowed places. The only registry writes of this test are the sandbox seed under
