@@ -235,13 +235,15 @@ public sealed class HiveMountTests
         AutomationElement? loadItem = driver.WaitForElement("MenuCommand_" + CommandLoadHive);
         bool enabled = IsEnabled(loadItem);
         E2EResults.Record("hives.elevated.load.enabled", enabled, $"Load Hive enabled at HKEY_USERS={enabled}.");
-        _ = ControlTestSupport.CloseOpenMenus(session);
         if (!enabled)
         {
+            _ = ControlTestSupport.CloseOpenMenus(session);
             return false;
         }
 
-        driver.OpenMenu(MenuFile, CommandLoadHive);
+        // The item is invoked in the menu that is still open. Closing the menu and opening it again raced the close
+        // animation: the old item was found while it closed and had no clickable point.
+        InvokeMenuItem(loadItem!);
         IntPtr fileDialog = dialogs.WaitForDialog(TimeSpan.FromSeconds(10));
         E2EResults.Record(
             "hives.elevated.load.file-dialog",
@@ -362,13 +364,15 @@ public sealed class HiveMountTests
         AutomationElement? unloadItem = driver.WaitForElement("MenuCommand_" + CommandUnloadHive);
         bool enabled = IsEnabled(unloadItem);
         E2EResults.Record("hives.elevated.unload.enabled", enabled, $"Unload Hive enabled on the mount={enabled}.");
-        _ = ControlTestSupport.CloseOpenMenus(session);
         if (!enabled)
         {
+            _ = ControlTestSupport.CloseOpenMenus(session);
             return false;
         }
 
-        driver.OpenMenu(MenuFile, CommandUnloadHive);
+        // The item is invoked in the menu that is still open. Closing the menu and opening it again raced the close
+        // animation: the old item was found while it closed and had no clickable point.
+        InvokeMenuItem(unloadItem!);
         AutomationElement? confirm = driver.WaitForElement(PromptRootId, TimeSpan.FromSeconds(10));
         string message = confirm is null ? string.Empty : driver.TextOf("DialogMessage");
         bool asked = confirm is not null && message.Contains(mount, StringComparison.Ordinal);
@@ -488,6 +492,18 @@ public sealed class HiveMountTests
         }
 
         return ControlTestSupport.WaitForTreeSelection(session, rootName, TimeSpan.FromSeconds(10));
+    }
+
+    private static void InvokeMenuItem(AutomationElement item)
+    {
+        if (item.Patterns.Invoke.IsSupported)
+        {
+            item.Patterns.Invoke.Pattern.Invoke();
+        }
+        else
+        {
+            item.Click();
+        }
     }
 
     private static bool IsEnabled(AutomationElement? element)
