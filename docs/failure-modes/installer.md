@@ -576,11 +576,11 @@ The file is already signed (a rebuild of the same publish folder).
 
 `scripts/build-installer.js` signs the BWC-built files in the publish folder root before the payload
 is listed: `BetterWindowsConfig.exe`, `BwcRegedit.exe`, `BwcUpdate.exe`, `BetterWindowsConfig.dll`,
-`BwcRegedit.dll`, `BwcUpdate.dll`, and `Bwc.*.dll`. The match is case-insensitive, root only, and
+`BwcRegedit.dll`, and `Bwc.*.dll` (`BwcUpdate` is NativeAOT: its exe is the only file). The match is case-insensitive, root only, and
 limited to `.dll` and `.exe`.
 
 - Intended: no other file is signed. Microsoft and third-party runtime files (for example
-  `Microsoft.*.dll`, `hostfxr.dll`, `coreclr.dll`, and the self-contained runtime of `BwcUpdate`)
+  `Microsoft.*.dll`, `hostfxr.dll`, and `coreclr.dll`)
   and any file in a subfolder keep their original signature or none. The self-test checks the exact
   list for a fixture folder.
 
