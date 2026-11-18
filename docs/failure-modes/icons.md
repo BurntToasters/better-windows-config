@@ -141,3 +141,75 @@ so a UAC prompt never appeared.
 
 A capture script that finds another classic regedit window refuses to launch or stop it. The
 measurement in this session was made from a fresh launch, not from an attached window.
+
+## 0.2.0: icons by module (piece U1a)
+
+Scope: `IconProvider` loads four icons from `regedit.exe` by `IconKind`. 0.2.0 adds a source named by `ModuleIcon`
+(module file name, a group icon resource id or an index, and the directory it lives in: System32 by default, Windows
+for `regedit.exe`) so the Local Group Policy Editor can load icons from `gpedit.dll` and `admtmpl.dll`. No gpedit id is
+stored in `Bwc.UI`. The existing `IconKind` path keeps its behavior and shares the same loader.
+
+### Missing module
+
+Failure mode: the file is absent on a stripped SKU or an unusual image, or `LoadLibraryEx` fails. A throw on a tree row
+paints nothing.
+
+Rule: a failed load returns no pixels, and `IconProvider` returns a BWC fallback glyph (the requested `IconKind`, or a
+neutral generic glyph when none is given). It never returns null and never throws. The failure is logged once.
+Check: `Icons_ModulePathMatchesRegeditPathAndFallsBack` loads a module that does not exist and requires pixels that are
+byte for byte the generic fallback glyph.
+
+### Missing id or index
+
+Failure mode: the module exists but the group id is absent, or the index is past the last group icon, or the index is
+negative. The load returns null, or reads the wrong icon for an index that wraps.
+
+Rule: an id that is not found, an index outside `0..count-1`, and a non-positive id are all "absent" and give the
+fallback. The index counts the module's group icons in resource directory order, the order `ExtractIcon` uses.
+Check: the same test loads an absent id from an existing module and an index past the end.
+
+### Module name is a path
+
+Failure mode: a name such as `..\..\x.dll` or `C:\x.dll` would make the loader open a file outside the chosen
+directory. The load is as a data file, so no code runs, but the file is still arbitrary.
+
+Rule: the module must be a plain file name. A name with a separator, a drive colon, or an empty name is absent. The
+directory comes from the System32 folder or the Windows folder only. Check: the same test passes `..\regedit.exe` and
+requires the fallback.
+
+### DPI sizes
+
+Failure mode: the group holds 16, 24, 32, 48 and 256 pixel images. Asking for 20 px at 125 percent picks the nearest
+and scales, which can differ from the classic result. A size of zero or a negative size from a bad scale fails.
+
+Rule: the size is `round(16 * scale)` with the same guard as the old path (a non-finite or non-positive scale is 1.0),
+passed to `LoadImage`, which selects the closest image. A regedit icon at 16 and 32 px is compared in the test with the
+old `IconKind` path; the two must be identical because they call one function.
+
+### Cache per DPI
+
+Failure mode: the cache key lacks the size, so a window moved to a 200 percent monitor keeps the 16 px bitmap and is
+blurred. A key that includes the module but not the directory mixes two copies of a file name.
+
+Rule: the key is the whole `ModuleIcon` plus the pixel size. A failed load is cached as the fallback image, so a
+missing module is tried once per size, not once per row. The cache is used from the UI thread only, as before.
+Check: the test requires the same instance for two calls at one scale and a different instance, with a different pixel
+width, at another.
+
+### Handle leaks
+
+Failure mode: each load opens the module, creates an HICON, two bitmaps and a device context. A return path that skips a
+release leaks a handle for every row painted.
+
+Rule: the module is freed, the icon destroyed, both bitmaps deleted and the device context released in `finally`
+blocks, on every path including a failed index lookup. Check: the E2E hook loads a module icon 100 times and compares
+the process GDI and USER object counts before and after, allowing a small drift for other threads.
+
+### The E2E hook leaks into the ship build
+
+Failure mode: the proof needs code inside the app, because the test process cannot call the internal loader.
+
+Rule: the hook is inside `#if BWC_E2E` in `src/Bwc.UI/Icons/IconSelfCheck.cs`. It runs once, on the first
+`IconProvider.Get`, only when `BWC_E2E_ICON_REPORT` names a file, and writes a JSON report there (pixel hashes for the
+old and new paths at 16 and 32 px, the fallback checks, cache identity and handle counts). The test deletes the file
+before launch and fails if it is not written. The ship flavor does not compile it.

@@ -292,7 +292,7 @@ public sealed class PolReaderTests
     }
 
     [TestMethod]
-    public void DuplicateRecords_LaterOverwritesInEarlierPosition()
+    public void DuplicateRecordWithDifferentData_MovesToTheEndOfTheKey()
     {
         var doc = PolDocument.Parse(File(
             DwordRecord("K", "A", 1),
@@ -300,9 +300,30 @@ public sealed class PolReaderTests
             DwordRecord("K", "a", 3)));
         var records = doc.GetRecords("K");
         Assert.AreEqual(2, records.Count);
-        Assert.AreEqual("a", records[0].ValueName);
-        Assert.AreEqual(3u, PolData.TryGetDWord(records[0].Data.Span));
+        Assert.AreEqual("B", records[0].ValueName);
+        Assert.AreEqual("a", records[1].ValueName);
+        Assert.AreEqual(3u, PolData.TryGetDWord(records[1].Data.Span));
+    }
+
+    [TestMethod]
+    public void DuplicateRecordWithIdenticalData_KeepsTheFirstRecordAndPosition()
+    {
+        var doc = PolDocument.Parse(File(
+            DwordRecord("K", "A", 1),
+            DwordRecord("K", "B", 2),
+            DwordRecord("K", "a", 1)));
+        var records = doc.GetRecords("K");
+        Assert.AreEqual(2, records.Count);
+        Assert.AreEqual("A", records[0].ValueName);
         Assert.AreEqual("B", records[1].ValueName);
+    }
+
+    [TestMethod]
+    public void ParsedDocument_StartsWithVersionZeroAndNoChanges()
+    {
+        var doc = PolDocument.Parse(File(DwordRecord("K", "A", 1), DwordRecord("K", "A", 2)));
+        Assert.AreEqual(0, doc.Version);
+        Assert.IsFalse(doc.HasChanges);
     }
 
     [TestMethod]

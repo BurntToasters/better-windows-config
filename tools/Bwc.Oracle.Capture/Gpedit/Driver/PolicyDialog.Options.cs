@@ -1,0 +1,469 @@
+using System.Text.Json.Nodes;
+using System.Windows.Automation;
+using Bwc.Oracle.Capture.Gpedit.Probe;
+
+namespace Bwc.Oracle.Capture.Gpedit.Driver;
+
+// One control group of the options pane: a label and the control that holds the value, found by native window class and style.
+internal sealed class OptionGroup
+{
+    internal int Index { get; init; }
+
+    internal int ControlIndex { get; init; }
+
+    internal string Kind { get; init; } = "unknown";
+
+    internal string Label { get; init; } = string.Empty;
+
+    internal string PanelId { get; init; } = string.Empty;
+
+    internal string ControlId { get; init; } = string.Empty;
+
+    internal string ClassName { get; init; } = string.Empty;
+
+    internal IntPtr Container { get; init; }
+
+    internal IntPtr Control { get; init; }
+
+    internal NativeRect Rect { get; init; }
+}
+
+// Options pane of the setting dialog. The controls are created in code by classic, so they are found by what they are (an EDIT, a
+// multi-line EDIT, an EDIT inside an up-down control, a COMBOBOX, a check box, a Show button), not by guessed ids; the guessed kind is
+// recorded next to the real id and class. Failure modes 6 to 9 of the driver document.
+internal sealed partial class PolicyDialog
+{
+    private static readonly string[] NumericKinds = { "decimalTextBox", "longDecimalTextBox", "spinner" };
+
+    private static bool Has(WinInfo window, string className) => window.Class.Contains("." + className + ".", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsCheckStyle(uint style)
+    {
+        uint type = style & DriverNative.BsTypeMask;
+        return type is 2 or 3 or 5 or 6;
+    }
+
+    private static bool IsPushStyle(uint style)
+    {
+        uint type = style & DriverNative.BsTypeMask;
+        return type is 0 or 1;
+    }
+
+    internal List<OptionGroup> DiscoverOptions()
+    {
+        AutomationElement panel = Element("flowLayoutPanelDynamic");
+        IntPtr panelWindow = new(panel.Current.NativeWindowHandle);
+        if (panelWindow == IntPtr.Zero)
+        {
+            throw new DriverException("the options panel has no window handle");
+        }
+
+        List<WinInfo> children = ProbeWindows.Children(panelWindow)
+            .Where(c => c.Visible && Win32.GetParent(c.Hwnd) == panelWindow)
+            .OrderBy(c => c.Rect.Top).ThenBy(c => c.Rect.Left).ToList();
+        var groups = new List<OptionGroup>();
+        int controlIndex = 0;
+        foreach (WinInfo child in children)
+        {
+            string kind = "unknown";
+            string label = string.Empty;
+            IntPtr control = IntPtr.Zero;
+            string controlId = string.Empty;
+            string className = child.Class;
+            if (Has(child, "BUTTON") && IsCheckStyle(DriverNative.Style(child.Hwnd)))
+            {
+                kind = "checkBox";
+                label = child.Title;
+                control = child.Hwnd;
+                controlId = GpeditDriver.IdOf(child.Hwnd);
+            }
+            else if (Has(child, "STATIC"))
+            {
+                kind = "staticText";
+                label = child.Title;
+            }
+            else
+            {
+                List<WinInfo> inner = ProbeWindows.Children(child.Hwnd);
+                label = inner.FirstOrDefault(d => Has(d, "STATIC") && d.Title.Length > 0)?.Title ?? string.Empty;
+                WinInfo? combo = inner.FirstOrDefault(d => Has(d, "COMBOBOX"));
+                WinInfo? edit = inner.FirstOrDefault(d => Has(d, "EDIT"));
+                WinInfo? push = inner.FirstOrDefault(d => Has(d, "BUTTON") && IsPushStyle(DriverNative.Style(d.Hwnd)));
+                if (combo is not null)
+                {
+                    uint style = DriverNative.Style(combo.Hwnd) & DriverNative.CbsMask;
+                    kind = style == DriverNative.CbsDropDownList ? "dropdownList" : style == DriverNative.CbsDropDown ? "comboBox" : "unknown";
+                    control = combo.Hwnd;
+                    className = combo.Class;
+                }
+                else if (edit is not null)
+                {
+                    control = edit.Hwnd;
+                    className = edit.Class;
+                    controlId = GpeditDriver.IdOf(edit.Hwnd);
+                    bool multiline = (DriverNative.Style(edit.Hwnd) & DriverNative.EsMultiline) != 0;
+                    bool nested = Win32.GetParent(edit.Hwnd) != child.Hwnd;
+                    string hint = (controlId + " " + GpeditDriver.IdOf(child.Hwnd)).ToLowerInvariant();
+                    kind = multiline ? "multiText"
+                        : nested ? "spinner"
+                        : hint.Contains("longdecimal", StringComparison.Ordinal) ? "longDecimalTextBox"
+                        : hint.Contains("decimal", StringComparison.Ordinal) ? "decimalTextBox"
+                        : "textBox";
+                }
+                else if (push is not null)
+                {
+                    kind = "list";
+                    control = push.Hwnd;
+                    className = push.Class;
+                    controlId = GpeditDriver.IdOf(push.Hwnd);
+                }
+            }
+
+            if (kind != "staticText" && control != IntPtr.Zero && string.IsNullOrEmpty(controlId))
+            {
+                controlId = GpeditDriver.IdOf(control);
+            }
+
+            groups.Add(new OptionGroup
+            {
+                Index = groups.Count,
+                ControlIndex = kind == "staticText" ? -1 : controlIndex,
+                Kind = kind,
+                Label = label,
+                PanelId = GpeditDriver.IdOf(child.Hwnd),
+                ControlId = controlId,
+                ClassName = className,
+                Container = child.Hwnd,
+                Control = control,
+                Rect = child.Rect,
+            });
+            if (kind != "staticText")
+            {
+                controlIndex++;
+            }
+        }
+
+        return groups;
+    }
+
+    internal JsonArray ReadOptions(bool readLists)
+    {
+        var result = new JsonArray();
+        foreach (OptionGroup group in DiscoverOptions())
+        {
+            result.Add(DescribeGroup(group, readLists));
+        }
+
+        return result;
+    }
+
+    private JsonObject DescribeGroup(OptionGroup group, bool readLists)
+    {
+        var node = new JsonObject
+        {
+            ["index"] = group.Index,
+            ["controlIndex"] = group.ControlIndex,
+            ["kind"] = group.Kind,
+            ["label"] = group.Label,
+            ["panelId"] = group.PanelId,
+            ["controlId"] = group.ControlId,
+            ["className"] = group.ClassName,
+            ["rect"] = new JsonArray(group.Rect.Left, group.Rect.Top, group.Rect.Width, group.Rect.Height),
+        };
+        if (group.Control == IntPtr.Zero)
+        {
+            return node;
+        }
+
+        node["enabled"] = Win32Ext.IsWindowEnabled(group.Control);
+        switch (group.Kind)
+        {
+            case "textBox" or "decimalTextBox" or "longDecimalTextBox" or "spinner":
+                node["text"] = DriverNative.GetText(group.Control);
+                break;
+            case "multiText":
+                string text = DriverNative.GetText(group.Control);
+                node["text"] = text;
+                node["lines"] = new JsonArray(text.Split("\r\n").Select(l => (JsonNode?)JsonValue.Create(l)).ToArray());
+                break;
+            case "checkBox":
+                node["checkState"] = DriverNative.CheckState(group.Control);
+                break;
+            case "dropdownList" or "comboBox":
+                List<string> items = DriverNative.ComboItems(group.Control);
+                node["items"] = new JsonArray(items.Select(i => (JsonNode?)JsonValue.Create(i)).ToArray());
+                int selected = DriverNative.ComboSelected(group.Control);
+                node["selectedIndex"] = selected;
+                node["selectedText"] = selected >= 0 && selected < items.Count ? items[selected] : null;
+                if (group.Kind == "comboBox")
+                {
+                    node["text"] = DriverNative.GetText(group.Control);
+                }
+
+                break;
+            case "list":
+                node["text"] = DriverNative.GetText(group.Control);
+                if (readLists && Win32Ext.IsWindowEnabled(group.Control))
+                {
+                    node["contents"] = ReadListContents(group);
+                }
+                else if (readLists)
+                {
+                    node["contents"] = "not read: the Show button is disabled";
+                }
+
+                break;
+            default:
+                node["tree"] = ProbeUia.Tree(AutomationElement.FromHandle(group.Container), 5, 80, rawView: true);
+                break;
+        }
+
+        return node;
+    }
+
+    private static string Normalize(string label) => WithoutAmp(label).Trim().TrimEnd(':').Trim().ToLowerInvariant();
+
+    private static OptionGroup FindGroup(OptionSpec spec, List<OptionGroup> groups, out string how)
+    {
+        List<OptionGroup> candidates = groups.Where(g => g.Kind != "staticText").ToList();
+        if (spec.Label is not null)
+        {
+            how = "exact";
+            List<OptionGroup> hits = candidates.Where(g => string.Equals(g.Label, spec.Label, StringComparison.Ordinal)).ToList();
+            if (hits.Count == 0)
+            {
+                how = "normalized";
+                hits = candidates.Where(g => Normalize(g.Label) == Normalize(spec.Label)).ToList();
+            }
+
+            if (hits.Count == 0)
+            {
+                throw new DriverException($"no option labelled '{spec.Label}'. Labels found: " + string.Join(" | ", candidates.Select(c => $"'{c.Label}' ({c.Kind})")));
+            }
+
+            if (hits.Count > 1)
+            {
+                if (spec.Index is { } pick && pick < hits.Count)
+                {
+                    how += "+index";
+                    return hits[pick];
+                }
+
+                throw new DriverException($"{hits.Count} options are labelled '{spec.Label}'; give 'index'");
+            }
+
+            return hits[0];
+        }
+
+        int at = spec.Index!.Value;
+        if (at >= candidates.Count)
+        {
+            throw new DriverException($"option index {at} does not exist; the dialog has {candidates.Count} controls");
+        }
+
+        how = "index";
+        return candidates[at];
+    }
+
+    private static bool KindMatches(string actual, string expected) =>
+        actual == expected || (NumericKinds.Contains(expected) && NumericKinds.Contains(actual)) || (actual == "textBox" && NumericKinds.Contains(expected));
+
+    internal JsonObject SetOption(OptionSpec spec)
+    {
+        List<OptionGroup> groups = DiscoverOptions();
+        OptionGroup group = FindGroup(spec, groups, out string how);
+        if (spec.ExpectKind is not null && !KindMatches(group.Kind, spec.ExpectKind))
+        {
+            throw new DriverException($"option '{group.Label}' is a {group.Kind} (class {group.ClassName}, id '{group.ControlId}'), not a {spec.ExpectKind}");
+        }
+
+        if (group.Control == IntPtr.Zero)
+        {
+            throw new DriverException($"option '{group.Label}' has no control to set (kind {group.Kind})", evidence: DescribeGroup(group, false));
+        }
+
+        RequireOwned(group.Control);
+        if (!Win32Ext.IsWindowEnabled(group.Control))
+        {
+            throw new DriverException($"option '{group.Label}' is disabled (the state must be Enabled first)");
+        }
+
+        JsonObject result = group.Kind switch
+        {
+            "textBox" or "decimalTextBox" or "longDecimalTextBox" or "spinner" =>
+                SetEdit(group, Require(spec.Text, "text", group), numeric: true, typed: spec.Typed is true),
+            "multiText" => SetEdit(
+                group,
+                spec.Lines is not null ? string.Join("\r\n", spec.Lines) : Require(spec.Text, "text or lines", group),
+                numeric: false,
+                typed: spec.Typed is true),
+            "checkBox" => SetCheck(group, Require(spec.Checked, "checked", group)),
+            "dropdownList" => SetCombo(group, spec),
+            "comboBox" => spec.Text is not null ? SetEdit(group, spec.Text, numeric: false, notifyCombo: true, typed: spec.Typed is true) : SetCombo(group, spec),
+            "list" => EditList(group, spec),
+            _ => throw new DriverException($"option '{group.Label}' is of an unknown kind (class {group.ClassName})", evidence: DescribeGroup(group, false)),
+        };
+        result["set"] = "option";
+        result["label"] = group.Label;
+        result["labelMatch"] = how;
+        result["kind"] = group.Kind;
+        result["controlId"] = group.ControlId;
+        result["className"] = group.ClassName;
+        return result;
+    }
+
+    private static T Require<T>(T? value, string field, OptionGroup group)
+        where T : struct => value ?? throw new DriverException($"'{field}' does not apply to option '{group.Label}' ({group.Kind})");
+
+    private static string Require(string? value, string field, OptionGroup group) =>
+        value ?? throw new DriverException($"'{field}' does not apply to option '{group.Label}' ({group.Kind})");
+
+    // Sets edit text with WM_SETTEXT, moves focus to OK so a numeric edit validates, and reads the text again: observed can differ
+    // from requested (clamped to the range, or reset), which is the point of the numeric cases.
+    private JsonObject SetEdit(OptionGroup group, string text, bool numeric, bool notifyCombo = false, bool typed = false)
+    {
+        string before = DriverNative.GetText(group.Control);
+        if (typed)
+        {
+            TypeInto(group, text);
+        }
+        else
+        {
+            DriverNative.SetText(group.Control, text);
+            if (notifyCombo)
+            {
+                DriverNative.NotifyParent(group.Control, DriverNative.CbnEditChange);
+            }
+        }
+
+        string immediate = DriverNative.GetText(group.Control);
+        CommitFocus();
+        string observed = DriverNative.GetText(group.Control);
+        bool isNumeric = numeric && NumericKinds.Contains(group.Kind);
+        if (!isNumeric && !typed && !string.Equals(observed, text, StringComparison.Ordinal))
+        {
+            throw new DriverException($"the text of '{group.Label}' did not stick (asked '{text}', read '{observed}')");
+        }
+
+        return new JsonObject
+        {
+            ["typed"] = typed,
+            ["requested"] = text,
+            ["before"] = before,
+            ["immediate"] = immediate,
+            ["observed"] = observed,
+            ["clamped"] = !string.Equals(observed, text, StringComparison.Ordinal),
+        };
+    }
+
+    // Real key presses, as a user types: the edit limit (maxLength) applies to typed text and not to WM_SETTEXT. The control must have
+    // the keyboard focus, which is read back before any key is sent.
+    private void TypeInto(OptionGroup group, string text)
+    {
+        DriverInput.RequireForeground(Hwnd, driver.Pid);
+        ProbeUia.Focus(AutomationElement.FromHandle(group.Control));
+        Thread.Sleep(200);
+        AutomationElement? focused = AutomationElement.FocusedElement;
+        if (focused is null || focused.Current.NativeWindowHandle != group.Control.ToInt32())
+        {
+            throw new DriverException($"the control of '{group.Label}' did not get the keyboard focus, so nothing was typed");
+        }
+
+        DriverInput.Chord(new[] { DriverInput.VkControl }, DriverInput.VkA);
+        DriverInput.Key(DriverInput.VkDelete);
+        string[] lines = text.Split("\r\n");
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (i > 0)
+            {
+                DriverInput.Key(ProbeInput.VkReturn);
+            }
+
+            DriverInput.TypeText(lines[i]);
+        }
+    }
+
+    private JsonObject SetCheck(OptionGroup group, bool wanted)
+    {
+        int before = DriverNative.CheckState(group.Control);
+        string via = "none needed";
+        if ((before == 1) != wanted)
+        {
+            via = "Toggle";
+            AutomationElement button = AutomationElement.FromHandle(group.Control);
+            if (button.TryGetCurrentPattern(TogglePattern.Pattern, out object? toggle))
+            {
+                ((TogglePattern)toggle).Toggle();
+            }
+            else
+            {
+                via = "BM_CLICK";
+                DriverNative.Click(group.Control);
+            }
+
+            Thread.Sleep(300);
+        }
+
+        int observed = DriverNative.CheckState(group.Control);
+        if ((observed == 1) != wanted)
+        {
+            DriverNative.Click(group.Control);
+            Thread.Sleep(300);
+            observed = DriverNative.CheckState(group.Control);
+            via += " then BM_CLICK";
+        }
+
+        if ((observed == 1) != wanted)
+        {
+            throw new DriverException($"the check box '{group.Label}' did not reach {wanted} (check state {observed})");
+        }
+
+        return new JsonObject { ["requested"] = wanted, ["beforeCheckState"] = before, ["observedCheckState"] = observed, ["via"] = via };
+    }
+
+    // Drop-down item by exact text (raw, with any ampersand) or by position. A drop-down list only takes an existing item.
+    private JsonObject SetCombo(OptionGroup group, OptionSpec spec)
+    {
+        List<string> items = DriverNative.ComboItems(group.Control);
+        int index;
+        if (spec.ItemIndex is { } position)
+        {
+            index = position;
+        }
+        else if (spec.Item is not null)
+        {
+            index = items.FindIndex(i => string.Equals(i, spec.Item, StringComparison.Ordinal));
+        }
+        else
+        {
+            throw new DriverException($"'item' or 'itemIndex' is needed for '{group.Label}' ({group.Kind})");
+        }
+
+        if (index < 0 || index >= items.Count)
+        {
+            throw new DriverException(
+                $"'{group.Label}' has no item {(spec.Item is not null ? $"'{spec.Item}'" : $"#{index}")}. Items: " + string.Join(" | ", items.Select(i => $"'{i}'")),
+                evidence: new JsonArray(items.Select(i => (JsonNode?)JsonValue.Create(i)).ToArray()));
+        }
+
+        int before = DriverNative.ComboSelected(group.Control);
+        DriverNative.ComboSelect(group.Control, index);
+        Thread.Sleep(200);
+        CommitFocus();
+        int observed = DriverNative.ComboSelected(group.Control);
+        if (observed != index)
+        {
+            throw new DriverException($"'{group.Label}' did not select item {index} (selected index {observed})");
+        }
+
+        return new JsonObject
+        {
+            ["requestedItem"] = spec.Item,
+            ["requestedIndex"] = index,
+            ["beforeIndex"] = before,
+            ["observedIndex"] = observed,
+            ["observedText"] = items[observed],
+            ["items"] = new JsonArray(items.Select(i => (JsonNode?)JsonValue.Create(i)).ToArray()),
+        };
+    }
+}

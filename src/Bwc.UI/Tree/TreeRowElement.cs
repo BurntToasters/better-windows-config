@@ -334,8 +334,14 @@ public sealed class TreeRowElement : Panel
             return;
         }
 
-        var kind = Node.Parent is null ? Icons.IconKind.Computer : Icons.IconKind.ClosedFolder;
         double scale = XamlRoot?.RasterizationScale ?? 1.0;
+        if (Node.Icon is { } reference)
+        {
+            _icon.Source = Icons.IconProvider.Get(reference, scale);
+            return;
+        }
+
+        var kind = Node.Parent is null ? Icons.IconKind.Computer : Icons.IconKind.ClosedFolder;
         _icon.Source = Icons.IconProvider.Get(kind, scale);
     }
 

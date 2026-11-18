@@ -61,10 +61,11 @@ Record: `[` key NUL `;` name NUL `;` type(4) `;` size(4) `;` data(size) `]`, del
 
 ### 1.5 Value names and duplicates
 - Value names compare case-insensitively within a key. The empty name is the key's default value and is valid.
-- Two records for the same key and name (any case): load replays in file order, so the later record replaces the
-  earlier one in the earlier one's position (contract: overwrite keeps position). The file therefore does not
-  round-trip byte for byte when it holds duplicates; the result is the normalized form. Classic's result is *verify
-  against oracle* (matrix D).
+- Two records for the same key and name (any case): load replays in file order with the same rule as `SetValue`
+  (section 2.1). A later record with the same type and data changes nothing (the first record and its position stay);
+  a later record with different data removes the earlier record and appends the later one at the end of the key. The
+  file therefore does not round-trip byte for byte when it holds duplicates; the result is the normalized form.
+  Classic's result for a file with duplicates is *verify against oracle* (matrix D).
 - Two records of one key that are not adjacent in the file (`A`, `B`, `A`) are grouped under one key on write. Same
   caveat: a file not already in classic order may be normalized.
 
@@ -79,14 +80,28 @@ Record: `[` key NUL `;` name NUL `;` type(4) `;` size(4) `;` data(size) `]`, del
 
 ## 2. Editing
 
-### 2.1 Overwrite position
-`SetValue` on an existing key and name replaces the record in place (same position among the key's records) and keeps
-the stored spelling of the key and name (registry semantics). Setting identical content leaves the bytes unchanged.
-*verify against oracle*: rule `PolOrderRules.ReplaceInPlace`.
+### 2.1 Set to different data moves to the end (classic probe, 2026-11-18)
+`SetValue` on an existing key and name with a different type or different data removes the old record and appends a new
+one at the end of the key's records. Probe: Zeta=1, then Alpha=1, then Zeta=0 gave `[Alpha=1, Zeta=0]`. The new record
+reuses the stored spelling of the key and name (assumed, not probed). Rule `PolOrderRules.ReplaceByAppend`.
+
+### 2.1a Set to identical data changes nothing
+`SetValue` with the same type and the same data bytes returns the existing record, keeps its bytes and its position,
+and does not count as a change (probe: an OK that changes nothing writes no file). `AddDeleteInstruction` follows the
+same rule for an existing identical `**del.` record.
+
+### 2.1b Change tracking
+`PolDocument.Version` starts at 0 after `Create` or `Parse` and increases by one for every call that changed the model
+(a set with different data, a new record, a removal that removed something). Calls that change nothing leave it alone.
+`HasChanges` compares the bytes the document would write now with the bytes it would have written right after load
+(or the empty document after `Create`); it is false after an edit that was undone, for example a value removed and
+recreated at the same end position. The store uses `HasChanges` to skip the write when nothing changed. `Version`
+alone is not enough because an edit and its undo both bump it.
 
 ### 2.2 Delete then recreate
 `RemoveValue` removes the record. A later `SetValue` of that name appends at the end of its key's records, not at the
-old position. *verify against oracle*: rule `PolOrderRules.AppendToKey`.
+old position. Rule `PolOrderRules.AppendToKey` (the contract states it; the probe confirms the same shape for
+Disabled and Not Configured, see 2.7).
 
 ### 2.3 New value in an existing or new key
 A new value goes to the end of its key's records. A new key has no position of its own; keys are placed only by the
@@ -102,7 +117,7 @@ sort rule at write time.
 
 ### 2.5 Delete instruction
 `AddDeleteInstruction(key, name)` adds `**del.<name>` (type 1, size 4, data `20 00 00 00`) at the end of the key
-(or replaces an existing one in place). It does not remove the value record `name`; the policy layer decides which
+(unchanged when an identical one exists, replaced by append when its data differs). It does not remove the value record `name`; the policy layer decides which
 combinations are allowed. `RemoveInstructions(key, name)` removes the `**del.<name>` and `**soft.<name>` records for
 that value (the per-value instruction prefixes are one array in `PolOrderRules`) and reports how many it removed.
 
@@ -112,7 +127,16 @@ that value (the per-value instruction prefixes are one array in `PolOrderRules`)
   returns the count. It does not remove child keys (`A` does not remove `A\B`).
 - A key whose last record is removed disappears from the model. A document with no records is empty.
 
-### 2.7 Empty document
+### 2.7 Probe sequences (golden tests)
+Replayed in `PolRoundTripTests` on key `Software\Policies\BWC-Oracle\Probe`, all steps from classic:
+1. Zeta=1 gives `[Zeta=1]`; then Alpha=1 gives `[Zeta=1, Alpha=1]`.
+2. Zeta=0 gives `[Alpha=1, Zeta=0]`.
+3. Alpha Disabled with no disabledValue is `RemoveValue(Alpha)` then `AddDeleteInstruction(Alpha)`: `[Zeta=0, **del.Alpha]`.
+4. Zeta Not Configured is `RemoveValue(Zeta)`: `[**del.Alpha]`, no instruction written for Zeta.
+The key sorted before `Software\Policies\Microsoft\Windows\CloudContent`. Whether the policy layer calls these
+methods in this combination is its own decision; this piece only guarantees the record order they produce.
+
+### 2.8 Empty document
 Writing a document with no records writes the 8-byte header. What classic writes for an emptied file (header only,
 zero bytes, or deleting the file) is unknown and *verify against oracle*; the choice is the one method
 `PolOrderRules.EmptyDocumentBytes` (callers that must treat "empty" differently test `IsEmpty` first).
@@ -133,7 +157,8 @@ same on every machine. Windows registry key comparison uses its own upcase table
 Unit test coverage uses a few non-ASCII letters to pin the .NET behavior. *verify against oracle*.
 
 ### 3.3 Values inside a key
-Values keep model order: file order for loaded records, then edit order (overwrite in place, recreate at end).
+Values keep model order: file order for loaded records, then edit order (a change of data or a recreate appends at
+the end, identical data stays where it is).
 
 ### 3.4 Record bytes
 Every record carries its own complete serialized bytes. A loaded record is written back from its original bytes, an

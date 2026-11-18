@@ -26,11 +26,25 @@ internal static class PolOrderRules
     /// </summary>
     public static byte[] EmptyDocumentBytes() => PolFormat.Header.ToArray();
 
-    /// <summary>Verify against oracle: overwriting an existing value keeps its position in the key.</summary>
-    public static void ReplaceInPlace(LinkedListNode<PolRecord> existing, PolRecord replacement) => existing.Value = replacement;
+    /// <summary>
+    /// Classic probe (2026-11-18): setting a value to different data removes its record and appends the new one at the
+    /// end of its key. Setting the same type and data changes nothing, see <see cref="IsSameContent"/>.
+    /// </summary>
+    public static LinkedListNode<PolRecord> ReplaceByAppend(
+        LinkedList<PolRecord> recordsOfKey,
+        LinkedListNode<PolRecord> existing,
+        PolRecord replacement)
+    {
+        recordsOfKey.Remove(existing);
+        return recordsOfKey.AddLast(replacement);
+    }
+
+    /// <summary>Classic probe (2026-11-18): a set with the same type and data bytes is not a change.</summary>
+    public static bool IsSameContent(PolRecord existing, uint type, ReadOnlySpan<byte> data) =>
+        existing.Type == type && existing.Data.Span.SequenceEqual(data);
 
     /// <summary>
-    /// Verify against oracle: a new value, including one created again after it was deleted, goes to the end of its key.
+    /// A new value, including one created again after it was deleted, goes to the end of its key.
     /// </summary>
     public static LinkedListNode<PolRecord> AppendToKey(LinkedList<PolRecord> recordsOfKey, PolRecord record) =>
         recordsOfKey.AddLast(record);

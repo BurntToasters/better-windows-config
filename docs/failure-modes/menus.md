@@ -213,3 +213,71 @@ keyboard sequence.
 
 The oracle is at 192 DPI. Checks use `OracleMetrics.DevicePixels` at the window DPI with a
 tolerance of one DIP in device pixels. A 1 px rounding error at 125 percent is inside the tolerance.
+
+## 0.2.0: tool-neutral menu builder (piece U1a)
+
+Scope: the generic half of `RegeditMenu` moves to `src/Bwc.UI/Menu/ClassicMenuBuilder.cs` so the Local Group Policy
+Editor and Local Security Policy can build the same classic bar and popups from their own command tables. The model
+is `ClassicCommand` plus `ClassicCommandKind` (normal, check, radio) and an optional radio group name. `RegeditMenu`
+keeps the regedit table, the Edit value items and the theme ids, and its old public and internal entry points stay as
+thin forwarders so the controllers that call them are not edited. The regedit menu, context menu and keyboard suites
+are the acceptance: the moved builder must produce the same controls, in the same order, with the same properties.
+
+### Check and radio items were chosen by command id
+
+Failure mode: the old builder made View > Address Bar a toggle and the three theme items radios by comparing the
+command id with constants. A builder that is tool-neutral cannot know those ids. If the move drops the id test and the
+table does not declare the kind, Address Bar becomes a plain item with no check glyph, and the theme items lose their
+radio group, so more than one bullet can show or none.
+
+Rule: the kind and radio group are declared on the `ClassicCommand` in the tool's table. `RegeditMenu` declares
+Address Bar as `Check` and the three theme items as `Radio` in group `BwcTheme`. The builder never looks at an id.
+Check: the existing Menus tests that read the Address Bar check state and the theme radio state, unchanged.
+
+### Mnemonic and accelerator text changes in transit
+
+Failure mode: the parse of `&File` and `Ctrl+P` text moves with the builder. A change in how `&&`, a trailing `&`, the
+oracle TAB, or the older literal backslash-t is handled shifts a menu width, loses an access key, or shows a literal
+ampersand.
+
+Rule: `ParseMenuText` moves unchanged and `RegeditMenu.ParseMenuText` forwards to it. Two items in one menu with the
+same access key are legal, as they are in classic; the builder does not rewrite them. Check: the existing menu width
+check against `regedit-metrics.json`, and the accelerator text check, which read the built controls.
+
+### Order, separators and submenus
+
+Failure mode: the builder adds children in a different order, skips the separator style, or builds a submenu as a
+leaf. The Edit value items are addressed by index (the first three entries), so a reorder makes
+`SetValueCommandsVisible` hide the wrong rows.
+
+Rule: children are added in table order, a separator is always a `MenuFlyoutSeparator` with the separator style, and a
+command with children is always a `MenuFlyoutSubItem` with the submenu style. The three value items stay first in the
+regedit Edit table. Check: the existing Edit menu order and value-item visibility checks.
+
+### Enabled, visible and checked state after the move
+
+Failure mode: a state setter walks only one level, so a command in a submenu (the New subtree, the theme radios) keeps a
+stale state. A state kept outside the control is lost when the popup is rebuilt.
+
+Rule: enable, visibility and check changes are by command id through the whole tree of items and submenus, and the
+state lives on the control (`IsEnabled`, `Visibility`, `IsChecked`), so a popup that opens later shows it. Disabled
+items stay in the keyboard walk the way they did (see the keyboard section above); the builder does not drop them.
+
+### Keyboard navigation and Alt handling
+
+Failure mode: `ClassicMenuKeyboard` finds items by control type and by `MenuItemActions` registration, not by the
+builder. If the moved builder stops calling `MenuItemActions.Register` for a leaf with an action, a mnemonic or Enter
+runs nothing, and a UI Automation Invoke does nothing. If `AccessKey` is no longer set on the bar and the items, Alt
+plus a letter stops opening the menu.
+
+Rule: the builder sets `AccessKey`, the `Click` handler and `MenuItemActions.Register` for every command with an action,
+as before, and sets `KeyboardAcceleratorPlacementMode` to Hidden whenever accelerator text is shown so no tooltip
+appears. Check: the existing keyboard menu tests (Alt, F10, arrows, mnemonic, Escape) and the Ctrl+L tooltip check.
+
+### A second tool gets default Fluent menus
+
+Failure mode: the style keys (`BwcMenuBarItemStyle` and the others) are resolved from `Application.Current.Resources`.
+A tool whose `App.xaml` does not merge `Dense.xaml` gets default Fluent menus without an error.
+
+Rule: the builder applies nothing when a style is missing, as before, and the Gpedit head merges the shared theme in
+its own App.xaml (manager-owned). The gpedit E2E menu checks catch a missing style by the item height.

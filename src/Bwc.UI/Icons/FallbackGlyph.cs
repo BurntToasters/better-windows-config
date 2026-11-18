@@ -39,6 +39,22 @@ internal static class FallbackGlyph
         return new IconExtraction.Pixels(side, side, bgra);
     }
 
+    /// <summary>
+    /// The neutral glyph for a module icon that is absent and has no classic stand-in: a grey page with
+    /// a darker border and three text lines. It is drawn here, never read from a system file.
+    /// </summary>
+    public static IconExtraction.Pixels RenderGeneric(int size)
+    {
+        int side = Math.Max(1, size);
+        var bgra = new byte[side * side * 4];
+        Fill(bgra, side, 2, 1, 14, 15, 0x70, 0x70, 0x70);
+        Fill(bgra, side, 3, 2, 13, 14, 0xF0, 0xF0, 0xF0);
+        Fill(bgra, side, 5, 4, 11, 5, 0x90, 0x90, 0x90);
+        Fill(bgra, side, 5, 7, 11, 8, 0x90, 0x90, 0x90);
+        Fill(bgra, side, 5, 10, 9, 11, 0x90, 0x90, 0x90);
+        return new IconExtraction.Pixels(side, side, bgra);
+    }
+
     /// <summary>Fills the half-open grid rectangle [x0, x1) by [y0, y1) with an opaque color.</summary>
     private static void Fill(byte[] bgra, int side, int x0, int y0, int x1, int y1, byte r, byte g, byte b)
     {

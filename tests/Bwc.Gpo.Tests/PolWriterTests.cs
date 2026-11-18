@@ -103,14 +103,88 @@ public sealed class PolWriterTests
     }
 
     [TestMethod]
-    public void Overwrite_KeepsPositionAndExistingSpelling()
+    public void SetToDifferentData_MovesToTheEndAndKeepsExistingSpelling()
     {
         var doc = PolDocument.Create();
         doc.SetValue("Key", "First", PolValueType.DWord, PolData.FromDWord(1));
         doc.SetValue("Key", "Second", PolValueType.DWord, PolData.FromDWord(2));
         doc.SetValue("KEY", "FIRST", PolValueType.DWord, PolData.FromDWord(9));
-        CollectionAssert.AreEqual(new[] { "Key|First", "Key|Second" }, Names(doc));
+        CollectionAssert.AreEqual(new[] { "Key|Second", "Key|First" }, Names(doc));
         Assert.AreEqual(9u, PolData.TryGetDWord(doc.GetValue("key", "first")!.Data.Span));
+        Assert.AreEqual(2, doc.RecordCount);
+    }
+
+    [TestMethod]
+    public void SetToDifferentType_MovesToTheEnd()
+    {
+        var doc = PolDocument.Create();
+        doc.SetValue("K", "A", PolValueType.DWord, PolData.FromDWord(1));
+        doc.SetValue("K", "B", PolValueType.DWord, PolData.FromDWord(2));
+        doc.SetValue("K", "A", PolValueType.Binary, PolData.FromDWord(1));
+        CollectionAssert.AreEqual(new[] { "K|B", "K|A" }, Names(doc));
+    }
+
+    [TestMethod]
+    public void SetToIdenticalData_KeepsPositionAndRecordAndReportsNoChange()
+    {
+        var doc = PolDocument.Create();
+        doc.SetValue("K", "A", PolValueType.DWord, PolData.FromDWord(1));
+        var second = doc.SetValue("K", "B", PolValueType.DWord, PolData.FromDWord(2));
+        var before = doc.Version;
+        var again = doc.SetValue("K", "A", PolValueType.DWord, PolData.FromDWord(1));
+        Assert.AreEqual(before, doc.Version);
+        Assert.AreSame(doc.GetRecords("K")[0], again);
+        Assert.AreSame(second, doc.GetRecords("K")[1]);
+    }
+
+    [TestMethod]
+    public void Version_RisesOnlyForCallsThatChangeTheModel()
+    {
+        var doc = PolDocument.Create();
+        Assert.AreEqual(0, doc.Version);
+        doc.SetValue("K", "A", PolValueType.DWord, PolData.FromDWord(1));
+        Assert.AreEqual(1, doc.Version);
+        doc.SetValue("K", "A", PolValueType.DWord, PolData.FromDWord(1));
+        Assert.AreEqual(1, doc.Version);
+        doc.SetValue("K", "A", PolValueType.DWord, PolData.FromDWord(2));
+        Assert.AreEqual(2, doc.Version);
+        Assert.IsFalse(doc.RemoveValue("K", "nope"));
+        Assert.AreEqual(0, doc.RemoveKey("nokey"));
+        Assert.AreEqual(0, doc.RemoveInstructions("K", "A"));
+        Assert.AreEqual(2, doc.Version);
+        doc.AddDeleteInstruction("K", "A");
+        doc.AddDeleteInstruction("K", "A");
+        Assert.AreEqual(3, doc.Version);
+        Assert.IsTrue(doc.RemoveValue("K", "A"));
+        Assert.AreEqual(4, doc.Version);
+        Assert.AreEqual(1, doc.RemoveKey("K"));
+        Assert.AreEqual(5, doc.Version);
+    }
+
+    [TestMethod]
+    public void HasChanges_IsFalseForNoOpsAndForAnUndoneEdit()
+    {
+        var doc = PolDocument.Parse(File(DwordRecord("K", "A", 1), DwordRecord("K", "B", 2)));
+        Assert.IsFalse(doc.HasChanges);
+        doc.SetValue("K", "A", PolValueType.DWord, PolData.FromDWord(1));
+        Assert.IsFalse(doc.HasChanges);
+        doc.RemoveValue("K", "B");
+        Assert.IsTrue(doc.HasChanges);
+        doc.SetValue("K", "B", PolValueType.DWord, PolData.FromDWord(2));
+        Assert.IsFalse(doc.HasChanges);
+        doc.SetValue("K", "A", PolValueType.DWord, PolData.FromDWord(5));
+        Assert.IsTrue(doc.HasChanges);
+    }
+
+    [TestMethod]
+    public void HasChanges_OnANewDocumentIsTrueOnlyAfterARecordIsAdded()
+    {
+        var doc = PolDocument.Create();
+        Assert.IsFalse(doc.HasChanges);
+        doc.SetValue("K", "A", PolValueType.DWord, PolData.FromDWord(1));
+        Assert.IsTrue(doc.HasChanges);
+        doc.RemoveValue("K", "A");
+        Assert.IsFalse(doc.HasChanges);
     }
 
     [TestMethod]

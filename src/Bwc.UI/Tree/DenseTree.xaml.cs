@@ -292,6 +292,11 @@ public sealed partial class DenseTree : UserControl
     /// <summary>Starts the inline rename of this node when the double-click time passes with no other input.</summary>
     private void ArmRename(TreeNode node)
     {
+        if (!node.CanRename)
+        {
+            return;
+        }
+
         _pendingRenameNode = node;
         _renameTimer ??= CreateRenameTimer();
         _renameTimer.Interval = TimeSpan.FromMilliseconds(ClickTiming.DoubleClickMilliseconds());
@@ -478,8 +483,14 @@ public sealed partial class DenseTree : UserControl
         }
     }
 
-    /// <summary>Starts the inline rename box for the selected node. F2 uses the same path.</summary>
+    /// <summary>
+    /// Starts the inline rename box for the selected node. F2 uses the same path. Nothing happens when no node is
+    /// selected or the selected node has <see cref="TreeNode.CanRename"/> false.
+    /// </summary>
     public void BeginRenameSelected() => BeginRename();
+
+    /// <summary>True when a node is selected and allows an in-place rename. A host can use it for its Rename state.</summary>
+    public bool CanRenameSelected => SelectedNode is { CanRename: true };
 
     /// <summary>Selects the parent of the selected key (Alt+Up and Backspace). The root has no parent.</summary>
     public void GoToParentOfSelected() => GoToParent();
@@ -1050,7 +1061,7 @@ public sealed partial class DenseTree : UserControl
     private void BeginRename()
     {
         var node = SelectedNode;
-        if (node is null)
+        if (node is null || !node.CanRename)
         {
             return;
         }

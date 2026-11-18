@@ -150,6 +150,18 @@ const sandboxedSeedReason = "Seeds through SandboxRegistry, which confines every
 // C# files that name no registry type but call SetValue or CreateSubKey. Each entry says what the receiver is.
 const unnamedCallAllowlist = new Map([
   [
+    "tests/Bwc.Gpo.Tests/PolWriterTests.cs",
+    "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
+  ],
+  [
+    "tests/Bwc.Gpo.Tests/PolRoundTripTests.cs",
+    "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
+  ],
+  [
+    "tests/Bwc.E2E/Tree/TreeCanRenameTests.cs",
+    "Seeds two keys under the E2E run root through SandboxRegistry, the harness writer.",
+  ],
+  [
     "src/Bwc.Regedit/Controllers/ValueCommands.cs",
     "Sets a hex dialog model in memory (HexViewerDialog and HexEditorDialog), and writes through RegistryStore, the guarded writer.",
   ],
@@ -195,6 +207,10 @@ const unnamedCallAllowlist = new Map([
 
 // C# files that start classic or Hub processes whose literal names reg or regedit. Each entry says why it is safe.
 const launchAllowlist = new Map([
+  [
+    "src/Bwc.UI/Icons/IconSelfCheck.cs",
+    "E2E flavor only. Names regedit.exe as the module whose icons it loads with LoadLibraryEx; it starts no process.",
+  ],
   [
     "tests/Bwc.E2E/Installer/InstallerUpdateTests.cs",
     "Starts classic regedit to look at the installed state. Its writes go through the harness, not a reg command.",

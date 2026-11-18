@@ -45,7 +45,7 @@ public sealed class PolRoundTripTests
     {
         var bytes = File(DwordRecord("K", "A", 1), DwordRecord("K", "B", 2), DwordRecord("K", "A", 3));
         var once = PolDocument.Parse(bytes).ToBytes();
-        CollectionAssert.AreEqual(File(DwordRecord("K", "A", 3), DwordRecord("K", "B", 2)), once);
+        CollectionAssert.AreEqual(File(DwordRecord("K", "B", 2), DwordRecord("K", "A", 3)), once);
         CollectionAssert.AreEqual(once, PolDocument.Parse(once).ToBytes());
     }
 
@@ -60,11 +60,91 @@ public sealed class PolRoundTripTests
         var doc = PolDocument.Parse(bytes);
         doc.SetValue("K", "A", PolValueType.DWord, PolData.FromDWord(2));
         var expected = File(
-            DwordRecord("K", "A", 2),
             Record("K", "**mystery", 99, [7, 7]),
             Record("K", "Odd", 1, Utf16("unterminated")),
+            DwordRecord("K", "A", 2),
             DwordRecord("Z", "V", 1));
         CollectionAssert.AreEqual(expected, doc.ToBytes());
+    }
+
+    private const string ProbeKey = @"Software\Policies\BWC-Oracle\Probe";
+    private const string CloudContentKey = @"Software\Policies\Microsoft\Windows\CloudContent";
+
+    private static string[] ProbeOrder(PolDocument doc) =>
+        doc.GetRecords(ProbeKey)
+            .Select(r => r.ValueName + "=" + (r.IsInstruction ? "del" : PolData.TryGetDWord(r.Data.Span)?.ToString()))
+            .ToArray();
+
+    [TestMethod]
+    public void ClassicProbeSequence_ReplaysTheFourObservedSteps()
+    {
+        var doc = PolDocument.Create();
+        doc.SetValue(CloudContentKey, "Other", PolValueType.DWord, PolData.FromDWord(1));
+
+        doc.SetValue(ProbeKey, "Zeta", PolValueType.DWord, PolData.FromDWord(1));
+        CollectionAssert.AreEqual(new[] { "Zeta=1" }, ProbeOrder(doc));
+        doc.SetValue(ProbeKey, "Alpha", PolValueType.DWord, PolData.FromDWord(1));
+        CollectionAssert.AreEqual(new[] { "Zeta=1", "Alpha=1" }, ProbeOrder(doc));
+
+        doc.SetValue(ProbeKey, "Zeta", PolValueType.DWord, PolData.FromDWord(0));
+        CollectionAssert.AreEqual(new[] { "Alpha=1", "Zeta=0" }, ProbeOrder(doc));
+
+        doc.RemoveValue(ProbeKey, "Alpha");
+        doc.AddDeleteInstruction(ProbeKey, "Alpha");
+        CollectionAssert.AreEqual(new[] { "Zeta=0", "**del.Alpha=del" }, ProbeOrder(doc));
+        var del = doc.GetValue(ProbeKey, "**del.Alpha")!;
+        Assert.AreEqual(1u, del.Type);
+        CollectionAssert.AreEqual(new byte[] { 0x20, 0, 0, 0 }, del.Data.ToArray());
+
+        doc.RemoveValue(ProbeKey, "Zeta");
+        CollectionAssert.AreEqual(new[] { "**del.Alpha=del" }, ProbeOrder(doc));
+
+        CollectionAssert.AreEqual(new[] { ProbeKey, CloudContentKey }, doc.GetKeys().ToArray());
+    }
+
+    [TestMethod]
+    public void ClassicProbeSequence_SavedBytesReloadToTheSameOrderAfterEveryStep()
+    {
+        var doc = PolDocument.Create();
+        Action[] steps =
+        [
+            () => doc.SetValue(ProbeKey, "Zeta", PolValueType.DWord, PolData.FromDWord(1)),
+            () => doc.SetValue(ProbeKey, "Alpha", PolValueType.DWord, PolData.FromDWord(1)),
+            () => doc.SetValue(ProbeKey, "Zeta", PolValueType.DWord, PolData.FromDWord(0)),
+            () =>
+            {
+                doc.RemoveValue(ProbeKey, "Alpha");
+                doc.AddDeleteInstruction(ProbeKey, "Alpha");
+            },
+            () => doc.RemoveValue(ProbeKey, "Zeta"),
+        ];
+        var expected = new[]
+        {
+            File(DwordRecord(ProbeKey, "Zeta", 1)),
+            File(DwordRecord(ProbeKey, "Zeta", 1), DwordRecord(ProbeKey, "Alpha", 1)),
+            File(DwordRecord(ProbeKey, "Alpha", 1), DwordRecord(ProbeKey, "Zeta", 0)),
+            File(DwordRecord(ProbeKey, "Zeta", 0), DeleteRecord(ProbeKey, "Alpha")),
+            File(DeleteRecord(ProbeKey, "Alpha")),
+        };
+        for (var i = 0; i < steps.Length; i++)
+        {
+            steps[i]();
+            var bytes = doc.ToBytes();
+            CollectionAssert.AreEqual(expected[i], bytes, $"step {i + 1}");
+            CollectionAssert.AreEqual(bytes, PolDocument.Parse(bytes).ToBytes(), $"reload step {i + 1}");
+        }
+    }
+
+    [TestMethod]
+    public void ClassicProbe_AnOkThatChangesNothingReportsNoChange()
+    {
+        var bytes = File(DwordRecord(ProbeKey, "Zeta", 0), DeleteRecord(ProbeKey, "Alpha"));
+        var doc = PolDocument.Parse(bytes);
+        doc.SetValue(ProbeKey, "Zeta", PolValueType.DWord, PolData.FromDWord(0));
+        doc.AddDeleteInstruction(ProbeKey, "Alpha");
+        Assert.IsFalse(doc.HasChanges);
+        Assert.AreEqual(0, doc.Version);
+        CollectionAssert.AreEqual(bytes, doc.ToBytes());
     }
 
     [TestMethod]
