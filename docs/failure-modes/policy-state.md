@@ -66,7 +66,7 @@ Not Configured removes the value record and writes no instruction (*probe-confir
 
 | Shape | Enabled writes | Disabled writes | State is read as |
 |---|---|---|---|
-| enabledList only | every item at its key (item key, else list default key, else policy key) | nothing for the list; no value record can say Disabled | Enabled when every item record matches; else Not Configured |
+| enabledList only | every item at its key (item key, else list default key, else policy key) | removes every item and writes `**del.<item>` in the item's key (product today), or writes nothing (the earlier reading); *verify against oracle*, matrix B Pol_Value_EnabledListOnly Disabled; no value record can say Disabled | Enabled when every item record matches; else Not Configured |
 | disabledList only | nothing | every item | Disabled when every item matches; else Not Configured |
 | both lists | enabledList items; disabledList items are removed | disabledList items; enabledList items removed and `**del.` written | the list that matches in full |
 | elements only | each element's value | each element's value removed and `**del.<valueName>` written (*verify against oracle*, `[Rule: DisabledClearsElementsWithDelete]`) | Enabled when any element has a value (*verify against oracle*, `[Rule: IsEnabledByElementEvidence]`); Disabled when a `**del.` for an element name exists and nothing is Enabled |
@@ -256,3 +256,58 @@ Tests that asserted the previous, non-ADMX behavior were updated, not removed:
 - `List_Additive_FollowsTheAdditiveRule` expects the foreign value to stay.
 - `List_UnderAPolicyValueName_WritesTheSwitchAndTheList` and `PolicyStateFlowTests`: Disabled on a list writes `**delvals.`
   and a list-only policy reads Disabled instead of Not Configured.
+
+## Blind review additions
+
+Added by the blind test-first pass (tests in `tests/Bwc.Policy.Tests/Blind/StateBlindTests.cs`). Each item is a way the
+reader, writer or validator could fail that the sections above do not state.
+
+### 8. Arguments and purity
+
+- `Read`, `Apply` and `Validate` throw `ArgumentNullException` for a null policy, document or edit.
+- `Read` never changes the document: the bytes and `HasChanges` are the same before and after.
+- Element ids of an edit are matched ignoring case (the edit's dictionary is case-insensitive) and the snapshot answers
+  the same. A problem carries the id as the caller gave it for an unknown element.
+
+### 9. Idempotence and round trips
+
+- Applying the same edit twice gives `Changed` false the second time and `HasChanges` false on a document that was parsed
+  from the bytes of the first apply. This holds for Enabled, Disabled and Not Configured, for every shape in section 1 to 3.
+- Not Configured on a document that holds only this policy's records leaves an empty document (`IsEmpty`). Not Configured
+  on a document that holds nothing for the policy reports `Changed` false.
+- Enabled with values then read gives back the same element values (round trip), for every element kind, including text
+  with characters outside the basic plane and with leading or trailing blanks.
+
+### 10. Several problems in one edit
+
+`Validate` and `Apply` list every problem of the edit, in the document order of the elements of the policy (where an
+unknown element id sits in that order is not specified), not only the first. When there is at least one, the document bytes are unchanged, whatever
+the other elements held.
+
+### 11. Number edges
+
+A longDecimal accepts `ulong.MaxValue` without `maxValue`. A decimal without `maxValue` rejects 4294967296 as
+`AboveMaximum` with the limit 4294967295. A decimal at `minValue` and at `maxValue` is valid. The limit in a problem is the
+limit that was broken.
+
+### 12. Names compare ignoring case
+
+A record is found whatever the case of its key and value name in the file (`PolDocument` semantics), so a file written
+with other spelling of the key still reads the same state. Writes keep the spelling the document already has.
+
+### 13. Order of elements in the output
+
+Elements are written in template document order, not in name order, even when they share a key
+(`Pol_Shared_ElementsReverseOrder` writes `Gate`, then `ZetaElement`, then `AlphaElement`). Two checks of one policy in
+reverse name order (`Pol_Bool_TwoChecksReverseOrder`) are written `ZetaCheck` then `AlphaCheck`.
+
+### 14. Foreign instructions
+
+A `**del.<name>` of a value that this policy does not name, in a key this policy uses, is never touched by Enabled,
+Disabled or Not Configured of this policy, and is not in `OwnedRecords`.
+
+### 15. A template fault reaches the document call
+
+A policy whose key has a leading backslash, or whose value name starts with `**`, makes the document refuse the call
+(section 5). The exception is `ArgumentException`. The loader may accept such a template (it only limits length), so the
+engine must not turn it into a silent write of a wrong record.

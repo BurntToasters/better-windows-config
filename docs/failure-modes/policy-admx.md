@@ -379,3 +379,57 @@ How it can fail (each has a test):
   reference codes over the system folder.
 
 The fixtures `bad/ListItemNoKey` and `bad/BooleanNoValueName` are the tests.
+
+## Blind review additions
+
+Added by the blind test-first pass (tests in `tests/Bwc.Policy.Tests/Blind/AdmxBlindTests.cs`). Each item is a way the loader
+could fail that the sections above do not state.
+
+### 37. Culture text that is not one safe folder name
+
+The UI culture comes from the caller and names a folder (`<folder>\<culture>`). A culture such as `..\other`, a rooted path
+or one that holds a separator must never make the loader read an ADML outside the template folder. The loader treats such a
+culture as a language folder that is missing, so the template falls back to `en-US` (section 11). It never throws.
+
+### 38. Failure per occurrence
+
+Section 12 and section 14 name one failure per undefined or duplicated id. Two different undefined string ids in one file give
+two `UndefinedString` failures (one per id, document order), and one id used twice gives one failure per use. A file with
+several unrelated faults lists every one of them (none hides another), and all of them are attributed to that file.
+
+### 39. DOCTYPE outside the scanned window
+
+A `DOCTYPE` that starts after the first 64 KiB of the file (a long comment before it) is still `DtdProhibited`. Only its line
+and position are 0 (section 2). It is never `MalformedXml` and never expanded.
+
+### 40. Empty required attribute
+
+An attribute that is present with an empty value (`name=""`) is not the same as an absent one (section 36 rule 3 says the
+same for `valueName`). Section 17 names only the absent case. Whether an empty `name` is a `MissingAttribute` is open; the
+test is marked open.
+
+### 41. Extension, case and sub-folders of template files
+
+A file named `X.ADMX` (upper case extension) is a template (section 7: ignoring case). `X.admx.bak`, `X.txt` and a `.admx` file
+inside a sub-folder that is not the language folder are not read and give no failure. A `.admx` file that is a directory name
+is not a template.
+
+### 42. Several languages in one folder
+
+An ADML that exists for the requested culture but not for one template of the folder is a per-file fallback (section 11).
+The language recorded on each template file is the one that was used, so one set can hold files of two languages.
+
+### 43. A stray invalid attribute on a control
+
+A `spin`, `spinStep`, `noSort`, `defaultItem`, `defaultChecked`, `required` or `defaultHeight` attribute with a value that
+could not be parsed, on a control kind that does not use it, never fails (section 28). The same attribute on the kind that
+uses it follows section 18.
+
+### 44. Property of the immutable set
+
+`TemplateSet` lists are snapshots: `Files`, `Categories`, `Policies`, `SupportedOn` and `Failures` of one set are the same
+objects on every access, and the `Children` of a category and `Policies` of a category list are in source order.
+
+### 45. A template whose namespace differs only in case
+
+Two files whose namespaces differ only in case are duplicates (section 30 and 20): `DuplicateNamespace` for the later file.

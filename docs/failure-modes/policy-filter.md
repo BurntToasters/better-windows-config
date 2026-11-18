@@ -89,3 +89,22 @@ corrects them in one place.
 | D5 | Huge template sets (thousands of policies) | A filter run that blocks | `Apply` checks the token once per 256 subjects and throws `OperationCanceledException`, as the contract requires. Nothing is partly applied: a cancelled call returns nothing. |
 | D6 | Filter built from options that change afterwards | A live options object mutates | `FilterOptions` is an immutable record. `PolicyFilter` copies the platform and word lists when built. |
 | D7 | Null policy | Crash | `ArgumentNullException`. A null state or comment is allowed (B5, A5). |
+
+## Blind review additions
+
+Added by the blind test-first pass (tests in `tests/Bwc.Policy.Tests/Blind/FilterStoreBlindTests.cs`). Each item is a way the
+filter could fail that the sections above do not state.
+
+| ID | Case | Risk | Handling |
+| --- | --- | --- | --- |
+| E1 | Several invalid parts at once | Only the first problem is reported, so the dialog needs several OK presses | `Validate()` returns every problem: `KeywordTextMissing`, `KeywordWithinMissing` and `PlatformsMissing` can all be in one list. `TryCreate` returns false with the same list and a null filter. A valid option set gives true, a filter and no problems. |
+| E2 | Keyword text with wildcard or pattern characters (`.*`, `?`, `%`, `[a]`) | A pattern engine treats them as syntax | The text is literal. A word `a.c` does not match `abc`. |
+| E3 | Exact phrase over the border of two texts (end of the title plus start of the help text) | A phrase that exists in no single text matches | The phrase must lie inside one ticked text. |
+| E4 | Match All with a word that is only in an unticked text | A hit in an unticked text counts | Only ticked texts count for every mode. |
+| E5 | The same subject twice | A filter that keeps state answers differently the second time | `Matches` is pure: same answer each time and the subject is not changed. |
+| E6 | `Apply` and `Count` agree | A status line that does not match the list | `Count(subjects).Shown` equals `Apply(subjects).Shown.Count`, `Total` equals the number of subjects, and `Apply` keeps the input order. An empty input gives 0 of 0. |
+| E7 | All parts together | One part overrides another | Managed, Configured, Commented, keyword and requirements are combined with AND. |
+| E8 | A null input sequence or null set | A crash with no typed reason | `Apply`, `Count` and `AllSettings.List` throw `ArgumentNullException`. |
+| E9 | A culture that changes the case rules (Turkish) | The keyword `TITLE` misses `title` | The result is the same under `tr-TR` as under the invariant culture (A7). |
+| E10 | A platform key written with other case or a policy whose definition has another case | A selected platform misses its policy | The key comparison ignores case (C7). A stale key beside a valid key in Any mode still matches through the valid key. |
+| E11 | `AllSettings` order and sides | A reordered or duplicated list | Source order, one entry per policy, class Machine only on the Machine side, User only on the User side, Both on each. |

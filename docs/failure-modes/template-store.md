@@ -127,3 +127,24 @@ code, the path and a detail.
 | F2 | Sandbox rules (current user in place of Administrators) | The tests and E2E need a writable store | `ForCurrentUser()` creates the folder for real and the test reads the ACL back: inheritance off, current user and SYSTEM full control, no other entry. |
 | F3 | The ACL class is linked from the update project | A copy that drifts | Linked by `<Compile Include ... Link>`, not copied, so the rules stay one source. |
 | F4 | A parent folder that exists and is writable by users | A swap of the store folder | Detected by the owner and DACL check of the store folder (A3). A swapped folder is owned by the swapper. |
+
+## Blind review additions
+
+Added by the blind test-first pass (tests in `tests/Bwc.Policy.Tests/Blind/FilterStoreBlindTests.cs`). Each item is a way the
+store could fail that the sections above do not state.
+
+| ID | Case | Risk | Handling |
+| --- | --- | --- | --- |
+| G1 | `Check` on a good template when the store does not exist | A check creates the store | `Check` never writes anything, not even the store folder. |
+| G2 | A refused `Import` | A refused import leaves a folder or a file behind | A refusal writes nothing. A store folder that did not exist still does not exist. |
+| G3 | The same file imported twice | A silent overwrite | The second import is `NamespaceAlreadyImported` and the store bytes are unchanged. |
+| G4 | An import then a removal then an import | A name that stays reserved | After `Remove` the namespace can be imported again, and the store holds no template, no ADML and no temp file. |
+| G5 | The extension of the source is upper case (`Foo.ADMX`) | The store holds an extension the loader may not match, or the name differs | The store name keeps the stem and has a lowercase `.admx`. The ADML name matches the stem. |
+| G6 | The ADML copied | A changed byte | The ADMX and the ADML in the store are byte equal to the checked source bytes. |
+| G7 | `Check` and `Import` with a null path | A crash | A null path is `SourceMissing`, like an empty one. |
+| G8 | A namespace given to `Remove` in another case | A template that cannot be removed | The namespace is compared ignoring case (loader rule 30). |
+| G9 | `TemplateSources.Load` twice | A different result for the same folders | Same files, failures and `Shadowed` in the same order. `ImportedFiles` all have `SourceIndex` 1 (`StoreSourceIndex`). |
+| G10 | The name rules of `TemplateFileNames` | A name that Windows reads as a device or a stream | `CON`, `NUL`, `COM1`, `LPT9` (with or without an extension), a trailing dot or space, a leading space, `:`, `*`, `?`, a separator, a control character, an empty name and a name over 255 characters are not safe. A name such as `Win-Defender.admx` or one with a non-ASCII letter is safe. `IsSafeAdmxFileName` also needs a stem and the `.admx` extension (any case). |
+| G11 | Store root text with `..` segments or a trailing separator | A root that is not the folder it names | The root is normalized to a full path (`StoreRoot`), so `a\b\..\store\` and `a\store` are the same. |
+| G12 | `EnsureStore` twice | The second call changes the ACL or fails | It is idempotent and the folder keeps its rules. |
+| G13 | A stray temp file in the store (`name.<guid>.tmp`) | A failure or a template from a temp file | The loader ignores it and reports nothing. |
