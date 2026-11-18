@@ -2,7 +2,7 @@
 
 | <img height="20" src="https://raw.githubusercontent.com/BurntToasters/bcls/main/media/windows.png" /> Windows | <img height="20" src="https://raw.githubusercontent.com/BurntToasters/bcls/main/media/mac.png" /> macOS | <img height="20" src="https://raw.githubusercontent.com/BurntToasters/bcls/main/media/linux.png" /> Linux |
 | :--- | :--- | :--- |
-| **Setup EXE:** [x64](https://github.com/BurntToasters/better-windows-config/releases/download/v0.1.3/BetterWindowsConfig-0.1.3-win-x64-setup.exe) / [arm64](https://github.com/BurntToasters/better-windows-config/releases/download/v0.1.3/BetterWindowsConfig-0.1.3-win-arm64-setup.exe) | | |
+| **Setup EXE:** [x64](https://github.com/BurntToasters/better-windows-config/releases/download/v0.1.4/BetterWindowsConfig-0.1.4-win-x64-setup.exe) / [arm64](https://github.com/BurntToasters/better-windows-config/releases/download/v0.1.4/BetterWindowsConfig-0.1.4-win-arm64-setup.exe) | | |
 
 > Better Windows Config is Windows only. It needs Windows 10 version 2004 (build 19041) or later, or Windows 11.
 
@@ -16,6 +16,13 @@
 ### ℹ️ Enjoying Better Windows Config? Consider [❤️ Supporting Me! ❤️](https://rosie.run/support)
 
 Better Windows Config! Faithful, modern re-implementations of the classic Windows tools, starting with the Registry Editor.
+
+## Changes in `v0.1.4:`
+
+- **Updater:** No more console window during an update.
+  - The update helper that installs the update now runs hidden, so a blank command prompt window no longer appears after you accept the Windows permission prompt.
+  - Reopening Better Windows Config after the update no longer flashes a console window.
+  - When an update starts, Windows shows a notification: "Better Windows Config is updating and will restart automatically...". The app closes, installs the update, and reopens by itself.
 
 ## Changes in `v0.1.3:`
 

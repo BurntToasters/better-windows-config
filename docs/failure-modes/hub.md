@@ -225,6 +225,9 @@ installer does that per the update contract), and exits. The fixture signs the s
 | HI8 | After a successful install the Hub is not started again | The user is left with no app | `hub.install.relaunched`: a new Hub from the publish folder shows its main window |
 | HI9 | The Hub's window stays after a refused install or closes early on a refusal | Confusing state | `hub.refuse.hubStays`, and the message box is dismissed |
 | HI10 | A staged installer that failed verification is kept in staging | Staged bytes stay around | `hub.refuse.staging`: no staging folder created by the test holds a receipt |
+| HI11 | The "updating" toast is shown when `UpdateService.StartInstall` failed, or before it runs | The user is told the update is starting while the error dialog says it could not start | Code review: `UpdateNotice.ShowUpdating` is called only after the try/catch around `StartInstall` in `MainWindow.Updates.cs` (a failed start returns early). The log line `Update notification shown.` must not follow `Update install could not start.` |
+| HI12 | The toast API throws (no Start menu shortcut carries the AppUserModelID in dev or E2E builds, or notifications are off) and the exception stops the install | The update does not run, or the Hub stays open after the press | `hub.install.hubClosed` and `hub.install.relaunched` still pass in E2E builds, where no shortcut exists. `UpdateNotice.ShowUpdating` catches every exception and logs a warning, and `Hub closing so the update can install.` still follows it. Code review of the catch |
+| HI13 | The toast has a button or an activation handler, so a click reaches a Hub that is already exiting | A button that does nothing, or a Hub that is restarted by a stray click | Code review: the toast XML has no `action` or `actions` element and no `Activated` handler is attached. The Hub exits right after it shows the toast |
 
 Not covered by these two tests (each is covered elsewhere or is a documented limit):
 
