@@ -301,6 +301,9 @@ Download and Install checks the update again, closes the Hub, and replaces the i
   <data name="UpdateInstallStartFailed" xml:space="preserve">
     <value>The update could not be started: {0}</value>
   </data>
+  <data name="UpdateInstallingToast" xml:space="preserve">
+    <value>Better Windows Config is updating and will restart automatically...</value>
+  </data>
   <data name="UpdateCanceled" xml:space="preserve">
     <value>The update check was canceled.</value>
   </data>

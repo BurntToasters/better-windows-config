@@ -35,6 +35,7 @@ Terms:
 | ME9 | The verified installer is held with `FileShare.Read` until the elevated helper has started | Swap between the check and the start | Write-open and delete fail while the host start runs (HT4 now covers the hand-off) | `Verified_Installer_Is_Locked` |
 | ME10 | Exception after the elevated helper started | Hub relaunched while the install runs | No relaunch. `Unexpected`, `ElevatedHelperStarted` true | `Doc` (the exception before the start is `Unexpected_During_Elevated_Start_Relaunches_Hub`) |
 | ME11 | Bad `--installer-switch` | Switch checks dropped because the switches are not forwarded | Still refused `InstallerArgumentRejected` (same rules as Q2 to Q4) | `Installer_Arg_Validation` |
+| ME12 | The elevated helper's console window is visible during the apply (a `cmd`-style window appears with no explanation) | The user sees a stray console window, may close it, and stops the update | The `runas` start is made with `WindowStyle` Hidden, so ShellExecuteEx passes SW_HIDE and the helper's console starts hidden. The consent prompt, the verb, the working directory, the arguments, and the cancel handling (ME6) are unchanged | `Doc` (a visible run shows whether the window is hidden; no unit test can see a window style) |
 
 ## EA. Elevated helper (`--apply-elevated <staging folder>`)
 

@@ -282,6 +282,7 @@ public sealed partial class MainWindow
             return;
         }
 
+        UpdateNotice.ShowUpdating();
         Log.Info("Hub closing so the update can install.");
         Close();
     }

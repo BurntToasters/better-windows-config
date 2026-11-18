@@ -230,13 +230,15 @@ FunctionEnd
 ; Starts the Hub through BwcUpdate.exe --launch-hub, never directly: an elevated setup that started the Hub itself would
 ; leave an elevated Hub. The helper starts it at the shell's integrity level (a normal start when it is not elevated,
 ; which is the E2E per-user flavor). $R5 = the extra arguments ("" or "--update-result InstallerFailed"). The helper
-; starts from %WINDIR%, never from a folder that a standard user can write. A missing helper or Hub is a log line, and
-; a failed start never changes the exit code.
+; starts from %WINDIR%, never from a folder that a standard user can write. BwcUpdate.exe is a console program, so it
+; runs through nsExec::Exec, which starts it hidden (a plain Exec would flash a console window). Its return value is
+; popped into $R6 and ignored: a failed start never changes the exit code. A missing helper or Hub is a log line.
 Function BwcLaunchHub
   IfFileExists "$INSTDIR\${BWC_UPDATER_EXE}" 0 BwcLaunch_missing
   IfFileExists "$INSTDIR\${BWC_HUB_EXE}" 0 BwcLaunch_missing
   SetOutPath "$WINDIR"
-  Exec '"$INSTDIR\${BWC_UPDATER_EXE}" --launch-hub $R5'
+  nsExec::Exec '"$INSTDIR\${BWC_UPDATER_EXE}" --launch-hub $R5'
+  Pop $R6
   Return
   BwcLaunch_missing:
   DetailPrint "The Hub was not started: ${BWC_UPDATER_EXE} or ${BWC_HUB_EXE} is missing from $INSTDIR."

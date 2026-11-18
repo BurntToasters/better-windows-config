@@ -1,8 +1,8 @@
 <Project>
 
   <PropertyGroup>
-    <Version>0.1.3</Version>
-    <FileVersion>0.1.3.0</FileVersion>
+    <Version>0.1.4</Version>
+    <FileVersion>0.1.4.0</FileVersion>
     <Company>Better Windows Config</Company>
     <Product>Better Windows Config</Product>
     <Copyright>Copyright (c) Better Windows Config contributors</Copyright>
