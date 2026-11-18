@@ -97,7 +97,7 @@ public sealed class AdmxParserTests
         Assert.AreEqual("ListMaster", both.ValueName);
         Assert.AreEqual(2, both.EnabledList!.Items.Count);
         Assert.AreEqual(1, both.DisabledList!.Items.Count);
-        Assert.IsNull(both.EnabledList.DefaultKey);
+        Assert.AreEqual(@"Software\Policies\BWC-Oracle\Basics", both.EnabledList.DefaultKey);
         Assert.AreEqual(both.Key, both.EnabledList.Items[0].EffectiveKey);
         Assert.AreEqual(@"Software\Policies\BWC-Oracle\Basics\BothListKey", both.EnabledList.Items[1].EffectiveKey);
     }

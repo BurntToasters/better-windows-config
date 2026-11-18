@@ -167,7 +167,7 @@
     <policy name="Pol_Value_BothLists" class="Machine" displayName="$(string.Pol_Value_BothLists)" explainText="$(string.Pol_Value_BothLists_Help)" key="Software\Policies\BWC-Oracle\Basics" valueName="ListMaster">
       <parentCategory ref="Basics" />
       <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
-      <enabledList>
+      <enabledList defaultKey="Software\Policies\BWC-Oracle\Basics">
         <item valueName="BothListOn">
           <value>
             <decimal value="1" />
@@ -180,7 +180,7 @@
         </item>
       </enabledList>
       <disabledList>
-        <item valueName="BothListOff">
+        <item key="Software\Policies\BWC-Oracle\Basics" valueName="BothListOff">
           <value>
             <decimal value="0" />
           </value>
@@ -487,7 +487,7 @@
               <decimal value="3" />
             </value>
             <valueList>
-              <item valueName="ProfileCOnly">
+              <item key="Software\Policies\BWC-Oracle\Elements\Choice" valueName="ProfileCOnly">
                 <value>
                   <decimal value="300" />
                 </value>
