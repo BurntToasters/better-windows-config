@@ -17,6 +17,74 @@ internal sealed class ParseContext(string path, FailureSink sink)
         sink.Add(code, Path, detail, position.Line, position.Position);
     }
 
+    /// <summary>
+    /// Records a failure at the closing angle bracket of the element's start tag, which is the position classic reports
+    /// for a missing attribute (a tag may span lines, and a self-closing tag ends at its own bracket). The position is
+    /// found by scanning the file text from the element name, skipping quoted values. When the text cannot be read or
+    /// the bracket is not found, the position of the element name is used.
+    /// </summary>
+    internal void FailAtStartTagEnd(TemplateFailureCode code, XElement element, string detail)
+    {
+        var start = PositionOf(element);
+        var end = StartTagEnd(start) ?? start;
+        sink.Add(code, Path, detail, end.Line, end.Position);
+    }
+
+    private SourcePosition? StartTagEnd(SourcePosition start)
+    {
+        if (start.Line <= 0 || start.Position <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var text = File.ReadAllText(Path).Replace("\r\n", "\n").Replace('\r', '\n');
+            var offset = 0;
+            for (var line = 1; line < start.Line; line++)
+            {
+                var next = text.IndexOf('\n', offset);
+                if (next < 0)
+                {
+                    return null;
+                }
+
+                offset = next + 1;
+            }
+
+            var lineNumber = start.Line;
+            var lineStart = offset;
+            var quote = '\0';
+            for (var i = offset + start.Position - 1; i < text.Length; i++)
+            {
+                var c = text[i];
+                if (c == '\n')
+                {
+                    lineNumber++;
+                    lineStart = i + 1;
+                }
+                else if (quote != '\0')
+                {
+                    quote = c == quote ? '\0' : quote;
+                }
+                else if (c is '"' or '\'')
+                {
+                    quote = c;
+                }
+                else if (c == '>')
+                {
+                    return new SourcePosition(lineNumber, i - lineStart + 1);
+                }
+            }
+
+            return null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
     internal static string? Attr(XElement element, string name) => element.Attribute(name)?.Value;
 
     /// <summary>Reads an optional boolean attribute. A value that is not true, false, 1 or 0 is recorded and ignored.</summary>

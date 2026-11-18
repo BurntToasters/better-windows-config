@@ -319,7 +319,7 @@ public sealed class AdmxParserTests
     }
 
     [TestMethod]
-    public void Parser_PolicyMissingKeyClassOrName_IsDroppedAndRecorded()
+    public void Parser_PolicyMissingKeyClassOrName_IsRecordedAndTheFileIsRejected()
     {
         using var temp = new TempTemplates();
         temp.AddSimple(
@@ -334,8 +334,7 @@ public sealed class AdmxParserTests
             """,
             """<string id="P">P</string>""");
         var set = temp.Load();
-        Assert.AreEqual(1, set.Policies.Count);
-        Assert.AreEqual("Good", set.Policies[0].Name);
+        FailureAssert.NothingLoaded(set);
         Assert.AreEqual(3, set.Failures.Count(f => f.Code == TemplateFailureCode.MissingAttribute));
         var details = set.Failures.Where(f => f.Code == TemplateFailureCode.MissingAttribute).Select(f => f.Detail).OrderBy(d => d, StringComparer.Ordinal).ToArray();
         CollectionAssert.AreEqual(new[] { "class", "key", "name" }, details);
@@ -357,7 +356,7 @@ public sealed class AdmxParserTests
     }
 
     [TestMethod]
-    public void Parser_DuplicatePolicyCategoryAndSupportedOn_KeepTheFirst()
+    public void Parser_DuplicatePolicyCategoryAndSupportedOn_AreRecordedAndTheFileIsRejected()
     {
         using var temp = new TempTemplates();
         temp.Add(
@@ -380,17 +379,14 @@ public sealed class AdmxParserTests
             """,
             """<string id="First">First</string><string id="Second">Second</string>""");
         var set = temp.Load();
-        Assert.AreEqual(1, set.Policies.Count);
-        Assert.AreEqual("A", set.Policies[0].ValueName);
-        Assert.AreEqual("First", set.Categories.Single().DisplayName);
-        Assert.AreEqual("First", set.SupportedOn.Single().DisplayName);
+        FailureAssert.NothingLoaded(set);
         FailureAssert.Single(set, TemplateFailureCode.DuplicatePolicy);
         FailureAssert.Single(set, TemplateFailureCode.DuplicateCategory);
         FailureAssert.Single(set, TemplateFailureCode.DuplicateSupportedOn);
     }
 
     [TestMethod]
-    public void Parser_DuplicateElementId_DropsTheWholePolicy()
+    public void Parser_DuplicateElementId_IsRecordedAndTheFileIsRejected()
     {
         using var temp = new TempTemplates();
         temp.AddSimple(
@@ -403,13 +399,12 @@ public sealed class AdmxParserTests
             """,
             """<string id="P">P</string>""");
         var set = temp.Load();
-        Assert.AreEqual(1, set.Policies.Count);
-        Assert.AreEqual("Good", set.Policies[0].Name);
+        FailureAssert.NothingLoaded(set);
         Assert.AreEqual("a", FailureAssert.Single(set, TemplateFailureCode.DuplicateElement).Detail);
     }
 
     [TestMethod]
-    public void Parser_ElementWithoutId_DropsTheWholePolicy()
+    public void Parser_ElementWithoutId_IsRecordedAndTheFileIsRejected()
     {
         using var temp = new TempTemplates();
         temp.AddSimple(
@@ -418,12 +413,12 @@ public sealed class AdmxParserTests
             """<policy name="Bad" class="Machine" displayName="$(string.P)" key="K"><parentCategory ref="Root" /><elements><text valueName="A" /></elements></policy>""",
             """<string id="P">P</string>""");
         var set = temp.Load();
-        Assert.AreEqual(0, set.Policies.Count);
+        FailureAssert.NothingLoaded(set);
         Assert.AreEqual("id", FailureAssert.Single(set, TemplateFailureCode.MissingAttribute).Detail);
     }
 
     [TestMethod]
-    public void Parser_InvalidNumbersAndBooleans_AreRecordedAndIgnored()
+    public void Parser_InvalidNumbersAndBooleans_AreRecordedAndTheFileIsRejected()
     {
         using var temp = new TempTemplates();
         temp.AddSimple(
@@ -435,11 +430,7 @@ public sealed class AdmxParserTests
             """,
             """<string id="P">P</string>""");
         var set = temp.Load();
-        var element = set.Policies.Single().Element<DecimalElement>("D");
-        Assert.IsNull(element.MinValue);
-        Assert.IsNull(element.MaxValue);
-        Assert.IsFalse(element.Soft);
-        Assert.IsTrue(element.Required);
+        FailureAssert.NothingLoaded(set);
         var details = set.Failures.Where(f => f.Code == TemplateFailureCode.InvalidAttributeValue).Select(f => f.Detail).OrderBy(d => d, StringComparer.Ordinal).ToArray();
         CollectionAssert.AreEqual(new[] { "maxValue", "minValue", "soft" }, details);
     }
@@ -464,7 +455,7 @@ public sealed class AdmxParserTests
     }
 
     [TestMethod]
-    public void Parser_NamesAndKeysOverTheLimits_AreRefused()
+    public void Parser_NamesAndKeysOverTheLimits_AreRecordedAndTheFileIsRejected()
     {
         using var temp = new TempTemplates();
         var longName = new string('n', AdmxLimits.MaxNameLength + 1);
@@ -482,7 +473,7 @@ public sealed class AdmxParserTests
             """,
             """<string id="P">P</string>""");
         var set = temp.Load();
-        Assert.AreEqual("Good", set.Policies.Single().Name);
+        FailureAssert.NothingLoaded(set);
         var details = set.Failures.Where(f => f.Code == TemplateFailureCode.NameTooLong).Select(f => f.Detail).OrderBy(d => d, StringComparer.Ordinal).ToArray();
         CollectionAssert.AreEqual(new[] { "id", "key", "name", "valueName" }, details);
     }

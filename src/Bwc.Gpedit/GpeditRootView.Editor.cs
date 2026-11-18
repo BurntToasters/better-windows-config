@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Bwc.Core;
+using Bwc.Gpedit.Editor.Dialog;
 using Bwc.Gpedit.List;
 using Bwc.Gpedit.Policy;
 using Bwc.Gpedit.Tree;
@@ -9,6 +10,7 @@ using Bwc.Policy.Admx;
 using Bwc.UI.Console.Extended;
 using Bwc.UI.Console.List;
 using Bwc.UI.Tree;
+using Microsoft.UI;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -54,10 +56,11 @@ public sealed partial class GpeditRootView
     private int _editRequests;
     private string _lastEdit = string.Empty;
     private int _linkInvocations;
+    private PolicySettingDialog? _policyDialog;
 
     /// <summary>
     /// Raised when the user asks to edit a policy: the Edit policy setting link, Enter or a double click on a policy row.
-    /// The setting dialog (piece G3a) handles it; until then nothing subscribes.
+    /// The view itself subscribes and opens the setting dialog (piece G3a, <see cref="OpenPolicyDialog"/>).
     /// </summary>
     public event EventHandler<GpeditPolicyEditEventArgs>? PolicyEditRequested;
 
@@ -74,6 +77,7 @@ public sealed partial class GpeditRootView
 
         ConfigureEditorResultPane();
         StartModelLoad();
+        PolicyEditRequested += OnPolicyEditRequested;
 
         Shell.TreeContent.SetRoots([_source.Root]);
         Shell.TreeContent.SelectionChanged += OnTreeSelectionChanged;
@@ -321,6 +325,128 @@ public sealed partial class GpeditRootView
         }
 
         UpdateReadout();
+    }
+
+    // ---- the setting dialog -------------------------------------------------------------------------
+
+    private void OnPolicyEditRequested(object? sender, GpeditPolicyEditEventArgs e) => OpenPolicyDialog(e.Policy, e.Side);
+
+    /// <summary>
+    /// Opens the setting dialog for a policy (docs/failure-modes/gpedit-dialog.md). One dialog at a time. Previous Setting and
+    /// Next Setting move through the policy rows of the shown list in display order. Apply changes the in-memory policy object
+    /// only (the seam <see cref="IPolicyEditStore"/>; piece G4 replaces it), and the State and Comment cells are rebuilt.
+    /// </summary>
+    private void OpenPolicyDialog(PolicyDefinition policy, GpoSide side)
+    {
+#if BWC_E2E
+        // The list tests that only count the request keep the main window enabled.
+        if (string.Equals(Environment.GetEnvironmentVariable("BWC_E2E_GPEDIT_NO_DIALOG"), "1", StringComparison.Ordinal))
+        {
+            return;
+        }
+#endif
+        if (_policyDialog is not null || _model is not { } model || XamlRoot?.ContentIslandEnvironment is not { } environment)
+        {
+            return;
+        }
+
+        var order = new List<PolicyRef>();
+        foreach (ConsoleListRow row in _list.Rows)
+        {
+            if (row.Tag is GpeditRowTag { Kind: GpeditRowKind.Policy, Policy: { } rowPolicy } tag)
+            {
+                order.Add(new PolicyRef(rowPolicy, tag.Side));
+            }
+        }
+
+        int index = order.FindIndex(r => ReferenceEquals(r.Policy, policy) && r.Side == side);
+        if (index < 0)
+        {
+            order = [new PolicyRef(policy, side)];
+            index = 0;
+        }
+
+        var store = new InMemoryPolicyEditStore(model.PolFor, model.CommentsFor, StoreIsReadOnly());
+        PolicySettingDialog dialog;
+        try
+        {
+            dialog = new PolicySettingDialog(order, index, store);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Log.Warn($"The setting dialog of '{policy.FullName}' could not be created: {ex.Message}");
+            return;
+        }
+
+        dialog.Applied += (_, _) => RefreshPolicyRows();
+        _policyDialog = dialog;
+        _ = RunPolicyDialogAsync(dialog, Win32Interop.GetWindowFromWindowId(environment.AppWindowId));
+    }
+
+    private async Task RunPolicyDialogAsync(PolicySettingDialog dialog, nint owner)
+    {
+        try
+        {
+            _ = await dialog.ShowAsync(owner);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Log.Warn("The setting dialog failed: " + ex.Message);
+        }
+        finally
+        {
+            _policyDialog = null;
+            SelectPolicyRow(dialog.Shown);
+        }
+    }
+
+    /// <summary>
+    /// Rebuilds the rows of the shown node after an Apply, keeping the
+    /// selection, so State and Comment are current.
+    /// </summary>
+    private void RefreshPolicyRows()
+    {
+        if (_model is null || Shell.TreeContent.SelectedNode is not { } node)
+        {
+            return;
+        }
+
+        try
+        {
+            GpeditListContent content = GpeditListBuilder.Build(node, _model, _source);
+            if (!content.IsPlaceholder)
+            {
+                _list.SetRows(content.Rows, keepSelectionByTag: true);
+            }
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Log.Warn($"The rows of '{node.Name}' could not be refreshed: {ex.Message}");
+        }
+    }
+
+    /// <summary>After the dialog closes the list selects the last policy shown and takes the focus back.</summary>
+    private void SelectPolicyRow(PolicyRef shown)
+    {
+        IReadOnlyList<ConsoleListRow> rows = _list.Rows;
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (rows[i].Tag is GpeditRowTag { Kind: GpeditRowKind.Policy, Policy: { } rowPolicy } tag
+                && ReferenceEquals(rowPolicy, shown.Policy) && tag.Side == shown.Side)
+            {
+                _list.SelectIndex(i, focus: true);
+                return;
+            }
+        }
+    }
+
+    private static bool StoreIsReadOnly()
+    {
+#if BWC_E2E
+        return string.Equals(Environment.GetEnvironmentVariable("BWC_E2E_GPEDIT_READONLY"), "1", StringComparison.Ordinal);
+#else
+        return false;
+#endif
     }
 
     // ---- persistence --------------------------------------------------------------------------------

@@ -8,7 +8,8 @@ store and all UI are other pieces.
 Rules that hold for every section below:
 
 - The loader never throws for a bad template. A problem becomes a `TemplateFailure` (file path, line, position, reason
-  code, detail). The rest of the set still loads. The only exception that leaves the loader is
+  code, detail). The rest of the set still loads. A file with a load failure contributes nothing to the set (section 35),
+  as in classic, which shows none of the content of a file it refuses. The only exception that leaves the loader is
   `OperationCanceledException`, checked once per file.
 - The parser never validates against the XSD. Elements and attributes it does not read are ignored without a failure.
 - The engine never formats user text. A failure carries a code and the faulty identifier in `Detail`.
@@ -106,17 +107,17 @@ failure.
 
 ### 12. Undefined string
 
-A `$(string.id)` that the ADML does not define fails with `UndefinedString` and `Detail` is the id. The item keeps
-loading. A text that was not found takes a fallback: a display name falls back to the item's own name, every other text
-(explain text, supported-on text, enum item names) falls back to an empty string. The fixture `bad/UndefinedString` is the
-test. Whether classic drops the policy is oracle group H.
+A `$(string.id)` that the ADML does not define fails with `UndefinedString` and `Detail` is the id. The whole file
+is rejected (section 35): it adds no category, policy or supported-on definition. While the file is being read a text
+that was not found still takes a fallback (a display name falls back to the item's own name, every other text to an
+empty string), but that content is discarded with the file. The fixture `bad/UndefinedString` is the test.
 
 ### 13. Undefined presentation
 
 A policy `presentation="$(presentation.id)"` that the ADML does not define fails with `UndefinedPresentation` and
-`Detail` is the id. The policy keeps loading with no presentation. A `presentation` value that is not of that form fails
+`Detail` is the id. The file is rejected (section 35). A `presentation` value that is not of that form fails
 the same way. A policy with elements and no `presentation` attribute has no presentation and no failure. A control whose
-`refId` names no element of the policy fails with `UndefinedPresentationRef` and stays in the list with no element.
+`refId` names no element of the policy fails with `UndefinedPresentationRef`, and the file is rejected (section 35).
 Elements with no control are kept. Controls keep the order of the ADML.
 
 ### 14. Duplicate string or presentation id
@@ -142,15 +143,15 @@ files stay below half of every limit.
 ### 17. Missing required attribute
 
 A policy without `name`, `class` or `key`, a category without `name`, an element without `id`, a list item without
-`valueName`, a definition without `name`, or a `using` without prefix or namespace fails with `MissingAttribute` and `Detail` is the attribute.
-The item is dropped (a policy with a bad element is dropped as a whole). A missing `displayName` fails the same way but
-the item stays, with the name as its display name.
+`valueName`, a definition without `name`, a `using` without prefix or namespace, a boolean element without `valueName`
+or a list item without `key` (section 36) fails with `MissingAttribute` and `Detail` is the attribute. Every
+`MissingAttribute` rejects the file (section 35). A missing `displayName` fails the same way.
 
 ### 18. Invalid attribute value
 
 A `class` other than Machine, User or Both (ignoring case), a boolean attribute that is not true, false, 1 or 0, a number
-that is not a non-negative integer fails with `InvalidAttributeValue` and `Detail` is the attribute name. A bad class drops
-the policy. A bad boolean or number is ignored as if absent and the item stays.
+that is not a non-negative integer fails with `InvalidAttributeValue` and `Detail` is the attribute name. A bad class,
+a bad boolean or a bad number rejects the file (section 35).
 
 ### 19. Undefined `using` prefix
 
@@ -158,14 +159,16 @@ A reference `prefix:name` whose prefix is neither the file's own target prefix n
 `UndefinedPrefix` and `Detail` is the prefix. The reference stays unresolved (a category parent, a policy category, a
 supported-on reference). A `using` whose namespace no loaded file defines fails with `UndefinedUsing` (the file
 path is the file that declares it, `Detail` is the namespace) once per declaration. The fixture `bad/UndefinedUsing` is
-the test. The file itself stays loaded.
+the test. A dangling reference is a link-level failure and does not reject the file (section 35): two shipped client
+files (`ServerManager`, `WindowsBackup`) declare a `using` for a server namespace that no client file defines, and
+classic loads them.
 
 ### 20. Duplicate names
 
 Inside one file, a second policy with the same name fails with `DuplicatePolicy`, a second category with
 `DuplicateCategory`, a second element id of one policy with `DuplicateElement` (and the policy is dropped, see section 16
-for the reason), a second supported-on definition with `DuplicateSupportedOn`. The first occurrence stays, the second is
-dropped. The fixture `bad/DuplicatePolicy` is the test. A second file that defines an already loaded namespace fails with
+for the reason), a second supported-on definition with `DuplicateSupportedOn`. The file is rejected (section 35), so the first
+occurrence does not stay either. The fixture `bad/DuplicatePolicy` is the test. A second file that defines an already loaded namespace fails with
 `DuplicateNamespace` when both are in one source and with `NamespaceShadowed` when the earlier file is in an earlier source
 (the system folder wins over the import store). That second file is dropped as a whole. Names are unique per namespace, so
 two namespaces may define the same name.
@@ -277,7 +280,7 @@ load at the next file.
 No folders, or folders without templates, give an empty set with no failures (apart from a missing folder). A source
 folder that holds an ADMX for a namespace twice (two file names) gives `DuplicateNamespace` for the later file. A set
 loaded from the fixture folder gives zero failures, and a good template plus a bad one load together with only the bad one
-failing.
+failing and contributing nothing.
 
 ### 34. Dangling references in shipped templates
 
@@ -288,3 +291,91 @@ They are real and common (about 30 on a current client), so the loader records t
 default; whether classic reports them is oracle group H. The system-folder invariant test therefore allows exactly the
 reference codes (`UndefinedUsing`, `UndefinedPrefix`, `UndefinedCategory`, `MissingCategory`, `UndefinedSupportedOn`) and
 fails on any other code, because a parse-level failure on a shipped file means the parser is stricter than classic.
+
+## Strictness that classic enforces
+
+### 35. A file with a load failure adds nothing
+
+Classic refuses a template file that it cannot load and then shows none of that file's content. The loader does the same.
+Every failure recorded while one template (its ADMX and its ADML) is read rejects that template: it adds no file, no
+category, no policy and no supported-on definition to the set, so a file never leaks partial content (this also covers
+the dropped items of sections 16, 17 and 18). The failures stay in `TemplateSet.Failures`. Other files load normally, and
+only the rejected file's own failures are listed for it.
+
+Which failures reject the file:
+
+- Read-level (recorded while the ADMX and ADML are read): `MalformedXml`, `DtdProhibited`, `XmlTooDeep`, `FileTooLarge`,
+  `FileNameTooLong`, `ReparsePoint`, `Unreadable`, `NotATemplate`, `MissingAdml`, `NameTooLong`, `StringTooLong`,
+  `MissingAttribute`, `InvalidAttributeValue`, `DuplicatePolicy`, `DuplicateCategory`, `DuplicateElement`,
+  `DuplicateSupportedOn`, `DuplicateString`, `DuplicatePresentation`, `UndefinedString`, `UndefinedPresentation`,
+  `UndefinedPresentationRef`, `InternalError`.
+- Set-level, which already drop the file: `DuplicateNamespace`, `NamespaceShadowed`.
+- Link-level dangling references keep the file: `UndefinedUsing`, `UndefinedPrefix`, `UndefinedCategory`,
+  `MissingCategory`, `UndefinedSupportedOn`, `CategoryCycle`. Shipped client templates carry them (section 34) and classic
+  loads every shipped file, so rejecting them would remove real policies (`ServerManager` and `WindowsBackup` alone
+  declare an undefined `using`). This differs from a literal reading of "any load failure" (which names `UndefinedUsing`);
+  it is recorded as uncertain until oracle group H shows what classic does with a dangling reference.
+
+How it can fail (each has a test):
+
+- A file with a good policy before the bad one keeps that good policy, category or supported-on definition (partial
+  content leaks). Test: a file with a good policy and a duplicate policy name adds nothing; the same for a file whose
+  later policy has an undefined string (the policy used to stay with its name as the display name).
+- A failed file drops a good sibling file, or its failures are attributed to the sibling. Test: good and bad files in one
+  folder and in two folders; the good file's categories, policies and supported-on definitions are all there and no failure
+  names the good file.
+- A failed file's category or supported-on definition is still found by another file's reference. Test: a reference to
+  it from a sibling gives `UndefinedCategory` and `UndefinedSupportedOn`, not a resolved link.
+- A dangling reference rejects its file, or a clean file is rejected. Test: `bad/UndefinedUsing` keeps its file and policy;
+  the good fixture folder has zero failures.
+- The system folder suddenly fails or loses files. Test: the system-folder invariant test (only dangling reference codes)
+  and a count test (every `.admx` of the folder is in `Files`).
+- The result depends on file order or on parallel scheduling. Test: the load-twice test keeps passing.
+
+### 36. List items and boolean elements need their attributes
+
+Confirmed by classic captures on this machine:
+
+- A list `item` with no `key` attribute, inside an `enabledList` that has no `defaultKey`, makes classic refuse the file:
+  "Expected attribute 'key' not found." with the file, line 171 and column 37 of the capture.
+- A `boolean` element with no `valueName` attribute (it had only `trueList` and `falseList`) makes classic refuse the
+  file: "Expected attribute 'valueName' not found." with the file, line 242 and column 32 of the capture.
+- When a file is refused, classic shows none of its content (section 35).
+
+Rules:
+
+1. An item of `enabledList` needs `key` unless the list has `defaultKey` (confirmed).
+2. An item of `disabledList`, `trueList` and `falseList` follows the same rule (inferred, pending Group H capture: they
+   are the same value-list shape and classic was only captured with `enabledList`). The `valueList` of an enum item is
+   not in this rule.
+3. A `boolean` element needs `valueName` (confirmed). Only an absent attribute fails: classic reported a missing
+   attribute, so `valueName=""` is accepted.
+4. Each is a `MissingAttribute` failure. `Detail` is the attribute name (`key` or `valueName`), `FilePath` is the ADMX, and
+   `Line` and `Position` are the one-based line and column of the `>` that closes the start tag of the offending element
+   (the `item` or the `boolean`). This convention is confirmed by the two classic captures: `        <item valueName="BothListOn">`
+   (8 spaces and 29 characters) gave line 171, column 37, and `        <boolean id="ListCheck">` (8 spaces and 24 characters)
+   gave line 242, column 32. A start tag that spans lines reports the line of its `>`, and a self-closing tag reports the
+   `>` of its `/>`. Other failures keep reporting the position of the element name. The UI can show the position the way
+   classic does.
+5. The file is rejected (section 35).
+
+How it can fail (each has a test):
+
+- The rule is missed on one list kind: `enabledList`, `disabledList`, `trueList` or `falseList` (one test per kind).
+- A `defaultKey` is honored on the wrong list: a `defaultKey` on `disabledList` does not rescue an item of `enabledList`;
+  an element `key`, the policy `key` or a `defaultKey` of a list of another element does not rescue an item either.
+- A list whose items all have `key`, or whose list has `defaultKey`, is wrongly refused (each kind).
+- Several items miss `key`: one failure per bad item, in document order.
+- The wrong attribute, file, line or column is named, for example the column of the element name instead of the `>`, or the
+  line of the name when the start tag spans lines. Test: literal positions for the two bad fixtures (21:39 and 21:31), and
+  positions computed from the file text for temporary files, including a start tag over two lines and a self-closing tag.
+- A `boolean` with `valueName` is wrongly refused, or a `boolean` with no `valueName` is accepted (also with only
+  `trueValue` and `falseValue`).
+- Extra strictness: a decimal, text, list or enum element with no `valueName`, a policy with no `valueName`, an enum
+  item `valueList` item with no `key`, and an `item` with a `key` but no `defaultKey` must all stay accepted, because no
+  capture shows classic refusing them.
+- Partial content leaks from the refused file, or a good sibling is dropped (section 35).
+- The good fixture or the system folder starts to fail. Test: zero failures over the good fixture, and only dangling
+  reference codes over the system folder.
+
+The fixtures `bad/ListItemNoKey` and `bad/BooleanNoValueName` are the tests.

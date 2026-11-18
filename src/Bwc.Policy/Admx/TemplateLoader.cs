@@ -231,7 +231,13 @@ public static class TemplateLoader
         file.SourceIndex = item.SourceIndex;
         file.DisplayName = adml.DisplayName;
         file.Description = adml.Description;
-        return AdmxParser.ParseBody(admxRoot, file, adml, admxContext);
+        var parsed = AdmxParser.ParseBody(admxRoot, file, adml, admxContext);
+
+        // Classic refuses a file it cannot load and shows none of its content, so a file with any failure recorded
+        // while it was read adds nothing. The failures stay in the result. Dangling references (a using, a category or
+        // a supported-on that names nothing) are found later, by the linker, and do not reject a file: shipped
+        // templates carry them and classic loads those.
+        return sink.Items.Count > 0 ? null : parsed;
     }
 
     private static bool AdmlExists(string path) => File.Exists(path) || SafeXml.IsReparsePointPath(path);

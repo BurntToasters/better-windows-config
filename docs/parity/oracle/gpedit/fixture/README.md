@@ -10,7 +10,7 @@ Nothing on the system reads these registry keys. The good fixture writes only be
 |---|---|---|
 | `BwcOracleBase.admx`, `en-US/BwcOracleBase.adml` | `BWC.Policies.OracleBase` (prefix `bwcbase`) | The top category "BWC Oracle" and three `supportedOn` definitions, the way `Windows.admx` does for Windows. |
 | `BwcOracle.admx`, `en-US/BwcOracle.adml` | `BWC.Policies.Oracle` (prefix `bwcoracle`, uses `bwcbase`) | 70 policies and the subcategories. |
-| `bad/<Case>/...` | `BWC.Policies.Bad.<Case>` | Six broken templates for load-error tests. Each is loaded alone, never together with the good fixture. |
+| `bad/<Case>/...` | `BWC.Policies.Bad.<Case>` | Eight broken templates for load-error tests. Each is loaded alone, never together with the good fixture. |
 
 The good fixture is schema valid. It does not use any attribute that the classic schema rejects. The BWC parser must still not validate against the schema.
 
@@ -120,6 +120,8 @@ Each case has its own folder under `bad/`, its own namespace `BWC.Policies.Bad.<
 | `bad/UndefinedUsing` | The ADMX declares `using` for the namespace `BWC.Policies.Bad.UndefinedUsing.Ghost`, which no file defines. | A load failure that names the unresolved namespace. |
 | `bad/DuplicatePolicy` | Two policies in one file have the name `Pol_Bad`. | A load failure that names the duplicate policy. |
 | `bad/DtdEntity` | The ADMX has a `DOCTYPE` with an internal entity `bwcvalue` that is used as a value name. | BWC refuses the file because DTD processing is prohibited, and reports it as a load failure. For classic the oracle records what happens. |
+| `bad/ListItemNoKey` | An `item` of an `enabledList` has no `key` attribute and the list has no `defaultKey`. | A load failure `MissingAttribute` that names `key`, the file, the line and the column. Classic refuses the file with "Expected attribute 'key' not found." (live capture). No content of the file is shown. |
+| `bad/BooleanNoValueName` | A `boolean` element has no `valueName` attribute and only a `trueList` and a `falseList`. | A load failure `MissingAttribute` that names `valueName`, the file, the line and the column. Classic refuses the file with "Expected attribute 'valueName' not found." (live capture). No content of the file is shown. |
 
 The entity is internal and harmless. No external entity or network reference exists in any file.
 

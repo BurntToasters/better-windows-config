@@ -1,12 +1,16 @@
 using System.Drawing;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Bwc.E2E.ConsoleFrame;
 using Bwc.E2E.Controls;
+using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
 using Bwc.Gpo.Refresh;
 using Bwc.Gpo.Store;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
+using FlaUI.Core.Input;
+using FlaUI.Core.WindowsAPI;
 
 namespace Bwc.E2E.Gpedit;
 
@@ -46,6 +50,15 @@ internal sealed class GpeditSandbox
 
     internal string ImportStore { get; }
 
+    /// <summary>
+    /// True when the editor opens the setting dialog for an edit request. The default is false: the list tests that only count
+    /// the request (BWC_E2E_GPEDIT_NO_DIALOG=1) keep their modeless view, and a dialog test turns it on.
+    /// </summary>
+    internal bool DialogEnabled { get; set; }
+
+    /// <summary>True makes the in-memory store of the editor report read-only (BWC_E2E_GPEDIT_READONLY=1).</summary>
+    internal bool ReadOnly { get; set; }
+
     /// <summary>The sandbox for a test. <paramref name="name"/> is the name given to <see cref="GpeditRun.Open"/>.</summary>
     internal static GpeditSandbox Create(string name) => new("console-" + name);
 
@@ -60,7 +73,13 @@ internal sealed class GpeditSandbox
             ["BWC_E2E_ADMX_ROOT"] = TemplateRoot,
             ["BWC_E2E_IMPORT_STORE"] = ImportStore,
             ["BWC_E2E_GPO_ROOT"] = GpoRoot,
+            ["BWC_E2E_GPEDIT_NO_DIALOG"] = DialogEnabled ? "0" : "1",
         };
+        if (ReadOnly)
+        {
+            environment["BWC_E2E_GPEDIT_READONLY"] = "1";
+        }
+
         if (shape)
         {
             environment["BWC_E2E_GPEDIT_SHAPE"] = "1";
@@ -117,6 +136,32 @@ internal sealed class GpeditSandbox
         string path = GpoFileNames.PolPath(GpoRoot, side);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, bytes.ToArray());
+    }
+
+    /// <summary>
+    /// The SHA-256 of each policy file of the sandbox (the policy file and the comment file of both sides, and the version
+    /// file), or "absent". Read only: a test compares two readings to prove that nothing was written.
+    /// </summary>
+    internal SortedDictionary<string, string> PolicyFileHashes()
+    {
+        var paths = new List<string>
+        {
+            GpoFileNames.GptIniPath(GpoRoot),
+            GpoFileNames.PolPath(GpoRoot, GpoSide.Machine),
+            GpoFileNames.PolPath(GpoRoot, GpoSide.User),
+            GpoFileNames.CmtxPath(GpoRoot, GpoSide.Machine),
+            GpoFileNames.CmtxPath(GpoRoot, GpoSide.User),
+        };
+        var map = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        foreach (string path in paths)
+        {
+            string key = Path.GetRelativePath(GpoRoot, path);
+            map[key] = File.Exists(path)
+                ? Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)))
+                : "absent";
+        }
+
+        return map;
     }
 
     /// <summary>Writes bytes that are not a valid policy file as the policy file of a side, after the seed.</summary>
@@ -458,4 +503,307 @@ internal sealed class GpeditChecks
             0,
             _failures.Count,
             $"Gpedit checks failed:{System.Environment.NewLine}{string.Join(System.Environment.NewLine, _failures)}");
+}
+
+/// <summary>
+/// The policy-setting dialog of a running editor, seen through UI Automation. The dialog is a separate
+/// top level window of the
+/// editor process, so its controls are found through <see cref="EditingDriver"/>. The automation ids
+/// are the control names of the
+/// classic form (buttonOK, radioButtonEnabled, textBoxComment and so on).
+/// </summary>
+internal sealed class GpeditDialog : IDisposable
+{
+    internal const string RootId = "DialogRoot";
+    internal const string Previous = "buttonPrevious";
+    internal const string Next = "buttonNext";
+    internal const string NotConfigured = "radioButtonNotConfigured";
+    internal const string Enabled = "radioButtonEnabled";
+    internal const string Disabled = "radioButtonDisabled";
+    internal const string Comment = "textBoxComment";
+    internal const string SupportedOn = "labelSupportedOnText";
+    internal const string Help = "textBoxHelp";
+    internal const string Ok = "buttonOK";
+    internal const string Cancel = "buttonCancel";
+    internal const string Apply = "buttonApply";
+    internal const string Title = "labelTitle";
+    internal const string OptionsPane = "flowLayoutPanelDynamic";
+
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
+
+    private readonly GpeditRun _run;
+    private readonly EditingDriver _driver;
+
+    private GpeditDialog(GpeditRun run, EditingDriver driver)
+    {
+        _run = run;
+        _driver = driver;
+    }
+
+    internal EditingDriver Driver => _driver;
+
+    internal GpeditRun Run => _run;
+
+    /// <summary>
+    /// Selects a policy row and opens its dialog with Enter (<paramref name="byKey"/>) or a double click. Returns null when no
+    /// dialog appeared.
+    /// </summary>
+    internal static GpeditDialog? Open(GpeditRun run, string rowName, bool byKey = true)
+    {
+        var driver = new EditingDriver(run.Shell.Session);
+        var dialog = new GpeditDialog(run, driver);
+        run.SelectRow(rowName);
+        _ = ControlTestSupport.EnsureForeground(run.Shell.Session);
+        if (byKey)
+        {
+            Keyboard.Type(VirtualKeyShort.RETURN);
+        }
+        else
+        {
+            GpeditRow? row = run.Rows().FirstOrDefault(r => r.Name == rowName);
+            run.Shell.Find("ConsoleListRow_" + (row?.Index ?? 0).ToString(CultureInfo.InvariantCulture))?.DoubleClick();
+        }
+
+        if (driver.WaitForElement(RootId, TimeSpan.FromSeconds(10)) is null)
+        {
+            dialog.Dispose();
+            return null;
+        }
+
+        _ = dialog.WaitForReadout();
+        _ = ClassicDialogTestsBridge.EnsureForeground(dialog.Hwnd);
+        return dialog;
+    }
+
+    public void Dispose() => _driver.Dispose();
+
+    internal AutomationElement? Root => _driver.WaitForElement(RootId, TimeSpan.FromSeconds(3));
+
+    internal IntPtr Hwnd => Root is { } root ? ClassicDialogTestsBridge.HandleOf(root) : IntPtr.Zero;
+
+    internal AutomationElement? Find(string id, double seconds = 3) => _driver.WaitForElement(id, TimeSpan.FromSeconds(seconds));
+
+    /// <summary>The window caption.</summary>
+    internal string Caption() => Root is { } root ? ShellRun.SafeName(ClassicDialogTestsBridge.WindowOf(root)) : string.Empty;
+
+    /// <summary>The text of a text box (its value) or a label (its name).</summary>
+    internal string TextOf(string id) => _driver.TextOf(id);
+
+    internal bool IsSelected(string radioId) => ControlTestSupport.IsSelected(Find(radioId));
+
+    internal bool IsEnabled(string id) => Find(id)?.IsEnabled ?? false;
+
+    internal bool IsReadOnly(string id)
+    {
+        try
+        {
+            return Find(id)?.Patterns.Value.PatternOrDefault?.IsReadOnly.ValueOrDefault ?? false;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    internal bool Select(string radioId)
+    {
+        try
+        {
+            Find(radioId)?.Patterns.SelectionItem.Pattern.Select();
+            Thread.Sleep(150);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    internal bool SetComment(string text)
+    {
+        bool done = _driver.SetText(Comment, text);
+        Thread.Sleep(200);
+        return done;
+    }
+
+    internal bool Invoke(string id)
+    {
+        bool done = _driver.Invoke(id);
+        Thread.Sleep(250);
+        return done;
+    }
+
+    internal void Press(VirtualKeyShort key)
+    {
+        _ = ClassicDialogTestsBridge.EnsureForeground(Hwnd);
+        Keyboard.Type(key);
+        Thread.Sleep(300);
+    }
+
+    internal bool WaitClosed() => _driver.WaitForNoDialog(TimeSpan.FromSeconds(10));
+
+    internal string FocusedId() => _run.Shell.FocusedId();
+
+    /// <summary>The dialog state published as the help text of DialogRoot (E2E flavor).</summary>
+    internal Dictionary<string, string> Readout()
+    {
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        string text = string.Empty;
+        try
+        {
+            text = Root?.Properties.HelpText.ValueOrDefault ?? string.Empty;
+        }
+        catch (Exception)
+        {
+            // The dialog is closing; an empty readout is returned.
+        }
+
+        foreach (string part in text.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int at = part.IndexOf('=', StringComparison.Ordinal);
+            if (at > 0)
+            {
+                map[part[..at]] = part[(at + 1)..];
+            }
+        }
+
+        return map;
+    }
+
+    internal string Read(string key) => Readout().GetValueOrDefault(key, string.Empty);
+
+    internal bool WaitForReadout() => ShellRun.WaitUntil(() => Readout().ContainsKey("Policy"), TimeSpan.FromSeconds(5));
+
+    /// <summary>
+    /// The rectangle of a control in DIP relative to the client
+    /// area of the dialog, or null when it has none.
+    /// </summary>
+    internal RectangleF? RectDip(string id)
+    {
+        AutomationElement? element = Find(id, 1);
+        IntPtr hwnd = Hwnd;
+        if (element is null || hwnd == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        var origin = new NativePoint();
+        _ = ClientToScreen(hwnd, ref origin);
+        Rectangle box = element.BoundingRectangle;
+        double scale = _run.Scale;
+        return new RectangleF(
+            (float)((box.Left - origin.X) / scale),
+            (float)((box.Top - origin.Y) / scale),
+            (float)(box.Width / scale),
+            (float)(box.Height / scale));
+    }
+
+    /// <summary>The client size in DIP.</summary>
+    internal SizeF ClientDip()
+    {
+        IntPtr hwnd = Hwnd;
+        if (hwnd == IntPtr.Zero || !GetClientRect(hwnd, out NativeRect rect))
+        {
+            return SizeF.Empty;
+        }
+
+        return new SizeF((float)((rect.Right - rect.Left) / _run.Scale), (float)((rect.Bottom - rect.Top) / _run.Scale));
+    }
+
+    /// <summary>Resizes the window so that the client area is the given size in DIP, keeping the position.</summary>
+    internal void ResizeClientDip(double width, double height)
+    {
+        IntPtr hwnd = Hwnd;
+        if (hwnd == IntPtr.Zero || !GetClientRect(hwnd, out NativeRect client) || !GetWindowRect(hwnd, out NativeRect window))
+        {
+            return;
+        }
+
+        int frameWidth = (window.Right - window.Left) - (client.Right - client.Left);
+        int frameHeight = (window.Bottom - window.Top) - (client.Bottom - client.Top);
+        int outerWidth = (int)Math.Round(width * _run.Scale) + frameWidth;
+        int outerHeight = (int)Math.Round(height * _run.Scale) + frameHeight;
+        _ = SetWindowPos(hwnd, IntPtr.Zero, 0, 0, outerWidth, outerHeight, SwpNoMove | SwpNoZOrder | SwpNoActivate);
+        Thread.Sleep(600);
+    }
+
+    internal string Screenshot(string name)
+    {
+        string dir = Path.Combine(GuiGate.Config.ArtifactsDir, "visual", GpeditRun.Area);
+        Directory.CreateDirectory(dir);
+        string path = Path.Combine(dir, name);
+        try
+        {
+            return Root is { } root ? ClassicDialogTestsBridge.SaveScreenshot(root, path) : string.Empty;
+        }
+        catch (Exception ex)
+        {
+            E2EResults.Note("gpedit.dialog.capture." + name, $"picture not written: {ex.Message}");
+            return string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Presses Tab <paramref name="count"/> times and returns the
+    /// automation id that holds the focus after each press.
+    /// </summary>
+    internal string[] TabSequence(int count)
+    {
+        var ids = new List<string>();
+        for (int i = 0; i < count; i++)
+        {
+            string before = FocusedId();
+            Press(VirtualKeyShort.TAB);
+            _ = ShellRun.WaitUntil(() => FocusedId() != before, TimeSpan.FromSeconds(1));
+            ids.Add(FocusedId());
+        }
+
+        return ids.ToArray();
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetClientRect(IntPtr hWnd, out NativeRect rect);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out NativeRect rect);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ClientToScreen(IntPtr hWnd, ref NativePoint point);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+}
+
+/// <summary>The few helpers of the classic dialog tests that the policy dialog tests reuse.</summary>
+internal static class ClassicDialogTestsBridge
+{
+    internal static bool EnsureForeground(IntPtr hwnd) => Bwc.E2E.Dialogs.ClassicDialogTests.EnsureForeground(hwnd);
+
+    internal static IntPtr HandleOf(AutomationElement root) => Bwc.E2E.Dialogs.ClassicDialogTests.DialogHandle(root);
+
+    internal static AutomationElement WindowOf(AutomationElement root) => Bwc.E2E.Dialogs.ClassicDialogTests.WindowOf(root);
+
+    internal static string SaveScreenshot(AutomationElement root, string path) => Bwc.E2E.Dialogs.ClassicDialogTests.SaveScreenshot(root, path);
 }

@@ -234,7 +234,7 @@ public sealed class AdmlTests
     }
 
     [TestMethod]
-    public void Presentation_ControlWithoutElement_IsRecordedAndKept()
+    public void Presentation_ControlWithoutElement_IsRecordedAndTheFileIsRejected()
     {
         using var temp = new TempTemplates();
         temp.AddSimple(
@@ -245,12 +245,11 @@ public sealed class AdmlTests
             presentations: """<presentation id="P"><textBox refId="Nope"><label>L</label></textBox></presentation>""");
         var set = temp.Load();
         Assert.AreEqual("Nope", FailureAssert.Single(set, TemplateFailureCode.UndefinedPresentationRef).Detail);
-        var control = set.Policies.Single().Presentation!.Controls.Single();
-        Assert.IsNull(control.Element);
+        FailureAssert.NothingLoaded(set);
     }
 
     [TestMethod]
-    public void Presentation_UndefinedId_IsRecordedAndPolicyKept()
+    public void Presentation_UndefinedId_IsRecordedAndTheFileIsRejected()
     {
         using var temp = new TempTemplates();
         temp.AddSimple(
@@ -262,14 +261,13 @@ public sealed class AdmlTests
             """,
             """<string id="P">P</string>""");
         var set = temp.Load();
-        Assert.AreEqual(2, set.Policies.Count);
-        Assert.IsTrue(set.Policies.All(p => p.Presentation is null));
+        FailureAssert.NothingLoaded(set);
         var details = set.Failures.Where(f => f.Code == TemplateFailureCode.UndefinedPresentation).Select(f => f.Detail).OrderBy(d => d, StringComparer.Ordinal).ToArray();
         CollectionAssert.AreEqual(new[] { "Ghost", "plain text" }, details);
     }
 
     [TestMethod]
-    public void Strings_UndefinedReference_FallsBackAndIsRecorded()
+    public void Strings_UndefinedReference_IsRecordedAndTheFileIsRejected()
     {
         using var temp = new TempTemplates();
         temp.AddSimple(
@@ -277,9 +275,7 @@ public sealed class AdmlTests
             "T.Undef",
             """<policy name="P" class="Machine" displayName="$(string.Missing)" explainText="$(string.AlsoMissing)" key="K"><parentCategory ref="Root" /></policy>""");
         var set = temp.Load();
-        var policy = set.Policies.Single();
-        Assert.AreEqual("P", policy.DisplayName);
-        Assert.AreEqual(string.Empty, policy.ExplainText);
+        FailureAssert.NothingLoaded(set);
         var details = set.Failures.Where(f => f.Code == TemplateFailureCode.UndefinedString).Select(f => f.Detail).OrderBy(d => d, StringComparer.Ordinal).ToArray();
         CollectionAssert.AreEqual(new[] { "AlsoMissing", "Missing" }, details);
     }
@@ -298,7 +294,7 @@ public sealed class AdmlTests
     }
 
     [TestMethod]
-    public void Strings_DuplicateIdInOneAdml_KeepsTheFirst()
+    public void Strings_DuplicateIdInOneAdml_IsRecordedAndTheFileIsRejected()
     {
         using var temp = new TempTemplates();
         temp.AddSimple(
@@ -307,7 +303,7 @@ public sealed class AdmlTests
             """<policy name="P" class="Machine" displayName="$(string.Twice)" key="K"><parentCategory ref="Root" /></policy>""",
             """<string id="Twice">First</string><string id="TWICE">Second</string>""");
         var set = temp.Load();
-        Assert.AreEqual("First", set.Policies.Single().DisplayName);
+        FailureAssert.NothingLoaded(set);
         Assert.AreEqual("TWICE", FailureAssert.Single(set, TemplateFailureCode.DuplicateString).Detail);
     }
 
@@ -323,7 +319,7 @@ public sealed class AdmlTests
             $"""<string id="P">P</string><string id="Huge">{huge}</string>""");
         var set = temp.Load();
         Assert.AreEqual("Huge", FailureAssert.Single(set, TemplateFailureCode.StringTooLong).Detail);
-        Assert.AreEqual(string.Empty, set.Policies.Single().ExplainText);
+        FailureAssert.NothingLoaded(set);
         Assert.AreEqual("Huge", FailureAssert.Single(set, TemplateFailureCode.UndefinedString).Detail);
     }
 

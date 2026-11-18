@@ -151,6 +151,15 @@ internal static class FailureAssert
 
     internal static void None(TemplateSet set) => Assert.AreEqual(0, set.Failures.Count, Describe(set));
 
+    /// <summary>A rejected file adds no file, category, policy or supported-on definition (failure mode 35).</summary>
+    internal static void NothingLoaded(TemplateSet set)
+    {
+        Assert.AreEqual(0, set.Files.Count, "files");
+        Assert.AreEqual(0, set.Categories.Count, "categories");
+        Assert.AreEqual(0, set.Policies.Count, "policies");
+        Assert.AreEqual(0, set.SupportedOn.Count, "supportedOn");
+    }
+
     internal static string Describe(TemplateSet set) =>
         string.Join("; ", set.Failures.Select(f => $"{f.Code} {Path.GetFileName(f.FilePath)} {f.Line}:{f.Position} {f.Detail}"));
 }

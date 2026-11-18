@@ -367,6 +367,13 @@ internal static class AdmxParser
                 fatal = true;
             }
 
+            if (valueName is null && kind == "boolean")
+            {
+                // Classic refuses the file: "Expected attribute 'valueName' not found." at the '>' of the start tag.
+                context.FailAtStartTagEnd(TemplateFailureCode.MissingAttribute, element, "valueName");
+                fatal = true;
+            }
+
             var effectiveKey = key ?? policyKey;
             var required = context.OptionalBool(element, "required") ?? false;
             var clientExtension = ParseContext.Attr(element, "clientExtension");
@@ -441,13 +448,18 @@ internal static class AdmxParser
                 items.Add(new EnumItem(
                     displayName,
                     ReadLiteral(item.Element("value")),
-                    ReadList(item.Element("valueList"), effectiveKey, ref fatal)));
+                    ReadList(item.Element("valueList"), effectiveKey, ref fatal, requireItemKey: false)));
             }
 
             return items;
         }
 
-        private PolicyValueList? ReadList(XElement? holder, string fallbackKey, ref bool fatal)
+        /// <summary>
+        /// Reads a value list. An item with no <c>key</c> in a list with no <c>defaultKey</c> is a missing attribute
+        /// (classic refuses the file) when <paramref name="requireItemKey"/> is set: enabledList, disabledList, trueList
+        /// and falseList. The valueList of an enum item is not covered by that rule.
+        /// </summary>
+        private PolicyValueList? ReadList(XElement? holder, string fallbackKey, ref bool fatal, bool requireItemKey = true)
         {
             if (holder is null)
             {
@@ -466,6 +478,12 @@ internal static class AdmxParser
                 var key = ParseContext.Attr(item, "key");
                 if (key is not null && !context.CheckKey(item, "key", key))
                 {
+                    fatal = true;
+                }
+
+                if (key is null && defaultKey is null && requireItemKey)
+                {
+                    context.FailAtStartTagEnd(TemplateFailureCode.MissingAttribute, item, "key");
                     fatal = true;
                 }
 

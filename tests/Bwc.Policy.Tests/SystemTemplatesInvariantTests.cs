@@ -136,6 +136,14 @@ public sealed class SystemTemplatesInvariantTests
     }
 
     [TestMethod]
+    public void SystemFolder_NoShippedFileIsRejected()
+    {
+        var set = Load(out _);
+        var admx = Directory.GetFiles(SystemFolder, "*.admx").Length;
+        Assert.AreEqual(admx, set.Files.Count, FailureAssert.Describe(set));
+    }
+
+    [TestMethod]
     public void SystemFolder_OnlyDanglingReferencesAreFailures()
     {
         var set = Load(out _);

@@ -40,7 +40,7 @@ public sealed class BadTemplateTests
     }
 
     [TestMethod]
-    public void UndefinedString_NamesTheIdAndTheFile_AndThePolicyStillLoads()
+    public void UndefinedString_NamesTheIdAndTheFile_AndTheFileAddsNothing()
     {
         var set = LoadBad("UndefinedString");
         var failure = FailureAssert.Single(set, TemplateFailureCode.UndefinedString);
@@ -48,10 +48,10 @@ public sealed class BadTemplateTests
         Assert.AreEqual("Pol_Bad_NotDefined", failure.Detail);
         Assert.AreEqual(Path.Combine(Fixture.Bad("UndefinedString"), "BwcUndefinedString.admx"), failure.FilePath);
         Assert.IsTrue(failure.Line > 0);
-        var policy = set.Policies.Single();
-        Assert.AreEqual("Pol_Bad", policy.Name);
-        Assert.AreEqual("Pol_Bad", policy.DisplayName);
-        Assert.IsNotNull(policy.Category);
+        Assert.AreEqual(0, set.Files.Count);
+        Assert.AreEqual(0, set.Policies.Count);
+        Assert.AreEqual(0, set.Categories.Count);
+        Assert.AreEqual(0, set.SupportedOn.Count);
     }
 
     [TestMethod]
@@ -67,15 +67,17 @@ public sealed class BadTemplateTests
     }
 
     [TestMethod]
-    public void DuplicatePolicy_NamesThePolicy_AndKeepsTheFirst()
+    public void DuplicatePolicy_NamesThePolicy_AndTheFileAddsNothing()
     {
         var set = LoadBad("DuplicatePolicy");
         var failure = FailureAssert.Single(set, TemplateFailureCode.DuplicatePolicy);
         Assert.AreEqual(1, set.Failures.Count);
         Assert.AreEqual("Pol_Bad", failure.Detail);
         Assert.AreEqual(Path.Combine(Fixture.Bad("DuplicatePolicy"), "BwcDuplicatePolicy.admx"), failure.FilePath);
-        Assert.AreEqual(1, set.Policies.Count);
-        Assert.AreEqual("BadValueOne", set.Policies[0].ValueName);
+        Assert.AreEqual(0, set.Files.Count);
+        Assert.AreEqual(0, set.Policies.Count);
+        Assert.AreEqual(0, set.Categories.Count);
+        Assert.AreEqual(0, set.SupportedOn.Count);
     }
 
     [TestMethod]
@@ -94,7 +96,7 @@ public sealed class BadTemplateTests
     [TestMethod]
     public void EveryBadFixture_GivesAtLeastOneFailureAndNeverThrows()
     {
-        foreach (var name in new[] { "MalformedXml", "MissingAdml", "UndefinedString", "UndefinedUsing", "DuplicatePolicy", "DtdEntity" })
+        foreach (var name in new[] { "MalformedXml", "MissingAdml", "UndefinedString", "UndefinedUsing", "DuplicatePolicy", "DtdEntity", "ListItemNoKey", "BooleanNoValueName" })
         {
             var set = LoadBad(name);
             Assert.IsTrue(set.Failures.Count >= 1, name);
@@ -115,8 +117,10 @@ public sealed class BadTemplateTests
                 Fixture.Bad("DuplicatePolicy"),
             ],
             "en-US");
-        Assert.AreEqual(good.Policies.Count + 1, set.Policies.Count);
-        Assert.AreEqual(good.Files.Count + 1, set.Files.Count);
+        Assert.AreEqual(good.Policies.Count, set.Policies.Count);
+        Assert.AreEqual(good.Files.Count, set.Files.Count);
+        Assert.AreEqual(good.Categories.Count, set.Categories.Count);
+        Assert.AreEqual(good.SupportedOn.Count, set.SupportedOn.Count);
         CollectionAssert.AreEquivalent(
             new[]
             {
