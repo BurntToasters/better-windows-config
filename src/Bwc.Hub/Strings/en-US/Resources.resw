@@ -349,4 +349,7 @@ Download and Install checks the update again, closes the Hub, and replaces the i
   <data name="ToolRegeditDescription" xml:space="preserve">
     <value>Browse and edit the Windows registry.</value>
   </data>
+  <data name="ToolGpeditDescription" xml:space="preserve">
+    <value>Browse and edit local group policy.</value>
+  </data>
 </root>

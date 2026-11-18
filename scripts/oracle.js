@@ -1,19 +1,30 @@
 #!/usr/bin/env node
 /**
- * Regenerates the classic regedit oracle on this Windows desktop.
+ * Regenerates the classic oracle on this Windows desktop, for one tool at a time (--tool regedit, the default,
+ * or --tool gpedit).
  *
- * Steps, in order:
+ * Tool regedit. Steps, in order:
  *   1. Build tools/Bwc.Oracle.Resources and tools/Bwc.Oracle.Capture (Release, host platform).
  *   2. resources: dump C:\Windows\regedit.exe and its en-US MUI into docs/parity/oracle (untracked).
  *   3. One capture per command: export, metrics, dialogs, menus, import, find, sort, permissions, keys, context,
  * binary, print, security, remote, manifest (tracked numbers and goldens; screenshots and control text are untracked).
  *   4. cleanup: delete HKCU\Software\BWC-Oracle if anything left it behind.
  *
+ * Tool gpedit. Steps:
+ *   resources: dump gpedit.dll, admtmpl.dll, mmc.exe, mmcndmgr.dll, mmcbase.dll and their en-US MUI, the managed
+ *     WinForms resources of the policy-setting dialog and gpedit.msc into docs/parity/oracle/gpedit. Needs no
+ *     administrator rights. The full dumps are untracked; gpedit-resource-index.json is the one tracked file.
+ *   probe: run `Bwc.Oracle.Capture gpedit probe`. It needs administrator rights and drives GUI, so run it by hand
+ *     from an administrator terminal (see docs/failure-modes/oracle-gpedit-static.md).
+ *   Only the projects that the chosen steps need are built. The run record goes to artifacts/oracle/gpedit/last-run.json.
+ *
  * Usage:
  *   npm run oracle
  *   npm run oracle -- --only dialogs
  *   npm run oracle -- --only metrics,menus --skip-build
  *   npm run oracle -- --list
+ *   npm run oracle -- --tool gpedit --only resources
+ *   npm run oracle -- --tool gpedit --list
  *
  * Safety rules, enforced by the tools this script runs (see docs/failure-modes/oracle.md):
  *   - Classic regedit is started only by the capture tool, with __COMPAT_LAYER=RunAsInvoker set on the
@@ -56,23 +67,37 @@ const CAPTURES = [
   "resource-viewers",
   "tree-order",
 ];
-const ALL_STEPS = ["resources", ...CAPTURES];
-const RUN_RECORD = path.join(ROOT, "artifacts", "oracle", "last-run.json");
+const TOOLS = {
+  regedit: {
+    steps: ["resources", ...CAPTURES],
+    runRecord: path.join(ROOT, "artifacts", "oracle", "last-run.json"),
+    resourcesOut: "docs/parity/oracle",
+  },
+  gpedit: {
+    steps: ["resources", "probe"],
+    runRecord: path.join(ROOT, "artifacts", "oracle", "gpedit", "last-run.json"),
+    resourcesOut: "docs/parity/oracle/gpedit",
+  },
+};
 
 const RESOURCES_PROJECT = "tools/Bwc.Oracle.Resources/Bwc.Oracle.Resources.csproj";
 const CAPTURE_PROJECT = "tools/Bwc.Oracle.Capture/Bwc.Oracle.Capture.csproj";
 
 function printHelp() {
-  console.log(`Usage: node ${SCRIPT} [--only <step>[,<step>...]] [--skip-build] [--list]
+  const stepLines = Object.entries(TOOLS).map(([name, tool]) => `  ${name}: ${tool.steps.join(", ")}`);
+  console.log(`Usage: node ${SCRIPT} [--tool regedit|gpedit] [--only <step>[,<step>...]] [--skip-build] [--list]
 
-Steps: ${ALL_STEPS.join(", ")}
+Tools: ${Object.keys(TOOLS).join(", ")} (default regedit)
+Steps:
+${stepLines.join("\n")}
+  --tool <name>   which classic tool to capture
   --only <steps>  run only these steps (comma separated or repeated)
   --skip-build    use the existing tool binaries
-  --list          print the steps and exit`);
+  --list          print the steps of the chosen tool and exit`);
 }
 
 function parseArgs(argv) {
-  const options = { only: null, skipBuild: false, list: false, help: false };
+  const options = { tool: "regedit", only: null, skipBuild: false, list: false, help: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") {
@@ -81,6 +106,13 @@ function parseArgs(argv) {
       options.list = true;
     } else if (arg === "--skip-build") {
       options.skipBuild = true;
+    } else if (arg === "--tool") {
+      const value = argv[i + 1];
+      if (!value || !Object.hasOwn(TOOLS, value)) {
+        throw new Error(`--tool needs one of: ${Object.keys(TOOLS).join(", ")}`);
+      }
+      options.tool = value;
+      i += 1;
     } else if (arg === "--only") {
       const value = argv[i + 1];
       if (!value) {
@@ -94,9 +126,10 @@ function parseArgs(argv) {
   }
 
   if (options.only) {
-    const unknown = options.only.filter((name) => !ALL_STEPS.includes(name));
+    const valid = TOOLS[options.tool].steps;
+    const unknown = options.only.filter((name) => !valid.includes(name));
     if (unknown.length > 0) {
-      throw new Error(`unknown step(s): ${unknown.join(", ")}. Valid: ${ALL_STEPS.join(", ")}`);
+      throw new Error(`unknown step(s) for tool ${options.tool}: ${unknown.join(", ")}. Valid: ${valid.join(", ")}`);
     }
   }
 
@@ -151,26 +184,33 @@ function main() {
     return 0;
   }
 
+  const tool = TOOLS[options.tool];
   if (options.list) {
-    console.log(ALL_STEPS.join("\n"));
+    console.log(tool.steps.join("\n"));
     return 0;
   }
 
   if (process.platform !== "win32") {
-    throw new Error("the oracle needs classic regedit.exe and runs only on Windows");
+    throw new Error("the oracle needs the classic Windows tools and runs only on Windows");
   }
 
-  const steps = options.only ?? ALL_STEPS;
+  const steps = options.only ?? tool.steps;
   const platform = hostPlatform();
-  const record = { script: SCRIPT, startedAt: new Date().toISOString(), platform, steps: [], result: "running" };
+  const record = { script: SCRIPT, tool: options.tool, startedAt: new Date().toISOString(), platform, steps: [], result: "running" };
   const results = [];
+  const finishRun = (exitCode) => finish(record, results, exitCode, tool.runRecord);
 
   if (!options.skipBuild) {
-    for (const project of [RESOURCES_PROJECT, CAPTURE_PROJECT]) {
+    // regedit builds both projects as before. gpedit builds only what its chosen steps run.
+    const projects =
+      options.tool === "regedit"
+        ? [RESOURCES_PROJECT, CAPTURE_PROJECT]
+        : [RESOURCES_PROJECT, ...(steps.some((step) => step !== "resources") ? [CAPTURE_PROJECT] : [])];
+    for (const project of projects) {
       const build = dotnetBuild(project, platform);
       results.push(build);
       if (build.status !== 0) {
-        return finish(record, results, 1);
+        return finishRun(1);
       }
     }
   }
@@ -180,10 +220,21 @@ function main() {
 
   for (const step of steps) {
     if (step === "resources") {
-      const outcome = run(resourcesExe, ["--out", "docs/parity/oracle"], "resources");
+      const toolArgs = options.tool === "regedit" ? [] : ["--tool", options.tool];
+      const outcome = run(resourcesExe, [...toolArgs, "--out", tool.resourcesOut], "resources");
       results.push(outcome);
       if (outcome.status !== 0) {
-        return finish(record, results, 1);
+        return finishRun(1);
+      }
+      continue;
+    }
+
+    if (options.tool === "gpedit") {
+      // The command is written in the capture tool. It needs administrator rights, so it is run by hand.
+      const outcome = run(captureExe, ["gpedit", step], `capture gpedit ${step}`);
+      results.push(outcome);
+      if (outcome.status !== 0) {
+        console.error(`oracle: step '${step}' failed with status ${outcome.status}`);
       }
       continue;
     }
@@ -198,20 +249,22 @@ function main() {
     }
   }
 
-  const cleanup = run(captureExe, ["cleanup"], "cleanup");
-  results.push(cleanup);
+  if (options.tool === "regedit") {
+    const cleanup = run(captureExe, ["cleanup"], "cleanup");
+    results.push(cleanup);
+  }
 
   const failed = results.filter((r) => r.status !== 0);
-  return finish(record, results, failed.length === 0 ? 0 : 1);
+  return finishRun(failed.length === 0 ? 0 : 1);
 }
 
-function finish(record, results, exitCode) {
+function finish(record, results, exitCode, runRecord) {
   record.steps = results;
   record.finishedAt = new Date().toISOString();
   record.result = exitCode === 0 ? "pass" : "fail";
-  fs.mkdirSync(path.dirname(RUN_RECORD), { recursive: true });
-  fs.writeFileSync(RUN_RECORD, `${JSON.stringify(record, null, 2)}\n`, "utf8");
-  console.log(`oracle: ${record.result}; run record at ${RUN_RECORD}`);
+  fs.mkdirSync(path.dirname(runRecord), { recursive: true });
+  fs.writeFileSync(runRecord, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  console.log(`oracle: ${record.result}; run record at ${runRecord}`);
   for (const r of results) {
     console.log(`  ${r.status === 0 ? "ok  " : "FAIL"} ${r.label} (${r.seconds}s${r.error ? `, ${r.error}` : ""})`);
   }

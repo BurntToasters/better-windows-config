@@ -74,6 +74,7 @@ public sealed class HubTests
     private const string LightTheme = "Light";
     private const string DarkTheme = "Dark";
     private const string NoticesScope = "hub-main";
+    private const string ToolOrderScope = "hub-tool-order";
     private const string UnconfiguredScope = "hub-unconfigured";
     private const string SettingsScope = "hub-settings";
     private const string LightScope = "hub-light";
@@ -170,6 +171,77 @@ public sealed class HubTests
         E2EResults.Record("hub.closed", !IsRunning(hub.ProcessId), $"Hub pid {hub.ProcessId} was closed by the test.");
 
         AssertNoFailures("Hub window checks");
+    }
+
+    /// <summary>
+    /// The Hub renders ToolCatalog.Tools in catalog order and keeps no second list. Both tools are listed, the Registry
+    /// Editor first and the Local Group Policy Editor second, each row with its display name, its description and the
+    /// Installed status (docs/failure-modes/gpedit-scaffold.md, Hub and catalog).
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    public void Hub_ListsBothToolsInCatalogOrder()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        EnsureExecutables(config);
+
+        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, ToolOrderScope, null));
+        E2EResults.CurrentSession = hub;
+
+        AutomationElement? toolList = WaitFor(hub, "ToolList");
+        E2EResults.Record("hub.rows.list", toolList is not null, toolList is null ? "ToolList was not found." : "ToolList was found.");
+
+        // Full row ids: a bare "regedit" literal reads as a launch of the classic tool to the registry-writer scan.
+        string[] expectedIds = new[] { "ToolRow_regedit", "ToolRow_gpedit" }.Select(row => row["ToolRow_".Length..]).ToArray();
+        string[] expectedNames = { "Registry Editor", "Local Group Policy Editor" };
+        string[] expectedDescriptions = { "Browse and edit the Windows registry.", "Browse and edit local group policy." };
+        List<AutomationElement> rows = new();
+        if (toolList is not null)
+        {
+            // The rows are tool rows by id. The list is read after the first row exists, so the tree is built.
+            _ = WaitFor(hub, "ToolRow_" + expectedIds[0]);
+            rows = toolList.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem))
+                .Where(row => (row.AutomationId ?? string.Empty).StartsWith("ToolRow_", StringComparison.Ordinal))
+                .ToList();
+        }
+
+        string[] actualIds = rows.Select(row => (row.AutomationId ?? string.Empty)["ToolRow_".Length..]).ToArray();
+        E2EResults.Record(
+            "hub.rows.order",
+            actualIds.SequenceEqual(expectedIds, StringComparer.Ordinal),
+            $"Tool rows in tree order were [{string.Join(", ", actualIds)}]. Expected [{string.Join(", ", expectedIds)}].");
+
+        int[] tops = rows.Select(row => row.BoundingRectangle.Top).ToArray();
+        bool topsAscending = tops.Length == expectedIds.Length && tops.Zip(tops.Skip(1), (a, b) => a < b).All(ascending => ascending);
+        E2EResults.Record(
+            "hub.rows.visualOrder",
+            topsAscending,
+            $"Row tops on screen were [{string.Join(", ", tops)}]. Expected strictly increasing for {expectedIds.Length} rows.");
+
+        for (int index = 0; index < Math.Min(rows.Count, expectedIds.Length); index++)
+        {
+            AutomationElement row = rows[index];
+            string id = expectedIds[index];
+            string[] texts = row.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Text))
+                .Select(text => text.Name ?? string.Empty)
+                .ToArray();
+            E2EResults.Record(
+                "hub.rows." + id + ".name",
+                string.Equals(row.Name, expectedNames[index], StringComparison.Ordinal) && texts.Contains(expectedNames[index], StringComparer.Ordinal),
+                $"Row {id} has name '{row.Name}' and cells [{string.Join(" | ", texts)}]. Expected the display name '{expectedNames[index]}'.");
+            E2EResults.Record(
+                "hub.rows." + id + ".description",
+                texts.Contains(expectedDescriptions[index], StringComparer.Ordinal),
+                $"Row {id} cells were [{string.Join(" | ", texts)}]. Expected the description '{expectedDescriptions[index]}'.");
+            E2EResults.Record(
+                "hub.rows." + id + ".status",
+                texts.Contains("Installed", StringComparer.Ordinal),
+                $"Row {id} cells were [{string.Join(" | ", texts)}]. Expected the status 'Installed'.");
+        }
+
+        hub.Close();
+        AssertNoFailures("Hub tool order checks");
     }
 
     [TestMethod]

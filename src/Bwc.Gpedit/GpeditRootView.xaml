@@ -1,0 +1,10 @@
+<UserControl
+    x:Class="Bwc.Gpedit.GpeditRootView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    AutomationProperties.AutomationId="GpeditRoot"
+    AutomationProperties.Name="Local Group Policy Editor">
+
+    <Grid x:Name="RootGrid" Background="{StaticResource BwcFaceBrush}" />
+
+</UserControl>

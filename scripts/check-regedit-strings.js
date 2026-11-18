@@ -1,33 +1,74 @@
 #!/usr/bin/env node
 /**
- * Compares every RT_STRING of classic regedit.exe with BWC's own strings and writes string-parity.json.
+ * Compares every RT_STRING of a classic tool with BWC's own strings and writes string-parity.json, per tool.
  *
- * Input: docs/parity/oracle/regedit-resources.json (untracked, written by `npm run oracle -- --only resources`).
- * When that file is absent (CI, a fresh clone) the script prints a skip note and exits 0.
+ * Usage:
+ *   node scripts/check-regedit-strings.js              every tool whose dump exists
+ *   node scripts/check-regedit-strings.js --tool gpedit  one tool (regedit or gpedit)
+ *
+ * Tools:
+ *   regedit  Input docs/parity/oracle/regedit-resources.json (modules[0], regedit.exe). Output
+ *            docs/parity/oracle/string-parity.json. Ids are integers. Citation in a resw comment: "Oracle 123".
+ *   gpedit   Input docs/parity/oracle/gpedit/gpedit-resources.json (every module with an RT_STRING table). Output
+ *            docs/parity/oracle/gpedit/string-parity.json. Ids are qualified by module, "admtmpl.dll.mui:123".
+ *            Citation in a resw comment: "Oracle admtmpl.dll.mui:123" (a list may follow the colon).
+ *            Compared: every Strings/en-US/*.resw under src/Bwc.Gpedit, src/Bwc.Gpedit.Editor and src/Bwc.UI/Console
+ *            (none need exist), and the C# literals under those folders.
+ *
+ * The dumps are untracked (written by `npm run oracle -- [--tool gpedit] --only resources`). When a tool's dump is
+ * absent (CI, a fresh clone) the script prints a skip note for it and exits 0.
  *
  * Status per id:
  *   template  the text has %%u or %1!...! tokens, which are not compared.
  *   equal     the text (with %1 and %2 turned into {0} and {1}) is the value of a resw entry that the oracle cites, or
- *             of any resw entry, or appears as a C# string literal under src/.
- *   differs   a resw entry whose comment cites "Oracle <id>" has other text.
+ *             of any resw entry, or appears as a C# string literal in the compared sources.
+ *   differs   a resw entry whose comment cites the id has other text.
  *   absent    none of the above.
  *
- * Tracked output: docs/parity/oracle/string-parity.json. It holds ids and statuses only, sorted by id, with no text and
- * no
- * timestamp. Written to a temporary file and renamed into place.
+ * Tracked output holds ids and statuses only, sorted by id, with no text and no timestamp. Written to a temporary file
+ * and renamed into place.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const DUMP_PATH = path.join(ROOT, "docs", "parity", "oracle", "regedit-resources.json");
-const OUT_PATH = path.join(ROOT, "docs", "parity", "oracle", "string-parity.json");
-const RESW_FILES = ["src/Bwc.Regedit/Strings/en-US/Resources.resw", "src/Bwc.UI/Strings/en-US/Resources.resw"];
 const SOURCE_ROOT = path.join(ROOT, "src");
 const SKIPPED_DIRECTORIES = new Set(["bin", "obj", "node_modules"]);
 
+// The gpedit projects whose strings and C# literals are compared, relative to the repository root.
+const GPEDIT_ROOTS = ["src/Bwc.Gpedit", "src/Bwc.Gpedit.Editor", "src/Bwc.UI/Console"];
+
 const XML_ENTITIES = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
+
+const TOOLS = {
+  regedit: {
+    dump: path.join("docs", "parity", "oracle", "regedit-resources.json"),
+    out: path.join("docs", "parity", "oracle", "string-parity.json"),
+    skipHint: "npm run oracle -- --only resources",
+    // Explicit resw files, and the whole of src/ for C# literals.
+    reswFiles: () => ["src/Bwc.Regedit/Strings/en-US/Resources.resw", "src/Bwc.UI/Strings/en-US/Resources.resw"],
+    sourceRoots: [SOURCE_ROOT],
+    compared: () => ["src/Bwc.Regedit/Strings/en-US/Resources.resw", "src/Bwc.UI/Strings/en-US/Resources.resw", "src/**/*.cs (excluding bin and obj)"],
+    source: "regedit.exe RT_STRING ids (untracked dump, regedit-resources.json)",
+    qualified: false,
+    readOracleStrings: readRegeditStrings,
+  },
+  gpedit: {
+    dump: path.join("docs", "parity", "oracle", "gpedit", "gpedit-resources.json"),
+    out: path.join("docs", "parity", "oracle", "gpedit", "string-parity.json"),
+    skipHint: "npm run oracle -- --tool gpedit --only resources",
+    reswFiles: () => findReswFiles(GPEDIT_ROOTS),
+    sourceRoots: GPEDIT_ROOTS.map((root) => path.join(ROOT, root)),
+    compared: () => [
+      ...GPEDIT_ROOTS.map((root) => `${root}/**/Strings/en-US/*.resw`),
+      ...GPEDIT_ROOTS.map((root) => `${root}/**/*.cs (excluding bin and obj)`),
+    ],
+    source: "gpedit RT_STRING ids by module (untracked dump, gpedit-resources.json)",
+    qualified: true,
+    readOracleStrings: readGpeditStrings,
+  },
+};
 
 function decodeXml(text) {
   return text.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (match, body) => {
@@ -46,8 +87,9 @@ function normalizeLines(text) {
   return text.replace(/\r\n?/g, "\n");
 }
 
-// Reads the RT_STRING table of regedit.exe (module 0). Throws when the dump does not have the expected shape.
-function readOracleStrings(dump) {
+// The regedit key is the integer string id. Reads the RT_STRING table of regedit.exe (module 0). Throws when the dump
+// does not have the expected shape.
+function readRegeditStrings(dump) {
   const module = Array.isArray(dump.modules) ? dump.modules[0] : undefined;
   if (!module || !Array.isArray(module.stringTables)) {
     throw new Error("regedit-resources.json has no modules[0].stringTables.");
@@ -71,12 +113,71 @@ function readOracleStrings(dump) {
   return byId;
 }
 
+// The gpedit key is "<module>:<id>" for every module of the dump, so id 123 of two modules never collides.
+function readGpeditStrings(dump) {
+  if (!Array.isArray(dump.modules) || dump.modules.length === 0) {
+    throw new Error("gpedit-resources.json has no modules.");
+  }
+
+  const byKey = new Map();
+  for (const module of dump.modules) {
+    if (typeof module.module !== "string" || !Array.isArray(module.stringTables)) {
+      throw new Error("a gpedit-resources.json module has no name or no stringTables.");
+    }
+    for (const table of module.stringTables) {
+      for (const entry of table.strings ?? []) {
+        if (!Number.isInteger(entry.id) || typeof entry.text !== "string") {
+          throw new Error(`a string table entry of ${module.module} has no integer id or no text.`);
+        }
+        const key = `${module.module}:${entry.id}`;
+        if (!byKey.has(key)) {
+          byKey.set(key, entry.text);
+        }
+      }
+    }
+  }
+
+  if (byKey.size === 0) {
+    throw new Error("gpedit-resources.json has no RT_STRING entries.");
+  }
+  return byKey;
+}
+
+// Every Strings/en-US/*.resw under the given source folders, relative to the repository root. A folder that does not
+// exist yet contributes nothing.
+function findReswFiles(roots) {
+  const found = [];
+  const walk = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        if (!SKIPPED_DIRECTORIES.has(entry.name)) {
+          walk(full);
+        }
+      } else if (entry.isFile() && entry.name.endsWith(".resw")) {
+        const parent = path.dirname(full).split(path.sep).slice(-2).join("/");
+        if (parent === "Strings/en-US") {
+          found.push(path.relative(ROOT, full).split(path.sep).join("/"));
+        }
+      }
+    }
+  };
+
+  for (const root of roots) {
+    const absolute = path.join(ROOT, root);
+    if (fs.existsSync(absolute)) {
+      walk(absolute);
+    }
+  }
+  return found.sort();
+}
+
 // Every <data> entry of the resw files, with the comment before it or inside it (if any). A comment before the element
 // is the one right above <data>. A comment inside it sits between the opening tag and <value>.
-function readResw() {
+function readResw(files) {
   const entries = [];
   const dataPattern = /(?:<!--([\s\S]*?)-->\s*)?<data\s+name="([^"]+)"[^>]*>(?:\s*<!--([\s\S]*?)-->)?\s*<value>([\s\S]*?)<\/value>/g;
-  for (const relative of RESW_FILES) {
+  for (const relative of files) {
     const file = path.join(ROOT, relative);
     const xml = fs.readFileSync(file, "utf8");
     for (const match of xml.matchAll(dataPattern)) {
@@ -90,15 +191,9 @@ function readResw() {
   return entries;
 }
 
-// Ids cited by a comment that starts with "Oracle <ids>", such as "Oracle 25 (MSG-010)", "Oracle 302 and 305" or
-// "Oracle 49 to 54". A comment that mentions an id later in its text (a file header) cites nothing.
-function citedIds(comment) {
-  const match = /^Oracle\s+(\d+(?:\s*(?:,|and|to)\s*\d+)*)/.exec(comment.trim());
-  if (!match) {
-    return [];
-  }
-
-  const tokens = match[1].split(/\s*(,|and|to)\s*/);
+// The ids of a list such as "25", "302 and 305" or "49 to 54".
+function parseIdList(list) {
+  const tokens = list.split(/\s*(,|and|to)\s*/);
   const ids = [Number.parseInt(tokens[0], 10)];
   for (let i = 1; i < tokens.length; i += 2) {
     const value = Number.parseInt(tokens[i + 1], 10);
@@ -114,15 +209,39 @@ function citedIds(comment) {
   return ids;
 }
 
-// The text of every C# file under src/, without bin and obj. A string literal is searched in its escaped form.
-function readCSharpSources(directory, out = []) {
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    if (entry.isDirectory()) {
-      if (!SKIPPED_DIRECTORIES.has(entry.name)) {
-        readCSharpSources(path.join(directory, entry.name), out);
+const ID_LIST = String.raw`\d+(?:\s*(?:,|and|to)\s*\d+)*`;
+
+// Keys cited by a comment that starts with "Oracle ...". The regedit form is "Oracle 25 (MSG-010)", "Oracle 302 and 305"
+// or "Oracle 49 to 54". The gpedit form needs the module: "Oracle admtmpl.dll.mui:123" or "Oracle gpedit.dll.mui:5, 6".
+// A comment that mentions an id later in its text (a file header) cites nothing.
+function citedKeys(comment, qualified) {
+  const text = comment.trim();
+  if (!qualified) {
+    const match = new RegExp(`^Oracle\\s+(${ID_LIST})`).exec(text);
+    return match ? parseIdList(match[1]) : [];
+  }
+
+  const match = new RegExp(`^Oracle\\s+([A-Za-z0-9_.\\-]+):(${ID_LIST})`).exec(text);
+  return match ? parseIdList(match[2]).map((id) => `${match[1]}:${id}`) : [];
+}
+
+// The text of every C# file under the given folders, without bin and obj. A string literal is searched in its escaped form.
+function readCSharpSources(directories) {
+  const out = [];
+  const walk = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!SKIPPED_DIRECTORIES.has(entry.name)) {
+          walk(path.join(directory, entry.name));
+        }
+      } else if (entry.isFile() && entry.name.endsWith(".cs")) {
+        out.push(fs.readFileSync(path.join(directory, entry.name), "utf8"));
       }
-    } else if (entry.isFile() && entry.name.endsWith(".cs")) {
-      out.push(fs.readFileSync(path.join(directory, entry.name), "utf8"));
+    }
+  };
+  for (const directory of directories) {
+    if (fs.existsSync(directory)) {
+      walk(directory);
     }
   }
   return out;
@@ -161,6 +280,19 @@ function statusOf(id, text, resw, citedBy, sources) {
   return "absent";
 }
 
+// Integer ids ascending, or "<module>:<id>" by module (ordinal) then id.
+function compareKeys(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    return a - b;
+  }
+  const [moduleA, idA] = String(a).split(/:(?=\d+$)/);
+  const [moduleB, idB] = String(b).split(/:(?=\d+$)/);
+  if (moduleA !== moduleB) {
+    return moduleA < moduleB ? -1 : 1;
+  }
+  return Number(idA) - Number(idB);
+}
+
 function writeAtomically(file, text) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const temp = `${file}.tmp`;
@@ -168,28 +300,32 @@ function writeAtomically(file, text) {
   fs.renameSync(temp, file);
 }
 
-function main() {
-  if (!fs.existsSync(DUMP_PATH)) {
-    console.log(`string-parity: skipped, ${path.relative(ROOT, DUMP_PATH)} is absent (untracked; run npm run oracle -- --only resources)`);
-    return 0;
+function checkTool(name) {
+  const tool = TOOLS[name];
+  const dumpPath = path.join(ROOT, tool.dump);
+  const outPath = path.join(ROOT, tool.out);
+  if (!fs.existsSync(dumpPath)) {
+    console.log(`string-parity: ${name}: skipped, ${tool.dump.split(path.sep).join("/")} is absent (untracked; run ${tool.skipHint})`);
+    return;
   }
 
-  const dump = JSON.parse(fs.readFileSync(DUMP_PATH, "utf8"));
-  const oracle = readOracleStrings(dump);
-  const resw = readResw();
+  const dump = JSON.parse(fs.readFileSync(dumpPath, "utf8"));
+  const oracle = tool.readOracleStrings(dump);
+  const reswFiles = tool.reswFiles();
+  const resw = readResw(reswFiles);
   const citedBy = new Map();
   for (const entry of resw) {
-    for (const id of citedIds(entry.comment)) {
-      if (!citedBy.has(id)) {
-        citedBy.set(id, []);
+    for (const key of citedKeys(entry.comment, tool.qualified)) {
+      if (!citedBy.has(key)) {
+        citedBy.set(key, []);
       }
-      citedBy.get(id).push(entry);
+      citedBy.get(key).push(entry);
     }
   }
-  const sources = readCSharpSources(SOURCE_ROOT);
+  const sources = readCSharpSources(tool.sourceRoots);
 
-  const ids = [...oracle.keys()].sort((a, b) => a - b);
-  const strings = ids.map((id) => ({ id, status: statusOf(id, oracle.get(id), resw, citedBy, sources) }));
+  const keys = [...oracle.keys()].sort(compareKeys);
+  const strings = keys.map((id) => ({ id, status: statusOf(id, oracle.get(id), resw, citedBy, sources) }));
   const counts = { equal: 0, differs: 0, template: 0, absent: 0 };
   for (const s of strings) {
     counts[s.status] += 1;
@@ -198,16 +334,40 @@ function main() {
   const output = {
     schema: 1,
     generator: "scripts/check-regedit-strings.js",
-    source: "regedit.exe RT_STRING ids (untracked dump, regedit-resources.json)",
-    compared: RESW_FILES.concat(["src/**/*.cs (excluding bin and obj)"]),
+    source: tool.source,
+    compared: tool.compared(),
     counts,
     strings,
   };
-  writeAtomically(OUT_PATH, `${JSON.stringify(output, null, 2)}\n`);
+  writeAtomically(outPath, `${JSON.stringify(output, null, 2)}\n`);
   console.log(
-    `string-parity: ${strings.length} ids: equal ${counts.equal}, differs ${counts.differs}, template ${counts.template}, absent ${counts.absent}`,
+    `string-parity: ${name}: ${strings.length} ids: equal ${counts.equal}, differs ${counts.differs}, template ${counts.template}, absent ${counts.absent}`,
   );
-  console.log(`string-parity: wrote ${path.relative(ROOT, OUT_PATH)}`);
+  console.log(`string-parity: ${name}: wrote ${path.relative(ROOT, outPath).split(path.sep).join("/")}`);
+}
+
+function parseArgs(argv) {
+  let only = null;
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === "--tool") {
+      const value = argv[i + 1];
+      if (!value || !Object.hasOwn(TOOLS, value)) {
+        throw new Error(`--tool needs one of: ${Object.keys(TOOLS).join(", ")}`);
+      }
+      only = value;
+      i += 1;
+    } else {
+      throw new Error(`unknown argument '${argv[i]}'`);
+    }
+  }
+  return only;
+}
+
+function main() {
+  const only = parseArgs(process.argv.slice(2));
+  for (const name of only ? [only] : Object.keys(TOOLS)) {
+    checkTool(name);
+  }
   return 0;
 }
 

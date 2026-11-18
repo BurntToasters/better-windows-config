@@ -25,6 +25,7 @@ const IMAGEMAGICK_ROOT = process.env.ProgramFiles || "C:\\Program Files";
 const APP_ICONS = [
   { source: "resources/bwc.png", icon: "resources/bwc.ico" },
   { source: "resources/bwc-regedit.png", icon: "resources/bwc-regedit.ico" },
+  { source: "resources/bwc-gpo.png", icon: "resources/bwc-gpo.ico" },
 ];
 
 function printHelp() {

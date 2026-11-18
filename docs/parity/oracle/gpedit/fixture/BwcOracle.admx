@@ -1,0 +1,730 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BWC oracle fixture. Authored by Better Windows Config. Not a Microsoft file. -->
+<policyDefinitions revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <policyNamespaces>
+    <target prefix="bwcoracle" namespace="BWC.Policies.Oracle" />
+    <using prefix="bwcbase" namespace="BWC.Policies.OracleBase" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <supportedOn>
+    <definitions>
+      <definition name="SUPPORTED_LocalOnly" displayName="$(string.SUPPORTED_LocalOnly)" />
+    </definitions>
+  </supportedOn>
+  <categories>
+    <category name="Basics" displayName="$(string.Cat_Basics)" explainText="$(string.Cat_Basics_Help)">
+      <parentCategory ref="bwcbase:BwcOracle" />
+    </category>
+    <category name="Elements" displayName="$(string.Cat_Elements)">
+      <parentCategory ref="bwcbase:BwcOracle" />
+    </category>
+    <category name="Booleans" displayName="$(string.Cat_Booleans)">
+      <parentCategory ref="Elements" />
+    </category>
+    <category name="Numbers" displayName="$(string.Cat_Numbers)">
+      <parentCategory ref="Elements" />
+    </category>
+    <category name="Texts" displayName="$(string.Cat_Texts)">
+      <parentCategory ref="Elements" />
+    </category>
+    <category name="Choices" displayName="$(string.Cat_Choices)">
+      <parentCategory ref="Elements" />
+    </category>
+    <category name="Lists" displayName="$(string.Cat_Lists)">
+      <parentCategory ref="Elements" />
+    </category>
+    <category name="Shared" displayName="$(string.Cat_Shared)">
+      <parentCategory ref="bwcbase:BwcOracle" />
+    </category>
+    <category name="SortCases" displayName="$(string.Cat_SortCases)">
+      <parentCategory ref="bwcbase:BwcOracle" />
+    </category>
+    <category name="Ampersand" displayName="$(string.Cat_Ampersand)">
+      <parentCategory ref="bwcbase:BwcOracle" />
+    </category>
+    <category name="Explain" displayName="$(string.Cat_Explain)">
+      <parentCategory ref="bwcbase:BwcOracle" />
+    </category>
+    <category name="MachineOnly" displayName="$(string.Cat_MachineOnly)">
+      <parentCategory ref="bwcbase:BwcOracle" />
+    </category>
+    <category name="MachineNested" displayName="$(string.Cat_MachineNested)">
+      <parentCategory ref="MachineOnly" />
+    </category>
+    <category name="MachineDeep" displayName="$(string.Cat_MachineDeep)">
+      <parentCategory ref="MachineNested" />
+    </category>
+    <category name="UserOnly" displayName="$(string.Cat_UserOnly)">
+      <parentCategory ref="bwcbase:BwcOracle" />
+    </category>
+    <category name="UserNested" displayName="$(string.Cat_UserNested)">
+      <parentCategory ref="UserOnly" />
+    </category>
+    <category name="EmptyCategory" displayName="$(string.Cat_EmptyCategory)">
+      <parentCategory ref="bwcbase:BwcOracle" />
+    </category>
+  </categories>
+  <policies>
+
+    <!-- ===== Directly under the top category ===== -->
+    <policy name="Pol_Top_DirectUnderRoot" class="User" displayName="$(string.Pol_Top_DirectUnderRoot)" explainText="$(string.Pol_Top_DirectUnderRoot_Help)" key="Software\Policies\BWC-Oracle" valueName="TopFlag">
+      <parentCategory ref="bwcbase:BwcOracle" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+
+    <!-- ===== Basics: class, value forms, lists, key placement ===== -->
+    <policy name="Pol_Class_Machine" class="Machine" displayName="$(string.Pol_Class_Machine)" explainText="$(string.Pol_Class_Machine_Help)" key="Software\Policies\BWC-Oracle\Basics" valueName="MachineFlag">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Class_User" class="User" displayName="$(string.Pol_Class_User)" explainText="$(string.Pol_Class_User_Help)" key="Software\Policies\BWC-Oracle\Basics" valueName="UserFlag">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcNewer" />
+    </policy>
+    <policy name="Pol_Class_Both" class="Both" displayName="$(string.Pol_Class_Both)" explainText="$(string.Pol_Class_Both_Help)" key="Software\Policies\BWC-Oracle\Basics" valueName="BothFlag">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcOlder" />
+    </policy>
+    <policy name="Pol_Value_Decimal" class="Machine" displayName="$(string.Pol_Value_Decimal)" explainText="$(string.Pol_Value_Decimal_Help)" key="Software\Policies\BWC-Oracle\Basics" valueName="ModeNumber">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <enabledValue>
+        <decimal value="5" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="9" />
+      </disabledValue>
+    </policy>
+    <policy name="Pol_Value_String" class="User" displayName="$(string.Pol_Value_String)" explainText="$(string.Pol_Value_String_Help)" key="Software\Policies\BWC-Oracle\Basics" valueName="ModeText">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <enabledValue>
+        <string>on</string>
+      </enabledValue>
+      <disabledValue>
+        <string>off</string>
+      </disabledValue>
+    </policy>
+    <policy name="Pol_Value_EnabledOnly" class="Machine" displayName="$(string.Pol_Value_EnabledOnly)" explainText="$(string.Pol_Value_EnabledOnly_Help)" key="Software\Policies\BWC-Oracle\Basics" valueName="EnabledOnly">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <enabledValue>
+        <decimal value="7" />
+      </enabledValue>
+    </policy>
+    <policy name="Pol_Value_DisabledOnly" class="Machine" displayName="$(string.Pol_Value_DisabledOnly)" explainText="$(string.Pol_Value_DisabledOnly_Help)" key="Software\Policies\BWC-Oracle\Basics" valueName="DisabledOnly">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <disabledValue>
+        <decimal value="3" />
+      </disabledValue>
+    </policy>
+    <policy name="Pol_Value_NoValueName_ElementsOnly" class="Machine" displayName="$(string.Pol_Value_NoValueName_ElementsOnly)" explainText="$(string.Pol_Value_NoValueName_ElementsOnly_Help)" presentation="$(presentation.Pol_Value_NoValueName_ElementsOnly)" key="Software\Policies\BWC-Oracle\Basics">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <text id="OnlyText" valueName="OnlyText" />
+        <decimal id="OnlyNumber" valueName="OnlyNumber" />
+      </elements>
+    </policy>
+    <policy name="Pol_Value_EnabledListOnly" class="Machine" displayName="$(string.Pol_Value_EnabledListOnly)" explainText="$(string.Pol_Value_EnabledListOnly_Help)" key="Software\Policies\BWC-Oracle\Basics">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <enabledList defaultKey="Software\Policies\BWC-Oracle\Basics\EnabledListKey">
+        <item valueName="ListItemOne">
+          <value>
+            <decimal value="1" />
+          </value>
+        </item>
+        <item key="Software\Policies\BWC-Oracle\Basics\ItemKeyOverride" valueName="ListItemTwo">
+          <value>
+            <string>two</string>
+          </value>
+        </item>
+        <item valueName="ListItemThree">
+          <value>
+            <decimal value="3" />
+          </value>
+        </item>
+      </enabledList>
+    </policy>
+    <policy name="Pol_Value_DisabledListOnly" class="Machine" displayName="$(string.Pol_Value_DisabledListOnly)" explainText="$(string.Pol_Value_DisabledListOnly_Help)" key="Software\Policies\BWC-Oracle\Basics">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <disabledList defaultKey="Software\Policies\BWC-Oracle\Basics\DisabledListKey">
+        <item valueName="OffItemOne">
+          <value>
+            <decimal value="0" />
+          </value>
+        </item>
+        <item key="Software\Policies\BWC-Oracle\Basics\ItemKeyOverride" valueName="OffItemTwo">
+          <value>
+            <string>zero</string>
+          </value>
+        </item>
+      </disabledList>
+    </policy>
+    <policy name="Pol_Value_BothLists" class="Machine" displayName="$(string.Pol_Value_BothLists)" explainText="$(string.Pol_Value_BothLists_Help)" key="Software\Policies\BWC-Oracle\Basics" valueName="ListMaster">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <enabledList>
+        <item valueName="BothListOn">
+          <value>
+            <decimal value="1" />
+          </value>
+        </item>
+        <item key="Software\Policies\BWC-Oracle\Basics\BothListKey" valueName="BothListOnOther">
+          <value>
+            <decimal value="11" />
+          </value>
+        </item>
+      </enabledList>
+      <disabledList>
+        <item valueName="BothListOff">
+          <value>
+            <decimal value="0" />
+          </value>
+        </item>
+      </disabledList>
+    </policy>
+    <policy name="Pol_Element_KeyOverride" class="Machine" displayName="$(string.Pol_Element_KeyOverride)" explainText="$(string.Pol_Element_KeyOverride_Help)" presentation="$(presentation.Pol_Element_KeyOverride)" key="Software\Policies\BWC-Oracle\Basics" valueName="ElementKeyFlag">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <text id="OverrideText" key="Software\Policies\BWC-Oracle\Basics\ElementKey" valueName="OverrideText" />
+      </elements>
+    </policy>
+    <policy name="Pol_Outside_KeyOutsideRoots" class="Machine" displayName="$(string.Pol_Outside_KeyOutsideRoots)" explainText="$(string.Pol_Outside_KeyOutsideRoots_Help)" key="Software\BWC-Oracle-Gpedit" valueName="OutsideFlag">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Both_WithElements" class="Both" displayName="$(string.Pol_Both_WithElements)" explainText="$(string.Pol_Both_WithElements_Help)" presentation="$(presentation.Pol_Both_WithElements)" key="Software\Policies\BWC-Oracle\Basics" valueName="BothElementFlag">
+      <parentCategory ref="Basics" />
+      <supportedOn ref="bwcoracle:SUPPORTED_LocalOnly" />
+      <elements>
+        <decimal id="BothNumber" valueName="BothNumber" minValue="0" maxValue="99" />
+      </elements>
+    </policy>
+
+    <!-- ===== Elements: booleans ===== -->
+    <policy name="Pol_Bool_TrueFalseValues" class="Machine" displayName="$(string.Pol_Bool_TrueFalseValues)" explainText="$(string.Pol_Bool_TrueFalseValues_Help)" presentation="$(presentation.Pol_Bool_TrueFalseValues)" key="Software\Policies\BWC-Oracle\Elements\Bool">
+      <parentCategory ref="Booleans" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <boolean id="TrueFalseCheck" valueName="TrueFalseCheck">
+          <trueValue>
+            <decimal value="10" />
+          </trueValue>
+          <falseValue>
+            <decimal value="20" />
+          </falseValue>
+        </boolean>
+      </elements>
+    </policy>
+    <policy name="Pol_Bool_StringValues" class="User" displayName="$(string.Pol_Bool_StringValues)" explainText="$(string.Pol_Bool_StringValues_Help)" presentation="$(presentation.Pol_Bool_StringValues)" key="Software\Policies\BWC-Oracle\Elements\Bool">
+      <parentCategory ref="Booleans" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <boolean id="StringCheck" valueName="StringCheck">
+          <trueValue>
+            <string>yes</string>
+          </trueValue>
+          <falseValue>
+            <string>no</string>
+          </falseValue>
+        </boolean>
+      </elements>
+    </policy>
+    <policy name="Pol_Bool_TrueFalseLists" class="Machine" displayName="$(string.Pol_Bool_TrueFalseLists)" explainText="$(string.Pol_Bool_TrueFalseLists_Help)" presentation="$(presentation.Pol_Bool_TrueFalseLists)" key="Software\Policies\BWC-Oracle\Elements\Bool">
+      <parentCategory ref="Booleans" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <boolean id="ListCheck">
+          <trueList defaultKey="Software\Policies\BWC-Oracle\Elements\Bool\TrueListKey">
+            <item valueName="TrueListOne">
+              <value>
+                <decimal value="1" />
+              </value>
+            </item>
+            <item key="Software\Policies\BWC-Oracle\Elements\Bool\TrueListOtherKey" valueName="TrueListTwo">
+              <value>
+                <string>t2</string>
+              </value>
+            </item>
+          </trueList>
+          <falseList defaultKey="Software\Policies\BWC-Oracle\Elements\Bool\FalseListKey">
+            <item valueName="FalseListOne">
+              <value>
+                <decimal value="0" />
+              </value>
+            </item>
+            <item valueName="FalseListTwo">
+              <value>
+                <string>f2</string>
+              </value>
+            </item>
+          </falseList>
+        </boolean>
+      </elements>
+    </policy>
+    <policy name="Pol_Bool_NoFalseValue" class="Machine" displayName="$(string.Pol_Bool_NoFalseValue)" explainText="$(string.Pol_Bool_NoFalseValue_Help)" presentation="$(presentation.Pol_Bool_NoFalseValue)" key="Software\Policies\BWC-Oracle\Elements\Bool">
+      <parentCategory ref="Booleans" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <boolean id="NoFalseCheck" valueName="NoFalseCheck">
+          <trueValue>
+            <decimal value="1" />
+          </trueValue>
+        </boolean>
+      </elements>
+    </policy>
+    <policy name="Pol_Bool_TwoChecksReverseOrder" class="Machine" displayName="$(string.Pol_Bool_TwoChecksReverseOrder)" explainText="$(string.Pol_Bool_TwoChecksReverseOrder_Help)" presentation="$(presentation.Pol_Bool_TwoChecksReverseOrder)" key="Software\Policies\BWC-Oracle\Elements\Bool\Order">
+      <parentCategory ref="Booleans" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <boolean id="ZetaCheck" valueName="ZetaCheck">
+          <trueValue>
+            <decimal value="1" />
+          </trueValue>
+          <falseValue>
+            <decimal value="0" />
+          </falseValue>
+        </boolean>
+        <boolean id="AlphaCheck" valueName="AlphaCheck">
+          <trueValue>
+            <decimal value="1" />
+          </trueValue>
+          <falseValue>
+            <decimal value="0" />
+          </falseValue>
+        </boolean>
+      </elements>
+    </policy>
+
+    <!-- ===== Elements: numbers ===== -->
+    <policy name="Pol_Decimal_MinMax" class="Machine" displayName="$(string.Pol_Decimal_MinMax)" explainText="$(string.Pol_Decimal_MinMax_Help)" presentation="$(presentation.Pol_Decimal_MinMax)" key="Software\Policies\BWC-Oracle\Elements\Number">
+      <parentCategory ref="Numbers" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <decimal id="MinMaxNumber" valueName="MinMaxNumber" minValue="10" maxValue="500" />
+      </elements>
+    </policy>
+    <policy name="Pol_Decimal_Required" class="User" displayName="$(string.Pol_Decimal_Required)" explainText="$(string.Pol_Decimal_Required_Help)" presentation="$(presentation.Pol_Decimal_Required)" key="Software\Policies\BWC-Oracle\Elements\Number">
+      <parentCategory ref="Numbers" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <decimal id="RequiredNumber" valueName="RequiredNumber" required="true" />
+      </elements>
+    </policy>
+    <policy name="Pol_Decimal_Soft" class="Machine" displayName="$(string.Pol_Decimal_Soft)" explainText="$(string.Pol_Decimal_Soft_Help)" presentation="$(presentation.Pol_Decimal_Soft)" key="Software\Policies\BWC-Oracle\Elements\Number">
+      <parentCategory ref="Numbers" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <decimal id="SoftNumber" valueName="SoftNumber" minValue="1" maxValue="100" soft="true" />
+      </elements>
+    </policy>
+    <policy name="Pol_Decimal_StoreAsText" class="Machine" displayName="$(string.Pol_Decimal_StoreAsText)" explainText="$(string.Pol_Decimal_StoreAsText_Help)" presentation="$(presentation.Pol_Decimal_StoreAsText)" key="Software\Policies\BWC-Oracle\Elements\Number">
+      <parentCategory ref="Numbers" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <decimal id="TextNumber" valueName="TextNumber" storeAsText="true" minValue="0" maxValue="65535" />
+      </elements>
+    </policy>
+    <policy name="Pol_LongDecimal_Basic" class="Machine" displayName="$(string.Pol_LongDecimal_Basic)" explainText="$(string.Pol_LongDecimal_Basic_Help)" presentation="$(presentation.Pol_LongDecimal_Basic)" key="Software\Policies\BWC-Oracle\Elements\Number">
+      <parentCategory ref="Numbers" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <longDecimal id="LongNumber" valueName="LongNumber" minValue="0" maxValue="9000000000000" />
+      </elements>
+    </policy>
+    <policy name="Pol_LongDecimal_RequiredSoftText" class="User" displayName="$(string.Pol_LongDecimal_RequiredSoftText)" explainText="$(string.Pol_LongDecimal_RequiredSoftText_Help)" presentation="$(presentation.Pol_LongDecimal_RequiredSoftText)" key="Software\Policies\BWC-Oracle\Elements\Number">
+      <parentCategory ref="Numbers" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <longDecimal id="LongTextNumber" valueName="LongTextNumber" required="true" soft="true" storeAsText="true" />
+      </elements>
+    </policy>
+
+    <!-- ===== Elements: text, combo box, multi text ===== -->
+    <policy name="Pol_Text_Plain" class="Machine" displayName="$(string.Pol_Text_Plain)" explainText="$(string.Pol_Text_Plain_Help)" presentation="$(presentation.Pol_Text_Plain)" key="Software\Policies\BWC-Oracle\Elements\Text">
+      <parentCategory ref="Texts" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <text id="PlainText" valueName="PlainText" />
+      </elements>
+    </policy>
+    <policy name="Pol_Text_Expandable" class="Machine" displayName="$(string.Pol_Text_Expandable)" explainText="$(string.Pol_Text_Expandable_Help)" presentation="$(presentation.Pol_Text_Expandable)" key="Software\Policies\BWC-Oracle\Elements\Text">
+      <parentCategory ref="Texts" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <text id="ExpandText" valueName="ExpandText" expandable="true" />
+      </elements>
+    </policy>
+    <policy name="Pol_Text_MaxLength" class="User" displayName="$(string.Pol_Text_MaxLength)" explainText="$(string.Pol_Text_MaxLength_Help)" presentation="$(presentation.Pol_Text_MaxLength)" key="Software\Policies\BWC-Oracle\Elements\Text">
+      <parentCategory ref="Texts" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <text id="ShortText" valueName="ShortText" maxLength="12" />
+      </elements>
+    </policy>
+    <policy name="Pol_Text_Required" class="Machine" displayName="$(string.Pol_Text_Required)" explainText="$(string.Pol_Text_Required_Help)" presentation="$(presentation.Pol_Text_Required)" key="Software\Policies\BWC-Oracle\Elements\Text">
+      <parentCategory ref="Texts" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <text id="RequiredText" valueName="RequiredText" required="true" />
+      </elements>
+    </policy>
+    <policy name="Pol_Text_ComboBoxSuggestions" class="Machine" displayName="$(string.Pol_Text_ComboBoxSuggestions)" explainText="$(string.Pol_Text_ComboBoxSuggestions_Help)" presentation="$(presentation.Pol_Text_ComboBoxSuggestions)" key="Software\Policies\BWC-Oracle\Elements\Text">
+      <parentCategory ref="Texts" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <text id="ComboText" valueName="ComboText" />
+      </elements>
+    </policy>
+    <policy name="Pol_Text_ComboBoxNoSortRequired" class="Machine" displayName="$(string.Pol_Text_ComboBoxNoSortRequired)" explainText="$(string.Pol_Text_ComboBoxNoSortRequired_Help)" presentation="$(presentation.Pol_Text_ComboBoxNoSortRequired)" key="Software\Policies\BWC-Oracle\Elements\Text">
+      <parentCategory ref="Texts" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <text id="ComboNoSortText" valueName="ComboNoSortText" required="true" />
+      </elements>
+    </policy>
+    <policy name="Pol_MultiText_Basic" class="Machine" displayName="$(string.Pol_MultiText_Basic)" explainText="$(string.Pol_MultiText_Basic_Help)" presentation="$(presentation.Pol_MultiText_Basic)" key="Software\Policies\BWC-Oracle\Elements\Text">
+      <parentCategory ref="Texts" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <multiText id="MultiLines" valueName="MultiLines" />
+      </elements>
+    </policy>
+    <policy name="Pol_MultiText_Limits" class="User" displayName="$(string.Pol_MultiText_Limits)" explainText="$(string.Pol_MultiText_Limits_Help)" presentation="$(presentation.Pol_MultiText_Limits)" key="Software\Policies\BWC-Oracle\Elements\Text">
+      <parentCategory ref="Texts" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <multiText id="LimitedLines" valueName="LimitedLines" required="true" maxLength="20" maxStrings="3" />
+      </elements>
+    </policy>
+
+    <!-- ===== Elements: enums ===== -->
+    <policy name="Pol_Enum_DecimalItems" class="Machine" displayName="$(string.Pol_Enum_DecimalItems)" explainText="$(string.Pol_Enum_DecimalItems_Help)" presentation="$(presentation.Pol_Enum_DecimalItems)" key="Software\Policies\BWC-Oracle\Elements\Choice">
+      <parentCategory ref="Choices" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <enum id="DecimalChoice" valueName="DecimalChoice">
+          <item displayName="$(string.Pol_Enum_DecimalItems_Zero)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.Pol_Enum_DecimalItems_One)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+          <item displayName="$(string.Pol_Enum_DecimalItems_Two)">
+            <value>
+              <decimal value="2" />
+            </value>
+          </item>
+          <item displayName="$(string.Pol_Enum_DecimalItems_Three)">
+            <value>
+              <decimal value="3" />
+            </value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+    <policy name="Pol_Enum_StringItems" class="User" displayName="$(string.Pol_Enum_StringItems)" explainText="$(string.Pol_Enum_StringItems_Help)" presentation="$(presentation.Pol_Enum_StringItems)" key="Software\Policies\BWC-Oracle\Elements\Choice">
+      <parentCategory ref="Choices" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <enum id="StringChoice" valueName="StringChoice">
+          <item displayName="$(string.Pol_Enum_StringItems_Red)">
+            <value>
+              <string>red</string>
+            </value>
+          </item>
+          <item displayName="$(string.Pol_Enum_StringItems_Green)">
+            <value>
+              <string>green</string>
+            </value>
+          </item>
+          <item displayName="$(string.Pol_Enum_StringItems_Blue)">
+            <value>
+              <string>blue</string>
+            </value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+    <policy name="Pol_Enum_ItemValueList" class="Machine" displayName="$(string.Pol_Enum_ItemValueList)" explainText="$(string.Pol_Enum_ItemValueList_Help)" presentation="$(presentation.Pol_Enum_ItemValueList)" key="Software\Policies\BWC-Oracle\Elements\Choice">
+      <parentCategory ref="Choices" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <enum id="ProfileChoice" valueName="ProfileChoice">
+          <item displayName="$(string.Pol_Enum_ItemValueList_A)">
+            <value>
+              <decimal value="1" />
+            </value>
+            <valueList defaultKey="Software\Policies\BWC-Oracle\Elements\Choice\ProfileA">
+              <item valueName="ProfileAFirst">
+                <value>
+                  <decimal value="100" />
+                </value>
+              </item>
+              <item key="Software\Policies\BWC-Oracle\Elements\Choice\ProfileAOther" valueName="ProfileASecond">
+                <value>
+                  <string>second</string>
+                </value>
+              </item>
+            </valueList>
+          </item>
+          <item displayName="$(string.Pol_Enum_ItemValueList_B)">
+            <value>
+              <decimal value="2" />
+            </value>
+          </item>
+          <item displayName="$(string.Pol_Enum_ItemValueList_C)">
+            <value>
+              <decimal value="3" />
+            </value>
+            <valueList>
+              <item valueName="ProfileCOnly">
+                <value>
+                  <decimal value="300" />
+                </value>
+              </item>
+            </valueList>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+    <policy name="Pol_Enum_Required" class="Machine" displayName="$(string.Pol_Enum_Required)" explainText="$(string.Pol_Enum_Required_Help)" presentation="$(presentation.Pol_Enum_Required)" key="Software\Policies\BWC-Oracle\Elements\Choice">
+      <parentCategory ref="Choices" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <enum id="RequiredChoice" valueName="RequiredChoice" required="true">
+          <item displayName="$(string.Pol_Enum_Required_Low)">
+            <value>
+              <decimal value="10" />
+            </value>
+          </item>
+          <item displayName="$(string.Pol_Enum_Required_High)">
+            <value>
+              <decimal value="20" />
+            </value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+    <policy name="Pol_Enum_NoSortDefaultItem" class="Machine" displayName="$(string.Pol_Enum_NoSortDefaultItem)" explainText="$(string.Pol_Enum_NoSortDefaultItem_Help)" presentation="$(presentation.Pol_Enum_NoSortDefaultItem)" key="Software\Policies\BWC-Oracle\Elements\Choice">
+      <parentCategory ref="Choices" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <enum id="UnsortedChoice" valueName="UnsortedChoice">
+          <item displayName="$(string.Pol_Enum_NoSortDefaultItem_Zulu)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.Pol_Enum_NoSortDefaultItem_Alpha)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+          <item displayName="$(string.Pol_Enum_NoSortDefaultItem_Mike)">
+            <value>
+              <decimal value="2" />
+            </value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+
+    <!-- ===== Elements: lists ===== -->
+    <policy name="Pol_List_Plain" class="Machine" displayName="$(string.Pol_List_Plain)" explainText="$(string.Pol_List_Plain_Help)" presentation="$(presentation.Pol_List_Plain)" key="Software\Policies\BWC-Oracle\Lists">
+      <parentCategory ref="Lists" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <list id="PlainList" key="Software\Policies\BWC-Oracle\Lists\Plain" />
+      </elements>
+    </policy>
+    <policy name="Pol_List_EmptyPrefix" class="Machine" displayName="$(string.Pol_List_EmptyPrefix)" explainText="$(string.Pol_List_EmptyPrefix_Help)" presentation="$(presentation.Pol_List_EmptyPrefix)" key="Software\Policies\BWC-Oracle\Lists">
+      <parentCategory ref="Lists" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <list id="EmptyPrefixList" key="Software\Policies\BWC-Oracle\Lists\EmptyPrefix" valuePrefix="" />
+      </elements>
+    </policy>
+    <policy name="Pol_List_Additive" class="Machine" displayName="$(string.Pol_List_Additive)" explainText="$(string.Pol_List_Additive_Help)" presentation="$(presentation.Pol_List_Additive)" key="Software\Policies\BWC-Oracle\Lists">
+      <parentCategory ref="Lists" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <list id="AdditiveList" key="Software\Policies\BWC-Oracle\Lists\Additive" additive="true" />
+      </elements>
+    </policy>
+    <policy name="Pol_List_ExplicitValue" class="Machine" displayName="$(string.Pol_List_ExplicitValue)" explainText="$(string.Pol_List_ExplicitValue_Help)" presentation="$(presentation.Pol_List_ExplicitValue)" key="Software\Policies\BWC-Oracle\Lists">
+      <parentCategory ref="Lists" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <list id="ExplicitList" key="Software\Policies\BWC-Oracle\Lists\Explicit" explicitValue="true" />
+      </elements>
+    </policy>
+    <policy name="Pol_List_ValuePrefix" class="User" displayName="$(string.Pol_List_ValuePrefix)" explainText="$(string.Pol_List_ValuePrefix_Help)" presentation="$(presentation.Pol_List_ValuePrefix)" key="Software\Policies\BWC-Oracle\Lists">
+      <parentCategory ref="Lists" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <list id="PrefixList" key="Software\Policies\BWC-Oracle\Lists\Prefix" valuePrefix="Item" />
+      </elements>
+    </policy>
+    <policy name="Pol_List_Expandable" class="Machine" displayName="$(string.Pol_List_Expandable)" explainText="$(string.Pol_List_Expandable_Help)" presentation="$(presentation.Pol_List_Expandable)" key="Software\Policies\BWC-Oracle\Lists">
+      <parentCategory ref="Lists" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <list id="ExpandList" key="Software\Policies\BWC-Oracle\Lists\Expand" expandable="true" />
+      </elements>
+    </policy>
+    <policy name="Pol_List_PolicyValueName" class="Machine" displayName="$(string.Pol_List_PolicyValueName)" explainText="$(string.Pol_List_PolicyValueName_Help)" presentation="$(presentation.Pol_List_PolicyValueName)" key="Software\Policies\BWC-Oracle\Lists" valueName="ListSwitch">
+      <parentCategory ref="Lists" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <list id="SwitchedList" key="Software\Policies\BWC-Oracle\Lists\Switched" />
+      </elements>
+    </policy>
+
+    <!-- ===== Shared keys and write order ===== -->
+    <policy name="Pol_Shared_Zeta" class="Machine" displayName="$(string.Pol_Shared_Zeta)" explainText="$(string.Pol_Shared_Zeta_Help)" key="Software\Policies\BWC-Oracle\Shared" valueName="Zeta">
+      <parentCategory ref="Shared" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Shared_Alpha" class="Machine" displayName="$(string.Pol_Shared_Alpha)" explainText="$(string.Pol_Shared_Alpha_Help)" key="Software\Policies\BWC-Oracle\Shared" valueName="Alpha">
+      <parentCategory ref="Shared" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Shared_Mid" class="Machine" displayName="$(string.Pol_Shared_Mid)" explainText="$(string.Pol_Shared_Mid_Help)" key="Software\Policies\BWC-Oracle\Shared" valueName="Mid">
+      <parentCategory ref="Shared" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Shared_ElementsReverseOrder" class="Machine" displayName="$(string.Pol_Shared_ElementsReverseOrder)" explainText="$(string.Pol_Shared_ElementsReverseOrder_Help)" presentation="$(presentation.Pol_Shared_ElementsReverseOrder)" key="Software\Policies\BWC-Oracle\Shared" valueName="Gate">
+      <parentCategory ref="Shared" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <text id="ZetaElement" valueName="ZetaElement" />
+        <decimal id="AlphaElement" valueName="AlphaElement" />
+      </elements>
+    </policy>
+    <policy name="Pol_SharedList_One" class="Machine" displayName="$(string.Pol_SharedList_One)" explainText="$(string.Pol_SharedList_One_Help)" presentation="$(presentation.Pol_SharedList_One)" key="Software\Policies\BWC-Oracle\Shared">
+      <parentCategory ref="Shared" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <list id="SharedListOne" key="Software\Policies\BWC-Oracle\Shared\SharedList" />
+      </elements>
+    </policy>
+    <policy name="Pol_SharedList_Two" class="Machine" displayName="$(string.Pol_SharedList_Two)" explainText="$(string.Pol_SharedList_Two_Help)" presentation="$(presentation.Pol_SharedList_Two)" key="Software\Policies\BWC-Oracle\Shared">
+      <parentCategory ref="Shared" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <list id="SharedListTwo" key="Software\Policies\BWC-Oracle\Shared\SharedList" />
+      </elements>
+    </policy>
+
+    <!-- ===== Sort cases (defined in an order that differs from the display order) ===== -->
+    <policy name="Pol_Sort_Zulu" class="Machine" displayName="$(string.Pol_Sort_Zulu)" explainText="$(string.Pol_Sort_Zulu_Help)" key="Software\Policies\BWC-Oracle\Sort" valueName="SortZulu">
+      <parentCategory ref="SortCases" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Sort_LowerAlpha" class="Machine" displayName="$(string.Pol_Sort_LowerAlpha)" explainText="$(string.Pol_Sort_LowerAlpha_Help)" key="Software\Policies\BWC-Oracle\Sort" valueName="SortLowerAlpha">
+      <parentCategory ref="SortCases" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Sort_Digit10" class="Machine" displayName="$(string.Pol_Sort_Digit10)" explainText="$(string.Pol_Sort_Digit10_Help)" key="Software\Policies\BWC-Oracle\Sort" valueName="SortDigit10">
+      <parentCategory ref="SortCases" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Sort_Digit2" class="Machine" displayName="$(string.Pol_Sort_Digit2)" explainText="$(string.Pol_Sort_Digit2_Help)" key="Software\Policies\BWC-Oracle\Sort" valueName="SortDigit2">
+      <parentCategory ref="SortCases" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Sort_LeadingSymbol" class="Machine" displayName="$(string.Pol_Sort_LeadingSymbol)" explainText="$(string.Pol_Sort_LeadingSymbol_Help)" key="Software\Policies\BWC-Oracle\Sort" valueName="SortLeadingSymbol">
+      <parentCategory ref="SortCases" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Sort_NonAscii" class="Machine" displayName="$(string.Pol_Sort_NonAscii)" explainText="$(string.Pol_Sort_NonAscii_Help)" key="Software\Policies\BWC-Oracle\Sort" valueName="SortNonAscii">
+      <parentCategory ref="SortCases" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Sort_Digit1" class="Machine" displayName="$(string.Pol_Sort_Digit1)" explainText="$(string.Pol_Sort_Digit1_Help)" key="Software\Policies\BWC-Oracle\Sort" valueName="SortDigit1">
+      <parentCategory ref="SortCases" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Sort_UpperAlpha" class="Machine" displayName="$(string.Pol_Sort_UpperAlpha)" explainText="$(string.Pol_Sort_UpperAlpha_Help)" key="Software\Policies\BWC-Oracle\Sort" valueName="SortUpperAlpha">
+      <parentCategory ref="SortCases" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+
+    <!-- ===== Ampersand handling ===== -->
+    <policy name="Pol_Amp_DisplayName" class="Machine" displayName="$(string.Pol_Amp_DisplayName)" explainText="$(string.Pol_Amp_DisplayName_Help)" key="Software\Policies\BWC-Oracle\Amp" valueName="AmpName">
+      <parentCategory ref="Ampersand" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Amp_LabelSingle" class="Machine" displayName="$(string.Pol_Amp_LabelSingle)" explainText="$(string.Pol_Amp_LabelSingle_Help)" presentation="$(presentation.Pol_Amp_LabelSingle)" key="Software\Policies\BWC-Oracle\Amp">
+      <parentCategory ref="Ampersand" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <text id="AmpText" valueName="AmpText" />
+        <boolean id="AmpCheck" valueName="AmpCheck" />
+        <decimal id="AmpNumber" valueName="AmpNumber" />
+        <enum id="AmpChoice" valueName="AmpChoice">
+          <item displayName="$(string.Pol_Amp_LabelSingle_ItemOne)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+          <item displayName="$(string.Pol_Amp_LabelSingle_ItemTwo)">
+            <value>
+              <decimal value="2" />
+            </value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+    <policy name="Pol_Amp_LabelDouble" class="Machine" displayName="$(string.Pol_Amp_LabelDouble)" explainText="$(string.Pol_Amp_LabelDouble_Help)" presentation="$(presentation.Pol_Amp_LabelDouble)" key="Software\Policies\BWC-Oracle\Amp">
+      <parentCategory ref="Ampersand" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+      <elements>
+        <text id="DoubleAmpText" valueName="DoubleAmpText" />
+      </elements>
+    </policy>
+
+    <!-- ===== Explain text ===== -->
+    <policy name="Pol_Explain_MultiParagraph" class="Machine" displayName="$(string.Pol_Explain_MultiParagraph)" explainText="$(string.Pol_Explain_MultiParagraph_Help)" key="Software\Policies\BWC-Oracle\Explain" valueName="MultiParagraph">
+      <parentCategory ref="Explain" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Explain_EmptyString" class="Machine" displayName="$(string.Pol_Explain_EmptyString)" explainText="$(string.Pol_Explain_EmptyString_Help)" key="Software\Policies\BWC-Oracle\Explain" valueName="EmptyString">
+      <parentCategory ref="Explain" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Explain_AttributeOmitted" class="Machine" displayName="$(string.Pol_Explain_AttributeOmitted)" key="Software\Policies\BWC-Oracle\Explain" valueName="AttributeOmitted">
+      <parentCategory ref="Explain" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+
+    <!-- ===== Nested categories ===== -->
+    <policy name="Pol_Nested_MachineTop" class="Machine" displayName="$(string.Pol_Nested_MachineTop)" explainText="$(string.Pol_Nested_MachineTop_Help)" key="Software\Policies\BWC-Oracle\Nested" valueName="MachineTop">
+      <parentCategory ref="MachineOnly" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Nested_MachineMid" class="Machine" displayName="$(string.Pol_Nested_MachineMid)" explainText="$(string.Pol_Nested_MachineMid_Help)" key="Software\Policies\BWC-Oracle\Nested" valueName="MachineMid">
+      <parentCategory ref="MachineNested" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Nested_MachineDeep" class="Machine" displayName="$(string.Pol_Nested_MachineDeep)" explainText="$(string.Pol_Nested_MachineDeep_Help)" key="Software\Policies\BWC-Oracle\Nested" valueName="MachineDeep">
+      <parentCategory ref="MachineDeep" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+    <policy name="Pol_Nested_UserDeep" class="User" displayName="$(string.Pol_Nested_UserDeep)" explainText="$(string.Pol_Nested_UserDeep_Help)" key="Software\Policies\BWC-Oracle\Nested" valueName="UserDeep">
+      <parentCategory ref="UserNested" />
+      <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
+    </policy>
+
+  </policies>
+</policyDefinitions>

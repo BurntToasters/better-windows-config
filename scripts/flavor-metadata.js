@@ -32,11 +32,12 @@ const FLAVOR_VALUES = new Map([
 ]);
 const PROJECT_PREFIXES = ["Bwc", "BetterWindowsConfig"];
 const ASSEMBLY_EXTENSIONS = [".dll", ".exe"];
-// Main assembly of each managed project that dotnet-build publishes (Bwc.Hub, Bwc.Regedit.App). A folder without them
+// Main assembly of each managed project that dotnet-build publishes (Bwc.Hub, Bwc.Regedit.App, Bwc.Gpedit.App). A folder without them
 // is incomplete, whatever the other files say. Bwc.Update has none: BwcUpdate.exe is NativeAOT (see UPDATE_EXE).
 const REQUIRED_ASSEMBLIES = [
   "BetterWindowsConfig.dll",
   "BwcRegedit.dll",
+  "BwcGpedit.dll",
 ];
 // The self-contained runtime of the Hub and Registry Editor. A folder without one of these cannot start
 // BetterWindowsConfig.exe (the system ".NET Desktop Runtime required" dialog), so a publish that lost one is refused
@@ -79,9 +80,10 @@ export const NATIVE_AOT_EXPORT = "DotNetRuntimeDebugHeader";
 // ReadyToRun images. Native apphosts do not contain it.
 const METADATA_SIGNATURE = Buffer.from("BSJB", "ascii");
 // Exe heads and the source manifest each one is built from. Bwc.Hub and Bwc.Update, like
-// Bwc.Regedit.App, pick app.e2e.manifest through a BwcFlavor condition in their csproj.
+// Bwc.Regedit.App and Bwc.Gpedit.App, pick app.e2e.manifest through a BwcFlavor condition in their csproj.
 const EXE_HEADS = [
   { name: "BwcRegedit.exe", sourceManifest: "src/Bwc.Regedit.App/app.manifest" },
+  { name: "BwcGpedit.exe", sourceManifest: "src/Bwc.Gpedit.App/app.manifest" },
   { name: "BetterWindowsConfig.exe", sourceManifest: "src/Bwc.Hub/app.manifest" },
   { name: "BwcUpdate.exe", sourceManifest: "src/Bwc.Update/app.manifest" },
 ];

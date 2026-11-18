@@ -19,7 +19,7 @@ internal static class FlavorMetadata
     private const string UpdateMarkerPrefix = "BwcUpdateFlavor=";
 
     // The main assembly of each managed app the publish folder holds. A flavor mix in any one of them fails the guard.
-    private static readonly string[] Assemblies = { "BetterWindowsConfig.dll", "BwcRegedit.dll" };
+    private static readonly string[] Assemblies = { "BetterWindowsConfig.dll", "BwcRegedit.dll", "BwcGpedit.dll" };
 
     /// <summary>
     /// Returns null when every app assembly in the publish folder says the e2e flavor. Otherwise returns the

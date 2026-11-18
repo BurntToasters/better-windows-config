@@ -26,6 +26,7 @@ const FLAVORS = new Set(["ship", "e2e"]);
 const PROJECTS = [
   { name: "Bwc.Hub", project: "src/Bwc.Hub/Bwc.Hub.csproj" },
   { name: "Bwc.Regedit.App", project: "src/Bwc.Regedit.App/Bwc.Regedit.App.csproj" },
+  { name: "Bwc.Gpedit.App", project: "src/Bwc.Gpedit.App/Bwc.Gpedit.App.csproj" },
   // NativeAOT: published into its own folder, never the shared one (update-elevation.md HN25).
   { name: "Bwc.Update", project: "src/Bwc.Update/Bwc.Update.csproj", staged: true },
 ];
@@ -39,7 +40,7 @@ function printHelp() {
   console.log(`Usage:
   node ${SCRIPT} --rid win-x64|win-arm64 [--flavor ship|e2e]
 
-Publishes Bwc.Hub, Bwc.Regedit.App, then Bwc.Update into
+Publishes Bwc.Hub, Bwc.Regedit.App, Bwc.Gpedit.App, then Bwc.Update into
 publish/<rid> (ship) or publish/<rid>-e2e (e2e). Bwc.Update is NativeAOT: it is published
 into publish/<rid>[-e2e]-bwcupdate-aot, and only BwcUpdate.exe is copied into the shared
 folder (a publish with -o set to the shared folder deleted the Hub's runtime files).
@@ -254,7 +255,7 @@ function removeStaleReadyToRun({ project, rid, platform }) {
 /**
  * Deletes the rid-specific copy-local output in bin/<platform>/Release/<tfm>/<rid>. Copy-local skips a file
  * whose size and timestamp match, so a Bwc.UI.dll left by a ship build (BwcFlavor=ship) could survive in
- * Bwc.Hub's bin and differ from the E2E copy in Bwc.Regedit.App, which the shared-folder check then refuses.
+ * Bwc.Hub's bin and differ from the E2E copy in Bwc.Regedit.App or Bwc.Gpedit.App, which the shared-folder check then refuses.
  * The publish copies every referenced assembly again. Returns the repo-relative folders it removed.
  */
 function removeStaleCopyLocalOutput({ project, rid, platform }) {

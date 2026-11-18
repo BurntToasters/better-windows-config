@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ADMX and policy state engine. No UI: no WinUI, no Bwc.UI, no Windows App SDK (docs/failure-modes/gpedit-scaffold.md). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Bwc.Policy</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Bwc.Gpo\Bwc.Gpo.csproj" />
+  </ItemGroup>
+
+</Project>

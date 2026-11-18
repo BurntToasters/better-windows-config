@@ -98,6 +98,15 @@ const managedWriteAllowlist = new Map([
     "tests/Bwc.E2E/Harness/AppletState.cs",
     "Restores the classic regedit applet key from its own snapshot. Writes go only under Applets/Regedit.",
   ],
+  [
+    "tools/Bwc.Oracle.Capture/Gpedit/Session/GpeditRegistry.cs",
+    "Deletes only Software/Policies/BWC-Oracle and Software/BWC-Oracle-Gpedit (HKLM and HKCU) and the HKCU self test key. " +
+      "AssertAllowed refuses every other key before the delete.",
+  ],
+  [
+    "tools/Bwc.Oracle.Capture/Gpedit/Session/SelfTest.cs",
+    "Creates and deletes only HKCU/Software/BWC-Oracle-Gpedit-Selftest to exercise the session restore without elevation.",
+  ],
   ["tests/Bwc.Registry.Tests/RegFileExporterTests.cs", "Seeds and removes sandbox run keys for export tests."],
   ["tests/Bwc.Registry.Tests/RegFileImporterTests.cs", "Seeds and removes sandbox run keys for import tests."],
   ["tests/Bwc.Registry.Tests/RegistryFinderTests.cs", "Seeds and removes sandbox run keys for find tests."],
@@ -213,6 +222,10 @@ const scriptWriteAllowlist = new Map([
   [
     "scripts/check-registry-writer.js",
     "Defines the patterns this checker looks for. Its own literals are the patterns, not registry writes.",
+  ],
+  [
+    "scripts/oracle.js",
+    "Names the regedit oracle as a --tool value and starts only the oracle tools it builds. It runs no reg command.",
   ],
   [
     "scripts/run-app.js",
