@@ -20,6 +20,7 @@ internal static class GpeditCommands
         string[] rest = args.SkipWhile(a => !string.Equals(a, "gpedit", StringComparison.Ordinal)).Skip(1).ToArray();
         string sub = rest.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)) ?? string.Empty;
         bool dryRun = rest.Contains("--dry-run", StringComparer.Ordinal);
+        GpeditDpi.Ensure();
 
         try
         {

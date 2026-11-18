@@ -275,13 +275,8 @@ internal static class ProbeUia
 
     internal static void Click(AutomationElement element, bool doubleClick)
     {
-        System.Windows.Rect rect = element.Current.BoundingRectangle;
-        if (rect.IsEmpty || double.IsInfinity(rect.X))
-        {
-            throw new InvalidOperationException($"'{NameOf(element)}' has no bounding rectangle to click.");
-        }
-
-        ProbeInput.Click((int)(rect.X + (rect.Width / 2)), (int)(rect.Y + (rect.Height / 2)), doubleClick);
+        NativePoint point = ProbeClickGuard.Check(element);
+        ProbeInput.Click(point.X, point.Y, doubleClick);
     }
 
     internal static void Focus(AutomationElement element)

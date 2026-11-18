@@ -228,3 +228,67 @@ type, with Windows version and language differences possible.
   `artifacts/oracle/gpedit/selftest.json` with a pass or fail line per case.
 - The sandbox is selected only by this command, never by an environment variable or an option of the
   real commands, so a capture cannot be redirected by accident.
+
+## 20. Stale result list picked
+
+MMC keeps one list view window per node it has shown. A list left from an earlier node (for example the
+children of Windows Settings) still reports not offscreen through UI Automation, so choosing the first
+`SysListView32` that is not offscreen returned the wrong rows: the first elevated run could not find
+`Probe Options` and every later step failed.
+
+- The probe lists every `SysListView32` and scores it: the native window is visible (`IsWindowVisible`,
+  which includes all parents), its rectangle is non-empty and inside the main window, its header has
+  Setting and State, and UI Automation does not report it offscreen. Only a visible, on-screen list is
+  used.
+- The list is looked up again for each use (after navigation, after each tab switch, after each dialog
+  closes). Opening a policy retries every 500 ms for 20 seconds. Hidden lists are searched only after
+  10 seconds, and the failure message lists every list with its hwnd, visibility, headers and rows.
+- The hwnd of the list that was used is recorded as `listHwnd` in the navigate, result-list,
+  options-dialog and byteorder steps, so a wrong choice is visible in `probe.json`.
+- Rows are matched by display name containing the policy name (the probe ADML names them
+  "Probe Zeta setting" and so on).
+
+## 21. DPI virtualization (coordinates in the wrong place)
+
+The first elevated runs showed screenshots at half size and clicks that missed at a 200% display scale:
+a process that is not DPI aware gets virtualized window rectangles and mouse coordinates.
+
+- Every gpedit command calls `GpeditDpi.Ensure()` first, before any UI Automation or window call, and
+  sets per-monitor v2 awareness for the process. If the process awareness is already fixed and the call
+  fails, it sets the awareness of the current thread, which is the thread that runs the probe.
+- The result is written to `probe.json` as `dpiAwareness` (call results, last error, awareness value).
+- When this thread is not per-monitor v2 aware after that, every coordinate click is refused (section 23).
+
+## 22. Tabs of the HTML view clicked by coordinates
+
+The Extended and Standard tabs are HTML elements inside the MMC view (an `Internet Explorer_Server`
+pane). They offer `InvokePattern` only, and their reported rectangle can be in another coordinate
+space. A click on it landed on a tree item and moved the tree selection away from BWC Probe.
+
+- Tabs are switched only with `InvokePattern`. A tab without it is skipped and recorded (`skipped`,
+  `reason`); it is never clicked.
+- The IE subtree repeats the same tab elements many times, so tabs are de-duplicated by name and
+  rectangle before use.
+- After the tab test the probe checks that the list shows the probe rows again and, if not, invokes
+  Extended and then Standard until it does (`listShownAtEnd`).
+
+## 23. A coordinate click lands on the wrong window
+
+- Every click goes through `ProbeClickGuard`. It refuses unless the thread is per-monitor v2 aware, the
+  element belongs to the mmc.exe the probe started, its rectangle is usable, the click point is inside
+  the native window rectangle of the element (or of its nearest window ancestor), and `WindowFromPoint`
+  at that point is that window or one of its children. A refused click throws, so the step records
+  why (`click refused: ...`) and nothing is clicked.
+- Patterns and keys come first everywhere. Opening a policy row uses SelectionItem, focus, then Enter;
+  a guarded click and a guarded double click are fallbacks. The method that worked is recorded as
+  `openedVia`, with the focused element before Enter in `notes`.
+
+## 24. Tree selection moved away from BWC Probe
+
+An earlier step, a stray click, or MMC itself can change the selected node, so the list then shows other
+rows.
+
+- Before every policy is opened, the probe checks that the selected tree item is BWC Probe and that the
+  visible list holds the probe rows. If not, it navigates again once and records that it had to
+  (`notes`: "re-navigated ..."), with the selection and row state before and after.
+- If the rows are still missing, the open fails with the list dump from section 20.

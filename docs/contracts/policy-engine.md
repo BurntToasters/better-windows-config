@@ -69,8 +69,14 @@ A `Registry.pol` file is a header followed by zero or more records. Everything i
 `Bwc.Gpo` models the file the way classic does, so saved bytes match classic's bytes.
 
 - Load replays the records in file order. Each record sets or deletes a value in the model.
-- Overwriting an existing value keeps its position.
+- Setting a value to different data removes its record and appends a new one at the end of its key
+  (probe, 2026-11-18: Zeta then Alpha enabled, then Zeta disabled, gave Alpha then Zeta). Setting a value
+  to the data it already has changes nothing.
 - Deleting a value and then creating it again appends it at the end of its key.
+- Disabled on a policy with a value name and no `disabledValue` removes the value record and appends
+  `**del.<valueName>` at the end of the key (probe, 2026-11-18).
+- Not Configured removes the value record and writes no delete instruction (probe, 2026-11-18).
+- An OK or Apply that changes nothing writes no file and does not bump `gpt.ini` (probe, 2026-11-18).
 - Save writes keys in registry-sorted order and, inside a key, values in creation order.
 - Records the model does not understand, and unknown `**` instructions, are kept and written back
   byte for byte.
@@ -81,10 +87,14 @@ A `Registry.pol` file is a header followed by zero or more records. Everything i
 The following rules are not guessed. Each is *verify against oracle* and the owning package
 records the golden before the engine is frozen:
 
-- *verify against oracle*: record order inside a key when a policy writes several values.
+- *verify against oracle*: record order inside a key when one policy writes several values at once
+  (the probe settled the one-value case above).
 - *verify against oracle*: how a boolean that is false is stored when the template has no
   `falseValue`.
 - *verify against oracle*: how the state of a policy is inferred from a partial or foreign file.
+  Probe lead (2026-11-18): with only `**del.Alpha` in the key, choosing Not Configured for Probe_Alpha
+  and pressing OK wrote nothing, so classic may already show that policy as Not Configured rather than
+  Disabled. Matrix D settles it.
 - *verify against oracle*: what Not Configured removes from a key shared by several policies or by a
   list.
 - *verify against oracle*: what is written when the file ends up with no records (an emptied
@@ -146,7 +156,12 @@ Rules for the whole sequence:
   older ones. The backup is not repeated for later saves in the same session.
 - A failure in step 2, 3, or 4 stops the sequence and is reported with the path and Win32 code.
   Files already written stay written, as in classic; the backup holds the pre-session state.
-- Whether classic refreshes after a save, and when, is part of oracle group G.
+- Classic applies the policy to the live registry right after a save: the probe (2026-11-18) saw the
+  new `HKLM` values within 4 seconds of OK. BWC therefore refreshes after every save. The exact call
+  and its flags are part of oracle group G.
+- On the first save of a session, classic rewrote `Machine\comment.cmtx` even with no comment change:
+  its `policyNamespaces` list changed to hold only the namespace of the edited policy. Later saves in
+  the same session left it alone. The rule for that list is *verify against oracle* (group C).
 
 ## `Bwc.Gpo`: write policy and E2E seams
 

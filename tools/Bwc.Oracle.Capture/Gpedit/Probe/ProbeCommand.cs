@@ -41,6 +41,8 @@ internal sealed class ProbeCommand
     private IntPtr main;
     private AutomationElement? mainElement;
     private JsonObject? lastFiles;
+    private IntPtr lastListHwnd;
+    private string lastOpenMethod = string.Empty;
 
     private ProbeCommand(RepoPaths repo, GpeditContext ctx)
     {
@@ -134,7 +136,6 @@ internal sealed class ProbeCommand
 
     internal static void Run(RepoPaths repo)
     {
-        Win32.SetProcessDpiAwarenessContext(Msg.DpiAwarePerMonitorV2);
         TemplateSet templates = ProbeTemplate.Load(repo);
         GpeditSession.Run("probe", templates, ctx => new ProbeCommand(repo, ctx).Execute());
     }
@@ -149,6 +150,7 @@ internal sealed class ProbeCommand
             ["os"] = Report.OsInfo(),
             ["systemDpi"] = Win32.GetDpiForSystem(),
             ["elevated"] = SessionGuards.IsElevated(),
+            ["dpiAwareness"] = GpeditDpi.Result.DeepClone(),
             ["templates"] = new JsonArray(ProbeTemplateNames(repo)),
             ["plan"] = new JsonArray(Plan.Select(p => (JsonNode?)JsonValue.Create(p)).ToArray()),
         };
@@ -225,6 +227,7 @@ internal sealed class ProbeCommand
     {
         mmc = ctx.StartMmc(ctx.Paths.GpeditMsc);
         int pid = mmc.Id;
+        ProbeClickGuard.TargetPid = pid;
         WinInfo? window = ProbeUia.Wait(() =>
         {
             if (mmc.HasExited)
@@ -542,13 +545,50 @@ internal sealed class ProbeCommand
         };
     }
 
-    private AutomationElement? FindResultList()
+    // MMC keeps several list views alive (one per node it has shown) and a stale one still reports not offscreen. A list is real only when its
+    // native window is visible with a non-empty rectangle inside the main window. The one whose header has Setting and State ranks first.
+    private sealed record ListCandidate(AutomationElement List, IntPtr Hwnd, bool Visible, bool OnScreen, string Headers, int Score);
+
+    private List<ListCandidate> ListCandidates()
     {
         AutomationElement root = Main();
-        List<AutomationElement> lists = ProbeUia.OfClass(root, "SysListView32");
-        AutomationElement? visible = lists.FirstOrDefault(l => !l.Current.IsOffscreen);
-        return visible ?? lists.FirstOrDefault() ?? ProbeUia.OfType(root, ControlType.List).FirstOrDefault();
+        Win32.GetWindowRect(main, out NativeRect mainRect);
+        var found = new List<ListCandidate>();
+        foreach (AutomationElement list in ProbeUia.OfClass(root, "SysListView32"))
+        {
+            try
+            {
+                var hwnd = new IntPtr(list.Current.NativeWindowHandle);
+                bool visible = hwnd != IntPtr.Zero && Win32.IsWindowVisible(hwnd);
+                Win32.GetWindowRect(hwnd, out NativeRect r);
+                bool onScreen = r.Width > 0 && r.Height > 0 && r.Left < mainRect.Right && r.Right > mainRect.Left && r.Top < mainRect.Bottom && r.Bottom > mainRect.Top;
+                string headers = string.Join("|", ProbeUia.OfType(list, ControlType.HeaderItem).Select(h => ProbeUia.Clean(ProbeUia.NameOf(h))));
+                bool settingAndState = headers.Contains("Setting", StringComparison.OrdinalIgnoreCase) && headers.Contains("State", StringComparison.OrdinalIgnoreCase);
+                int score = (visible ? 100 : 0) + (onScreen ? 50 : 0) + (settingAndState ? 200 : 0) + (list.Current.IsOffscreen ? 0 : 10);
+                found.Add(new ListCandidate(list, hwnd, visible, onScreen, headers, score));
+            }
+            catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException)
+            {
+                // A list view that vanished while it was being read is not a candidate.
+            }
+        }
+
+        return found.OrderByDescending(c => c.Score).ToList();
     }
+
+    private AutomationElement? FindResultList()
+    {
+        ListCandidate? best = ListCandidates().FirstOrDefault(c => c.Visible && c.OnScreen);
+        lastListHwnd = best?.Hwnd ?? IntPtr.Zero;
+        return best?.List ?? ProbeUia.OfType(Main(), ControlType.List).FirstOrDefault();
+    }
+
+    private string ListHwndText => lastListHwnd == IntPtr.Zero ? "none" : "0x" + lastListHwnd.ToString("X");
+
+    private static string DescribeCandidates(List<ListCandidate> candidates) => string.Join(
+        " ; ",
+        candidates.Select(c => $"hwnd 0x{c.Hwnd:X} visible={c.Visible} onScreen={c.OnScreen} headers=[{c.Headers}] rows=" +
+            ProbeUia.NamesOf(ProbeUia.Find(c.List, TreeScope.Children, Condition.TrueCondition).Take(8))));
 
     private JsonNode Navigate()
     {
@@ -578,10 +618,17 @@ internal sealed class ProbeCommand
         }
 
         Thread.Sleep(1500);
+        ListCandidate? shown = ProbeUia.Wait(
+            () => ListCandidates().FirstOrDefault(c => c.Visible && c.OnScreen && c.Headers.Contains("Setting", StringComparison.OrdinalIgnoreCase) && c.Headers.Contains("State", StringComparison.OrdinalIgnoreCase)),
+            TimeSpan.FromSeconds(10));
+        lastListHwnd = shown?.Hwnd ?? IntPtr.Zero;
         return new JsonObject
         {
             ["hops"] = hops,
             ["selectedVia"] = via,
+            ["listHwnd"] = ListHwndText,
+            ["listHeaders"] = shown?.Headers,
+            ["listCandidates"] = DescribeCandidates(ListCandidates()),
             ["screenshot"] = Shot(main, "navigated"),
         };
     }
@@ -597,25 +644,26 @@ internal sealed class ProbeCommand
     {
         AutomationElement root = Main();
         AutomationElement? list = FindResultList();
-        var result = new JsonObject { ["initial"] = list is null ? new JsonObject { ["found"] = false } : DumpList(list) };
+        var result = new JsonObject { ["listHwnd"] = ListHwndText, ["initial"] = list is null ? new JsonObject { ["found"] = false } : DumpList(list) };
 
-        List<AutomationElement> tabs = ProbeUia.OfType(root, ControlType.TabItem);
+        List<AutomationElement> tabs = DistinctTabs(root);
         result["tabNames"] = new JsonArray(tabs.Select(t => (JsonNode?)ProbeUia.Trim(ProbeUia.NameOf(t))).ToArray());
-        AutomationElement? originallySelected = tabs.FirstOrDefault(t => t.TryGetCurrentPattern(SelectionItemPattern.Pattern, out object? p) && ((SelectionItemPattern)p).Current.IsSelected);
         var byTab = new JsonObject();
         foreach (string tabName in new[] { "Extended", "Standard" })
         {
             ctx.ThrowIfCancelled();
-            AutomationElement? tab = tabs.FirstOrDefault(t => string.Equals(ProbeUia.Clean(ProbeUia.NameOf(t)), tabName, StringComparison.OrdinalIgnoreCase));
+            AutomationElement? tab = FindTab(tabs, tabName);
             if (tab is null)
             {
                 byTab[tabName] = new JsonObject { ["found"] = false };
                 continue;
             }
 
-            if (!ProbeUia.Select(tab))
+            // The tabs are HTML elements in the MMC view. They offer Invoke only; with no Invoke the tab is skipped and recorded, never clicked.
+            if (!InvokeTab(tab, out string? invokeError))
             {
-                ProbeUia.Click(tab, doubleClick: false);
+                byTab[tabName] = new JsonObject { ["found"] = true, ["skipped"] = true, ["reason"] = invokeError, ["tab"] = ProbeUia.Describe(tab) };
+                continue;
             }
 
             Thread.Sleep(1200);
@@ -623,6 +671,8 @@ internal sealed class ProbeCommand
             byTab[tabName] = new JsonObject
             {
                 ["found"] = true,
+                ["invoked"] = true,
+                ["listHwnd"] = ListHwndText,
                 ["list"] = tabList is null ? null : DumpList(tabList),
                 ["htmlHosts"] = new JsonArray(ProbeUia.OfClass(root, "Internet Explorer_Server")
                     .Select(h => (JsonNode?)ProbeUia.Tree(h, 6, 250, rawView: true)).ToArray()),
@@ -632,47 +682,191 @@ internal sealed class ProbeCommand
         }
 
         result["tabs"] = byTab;
-        if (originallySelected is not null)
+        result["listShownAtEnd"] = RestoreListView(tabs);
+        return result;
+    }
+
+    // The IE subtree repeats the same tab elements many times: keep one per name and rectangle.
+    private static List<AutomationElement> DistinctTabs(AutomationElement root)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var tabs = new List<AutomationElement>();
+        foreach (AutomationElement tab in ProbeUia.OfType(root, ControlType.TabItem))
         {
-            ProbeUia.Select(originallySelected);
-            Thread.Sleep(600);
-            result["reselectedOriginalTab"] = ProbeUia.Clean(ProbeUia.NameOf(originallySelected));
+            if (seen.Add(ProbeUia.NameOf(tab) + "|" + tab.Current.BoundingRectangle))
+            {
+                tabs.Add(tab);
+            }
         }
 
-        return result;
+        return tabs;
+    }
+
+    private static AutomationElement? FindTab(List<AutomationElement> tabs, string name) =>
+        tabs.FirstOrDefault(t => string.Equals(ProbeUia.Clean(ProbeUia.NameOf(t)), name, StringComparison.OrdinalIgnoreCase));
+
+    private static bool InvokeTab(AutomationElement tab, out string? error)
+    {
+        try
+        {
+            if (ProbeUia.Invoke(tab))
+            {
+                error = null;
+                return true;
+            }
+
+            error = "the tab has no InvokePattern";
+            return false;
+        }
+        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException)
+        {
+            error = ex.GetType().Name + ": " + ex.Message;
+            return false;
+        }
+    }
+
+    private bool ProbeRowsShown() => ListCandidates().Any(c => c.Visible && c.OnScreen
+        && ProbeUia.Find(c.List, TreeScope.Children, Condition.TrueCondition).Any(r => ProbeUia.NameOf(r).Contains("Probe ", StringComparison.OrdinalIgnoreCase)));
+
+    // After the tab test the list must show the probe rows again. If it does not, invoke Extended, then Standard, until it does.
+    private string RestoreListView(List<AutomationElement> tabs)
+    {
+        if (ProbeRowsShown())
+        {
+            return "probe rows shown";
+        }
+
+        foreach (string name in new[] { "Extended", "Standard" })
+        {
+            AutomationElement? tab = FindTab(tabs, name);
+            if (tab is not null && InvokeTab(tab, out _) && ProbeUia.Wait(() => ProbeRowsShown() ? "yes" : null, TimeSpan.FromSeconds(4)) is not null)
+            {
+                return $"probe rows shown after invoking {name}";
+            }
+        }
+
+        return "probe rows NOT shown";
+    }
+
+    private readonly List<string> notes = new();
+
+    private JsonArray TakeNotes()
+    {
+        var array = new JsonArray(notes.Select(n => (JsonNode?)JsonValue.Create(n)).ToArray());
+        notes.Clear();
+        return array;
+    }
+
+    // Before a policy is opened: the tree must still have BWC Probe selected and the visible list must hold the probe rows. If not, navigate once more.
+    private void EnsureProbeNodeShown()
+    {
+        string selected = SelectedTreeItemName();
+        bool treeOk = selected.StartsWith("BWC Probe", StringComparison.OrdinalIgnoreCase);
+        bool rowsOk = ProbeRowsShown();
+        if (treeOk && rowsOk)
+        {
+            return;
+        }
+
+        notes.Add($"re-navigated: tree selection was '{selected}', probe rows shown: {rowsOk}");
+        Navigate();
+        selected = SelectedTreeItemName();
+        notes.Add($"after re-navigation: tree selection '{selected}', probe rows shown: {ProbeRowsShown()}");
+    }
+
+    private string SelectedTreeItemName()
+    {
+        AutomationElement? tree = FindTree();
+        if (tree is null)
+        {
+            return string.Empty;
+        }
+
+        foreach (AutomationElement item in ProbeUia.OfType(tree, ControlType.TreeItem))
+        {
+            if (item.TryGetCurrentPattern(SelectionItemPattern.Pattern, out object? p) && ((SelectionItemPattern)p).Current.IsSelected)
+            {
+                return ProbeUia.Clean(ProbeUia.NameOf(item));
+            }
+        }
+
+        return string.Empty;
     }
 
     // Opens the setting dialog of the list row whose name contains policy: select the row, then Enter, then a double click if no dialog came.
     private IntPtr OpenPolicy(string policy)
     {
         EnsureNoDialog();
-        AutomationElement list = FindResultList() ?? throw new InvalidOperationException("no result list");
-        AutomationElement row = ProbeUia.Find(list, TreeScope.Children, Condition.TrueCondition)
-            .FirstOrDefault(r => ProbeUia.NameOf(r).Contains(policy, StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidOperationException($"no row containing '{policy}'. Rows: " + ProbeUia.NamesOf(ProbeUia.Find(list, TreeScope.Children, Condition.TrueCondition)));
+        EnsureProbeNodeShown();
+        // Look again every time: the list is rebuilt after navigation and after each dialog closes. Visible lists first; after 10 seconds
+        // every list is searched, and the hit records whether it was hidden.
+        DateTime started = DateTime.UtcNow;
+        (ListCandidate Candidate, AutomationElement Row)? hit = null;
+        while (hit is null)
+        {
+            bool allowHidden = DateTime.UtcNow - started > TimeSpan.FromSeconds(10);
+            foreach (ListCandidate candidate in ListCandidates().Where(c => allowHidden || (c.Visible && c.OnScreen)))
+            {
+                AutomationElement? found = ProbeUia.Find(candidate.List, TreeScope.Children, Condition.TrueCondition)
+                    .FirstOrDefault(r => ProbeUia.NameOf(r).Contains(policy, StringComparison.OrdinalIgnoreCase));
+                if (found is not null)
+                {
+                    hit = (candidate, found);
+                    break;
+                }
+            }
+
+            if (hit is null)
+            {
+                if (DateTime.UtcNow - started > TimeSpan.FromSeconds(20))
+                {
+                    throw new InvalidOperationException($"no row containing '{policy}' in any list view after 20 seconds. Lists: " + DescribeCandidates(ListCandidates()));
+                }
+
+                Thread.Sleep(500);
+            }
+        }
+
+        lastListHwnd = hit.Value.Candidate.Hwnd;
+        AutomationElement row = hit.Value.Row;
         var known = ProbeWindows.Dialogs(Pid, main).Select(w => w.Hwnd).ToHashSet();
 
+        // Pattern and key first: select the row, focus it, press Enter. A guarded click is the fallback, a guarded double click the last resort.
         ProbeInput.Foreground(main);
+        string method = "SelectionItem";
         if (!ProbeUia.Select(row))
         {
             ProbeUia.Click(row, doubleClick: false);
+            method = "click";
         }
 
         ProbeUia.Focus(row);
         Thread.Sleep(300);
+        notes.Add("focus before Enter: " + ProbeUia.NameOf(AutomationElement.FocusedElement ?? row));
         ProbeInput.Key(ProbeInput.VkReturn);
+        method += "+Enter";
         WinInfo? dialog = ProbeUia.Wait(() => ProbeWindows.Dialogs(Pid, main).FirstOrDefault(w => !known.Contains(w.Hwnd)), TimeSpan.FromSeconds(10));
         if (dialog is null)
         {
-            ProbeUia.Click(row, doubleClick: true);
+            try
+            {
+                ProbeUia.Click(row, doubleClick: true);
+                method += ", then double click";
+            }
+            catch (InvalidOperationException ex)
+            {
+                notes.Add("double click not made: " + ex.Message);
+            }
+
             dialog = ProbeUia.Wait(() => ProbeWindows.Dialogs(Pid, main).FirstOrDefault(w => !known.Contains(w.Hwnd)), TimeSpan.FromSeconds(10));
         }
 
         if (dialog is null)
         {
-            throw new TimeoutException($"no dialog opened for '{policy}' after Enter and after a double click");
+            throw new TimeoutException($"no dialog opened for '{policy}' (tried {method}). Notes: {string.Join("; ", notes)}");
         }
 
+        lastOpenMethod = method;
         Thread.Sleep(600);
         return dialog.Hwnd;
     }
@@ -685,6 +879,9 @@ internal sealed class ProbeCommand
             AutomationElement element = AutomationElement.FromHandle(dialog);
             return new JsonObject
             {
+                ["listHwnd"] = ListHwndText,
+                ["openedVia"] = lastOpenMethod,
+                ["notes"] = TakeNotes(),
                 ["window"] = ProbeWindows.ToJson(ProbeWindows.TopLevel(Pid).First(w => w.Hwnd == dialog)),
                 ["screenshot"] = Shot(dialog, "dialog-options"),
                 ["uiaTree"] = ProbeUia.Tree(element, 14, 1500, rawView: false),
@@ -816,7 +1013,7 @@ internal sealed class ProbeCommand
         EnsureNoDialog();
         Dictionary<string, string> before = PolFiles.Fingerprint(ctx.Paths);
         IntPtr dialog = OpenPolicy(policy);
-        var data = new JsonObject { ["policy"] = policy, ["state"] = state };
+        var data = new JsonObject { ["policy"] = policy, ["state"] = state, ["listHwnd"] = ListHwndText, ["openedVia"] = lastOpenMethod, ["notes"] = TakeNotes() };
         try
         {
             AutomationElement element = AutomationElement.FromHandle(dialog);
