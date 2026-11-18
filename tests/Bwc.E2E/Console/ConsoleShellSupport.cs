@@ -427,15 +427,21 @@ internal sealed class ShellRun : IDisposable
     internal void Measure(string key, object? value) => _measurements[key] = value;
 
     /// <summary>Writes the measurements as JSON and, when asked, a picture of the client area.</summary>
-    internal void WriteArtifacts(string pictureName)
+    internal void WriteArtifacts(string pictureName) => WriteArtifacts(pictureName, "console-shell");
+
+    /// <summary>
+    /// Writes the measurements and the picture under artifacts/e2e/visual/&lt;area&gt; as
+    /// &lt;area&gt;-&lt;name&gt;.json.
+    /// </summary>
+    internal void WriteArtifacts(string pictureName, string area)
     {
-        string dir = Path.Combine(GuiGate.Config.ArtifactsDir, "visual", "console-shell");
+        string dir = Path.Combine(GuiGate.Config.ArtifactsDir, "visual", area);
         Directory.CreateDirectory(dir);
         _measurements["test"] = Name;
         _measurements["dpi"] = Dpi;
         _measurements["scale"] = Scale;
         File.WriteAllText(
-            Path.Combine(dir, $"console-shell-{Name}.json"),
+            Path.Combine(dir, $"{area}-{Name}.json"),
             JsonSerializer.Serialize(_measurements, new JsonSerializerOptions { WriteIndented = true }));
         if (pictureName.Length == 0)
         {
@@ -461,6 +467,36 @@ internal sealed class ShellRun : IDisposable
         catch (WindowCapture.NotJudgedException ex)
         {
             E2EResults.Note("console.shell.capture." + pictureName, $"picture not written: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// A verified picture of the client area and the screen position of its top left corner, or null when
+    /// it cannot be judged.
+    /// </summary>
+    internal Bitmap? CaptureClient(out Point origin)
+    {
+        origin = Point.Empty;
+        if (!GetClientRect(Session.MainHwnd, out NativeRect client))
+        {
+            return null;
+        }
+
+        var topLeft = new NativePoint { X = 0, Y = 0 };
+        _ = ClientToScreen(Session.MainHwnd, ref topLeft);
+        origin = new Point(topLeft.X, topLeft.Y);
+        try
+        {
+            return WindowCapture.CaptureRegion(
+                Session.MainHwnd,
+                origin,
+                client.Right - client.Left,
+                client.Bottom - client.Top);
+        }
+        catch (WindowCapture.NotJudgedException ex)
+        {
+            E2EResults.Note("console.capture", $"picture not judged: {ex.Message}");
+            return null;
         }
     }
 
@@ -527,9 +563,9 @@ internal sealed class ShellChecks
     private readonly string _prefix;
     private readonly List<string> _failures = [];
 
-    internal ShellChecks(string name)
+    internal ShellChecks(string name, string area = "shell")
     {
-        _prefix = "console.shell." + name;
+        _prefix = $"console.{area}.{name}";
     }
 
     internal void Record(string id, bool pass, string notes)

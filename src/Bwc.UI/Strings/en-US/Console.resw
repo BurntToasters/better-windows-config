@@ -129,4 +129,20 @@
   <data name="ConsoleMenuHelpTopics" xml:space="preserve">
     <value>&amp;Help Topics</value>
   </data>
+  <!-- Probe gpedit (artifacts/oracle/gpedit/probe.json, step result-list): automation name of the result list. An internal window caption, not prose. -->
+  <data name="ConsoleListName" xml:space="preserve">
+    <value>Console Embedded Window Results</value>
+  </data>
+  <!-- Probe gpedit, step result-list: automation name of the result list header. An internal window caption, not prose. -->
+  <data name="ConsoleListHeaderName" xml:space="preserve">
+    <value>Console Embedded Results Header</value>
+  </data>
+  <!-- BWC label: the item status of a column header that the list is sorted by, in ascending order. -->
+  <data name="ConsoleListSortedAscending" xml:space="preserve">
+    <value>Sorted ascending</value>
+  </data>
+  <!-- BWC label: the item status of a column header that the list is sorted by, in descending order. -->
+  <data name="ConsoleListSortedDescending" xml:space="preserve">
+    <value>Sorted descending</value>
+  </data>
 </root>
