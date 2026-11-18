@@ -24,6 +24,8 @@ import {
 } from "./release-policy.js";
 import {
   CREDENTIAL_ENV,
+  continueStepNames,
+  FIRST_V2_FEED_VERSION,
   draftArgs,
   main,
   parseReleaseArgs,
@@ -231,7 +233,7 @@ check("release:win:continue step list is exact for stable", () => {
       { name: "release:session:verify", args: [] },
       { name: "build:win:x64", args: [] },
       { name: "build:win:arm64", args: [] },
-      { name: "release:rehearse:client", args: [] },
+      ...(VERSION === FIRST_V2_FEED_VERSION ? [] : [{ name: "release:rehearse:client", args: [] }]),
       { name: "installer:x64", args: [] },
       { name: "installer:arm64", args: [] },
       {
@@ -275,6 +277,23 @@ check("continue: mirror is last, the automatic flow never runs git, and no GUI E
     if (/e2e/i.test(step.name) || step.args.some((arg) => /e2e/i.test(arg))) {
       throw new Error(`GUI E2E step found: ${step.name} ${step.args.join(" ")}`);
     }
+  }
+});
+
+check("continue: the client rehearsal is left out for the first v2 feed version only", () => {
+  const names = (version) => releaseSteps("continue", { version, env: cleanEnv() }).map((step) => step.name);
+  if (names(FIRST_V2_FEED_VERSION).includes("release:rehearse:client")) {
+    throw new Error(`${FIRST_V2_FEED_VERSION} still runs the rehearsal, with no live v2 feed to check`);
+  }
+  for (const version of ["0.1.3", "0.2.0", "1.0.0"]) {
+    const steps = names(version);
+    const at = steps.indexOf("release:rehearse:client");
+    if (at < 0 || at !== steps.indexOf("build:win:arm64") + 1 || at > steps.indexOf("installer:x64")) {
+      throw new Error(`${version}: the rehearsal must run after both builds and before the installers`);
+    }
+  }
+  if (!continueStepNames().includes("release:rehearse:client")) {
+    throw new Error("release:rehearse:client is no longer a valid --from step");
   }
 });
 

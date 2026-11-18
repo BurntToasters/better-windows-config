@@ -58,14 +58,17 @@ function keySummary(loadedPaths, texts, embeddedTexts) {
 }
 
 /**
- * The asset names a release of this bundle may hold: the manifest and its signature, and the setups. Nothing else is
+ * The asset names a release of this bundle may hold: the manifest and the setups, each with the .minisig and the .sig
+ * (base64 envelope) that release:assemble writes beside it. These are the files release:draft uploads. Nothing else is
  * expected, so nothing else is uploaded.
  */
 export function expectedAssetNames(bundle) {
+  const primary = [path.basename(bundle.manifestPath), ...bundle.installers.map((installer) => installer.fileName)];
   return [
-    path.basename(bundle.manifestPath),
-    path.basename(bundle.signaturePath),
-    ...bundle.installers.map((installer) => installer.fileName),
+    ...new Set([
+      path.basename(bundle.signaturePath),
+      ...primary.flatMap((name) => [name, `${name}.minisig`, `${name}.sig`]),
+    ]),
   ];
 }
 
