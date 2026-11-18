@@ -43,6 +43,7 @@ public sealed class BwcRestrictedResult
     public uint IntegrityRid;
     public string FailedStep;
     public string Error;
+    public string Desktop;
 }
 
 public static class BwcRestricted
@@ -58,7 +59,11 @@ public static class BwcRestricted
     private const uint SeGroupIntegrity = 0x20;
     private const uint SecurityMandatoryHighRid = 0x3000;
     private const uint CreateSuspended = 0x4;
-    private const uint CreateNoWindow = 0x08000000;
+    private const uint DetachedProcess = 0x00000008;
+    private const uint WinstaAllAccess = 0x37F;
+    private const uint CwfCreateOnly = 0x1;
+    private const int UoiName = 2;
+    private const uint DesktopAllAccess = 0x000F01FF;
     private const int StartfUseStdHandles = 0x100;
     private const uint GenericRead = 0x80000000;
     private const uint GenericWrite = 0x40000000;
@@ -157,6 +162,32 @@ public static class BwcRestricted
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern uint ResumeThread(IntPtr thread);
 
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string sddl, uint revision,
+        out IntPtr descriptor, out uint size);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr CreateWindowStationW(string name, uint flags, uint access, ref SecurityAttributes attributes);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetProcessWindowStation();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetProcessWindowStation(IntPtr station);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr CreateDesktopW(string name, IntPtr device, IntPtr mode, uint flags, uint access,
+        ref SecurityAttributes attributes);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool CloseDesktop(IntPtr desktop);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool CloseWindowStation(IntPtr station);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool GetUserObjectInformationW(IntPtr handle, int index, StringBuilder info, int length, out int needed);
+
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
 
@@ -235,6 +266,88 @@ public static class BwcRestricted
         return handle;
     }
 
+    /// <summary>
+    /// C27: the desktop the restricted child starts on. Over SSH the session's own window station was made for the full
+    /// administrator token, and the child dies at start (0xC0000142) when it cannot open it. So the child gets a private
+    /// window station and desktop that only the current user and SYSTEM may open, labeled medium. The station is
+    /// unnamed first (Windows names it after the logon session), then named with a GUID. CWF_CREATE_ONLY makes sure an
+    /// existing station is never reused. Only an unelevated caller may fall back to its own desktop, which its
+    /// medium-integrity child can already open. Returns the lpDesktop value, or null for the caller's own desktop.
+    /// </summary>
+    private static string ChooseDesktop(bool callerElevated, out IntPtr station, out IntPtr desktop, out string mode)
+    {
+        station = IntPtr.Zero;
+        desktop = IntPtr.Zero;
+        mode = null;
+        string user = System.Security.Principal.WindowsIdentity.GetCurrent().User.Value;
+        string sddl = "D:P(A;;GA;;;" + user + ")(A;;GA;;;SY)S:(ML;;NW;;;ME)";
+        IntPtr descriptor;
+        uint size;
+        Check(ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, 1, out descriptor, out size), "desktop-descriptor");
+        try
+        {
+            var attributes = new SecurityAttributes();
+            attributes.Length = Marshal.SizeOf(typeof(SecurityAttributes));
+            attributes.SecurityDescriptor = descriptor;
+            attributes.InheritHandle = 0;
+
+            station = CreateWindowStationW(null, CwfCreateOnly, WinstaAllAccess, ref attributes);
+            int unnamedError = station == IntPtr.Zero ? Marshal.GetLastWin32Error() : 0;
+            mode = "private-unnamed";
+            int namedError = 0;
+            if (station == IntPtr.Zero)
+            {
+                station = CreateWindowStationW("BwcRestricted-" + Guid.NewGuid().ToString("N"), CwfCreateOnly, WinstaAllAccess, ref attributes);
+                namedError = station == IntPtr.Zero ? Marshal.GetLastWin32Error() : 0;
+                mode = "private-named";
+            }
+
+            if (station == IntPtr.Zero)
+            {
+                if (!callerElevated)
+                {
+                    mode = "caller, unelevated (private station refused: unnamed Win32 " + unnamedError + ", named Win32 " + namedError + ")";
+                    return null;
+                }
+
+                throw new StepFailed("create-window-station", "no private window station for an elevated caller (unnamed: Win32 "
+                    + unnamedError + ", named: Win32 " + namedError + ")");
+            }
+
+            string stationName = ObjectName(station);
+
+            // CreateDesktop makes the desktop on the calling process's window station, so switch to it for the call.
+            IntPtr previous = GetProcessWindowStation();
+            Check(previous != IntPtr.Zero, "current-window-station");
+            Check(SetProcessWindowStation(station), "enter-window-station");
+            try
+            {
+                desktop = CreateDesktopW("Default", IntPtr.Zero, IntPtr.Zero, 0, DesktopAllAccess, ref attributes);
+                Check(desktop != IntPtr.Zero, "create-desktop");
+            }
+            finally
+            {
+                SetProcessWindowStation(previous);
+            }
+
+            return stationName + "\\Default";
+        }
+        finally
+        {
+            LocalFree(descriptor);
+        }
+    }
+
+    private static string ObjectName(IntPtr handle)
+    {
+        int needed;
+        GetUserObjectInformationW(handle, UoiName, null, 0, out needed);
+        Check(needed > 0, "window-station-name");
+        var buffer = new StringBuilder(needed / 2 + 1);
+        Check(GetUserObjectInformationW(handle, UoiName, buffer, needed, out needed), "window-station-name");
+        return buffer.ToString();
+    }
+
     /// <summary>Reads TokenElevation and the integrity RID. A read that fails counts as elevated and high.</summary>
     private static void ReadIdentity(IntPtr token, BwcRestrictedResult result)
     {
@@ -294,6 +407,8 @@ public static class BwcRestricted
         IntPtr stdin = IntPtr.Zero;
         IntPtr stdout = IntPtr.Zero;
         IntPtr stderr = IntPtr.Zero;
+        IntPtr station = IntPtr.Zero;
+        IntPtr desktop = IntPtr.Zero;
         var process = new ProcessInformation();
         bool resumed = false;
         try
@@ -317,6 +432,12 @@ public static class BwcRestricted
             var startup = new StartupInfo();
             startup.cb = Marshal.SizeOf(typeof(StartupInfo));
             startup.dwFlags = StartfUseStdHandles;
+            var caller = new BwcRestrictedResult();
+            ReadIdentity(ownToken, caller);
+            bool callerElevated = caller.Elevated || caller.IntegrityRid >= SecurityMandatoryHighRid;
+            string desktopMode;
+            startup.lpDesktop = ChooseDesktop(callerElevated, out station, out desktop, out desktopMode);
+            result.Desktop = desktopMode;
             startup.hStdInput = stdin;
             startup.hStdOutput = stdout;
             startup.hStdError = stderr;
@@ -328,7 +449,7 @@ public static class BwcRestricted
             }
 
             Check(CreateProcessAsUserW(restricted, exe, commandLine, IntPtr.Zero, IntPtr.Zero, true,
-                CreateSuspended | CreateNoWindow, IntPtr.Zero, workingDirectory, ref startup, out process), "create-process");
+                CreateSuspended | DetachedProcess, IntPtr.Zero, workingDirectory, ref startup, out process), "create-process");
 
             // C23: the child has not run yet. It runs only when its token is neither elevated nor high integrity.
             IntPtr childToken;
@@ -388,6 +509,8 @@ public static class BwcRestricted
             if (stdin != IntPtr.Zero) CloseHandle(stdin);
             if (stdout != IntPtr.Zero) CloseHandle(stdout);
             if (stderr != IntPtr.Zero) CloseHandle(stderr);
+            if (desktop != IntPtr.Zero) CloseDesktop(desktop);
+            if (station != IntPtr.Zero) CloseWindowStation(station);
             if (label != IntPtr.Zero) Marshal.FreeHGlobal(label);
             if (mediumSid != IntPtr.Zero) LocalFree(mediumSid);
             if (restricted != IntPtr.Zero) CloseHandle(restricted);
@@ -426,6 +549,7 @@ $result = [ordered]@{
     timedOut     = $run.TimedOut
     elevated     = $run.Elevated
     integrityRid = $integrity
+    desktop      = $run.Desktop
     failedStep   = $run.FailedStep
     error        = $run.Error
 }
