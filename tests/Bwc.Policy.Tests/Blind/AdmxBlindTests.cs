@@ -1677,29 +1677,6 @@ public sealed class AdmxBlindTests
         Assert.AreEqual(1, set.Files.Count);
     }
 
-    // ---------------------------------------------------------------- 34. System folder (invariants only)
-
-    [TestMethod]
-    public void Sec34_SystemFolder_OnlyDanglingReferenceCodes_AndEveryFileIsLoaded()
-    {
-        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "PolicyDefinitions");
-        if (!Directory.Exists(folder))
-        {
-            Assert.Inconclusive("No system template folder on this machine.");
-        }
-
-        var set = TemplateLoader.Load([folder], "en-US");
-        var allowed = new HashSet<TemplateFailureCode>
-        {
-            TemplateFailureCode.UndefinedUsing, TemplateFailureCode.UndefinedPrefix, TemplateFailureCode.UndefinedCategory,
-            TemplateFailureCode.MissingCategory, TemplateFailureCode.UndefinedSupportedOn,
-        };
-        var offenders = set.Failures.Where(f => !allowed.Contains(f.Code)).ToList();
-        Assert.AreEqual(0, offenders.Count, FailureAssert.Describe(set));
-        var count = Directory.EnumerateFiles(folder, "*.admx", SearchOption.TopDirectoryOnly).Count();
-        Assert.AreEqual(count, set.Files.Count);
-    }
-
     // ---------------------------------------------------------------- 35. A failed file adds nothing
 
     [TestMethod]

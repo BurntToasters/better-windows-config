@@ -170,6 +170,14 @@ const unnamedCallAllowlist = new Map([
     "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
   ],
   [
+    "tests/Bwc.Policy.Tests/Blind/StateBlindTests.cs",
+    "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
+  ],
+  [
+    "tests/Bwc.Policy.Tests/Blind/FilterStoreBlindTests.cs",
+    "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
+  ],
+  [
     "tests/Bwc.E2E/Tree/TreeCanRenameTests.cs",
     "Seeds two keys under the E2E run root through SandboxRegistry, the harness writer.",
   ],
