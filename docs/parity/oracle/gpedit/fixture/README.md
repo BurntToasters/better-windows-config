@@ -47,7 +47,7 @@ Columns: class (M machine, U user, B both), key, value name, elements (id and ki
 | `Pol_Both_WithElements` | B | K\Basics | `BothElementFlag` | `BothNumber` decimal 0 to 99 | class Both with an element, `supportedOn` defined in the same file | |
 | `Pol_Bool_TrueFalseValues` | M | K\Elements\Bool | none | `TrueFalseCheck` boolean, true 10, false 20 | boolean with trueValue and falseValue | |
 | `Pol_Bool_StringValues` | U | K\Elements\Bool | none | `StringCheck` boolean, true `yes`, false `no` | boolean with string values, default checked | |
-| `Pol_Bool_TrueFalseLists` | M | K\Elements\Bool | none | `ListCheck` boolean with trueList and falseList | boolean with lists, item key override | OQ-04 |
+| `Pol_Bool_TrueFalseLists` | M | K\Elements\Bool | none | `ListCheck` boolean with valueName, trueList and falseList (classic requires valueName) | boolean with lists, item key override | OQ-04 |
 | `Pol_Bool_NoFalseValue` | M | K\Elements\Bool | none | `NoFalseCheck` boolean, true 1 only | boolean with no falseValue | OQ-02 |
 | `Pol_Bool_TwoChecksReverseOrder` | M | K\Elements\Bool\Order | none | `ZetaCheck` boolean, then `AlphaCheck` boolean | two values in one key, defined in reverse name order | OQ-01 |
 | `Pol_Decimal_MinMax` | M | K\Elements\Number | none | `MinMaxNumber` decimal 10 to 500 | decimal with minValue and maxValue, spin step 5 | |

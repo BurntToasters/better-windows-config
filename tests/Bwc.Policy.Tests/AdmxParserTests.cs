@@ -135,7 +135,7 @@ public sealed class AdmxParserTests
         Assert.AreEqual("no", strings.FalseValue!.Text);
 
         var lists = fixture.Policy("Pol_Bool_TrueFalseLists").Element<BooleanElement>("ListCheck");
-        Assert.IsNull(lists.ValueName);
+        Assert.AreEqual("ListCheck", lists.ValueName);
         Assert.IsNull(lists.TrueValue);
         Assert.AreEqual(2, lists.TrueList!.Items.Count);
         Assert.AreEqual(2, lists.FalseList!.Items.Count);

@@ -239,7 +239,7 @@
       <parentCategory ref="Booleans" />
       <supportedOn ref="bwcbase:SUPPORTED_BwcAny" />
       <elements>
-        <boolean id="ListCheck">
+        <boolean id="ListCheck" valueName="ListCheck">
           <trueList defaultKey="Software\Policies\BWC-Oracle\Elements\Bool\TrueListKey">
             <item valueName="TrueListOne">
               <value>
