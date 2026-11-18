@@ -11,10 +11,10 @@
     "src/Bwc.UI/Console/**/*.cs (excluding bin and obj)"
   ],
   "counts": {
-    "equal": 92,
+    "equal": 96,
     "differs": 2,
     "template": 32,
-    "absent": 2058
+    "absent": 2054
   },
   "strings": [
     {
@@ -91,11 +91,11 @@
     },
     {
       "id": "admtmpl.dll:29",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:31",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:32",
@@ -627,11 +627,11 @@
     },
     {
       "id": "admtmpl.dll.mui:29",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:31",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:32",

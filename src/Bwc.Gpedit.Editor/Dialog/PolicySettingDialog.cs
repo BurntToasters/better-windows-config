@@ -1,5 +1,6 @@
 using System.Globalization;
 using Bwc.Gpo.Comments;
+using Bwc.Gpedit.Editor.Options;
 using Bwc.Gpo.Pol;
 using Bwc.Policy.Admx;
 using Bwc.Policy.Model;
@@ -13,7 +14,10 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
+using Windows.System;
+using Windows.UI.Core;
 using Windows.Graphics;
 using WinRT.Interop;
 
@@ -78,12 +82,18 @@ public sealed class PolicySettingDialog : ClassicDialog
     private readonly FrameworkElement _helpLabel;
     private readonly AutomationHost _icon;
     private readonly AutomationHost _optionsHost;
-    private readonly StackPanel _optionsPanel;
+    private readonly Canvas _optionsPanel;
+    private readonly ScrollViewer _optionsScroll;
 
     private int _index;
     private bool _loading;
     private bool _messageOpen;
     private bool _optionsDirty;
+    private bool _externalDirty;
+    private PolicyOptionsView? _options;
+    private string _optionsBaseline = string.Empty;
+    private double _optionsWidth;
+    private double _optionsHeight;
     private int _applyCount;
     private PolicyStateSnapshot? _snapshot;
     private PolicyState _baseState;
@@ -126,8 +136,9 @@ public sealed class PolicySettingDialog : ClassicDialog
         // The two parts that are not template controls: the icon and the Options pane. They sit on the canvas of the dialog.
         _icon = new AutomationHost { ControlType = AutomationControlType.Image };
         AutomationProperties.SetAutomationId(_icon, "pictureBox");
-        _optionsPanel = new StackPanel { Orientation = Orientation.Vertical };
-        var scroll = new ScrollViewer
+        // Top left: a canvas shorter than the viewport would otherwise be centered in it.
+        _optionsPanel = new Canvas { HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
+        _optionsScroll = new ScrollViewer
         {
             Content = _optionsPanel,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -136,7 +147,7 @@ public sealed class PolicySettingDialog : ClassicDialog
         };
         _optionsHost = new AutomationHost
         {
-            Content = scroll,
+            Content = _optionsScroll,
             // The pane is painted like the edit boxes (the window color, shared with the comment box) inside a thin border.
             Background = _comment.Background,
             BorderBrush = BwcPaint.Shadow,
@@ -158,6 +169,13 @@ public sealed class PolicySettingDialog : ClassicDialog
         _disabled.Checked += OnStateChecked;
         _comment.TextChanged += OnCommentChanged;
 
+        // The dialog handles Tab itself: the option controls come between Supported on and Help, and the base follows
+        // the template.
+        if (Content is UIElement surface)
+        {
+            surface.PreviewKeyDown += OnPreviewKeyDown;
+        }
+
         LoadCurrent();
     }
 
@@ -171,20 +189,22 @@ public sealed class PolicySettingDialog : ClassicDialog
     public PolicyRef Shown => _order[_index];
 
     /// <summary>
-    /// The pane that holds the option controls. Empty in this piece; piece G3b fills it. A control placed here is not in the
-    /// tab order of the dialog base, which follows the template only (see docs/failure-modes/gpedit-dialog.md, section 4).
+    /// The pane that holds the option controls (a canvas: the options view places each control). The dialog fills it from the
+    /// presentation of the policy and handles Tab for it, because the dialog base follows the template only (see
+    /// docs/failure-modes/gpedit-options.md, section 14).
     /// </summary>
     public Panel OptionsPane => _optionsPanel;
 
     /// <summary>
-    /// Supplies the element values of an Enabled edit (piece G3b). When null, the values that were read for the policy are used
-    /// while the state stays Enabled, and none otherwise.
+    /// Supplies the element values of an Enabled edit. When null, the values of the Options pane are used (the stored values
+    /// and the defaults, changed by the user).
     /// </summary>
     public Func<IReadOnlyDictionary<string, ElementValue>>? ElementValues { get; set; }
 
     /// <summary>Tells the dialog that an option control changed, so Apply is enabled (piece G3b).</summary>
     public void MarkOptionsDirty()
     {
+        _externalDirty = true;
         _optionsDirty = true;
         UpdateButtons();
     }
@@ -287,6 +307,7 @@ public sealed class PolicySettingDialog : ClassicDialog
             _baseState = _snapshot?.State ?? PolicyState.NotConfigured;
             _baseComment = ReadComment(current);
             _optionsDirty = false;
+            _externalDirty = false;
             _notConfigured.IsChecked = _baseState == PolicyState.NotConfigured;
             _enabled.IsChecked = _baseState == PolicyState.Enabled;
             _disabled.IsChecked = _baseState == PolicyState.Disabled;
@@ -302,6 +323,42 @@ public sealed class PolicySettingDialog : ClassicDialog
         _enabled.IsEnabled = !locked;
         _disabled.IsEnabled = !locked;
         _comment.IsReadOnly = locked;
+        RebuildOptions(policy);
+        UpdateButtons();
+    }
+
+    /// <summary>Builds the Options pane of the policy that is shown now and loads the stored values or the defaults.</summary>
+    private void RebuildOptions(PolicyDefinition policy)
+    {
+        var context = new OptionsContext
+        {
+            Create = CreateControl,
+            Changed = OnOptionsChanged,
+            OwnerHandle = () => WindowNative.GetWindowHandle(this),
+        };
+        _options = new PolicyOptionsView(policy, _optionsPanel, context);
+        _options.Load(_snapshot);
+        _options.SetEnabled(SelectedState == PolicyState.Enabled && !IsReadOnly);
+        _optionsBaseline = _options.Fingerprint();
+
+        // A check box or a drop-down reports its own change at once while it loads: that is not an edit.
+        _optionsDirty = false;
+        _ = _optionsScroll.ChangeView(0, 0, null, disableAnimation: true);
+        ArrangeOptions();
+    }
+
+    /// <summary>
+    /// An option control changed. The control may have changed its own text while the pane loaded (the text box reports that
+    /// late), so Apply is enabled only when the values differ from what was loaded or last applied.
+    /// </summary>
+    private void OnOptionsChanged()
+    {
+        if (_options is null)
+        {
+            return;
+        }
+
+        _optionsDirty = _externalDirty || _options.Fingerprint() != _optionsBaseline;
         UpdateButtons();
     }
 
@@ -343,6 +400,7 @@ public sealed class PolicySettingDialog : ClassicDialog
     {
         if (!_loading)
         {
+            _options?.SetEnabled(SelectedState == PolicyState.Enabled && !IsReadOnly);
             UpdateButtons();
         }
     }
@@ -407,7 +465,11 @@ public sealed class PolicySettingDialog : ClassicDialog
                 _ = TryApply();
                 break;
             default:
-                base.OnCommand(id, automationId);
+                if (_options?.TryRun(id) != true)
+                {
+                    base.OnCommand(id, automationId);
+                }
+
                 break;
         }
     }
@@ -443,6 +505,16 @@ public sealed class PolicySettingDialog : ClassicDialog
 
         // Only a comment changed: the state is not applied again, so its values and its order in the file stay as they are.
         PolicyEdit? edit = state == _baseState && !_optionsDirty ? null : BuildEdit(state);
+        if (edit is { State: PolicyState.Enabled })
+        {
+            IReadOnlyList<PolicyEditProblem> problems = PolicyEditValidator.Validate(target.Policy, edit);
+            if (problems.Count > 0)
+            {
+                ShowProblem(target.Policy, problems[0]);
+                return false;
+            }
+        }
+
         PolicyApplyOutcome outcome;
         try
         {
@@ -464,7 +536,10 @@ public sealed class PolicySettingDialog : ClassicDialog
         _snapshot = ReadSnapshot(target) ?? _snapshot;
         _baseState = state;
         _baseComment = comment;
+        _options?.Rebase(_snapshot);
+        _optionsBaseline = _options?.Fingerprint() ?? string.Empty;
         _optionsDirty = false;
+        _externalDirty = false;
         _applyCount++;
         UpdateButtons();
         Applied?.Invoke(this, target);
@@ -481,23 +556,26 @@ public sealed class PolicySettingDialog : ClassicDialog
                 return PolicyEdit.NotConfigured;
         }
 
-        if (ElementValues is { } provider)
-        {
-            return PolicyEdit.EnabledWith(provider());
-        }
-
-        // Without an Options pane the values that were read are kept while the policy stays Enabled; a policy that becomes
-        // Enabled has no values to give.
-        IReadOnlyDictionary<string, ElementValue> read = _baseState == PolicyState.Enabled && _snapshot is not null
-            ? _snapshot.Elements
-            : new Dictionary<string, ElementValue>();
-        return PolicyEdit.EnabledWith(read);
+        return PolicyEdit.EnabledWith(ElementValues is { } provider ? provider() : ReadOptionValues());
     }
+
+    /// <summary>
+    /// The values of the Options pane: what Apply writes. An element the pane has no control for keeps the value that was read
+    /// for it.
+    /// </summary>
+    private IReadOnlyDictionary<string, ElementValue> ReadOptionValues() =>
+        _options?.ReadValues() ?? new Dictionary<string, ElementValue>();
 
     // ---- messages ------------------------------------------------------------------------------
 
     private void ShowProblem(PolicyDefinition policy, PolicyEditProblem problem)
     {
+        if (_options?.Describe(problem) is { } message)
+        {
+            ShowMessage(message.Caption, message.Text, message.AfterClose);
+            return;
+        }
+
         if (problem.Kind == PolicyProblemKind.Required)
         {
             string caption = string.Format(CultureInfo.CurrentCulture, DialogStrings.Get("DialogRequiredCaption"), FieldLabel(policy, problem.ElementId));
@@ -517,7 +595,7 @@ public sealed class PolicySettingDialog : ClassicDialog
         return string.IsNullOrWhiteSpace(label) ? elementId : label.Trim().TrimEnd(':').TrimEnd();
     }
 
-    private void ShowMessage(string caption, string text)
+    private void ShowMessage(string caption, string text, Action? afterClose = null)
     {
         if (_messageOpen)
         {
@@ -525,10 +603,10 @@ public sealed class PolicySettingDialog : ClassicDialog
         }
 
         _messageOpen = true;
-        _ = ShowMessageAsync(caption, text);
+        _ = ShowMessageAsync(caption, text, afterClose);
     }
 
-    private async Task ShowMessageAsync(string caption, string text)
+    private async Task ShowMessageAsync(string caption, string text, Action? afterClose)
     {
         try
         {
@@ -542,6 +620,11 @@ public sealed class PolicySettingDialog : ClassicDialog
         finally
         {
             _messageOpen = false;
+            if (afterClose is not null)
+            {
+                // After the message box has gone and the dialog is active again, so the focus stays where it is put.
+                _ = DispatcherQueue.TryEnqueue(() => afterClose());
+            }
         }
     }
 
@@ -562,32 +645,7 @@ public sealed class PolicySettingDialog : ClassicDialog
         // The base sizes the client from the dialog units; the form is 684 x 604 DIP exactly, at every DPI.
         double scale = Metrics.Scale;
         AppWindow.ResizeClient(new SizeInt32((int)Math.Round(ClientWidthDip * scale), (int)Math.Round(ClientHeightDip * scale)));
-        CenterOnOwner(ownerHwnd);
-    }
-
-    private void CenterOnOwner(nint ownerHwnd)
-    {
-        try
-        {
-            WindowId ownerId = Win32Interop.GetWindowIdFromWindow(ownerHwnd);
-            AppWindow? owner = AppWindow.GetFromWindowId(ownerId);
-            if (owner is null)
-            {
-                return;
-            }
-
-            RectInt32 work = DisplayArea.GetFromWindowId(ownerId, DisplayAreaFallback.Nearest).WorkArea;
-            SizeInt32 size = AppWindow.Size;
-            int left = owner.Position.X + (owner.Size.Width - size.Width) / 2;
-            int top = owner.Position.Y + (owner.Size.Height - size.Height) / 2;
-            left = Math.Clamp(left, work.X, Math.Max(work.X, work.X + work.Width - size.Width));
-            top = Math.Clamp(top, work.Y, Math.Max(work.Y, work.Y + work.Height - size.Height));
-            AppWindow.Move(new PointInt32(left, top));
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            UiDiagnostics.Warn?.Invoke("The setting dialog could not be centered: " + ex.Message);
-        }
+        DialogPlacement.CenterOnOwner(AppWindow, ownerHwnd);
     }
 
     /// <inheritdoc />
@@ -651,6 +709,9 @@ public sealed class PolicySettingDialog : ClassicDialog
         double paneHeight = splitHeight - 39;
         Place(_optionsLabel, 3, splitTop, 52, 15);
         Place(_optionsHost, 3, splitTop + 37, panel1 - 3, paneHeight);
+        _optionsWidth = Math.Max(1, panel1 - 3 - 2);
+        _optionsHeight = Math.Max(1, paneHeight - 2);
+        ArrangeOptions();
         double helpLeft = 3 + panel1 + SplitterWidthDip;
         Place(_helpLabel, helpLeft, splitTop, 35, 15);
         Place(_help, helpLeft, splitTop + 37, panel2 - 2, paneHeight);
@@ -661,12 +722,124 @@ public sealed class PolicySettingDialog : ClassicDialog
         Place(_apply, width - 84, buttonTop, 75, 25);
     }
 
+    /// <summary>Lays the option controls out in the viewport of the pane (inside its 1 DIP border).</summary>
+    private void ArrangeOptions()
+    {
+        if (_options is not null && _optionsWidth > 0)
+        {
+            _options.Layout(_optionsWidth, _optionsHeight);
+        }
+    }
+
     private static void Place(FrameworkElement element, double x, double y, double width, double height)
     {
         Canvas.SetLeft(element, x);
         Canvas.SetTop(element, y);
         element.Width = Math.Max(1, width);
         element.Height = Math.Max(1, height);
+    }
+
+    // ---- Tab order -----------------------------------------------------------------------------
+
+    /// <summary>
+    /// Tab and Shift+Tab. The order is the one of the form: Previous, Next, the radio buttons, Comment, Supported on,
+    /// the option
+    /// controls of the pane, Help, OK, Cancel, Apply. A disabled control is skipped, so the option controls are passed over
+    /// while the policy is not Enabled. The base handles every other key.
+    /// </summary>
+    private void OnPreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (Content is not FrameworkElement { XamlRoot: { } xamlRoot })
+        {
+            return;
+        }
+
+        // Enter and Escape in a combo box whose list is closed are the keys of the dialog (OK and Cancel, as in classic). The
+        // combo box would handle them itself and the dialog base never sees them.
+        if (e.Key is VirtualKey.Enter or VirtualKey.Escape && !IsDown(VirtualKey.Menu) && InsideClosedCombo(FocusManager.GetFocusedElement(xamlRoot)))
+        {
+            e.Handled = true;
+            OnCommand(e.Key == VirtualKey.Enter ? 1 : 2, e.Key == VirtualKey.Enter ? "buttonOK" : "buttonCancel");
+            return;
+        }
+
+        if (e.Key != VirtualKey.Tab || IsDown(VirtualKey.Control) || IsDown(VirtualKey.Menu))
+        {
+            return;
+        }
+
+        List<(FrameworkElement Owner, FrameworkElement Target)> stops = [];
+        void Add(FrameworkElement element)
+        {
+            if (element is Control { IsEnabled: true } && element.Visibility == Visibility.Visible)
+            {
+                stops.Add((element, element));
+            }
+        }
+
+        foreach (FrameworkElement element in new FrameworkElement[] { _previous, _next, _notConfigured, _enabled, _disabled, _comment, _supportedOn })
+        {
+            Add(element);
+        }
+
+        if (_options is not null)
+        {
+            foreach ((FrameworkElement owner, FrameworkElement target) in _options.TabStops())
+            {
+                if (owner is Control { IsEnabled: true })
+                {
+                    stops.Add((owner, target));
+                }
+            }
+        }
+
+        foreach (FrameworkElement element in new FrameworkElement[] { _help, _ok, _cancel, _apply })
+        {
+            Add(element);
+        }
+
+        if (stops.Count == 0)
+        {
+            return;
+        }
+
+        bool backward = IsDown(VirtualKey.Shift);
+        object? focused = FocusManager.GetFocusedElement(xamlRoot);
+        int current = stops.FindIndex(stop => ReferenceEquals(focused, stop.Owner) || ReferenceEquals(focused, stop.Target) || IsInside(focused, stop.Owner));
+        int next = current < 0
+            ? (backward ? stops.Count - 1 : 0)
+            : (current + (backward ? -1 : 1) + stops.Count) % stops.Count;
+        e.Handled = true;
+        _ = stops[next].Target.Focus(FocusState.Keyboard);
+    }
+
+    private static bool InsideClosedCombo(object? focused)
+    {
+        for (DependencyObject? node = focused as DependencyObject; node is not null; node = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(node))
+        {
+            if (node is ComboBox combo)
+            {
+                return !combo.IsDropDownOpen;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsDown(VirtualKey key) =>
+        InputKeyboardSource.GetKeyStateForCurrentThread(key).HasFlag(CoreVirtualKeyStates.Down);
+
+    private static bool IsInside(object? focused, FrameworkElement owner)
+    {
+        for (DependencyObject? node = focused as DependencyObject; node is not null; node = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(node))
+        {
+            if (ReferenceEquals(node, owner))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // ---- E2E readout ---------------------------------------------------------------------------
@@ -689,6 +862,7 @@ public sealed class PolicySettingDialog : ClassicDialog
             $"Policy={current.Policy.FullName};Side={current.Side};State={state};Dirty={(IsDirty ? 1 : 0)};" +
             $"Index={_index};Count={_order.Count};ReadOnly={(IsReadOnly ? 1 : 0)};Applies={_applyCount};";
         AutomationProperties.SetHelpText(root, text.Replace("\r", " ", StringComparison.Ordinal).Replace("\n", " ", StringComparison.Ordinal));
+        AutomationProperties.SetHelpText(_optionsHost, _options?.Readout() ?? "Enabled=0;");
 #endif
     }
 

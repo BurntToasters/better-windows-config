@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Control label of the WinForms Editor form (buttonPrevious). -->
+  <data name="OptionsShowButton" xml:space="preserve">
+    <value>Show...</value>
+  </data>
+  <data name="OptionsNumericCaption" xml:space="preserve">
+    <value>Error in field "{0}" </value>
+  </data>
+  <data name="OptionsMinText" xml:space="preserve">
+    <value>The number in this field was smaller than the minimum value of {0}. The number has been reset from {1} to the minimum value.</value>
+  </data>
+  <data name="OptionsMaxText" xml:space="preserve">
+    <value>The number in this field was larger than the maximum value of {0}. The number has been reset from {1} to the maximum value.</value>
+  </data>
+  <data name="OptionsCountCaption" xml:space="preserve">
+    <value>Field "{0}" has too many entries</value>
+  </data>
+  <data name="OptionsCountText" xml:space="preserve">
+    <value>This field can contain a maximum of {0} lines of text. Make sure that you enter {1} or fewer lines of text.</value>
+  </data>
+  <data name="OptionsLengthCaption" xml:space="preserve">
+    <value>Field "{0}" contains lines that are too long</value>
+  </data>
+  <data name="OptionsLengthText" xml:space="preserve">
+    <value>This field can contain a maximum of {0} characters per line. Make sure that you enter {1} or fewer characters per line.</value>
+  </data>
+  <data name="OptionsEmptyLinesCaption" xml:space="preserve">
+    <value>Field "{0}" cannot contain empty lines of text</value>
+  </data>
+  <data name="OptionsEmptyLinesText" xml:space="preserve">
+    <value>No text was entered for this field. Make sure that you enter text.</value>
+  </data>
+  <data name="OptionsListRequiredCaption" xml:space="preserve">
+    <value>Error in field "{0}"</value>
+  </data>
+  <data name="OptionsListRequiredText" xml:space="preserve">
+    <value>No entries were added to the list. Make sure that you add an entry to the list.</value>
+  </data>
+  <data name="ContentsCaption" xml:space="preserve">
+    <value>Show Contents</value>
+  </data>
+  <data name="ContentsOk" xml:space="preserve">
+    <value>&amp;OK</value>
+  </data>
+  <data name="ContentsCancel" xml:space="preserve">
+    <value>&amp;Cancel</value>
+  </data>
+  <data name="ContentsColumnValue" xml:space="preserve">
+    <value>Value</value>
+  </data>
+  <data name="ContentsColumnValueName" xml:space="preserve">
+    <value>Value name</value>
+  </data>
+  <data name="ContentsErrorCaption" xml:space="preserve">
+    <value>Error in the information entered</value>
+  </data>
+  <data name="ContentsDuplicateName" xml:space="preserve">
+    <value>The name "{0}" has already been specified. Make sure that you specify a unique value.</value>
+  </data>
+  <data name="ContentsDuplicateValue" xml:space="preserve">
+    <value>The value "{0}" has already been specified. Make sure that you specify a unique value.</value>
+  </data>
+  <data name="ContentsEmptyName" xml:space="preserve">
+    <value>No value was entered for a field. Make sure you enter a value.</value>
+  </data>
+  <data name="ContentsEmptyValue" xml:space="preserve">
+    <value>No value was entered for a field. Make sure you enter a value.</value>
+  </data>
+</root>

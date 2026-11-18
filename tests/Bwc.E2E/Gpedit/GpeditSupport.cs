@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using Bwc.E2E.ConsoleFrame;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Editing;
@@ -27,6 +28,8 @@ internal sealed class GpeditSandbox
 {
     internal const string Namespace = "BWC.Policies.Oracle";
     internal const string BasicsKey = @"Software\Policies\BWC-Oracle\Basics";
+    internal const string AdditiveListKey = @"Software\Policies\BWC-Oracle\Lists\Additive";
+    internal const string ExplicitListKey = @"Software\Policies\BWC-Oracle\Lists\Explicit";
 
     private GpeditSandbox(string scope)
     {
@@ -111,24 +114,53 @@ internal sealed class GpeditSandbox
     /// Writes a policy file of a side with one DWORD value per entry under the Basics key: the signature, the version, then
     /// the records <c>[key;name;type;size;data]</c> (strings are UTF-16LE with a terminator, the numbers are little endian).
     /// </summary>
-    internal void WritePolicyFile(GpoSide side, IReadOnlyList<(string Name, uint Value)> values)
+    internal void WritePolicyFile(GpoSide side, IReadOnlyList<(string Name, uint Value)> values) =>
+        WriteRecords(side, values.Select(v => (BasicsKey, v.Name, 4u, BitConverter.GetBytes(v.Value))).ToList());
+
+    /// <summary>
+    /// The standard machine seed plus string entries in the keys of the additive list (three entries) and the explicit list
+    /// (two entries) of the fixture, so those two policies read as Enabled with a list.
+    /// </summary>
+    internal void SeedLists()
+    {
+        var records = new List<(string Key, string Name, uint Type, byte[] Data)>
+        {
+            (BasicsKey, "MachineFlag", 4u, BitConverter.GetBytes(1u)),
+            (BasicsKey, "BothFlag", 4u, BitConverter.GetBytes(1u)),
+            (BasicsKey, "ModeNumber", 4u, BitConverter.GetBytes(9u)),
+        };
+        // A list with no valuePrefix stores each entry under its own text as the value name (the engine's rule).
+        foreach ((string name, string data) in new[] { ("alpha", "alpha"), ("bravo", "bravo"), ("charlie", "charlie") })
+        {
+            records.Add((AdditiveListKey, name, 1u, System.Text.Encoding.Unicode.GetBytes(data + '\0')));
+        }
+
+        foreach ((string name, string data) in new[] { ("first", "one"), ("second", "two") })
+        {
+            records.Add((ExplicitListKey, name, 1u, System.Text.Encoding.Unicode.GetBytes(data + '\0')));
+        }
+
+        WriteRecords(GpoSide.Machine, records);
+    }
+
+    private void WriteRecords(GpoSide side, IReadOnlyList<(string Key, string Name, uint Type, byte[] Data)> records)
     {
         using var bytes = new MemoryStream();
         using (var writer = new BinaryWriter(bytes, System.Text.Encoding.Unicode, leaveOpen: true))
         {
             writer.Write(new byte[] { 0x50, 0x52, 0x65, 0x67, 0x01, 0x00, 0x00, 0x00 });
-            foreach ((string name, uint value) in values)
+            foreach ((string key, string name, uint type, byte[] data) in records)
             {
                 writer.Write('[');
-                writer.Write(System.Text.Encoding.Unicode.GetBytes(BasicsKey + '\0'));
+                writer.Write(System.Text.Encoding.Unicode.GetBytes(key + '\0'));
                 writer.Write(';');
                 writer.Write(System.Text.Encoding.Unicode.GetBytes(name + '\0'));
                 writer.Write(';');
-                writer.Write(4u);
+                writer.Write(type);
                 writer.Write(';');
-                writer.Write(4u);
+                writer.Write((uint)data.Length);
                 writer.Write(';');
-                writer.Write(value);
+                writer.Write(data);
                 writer.Write(']');
             }
         }
@@ -729,6 +761,172 @@ internal sealed class GpeditDialog : IDisposable
         Thread.Sleep(600);
     }
 
+    // ---- the Options pane ------------------------------------------------------------------------
+
+    /// <summary>
+    /// The E2E readout of the Options pane (the help text of <see cref="OptionsPane"/>): <c>Enabled</c>,
+    /// <c>V.&lt;element id&gt;</c>
+    /// (the value Apply would write, as JSON) and <c>I.&lt;element id&gt;</c> (the items of a drop-down in display order, as a
+    /// JSON array). Values are percent-escaped by the product and returned unescaped here.
+    /// </summary>
+    internal Dictionary<string, string> OptionsReadout()
+    {
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        string text = string.Empty;
+        try
+        {
+            text = Find(OptionsPane, 1)?.Properties.HelpText.ValueOrDefault ?? string.Empty;
+        }
+        catch (Exception)
+        {
+            // The dialog is closing; an empty readout is returned.
+        }
+
+        foreach (string part in text.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int at = part.IndexOf('=', StringComparison.Ordinal);
+            if (at > 0)
+            {
+                map[part[..at]] = Uri.UnescapeDataString(part[(at + 1)..]);
+            }
+        }
+
+        return map;
+    }
+
+    /// <summary>True when the pane says its controls are enabled.</summary>
+    internal bool OptionsEnabled() => OptionsReadout().GetValueOrDefault("Enabled") == "1";
+
+    /// <summary>The value of an element as the pane would give it to Apply, or null when the pane has no such
+    /// element.</summary>
+    internal JsonElement? ValueOf(string elementId) =>
+        OptionsReadout().TryGetValue("V." + elementId, out string? json) ? JsonDocument.Parse(json).RootElement.Clone() : null;
+
+    /// <summary>The items of a drop-down in display order (empty when the element has none).</summary>
+    internal string[] ItemsOf(string elementId) =>
+        OptionsReadout().TryGetValue("I." + elementId, out string? json)
+            ? JsonSerializer.Deserialize<string[]>(json) ?? []
+            : [];
+
+    /// <summary>The ids of the elements that have a value in the pane readout.</summary>
+    internal string[] ElementIds() =>
+        OptionsReadout().Keys.Where(k => k.StartsWith("V.", StringComparison.Ordinal)).Select(k => k[2..]).ToArray();
+
+    /// <summary>Gives a control the keyboard focus by UI Automation.</summary>
+    internal bool FocusControl(string id)
+    {
+        try
+        {
+            _ = ClassicDialogTestsBridge.EnsureForeground(Hwnd);
+            Find(id, 2)?.Focus();
+            Thread.Sleep(150);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Replaces the text of a text box or an editable combo box by real keys: focus, select all, type.</summary>
+    internal bool TypeInto(string id, string text)
+    {
+        if (!FocusControl(id))
+        {
+            return false;
+        }
+
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
+        Thread.Sleep(100);
+        if (text.Length == 0)
+        {
+            Keyboard.Type(VirtualKeyShort.DELETE);
+        }
+        else
+        {
+            Keyboard.Type(text);
+        }
+
+        Thread.Sleep(300);
+        return true;
+    }
+
+    /// <summary>Presses Shift+Tab.</summary>
+    internal void PressShiftTab()
+    {
+        _ = ClassicDialogTestsBridge.EnsureForeground(Hwnd);
+        Keyboard.TypeSimultaneously(VirtualKeyShort.SHIFT, VirtualKeyShort.TAB);
+        Thread.Sleep(300);
+    }
+
+    /// <summary>Toggles a check box by UI Automation.</summary>
+    internal bool Toggle(string id)
+    {
+        try
+        {
+            Find(id, 2)?.Patterns.Toggle.Pattern.Toggle();
+            Thread.Sleep(200);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Chooses an item of a drop-down list by its text (expands the list and selects the item).</summary>
+    internal bool Choose(string id, string item)
+    {
+        try
+        {
+            Find(id, 2)?.AsComboBox().Select(item);
+            Thread.Sleep(300);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>The control types and automation ids of everything inside the Options pane (diagnostic).</summary>
+    internal string[] PaneControlIds()
+    {
+        try
+        {
+            AutomationElement? pane = Find(OptionsPane, 1);
+            return pane is null
+                ? []
+                : pane.FindAllDescendants().Select(e => ShellRun.SafeId(e)).Where(id => id.Length > 0).ToArray();
+        }
+        catch (Exception)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Waits for a message box of the dialog and returns its caption and text, or null. The message is closed with
+    /// <see cref="DismissMessage"/>.
+    /// </summary>
+    internal (string Caption, string Text)? WaitMessage(double seconds = 8)
+    {
+        AutomationElement? message = Find("DialogMessage", seconds);
+        if (message is null)
+        {
+            return null;
+        }
+
+        return (ShellRun.SafeName(ClassicDialogTestsBridge.WindowOf(message)), ShellRun.SafeName(message));
+    }
+
+    /// <summary>Closes the message box with Enter and waits until it is gone.</summary>
+    internal bool DismissMessage()
+    {
+        Press(VirtualKeyShort.RETURN);
+        return ShellRun.WaitUntil(() => Find("DialogMessage", 0.3) is null, TimeSpan.FromSeconds(8));
+    }
+
     internal string Screenshot(string name)
     {
         string dir = Path.Combine(GuiGate.Config.ArtifactsDir, "visual", GpeditRun.Area);
@@ -794,6 +992,122 @@ internal sealed class GpeditDialog : IDisposable
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+}
+
+/// <summary>
+/// The "Show Contents" dialog of a list element (the grid dialog that a list's "Show..." button opens), seen through UI
+/// Automation. Its grid is <c>dataGrid</c> and its cells are <c>dataGrid.R&lt;row&gt;C&lt;column&gt;</c>; the buttons
+/// carry the ids
+/// of the classic form (<c>buttonOK</c>, <c>buttonCancel</c>) that the policy dialog also has, so they are found
+/// inside this
+/// window only.
+/// </summary>
+internal sealed class GpeditContents
+{
+    internal const string GridId = "dataGrid";
+
+    private readonly GpeditDialog _owner;
+    private readonly AutomationElement _window;
+
+    private GpeditContents(GpeditDialog owner, AutomationElement window)
+    {
+        _owner = owner;
+        _window = window;
+    }
+
+    /// <summary>Waits for the dialog to appear; null when it did not.</summary>
+    internal static GpeditContents? Wait(GpeditDialog owner, double seconds = 10)
+    {
+        AutomationElement? grid = owner.Find(GridId, seconds);
+        return grid is null ? null : new GpeditContents(owner, ClassicDialogTestsBridge.WindowOf(grid));
+    }
+
+    internal string Caption => ShellRun.SafeName(_window);
+
+    internal bool IsOpen => _owner.Find(GridId, 0.5) is not null;
+
+    internal AutomationElement? Cell(int row, int column) => _owner.Find($"{GridId}.R{row}C{column}", 2);
+
+    internal string CellText(int row, int column)
+    {
+        try
+        {
+            AutomationElement? cell = Cell(row, column);
+            return cell?.Patterns.Value.IsSupported == true ? cell.Patterns.Value.Pattern.Value.Value ?? string.Empty : string.Empty;
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
+
+    internal string CellName(int row, int column) => ShellRun.SafeName(Cell(row, column));
+
+    /// <summary>The texts of the rows that hold something (the empty last row is left out).</summary>
+    internal List<string[]> Rows(int columns)
+    {
+        var rows = new List<string[]>();
+        for (int row = 0; row < 64; row++)
+        {
+            string name = CellName(row, 0);
+            if (name.Length == 0 || name.EndsWith("new row", StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            rows.Add(Enumerable.Range(0, columns).Select(column => CellText(row, column)).ToArray());
+        }
+
+        return rows;
+    }
+
+    /// <summary>Types text into a cell: focus it, type, Enter commits.</summary>
+    internal void Edit(int row, int column, string text)
+    {
+        _ = ClassicDialogTestsBridge.EnsureForeground(ClassicDialogTestsBridge.HandleOf(_window));
+        Cell(row, column)?.Focus();
+        Thread.Sleep(150);
+        Keyboard.Type(text);
+        Thread.Sleep(150);
+        Keyboard.Type(VirtualKeyShort.RETURN);
+        Thread.Sleep(250);
+    }
+
+    /// <summary>Puts the focus on a cell and presses Delete (removes the row).</summary>
+    internal void DeleteRow(int row)
+    {
+        _ = ClassicDialogTestsBridge.EnsureForeground(ClassicDialogTestsBridge.HandleOf(_window));
+        Cell(row, 0)?.Focus();
+        Thread.Sleep(150);
+        Keyboard.Type(VirtualKeyShort.DELETE);
+        Thread.Sleep(250);
+    }
+
+    internal bool Ok() => Press("buttonOK");
+
+    internal bool Cancel() => Press("buttonCancel");
+
+    internal bool WaitClosed() => ShellRun.WaitUntil(() => !IsOpen, TimeSpan.FromSeconds(8));
+
+    private bool Press(string id)
+    {
+        try
+        {
+            AutomationElement? button = _window.FindFirstDescendant(cf => cf.ByAutomationId(id));
+            if (button is null)
+            {
+                return false;
+            }
+
+            button.Patterns.Invoke.Pattern.Invoke();
+            Thread.Sleep(300);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
 }
 
 /// <summary>The few helpers of the classic dialog tests that the policy dialog tests reuse.</summary>
