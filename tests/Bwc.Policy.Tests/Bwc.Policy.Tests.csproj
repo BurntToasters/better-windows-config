@@ -10,4 +10,9 @@
     <ProjectReference Include="..\..\src\Bwc.Policy\Bwc.Policy.csproj" />
   </ItemGroup>
 
+  <!-- BWC-authored fixture templates, copied next to the test assembly as Fixture\... (including Fixture\bad\...). -->
+  <ItemGroup>
+    <None Include="..\..\docs\parity\oracle\gpedit\fixture\**\*" Link="Fixture\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
