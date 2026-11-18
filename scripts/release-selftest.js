@@ -44,6 +44,7 @@ import { buildManifest, installerTrustedComment, manifestFileName, serializeMani
 import { expectedAssetNames, loadReleaseBundle, unexpectedAssets } from "./lib/release-bundle.js";
 import { SIGNING_REQUIRED_VARIABLES } from "./release-policy.js";
 import { publishedReleaseMismatch } from "./release-publish.js";
+import { runClient, verdictOf } from "./updater-client-live.js";
 
 const SCRIPT = "scripts/release-selftest.js";
 const REPO_ROOT = repoRootFrom(import.meta.url);
@@ -1327,6 +1328,37 @@ async function runNoLegacyFeedCases(temp, fixture, cases) {
     "an extra asset was accepted or a sidecar refused",
     cases,
   );
+
+  // C20: a nonzero client exit names the verdict that the client printed on stdout.
+  const refusal = (run) => {
+    try {
+      verdictOf("check", run, "0.1.2");
+      return null;
+    } catch (error) {
+      return error;
+    }
+  };
+  const elevated = refusal({
+    code: 1,
+    stdout: '{"ok":false,"failure":"RunningElevated","detail":"run unelevated","version":null}\n',
+    stderr: "",
+  });
+  expectCheck(
+    "C20 a nonzero exit with a stdout verdict is client-failed and names the failure and detail",
+    elevated?.reason === "client-failed" &&
+      elevated.message.includes("exited 1") &&
+      elevated.message.includes("RunningElevated") &&
+      elevated.message.includes("run unelevated"),
+    String(elevated?.message),
+    cases,
+  );
+  const crashed = refusal({ code: 7, stdout: "", stderr: "boom" });
+  expectCheck(
+    "C20 a nonzero exit with no verdict still reports the exit code and the stderr tail",
+    crashed?.reason === "client-failed" && crashed.message.includes("exited 7") && crashed.message.includes("boom"),
+    String(crashed?.message),
+    cases,
+  );
 }
 
 function git(temp, args) {
@@ -1907,6 +1939,50 @@ function runPublishReuseCases(temp, cases) {
   );
 }
 
+/**
+ * C21 to C25: the client rehearsal starts every run through scripts/run-restricted.ps1. node.exe stands in for the
+ * client, so these cases need no build and no network. From an elevated shell they show the de-elevation itself.
+ */
+async function runRestrictedLaunchCases(cases) {
+  const node = process.execPath;
+  const tricky = ["a b", 'q"x', "tr\\", "end\\\\", "", "uni é", '--flag="v w"'];
+  const echo = await runClient(node, ["-e", "console.log(JSON.stringify(process.argv.slice(1)))", ...tricky], 60_000);
+  expectCheck(
+    "C21 a client run is unelevated, at medium integrity, through the restricted token",
+    echo.launch?.mode === "restricted-token" && echo.launch.elevated === false && echo.launch.integrity === "0x2000",
+    JSON.stringify(echo.launch),
+    cases,
+  );
+  expectCheck(
+    "C25 arguments with spaces, quotes, trailing backslashes, empty, and non-ASCII text arrive unchanged",
+    echo.code === 0 && echo.stdout.trim() === JSON.stringify(tricky),
+    echo.stdout.trim(),
+    cases,
+  );
+  const exited = await runClient(node, ["-e", "process.stderr.write('err-text');process.exit(5)"], 60_000);
+  expectCheck(
+    "C21 the client's exit code and stderr come back from the restricted run",
+    exited.code === 5 && exited.stderr === "err-text",
+    JSON.stringify({ code: exited.code, stderr: exited.stderr }),
+    cases,
+  );
+  const missing = await runClient(path.join(os.tmpdir(), "bwc-no-such-client.exe"), ["--check"], 60_000).then(
+    () => null,
+    (error) => error,
+  );
+  expectCheck(
+    "C22 a client that cannot be started is deelevate-failed, and nothing else is started",
+    missing?.reason === "deelevate-failed" && missing.message.includes("create-process"),
+    String(missing?.message),
+    cases,
+  );
+  const hung = await runClient(node, ["-e", "setTimeout(() => {}, 120000)"], 2_000).then(
+    () => null,
+    (error) => error,
+  );
+  expectCheck("C24 a client that hangs is ended at the timeout and refused timeout", hung?.reason === "timeout", String(hung?.message), cases);
+}
+
 async function main() {
   const started = Date.now();
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "bwc-release-selftest-"));
@@ -1927,6 +2003,7 @@ async function main() {
     await runReadinessCases(temp, fixture, cases);
     runPublishDecisionCases(cases);
     runReadinessCliCases(temp, fixture, cases);
+    await runRestrictedLaunchCases(cases);
     expectCheck(
       "release-verify accepts --allow-published (the publish rerun check)",
       (() => {
