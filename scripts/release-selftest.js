@@ -1296,6 +1296,15 @@ async function runNoLegacyFeedCases(temp, fixture, cases) {
     JSON.stringify(names),
     cases,
   );
+  const sidecars = [manifestFileName("stable"), ...names.filter((name) => name.endsWith("-setup.exe"))].flatMap(
+    (name) => [`${name}.minisig`, `${name}.sig`],
+  );
+  expectCheck(
+    "LF1 the expected set holds every .minisig and .sig that release:assemble writes and release:draft uploads",
+    sidecars.length > 2 && sidecars.every((name) => names.includes(name)),
+    JSON.stringify(names),
+    cases,
+  );
   expectCheck(
     "LF1 a release that holds exactly the expected assets has nothing unexpected",
     unexpectedAssets(release, names).length === 0,
