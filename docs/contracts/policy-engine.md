@@ -148,8 +148,12 @@ Rules for the whole sequence:
 - Every file write is atomic: write a temp file next to the target, flush it, then replace the
   target. A failed write leaves the old file in place and removes the temp file.
 - Read, modify, write runs under one lock for the three files, held across steps 1 to 4. The lock
-  is a file lock on the GPO folder so another BWC instance and another writer using the same
-  convention wait. A lock that cannot be taken in a bounded time is a typed failure.
+  is a named mutex (`Global\BetterWindowsConfig.GpoWrite`, or a name derived from the sandbox root
+  in the E2E flavor), not a file in the GPO folder, so the folder holds only what classic writes.
+  Another BWC instance waits. A lock that cannot be taken in a bounded time is a typed failure.
+- Every byte written to the GPO folder or the backup folder goes through one file:
+  `src/Bwc.Gpo/Store/GpoFileWriter.cs` (atomic temp-then-replace, backup copies). Every refresh call
+  goes through `src/Bwc.Gpo/Refresh/PolicyRefresh.cs`. `scripts/check-policy-writer.js` enforces both.
 - Before the first write of a session, the engine copies the three files to
   `%ProgramData%\BetterWindowsConfig\gpedit\backup` in a new timestamped folder. A file that does
   not exist yet is recorded as absent. The engine keeps the last 10 backup folders and removes
@@ -166,8 +170,12 @@ Rules for the whole sequence:
 ## `Bwc.Gpo`: write policy and E2E seams
 
 - Every write to the GPO folder passes a write policy first, as `RegistryWriter` does in the
-  registry engine. The policy is a small interface in `Bwc.Gpo`; the tool project supplies the
-  implementation (`GpeditStorePolicy`).
+  registry engine. The policy is a small interface in `Bwc.Gpo` (it names the GPO root, the backup
+  root, the lock name and the refresher). `Bwc.Gpo` has two implementations: the system one and a
+  sandbox one that takes a root and a run data root and refuses a root outside the run data root or
+  with a reparse point. Both compile in every flavor and neither reads an environment variable. The
+  tool's `GpeditStorePolicy` picks one: always the system one in the ship flavor; under
+  `#if BWC_E2E` the sandbox one from `BWC_E2E_GPO_ROOT`, or deny-all when it is unset.
 - The shipping policy uses `%SystemRoot%\System32\GroupPolicy`.
 - Under `#if BWC_E2E`, the E2E flavor never uses the real folder:
   - `BWC_E2E_GPO_ROOT` names a sandbox folder. It must be inside the E2E run data root. A path
