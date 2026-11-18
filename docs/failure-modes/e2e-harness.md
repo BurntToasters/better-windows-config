@@ -559,6 +559,45 @@ and the result records `staleCopyLocalRemoved` for each project. The shared-fold
 are unchanged. The exact timing that produced the collision was not reproduced; the guard removes the input
 that the verified tree shows to be stale.
 
+## 44. The real Local Group Policy store changed during a run (G0b)
+
+The Local Group Policy Editor of 0.2.0 writes `%SystemRoot%\System32\GroupPolicy` when a user runs it elevated.
+The E2E flavor is `asInvoker` and every GPO test is meant to use a private store, but a wrong path in a
+test, a default store location, or a refresh call that reaches the real machine would write the developer's
+real policy and no check would say so. `GpoGuard` hashes the real folder before the first test and after the last,
+and the run fails when the two differ. It only reads.
+
+What counts as a change:
+
+- Each file and each directory under the folder is one entry: relative path, a kind (file, directory, reparse
+  point, unreadable), and for a file its size and SHA-256. A file added, removed, resized, or with different
+  bytes is a change. A directory added or removed is a change, because an empty `Machine\Scripts` folder is a
+  write. A time stamp alone is not a change, because the content is the policy and a read can touch times.
+- A folder that does not exist is a valid state with no entries. Missing before and missing after is a pass.
+  Missing before and present after (or the reverse) is a change.
+- The path is compared without case. Entries are sorted by ordinal ignore-case path, so enumeration order never
+  produces a difference.
+
+Failure modes and guards:
+
+| Failure | Guard |
+| --- | --- |
+| The hash reads through WOW64 redirection and sees `SysWOW64`, which has no GroupPolicy folder, so a real change is invisible | A 32-bit process on a 64-bit OS reads `%SystemRoot%\Sysnative`. The root actually read is recorded in the check notes. |
+| The guard writes: opens with write access, touches times, or creates a snapshot file in the folder | Files open with `FileAccess.Read` and `FileShare` read, write and delete. Nothing is created or deleted below the root. The guard self-test captures a folder twice and asserts that no entry, size, or last write time changed. The snapshot lives in memory only. |
+| A reparse point under the folder leads the walk outside it, or in a loop | A directory or file with `FileAttributes.ReparsePoint` is recorded as one `reparse` entry with its attributes and is never followed or hashed. |
+| One unreadable file or folder aborts the guard, or hides a change | Each entry is read in its own try block, retried 3 times 100 ms apart for a sharing violation. A still unreadable entry becomes `unreadable:<ExceptionType>` and takes part in the comparison. A file that is unreadable only in one of the two snapshots is a change and says so. |
+| Windows or a management agent refreshes policy during the run and changes `gpt.ini` or `Registry.pol`, so the guard blames BWC | The check fails, because the run cannot prove it did not write. The notes list every changed path with before and after size and hash prefix, so the cause can be read. Rerun on a quiet machine. This is accepted: a false failure is visible, a false pass is not. |
+| The baseline fails (the walk throws) and the run ends "unchanged" because both sides are empty | A baseline that could not be captured is a failed `gpo.real-unchanged` check with the exception, never a pass. The final capture failing is the same. |
+| The guard runs only on a full run, or only when a test touches policy | `GuiGate.AssemblyInit` takes the baseline and `GuiGate.AssemblyCleanup` takes the final snapshot, so every run, including a filtered one, records the check. |
+| The check is recorded after `E2EResults.Finish`, so it never reaches the artifact | `GpoGuard.Finish` runs in assembly cleanup before `Finish`, in its own try block, so an exception in the guard cannot stop the artifact from being written. |
+| A passing check that proves nothing (the root is wrong, so zero entries both times) | The notes carry the root, the entry count, and a digest of the whole snapshot. A root that exists with entries and a count of zero is impossible by construction; a missing root is stated as "missing" in the notes. |
+
+Self test: `GpoGuardTests` (category Harness, under `tests/Bwc.E2E/Harness`) runs `GpoGuard.Capture` and
+`GpoGuard.Compare` against folders it builds under the run data root. Cases: both missing; missing then created;
+file added; file removed; same size with different bytes; time stamp only; empty directory added; nested file
+changed; a file held open with `FileShare.None` in one snapshot only; a capture that leaves the folder
+byte-identical with the same last write times. The check in the real run is named `gpo.real-unchanged`.
+
 ## Verification artifact
 
 A successful harness run leaves `artifacts/e2e/result-<rid>-<flavor>.json` with schema 2, the run

@@ -37,6 +37,9 @@ public sealed class GuiGate
         _resultsStarted = true;
         _runStartedUtc = DateTime.UtcNow;
 
+        // Before any test can run: the hash of the real Local Group Policy folder (read only, never throws).
+        GpoGuard.Begin();
+
         _sandbox = new SandboxRegistry(_config);
         try
         {
@@ -94,6 +97,12 @@ public sealed class GuiGate
             {
                 E2EResults.Record("sandbox.cleanup", false, ex.Message);
             }
+        }
+
+        if (_resultsStarted)
+        {
+            // After the last test and before the artifact is written (never throws).
+            GpoGuard.Finish();
         }
 
         try

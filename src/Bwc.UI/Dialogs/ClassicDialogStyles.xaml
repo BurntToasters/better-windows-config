@@ -287,5 +287,85 @@
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
 
-</ResourceDictionary>
+    <!--
+        A text box with no frame of its own, for the spin box and the grid cells. The owner draws the frame (the spin
+        box) or the row (the grid), and paints the background from the palette in code. The text is the template's
+        ScrollViewer, so the caret scrolls into view.
+    -->
+    <Style x:Key="BwcClassicBareTextBoxStyle" TargetType="TextBox">
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="3,0,3,0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Grid Background="{TemplateBinding Background}">
+                        <ScrollViewer
+                            x:Name="ContentElement"
+                            Padding="{TemplateBinding Padding}"
+                            VerticalAlignment="Center"
+                            HorizontalScrollMode="Auto"
+                            HorizontalScrollBarVisibility="Hidden"
+                            VerticalScrollMode="Disabled"
+                            VerticalScrollBarVisibility="Hidden"
+                            IsTabStop="False"
+                            ZoomMode="Disabled"
+                            AutomationProperties.AccessibilityView="Raw" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
+    <!-- The two spin buttons of the numeric up-down. A flat face button with a pressed dimming; the arrow is the content. -->
+    <Style x:Key="BwcClassicSpinButtonStyle" TargetType="RepeatButton">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border
+                        x:Name="RootBorder"
+                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1,0,0,0">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver" />
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Presenter.Opacity" Value="0.5" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Presenter.Opacity" Value="0.4" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <ContentPresenter
+                            x:Name="Presenter"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Content="{TemplateBinding Content}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

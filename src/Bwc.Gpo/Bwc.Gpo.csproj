@@ -6,6 +6,7 @@
     <RootNamespace>Bwc.Gpo</RootNamespace>
     <IsAotCompatible>true</IsAotCompatible>
     <IsTrimmable>true</IsTrimmable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
 </Project>

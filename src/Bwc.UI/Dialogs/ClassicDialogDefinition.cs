@@ -35,6 +35,20 @@ public enum ClassicControlKind
 
     /// <summary>The classic HEX control (Edit Binary Value), a hex editor at the template size.</summary>
     HexEditor,
+
+    /// <summary>
+    /// Numeric up-down: a text box with spin buttons. Built as <see cref="ClassicSpinBox"/>. The range and step come from
+    /// <see cref="ClassicControlDefinition.Minimum"/>, <see cref="ClassicControlDefinition.Maximum"/> and
+    /// <see cref="ClassicControlDefinition.Step"/>; <see cref="ClassicControlDefinition.Text"/> is its accessible name.
+    /// </summary>
+    Spinner,
+
+    /// <summary>
+    /// Editable list of one or two columns (the policy "Show Contents" grid). Built as <see cref="ClassicEditableGrid"/>.
+    /// The column titles come from <see cref="ClassicControlDefinition.Columns"/>; <see cref="ClassicControlDefinition.Text"/>
+    /// is its accessible name.
+    /// </summary>
+    EditableGrid,
 }
 
 /// <summary>
@@ -82,6 +96,21 @@ public sealed record ClassicControlDefinition(
 
     /// <summary>Column titles of a <see cref="ClassicControlKind.ColumnList"/>, from the template's semicolon list.</summary>
     public IReadOnlyList<string> Columns { get; init; } = [];
+
+    /// <summary>
+    /// True when <see cref="Text"/> is shown exactly as given: an ampersand is an ampersand, there is no access key, and
+    /// the control takes no part in the duplicate mnemonic check. Text from ADML templates uses it. Default false.
+    /// </summary>
+    public bool LiteralText { get; init; }
+
+    /// <summary>Smallest value of a <see cref="ClassicControlKind.Spinner"/>.</summary>
+    public long Minimum { get; init; }
+
+    /// <summary>Largest value of a <see cref="ClassicControlKind.Spinner"/>.</summary>
+    public long Maximum { get; init; } = 100;
+
+    /// <summary>Change of one Up, Down, or button press of a <see cref="ClassicControlKind.Spinner"/>. Positive.</summary>
+    public long Step { get; init; } = 1;
 }
 
 /// <summary>
@@ -108,4 +137,16 @@ public sealed record ClassicDialogDefinition(
 
     /// <summary>Font size in points.</summary>
     public int FontPointSize { get; init; } = 8;
+
+    /// <summary>
+    /// True for a dialog the user can resize (a sizing border, no maximize or minimize box). Default false, which keeps
+    /// every existing dialog at its template size. The canvas follows the window and <c>OnClientResized</c> is raised.
+    /// </summary>
+    public bool Resizable { get; init; }
+
+    /// <summary>Smallest client width in DLU of a resizable dialog. 0 means the template width.</summary>
+    public int MinWidthDlu { get; init; }
+
+    /// <summary>Smallest client height in DLU of a resizable dialog. 0 means the template height.</summary>
+    public int MinHeightDlu { get; init; }
 }

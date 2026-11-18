@@ -154,6 +154,14 @@ const unnamedCallAllowlist = new Map([
     "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
   ],
   [
+    "tests/Bwc.Gpo.Tests/GpoStorePolHelper.cs",
+    "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
+  ],
+  [
+    "src/Bwc.Policy/Model/PolicyStateWriter.cs",
+    "Calls PolDocument.SetValue, the in-memory Registry.pol model. The GPO files are written only by GpoFileWriter.",
+  ],
+  [
     "tests/Bwc.Gpo.Tests/PolRoundTripTests.cs",
     "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
   ],

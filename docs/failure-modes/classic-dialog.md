@@ -785,3 +785,173 @@ E2E: `NumberOverflow_QwordLayout` converts the QWORD maximum typed in decimal to
 Failure mode: the prompt uses the caption "Warning" (RT_STRING 111). No classic prompt is identified in the dump
 as using it, so BWC does not show it. This is declared (MSG-053), not proven, and the reason is recorded in
 `regedit-audit.md`.
+
+## 14. 0.2.0 additions for the policy setting dialog (U1b)
+
+The Local Group Policy Editor needs four things the regedit dialogs do not have: a resizable modal dialog, text from
+ADML templates shown literally, a numeric spin box, and an editable list grid for "Show Contents". Each is opt-in.
+No existing dialog declares any of them, so the regedit Dialogs suite is the regression guard for everything below.
+The E2E tests are `tests/Bwc.E2E/Dialogs/ClassicDialogAdditionsTests.cs`. They run the controls in host dialogs that
+exist only in the E2E flavor (`E2EDialogHost`, compiled under `BWC_E2E`, started by the environment variable
+`BWC_E2E_DIALOG_HOST` in a head process). Each host dialog writes a JSON report (`BWC_E2E_DIALOG_HOST_REPORT`) that the
+test reads after the dialog has closed.
+
+### 14.1 Resizable flag leaks into existing dialogs
+
+Failure mode: the presenter hook makes every dialog resizable, or a default changes, and a regedit dialog gets a sizing
+border (the outer size changes, so every geometry check moves). Guard: `ModalDialogWindow` asks a virtual
+`IsResizableDialog`, false by default; `ClassicDialogDefinition.Resizable` is false by default; only a definition that
+sets it turns it on. E2E: the regedit Dialogs suite is unchanged and green, and `Additions_FixedDialogHasNoSizingBorder`
+checks that a template dialog without the flag has no `WS_THICKFRAME`.
+
+### 14.2 A resizable dialog can be dragged below its minimum
+
+Failure mode: the user shrinks the dialog until controls overlap or the buttons are clipped. WinUI has no minimum size
+on the presenter. Guard: a window subclass answers `WM_GETMINMAXINFO`. The minimum is the client size in DLU converted at
+the window's current DPI, plus the non-client frame read from the window at that moment, so it is right at 100, 150 and
+200 percent and again after the dialog moves to a monitor with another DPI. `MinWidthDlu` or `MinHeightDlu` of 0 means
+the template size. E2E: `Additions_ResizableDialogHonorsMinimumAndGrows` drags the corner far inside the minimum and
+checks the client size is the minimum, then drags it outward and checks the client grew and the anchored controls followed.
+
+### 14.3 The subclass outlives the window, or leaks
+
+Failure mode: a window subclass that is never removed keeps a pinned GCHandle, a message reaches a freed handle after
+close and crashes the host, or a dialog that fails to show leaves the subclass installed. Guard: the subclass is
+installed only after `ApplySizeAndPosition` succeeded, removed in `OnClosed` and in `AbandonShow`, and the handle is freed
+once. The callback catches every exception and falls through to `DefSubclassProc`, so an error never unwinds into native
+code. E2E: the resizable host is opened twice, closed once by OK and once by Escape, and the process must still be
+running and respond afterward.
+
+### 14.4 Content does not follow the window
+
+Failure mode: the window grows but the canvas keeps the template size, so the face color stops at the old edge and controls
+stay where they were. Guard: for a resizable template the canvas takes the size of the root on every size change and
+`OnClientResized` is raised so the dialog can move its controls. A dialog that does not override it keeps the template
+layout and still paints the whole client area. E2E: the host anchors OK and Cancel to the bottom right and stretches the
+text box; the test compares the positions before and after the drag.
+
+### 14.5 Resizable dialog opens at the wrong size or is maximizable
+
+Failure mode: turning the sizing border on changes the frame, so the client size no longer equals the template, or the
+maximize and minimize boxes appear. Guard: the presenter keeps `IsMaximizable` and `IsMinimizable` false and the client is
+sized with `ResizeClient` after the presenter is set, as for the fixed dialogs. E2E: the resizable host is checked for the
+template client size at open and for the absence of `WS_MAXIMIZEBOX` and `WS_MINIMIZEBOX`.
+
+### 14.6 ADML text with an ampersand becomes a mnemonic
+
+Failure mode: a policy name such as "Allow R&D access" is parsed as Win32 mnemonic text. The ampersand disappears, a
+letter is underlined under Alt, Alt+letter activates the control, and a second text with the same letter makes the dialog
+throw "The mnemonic ... is used by both". Guard: `ClassicControlDefinition.LiteralText` (default false). A literal control
+gets `ClassicMnemonicText.Literal`, whose text is the source unchanged, with no access key and no entry in the mnemonic
+table, so there is no duplicate check. UI Automation names use the same text. Group box captions already do not parse the
+marker. Default behavior is unchanged: a non-literal control still removes the marker, still underlines under Alt and
+still throws on a duplicate. E2E: `Additions_LiteralTextKeepsAmpersand` checks that the UI Automation names keep `&` for
+literal controls whose would-be letters collide (no throw), that Alt+letter does not invoke the literal button, that a
+non-literal control in the same dialog keeps its mnemonic, and that two non-literal controls with one letter still throw
+(the host reports the exception).
+
+### 14.7 Literal text mixed up with the double ampersand
+
+Failure mode: a literal "A && B" is shown as "A & B" because the escape is still applied, or a trailing "&" is dropped as
+Win32 drops it. Guard: literal text is not scanned at all. Two ampersands stay two, and a trailing one stays. E2E: the
+literal host label is "Fish && Chips &" and the test expects exactly that text.
+
+### 14.8 Spin box range and keys
+
+Failure mode: Up past the maximum wraps or overflows, Down below the minimum goes negative, a step larger than the range
+jumps outside it, or a value near the `long` limits overflows when the step is added. Guard: the new value is
+`Clamp((Int128)current + step, min, max)` where current is the parsed text clamped to the range, and the constructor
+rejects `min > max` and `step <= 0`. Up and Down on the text box change the value by one step. Page Up and Page Down are not
+handled (they do not move a Win32 up-down). Typing never clamps. E2E: `Additions_SpinnerRangeKeysAndText` runs Up and Down
+from the middle, at the maximum, at the minimum, and with a step of 5 from a value that is not a multiple of 5.
+
+### 14.9 Typed text the spin box refuses to hold
+
+Failure mode: the spin box rewrites what the user typed (clamps 5000 to 100, strips letters, pads zeros), so the caller can
+never show its own validation message, or `TryGetValue` throws on text that is not a number. Guard: typed text is kept
+exactly. `Text` returns it, `TryGetValue` is false for empty, non-numeric or out-of-range text and never throws, and the
+caller decides what to do. A key or button press on unparsable text starts from the last valid value. E2E: the test types
+"abc" and "5000", reads `Text` back unchanged, reads `TryGetValue` from the report, and presses Up from "abc".
+
+### 14.10 Spin box parts take the tab stop or the focus
+
+Failure mode: the two buttons are tab stops, so Tab visits three stops per spin box, or a click on a button moves focus off
+the text. Guard: the buttons are not tab stops and a click returns focus to the text box. The text box is the focus target
+of the hosted control, so the dialog's Tab order, Enter, Escape and Alt handling see one stop for the spin box. E2E: the tab
+sequence of the spinner host lists each spin box once, and the Up button invoked through UI Automation leaves focus on the
+text.
+
+### 14.11 Spin box has no name or value for a screen reader
+
+Failure mode: the control shows as an unnamed group with two unnamed buttons. Guard: the control has an automation peer of
+type Spinner with the name from the definition, `RangeValue` (value, minimum, maximum, step) and `Value` (the text); the
+text box has the id `<id>.Text`, and the buttons are named "Increase" and "Decrease" with the ids `<id>.Up` and `<id>.Down`.
+E2E: the test reads the name, range and value through UI Automation.
+
+### 14.12 Spin box metrics differ from the other classic controls
+
+Failure mode: the control is taller than its template rectangle (padding, a border drawn outside), uses Fluent text box
+metrics, or the text is clipped by the buttons. Guard: the spin box takes the template rectangle like every other control,
+draws its 1 DIP frame inside it, uses the dialog font, and the buttons take a fixed 15 DIP column inside the frame. E2E:
+`CheckGeometry` compares the control rectangles with MapDialogRect for the spinner host template.
+
+### 14.13 Focus mapping breaks for a control whose focus is inside it
+
+Failure mode: the dialog finds the focused control by comparing the focused element with the hosted element. A spin box or a
+grid focuses an inner element, so the comparison fails, Tab restarts from the first stop, or Enter never reaches the default
+button. Guard: the hosted control has a focus target and recognizes focus inside it. Only the new kinds use that (for the
+others the target is the element itself and the old comparison runs unchanged), so existing dialogs behave as before. E2E:
+the tab sequence of both new hosts goes through the new controls in template order.
+
+### 14.14 Grid: adding a row
+
+Failure mode: there is no empty row to type into, a new row appears only after Enter and the typed text is lost, or two empty
+rows accumulate. Guard: the grid always ends with exactly one empty row. When the user types into it the row becomes a real
+row on the first character and a new empty row is appended in the same step, with the focus unmoved. `SetRows` also ends
+with the empty row. E2E: `Additions_EditableGridTwoColumns` and `Additions_EditableGridOneColumn` type into the last row and
+read the rows from the report.
+
+### 14.15 Grid: Delete removes the wrong thing
+
+Failure mode: Delete while editing deletes the row instead of a character, deletes the empty row, or leaves the focus on a
+removed cell. Guard: Delete removes the row only when the focused cell is not being edited and the row is a real row. While
+editing, and on the empty row, Delete is a character delete. After a row is removed the focus goes to the same index (the
+next row, or the empty row). E2E: Delete on a focused cell removes exactly that row and the next row is focused.
+
+### 14.16 Grid: edit state leaks
+
+Failure mode: a cell stays editable after focus leaves it, so typed keys go to two cells; Escape closes the dialog instead of
+cancelling the edit; or Enter in an edit presses OK. Guard: only one cell is editing at a time. Enter commits and moves to
+the next column, Escape reverts the cell and is consumed when it ends an edit (it reaches the dialog only when no edit is
+open), losing focus commits, and a row whose cells are all empty after a commit is removed. Enter that is not in an edit goes
+to the dialog (default button). E2E: Escape in an edit keeps the dialog open and the old text.
+
+### 14.17 Grid: keyboard navigation and typing
+
+Failure mode: arrows are swallowed by the text box so the cell cannot change, a printable key on a cell that is not being
+edited is dropped, or F2 does not enter an edit. Guard: Up and Down move to the same column of the previous or next row
+(committing an edit first), Left and Right move between columns when not editing, and in an edit only at the start or the end
+of the text. F2, a double click, or a printable key enters an edit (F2 and the double click select all, a printable key
+replaces the text). Tab leaves the grid. E2E: the two-column test uses Up, Down, Left, Right, F2, typing, Enter, Delete and
+Escape.
+
+### 14.18 Grid: names and ids per cell
+
+Failure mode: a screen reader reads cells as unnamed edits, or the ids change after a row is removed so a test hits another
+cell. Guard: every cell has the id `<id>.R<row>C<col>` (zero based) and the name "<column title>, row <n>" ("new row" for the
+empty one). The ids are renumbered after a row is added or removed. The grid has the id and name of its definition and the
+header row has the column titles. E2E: the test reads the names and ids of the cells before and after a delete.
+
+### 14.19 Grid: one column and two columns
+
+Failure mode: a one-column grid draws an empty second column, or a two-column grid gives the value column the whole width.
+Guard: the column count is the number of titles in the definition (1 or 2; anything else throws at construction) and columns
+share the width equally; the header shows each title. E2E: a one-column host ("Value") and a two-column host ("Value name",
+"Value").
+
+### 14.20 Host process and reports
+
+Failure mode: the E2E host hook starts in a ship build or in a process that did not ask for it, or the report is read before
+the dialog closed. Guard: the whole host is compiled only under `BWC_E2E`; it starts only when `BWC_E2E_DIALOG_HOST` names a
+scenario, and an unknown name or a startup exception is written to the report as a failed state, which the test turns into a
+failed check. The test reads the report only after the dialog is gone from the screen.

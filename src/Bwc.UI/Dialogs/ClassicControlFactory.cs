@@ -40,6 +40,39 @@ internal sealed class ClassicHostedControl
     /// <summary>Position in template order. Tab order and mnemonic fallbacks use it.</summary>
     internal int Index { get; set; }
 
+    /// <summary>
+    /// The element that takes keyboard focus for this control. It is <see cref="Element"/> unless the control focuses a
+    /// part inside itself (the spin box text, the current grid cell).
+    /// </summary>
+    internal FrameworkElement FocusTarget => (Element as IClassicFocusHost)?.FocusTarget ?? Element;
+
+    /// <summary>
+    /// True when <paramref name="focused"/> is this control. For a control with an inner focus target it is also true for
+    /// anything inside the control; every other control keeps the exact reference comparison.
+    /// </summary>
+    internal bool OwnsFocus(object? focused)
+    {
+        if (ReferenceEquals(Element, focused))
+        {
+            return true;
+        }
+
+        if (Element is not IClassicFocusHost || focused is not DependencyObject node)
+        {
+            return false;
+        }
+
+        for (DependencyObject? current = node; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (ReferenceEquals(current, Element))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>Shows or hides the access-key underline.</summary>
     internal void RenderMnemonic(bool cue)
     {
@@ -166,6 +199,19 @@ internal static class ClassicControlFactory
                 element = columns;
                 break;
 
+            case ClassicControlKind.Spinner:
+                var spin = new ClassicSpinBox(definition.Minimum, definition.Maximum, definition.Step, font, styles);
+                spin.SetIdentity(definition.AutomationId, name);
+                spin.SetTabStop(definition.TabStop);
+                element = spin;
+                break;
+
+            case ClassicControlKind.EditableGrid:
+                var grid = new ClassicEditableGrid(definition.Columns, font, styles);
+                grid.SetIdentity(definition.AutomationId, name);
+                element = grid;
+                break;
+
             case ClassicControlKind.ComboBox:
                 element = new ComboBox
                 {
@@ -250,6 +296,16 @@ internal static class ClassicControlFactory
 
     internal static Style? StyleOf(ResourceDictionary styles, string key) =>
         styles.TryGetValue(key, out object? value) ? value as Style : null;
+}
+
+/// <summary>
+/// A hosted control that focuses a part inside itself. The dialog focuses <see cref="FocusTarget"/> for Tab and mnemonics,
+/// and treats focus anywhere inside the control as the control having focus.
+/// </summary>
+internal interface IClassicFocusHost
+{
+    /// <summary>The element to focus: the text box of a spin box, the current cell of a grid.</summary>
+    FrameworkElement FocusTarget { get; }
 }
 
 /// <summary>A check box. In the E2E flavor it publishes the position of its glyph for the geometry checks.</summary>
