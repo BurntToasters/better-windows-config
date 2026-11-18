@@ -53,6 +53,7 @@ public sealed class WindowsUpdateProcessHost : IUpdateProcessHost
         {
             UseShellExecute = false,
             WorkingDirectory = Environment.SystemDirectory,
+            CreateNoWindow = true,
         };
         psi.ArgumentList.Add("--apply-elevated");
         psi.ArgumentList.Add(stagingFolder);
@@ -60,10 +61,13 @@ public sealed class WindowsUpdateProcessHost : IUpdateProcessHost
         return ElevatedStart.Started;
 #else
         // The runas verb makes Windows show its consent prompt. This process never elevates itself.
+        // The helper is a console program: WindowStyle Hidden passes SW_HIDE, so its console starts hidden and no
+        // stray console window is shown during the apply. The consent prompt is not affected by this.
         var psi = new ProcessStartInfo(helperExe)
         {
             UseShellExecute = true,
             Verb = "runas",
+            WindowStyle = ProcessWindowStyle.Hidden,
             WorkingDirectory = Environment.SystemDirectory,
         };
         psi.ArgumentList.Add("--apply-elevated");
