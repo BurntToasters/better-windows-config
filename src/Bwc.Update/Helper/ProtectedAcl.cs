@@ -31,15 +31,23 @@ public sealed class ProtectedAcl
     private static readonly SecurityIdentifier TrustedInstaller =
         new("S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464");
 
-    private ProtectedAcl(SecurityIdentifier owner, IReadOnlyList<SecurityIdentifier> fullControl, IReadOnlyList<SecurityIdentifier> trustedWriters)
+    private ProtectedAcl(
+        SecurityIdentifier owner,
+        IReadOnlyList<SecurityIdentifier> trustedOwners,
+        IReadOnlyList<SecurityIdentifier> fullControl,
+        IReadOnlyList<SecurityIdentifier> trustedWriters)
     {
         Owner = owner;
+        TrustedOwners = trustedOwners;
         FullControl = fullControl;
         TrustedWriters = trustedWriters;
     }
 
-    /// <summary>The owner a new folder gets. An existing folder must be owned by this SID or by SYSTEM.</summary>
+    /// <summary>The owner a new folder gets.</summary>
     public SecurityIdentifier Owner { get; }
+
+    /// <summary>The owners an existing folder may have, besides SYSTEM. Always includes <see cref="Owner"/>.</summary>
+    public IReadOnlyList<SecurityIdentifier> TrustedOwners { get; }
 
     /// <summary>The only entries of a new DACL.</summary>
     public IReadOnlyList<SecurityIdentifier> FullControl { get; }
@@ -52,25 +60,27 @@ public sealed class ProtectedAcl
     {
         var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
         var administrators = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
-        return new ProtectedAcl(administrators, [system, administrators], [system, administrators, TrustedInstaller]);
+        return new ProtectedAcl(administrators, [administrators], [system, administrators], [system, administrators, TrustedInstaller]);
     }
 
     /// <summary>
     /// The same rules with the current user in place of Administrators. E2E sandbox and tests only. A sandbox folder that
-    /// was created under the user's temp folder inherits an Administrators entry, so an existing one may carry it.
+    /// was created under the user's temp folder inherits an Administrators entry, so an existing one may carry it. An
+    /// existing folder may also be owned by Administrators, because an elevated process (the release gate, the elevated
+    /// runner) creates folders with that owner. Administrators may already write here, so this trusts no one new.
     /// </summary>
     public static ProtectedAcl ForCurrentUser()
     {
         var user = WindowsIdentity.GetCurrent().User ?? throw new InvalidOperationException("the current user has no SID");
         var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
         var administrators = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
-        return new ProtectedAcl(user, [system, user], [system, user, administrators]);
+        return new ProtectedAcl(user, [user, administrators], [system, user], [system, user, administrators]);
     }
 
-    /// <summary>The owners an existing folder may have: <see cref="Owner"/> and SYSTEM.</summary>
+    /// <summary>The owners an existing folder may have: <see cref="TrustedOwners"/> and SYSTEM.</summary>
     public bool IsTrustedOwner(SecurityIdentifier? owner) =>
         owner is not null
-        && (owner.Equals(Owner) || owner.IsWellKnown(WellKnownSidType.LocalSystemSid));
+        && (TrustedOwners.Contains(owner) || owner.IsWellKnown(WellKnownSidType.LocalSystemSid));
 
     /// <summary>A security descriptor for a new folder: owner, one full-control entry per principal, inheritance off.</summary>
     public DirectorySecurity NewSecurity()
@@ -113,7 +123,7 @@ public sealed class ProtectedAcl
 
         if (!IsTrustedOwner(owner))
         {
-            return "the owner is " + (owner?.Value ?? "unknown") + ", not an administrator";
+            return "the owner is " + (owner?.Value ?? "unknown") + ", not a trusted owner";
         }
 
         foreach (FileSystemAccessRule rule in rules)
