@@ -131,6 +131,12 @@ public sealed class RegistryCopyStateTests
             using RemoteRegistryConnection connection = RoutedLoopback();
             RegistryStore store = connection.CreateStore(new RunRootPolicy(runRoot));
 
+            // An elevated token creates keys owned by Administrators, not the user, so the expected owner is read
+            // from the source rather than assumed.
+            string? sourceOwner = new RawSecurityDescriptor(
+                store.Reader.GetKeySecurity(runRoot.Append("Source"), RegistrySecurityInformation.Owner), 0).Owner?.Value;
+            Assert.IsNotNull(sourceOwner, "The source key has no owner.");
+
             store.Writer.RenameKeyByCopy(runRoot.Append("Source"), "Dst");
 
             RegistryPath destination = runRoot.Append("Dst");
@@ -139,7 +145,7 @@ public sealed class RegistryCopyStateTests
 
             var owner = new RawSecurityDescriptor(store.Reader.GetKeySecurity(destination, RegistrySecurityInformation.Owner), 0);
             Assert.IsNotNull(owner.Owner, "The copied key has no owner.");
-            Assert.AreEqual(CurrentSid(), owner.Owner.Value, "The owner must be the current user, as the source is.");
+            Assert.AreEqual(sourceOwner, owner.Owner.Value, "The owner must be the source's owner.");
         }
         finally
         {

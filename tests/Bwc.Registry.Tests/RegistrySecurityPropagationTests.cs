@@ -362,11 +362,19 @@ public sealed class RegistrySecurityPropagationTests
     /// <summary>
     /// The owner walk changes only the owner. A child that denies WRITE_OWNER to the current user fails, and the walk
     /// still reaches the children below it and the sibling. The owner keeps WRITE_DAC, so the cleanup can restore the
-    /// child's DACL. See docs/failure-modes/permissions.md section 35.
+    /// child's DACL. See docs/failure-modes/permissions.md section 35. An elevated token holds
+    /// SeTakeOwnershipPrivilege, which the walk turns on and which overrides the WRITE_OWNER deny, so the denied path
+    /// can only be observed unelevated.
     /// </summary>
     [TestMethod]
     public void OwnerRecursionContinuesPastADeniedChild()
     {
+        if (IsElevated())
+        {
+            Assert.Inconclusive(
+                "Elevated: SeTakeOwnershipPrivilege overrides the WRITE_OWNER deny, so the denied child cannot be observed.");
+        }
+
         string runId = NewRunId();
         string top = TopOf(runId);
         string tree = top + @"\Tree";
