@@ -217,6 +217,21 @@ const policyPathAllowlist = new Map([
   ["tools/Bwc.Oracle.Capture/Gpedit/Probe/**", oracleCaptureReason],
 ]);
 
+// Protected-scope writes that are allowed, by file. Unlike the whole-file allowlists above, an entry names one exact hit
+// label, the most hits of that label the file may have, and why. A hit of any other label in the file is still a
+// violation, and so is every hit of the label beyond the maximum.
+const countedWriteAllowlist = new Map([
+  [
+    "src/Bwc.Gpedit/GpeditRootView.Editor.cs",
+    {
+      label: ".Save over a path",
+      max: 1,
+      reason:
+        "Bwc.Core.SettingsStore<T>.Save writes the editor's view settings (window, tree width, columns, view mode, tab) to settings.json in the BWC data root. It never reaches the GPO folder or a template folder.",
+    },
+  ],
+]);
+
 // Files that name a refresh API, a policy tool, or a policy COM name without calling it. Each entry says what the
 // literal is.
 const refreshNameAllowlist = new Map([
@@ -227,13 +242,18 @@ const refreshNameAllowlist = new Map([
 ]);
 const launchAllowlist = new Map([]);
 
+function countedUsage() {
+  return [...countedWriteAllowlist].map(([file, entry]) => `${file}: ${entry.label} x${entry.max}`).join("; ");
+}
+
 const usage = `Usage: node scripts/check-policy-writer.js [options]
 
 Scans every .cs, NativeMethods.txt, .ps1, .js, .mjs, and .cjs file under src/, tests/, tools/, and scripts/
 (skipping bin/, obj/, and node_modules/). Fails when:
   - a file-write API appears in src/Bwc.Gpo, Bwc.Policy, Bwc.Gpedit, Bwc.Gpedit.Editor, or Bwc.Gpedit.App outside
     ${gpoWriterFile}
-    and ${templateWriterFile},
+    and ${templateWriterFile}, except the counted allowlist: one named hit label, at most N times, in one named file
+    (${countedUsage()}); any other hit in that file, or one more of that label, still fails,
   - a file-write API shares a file with a GroupPolicy, PolicyDefinitions, Registry.pol, gpt.ini, or comment.cmtx
     literal and the file is not allowlisted,
   - RefreshPolicy, RefreshPolicyEx, ForceSyncFgPolicy, the critical section calls, or IGroupPolicyObject
@@ -802,7 +822,15 @@ function scanSource(relative, source, violations) {
   }
 
   if (inProtected && !isWriter) {
+    // A counted allowance covers the first max hits of its one label; every other hit is reported.
+    const counted = countedWriteAllowlist.get(relative);
+    let allowedLeft = counted?.max ?? 0;
     for (const hit of writes) {
+      if (counted !== undefined && !hit.native && hit.detail === counted.label && allowedLeft > 0) {
+        allowedLeft -= 1;
+        continue;
+      }
+
       addViolation(
         violations,
         relative,
@@ -1494,12 +1522,92 @@ function runSelfTest() {
       }
     }
 
+    runCountedAllowlistSelfTest();
+
     console.log(
       `check-policy-writer self-test: ${expectedFragments.length + 2} fixture violations detected across C#, NativeMethods.txt, script, and tool files; comments, prose, read-only opens, the named writers, the oracle capture, and the adjacent NativeMethods.txt passed.`,
     );
     return 0;
   } finally {
     rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+}
+
+// The counted allowlist cases. Each case runs on its own tree, because the allowlisted file is a real path.
+// (a) one allowed call passes, (b) a second call fails, (c) another write API in the file fails and the allowed call does
+// not, (d) the same call in another protected file fails.
+function runCountedAllowlistSelfTest() {
+  const [allowedFile] = [...countedWriteAllowlist.keys()];
+  const save = "    internal static void M(object x, Store s) => s.Save(x);";
+  const saveAgain = "    internal static void N(object x, Store s) => s.Save(x);";
+  const cases = [
+    {
+      name: "(a) the allowlisted file with exactly one .Save(x)",
+      files: { [allowedFile]: ["internal static class A", "{", save, "}"] },
+      exit: 0,
+      expected: [],
+      forbidden: [allowedFile],
+    },
+    {
+      name: "(b) the allowlisted file with two .Save(x) calls",
+      files: { [allowedFile]: ["internal static class A", "{", save, saveAgain, "}"] },
+      exit: 1,
+      expected: [`${allowedFile}:4: protected-write: .Save over a path`],
+      forbidden: [`${allowedFile}:3:`],
+    },
+    {
+      name: "(c) the allowlisted file with one .Save(x) and File.WriteAllText",
+      files: {
+        [allowedFile]: [
+          "internal static class A",
+          "{",
+          save,
+          '    internal static void N(string p) => File.WriteAllText(p, "x");',
+          "}",
+        ],
+      },
+      exit: 1,
+      expected: [`${allowedFile}:4: protected-write: File.WriteAllText`],
+      forbidden: [`${allowedFile}:3:`],
+    },
+    {
+      name: "(d) another protected file with .Save(x)",
+      files: { "src/Bwc.Gpedit/Other.cs": ["internal static class B", "{", save, "}"] },
+      exit: 1,
+      expected: ["src/Bwc.Gpedit/Other.cs:3: protected-write: .Save over a path"],
+      forbidden: [],
+    },
+  ];
+
+  for (const testCase of cases) {
+    const root = mkdtempSync(path.join(tmpdir(), "bwc-policy-writer-counted-"));
+    try {
+      for (const [relative, lines] of Object.entries(testCase.files)) {
+        writeFixture(root, relative, lines);
+      }
+
+      const result = spawnSync(process.execPath, [scriptPath, "--root", root], { encoding: "utf8" });
+      const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+      if (result.status !== testCase.exit) {
+        throw new Error(
+          `Self-test case ${testCase.name} expected exit code ${testCase.exit} but got ${result.status}.\n${output}`,
+        );
+      }
+
+      for (const fragment of testCase.expected) {
+        if (!output.includes(fragment)) {
+          throw new Error(`Self-test case ${testCase.name} did not report "${fragment}".\n${output}`);
+        }
+      }
+
+      for (const fragment of testCase.forbidden) {
+        if (output.includes(fragment)) {
+          throw new Error(`Self-test case ${testCase.name} reported "${fragment}", which must pass.\n${output}`);
+        }
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 }
 

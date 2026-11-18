@@ -96,6 +96,8 @@ internal sealed class ShellRun : IDisposable
             environment[pair.Key] = pair.Value;
         }
 
+        // The Console_* tests drive the placeholder frame host of the editor (GpeditRootView.E2EFrame.cs), not the real tree.
+        environment["BWC_E2E_GPEDIT_HOST"] = "console-frame";
         if (extraEnvironment is not null)
         {
             foreach (KeyValuePair<string, string> pair in extraEnvironment)
