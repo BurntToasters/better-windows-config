@@ -35,6 +35,12 @@ const REPO_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const RIDS = Object.freeze(["win-x64", "win-arm64"]);
 const MIRROR_STEP = "release:mirror";
 const CLEAN_STEP = "release:clean";
+/**
+ * The first release on the v2 feed (bwc-stable-v2.json). No earlier release publishes that file, so the live client
+ * rehearsal has no feed to check before this version ships and is left out for it alone. Every later version runs it.
+ * After publishing this version, run `npm run release:rehearse:client` once by hand.
+ */
+export const FIRST_V2_FEED_VERSION = "0.1.2";
 // The signed expiry of a release manifest, in hours (one year). Installed copies refuse an expired feed, and
 // releases are not re-signed between versions, so a short expiry would break update checks for everyone.
 export const RELEASE_EXPIRES_HOURS = 8760;
@@ -157,8 +163,9 @@ export function releaseSteps(mode, { version, env = process.env, from = null }) 
   const build = [
     { name: "build:win:x64", args: [] },
     { name: "build:win:arm64", args: [] },
-    // The shipped client checks the live feed before any paid signing step runs.
-    { name: "release:rehearse:client", args: [] },
+    // The shipped client checks the live feed before any paid signing step runs. The first v2 release has no live
+    // v2 feed to check yet (FIRST_V2_FEED_VERSION).
+    ...(version === FIRST_V2_FEED_VERSION ? [] : [{ name: "release:rehearse:client", args: [] }]),
     { name: "installer:x64", args: [] },
     { name: "installer:arm64", args: [] },
     {

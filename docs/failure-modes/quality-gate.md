@@ -151,6 +151,10 @@ artifact viewer. Do not compare raw paths across platforms.
 and then `--download` against the live stable feed. It writes
 `artifacts/release/client-live/result.json`. Written before the code, per AGENTS.md.
 
+`release:win:continue` leaves this step out for `FIRST_V2_FEED_VERSION` (0.1.2) only. It is the first release that
+publishes `bwc-stable-v2.json`, so before it ships the live feed returns 404 (C4) and there is nothing to check. Run
+`npm run release:rehearse:client` by hand once that release is published. Every later version runs the step as usual.
+
 | ID | Case | Risk | Required result |
 |----|------|------|-----------------|
 | C1 | `publish/<rid>/BwcUpdate.exe` missing | A rehearsal passes on a tree that was never built | Refuse `binary-missing` before any network call. Exit 3. |
