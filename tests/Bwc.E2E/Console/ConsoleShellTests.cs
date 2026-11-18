@@ -351,7 +351,16 @@ public sealed class ConsoleShellTests
         _ = ShellRun.WaitUntil(() => ExpandState(view) != ExpandCollapseState.Expanded);
 
         // A host entry with the letter of Exit wins it: Alt+F then X runs the host's entry and the window stays open.
-        run.ClickTreeNode(ComputerNode);
+        // The second Escape above already gave the focus back to the tree. A mouse click here would race the chord: the
+        // window hook sees Alt+F at once, while the click reaches XAML late and dismisses the popup the chord just opened
+        // (docs/failure-modes/menus.md, "A late pointer press closes a popup the keyboard opened"). So the test waits for
+        // the tree focus and clicks only when it is not there.
+        if (!ShellRun.WaitUntil(() => run.FocusedPane() == "tree", TimeSpan.FromSeconds(3)))
+        {
+            run.ClickTreeNode(ComputerNode);
+            Thread.Sleep(TimeSpan.FromSeconds(2));
+        }
+
         run.Chord(RawKeyboard.Alt, ShellRun.VkF);
         AutomationElement? file = run.Find("MenuCommand_59001");
         bool fileOpen = ShellRun.WaitUntil(() => ExpandState(file) == ExpandCollapseState.Expanded);

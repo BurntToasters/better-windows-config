@@ -513,6 +513,7 @@ public sealed unsafe class ClassicMenuKeyboard : IDisposable
         // automation opened the popup, so it cannot name the popup that must close.
         MenuBarItem? open = OpenTopLevelItem();
         _mode = Mode.Idle;
+        Control? returnFocus = _savedFocus as Control;
         _savedFocus = null;
         ClassicMenuState.ShowMnemonics = false;
         if (open is not null && PeerOf(open) is IExpandCollapseProvider provider)
@@ -523,7 +524,14 @@ public sealed unsafe class ClassicMenuKeyboard : IDisposable
         Publish();
         if (MenuItemActions.TryGet(item, out Action action))
         {
-            _ = item.DispatcherQueue.TryEnqueue(() => action());
+            // The focus goes back to the element that had it before the bar was entered, as Win32 does after a command and
+            // as Deactivate does for Escape. It is set in the queued task, after the popup has closed (closing puts the
+            // focus on the menu bar item), and before the action, so a command that sets its own focus still wins.
+            _ = item.DispatcherQueue.TryEnqueue(() =>
+            {
+                _ = returnFocus?.Focus(FocusState.Programmatic);
+                action();
+            });
         }
     }
 

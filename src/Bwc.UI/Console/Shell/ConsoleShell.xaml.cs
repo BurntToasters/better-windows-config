@@ -137,6 +137,13 @@ public sealed partial class ConsoleShell : UserControl
     /// </summary>
     public Control? ResultFocusTarget { get; set; }
 
+    /// <summary>
+    /// A hook for Tab and Shift+Tab while the focus is inside the result pane: the argument is true for Tab. The handler
+    /// moves the focus to another stop of its own content and returns true, or returns false and the shell cycles to the
+    /// next pane as usual. F6 and Shift+F6 always cycle the panes. Null (the default) leaves Tab to the pane cycle.
+    /// </summary>
+    public Func<bool, bool>? ResultPaneTabHandler { get; set; }
+
     /// <summary>The text of the status bar pane. Kept while the bar is hidden.</summary>
     public string StatusText
     {
@@ -620,6 +627,12 @@ public sealed partial class ConsoleShell : UserControl
         bool alt = IsDown(VirtualKey.Menu);
         bool shift = IsDown(VirtualKey.Shift);
         bool control = IsDown(VirtualKey.Control);
+        if (e.Key == VirtualKey.Tab && !alt && !control && FocusedPane == ConsolePane.Result && ResultPaneTabHandler is { } resultTab && resultTab(!shift))
+        {
+            e.Handled = true;
+            return;
+        }
+
         switch (e.Key)
         {
             case VirtualKey.Escape when _splitterDragging:

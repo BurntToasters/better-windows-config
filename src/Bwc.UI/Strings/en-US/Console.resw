@@ -145,4 +145,38 @@
   <data name="ConsoleListSortedDescending" xml:space="preserve">
     <value>Sorted descending</value>
   </data>
+  <!-- Probe gpedit (artifacts/oracle/gpedit/probe.json, step result-list): the tab names of the result pane, the short labels of the classic tab strip. -->
+  <data name="ConsoleExtendedTabExtended" xml:space="preserve">
+    <value>Extended</value>
+  </data>
+  <data name="ConsoleExtendedTabStandard" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <!-- BWC label: automation name of the Extended and Standard tab strip. Classic names it with an empty string. -->
+  <data name="ConsoleExtendedTabsName" xml:space="preserve">
+    <value>Result pane view</value>
+  </data>
+  <!-- BWC label: automation name of the description pane and of its scroller. -->
+  <data name="ConsoleDescriptionPaneName" xml:space="preserve">
+    <value>Description pane</value>
+  </data>
+  <data name="ConsoleDescriptionScrollName" xml:space="preserve">
+    <value>Description text</value>
+  </data>
+  <!-- The link label quoted in the plan (U2c): the link of the description pane of a policy. A host passes it in its model. -->
+  <data name="ConsoleExtendedEditPolicyLink" xml:space="preserve">
+    <value>Edit policy setting</value>
+  </data>
+  <!-- BWC wording: the heading of the first section of a policy description (probe: the string 247 of admtmpl.dll carries a colon and markup; this is the plain label). -->
+  <data name="ConsoleDescriptionRequirements" xml:space="preserve">
+    <value>Requirements</value>
+  </data>
+  <!-- BWC wording: the heading of the help text section of a policy description. -->
+  <data name="ConsoleDescriptionHelpHeading" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <!-- BWC wording: the hint shown in the description pane when no item is selected. -->
+  <data name="ConsoleDescriptionNoSelectionHint" xml:space="preserve">
+    <value>Select an item to see its description.</value>
+  </data>
 </root>

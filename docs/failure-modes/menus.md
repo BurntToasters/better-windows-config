@@ -281,3 +281,97 @@ A tool whose `App.xaml` does not merge `Dense.xaml` gets default Fluent menus wi
 
 Rule: the builder applies nothing when a style is missing, as before, and the Gpedit head merges the shared theme in
 its own App.xaml (manager-owned). The gpedit E2E menu checks catch a missing style by the item height.
+
+## 0.2.0: action lookup by item identity (found in the console list work)
+
+Scope: `MenuItemActions` in `src/Bwc.UI/Menu/`, the registry that the menu keyboard uses to run a leaf's command for a
+mnemonic letter, and the focus after such a command. Every host is affected (regedit, the hub, the console host), so the
+fix is in the shared code.
+
+### The managed wrapper of a menu item is not the object the menu hands out later
+
+Failure mode: the registry keyed each action by the `MenuFlyoutItem` in a `ConditionalWeakTable`. A WinUI item has a
+managed wrapper and a native object; the popup's item collection owns the native one. The keyboard finds an item by
+walking `flyout.Items`, which returns whatever wrapper the projection holds for the native item at that moment. When that
+is not the object that registered, the table finds no action, and the access key closes the popup and runs nothing. A
+click still works because the `Click` handler is held by the native event source. The console host saw it with radio items
+and worked around it by keeping every item in a list.
+
+Measured (menu5 run, before the fix, `BWC_E2E_MENU_GC`): after a forced `GC.Collect`, `GC.WaitForPendingFinalizers` and
+`GC.Collect`, 3 of 10 enabled leaves still found their action by the lookup the keyboard uses, although all 10 wrappers
+that had registered an action were still alive (a weak reference to each said so). So the failure is an identity
+mismatch between the wrapper that registered and the wrapper the menu returns later, which a collection of the first one
+(the original diagnosis) would also cause. Which three resolved was not recorded; the three check items, which are a
+managed subclass, are the likely ones (not measured).
+
+- Handling: the action is stored on the item itself as the value of an attached dependency property (`MenuItemActions.
+  ActionProperty`), in a small holder object. The value lives in the native object's property store, so any wrapper of the
+  item reads it, whatever wrapper registered it and whether or not that wrapper is still alive. No managed table is keyed
+  by a wrapper. `Tag` is not used because the builder keeps the command id there.
+- Detector: `Menus_ActionLookupSurvivesWrapperCollection` (tests/Bwc.E2E/Menus) starts the console host with
+  `BWC_E2E_MENU_GC` (e2e flavor only), which adds a View entry and a File entry. The View entry removes the List radio,
+  inserts the same item again 400 ms later (a removed item stays the child of its popup until the popup has closed), runs
+  the collection above, and writes into the status bar how many leaves resolve their action before and after, and how many
+  registering wrappers were collected (`MenuItemActions.E2EWrapperCounts`, e2e flavor only). The test requires every
+  enabled leaf to resolve after the collection, then drives every view mode through Alt+V and its access key and checks
+  each mode was set. It was run against the old table first and failed (3 of 10 resolved, the view modes did not change);
+  it passes with the property.
+
+### Item removed and added again
+
+Failure mode: a leaf is removed from a popup (a dynamic list entry, a theme item) and inserted again, in the same popup or
+another. A registry keyed by the control and cleaned on removal would lose the action; a registry keyed by a command id or
+the text would run the action of another item.
+
+- Handling: the action is a property of the item, never keyed by id or text, and nothing removes it when the item leaves a
+  popup. Removing and inserting the same item keeps its action; a new item has none until it registers. A second
+  registration replaces the first (the last one wins, as `AddOrUpdate` did).
+- Detector: the same test removes and re-inserts the List radio during the collection and presses its access key after.
+
+### Two menus share an item text
+
+Failure mode: File and View each have an item with the text `S&mall Icons` (in the host seam). An access key search by text
+or one shared per-text table runs the action of the other menu.
+
+- Handling: the lookup is by the item the key resolved in the open popup, which is per control; two controls with the same
+  text hold two holders. The mnemonic search itself already looks only at the open popup (see the keyboard section).
+- Detector: the same test presses File, then M, and View, then M, and checks the File entry wrote its own status text and did
+  not change the view mode, and the View one changed the mode and did not write the File text.
+
+### Focus after a mnemonic command stays on the menu bar
+
+Failure mode: `ClassicMenuKeyboard.InvokeLeaf` ended menu mode and dropped the element that had the focus before the
+bar was activated. Escape restores that element (`Deactivate`); a command did not, so after Alt+V and an access key the
+focus stayed on the View menu bar item and the arrow keys moved between menus instead of acting on the list or tree.
+Win32 gives the focus back to the window that had it before the menu was entered, for a command and for Escape alike.
+
+- Handling: `InvokeLeaf` keeps the saved focus element, collapses the popup as before, and queues one task that first
+  focuses the saved element (programmatic focus, as `Deactivate` does) and then runs the action, so a command that sets its
+  own focus (a dialog, the address bar) still wins. A saved element that left the tree or cannot take the focus is left
+  alone (`Focus` returns false; the existing section 9 of `ui-shell.md` applies). A leaf opened by the pointer has no saved
+  element and behaves as before. The registry menu tests do not read the focus after a mnemonic command; the full regedit
+  E2E suite is the check that nothing else moved.
+- Detector: `Menus_ActionLookupSurvivesWrapperCollection` also reads the focused pane after each view mode command (it must
+  be the result pane, where the focus was before Alt+V), which the console list tests used to get from a host workaround
+  that is removed with this change.
+
+### A late pointer press closes a popup the keyboard opened
+
+Failure mode: `Console_Shell_MenuKeyboard` failed intermittently at `altFOpensFile` ("File expand state after Alt+F=Collapsed").
+The test clicked a tree row and then pressed Alt+F within about a second. `ClassicMenuKeyboard` sees the key in the window
+hook at once, opens the File popup and the automation peer reports Expanded; the mouse click, sent a moment earlier, reaches
+the XAML input pipeline later and light-dismisses the popup. No message reaches the hooked windows when it closes, the
+bar stays in menu mode (mnemonic underlines stay visible) and a second Alt+F opens the popup normally.
+
+Measured (a 12 to 40 iteration loop of Alt+V, Esc, Esc, click the tree row, Alt+F in one running window, with a temporary
+message trace in the hook that is removed): without the click, 0 of 7 Alt+F presses failed; with the click, between 1 of 6
+and 25 of 40 failed, depending on the delay between the click and the key. The same loop run on a copy of the tree before
+this batch (HEAD 661e0f7, built separately) failed in the same way, so the race is not caused by the Extended view, the
+attached-property lookup or the focus return in `InvokeLeaf` (none of them is on this path; the loop also fails with the
+Standard tab). The exact owner of the late dismissal inside XAML was not isolated; the click being the trigger was.
+
+- Handling: product code is unchanged. A user cannot send a click and a chord a few milliseconds apart, and a popup opened
+  by the keyboard after a completed click stays open. The test no longer clicks: Escape already returns the focus to the
+  tree, so it waits for the tree focus and only clicks (then waits two seconds) when the focus is somewhere else.
+- Detector: `Console_Shell_MenuKeyboard` (`altFOpensFile`) run five times in a row with the filter
+  `Console_Shell|Console_Extended` and once inside the full suite.

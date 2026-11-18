@@ -44,6 +44,10 @@ internal sealed class ListRun : IDisposable
         var environment = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["BWC_E2E_CONSOLE_ROWS"] = rows.ToString(CultureInfo.InvariantCulture),
+
+            // The list tests measure the list across the whole result pane, so they start on the Standard tab; the
+            // Console_Extended tests ask for the Extended tab (the host's default) explicitly.
+            ["BWC_E2E_CONSOLE_TAB"] = "standard",
         };
         if (extra is not null)
         {

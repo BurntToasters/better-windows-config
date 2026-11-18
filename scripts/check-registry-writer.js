@@ -150,6 +150,10 @@ const sandboxedSeedReason = "Seeds through SandboxRegistry, which confines every
 // C# files that name no registry type but call SetValue or CreateSubKey. Each entry says what the receiver is.
 const unnamedCallAllowlist = new Map([
   [
+    "src/Bwc.UI/Menu/MenuItemActions.cs",
+    "Calls DependencyObject.SetValue to store a menu action on the item. No registry API is reached.",
+  ],
+  [
     "tests/Bwc.Gpo.Tests/PolWriterTests.cs",
     "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
   ],
