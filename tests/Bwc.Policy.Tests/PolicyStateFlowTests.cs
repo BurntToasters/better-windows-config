@@ -64,17 +64,16 @@ public sealed class PolicyStateFlowTests
         yield return new Sample("Pol_Enum_ItemValueList", PolicyEdit.Enabled(("ProfileChoice", C(0))));
         yield return new Sample("Pol_Enum_Required", PolicyEdit.Enabled(("RequiredChoice", C(1))));
         yield return new Sample("Pol_Enum_NoSortDefaultItem", PolicyEdit.Enabled(("UnsortedChoice", C(2))));
-        yield return new Sample("Pol_List_Plain", PolicyEdit.Enabled(("PlainList", L("a"))), DisabledReadable: false);
-        yield return new Sample("Pol_List_EmptyPrefix", PolicyEdit.Enabled(("EmptyPrefixList", L("a"))), DisabledReadable: false);
-        yield return new Sample("Pol_List_Additive", PolicyEdit.Enabled(("AdditiveList", L("a"))), DisabledReadable: false);
+        yield return new Sample("Pol_List_Plain", PolicyEdit.Enabled(("PlainList", L("a"))));
+        yield return new Sample("Pol_List_EmptyPrefix", PolicyEdit.Enabled(("EmptyPrefixList", L("a"))));
+        yield return new Sample("Pol_List_Additive", PolicyEdit.Enabled(("AdditiveList", L("a"))));
         yield return new Sample(
             "Pol_List_ExplicitValue",
-            PolicyEdit.Enabled(("ExplicitList", ElementValue.FromList(new ListEntry("n", "v")))),
-            DisabledReadable: false);
-        yield return new Sample("Pol_List_ValuePrefix", PolicyEdit.Enabled(("PrefixList", L("a"))), DisabledReadable: false);
-        yield return new Sample("Pol_List_Expandable", PolicyEdit.Enabled(("ExpandList", L("a"))), DisabledReadable: false);
+            PolicyEdit.Enabled(("ExplicitList", ElementValue.FromList(new ListEntry("n", "v")))));
+        yield return new Sample("Pol_List_ValuePrefix", PolicyEdit.Enabled(("PrefixList", L("a"))));
+        yield return new Sample("Pol_List_Expandable", PolicyEdit.Enabled(("ExpandList", L("a"))));
         yield return new Sample("Pol_List_PolicyValueName", PolicyEdit.Enabled(("SwitchedList", L("a"))));
-        yield return new Sample("Pol_SharedList_One", PolicyEdit.Enabled(("SharedListOne", L("a"))), DisabledReadable: false);
+        yield return new Sample("Pol_SharedList_One", PolicyEdit.Enabled(("SharedListOne", L("a"))));
         yield return new Sample("Pol_Shared_ElementsReverseOrder", PolicyEdit.Enabled(("ZetaElement", T("z")), ("AlphaElement", N(1))));
         yield return new Sample("Pol_Amp_LabelSingle", PolicyEdit.Enabled(("AmpText", T("t")), ("AmpChoice", C(1))));
         yield return new Sample("Pol_Amp_LabelDouble", PolicyEdit.Enabled(("DoubleAmpText", T("x"))));

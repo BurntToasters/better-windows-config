@@ -349,4 +349,34 @@ public sealed class PolWriterTests
         Assert.IsNull(PolData.TryGetDWord([1, 2, 3]));
         Assert.IsNull(PolData.TryGetQWord([1, 2, 3, 4]));
     }
+
+    [TestMethod]
+    public void DeleteValues_ThenAChangedValue_MovesOnlyTheValueBehindIt()
+    {
+        const string key = @"Software\Policies\BWC-Oracle\Lists\Plain";
+        var doc = PolDocument.Create();
+        doc.AddDeleteValuesInstruction(key);
+        doc.SetValue(key, "a", PolValueType.String, SzData("a"));
+        doc.SetValue(key, "b", PolValueType.String, SzData("b"));
+
+        doc.SetValue(key, "a", PolValueType.String, SzData("a2"));
+        doc.SetValue(key, "b", PolValueType.String, SzData("b"));
+
+        CollectionAssert.AreEqual(
+            File(
+                Record(key, "**delvals.", 1, [0x20, 0x00, 0x00, 0x00]),
+                SzRecord(key, "b", "b"),
+                SzRecord(key, "a", "a2")),
+            doc.ToBytes());
+    }
+
+    [TestMethod]
+    public void SetValue_StillRefusesInstructionNames()
+    {
+        var doc = PolDocument.Create();
+
+        Assert.ThrowsExactly<ArgumentException>(() => doc.SetValue("K", "**delvals.", PolValueType.String, SzData(" ")));
+        Assert.ThrowsExactly<ArgumentException>(() => doc.SetValue("K", "**soft.a", PolValueType.String, SzData(" ")));
+        Assert.IsTrue(doc.IsEmpty);
+    }
 }

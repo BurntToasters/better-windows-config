@@ -18,6 +18,12 @@ internal static class PolFormat
     /// <summary>Value-name prefix of a delete instruction.</summary>
     public const string DeletePrefix = "**del.";
 
+    /// <summary>Value name of the instruction that deletes every value of its key when the file is applied.</summary>
+    public const string DeleteValuesName = "**delvals.";
+
+    /// <summary>Value-name prefix of the instruction that writes a value only when it is absent.</summary>
+    public const string SoftPrefix = "**soft.";
+
     /// <summary>The data of a delete instruction: the UTF-16LE string " " with its terminator (REG_SZ, size 4).</summary>
     public static ReadOnlySpan<byte> DeleteInstructionData => [0x20, 0x00, 0x00, 0x00];
 }

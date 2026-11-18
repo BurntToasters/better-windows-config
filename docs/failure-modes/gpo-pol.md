@@ -76,7 +76,8 @@ Record: `[` key NUL `;` name NUL `;` type(4) `;` size(4) `;` data(size) `]`, del
 - Matching of instruction names is case-insensitive like every value name, so `**DEL.x` and `**del.X` are the same
   record. Which of them classic keeps or shows is *verify against oracle*.
 - A `**del.` record with data other than `20 00 00 00` or a type other than 1 is kept as is. Only
-  `AddDeleteInstruction` writes the canonical form (type 1, size 4, data `20 00 00 00`).
+  `AddDeleteInstruction` writes the canonical form (type 1, size 4, data `20 00 00 00`). The instruction calls of
+  section 2.5a write the same canonical form.
 
 ## 2. Editing
 
@@ -110,7 +111,7 @@ sort rule at write time.
 ### 2.4 Edit validation (`ArgumentException`)
 - Key: null, empty, containing NUL, leading or trailing backslash, or an empty segment.
 - Value name: null, containing NUL, or starting with `**` (instructions are created only through
-  `AddDeleteInstruction`). The empty name is allowed.
+  `AddDeleteInstruction`, `AddDeleteValuesInstruction`, `AddSoftInstruction`). The empty name is allowed.
 - Type other than SZ, EXPAND_SZ, BINARY, DWORD, MULTI_SZ, QWORD.
 - Data shape: DWORD not 4 bytes, QWORD not 8 bytes, a string type that is not an even length of at least 2 and ending
   in a NUL unit. BINARY accepts any length including 0.
@@ -120,6 +121,55 @@ sort rule at write time.
 (unchanged when an identical one exists, replaced by append when its data differs). It does not remove the value record `name`; the policy layer decides which
 combinations are allowed. `RemoveInstructions(key, name)` removes the `**del.<name>` and `**soft.<name>` records for
 that value (the per-value instruction prefixes are one array in `PolOrderRules`) and reports how many it removed.
+
+### 2.5a Delete-all-values and soft instructions (list instructions)
+
+Piece E1b. ADMX list semantics need two more instructions the model can write: `**delvals.` (delete every value of the
+key before the following records apply; a non-additive list writes it) and `**soft.<name>` (write the value only when it
+is absent). API, all on `PolDocument`:
+
+- `AddDeleteValuesInstruction(key)`: adds or moves `**delvals.` to the front of the key.
+- `RemoveDeleteValuesInstruction(key)`: removes it (false when absent).
+- `AddSoftInstruction(key, name)`: adds `**soft.<name>` at the end of the key.
+- `RemoveSoftInstruction(key, name)`: removes it (false when absent).
+
+Both instructions are written as type REG_SZ, size 4, data `20 00 00 00`, like `**del.` (*verify against oracle*: the
+bytes of `**delvals.` and `**soft.` in classic, capture group B lists and group D reading). Constants:
+`PolFormat.DeleteValuesName`, `PolFormat.SoftPrefix`.
+
+Failure modes and the chosen behavior:
+
+1. **Position of `**delvals.`.** A record in front of `**delvals.` is deleted when the file is applied, so a new
+   `**delvals.` goes to the front of its key, before every other record (instructions included). Rule
+   `PolOrderRules.PlaceDeleteValues`, *verify against oracle* (classic may put it right before the first list entry or at
+   the end of the values that were removed).
+2. **`**delvals.` repeated on re-apply.** One record per key (names compare case-insensitively), so it cannot stack. When
+   the record is already first and has the canonical bytes the call changes nothing: same bytes, `Version` unchanged,
+   `HasChanges` false.
+3. **`**delvals.` that is not first** (loaded from a file in another order, for example a value and then `**delvals.`). The
+   call moves it to the front and counts as a change. Its stored spelling is kept. A loaded record with a type or data
+   other than the canonical ones is replaced by the canonical record, also at the front.
+4. **`**delvals.` and a later value move.** `SetValue` with different data removes the value and appends it at the end of
+   the key, so it stays behind `**delvals.`. A set with identical data leaves the value where it is. Value edits never move
+   `**delvals.`. Removing every value of the key leaves `**delvals.` as the key's only record.
+5. **`**soft.<name>` on a key that already holds the value `<name>`.** The soft record is appended at the end of the key.
+   The value record is not touched and does not move (so a soft record can end up behind its value). Rule
+   `PolOrderRules.AppendToKey` as for `**del.`, *verify against oracle* (classic may put the soft record in front of its
+   value). An identical soft record that exists is no change; one with other data is replaced by append.
+6. **Case.** `**DELVALS.` and `**Soft.NAME` in a loaded file are the same records as `**delvals.` and `**soft.name`. An
+   add finds them and keeps their stored spelling. A new record is written as `**delvals.` and `**soft.` plus the name as
+   given. Whether classic matches the prefixes case-insensitively is *verify against oracle*.
+7. **A key whose only record is `**delvals.`.** The key exists (`GetKeys`, `RecordCount` 1) and round-trips byte for
+   byte. Removing that record removes the key; a document with no other record is then empty.
+8. **Removal.** Removing a record that is not there returns false and changes nothing. `RemoveInstructions(key, name)`
+   removes `**soft.<name>` as before and never `**delvals.` (it belongs to the key, not to a value). `RemoveKey` removes
+   it with the rest.
+9. **Unknown `**` instructions** (`**DeleteValues`, `**Mystery`) are untouched by these calls: same bytes, same order
+   among themselves. A new `**delvals.` goes in front of them.
+10. **Loading does not interpret.** A file with `**delvals.` followed by values keeps every record; the model never
+    removes the values that the instruction would delete when applied.
+11. **Validation.** An invalid key (empty, NUL, leading, trailing or doubled backslash) or a soft name with NUL is an
+    `ArgumentException` and writes nothing. The empty soft name is allowed like the empty `**del.` name.
 
 ### 2.6 Removing records
 - `RemoveValue` of a record that does not exist returns false and changes nothing.

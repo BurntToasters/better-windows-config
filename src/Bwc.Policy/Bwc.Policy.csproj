@@ -12,4 +12,9 @@
     <ProjectReference Include="..\Bwc.Gpo\Bwc.Gpo.csproj" />
   </ItemGroup>
 
+  <!-- The import store uses the updater's protected folder rules, linked by source (docs/failure-modes/template-store.md, F3). -->
+  <ItemGroup>
+    <Compile Include="..\Bwc.Update\Helper\ProtectedAcl.cs" Link="Store\ProtectedAcl.cs" />
+  </ItemGroup>
+
 </Project>

@@ -18,7 +18,7 @@ internal static class PolOrderRules
     /// Verify against oracle: value-name prefixes of the instructions that belong to one value and are removed with it
     /// by <see cref="PolDocument.RemoveInstructions"/>.
     /// </summary>
-    public static readonly string[] PerValueInstructionPrefixes = [PolFormat.DeletePrefix, "**soft."];
+    public static readonly string[] PerValueInstructionPrefixes = [PolFormat.DeletePrefix, PolFormat.SoftPrefix];
 
     /// <summary>
     /// Verify against oracle: the bytes written for a document with no records. The choice is the bare header; classic
@@ -48,6 +48,25 @@ internal static class PolOrderRules
     /// </summary>
     public static LinkedListNode<PolRecord> AppendToKey(LinkedList<PolRecord> recordsOfKey, PolRecord record) =>
         recordsOfKey.AddLast(record);
+
+    /// <summary>
+    /// Verify against oracle: <c>**delvals.</c> goes to the front of its key, before every other record. A record in front of
+    /// it would be deleted when the file is applied, so the front keeps every existing record meaningful. A record that
+    /// already exists is moved to the front too (the old node is removed first). Classic may place it right before the first
+    /// list entry instead.
+    /// </summary>
+    public static LinkedListNode<PolRecord> PlaceDeleteValues(
+        LinkedList<PolRecord> recordsOfKey,
+        LinkedListNode<PolRecord>? existing,
+        PolRecord record)
+    {
+        if (existing is not null)
+        {
+            recordsOfKey.Remove(existing);
+        }
+
+        return recordsOfKey.AddFirst(record);
+    }
 
     private sealed class RegistryKeyComparer : IComparer<string>
     {

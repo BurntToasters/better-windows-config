@@ -68,7 +68,8 @@ public static class PolicyStateWriter
         foreach (var element in PolicyRules.WriteOrder(policy.Elements))
         {
             edit.Elements.TryGetValue(element.Id, out var value);
-            PlanElement(plan, element, PolicyEditValidator.IsEmpty(value) ? null : value, document);
+            var keepsRemoved = value is ListValue { Removed.Count: > 0 };
+            PlanElement(plan, element, PolicyEditValidator.IsEmpty(value) && !keepsRemoved ? null : value, document);
         }
     }
 
@@ -94,6 +95,11 @@ public static class PolicyStateWriter
             if (element is ListElement list)
             {
                 plan.ClearListValues(list.EffectiveKey, includeDeleteValues: false);
+                if (PolicyRules.DisabledListWritesDelvals)
+                {
+                    plan.WriteDeleteValues(list.EffectiveKey);
+                }
+
                 continue;
             }
 
@@ -282,38 +288,75 @@ public static class PolicyStateWriter
     private static void PlanList(WritePlan plan, ListElement element, ListValue? value, PolDocument document)
     {
         var key = element.EffectiveKey;
-        var keepOthers = element.Additive && PolicyRules.AdditiveListKeepsOtherValues;
-        if (value is null || value.Entries.Count == 0)
+        var entries = value?.Entries ?? [];
+        var type = element.Expandable ? PolValueType.ExpandString : PolValueType.String;
+        var desired = new List<(string Name, byte[] Data)>();
+        for (var i = 0; i < entries.Count; i++)
         {
-            if (!keepOthers)
+            desired.Add((PolicyRules.ListEntryName(element, i, entries[i]), PolData.FromString(entries[i].Data)));
+        }
+
+        if (element.Additive && PolicyRules.AdditiveListKeepsOtherValues)
+        {
+            PlanAdditiveList(plan, key, type, value, desired);
+            return;
+        }
+
+        var replaceWritesDelvals = PolicyRules.ListReplaceWritesDelvals;
+        if (desired.Count == 0)
+        {
+            var keepDelvals = PolicyRules.EnabledEmptyListWritesDelvals && replaceWritesDelvals;
+            plan.ClearListValues(key, includeDeleteValues: !keepDelvals);
+            if (keepDelvals)
             {
-                plan.ClearListValues(key, includeDeleteValues: false);
+                plan.WriteDeleteValues(key);
             }
 
             return;
         }
 
-        var type = element.Expandable ? PolValueType.ExpandString : PolValueType.String;
-        var desired = new List<(string Name, byte[] Data)>();
-        for (var i = 0; i < value.Entries.Count; i++)
+        var existing = document.GetRecords(key).Where(r => !r.IsInstruction).ToArray();
+        var same = existing.Length == desired.Count
+            && existing.Select((record, i) => (record, i)).All(p =>
+                string.Equals(p.record.ValueName, desired[p.i].Name, StringComparison.OrdinalIgnoreCase)
+                && p.record.Type == (uint)type
+                && p.record.Data.Span.SequenceEqual(desired[p.i].Data));
+        if (!same)
         {
-            desired.Add((PolicyRules.ListEntryName(element, i, value.Entries[i]), PolData.FromString(value.Entries[i].Data)));
+            plan.ClearListValues(key, includeDeleteValues: false);
         }
 
-        if (!keepOthers)
+        if (replaceWritesDelvals)
         {
-            var existing = document.GetRecords(key).Where(r => !r.IsInstruction).ToArray();
-            var same = existing.Length == desired.Count
-                && existing.Select((record, i) => (record, i)).All(p =>
-                    string.Equals(p.record.ValueName, desired[p.i].Name, StringComparison.OrdinalIgnoreCase)
-                    && p.record.Type == (uint)type
-                    && p.record.Data.Span.SequenceEqual(desired[p.i].Data));
-            if (same)
-            {
-                return;
-            }
+            plan.WriteDeleteValues(key);
+        }
 
-            plan.ClearListValues(key, includeDeleteValues: false);
+        if (same)
+        {
+            return;
+        }
+
+        foreach (var (name, data) in desired)
+        {
+            plan.Set(new Slot(key, name), type, data);
+        }
+    }
+
+    private static void PlanAdditiveList(WritePlan plan, string key, PolValueType type, ListValue? value, List<(string Name, byte[] Data)> desired)
+    {
+        if (PolicyRules.AdditiveListRemovesDelvals)
+        {
+            plan.RemoveDeleteValues(key);
+        }
+
+        var names = new HashSet<string>(desired.Select(d => d.Name), StringComparer.OrdinalIgnoreCase);
+        foreach (var removed in value?.Removed ?? [])
+        {
+            var name = removed.Name ?? removed.Data;
+            if (!names.Contains(name))
+            {
+                plan.RemoveListValue(key, name, type, removed.Data);
+            }
         }
 
         foreach (var (name, data) in desired)
@@ -325,11 +368,20 @@ public static class PolicyStateWriter
     private sealed class WritePlan
     {
         private readonly List<(string Key, bool IncludeDeleteValues)> listClears = [];
+        private readonly List<string> deleteValuesRemovals = [];
+        private readonly List<string> deleteValuesWrites = [];
+        private readonly List<(string Key, string Name, PolValueType Type, string Data)> listRemovals = [];
         private readonly List<(Slot Slot, bool RemoveInstructions)> clears = [];
         private readonly List<(Slot Slot, bool IsDelete, PolValueType Type, byte[] Data)> writes = [];
         private readonly HashSet<string> claimed = new(StringComparer.OrdinalIgnoreCase);
 
         public void ClearListValues(string key, bool includeDeleteValues) => listClears.Add((key, includeDeleteValues));
+
+        public void RemoveDeleteValues(string key) => deleteValuesRemovals.Add(key);
+
+        public void WriteDeleteValues(string key) => deleteValuesWrites.Add(key);
+
+        public void RemoveListValue(string key, string name, PolValueType type, string data) => listRemovals.Add((key, name, type, data));
 
         public void Clear(Slot slot, bool removeInstructions) => clears.Add((slot, removeInstructions));
 
@@ -387,7 +439,22 @@ public static class PolicyStateWriter
 
                 if (includeDeleteValues)
                 {
-                    document.RemoveValue(key, PolicyEncoding.DeleteValuesName);
+                    document.RemoveDeleteValuesInstruction(key);
+                }
+            }
+
+            foreach (var key in deleteValuesRemovals)
+            {
+                document.RemoveDeleteValuesInstruction(key);
+            }
+
+            foreach (var (key, name, type, data) in listRemovals)
+            {
+                var record = document.GetValue(key, name);
+                if (record is not null && !record.IsInstruction && PolicyRules.StoredTypeMatches((uint)type, record.Type)
+                    && string.Equals(PolData.TryGetString(record.Data.Span), data, StringComparison.Ordinal))
+                {
+                    document.RemoveValue(key, name);
                 }
             }
 
@@ -398,6 +465,11 @@ public static class PolicyStateWriter
                 {
                     document.RemoveInstructions(slot.Key, slot.Name);
                 }
+            }
+
+            foreach (var key in deleteValuesWrites)
+            {
+                document.AddDeleteValuesInstruction(key);
             }
 
             foreach (var (slot, isDelete, type, data) in writes)

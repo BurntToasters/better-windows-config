@@ -76,21 +76,47 @@ internal static class PolicyRules
     public static readonly bool EnumClearsOtherItemLists = true;
 
     /// <summary>
-    /// Replacing a non-additive list also writes <c>**delvals.</c> for its key. The model has no API for that instruction,
-    /// so this stays false until it has one.
+    /// Enabling a non-additive list (ADMX default) writes <c>**delvals.</c> at the front of its key and then the entries, which
+    /// is how Group Policy expresses "replace the values of the key". Verify against oracle: the exact bytes and position
+    /// (capture group B lists, group C OQ-04). False writes the entries alone.
     /// </summary>
-    public static readonly bool ListReplaceWritesDelvals = false;
+    public static readonly bool ListReplaceWritesDelvals = true;
 
     /// <summary>
-    /// An additive list keeps the values of its key that are not among the new entries. False means the key ends up with
-    /// exactly the new entries, so a row removed in the dialog leaves the file.
+    /// An additive list (additive="true") adds its entries and keeps the values of its key that it does not own. Only the
+    /// entries in <see cref="ListValue.Removed"/> (the rows the dialog removed) leave the file. False makes the list behave
+    /// like a non-additive one: the key ends up with exactly the new entries. Verify against oracle.
     /// </summary>
-    public static readonly bool AdditiveListKeepsOtherValues = false;
+    public static readonly bool AdditiveListKeepsOtherValues = true;
+
+    /// <summary>
+    /// Enabling an additive list removes a <c>**delvals.</c> from its key, so the key no longer says "replace". False leaves
+    /// the record where it is. Verify against oracle.
+    /// </summary>
+    public static readonly bool AdditiveListRemovesDelvals = true;
+
+    /// <summary>
+    /// Disabled on a list policy removes the values of every list key and writes <c>**delvals.</c> there, so a list-only
+    /// policy reads back as Disabled through <see cref="ListDelvalsOnlyIsDisabled"/>. False writes nothing for the list and
+    /// a list-only policy then reads as Not Configured. Applies to additive and non-additive lists alike. Verify against
+    /// oracle (matrix B for the write, group D for the read).
+    /// </summary>
+    public static readonly bool DisabledListWritesDelvals = true;
+
+    /// <summary>
+    /// Enabled with an empty list writes <c>**delvals.</c> and no entries. False (default) removes the values and the
+    /// <c>**delvals.</c> and writes nothing, because delvals alone reads as Disabled for a list-only policy. Verify against
+    /// oracle.
+    /// </summary>
+    public static readonly bool EnabledEmptyListWritesDelvals = false;
 
     /// <summary>A <c>**delvals.</c> record in a list key with no entries reads as Disabled (no value name).</summary>
     public static readonly bool ListDelvalsOnlyIsDisabled = true;
 
-    /// <summary>Not Configured removes every value of a list key, also when another policy shares the key.</summary>
+    /// <summary>
+    /// Not Configured removes every value and the <c>**delvals.</c> of a list key, also when another policy shares the key.
+    /// Other instructions of the key stay.
+    /// </summary>
     public static readonly bool NotConfiguredClearsWholeListKey = true;
 
     /// <summary>

@@ -35,6 +35,16 @@ public abstract record ElementValue
     /// <param name="entries">The entries in order.</param>
     /// <returns>The value.</returns>
     public static ElementValue FromList(params ListEntry[] entries) => new ListValue(entries);
+
+    /// <summary>The entries of a list element and the entries the user removed from what was read.</summary>
+    /// <param name="entries">The entries in order.</param>
+    /// <param name="removed">
+    /// The entries that were in the list when it was read and are no longer in it. Only an additive list uses them: it
+    /// removes exactly these, because it cannot tell its own values from foreign ones in the key.
+    /// </param>
+    /// <returns>The value.</returns>
+    public static ElementValue FromListWithRemoved(IReadOnlyList<ListEntry> entries, IReadOnlyList<ListEntry> removed) =>
+        new ListValue(entries) { Removed = removed };
 }
 
 /// <summary>A boolean element value.</summary>
@@ -59,7 +69,15 @@ public sealed record ChoiceValue(int ItemIndex) : ElementValue;
 
 /// <summary>A list element value.</summary>
 /// <param name="Entries">The entries in order.</param>
-public sealed record ListValue(IReadOnlyList<ListEntry> Entries) : ElementValue;
+public sealed record ListValue(IReadOnlyList<ListEntry> Entries) : ElementValue
+{
+    /// <summary>
+    /// Entries the user removed from the list that was read (use the entries of the snapshot, which carry the stored value
+    /// names). An additive list removes these values from its key and keeps every other value; a list that is not additive
+    /// ignores them. Empty by default.
+    /// </summary>
+    public IReadOnlyList<ListEntry> Removed { get; init; } = [];
+}
 
 /// <summary>One row of a list element.</summary>
 /// <param name="Name">The value name column of an explicitValue list; null for other lists.</param>

@@ -261,13 +261,14 @@ public sealed class PolicyWriteElementTests
     {
         var key = Lists + @"\Plain";
         var document = ApplyTwice("Pol_List_Plain", PolicyEdit.Enabled(("PlainList", ElementValue.FromList(ListEntry.Of("b"), ListEntry.Of("a")))));
-        AssertBytes(document, RecSz(key, "b", "b"), RecSz(key, "a", "a"));
+        var delvals = Rec(key, "**delvals.", 1, [0x20, 0x00, 0x00, 0x00]);
+        AssertBytes(document, delvals, RecSz(key, "b", "b"), RecSz(key, "a", "a"));
         var read = (ListValue)Value(Read("Pol_List_Plain", document), "PlainList");
         CollectionAssert.AreEqual(new[] { "b", "a" }, read.Entries.Select(e => e.Data).ToArray());
 
         Apply("Pol_List_Plain", document, PolicyEdit.Enabled(("PlainList", ElementValue.FromList(ListEntry.Of("a"), ListEntry.Of("c")))));
 
-        AssertBytes(document, RecSz(key, "a", "a"), RecSz(key, "c", "c"));
+        AssertBytes(document, delvals, RecSz(key, "a", "a"), RecSz(key, "c", "c"));
         Assert.AreEqual(PolicyRules.ListReplaceWritesDelvals, document.GetValue(key, "**delvals.") is not null);
     }
 
@@ -279,7 +280,7 @@ public sealed class PolicyWriteElementTests
 
         Apply("Pol_List_Plain", document, PolicyEdit.Enabled(("PlainList", ElementValue.FromList(ListEntry.Of("new")))));
 
-        AssertBytes(document, RecSz(key, "new", "new"));
+        AssertBytes(document, Rec(key, "**delvals.", 1, [0x20, 0x00, 0x00, 0x00]), RecSz(key, "new", "new"));
     }
 
     [TestMethod]
@@ -287,7 +288,7 @@ public sealed class PolicyWriteElementTests
     {
         var document = ApplyTwice("Pol_List_EmptyPrefix", PolicyEdit.Enabled(("EmptyPrefixList", ElementValue.FromList(ListEntry.Of("x")))));
 
-        AssertBytes(document, RecSz(Lists + @"\EmptyPrefix", "x", "x"));
+        AssertBytes(document, Rec(Lists + @"\EmptyPrefix", "**delvals.", 1, [0x20, 0x00, 0x00, 0x00]), RecSz(Lists + @"\EmptyPrefix", "x", "x"));
     }
 
     [TestMethod]
@@ -295,7 +296,11 @@ public sealed class PolicyWriteElementTests
     {
         var document = ApplyTwice("Pol_List_ValuePrefix", PolicyEdit.Enabled(("PrefixList", ElementValue.FromList(ListEntry.Of("p"), ListEntry.Of("q")))));
 
-        AssertBytes(document, RecSz(Lists + @"\Prefix", "Item1", "p"), RecSz(Lists + @"\Prefix", "Item2", "q"));
+        AssertBytes(
+            document,
+            Rec(Lists + @"\Prefix", "**delvals.", 1, [0x20, 0x00, 0x00, 0x00]),
+            RecSz(Lists + @"\Prefix", "Item1", "p"),
+            RecSz(Lists + @"\Prefix", "Item2", "q"));
     }
 
     [TestMethod]
@@ -306,7 +311,7 @@ public sealed class PolicyWriteElementTests
             "Pol_List_ExplicitValue",
             PolicyEdit.Enabled(("ExplicitList", ElementValue.FromList(new ListEntry("n1", "v1"), new ListEntry("n2", "v2")))));
 
-        AssertBytes(document, RecSz(key, "n1", "v1"), RecSz(key, "n2", "v2"));
+        AssertBytes(document, Rec(key, "**delvals.", 1, [0x20, 0x00, 0x00, 0x00]), RecSz(key, "n1", "v1"), RecSz(key, "n2", "v2"));
         var read = (ListValue)Value(Read("Pol_List_ExplicitValue", document), "ExplicitList");
         CollectionAssert.AreEqual(new[] { "n1", "n2" }, read.Entries.Select(e => e.Name).ToArray());
     }
@@ -316,7 +321,7 @@ public sealed class PolicyWriteElementTests
     {
         var document = ApplyTwice("Pol_List_Expandable", PolicyEdit.Enabled(("ExpandList", ElementValue.FromList(ListEntry.Of("%a%")))));
 
-        AssertBytes(document, Rec(Lists + @"\Expand", "%a%", 2, Sz("%a%")));
+        AssertBytes(document, Rec(Lists + @"\Expand", "**delvals.", 1, [0x20, 0x00, 0x00, 0x00]), Rec(Lists + @"\Expand", "%a%", 2, Sz("%a%")));
         Assert.AreEqual(1, ((ListValue)Value(Read("Pol_List_Expandable", document), "ExpandList")).Entries.Count);
     }
 
@@ -334,7 +339,7 @@ public sealed class PolicyWriteElementTests
         }
         else
         {
-            AssertBytes(document, RecSz(key, "a", "a"));
+            AssertBytes(document, Rec(key, "**delvals.", 1, [0x20, 0x00, 0x00, 0x00]), RecSz(key, "a", "a"));
         }
     }
 
@@ -343,10 +348,11 @@ public sealed class PolicyWriteElementTests
     {
         var key = Lists + @"\Switched";
         var document = ApplyTwice("Pol_List_PolicyValueName", PolicyEdit.Enabled(("SwitchedList", ElementValue.FromList(ListEntry.Of("z")))));
-        AssertBytes(document, RecDw(Lists, "ListSwitch", 1), RecSz(key, "z", "z"));
+        var delvals = Rec(key, "**delvals.", 1, [0x20, 0x00, 0x00, 0x00]);
+        AssertBytes(document, RecDw(Lists, "ListSwitch", 1), delvals, RecSz(key, "z", "z"));
 
         Apply("Pol_List_PolicyValueName", document, PolicyEdit.Disabled);
-        AssertBytes(document, RecDw(Lists, "ListSwitch", 0));
+        AssertBytes(document, RecDw(Lists, "ListSwitch", 0), delvals);
         Assert.AreEqual(PolicyState.Disabled, Read("Pol_List_PolicyValueName", document).State);
 
         Apply("Pol_List_PolicyValueName", document, PolicyEdit.NotConfigured);
@@ -369,7 +375,7 @@ public sealed class PolicyWriteElementTests
     {
         var key = Shared + @"\SharedList";
         var document = ApplyTwice("Pol_SharedList_One", PolicyEdit.Enabled(("SharedListOne", ElementValue.FromList(ListEntry.Of("s")))));
-        AssertBytes(document, RecSz(key, "s", "s"));
+        AssertBytes(document, Rec(key, "**delvals.", 1, [0x20, 0x00, 0x00, 0x00]), RecSz(key, "s", "s"));
 
         Assert.AreEqual(PolicyState.Enabled, Read("Pol_SharedList_Two", document).State);
 

@@ -56,8 +56,9 @@ Not Configured removes the value record and writes no instruction (*probe-confir
 - Only `**del.Alpha` in the key: Disabled (*verify against oracle*, `[Rule: DeleteInstructionOnlyIsDisabled]`). Open
   lead: classic may show Not Configured, because choosing Not Configured on that state wrote nothing (probe lead). The
   two rules disagree on what OK writes, so the oracle settles them together; flipping the one member flips both.
-- `**soft.` and `**delvals.` are never written by the engine today (`PolDocument` has no API for them). They are kept
-  when the document is read and written back (E1), and removed with the value they belong to by Not Configured.
+- `**soft.<name>` is never written by the policy engine (the model has the API, no template shape needs it yet). It is
+  kept when the document is read and written back (E1), and removed with the value it belongs to by Not Configured.
+  `**delvals.` is written for lists only, see section 7.
 - Enabled removes `**del.<name>` for every name it writes.
 - An instruction that is not owned by the policy (another policy's name, an unknown `**` name) is never touched.
 
@@ -150,20 +151,19 @@ Items of a list can sit in different keys. A false that writes nothing removes t
   - otherwise (no attribute, or an empty prefix): the name is the data (value name = data).
 - Empty entry data is `EntryEmpty`. Two entries with the same name (case-insensitive) are `DuplicateEntry`. A name that
   starts with `**` or holds NUL is `InvalidCharacter`.
-- Non-additive (default): the key holds exactly the new entries, in order, after the write. When the existing values
-  already equal the new entries (name, type, data, order) nothing is touched. Classic also writes `**delvals.` for the
-  key; the model has no API for it, so it is not written yet (*verify against oracle*,
-  `[Rule: ListReplaceWritesDelvals]`, false).
-- Additive: the same, because removing an entry in the dialog must remove it from the file. The brief said an additive
-  list keeps the values that are in the key but not in the entries; `[Rule: AdditiveListKeepsOtherValues]` (false)
-  switches to that (*verify against oracle*).
+- Non-additive (default): the key holds `**delvals.` and then exactly the new entries, in order, after the write
+  (`[Rule: ListReplaceWritesDelvals]`, true, *verify against oracle*; section 7). When the existing values already equal
+  the new entries (name, type, data, order) they are not rewritten.
+- Additive: the key keeps the values the policy does not own and gets the entries; section 7
+  (`[Rule: AdditiveListKeepsOtherValues]`, true, *verify against oracle*).
 - An empty list removes every value of the key. Required and empty is `Required`.
 - Reads: every non-instruction record of the key whose type matches, in model order, as (name, data). Records of another
   type are foreign and ignored. A list-only policy is Enabled when the key has an entry.
-- Disabled removes every value of the list key. A `**delvals.` record in the list key reads as Disabled when no entry is
-  there (*verify against oracle*, `[Rule: ListDelvalsOnlyIsDisabled]`), but Disabled cannot write it yet.
-- Two policies that share a list key read the same entries. Not Configured on one removes every value of the key
-  (*verify against oracle*, `[Rule: NotConfiguredClearsWholeListKey]`).
+- Disabled removes every value of the list key and writes `**delvals.` (`[Rule: DisabledListWritesDelvals]`, section 7).
+  A `**delvals.` record in the list key reads as Disabled when no entry is there (*verify against oracle*,
+  `[Rule: ListDelvalsOnlyIsDisabled]`).
+- Two policies that share a list key read the same entries. Not Configured on one removes every value of the key and
+  its `**delvals.` (*verify against oracle*, `[Rule: NotConfiguredClearsWholeListKey]`).
 
 ## 4. Order of records (*verify against oracle*, `[Rule: WriteOrder]`)
 
@@ -195,3 +195,64 @@ stays.
 - Each element kind written and read back, and Disabled and Not Configured for every shape in the table above.
 - Validation: out of range, too long, required empty, wrong kind, unknown element, invalid choice, list problems.
 - Foreign values and instructions that stay, wrong types, class Both on two documents, a shared list key.
+
+## 7. List instructions: `**delvals.` and additive lists (piece E1b/E4b)
+
+ADMX meaning (Microsoft ADMX schema): `additive="false"` (the default) replaces the values of the list key; Group Policy
+expresses that as a `**delvals.` record in the key, in front of the entries. `additive="true"` adds to the values that
+exist and leaves the values the policy does not own alone. The record is REG_SZ, size 4, data `20 00 00 00`
+(`PolDocument.AddDeleteValuesInstruction`, failure modes in `docs/failure-modes/gpo-pol.md` 2.5a). Every rule below is
+*verify against oracle* (capture group B lists, group C OQ-04, group D for reading `**delvals.` and `**soft.`) and is one
+member of `PolicyRules`.
+
+### 7.1 Writing
+
+| Edit | Non-additive list | Additive list |
+|---|---|---|
+| Enabled with entries | clear the values of the key, `**delvals.` at the front, then the entries in order. When the values already equal the entries only `**delvals.` is ensured (`[Rule: ListReplaceWritesDelvals]`) | set the entries; values that are not entries stay; remove the entries in `ListValue.Removed` that still hold the data; remove a `**delvals.` of the key (`[Rule: AdditiveListKeepsOtherValues]`, `[Rule: AdditiveListRemovesDelvals]`) |
+| Enabled with no entries | remove the values and the `**delvals.`; nothing is written (`[Rule: EmptyEnabledListWritesDelvals]`, false) | remove the `Removed` entries and a `**delvals.`; nothing else |
+| Disabled | remove every value of the key, write `**delvals.` (`[Rule: DisabledListWritesDelvals]`, true) | the same: the policy cannot tell its own values from foreign ones, so it clears the key like the non-additive list |
+| Not Configured | remove every value and the `**delvals.` of the key (`[Rule: NotConfiguredClearsWholeListKey]`) | the same |
+
+Failure modes and the chosen behavior:
+
+1. **`**delvals.` position.** First record of the key, before the entries and before any other instruction (gpo-pol 2.5a
+   item 1). A later entry change keeps `**delvals.` where it is and re-appends the changed entries behind it.
+2. **Repeated apply.** `**delvals.` never stacks (one record per key); an apply that finds the key already in the
+   written shape changes nothing (`Changed` false, `HasChanges` false).
+3. **`**delvals.` plus a later value move.** Changing one entry moves only that entry to the end of the key, behind the
+   other entries. `**delvals.` stays first.
+4. **Soft record on a key that already holds the value.** Lists never write `**soft.`. A `**soft.` record that exists in
+   a list key is kept by Enabled and Disabled, and ignored by the reader (it is an instruction). The exception is the
+   existing per-value rule: writing an entry named `a` removes `**del.a` and `**soft.a` first, like any value write. Not
+   Configured keeps the record too: it removes the values and `**delvals.` only. `OwnedRecords` still lists it.
+5. **Case.** `**DELVALS.` in a loaded file is the policy's `**delvals.`: the reader finds it, and a write keeps its
+   spelling when it is first and canonical, otherwise replaces it.
+6. **A key whose only record is `**delvals.`.** A list-only policy reads Disabled with no element values
+   (`[Rule: ListDelvalsOnlyIsDisabled]`); a policy with a value name takes its state from its own value only.
+7. **Not Configured removes the `**delvals.`.** After Not Configured, a list key that held only the policy's records is
+   gone and the document can be empty. Instructions that are not `**delvals.` stay.
+8. **Two policies share a list key (one additive, one not).** Each read sees the same entries and the same `**delvals.`.
+   Enabling the non-additive one replaces the key, so the additive one's entries are gone and it reads the
+   replacement; enabling the additive one afterwards removes the `**delvals.` and keeps the non-additive one's entries
+   (it cannot know which values are whose). Not Configured on either removes the whole key. This is the cost of the
+   shared key: a policy can only be sure of values it wrote itself, and it learns that from `ListValue.Removed`, which the
+   dialog fills with the entries the user deleted.
+9. **Additive removal is conservative.** An entry in `Removed` is removed only when the key holds a string value of that
+   name (the entry's stored name, or its data when it has none) with the same data, and the name is not also an entry of
+   the new list. A value whose data differs (someone else changed it) stays. `Removed` of a non-additive list is ignored
+   because the replace removes everything.
+10. **Unknown `**` instructions in a list key** are never touched by any state: not removed, not moved. They are
+    owned records (`OwnedRecords`) but not entries.
+11. **Reader.** `**delvals.` is an instruction: never an entry, always an owned record of the list policy of its key
+    (every record of a list key is owned). A `**delvals.` behind the entries (a file not written by this engine) still
+    reads Enabled with the entries.
+
+### 7.2 Changed expectations
+
+Tests that asserted the previous, non-ADMX behavior were updated, not removed:
+
+- `List_Plain_NameIsTheData_AndAReplaceRewritesTheKey` now expects `**delvals.` first in the key.
+- `List_Additive_FollowsTheAdditiveRule` expects the foreign value to stay.
+- `List_UnderAPolicyValueName_WritesTheSwitchAndTheList` and `PolicyStateFlowTests`: Disabled on a list writes `**delvals.`
+  and a list-only policy reads Disabled instead of Not Configured.

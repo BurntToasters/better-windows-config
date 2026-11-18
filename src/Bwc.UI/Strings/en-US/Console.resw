@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Probe gpedit (artifacts/oracle/gpedit/probe.json): automation name of the console tree. An internal window caption, not prose. -->
+  <data name="ConsoleTreeName" xml:space="preserve">
+    <value>Console Embedded Scope</value>
+  </data>
+  <!-- Probe gpedit: automation name of the result pane. An internal window caption, not prose. -->
+  <data name="ConsoleResultName" xml:space="preserve">
+    <value>Console Embedded Window Results</value>
+  </data>
+  <!-- BWC label. The classic splitter has no accessible element. -->
+  <data name="ConsoleSplitterName" xml:space="preserve">
+    <value>Splitter</value>
+  </data>
+  <!-- BWC label. The classic menu is a toolbar band without a name. -->
+  <data name="ConsoleMenuBarName" xml:space="preserve">
+    <value>Menu Bar</value>
+  </data>
+  <!-- BWC label. The classic toolbar band has an empty name. -->
+  <data name="ConsoleToolbarName" xml:space="preserve">
+    <value>Toolbar</value>
+  </data>
+  <!-- BWC label. The classic status bar has an empty name and the automation id StatusBar. -->
+  <data name="ConsoleStatusBarName" xml:space="preserve">
+    <value>Status Bar</value>
+  </data>
+  <!-- Probe gpedit: toolbar button name (item 1). -->
+  <data name="ConsoleToolbarBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <!-- Probe gpedit: toolbar button name (item 2). -->
+  <data name="ConsoleToolbarForward" xml:space="preserve">
+    <value>Forward</value>
+  </data>
+  <!-- BWC label. The probed gpedit toolbar hides this button. -->
+  <data name="ConsoleToolbarUp" xml:space="preserve">
+    <value>Up One Level</value>
+  </data>
+  <!-- Probe gpedit: toolbar button name (item 5). -->
+  <data name="ConsoleToolbarShowHideTree" xml:space="preserve">
+    <value>Show/Hide Console Tree</value>
+  </data>
+  <!-- Probe gpedit: toolbar button name (item 12). -->
+  <data name="ConsoleToolbarProperties" xml:space="preserve">
+    <value>Properties</value>
+  </data>
+  <!-- BWC label. The probed gpedit toolbar hides this button. -->
+  <data name="ConsoleToolbarRefresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <!-- Probe gpedit: toolbar button name (item 15). -->
+  <data name="ConsoleToolbarExportList" xml:space="preserve">
+    <value>Export List</value>
+  </data>
+  <!-- Probe gpedit: toolbar button name (item 17). -->
+  <data name="ConsoleToolbarHelp" xml:space="preserve">
+    <value>Help</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: top-level File menu. -->
+  <data name="ConsoleMenuFile" xml:space="preserve">
+    <value>&amp;File</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: top-level Action menu (id 13238). -->
+  <data name="ConsoleMenuAction" xml:space="preserve">
+    <value>&amp;Action</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: top-level View menu (id 13239). -->
+  <data name="ConsoleMenuView" xml:space="preserve">
+    <value>&amp;View</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: top-level Help menu. -->
+  <data name="ConsoleMenuHelp" xml:space="preserve">
+    <value>&amp;Help</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: File menu entry, command 13220. -->
+  <data name="ConsoleMenuFileOptions" xml:space="preserve">
+    <value>O&amp;ptions...</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: File menu entry, command 57665. -->
+  <data name="ConsoleMenuFileExit" xml:space="preserve">
+    <value>E&amp;xit</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 162: View menu entry of SDI user mode, command 13231. -->
+  <data name="ConsoleMenuViewCustomize" xml:space="preserve">
+    <value>Customi&amp;ze View...</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: Help menu entry, command 12804. -->
+  <data name="ConsoleMenuHelpTopics" xml:space="preserve">
+    <value>&amp;Help Topics</value>
+  </data>
+</root>

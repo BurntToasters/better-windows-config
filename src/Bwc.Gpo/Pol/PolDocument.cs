@@ -177,6 +177,76 @@ public sealed class PolDocument
         return Upsert(key, PolFormat.DeletePrefix + name, (uint)PolValueType.String, PolFormat.DeleteInstructionData);
     }
 
+    /// <summary>
+    /// Adds the delete-all-values instruction for a key: <c>**delvals.</c>, REG_SZ, size 4, data <c>20 00 00 00</c>. When
+    /// the file is applied it deletes every value of the key that exists at that point, so a non-additive list writes it in
+    /// front of its entries. The record goes to the front of the key (see <see cref="PolOrderRules.PlaceDeleteValues"/>).
+    /// A record that is already first with these bytes is left alone (no change); one that is elsewhere or has other bytes
+    /// is replaced at the front and keeps its stored spelling. It never stacks: there is one such record per key.
+    /// </summary>
+    /// <param name="key">A key path without leading, trailing or doubled backslashes.</param>
+    /// <returns>The stored record.</returns>
+    /// <exception cref="ArgumentException">The key is invalid.</exception>
+    public PolRecord AddDeleteValuesInstruction(string key)
+    {
+        ValidateKey(key);
+        if (!_keys.TryGetValue(key, out var bucket))
+        {
+            bucket = new Bucket(key);
+            _keys.Add(key, bucket);
+        }
+
+        const uint type = (uint)PolValueType.String;
+        var data = PolFormat.DeleteInstructionData;
+        if (bucket.ByName.TryGetValue(PolFormat.DeleteValuesName, out var existing))
+        {
+            var old = existing.Value;
+            if (ReferenceEquals(bucket.Records.First, existing) && PolOrderRules.IsSameContent(old, type, data))
+            {
+                return old;
+            }
+
+            var replacement = PolRecord.Create(old.Key, old.ValueName, type, data);
+            bucket.ByName[PolFormat.DeleteValuesName] = PolOrderRules.PlaceDeleteValues(bucket.Records, existing, replacement);
+            Version++;
+            return replacement;
+        }
+
+        var record = PolRecord.Create(bucket.Spelling, PolFormat.DeleteValuesName, type, data);
+        bucket.ByName[PolFormat.DeleteValuesName] = PolOrderRules.PlaceDeleteValues(bucket.Records, null, record);
+        _recordCount++;
+        Version++;
+        return record;
+    }
+
+    /// <summary>Removes the <c>**delvals.</c> record of a key.</summary>
+    /// <param name="key">The key path.</param>
+    /// <returns>True when a record was removed.</returns>
+    public bool RemoveDeleteValuesInstruction(string key) => RemoveValue(key, PolFormat.DeleteValuesName);
+
+    /// <summary>
+    /// Adds the soft instruction for a value: <c>**soft.&lt;name&gt;</c>, REG_SZ, size 4, data <c>20 00 00 00</c>. It makes
+    /// the policy engine write the value only when it is absent. The record goes to the end of the key like
+    /// <see cref="AddDeleteInstruction"/> (identical record: no change; other data: replaced by append). The value record
+    /// itself is not touched and does not move.
+    /// </summary>
+    /// <param name="key">A key path without leading, trailing or doubled backslashes.</param>
+    /// <param name="name">The name of the value that is written only when absent.</param>
+    /// <returns>The stored record.</returns>
+    /// <exception cref="ArgumentException">The key or name is invalid.</exception>
+    public PolRecord AddSoftInstruction(string key, string name)
+    {
+        ValidateKey(key);
+        ValidateName(name);
+        return Upsert(key, PolFormat.SoftPrefix + name, (uint)PolValueType.String, PolFormat.DeleteInstructionData);
+    }
+
+    /// <summary>Removes the <c>**soft.&lt;name&gt;</c> record of a value. The value record stays.</summary>
+    /// <param name="key">The key path.</param>
+    /// <param name="name">The value name.</param>
+    /// <returns>True when a record was removed.</returns>
+    public bool RemoveSoftInstruction(string key, string name) => RemoveValue(key, PolFormat.SoftPrefix + name);
+
     /// <summary>Removes the instruction records of one value (<c>**del.</c> and <c>**soft.</c> plus the name).</summary>
     /// <param name="key">The key path.</param>
     /// <param name="name">The value name.</param>

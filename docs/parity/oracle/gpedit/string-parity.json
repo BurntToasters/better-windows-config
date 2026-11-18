@@ -11,10 +11,10 @@
     "src/Bwc.UI/Console/**/*.cs (excluding bin and obj)"
   ],
   "counts": {
-    "equal": 4,
+    "equal": 18,
     "differs": 0,
     "template": 32,
-    "absent": 2148
+    "absent": 2134
   },
   "strings": [
     {
@@ -1203,11 +1203,11 @@
     },
     {
       "id": "gpedit.dll:29",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll:30",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll:33",
@@ -2247,11 +2247,11 @@
     },
     {
       "id": "gpedit.dll.mui:29",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll.mui:30",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll.mui:33",
@@ -3951,7 +3951,7 @@
     },
     {
       "id": "mmcbase.dll:13437",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13438",
@@ -3967,7 +3967,7 @@
     },
     {
       "id": "mmcbase.dll:13441",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13442",
@@ -3975,7 +3975,7 @@
     },
     {
       "id": "mmcbase.dll:13443",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13444",
@@ -4155,7 +4155,7 @@
     },
     {
       "id": "mmcbase.dll:14028",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14029",
@@ -4199,7 +4199,7 @@
     },
     {
       "id": "mmcbase.dll:14039",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14040",
@@ -5683,7 +5683,7 @@
     },
     {
       "id": "mmcbase.dll.mui:13437",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13438",
@@ -5699,7 +5699,7 @@
     },
     {
       "id": "mmcbase.dll.mui:13441",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13442",
@@ -5707,7 +5707,7 @@
     },
     {
       "id": "mmcbase.dll.mui:13443",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13444",
@@ -5887,7 +5887,7 @@
     },
     {
       "id": "mmcbase.dll.mui:14028",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14029",
@@ -5931,7 +5931,7 @@
     },
     {
       "id": "mmcbase.dll.mui:14039",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14040",
