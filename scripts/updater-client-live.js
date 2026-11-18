@@ -29,6 +29,8 @@ const CHANNEL = "stable";
 const CURRENT_VERSION = "0.0.0";
 const CLIENT_TIMEOUT_MS = 5 * 60_000;
 const WRAPPER_MARGIN_MS = 60_000;
+/** 0xC0000142 as the signed exit code that GetExitCodeProcess gives the wrapper. */
+const STATUS_DLL_INIT_FAILED = -1073741502;
 const MANIFEST_TIMEOUT_MS = 60_000;
 const STDERR_TAIL_CHARS = 800;
 const USER_AGENT = "bwc-release-client-check";
@@ -206,12 +208,26 @@ export function runClient(exe, args, timeoutMs = CLIENT_TIMEOUT_MS) {
         finish(() => reject(new RehearsalError("timeout", `${step} did not finish within ${timeoutMs} ms`, EXIT.EXTERNAL)));
         return;
       }
+      if (outcome.exitCode === STATUS_DLL_INIT_FAILED) {
+        // C27: the child died before main, which is what a desktop it cannot open does. It is not a client verdict.
+        finish(() => reject(new RehearsalError(
+          "deelevate-failed",
+          `${step}: the restricted client could not start on its desktop (${outcome.desktop ?? "unknown"}): exit 0xC0000142`,
+          EXIT.EXTERNAL,
+        )));
+        return;
+      }
       const read = (file) => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "");
       const run = {
         code: outcome.exitCode,
         stdout: read(files.stdout),
         stderr: read(files.stderr),
-        launch: { mode: outcome.launch, elevated: outcome.elevated, integrity: outcome.integrityRid },
+        launch: {
+          mode: outcome.launch,
+          elevated: outcome.elevated,
+          integrity: outcome.integrityRid,
+          desktop: outcome.desktop ?? null,
+        },
       };
       finish(() => resolve(run));
     });

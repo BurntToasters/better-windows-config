@@ -1976,6 +1976,16 @@ async function runRestrictedLaunchCases(cases) {
     String(missing?.message),
     cases,
   );
+  const dllInit = await runClient(node, ["-e", "process.exit(-1073741502)"], 60_000).then(
+    () => null,
+    (error) => error,
+  );
+  expectCheck(
+    "C27 a client that dies at start with 0xC0000142 is deelevate-failed and names its desktop, not a client verdict",
+    dllInit?.reason === "deelevate-failed" && dllInit.message.includes("0xC0000142") && dllInit.message.includes("desktop ("),
+    String(dllInit?.message),
+    cases,
+  );
   const hung = await runClient(node, ["-e", "setTimeout(() => {}, 120000)"], 2_000).then(
     () => null,
     (error) => error,
