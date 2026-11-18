@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Rehearses the real updater client against the live stable feed. It runs the built ship
- * publish/<rid>/BwcUpdate.exe with --check, then --download, with --current-version 0.0.0. Each run must
+ * publish/<rid>/BwcUpdate.exe with --check, then --download, with --current-version 0.0.0. Each run goes through
+ * scripts/run-restricted.ps1, so it is unelevated even from an elevated SSH shell. Each run must
  * exit 0 and print a final JSON line with ok:true and the expected version. The download's staging folder
  * must exist, and this run deletes it (only that folder). The verdict goes to
  * artifacts/release/client-live/result.json. Failure modes: docs/failure-modes/quality-gate.md.
@@ -27,6 +28,7 @@ const RIDS = Object.freeze(["win-x64", "win-arm64"]);
 const CHANNEL = "stable";
 const CURRENT_VERSION = "0.0.0";
 const CLIENT_TIMEOUT_MS = 5 * 60_000;
+const WRAPPER_MARGIN_MS = 60_000;
 const MANIFEST_TIMEOUT_MS = 60_000;
 const STDERR_TAIL_CHARS = 800;
 const USER_AGENT = "bwc-release-client-check";
@@ -111,42 +113,114 @@ async function expectedVersion({ expectVersion, manifestUrl }, state) {
   return manifest.version;
 }
 
-/** Runs the client once. Resolves with the exit code and output, or rejects on a spawn error or a timeout. */
+/**
+ * Runs the client once through scripts/run-restricted.ps1, which starts it with a restricted, medium-integrity copy
+ * of this process's token (C21 to C26). The release VM is reached over SSH, which gives an administrator the full
+ * token, and the client refuses to check or download when elevated. Resolves with the exit code and output, or
+ * rejects with deelevate-failed (the client was not run unelevated) or timeout.
+ */
 export function runClient(exe, args, timeoutMs = CLIENT_TIMEOUT_MS) {
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), "bwc-client-run-"));
+  const files = {
+    stdout: path.join(work, "stdout.txt"),
+    stderr: path.join(work, "stderr.txt"),
+    result: path.join(work, "result.json"),
+  };
+  const wrapperArgs = [
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    path.join(REPO_ROOT, "scripts", "run-restricted.ps1"),
+    "-Exe",
+    exe,
+    "-ArgsBase64",
+    args.map((arg) => Buffer.from(String(arg), "utf8").toString("base64")).join(","),
+    "-WorkingDirectory",
+    process.cwd(),
+    "-StdoutPath",
+    files.stdout,
+    "-StderrPath",
+    files.stderr,
+    "-ResultPath",
+    files.result,
+    "-TimeoutMs",
+    String(timeoutMs),
+  ];
+  const step = args[0];
   return new Promise((resolve, reject) => {
-    let child;
+    const finish = (settle) => {
+      fs.rmSync(work, { recursive: true, force: true });
+      settle();
+    };
+    let wrapper;
     try {
-      child = spawn(exe, args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+      wrapper = spawn(windowsPowerShell(), wrapperArgs, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
     } catch (error) {
-      reject(new RehearsalError("client-failed", `could not start ${exe}: ${describeError(error)}`, EXIT.EXTERNAL));
+      finish(() => reject(new RehearsalError("deelevate-failed", `${step}: could not start the wrapper: ${describeError(error)}`, EXIT.EXTERNAL)));
       return;
     }
-    const out = [];
-    const err = [];
-    let timedOut = false;
+    const wrapperErr = [];
+    wrapper.stdout.resume();
+    wrapper.stderr.on("data", (chunk) => wrapperErr.push(chunk));
+    // C24: the wrapper ends the client at timeoutMs. This later kill is only for a wrapper that hangs itself.
+    let killed = false;
     const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill();
-    }, timeoutMs);
-    child.stdout.on("data", (chunk) => out.push(chunk));
-    child.stderr.on("data", (chunk) => err.push(chunk));
-    child.on("error", (error) => {
+      killed = true;
+      wrapper.kill();
+    }, timeoutMs + WRAPPER_MARGIN_MS);
+    wrapper.on("error", (error) => {
       clearTimeout(timer);
-      reject(new RehearsalError("client-failed", `could not start ${exe}: ${describeError(error)}`, EXIT.EXTERNAL));
+      finish(() => reject(new RehearsalError("deelevate-failed", `${step}: could not start the wrapper: ${describeError(error)}`, EXIT.EXTERNAL)));
     });
-    child.on("close", (code) => {
+    wrapper.on("close", (code) => {
       clearTimeout(timer);
-      if (timedOut) {
-        reject(new RehearsalError("timeout", `${args[0]} did not finish within ${timeoutMs} ms`, EXIT.EXTERNAL));
+      if (killed) {
+        finish(() => reject(new RehearsalError("timeout", `${step} did not finish within ${timeoutMs} ms`, EXIT.EXTERNAL)));
         return;
       }
-      resolve({
-        code,
-        stdout: Buffer.concat(out).toString("utf8"),
-        stderr: Buffer.concat(err).toString("utf8"),
-      });
+      let outcome;
+      try {
+        outcome = JSON.parse(fs.readFileSync(files.result, "utf8").replace(/^\uFEFF/, ""));
+      } catch (error) {
+        // C26: no result file means the wrapper itself failed, so the client cannot be said to have run unelevated.
+        const tail = stderrTail(Buffer.concat(wrapperErr).toString("utf8"));
+        finish(() => reject(new RehearsalError(
+          "deelevate-failed",
+          `${step}: the wrapper exited ${code} with no result (${describeError(error)})${tail ? ` ${tail}` : ""}`,
+          EXIT.EXTERNAL,
+        )));
+        return;
+      }
+      if (!outcome.started) {
+        // C22 and C23: the client never ran. There is no fallback to starting it any other way.
+        finish(() => reject(new RehearsalError(
+          "deelevate-failed",
+          `${step}: ${outcome.failedStep ?? "unknown step"}: ${outcome.error ?? "the client was not started"}`,
+          EXIT.EXTERNAL,
+        )));
+        return;
+      }
+      if (outcome.timedOut) {
+        finish(() => reject(new RehearsalError("timeout", `${step} did not finish within ${timeoutMs} ms`, EXIT.EXTERNAL)));
+        return;
+      }
+      const read = (file) => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "");
+      const run = {
+        code: outcome.exitCode,
+        stdout: read(files.stdout),
+        stderr: read(files.stderr),
+        launch: { mode: outcome.launch, elevated: outcome.elevated, integrity: outcome.integrityRid },
+      };
+      finish(() => resolve(run));
     });
   });
+}
+
+function windowsPowerShell() {
+  const systemRoot = process.env.SystemRoot ?? "C:\\Windows";
+  return path.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 }
 
 /** The last stdout line that is a JSON object with a boolean ok. Progress lines carry no ok, so they never count. */
@@ -172,10 +246,13 @@ function stderrTail(text) {
 
 /** Throws unless one client run exited 0, printed a verdict with ok:true, and reported the expected version. */
 export function verdictOf(step, run, expected) {
-  if (run.code !== 0) {
-    throw new RehearsalError("client-failed", `${step} exited ${run.code}: ${stderrTail(run.stderr)}`, EXIT.REFUSED);
-  }
   const verdict = finalVerdict(run.stdout);
+  if (run.code !== 0) {
+    // C20: the client prints its refusal on stdout, so name it along with the stderr tail.
+    const reason = verdict ? ` failure ${String(verdict.failure)}${verdict.detail ? ` (${verdict.detail})` : ""}` : "";
+    const tail = stderrTail(run.stderr);
+    throw new RehearsalError("client-failed", `${step} exited ${run.code}:${reason}${tail ? ` ${tail}` : ""}`, EXIT.REFUSED);
+  }
   if (!verdict) {
     throw new RehearsalError("output-unparsed", `${step} printed no final JSON line with a boolean ok`, EXIT.REFUSED);
   }
@@ -266,6 +343,7 @@ async function rehearse(options, state) {
 
   const check = await runClient(exe, ["--check", ...clientArgs], options.timeoutMs);
   const checkVerdict = verdictOf("check", check, state.expected);
+  state.launch = check.launch;
   state.checks.push({ name: "check", pass: true, detail: `ok, version ${checkVerdict.version}` });
 
   const stagingRoot = stagingRootFor(options.tempDir);
@@ -319,7 +397,7 @@ export async function runClientRehearsal(options = {}) {
   const root = options.root ?? REPO_ROOT;
   const env = options.env ?? process.env;
   const started = Date.now();
-  const state = { rid: null, exe: null, manifestUrl: null, expected: null, expectedSource: null, checks: [], staging: null };
+  const state = { rid: null, exe: null, manifestUrl: null, expected: null, expectedSource: null, launch: null, checks: [], staging: null };
   let failure = null;
   try {
     await rehearse({ ...options, root, env, timeoutMs: options.timeoutMs ?? CLIENT_TIMEOUT_MS }, state);
@@ -337,6 +415,7 @@ export async function runClientRehearsal(options = {}) {
     channel: CHANNEL,
     version: state.expected,
     expectedSource: state.expectedSource,
+    launch: state.launch,
     manifestUrl: state.manifestUrl,
     checks: state.checks,
     staging: state.staging,
