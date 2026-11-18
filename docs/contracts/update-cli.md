@@ -127,8 +127,9 @@ BwcUpdate.exe --set-aumid "<absolute path of a .lnk>" <app id>
 ```
 
 The installer calls this for each Start menu shortcut instead of running PowerShell (installer.md M45). Both values are
-positional and required. The app id is exactly `BetterWindowsConfig.Hub` (for `Better Windows Config.lnk`) or
-`BetterWindowsConfig.Regedit` (for `Registry Editor (BWC).lnk`).
+positional and required. The app id is exactly `BetterWindowsConfig.Hub` (for `Better Windows Config.lnk`),
+`BetterWindowsConfig.Regedit` (for `Registry Editor (BWC).lnk`), or `BetterWindowsConfig.Gpedit` (for
+`Local Group Policy Editor (BWC).lnk`).
 
 - Sets `System.AppUserModel.ID` through `IPropertyStore` (typed COM calls on a `CoCreateInstance` shell link), saves the
   shortcut, loads it again through a second instance, and compares.

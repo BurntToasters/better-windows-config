@@ -60,10 +60,13 @@ Runs the quality gate steps in order and writes artifacts/gate/result.json
 artifacts/gate/logs/<NN>-<step-name>.log; logs from earlier runs are removed first.
 The default RID comes from process.arch, never PROCESSOR_ARCHITECTURE.
 
-Steps: sync-version, registry-writer, no-em-dash, changelog-version, comment-lint,
-release-selftest, release-flow-selftest, release-assets-selftest, embed-key-selftest,
-signing-selftest, build-arm64, build-x64, test-core, test-registry-e2e, test-registry-shipping,
-test-update.
+Steps: sync-version, registry-writer, policy-writer, no-em-dash, changelog-version,
+comment-lint, release-selftest, release-flow-selftest, release-assets-selftest,
+embed-key-selftest, signing-selftest, build-arm64, build-x64, test-core, test-gpo,
+test-policy, test-registry-e2e, test-registry-shipping, test-update.
+policy-writer is the static guard for the local group policy writer
+(scripts/check-policy-writer.js). test-gpo and test-policy run tests/Bwc.Gpo.Tests
+and tests/Bwc.Policy.Tests.
 Unless --quick, each RID then runs publish-ship, verify-flavor-ship, e2e-ship,
 publish-e2e, verify-flavor-e2e, e2e-flavor. verify-flavor-* checks the BwcFlavor
 metadata of the publish folder. E2E steps also record the counts from
@@ -206,6 +209,7 @@ function sharedSteps(testPlatform) {
   return [
     nodeStep("sync-version", "scripts/sync-version.js", ["--check"]),
     nodeStep("registry-writer", "scripts/check-registry-writer.js", []),
+    nodeStep("policy-writer", "scripts/check-policy-writer.js", []),
     // Walk the working tree, not only git-tracked files, so new files are checked before commit.
     nodeStep("no-em-dash", "scripts/validate-no-em-dash.js", ["--root", ROOT]),
     nodeStep("changelog-version", "scripts/validate-changelog-version.js", []),
@@ -244,6 +248,32 @@ function sharedSteps(testPlatform) {
         NORMAL_TEST_FILTER,
       ]),
       project: "tests/Bwc.Core.Tests/Bwc.Core.Tests.csproj",
+    },
+    {
+      ...dotnetStep("test-gpo", [
+        "test",
+        "tests/Bwc.Gpo.Tests/Bwc.Gpo.Tests.csproj",
+        "-c",
+        "Release",
+        `-p:Platform=${testPlatform}`,
+        "--nologo",
+        "--filter",
+        NORMAL_TEST_FILTER,
+      ]),
+      project: "tests/Bwc.Gpo.Tests/Bwc.Gpo.Tests.csproj",
+    },
+    {
+      ...dotnetStep("test-policy", [
+        "test",
+        "tests/Bwc.Policy.Tests/Bwc.Policy.Tests.csproj",
+        "-c",
+        "Release",
+        `-p:Platform=${testPlatform}`,
+        "--nologo",
+        "--filter",
+        NORMAL_TEST_FILTER,
+      ]),
+      project: "tests/Bwc.Policy.Tests/Bwc.Policy.Tests.csproj",
     },
     {
       ...dotnetStep("test-registry-e2e", [

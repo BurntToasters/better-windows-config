@@ -1,3 +1,4 @@
+using Bwc.Core;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Bwc.Update.Tests;
@@ -11,13 +12,18 @@ public sealed class SetAumidTests
     private const string Programs = @"C:\ProgramData\Microsoft\Windows\Start Menu\Programs";
     private const string HubLnk = Programs + @"\Better Windows Config.lnk";
     private const string RegeditLnk = Programs + @"\Registry Editor (BWC).lnk";
+    private const string GpeditLnk = Programs + @"\Local Group Policy Editor (BWC).lnk";
     private const string HubId = "BetterWindowsConfig.Hub";
     private const string RegeditId = "BetterWindowsConfig.Regedit";
+    private const string GpeditId = "BetterWindowsConfig.Gpedit";
 
     // SA1, SA3
     [TestMethod]
     [DataRow(new[] { "--set-aumid", HubLnk, HubId }, true)]
     [DataRow(new[] { "--set-aumid", RegeditLnk, RegeditId }, true)]
+    [DataRow(new[] { "--set-aumid", GpeditLnk, GpeditId }, true)]
+    [DataRow(new[] { "--set-aumid", GpeditLnk, "betterwindowsconfig.gpedit" }, false)]
+    [DataRow(new[] { "--set-aumid", GpeditLnk, "BetterWindowsConfig.Gpedit2" }, false)]
     [DataRow(new[] { "--set-aumid" }, false)]
     [DataRow(new[] { "--set-aumid", HubLnk }, false)]
     [DataRow(new[] { "--set-aumid", HubLnk, HubId, "extra" }, false)]
@@ -71,6 +77,13 @@ public sealed class SetAumidTests
     [TestMethod]
     [DataRow(HubLnk, HubId, true)]
     [DataRow(RegeditLnk, RegeditId, true)]
+    [DataRow(GpeditLnk, GpeditId, true)]
+    [DataRow(Programs + @"\local group policy editor (bwc).LNK", GpeditId, true)]
+    [DataRow(GpeditLnk, HubId, false)]
+    [DataRow(GpeditLnk, RegeditId, false)]
+    [DataRow(RegeditLnk, GpeditId, false)]
+    [DataRow(HubLnk, GpeditId, false)]
+    [DataRow(Programs + @"\Local Group Policy Editor.lnk", GpeditId, false)]
     [DataRow(Programs + @"\better windows config.LNK", HubId, true)]
     [DataRow(HubLnk, RegeditId, false)]
     [DataRow(RegeditLnk, HubId, false)]
@@ -82,6 +95,40 @@ public sealed class SetAumidTests
         var problem = ShortcutAumidRules.ScopeProblem(shortcut, appId, folder => PathRules.SameDirectory(folder, Programs));
 
         Assert.AreEqual(accepted, problem is null, problem);
+    }
+
+    // SA14: the helper's table is the same list as the ids the apps set at startup, one row per catalog tool plus the Hub, and
+    // the shortcut names are the ones the installer creates (installer/include/bwc-common.nsh).
+    [TestMethod]
+    public void SetAumid_Table_Matches_AppIdentity_And_Installer()
+    {
+        string[] fromIdentity = [AppIdentity.HubAppUserModelId, AppIdentity.RegeditAppUserModelId, AppIdentity.GpeditAppUserModelId];
+        CollectionAssert.AreEqual(fromIdentity, ShortcutAumidRules.Shortcuts.Select(row => row.AppId).ToArray());
+        Assert.AreEqual(ToolCatalog.Tools.Count + 1, ShortcutAumidRules.Shortcuts.Count, "the Hub and every tool of the catalog");
+        Assert.AreEqual(
+            ShortcutAumidRules.Shortcuts.Count,
+            ShortcutAumidRules.Shortcuts.Select(row => row.ShortcutName).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            "no two ids share a shortcut name");
+
+        string common = File.ReadAllText(Path.Combine(RepoRoot(), "installer", "include", "bwc-common.nsh"));
+        foreach (var (appId, shortcutName) in ShortcutAumidRules.Shortcuts)
+        {
+            StringAssert.Contains(common, "\"" + shortcutName + "\"", "the installer creates " + shortcutName);
+            StringAssert.Contains(common, "\"" + appId + "\"", "the installer writes " + appId);
+        }
+    }
+
+    private static string RepoRoot()
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "BetterWindowsConfig.slnx")))
+            {
+                return dir.FullName;
+            }
+        }
+
+        throw new InvalidOperationException("BetterWindowsConfig.slnx was not found above " + AppContext.BaseDirectory);
     }
 
     // SA5

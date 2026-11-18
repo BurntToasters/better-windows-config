@@ -758,3 +758,22 @@ unelevated installer E2E.
 Known limits of the unelevated proof: nothing in this section that writes under Program Files, HKLM, or the all-users
 Start menu is run by `scripts/test-installer-e2e.js`. The `Elevated` rows are proved only by the elevated runner
 (`tests/Bwc.E2E/Installer`, category `Elevated`, I4), which a person installs and starts.
+
+## Third tool: Local Group Policy Editor (0.2.0)
+
+Release 0.2.0 adds `BwcGpedit.exe` (tool id `gpedit`, AUMID `BetterWindowsConfig.Gpedit`, icon `resources/bwc-gpo.ico`, embedded in the
+exe through `ApplicationIcon`). Everything that ships, signs, licenses, installs, closes, updates, and releases `BwcRegedit.exe` now treats
+`BwcGpedit.exe` the same way. The elevation, install folder, and update security model do not change. Written before the tests and the
+code, per AGENTS.md. Each list of the product's apps lives in one table per script (`BWC_ROOT_APPS` in `scripts/release-policy.js`,
+`InstallerRun.ProductShortcuts` in the installer E2E, `ShortcutAumidRules.Shortcuts` in the helper, `ToolCatalog` for the process
+names), so a fourth tool is one row in each table and not a hunt through the files.
+
+| ID | Case | Required result | Proof |
+|----|------|-----------------|-------|
+| M53 | The Start menu shortcut of the third tool | `Local Group Policy Editor (BWC).lnk` is written beside the Hub and Registry Editor shortcuts, in the same folder, with target `$INSTDIR\BwcGpedit.exe` and the icon location `$INSTDIR\BwcGpedit.exe,0` (the exe embeds the gpedit icon, so the shortcut shows it, never the Hub icon). The `(BWC)` suffix follows the Registry Editor shortcut, so the name never collides with the classic tool or the Windows "Edit group policy" entry. A write failure is fatal and rolls back (M23, M12) | E2E (`<case>.a.shortcuts` counts three, `<case>.a.icons`), Elevated (`fresh.shortcuts.*`) |
+| M54 | The AUMID of the third tool | After the shortcuts are written the setup runs `BwcUpdate.exe --set-aumid "<lnk>" BetterWindowsConfig.Gpedit` (M45). A failure is a warning only (M46). The app sets the same id at startup (`AppIdentity.GpeditAppUserModelId`) | Update tests (SA13), E2E (`<case>.a.aumid` reads all three), Elevated (`fresh.shortcuts.gpeditAumid`) |
+| M55 | Uninstall and rollback of the third shortcut | `BwcWriteFailed` (first install) and the uninstall delete the Gpedit shortcut next to the other two, so no shortcut of the product stays. The shortcut count is 0 after an uninstall | E2E (`uninstall.shortcuts`), Elevated |
+| M56 | `BwcGpedit.exe` is running from the install folder during an update or uninstall | The close step names it like the other tools: `ProcessCommands.ProcessNames` is `BetterWindowsConfig` plus every `ToolCatalog` exe, so the process is found by name and by image path (HC3) and closed (exit 0), or blocks with exit 3. The setup texts name "Registry Editor (BWC) or Local Group Policy Editor (BWC)". A copy of the name that runs from another folder never blocks (`RunningImageRule`) | Update tests (`CloseRunning_*` for each tool of the catalog), E2E (the Hub refusal names both open tools) |
+| M57 | Signing | `BwcGpedit.exe` and `BwcGpedit.dll` are signed with the other BWC root binaries. The match list is built from `BWC_ROOT_APPS` (`BetterWindowsConfig`, `BwcRegedit`, `BwcGpedit`, `BwcUpdate`) plus `Bwc.*.dll`; nothing else gets a signature. `--dry-run` and the verify step list the new files | Selftest (`artifact-signing-selftest.js`: the target list of the fixture folder) |
+| M58 | A publish folder without `BwcGpedit.exe` | The required-file check (`REQUIRED_PUBLISH_FILES`, built from `BWC_ROOT_APPS`) exits `1` and names the file, exactly as for `BwcRegedit.exe`. The installer E2E publish builds `Bwc.Gpedit.App` too, so its installers carry the exe | Build, E2E (`test-installer-e2e.js` publish) |
+| M59 | The third-party notices miss the NuGet packages of `Bwc.Gpedit.App` | `scripts/generate-nuget-licenses.js` reads `obj/project.assets.json` of `Bwc.Gpedit.App` as well. A missing assets file exits `1` naming the project, as for the others | Build (`generate-nuget-licenses.js`) |

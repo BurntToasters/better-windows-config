@@ -111,6 +111,9 @@ internal sealed record GpeditOp
 
     public int? WaitMs { get; init; }
 
+    // pressKey: key names from GpeditDriver.KeySpecs; Name is the focus target ("tree" or "list").
+    public List<string>? Keys { get; init; }
+
     internal static readonly string[] States = { "Not Configured", "Enabled", "Disabled" };
     internal static readonly string[] Buttons = { "Apply", "OK", "Cancel", "Previous", "Next" };
     internal static readonly string[] Menus = { "File", "Action", "View", "Help", "Context" };
@@ -143,6 +146,9 @@ internal sealed record GpeditOp
         ["screenshot"] = (Array.Empty<string>(), new[] { "name" }),
         ["wait"] = (new[] { "waitMs" }, Array.Empty<string>()),
         ["dismissDialogs"] = (Array.Empty<string>(), Array.Empty<string>()),
+        ["readLayout"] = (Array.Empty<string>(), NodeFields),
+        ["dialogLayout"] = (new[] { "policy" }, new[] { "root", "path", "occurrence", "state" }),
+        ["pressKey"] = (new[] { "keys" }, new[] { "root", "path", "policy", "occurrence", "name" }),
     };
 
     internal static IReadOnlyCollection<string> KindNames => Rules.Keys;
@@ -164,6 +170,8 @@ internal sealed record GpeditOp
             "sortColumn" => " " + Column,
             "filterOn" => " " + FilterOn,
             "wait" => $" {WaitMs} ms",
+            "dialogLayout" => $" '{Policy}'" + (State is not null ? $" state {State}" : string.Empty),
+            "pressKey" => $" [{string.Join(", ", Keys ?? new List<string>())}] in {Name ?? "tree"}" + (Policy is not null ? $" on '{Policy}'" : string.Empty),
             _ => string.Empty,
         };
         return Kind + detail + where + (Label is not null ? $"  [{Label}]" : string.Empty);
@@ -233,6 +241,27 @@ internal sealed record GpeditOp
         if (Menu is not null && Menu != "Context" && (set.Contains("root") || set.Contains("policy")))
         {
             problems.Add("'root', 'path' and 'policy' on dumpMenu are for the Context menu only");
+        }
+
+        if (Kind == "pressKey")
+        {
+            foreach (string key in Keys ?? new List<string>())
+            {
+                if (!GpeditDriver.KeySpecs.ContainsKey(key))
+                {
+                    problems.Add($"key '{key}' is not allowed (allowed: {string.Join(", ", GpeditDriver.KeySpecs.Keys)})");
+                }
+            }
+
+            if (Keys is { Count: 0 })
+            {
+                problems.Add("keys is empty");
+            }
+
+            if (Name is not null && Name is not ("tree" or "list"))
+            {
+                problems.Add("name (the focus target) must be tree or list");
+            }
         }
 
         if (Occurrence is < 0)
@@ -383,6 +412,7 @@ internal sealed record GpeditOp
         Add("screenshot", Screenshot is not null);
         Add("name", Name is not null);
         Add("waitMs", WaitMs is not null);
+        Add("keys", Keys is not null);
         return set;
     }
 }

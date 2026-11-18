@@ -30,6 +30,7 @@ import {
   listPublishFiles,
   makensisArgs,
   readNsisVersion,
+  REQUIRED_PUBLISH_FILES as BUILD_REQUIRED_PUBLISH_FILES,
   SIGNING_DEFINE_NAMES,
   validatePayload,
   buildPayloadNsh,
@@ -53,10 +54,11 @@ const RID_ARCH = new Map([
 const PUBLISH_PROJECTS = [
   "src/Bwc.Hub/Bwc.Hub.csproj",
   "src/Bwc.Regedit.App/Bwc.Regedit.App.csproj",
+  "src/Bwc.Gpedit.App/Bwc.Gpedit.App.csproj",
   "src/Bwc.Update/Bwc.Update.csproj",
 ];
 const UPDATE_PROJECT = "src/Bwc.Update/Bwc.Update.csproj";
-const REQUIRED_PUBLISH_FILES = ["BetterWindowsConfig.dll", "BetterWindowsConfig.exe", "BwcUpdate.exe"];
+const REQUIRED_PUBLISH_FILES = ["BetterWindowsConfig.dll", ...BUILD_REQUIRED_PUBLISH_FILES];
 const NSIS_SCRIPT = path.join(REPO_ROOT, "installer", "bwc.nsi");
 const LICENSE_FILE = path.join(REPO_ROOT, "LICENSE");
 const ICON_FILE = path.join(REPO_ROOT, "resources", "bwc.ico");
@@ -73,7 +75,7 @@ const EXIT_NSIS_MISSING = 3;
 const usage = `Usage: node ${SCRIPT} --rid win-arm64|win-x64 [--prepare]
 
 Builds unsigned E2E installers A (package.json version) and B (next patch), then runs the Installer E2E tests:
-an in-app update from A to B through the Hub, a case with BwcRegedit open, an uninstall, the refusal to install
+an in-app update from A to B through the Hub, a case with BwcRegedit and BwcGpedit open, an uninstall, the refusal to install
 over a newer version, and the refusal of the E2E /MACHINE switch without an elevated token. The E2E installer is the
 per-user sandbox, so everything here runs unelevated; the per-machine proof is the elevated runner (docs/installer.md).
 

@@ -184,3 +184,25 @@ publishes `bwc-stable-v2.json`, so before it ships the live feed returns 404 (C4
 | C25 | Client arguments carry spaces, quotes, or trailing backslashes | The client gets different arguments than the script passed | The arguments go to the wrapper as base64 JSON and are quoted with the CommandLineToArgvW rules. |
 | C26 | The wrapper cannot write the child's output files or its result file | A run with no verdict looks like an unparsed output | Refuse `deelevate-failed` naming the missing result. Exit 4. |
 | C27 | The restricted child cannot open the window station or desktop it starts on. Over SSH, Windows makes the session's station (`Service-0x0-<logon id>$`) from the elevated token's default DACL, which grants Administrators and SYSTEM, and the child holds Administrators as deny-only | Every client run dies at start with 0xC0000142 (STATUS_DLL_INIT_FAILED) and prints nothing | The child starts on a private window station and desktop whose DACL grants only the current user and SYSTEM, labeled medium, with `DETACHED_PROCESS` so no console host is needed. The station is created with `CWF_CREATE_ONLY`, unnamed first and then with a GUID name, so an existing station is never reused. Only an unelevated caller may fall back to its own desktop, which its medium child can already open. An elevated caller with no private station is refused `deelevate-failed` naming both Win32 errors. The result records the desktop used. An exit of 0xC0000142 is `deelevate-failed`, not a client verdict. |
+
+## Policy writer guard and the policy test projects (release 0.2.0)
+
+Three steps were added to `scripts/test-all.js`. They run in `--quick` mode too. The step logs and the
+`artifacts/gate/result.json` entries follow the same format as every other step. Every case for the guard is in
+`policy-writer.md`.
+
+| Step | Command | What it guards |
+|------|---------|----------------|
+| `policy-writer` | `node scripts/check-policy-writer.js`, right after `registry-writer` | No file write reaches the real `%SystemRoot%\System32\GroupPolicy`, a `PolicyDefinitions` folder, or the BWC import store except through `src/Bwc.Gpo/Store/GpoFileWriter.cs` and `src/Bwc.Policy/Store/TemplateStoreWriter.cs`. `RefreshPolicy*`, the critical section calls, and `IGroupPolicyObject` appear only in `src/Bwc.Gpo/Refresh/PolicyRefresh.cs`. `gpupdate`, `secedit`, `gpedit.msc`, and `mmc` are launched only by `tools/Bwc.Oracle.Capture/Gpedit/**`. |
+| `test-gpo` | `dotnet test tests/Bwc.Gpo.Tests/Bwc.Gpo.Tests.csproj -c Release -p:Platform=<host> --nologo --filter TestCategory!=Elevated` | The `Registry.pol` codec and, later, the GPO folder store, with the same filter, platform, and project check as `test-core`. |
+| `test-policy` | `dotnet test tests/Bwc.Policy.Tests/Bwc.Policy.Tests.csproj -c Release -p:Platform=<host> --nologo --filter TestCategory!=Elevated` | The ADMX and ADML loader and, later, the template store. |
+
+| ID | Case | Risk | Required result |
+|----|------|------|-----------------|
+| P1 | A new file in `src/Bwc.Gpo`, `Bwc.Policy`, `Bwc.Gpedit`, `Bwc.Gpedit.Editor`, or `Bwc.Gpedit.App` calls a file-write API | A second writer bypasses the write policy | `policy-writer` fails with `protected-write`. Route the write through the named writer. |
+| P2 | A test or script names `GroupPolicy`, `PolicyDefinitions`, `Registry.pol`, `gpt.ini`, or `comment.cmtx` next to a write | A test run changes this machine's policy | `policy-writer` fails with `policy-path-write` unless the file is allowlisted with a reason. |
+| P3 | `RefreshPolicyEx` or `gpupdate` appears outside the named files | A policy refresh runs from a test or a second code path | `policy-writer` fails with `refresh-name` or `policy-process-launch`. |
+| P4 | The guard itself stops matching (a refactor breaks a pattern) | A rule passes everything | `--self-test` holds a fixture for every rule and every pass case, and fails on any miss. Run it with `node scripts/check-policy-writer.js --self-test`. |
+| P5 | `tests/Bwc.Gpo.Tests` or `tests/Bwc.Policy.Tests` is renamed or deleted | The step runs nothing | Like every `dotnet test` step, it fails with `test project not found` before spawning. |
+| P6 | A `.pol` file (binary `Registry.pol` fixtures) is scanned for U+2014 | A false positive from bytes that are not text | `.pol` is in the em dash scanner's binary extensions, so it is skipped like `.dll`. `.admx` and `.adml` are XML text and stay scanned. |
+| P7 | The gate passes while the real GroupPolicy folder changed | A test wrote to the real folder through a path the guard cannot see | The E2E harness hashes the real folder before and after every unelevated run (`gpo.real-unchanged`, a later piece). The guard stops the code that could write; the hash proves nothing did. |

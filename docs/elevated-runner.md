@@ -157,7 +157,8 @@ The E2E tests (`tests/Bwc.E2E`) are run by `run.js` through `test-e2e.js --filte
   - `InstallerMachine_LaunchHubStartsAtMediumIntegrity`: `--launch-hub` from the elevated test starts the (stand-in)
     Hub at medium integrity through the desktop shell.
   - `InstallerMachine_CloseRunningClosesElevatedRegedit`: `--close-running` closes an elevated Registry Editor of the
-    test install, and the helper's token shows SeDebugPrivilege enabled while it scans.
+    test install (the shortcut checks of the other tests read all three product shortcuts, including the Local Group
+    Policy Editor, with their AUMIDs), and the helper's token shows SeDebugPrivilege enabled while it scans.
   - `InstallerMachine_UninstallThroughTheUninstallString`: the QuietUninstallString (in place, `_?=`) removes the key,
     shortcuts, files, and `.upd`. Only `Uninstall.exe` may be left, queued for the restart.
   - `InstallerMachine_DowngradeIsRefusedAndSameVersionRepairs`: A over B is refused with no change, and B over B

@@ -315,3 +315,23 @@ in the elevated runner (the unelevated run reports them as not run).
 81. **A run killed halfway.** Leftovers stay under the three locations. The run id is in the folder name, so the user removes
     `%ProgramFiles%\BWC-E2E\<id>*`, `HKLM\Software\BWC-E2E\<id>`, and the Start menu folder `BWC-E2E-<id>` by hand. The next run
     does not touch them (its id is new).
+
+## Third tool: Local Group Policy Editor (0.2.0)
+
+Written before the tests and the code. The product has three shortcuts and three apps now; the installer E2E reads that from one table
+(`InstallerRun.ProductShortcuts`: name, AUMID, exe) and not from three copies of the names. See installer.md M53 to M59.
+
+92. **The shortcut count is three.** Every silent install of the unelevated E2E (`<case>.a.shortcuts`, `<case>.b.shortcuts`) requires
+    exactly `ProductShortcuts.Length` shortcuts in the shortcut folder (it was "more than 0"), so a missing `Local Group Policy Editor
+    (BWC).lnk` fails the case and an extra stray one does too. The machine test (Elevated) requires the same count in the all-users folder.
+93. **Every shortcut carries its AUMID.** `<case>.a.aumid` reads all three through the shell property store: the Hub
+    `BetterWindowsConfig.Hub`, Registry Editor `BetterWindowsConfig.Regedit`, Local Group Policy Editor `BetterWindowsConfig.Gpedit`. The Elevated
+    run adds `fresh.shortcuts.gpeditAumid`. A missing or wrong id is a failed check, not a warning (88).
+94. **Every shortcut shows its own icon.** `<case>.a.icons` reads the icon location of each shortcut through `IShellLinkW` and requires the
+    exe of its own row (`BwcGpedit.exe` for the Gpedit shortcut, under the run's install folder) and index 0. A shortcut that points at
+    another exe, at the Hub icon file, or at a missing path fails. The check does not draw the icon: that the exe embeds `bwc-gpo.ico` is the
+    icon test of the Gpedit app (`resources/bwc-gpo.ico` as `ApplicationIcon`).
+95. **The Hub refuses while both tools are open.** The "regedit" update case now also starts `BwcGpedit.exe` from the install folder
+    (`regedit.gpedit.open`), and the Hub's refusal text must name `Registry Editor` and `Local Group Policy Editor` (`regedit.hub.refusesWhileToolsOpen`).
+    The process names the test stops at cleanup come from the same table.
+96. **Uninstall removes the third shortcut.** `uninstall.shortcuts` requires 0 remaining, which now includes the Gpedit shortcut.

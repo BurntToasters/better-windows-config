@@ -31,6 +31,7 @@ internal static class MachineNative
     private const int SidSubAuthorityCountOffset = 1;
     private const ushort VtLpwstr = 31;
 
+    private static readonly Guid ShellLinkClassId = new("00021401-0000-0000-C000-000000000046");
     private static readonly Guid PropertyStoreIid = new("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99");
     private static readonly Guid AppUserModelFormat = new("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3");
 
@@ -187,6 +188,38 @@ internal static class MachineNative
         finally
         {
             _ = CloseHandle(process);
+        }
+    }
+
+    /// <summary>
+    /// The icon location of a shortcut (the path and the index, as IShellLinkW.GetIconLocation reads them from the file), so a
+    /// test can require that each shortcut shows the icon of its own exe (installer.md M53). Throws
+    /// <see cref="COMException"/> when the file cannot be loaded or read.
+    /// </summary>
+    public static (string Path, int Index) ShortcutIconLocation(string shortcutPath)
+    {
+        Type shellLink = Type.GetTypeFromCLSID(ShellLinkClassId) ?? throw new COMException("The shell link class is not registered.");
+        var link = (IShellLinkW)Activator.CreateInstance(shellLink)!;
+        try
+        {
+            int hr = ((IPersistFile)link).Load(shortcutPath, 0);
+            if (hr < 0)
+            {
+                throw new COMException("IPersistFile.Load failed for " + shortcutPath, hr);
+            }
+
+            var path = new StringBuilder(1024);
+            hr = link.GetIconLocation(path, path.Capacity, out int index);
+            if (hr < 0)
+            {
+                throw new COMException("IShellLinkW.GetIconLocation failed for " + shortcutPath, hr);
+            }
+
+            return (path.ToString(), index);
+        }
+        finally
+        {
+            _ = Marshal.ReleaseComObject(link);
         }
     }
 
@@ -474,6 +507,90 @@ internal static class MachineNative
 
         [FieldOffset(8)]
         public nint Value;
+    }
+
+    [ComImport]
+    [Guid("000214F9-0000-0000-C000-000000000046")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IShellLinkW
+    {
+        [PreserveSig]
+        int GetPath([MarshalAs(UnmanagedType.LPWStr)] StringBuilder file, int max, nint findData, uint flags);
+
+        [PreserveSig]
+        int GetIDList(out nint pidl);
+
+        [PreserveSig]
+        int SetIDList(nint pidl);
+
+        [PreserveSig]
+        int GetDescription([MarshalAs(UnmanagedType.LPWStr)] StringBuilder name, int max);
+
+        [PreserveSig]
+        int SetDescription([MarshalAs(UnmanagedType.LPWStr)] string name);
+
+        [PreserveSig]
+        int GetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] StringBuilder dir, int max);
+
+        [PreserveSig]
+        int SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string dir);
+
+        [PreserveSig]
+        int GetArguments([MarshalAs(UnmanagedType.LPWStr)] StringBuilder args, int max);
+
+        [PreserveSig]
+        int SetArguments([MarshalAs(UnmanagedType.LPWStr)] string args);
+
+        [PreserveSig]
+        int GetHotkey(out short hotkey);
+
+        [PreserveSig]
+        int SetHotkey(short hotkey);
+
+        [PreserveSig]
+        int GetShowCmd(out int showCmd);
+
+        [PreserveSig]
+        int SetShowCmd(int showCmd);
+
+        [PreserveSig]
+        int GetIconLocation([MarshalAs(UnmanagedType.LPWStr)] StringBuilder iconPath, int max, out int icon);
+
+        [PreserveSig]
+        int SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string iconPath, int icon);
+
+        [PreserveSig]
+        int SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string path, uint reserved);
+
+        [PreserveSig]
+        int Resolve(nint hwnd, uint flags);
+
+        [PreserveSig]
+        int SetPath([MarshalAs(UnmanagedType.LPWStr)] string file);
+    }
+
+    [ComImport]
+    [Guid("0000010B-0000-0000-C000-000000000046")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IPersistFile
+    {
+        [PreserveSig]
+        int GetClassID(out Guid classId);
+
+        [PreserveSig]
+        int IsDirty();
+
+        [PreserveSig]
+        int Load([MarshalAs(UnmanagedType.LPWStr)] string fileName, uint mode);
+
+        [PreserveSig]
+        int Save([MarshalAs(UnmanagedType.LPWStr)] string? fileName, [MarshalAs(UnmanagedType.Bool)] bool remember);
+
+        [PreserveSig]
+        int SaveCompleted([MarshalAs(UnmanagedType.LPWStr)] string fileName);
+
+        [PreserveSig]
+        int GetCurFile(out nint fileName);
     }
 
     [ComImport]

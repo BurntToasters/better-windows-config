@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Bwc.Oracle.Capture.Gpedit.Driver;
+using Bwc.Oracle.Capture.Gpedit.Matrix;
 using Bwc.Oracle.Capture.Gpedit.Probe;
 using Bwc.Oracle.Capture.Gpedit.Session;
 
@@ -12,6 +13,7 @@ internal static class GpeditCommands
         "usage: Bwc.Oracle.Capture gpedit <subcommand>\n" +
         "  probe [--dry-run]  drive classic gpedit.msc and record how it can be automated and how Registry.pol is ordered (probe.json)\n" +
         "  ops <file.json> [--dry-run]  run a list of driver operations (selectNode, editPolicy, ...) against classic gpedit with the oracle fixture; validate only with --dry-run\n" +
+        "  matrix [--only A,B] [--case G/Id] [--resume] [--dry-run] [--list]  the full capture matrix (groups A to H) with goldens; see docs/failure-modes/oracle-gpedit-matrix.md\n" +
         "  restore            undo an unfinished capture from its backup manifest; says so when there is nothing to restore\n" +
         "  status             print whether a backup manifest exists and what it holds\n" +
         "  selftest           run the session code against a sandbox folder (no administrator rights, no mmc.exe), selftest.json\n" +
@@ -42,6 +44,9 @@ internal static class GpeditCommands
 
                 case "ops":
                     return OpsCommand.Run(repo, rest, dryRun);
+
+                case "matrix":
+                    return MatrixCommand.Run(repo, rest);
 
                 case "restore":
                     return Restore(repo);

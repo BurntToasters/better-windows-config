@@ -12,12 +12,15 @@
 !define BWC_PUBLISHER "Better Windows Config"
 !define BWC_HUB_EXE "BetterWindowsConfig.exe"
 !define BWC_REGEDIT_EXE "BwcRegedit.exe"
+!define BWC_GPEDIT_EXE "BwcGpedit.exe"
 !define BWC_UPDATER_EXE "BwcUpdate.exe"
 !define BWC_HUB_SHORTCUT "Better Windows Config.lnk"
 !define BWC_REGEDIT_SHORTCUT "Registry Editor (BWC).lnk"
-; Must match Bwc.Core AppIdentity (HubAppUserModelId, RegeditAppUserModelId).
+!define BWC_GPEDIT_SHORTCUT "Local Group Policy Editor (BWC).lnk"
+; Must match Bwc.Core AppIdentity (HubAppUserModelId, RegeditAppUserModelId, GpeditAppUserModelId) and ShortcutAumidRules.
 !define BWC_HUB_AUMID "BetterWindowsConfig.Hub"
 !define BWC_REGEDIT_AUMID "BetterWindowsConfig.Regedit"
+!define BWC_GPEDIT_AUMID "BetterWindowsConfig.Gpedit"
 ; Uninstall key of ship builds (HKLM, 64-bit view). E2E builds use a key under BWC-E2E\<RUNID>, in HKCU for the
 ; per-user sandbox and in HKLM for the E2E-only /MACHINE mode. Registry code uses SHCTX, so SetShellVarContext
 ; picks the hive.
@@ -322,7 +325,7 @@ FunctionEnd
   BwcClose_${ID}_session:
   DetailPrint "Better Windows Config runs in another Windows session (see the lines above). It was not closed."
   IfSilent BwcClose_${ID}_sessionSilent 0
-  MessageBox MB_OK|MB_ICONSTOP "${BWC_PRODUCT} or Registry Editor (BWC) is running in another Windows session, for example for another signed-in user. Sign that user out or close the apps there, then run setup again. Nothing was changed."
+  MessageBox MB_OK|MB_ICONSTOP "${BWC_PRODUCT}, Registry Editor (BWC), or Local Group Policy Editor (BWC) is running in another Windows session, for example for another signed-in user. Sign that user out or close the apps there, then run setup again. Nothing was changed."
   Abort "Stopped: Better Windows Config runs in another Windows session. Nothing was changed."
   BwcClose_${ID}_sessionSilent:
   SetErrorLevel 4
@@ -330,7 +333,7 @@ FunctionEnd
   BwcClose_${ID}_busy:
   DetailPrint "Better Windows Config is still running from ${DIR}."
   IfSilent BwcClose_${ID}_silent 0
-  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${BWC_PRODUCT} or Registry Editor (BWC) is still running from ${DIR}.$\r$\n$\r$\nClose those windows, then click Retry. Click Cancel to stop without changing anything." IDRETRY BwcClose_${ID}_run
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${BWC_PRODUCT}, Registry Editor (BWC), or Local Group Policy Editor (BWC) is still running from ${DIR}.$\r$\n$\r$\nClose those windows, then click Retry. Click Cancel to stop without changing anything." IDRETRY BwcClose_${ID}_run
   Abort "Stopped: Better Windows Config is still running. Nothing was changed."
   BwcClose_${ID}_silent:
   SetErrorLevel 2

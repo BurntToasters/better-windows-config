@@ -36,7 +36,7 @@ Options for `scripts/build-installer.js`:
 A real run does these steps in order: it checks for NSIS, removes the previous result, checks the
 signing variables and the Artifact Signing Client Tools (unless `SKIP_WIN_CODESIGN=1`), reuses
 `publish/<rid>` when the last publish passed or runs `scripts/dotnet-build.js`, requires
-`BetterWindowsConfig.exe`, `BwcRegedit.exe`, and `BwcUpdate.exe` in the publish folder, signs the BWC
+`BetterWindowsConfig.exe`, `BwcRegedit.exe`, `BwcGpedit.exe`, and `BwcUpdate.exe` in the publish folder, signs the BWC
 binaries in that folder, generates the notices, writes the payload include, checks the NSIS source,
 runs `makensis` (which signs the setup EXE and the uninstaller), audits the manifest level of the built
 EXE (below), verifies every signed file, and writes a JSON record next to the EXE. The record holds the
@@ -76,7 +76,7 @@ node scripts/build-installer.js --rid win-arm64 --dry-run
 ## Third-party notices
 
 `scripts/generate-nuget-licenses.js` reads `obj/project.assets.json` of `Bwc.Hub`,
-`Bwc.Regedit.App`, and `Bwc.Update`. It keeps the NuGet packages that ship for the chosen RID
+`Bwc.Regedit.App`, `Bwc.Gpedit.App`, and `Bwc.Update`. It keeps the NuGet packages that ship for the chosen RID
 (runtime, native, resource, or runtime-target assets) and reads each license from the local NuGet
 cache. Two shipped components are not library entries in the assets, so they are added explicitly:
 the .NET runtime pack (version from `publish/<rid>/BetterWindowsConfig.runtimeconfig.json`) and
@@ -113,11 +113,12 @@ or a build first.
   The same version is a repair and installs again. A recorded version that is not `X.Y.Z` or
   `X.Y.Z-beta.N` never blocks.
 - Copies the whole published folder, plus `LICENSE`, `THIRD-PARTY-NOTICES.txt`, and the uninstaller.
-- Writes two all-users Start menu shortcuts (`SetShellVarContext all`), each with the exe icon:
+- Writes three all-users Start menu shortcuts (`SetShellVarContext all`), each with the icon of its own exe (index 0):
   - `Better Windows Config` runs `BetterWindowsConfig.exe`.
   - `Registry Editor (BWC)` runs `BwcRegedit.exe`.
-  The shortcuts carry the AppUserModelIDs the apps set at startup (`BetterWindowsConfig.Hub` and
-  `BetterWindowsConfig.Regedit`). Failing to write the AppUserModelID is a logged warning. Failing to
+  - `Local Group Policy Editor (BWC)` runs `BwcGpedit.exe` and shows the gpedit icon (`resources/bwc-gpo.ico`, embedded in the exe).
+  The shortcuts carry the AppUserModelIDs the apps set at startup (`BetterWindowsConfig.Hub`,
+  `BetterWindowsConfig.Regedit`, and `BetterWindowsConfig.Gpedit`). Failing to write the AppUserModelID is a logged warning. Failing to
   write a shortcut is an error: the install rolls back. The AppUserModelID script is written into
   `<install folder>.new` (under Program Files) and run from there, never from `%TEMP%`, because the
   setup is elevated.
@@ -184,7 +185,7 @@ new version is complete on disk, and a failure puts the old version back.
    earlier version), it then runs
    `BwcUpdate.exe --close-running --install-dir <folder> [--exclude-pid <PARENTPID>] --timeout-seconds 30`.
    That closes every BWC process that runs from the folder (`WM_CLOSE` to its windows) and waits up
-   to 30 seconds. The step runs elevated, so it reaches an elevated Registry Editor too. When `/D=` named
+   to 30 seconds. The step runs elevated, so it reaches an elevated Registry Editor or Local Group Policy Editor too. When `/D=` named
    an earlier per-user install, the same command runs once more with `--install-dir <that folder>`, also on
    a first install; nothing there is removed. Exit `0` continues. Exit `3` (a process stays open or the
    updater still runs) offers Retry or Cancel in an interactive run, and a silent run aborts with exit
@@ -279,7 +280,7 @@ Never publish the E2E installer. It is for tests only.
 `node scripts/test-installer-e2e.js --rid <rid>` (unelevated) builds E2E installers A and B and runs, in the
 per-user sandbox: the in-app update from A to B through the Hub (the protected copy of the installer is placed
 under the run's temp folder with `BWC_E2E_UPDATE_PROTECTED_ROOT`, and the relaunch goes through
-`BwcUpdate.exe --launch-hub`), the same with Registry Editor open, an uninstall, the refusal of an older setup over
+`BwcUpdate.exe --launch-hub`), the same with Registry Editor and Local Group Policy Editor open, an uninstall, the refusal of an older setup over
 a newer one and the repair by the same version, and the refusal of `/MACHINE` without an elevated token
 (nothing written). It cannot run the per-machine paths: Program Files and HKLM writes, all-users shortcuts, the
 64-bit registry view, `<install folder>.upd` cleanup, the elevated close step, the de-elevated Hub start, and the

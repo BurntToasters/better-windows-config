@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Bwc.Core;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Bwc.Update.Tests;
@@ -40,6 +41,44 @@ public sealed class ProcessHostTests
         {
             Kill(running);
             Kill(other);
+        }
+    }
+
+    // HC5: the update gate counts every catalog tool that runs from the install folder, and none that runs elsewhere.
+    [TestMethod]
+    public void Scan_Counts_Every_Catalog_Tool_Under_Install_Dir()
+    {
+        using var dir = new TempDir();
+        var installDir = dir.Sub("install");
+        var otherDir = dir.Sub("other");
+        var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+        var started = new List<(string Exe, Process Inside, Process Outside)>();
+        try
+        {
+            foreach (var tool in ToolCatalog.Tools)
+            {
+                var inInstall = Path.Combine(installDir, tool.ExeName);
+                var elsewhere = Path.Combine(otherDir, tool.ExeName);
+                File.Copy(cmd, inInstall);
+                File.Copy(cmd, elsewhere);
+                started.Add((tool.ExeName, StartLongRunning(inInstall), StartLongRunning(elsewhere)));
+            }
+
+            var live = new WindowsUpdateProcessHost().LiveProcesses([], installDir);
+
+            foreach (var (exe, inside, outside) in started)
+            {
+                Assert.IsTrue(live.Contains(inside.Id), exe + " running from the install folder blocks the install");
+                Assert.IsFalse(live.Contains(outside.Id), exe + " running from another folder does not block the install");
+            }
+        }
+        finally
+        {
+            foreach (var (_, inside, outside) in started)
+            {
+                Kill(inside);
+                Kill(outside);
+            }
         }
     }
 

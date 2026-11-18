@@ -35,6 +35,7 @@ const BINARY_EXTENSIONS = new Set([
   ".pdb",
   ".pdf",
   ".png",
+  ".pol",
   ".pri",
   ".so",
   ".tar",

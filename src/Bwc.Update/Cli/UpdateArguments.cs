@@ -57,8 +57,9 @@ public sealed class UpdateArguments
                   8 elevated and the Hub cannot be started unelevated (nothing was started).
 
           BwcUpdate.exe --set-aumid <absolute path of a .lnk> <app id>
-            Sets System.AppUserModel.ID on one of the two Start menu shortcuts of this product (app id
-            BetterWindowsConfig.Hub for "Better Windows Config.lnk", BetterWindowsConfig.Regedit for "Registry Editor (BWC).lnk"),
+            Sets System.AppUserModel.ID on one of the three Start menu shortcuts of this product (app id
+            BetterWindowsConfig.Hub for "Better Windows Config.lnk", BetterWindowsConfig.Regedit for "Registry Editor (BWC).lnk",
+            BetterWindowsConfig.Gpedit for "Local Group Policy Editor (BWC).lnk"),
             directly in the all-users Programs folder, and reads it back. Run by the installer. Writes no log when elevated.
             Exit: 0 written, 2 usage, 3 refused (another folder, name, or a link), 4 not written, 7 unexpected.
 

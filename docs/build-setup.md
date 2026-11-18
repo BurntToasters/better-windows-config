@@ -106,7 +106,7 @@ Every assembly carries `BwcFlavor` from `Directory.Build.props`: `ship` in ship 
 - Every managed `Bwc*` and `BetterWindowsConfig*` `.dll` or `.exe` must carry exactly the
   folder's value: `publish/<rid>` expects `ship`, and `publish/<rid>-e2e` expects `E2E`.
   A missing value, a value from the other flavor, or two values fails the check.
-- The two managed project main assemblies (`BetterWindowsConfig.dll`, `BwcRegedit.dll`) must be
+- The three managed project main assemblies (`BetterWindowsConfig.dll`, `BwcRegedit.dll`, `BwcGpedit.dll`) must be
   present.
 - Native apphost `.exe` files have no managed metadata and are listed as skipped.
 - The self-contained runtime must be there: `hostfxr.dll`, `hostpolicy.dll`, `coreclr.dll`, `System.Private.CoreLib.dll`, and
@@ -123,10 +123,10 @@ Every assembly carries `BwcFlavor` from `Directory.Build.props`: `ship` in ship 
   unexpected-error log line (`src/Bwc.Update/Cli/BuildFlavor.cs`), so the trimmer keeps it. The folder
   must hold exactly its own value. In a ship folder the exe is also searched for `BWC_E2E_UPDATE_` as
   UTF-8 and UTF-16LE.
-- Each exe head's embedded manifest (`BwcRegedit.exe`, `BetterWindowsConfig.exe`,
+- Each exe head's embedded manifest (`BwcRegedit.exe`, `BwcGpedit.exe`, `BetterWindowsConfig.exe`,
   `BwcUpdate.exe`) must declare one `requestedExecutionLevel`. In `publish/<rid>-e2e` it must be
   `asInvoker`. In `publish/<rid>` it must be the level in that project's source manifest:
-  `highestAvailable` (`src/Bwc.Regedit.App/app.manifest`), `asInvoker` (`src/Bwc.Hub/app.manifest`),
+  `highestAvailable` (`src/Bwc.Regedit.App/app.manifest` and `src/Bwc.Gpedit.App/app.manifest`), `asInvoker` (`src/Bwc.Hub/app.manifest`),
   and `asInvoker` (`src/Bwc.Update/app.manifest`). The check reads the manifest bytes
   in both ASCII and UTF-16LE. It ignores closing tags.
 
@@ -153,7 +153,7 @@ node scripts/flavor-metadata.js --rid win-arm64 --flavor e2e
 ### E2E flavor never elevates
 
 The E2E flavor must not raise UAC when an agent or developer starts an exe directly.
-`src/Bwc.Regedit.App/Bwc.Regedit.App.csproj` and `src/Bwc.Update/Bwc.Update.csproj` select
+`src/Bwc.Regedit.App/Bwc.Regedit.App.csproj`, `src/Bwc.Gpedit.App/Bwc.Gpedit.App.csproj`, and `src/Bwc.Update/Bwc.Update.csproj` select
 `app.e2e.manifest` (asInvoker) instead of their ship manifest when `BwcFlavor` is `E2E`. The NativeAOT
 linker copies the manifest from the managed build output into `BwcUpdate.exe`, and the manifest check
 below reads it back from the exe.
@@ -162,7 +162,7 @@ check above enforces these levels.
 
 The apphost and merged manifest in `obj` are shared by both flavors, and the SDK does not
 rebuild them when only the manifest selection changes. The two projects that select a
-different manifest (Regedit and Update) therefore run `BwcDropFlavorManifestOutputs` before
+different manifest (Regedit, Gpedit, and Update) therefore run `BwcDropFlavorManifestOutputs` before
 `PrepareForBuild`. It records the last flavor in
 `obj/.../bwc-flavor.txt` and deletes the `Manifests` folder and `apphost.exe` when the flavor
 changes. Without it, the ship publish kept `asInvoker` after an E2E build.
@@ -210,8 +210,8 @@ described in [elevated-runner.md](elevated-runner.md).
 ## App icons
 
 Each app has a 1024x1024 PNG source in `resources/` and a generated `.ico` beside it.
-The Hub uses `bwc.ico`. The Registry Editor uses `bwc-regedit.ico`, which its exe embeds and its
-window loads. `npm run icons:normalize` rebuilds every `.ico` with ImageMagick (`magick` on PATH or
+The Hub uses `bwc.ico`. The Registry Editor uses `bwc-regedit.ico` and the Local Group Policy Editor uses
+`bwc-gpo.ico`; each exe embeds its icon (the installer shortcuts read it from the exe) and its window loads it. `npm run icons:normalize` rebuilds every `.ico` with ImageMagick (`magick` on PATH or
 under `C:\Program Files\ImageMagick-*`; nothing is downloaded). Each `.ico` holds 256, 128, 96, 72,
 64, 48, 40, 32, 24, 20, and 16 px images. `npm run icons:normalize -- --check` fails when an `.ico` is
 missing a size or older than its source. Run the normalize command again, then commit the `.ico`.

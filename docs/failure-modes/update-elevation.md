@@ -302,3 +302,17 @@ The comment in `UpdateApplier.VerifyAndStartAsync` said the verified file stays 
 After the runas start returns, the medium helper releases both handles (the start call returns when the elevated process was
 created, not when it opened the file). The comment now says that. The elevated helper does not rely on the medium helper's
 check: it copies, then verifies the copy (EA13 to EA16). Doc.
+
+## 0.2.0: the third tool (`BwcGpedit.exe`)
+
+Written before the tests and the code. `--set-aumid` and `--close-running` know the product's apps by a fixed list, so a new app is refused
+until the list names it. The list is one table (`ShortcutAumidRules.Shortcuts`: shortcut name and app id) and `ToolCatalog` for the exe names;
+nothing else in `Bwc.Update` hard-codes a tool.
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| SA13 | `--set-aumid "<...>\Local Group Policy Editor (BWC).lnk" BetterWindowsConfig.Gpedit` | The third shortcut is refused (exit 2 or 3) and has no AUMID, so a pinned tool groups wrongly on the taskbar | Accepted by SA2 and SA3, and by SA4 for exactly this pair. The app id is exactly `BetterWindowsConfig.Hub`, `BetterWindowsConfig.Regedit`, or `BetterWindowsConfig.Gpedit`; any other text stays a usage error | `SetAumid_Arguments_Parse`, `SetAumid_Name_And_Id_Rule` |
+| SA14 | The three ids of the helper differ from `AppIdentity` (the ids the apps set at startup) or from the installer defines | A shortcut and its window group apart | A test compares every row of `ShortcutAumidRules.Shortcuts` with `AppIdentity.HubAppUserModelId`, `RegeditAppUserModelId`, `GpeditAppUserModelId` and with the shortcut file names of `installer/include/bwc-common.nsh` | `SetAumid_Table_Matches_AppIdentity_And_Installer` |
+| SA15 | A shortcut name that belongs to another tool's id (`Local Group Policy Editor (BWC).lnk` with the Regedit id, or `Registry Editor (BWC).lnk` with the Gpedit id) | The helper writes a wrong id into a shortcut | Refused `PathRejected`, exit 3, nothing written (SA4) | `SetAumid_Name_And_Id_Rule` |
+| SA16 | The real COM write on the Gpedit shortcut | A third id is not stored | `ShortcutAumid.Write` stores `BetterWindowsConfig.Gpedit` and reads it back, and keeps the target (SA12) | `Aumid_Write_Roundtrips_On_Real_Shortcut` |
+| HC5 | `BwcGpedit.exe` runs from the install folder (`--close-running`, the update gate, the installer) | The tool is not found, so a replaced file is locked or an update proceeds over an open editor | `ProcessCommands.ProcessNames` and the Hub's refusal both come from `ToolCatalog`, so each catalog tool is found by name and by readable image path under the folder (HC3), and a copy of the same name elsewhere never counts. Printed lines name the process (`BwcGpedit pid=<n>`) | `CloseRunning_Every_Catalog_Tool_Is_Found`, `Scan_Counts_Every_Catalog_Tool_Under_Install_Dir`, `Image_Rule_Covers_Every_Catalog_Tool` |

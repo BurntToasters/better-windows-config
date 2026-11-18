@@ -656,8 +656,8 @@ refusal for an environment key, and the default repository. No network and no `g
 The installer's Windows files are Authenticode-signed with Azure Artifact Signing, the same way
 Zinnia signs them. The build signs these files, and nothing else:
 
-- The BWC binaries in the publish folder root: `BetterWindowsConfig.exe`, `BwcRegedit.exe`,
-  `BwcUpdate.exe` (NativeAOT, so there is no `BwcUpdate.dll`), `BetterWindowsConfig.dll`, `BwcRegedit.dll`, and `Bwc.*.dll`.
+- The BWC binaries in the publish folder root: `BetterWindowsConfig.exe`, `BwcRegedit.exe`, `BwcGpedit.exe`,
+  `BwcUpdate.exe` (NativeAOT, so there is no `BwcUpdate.dll`), `BetterWindowsConfig.dll`, `BwcRegedit.dll`, `BwcGpedit.dll`, and `Bwc.*.dll`.
   Microsoft and third-party runtime files are not touched.
 - The setup EXE (NSIS `!finalize`) and the uninstaller (NSIS `!uninstfinalize`, signed before it is
   embedded, so the setup signature covers it).

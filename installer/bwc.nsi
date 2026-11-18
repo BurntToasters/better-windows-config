@@ -393,6 +393,7 @@ Function BwcWriteFailed
   IfFileExists "$INSTDIR${BWC_BACKUP_SUFFIX}\${BWC_MANIFEST}" BwcWf_upgrade 0
   Delete "$BwcShortcutDir\${BWC_HUB_SHORTCUT}"
   Delete "$BwcShortcutDir\${BWC_REGEDIT_SHORTCUT}"
+  Delete "$BwcShortcutDir\${BWC_GPEDIT_SHORTCUT}"
   DeleteRegKey SHCTX "$BwcUninstallKey"
   BwcWf_upgrade:
   Call BwcRollback
@@ -499,6 +500,8 @@ Section "Better Windows Config" SecMain
   IfErrors BwcSec_writeFailed 0
   CreateShortCut "$BwcShortcutDir\${BWC_REGEDIT_SHORTCUT}" "$INSTDIR\${BWC_REGEDIT_EXE}" "" "$INSTDIR\${BWC_REGEDIT_EXE}" 0
   IfErrors BwcSec_writeFailed 0
+  CreateShortCut "$BwcShortcutDir\${BWC_GPEDIT_SHORTCUT}" "$INSTDIR\${BWC_GPEDIT_EXE}" "" "$INSTDIR\${BWC_GPEDIT_EXE}" 0
+  IfErrors BwcSec_writeFailed 0
 
   WriteRegStr SHCTX "$BwcUninstallKey" "DisplayName" "${BWC_PRODUCT}"
   WriteRegStr SHCTX "$BwcUninstallKey" "DisplayVersion" "${BWC_VERSION}"
@@ -525,6 +528,7 @@ Section "Better Windows Config" SecMain
   SetOutPath "$WINDIR"
   !insertmacro BWC_SET_AUMID_BODY "$BwcShortcutDir\${BWC_HUB_SHORTCUT}" "${BWC_HUB_AUMID}"
   !insertmacro BWC_SET_AUMID_BODY "$BwcShortcutDir\${BWC_REGEDIT_SHORTCUT}" "${BWC_REGEDIT_AUMID}"
+  !insertmacro BWC_SET_AUMID_BODY "$BwcShortcutDir\${BWC_GPEDIT_SHORTCUT}" "${BWC_GPEDIT_AUMID}"
   Goto BwcSec_written
   BwcSec_writeFailed:
   Call BwcWriteFailed
@@ -544,7 +548,7 @@ Section "Uninstall"
   ; Stop the apps first. Abort, with nothing removed, when they stay.
   Call un.BwcCloseRunningApps
 
-  ; Shortcuts. Ship: the two all-users shortcuts, in the folder the installer used ($SMPROGRAMS with the all-users
+  ; Shortcuts. Ship: the three all-users shortcuts, in the folder the installer used ($SMPROGRAMS with the all-users
   ; context). E2E: the folder that the install recorded; the /MACHINE sandbox also removes its own Start menu folder
   ; when it is empty.
   !ifdef BWC_E2E
@@ -555,6 +559,7 @@ Section "Uninstall"
   StrCmp $R0 "" BwcUn_noShortcuts 0
   Delete "$R0\${BWC_HUB_SHORTCUT}"
   Delete "$R0\${BWC_REGEDIT_SHORTCUT}"
+  Delete "$R0\${BWC_GPEDIT_SHORTCUT}"
   !ifdef BWC_E2E
     StrCmp $BwcMachine "1" 0 BwcUn_noShortcuts
     RMDir "$R0"

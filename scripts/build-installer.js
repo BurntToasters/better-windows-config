@@ -27,6 +27,7 @@ import { isDirectExecutionOf } from "./direct-execution.mjs";
 import { checkSetupManifestLevel, publishFolderName, SETUP_EXECUTION_LEVELS } from "./flavor-metadata.js";
 import { generateNugetNotices } from "./generate-nuget-licenses.js";
 import {
+  BWC_ROOT_APPS,
   bwcSigningTargets,
   missingSigningVariables,
   SKIP_ENV,
@@ -472,7 +473,7 @@ function printSigningPlan({ signing, publishDir, publishPresent, names }) {
  * Files the installer cannot work without. BwcUpdate.exe is the one the installer runs for the close
  * step, so a publish without it cannot produce a working upgrade.
  */
-export const REQUIRED_PUBLISH_FILES = Object.freeze(["BetterWindowsConfig.exe", "BwcRegedit.exe", "BwcUpdate.exe"]);
+export const REQUIRED_PUBLISH_FILES = Object.freeze(BWC_ROOT_APPS.map((name) => `${name}.exe`));
 
 /**
  * Checks installer/bwc.nsi and the files it includes, without NSIS. Reports: an include that does

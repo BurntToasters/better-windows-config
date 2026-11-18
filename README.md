@@ -57,7 +57,7 @@ differently from the original, that's a bug.
   </tr>
 </table>
 
-More classic tools will follow once the Registry Editor is solid.
+The **Local Group Policy Editor** is coming in 0.2.0. More classic tools will follow once the Registry Editor is solid.
 
 ## Install
 
@@ -146,6 +146,7 @@ new `## Changes in` section). Replace the placeholder notes before you release.
 | Path | What it is |
 | --- | --- |
 | `src/Bwc.Regedit.App` | The Registry Editor app. Its engine is `src/Bwc.Registry`. |
+| `src/Bwc.Gpedit.App` | The Local Group Policy Editor app, coming in 0.2.0. |
 | `src/Bwc.Hub` | The Hub launcher. |
 | `src/Bwc.Update` | The self-updater. |
 | `installer/` | The NSIS installer script. |

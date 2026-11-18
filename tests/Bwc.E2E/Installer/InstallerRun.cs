@@ -17,14 +17,30 @@ internal sealed class InstallerRun : IDisposable
 {
     public const string HubExeName = "BetterWindowsConfig.exe";
     public const string RegeditExeName = "BwcRegedit.exe";
+    public const string GpeditExeName = "BwcGpedit.exe";
     public const string UpdaterExeName = "BwcUpdate.exe";
     public const string UninstallerName = "Uninstall.exe";
+
+    public sealed record ProductShortcut(string Name, string AppId, string ExeName);
+
+    /// <summary>
+    /// The one table of the Start menu shortcuts the installer writes: file name, AppUserModelID, and the exe the shortcut
+    /// starts (and takes its icon from, index 0). Every installer check reads this table (installer.md M53 to M55,
+    /// installer-e2e.md 92 to 94), so a fourth tool is one row here and one in the installer.
+    /// </summary>
+    public static readonly IReadOnlyList<ProductShortcut> ProductShortcuts =
+    [
+        new("Better Windows Config.lnk", "BetterWindowsConfig.Hub", HubExeName),
+        new("Registry Editor (BWC).lnk", "BetterWindowsConfig.Regedit", RegeditExeName),
+        new("Local Group Policy Editor (BWC).lnk", "BetterWindowsConfig.Gpedit", GpeditExeName),
+    ];
     private const string RegistryParent = @"Software\BWC-E2E";
     private const string UninstallSubkey = @"Uninstall\BetterWindowsConfig";
     private const string MachineParentName = "BWC-E2E";
     private const string MachineStartMenuPrefix = "BWC-E2E-";
     private static readonly string[] MachineSiblingSuffixes = ["", ".new", ".old", ".upd"];
-    private static readonly string[] ProcessNames = ["BetterWindowsConfig", "BwcRegedit", "BwcUpdate"];
+    private static readonly string[] ProcessNames =
+        [.. ProductShortcuts.Select(shortcut => Path.GetFileNameWithoutExtension(shortcut.ExeName)), "BwcUpdate"];
     private static readonly TimeSpan CleanupWait = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan MachineUninstallTimeout = TimeSpan.FromSeconds(120);
     private readonly List<Process> _started = [];
@@ -85,6 +101,8 @@ internal sealed class InstallerRun : IDisposable
     public string HubExe => Path.Combine(InstallDir, HubExeName);
 
     public string RegeditExe => Path.Combine(InstallDir, RegeditExeName);
+
+    public string GpeditExe => Path.Combine(InstallDir, GpeditExeName);
 
     public string UpdaterExe => Path.Combine(InstallDir, UpdaterExeName);
 
@@ -249,7 +267,7 @@ internal sealed class InstallerRun : IDisposable
         return key is not null;
     }
 
-    /// <summary>The number of .lnk files the installer wrote to the shortcut folder.</summary>
+    /// <summary>The number of .lnk files in the shortcut folder (<see cref="ProductShortcuts"/> has the expected).</summary>
     public int ShortcutCount() =>
         Directory.Exists(ShortcutDir) ? Directory.GetFiles(ShortcutDir, "*.lnk", SearchOption.AllDirectories).Length : 0;
 

@@ -339,6 +339,18 @@ internal static class OpsRunner
 
                 return new JsonObject { ["waitedMs"] = op.WaitMs };
 
+            case "readLayout":
+                EnsureNode(driver, op, entry);
+                return driver.ReadLayout();
+
+            case "dialogLayout":
+                EnsureNode(driver, op, entry);
+                return driver.DialogLayout(op.Policy!, op.Occurrence, op.State);
+
+            case "pressKey":
+                EnsureNode(driver, op, entry);
+                return driver.PressKeys(op.Keys!, op.Name, op.Policy, op.Occurrence);
+
             case "dismissDialogs":
                 return new JsonObject { ["handled"] = driver.EnsureNoDialogs() };
 
