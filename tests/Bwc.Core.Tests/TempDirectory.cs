@@ -15,6 +15,8 @@ internal sealed class TempDirectory : IDisposable
 
     public void Dispose()
     {
+        // Elevated-mode tests hold their data folders open; release them so the folder can be removed.
+        SafeDataFolder.ReleaseAll();
         if (!Directory.Exists(Path))
         {
             return;

@@ -3,13 +3,36 @@ using System.Xml.Linq;
 
 namespace Bwc.Policy.Admx;
 
-/// <summary>Collects load failures. One sink belongs to one thread of work.</summary>
-internal sealed class FailureSink
+/// <summary>
+/// Collects load failures. One sink belongs to one thread of work. A sink made with a cap keeps that many failures, then
+/// one <see cref="TemplateFailureCode.TooManyFailures"/> entry, and drops the rest.
+/// </summary>
+internal sealed class FailureSink(int cap = int.MaxValue)
 {
+    private bool capped;
+
     internal List<TemplateFailure> Items { get; } = [];
 
-    internal void Add(TemplateFailureCode code, string path, string detail = "", int line = 0, int position = 0) =>
+    /// <summary>True once the cap is reached: the next failure ends the list and nothing after it is kept.</summary>
+    internal bool IsFull => capped || Items.Count >= cap;
+
+    internal void Add(TemplateFailureCode code, string path, string detail = "", int line = 0, int position = 0)
+    {
+        if (capped)
+        {
+            return;
+        }
+
+        if (Items.Count >= cap)
+        {
+            capped = true;
+            Items.Add(new TemplateFailure(
+                TemplateFailureCode.TooManyFailures, path, 0, 0, cap.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            return;
+        }
+
         Items.Add(new TemplateFailure(code, path, line, position, detail));
+    }
 }
 
 /// <summary>The source position of an element, kept as an annotation on the element.</summary>
@@ -34,16 +57,73 @@ internal static class SafeXml
         CloseInput = true,
     };
 
-    /// <summary>True when the path is a reparse point. A path that does not exist is not one.</summary>
-    internal static bool IsReparsePointPath(string path)
+    /// <summary>
+    /// True when the path is a reparse point. A path that does not exist (file or directory not found) is not one, so it
+    /// stays missing. Attributes that exist but cannot be read count as a link, as in the other path checks of the
+    /// solution: a path that cannot be inspected cannot be shown not to be a link.
+    /// </summary>
+    internal static bool IsReparsePointPath(string path) => IsReparsePointPath(path, File.GetAttributes);
+
+    /// <summary>The same check with the attribute read as a seam, for tests that cannot make a path unreadable.</summary>
+    internal static bool IsReparsePointPath(string path, Func<string, FileAttributes> readAttributes)
     {
         try
         {
-            return IsReparsePoint(File.GetAttributes(path));
+            return IsReparsePoint(readAttributes(path));
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
-            return false;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Reads a template file as text, for the one place that needs the text itself (the position of a start tag). It
+    /// applies the same checks as <see cref="Load"/> before it opens the file: name length, reparse point and size cap.
+    /// Returns null when the file is refused or cannot be read; the failure for that is already recorded by
+    /// <see cref="Load"/>.
+    /// </summary>
+    internal static string? ReadText(string path) => ReadText(path, File.GetAttributes);
+
+    /// <summary>The same read with the attribute read as a seam.</summary>
+    internal static string? ReadText(string path, Func<string, FileAttributes> readAttributes)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            if (info.Name.Length > AdmxLimits.MaxFileNameLength
+                || IsReparsePointPath(path, readAttributes)
+                || (readAttributes(path) & FileAttributes.Directory) != 0
+                || info.Length > AdmxLimits.MaxFileBytes)
+            {
+                return null;
+            }
+
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var reader = new StreamReader(stream, detectEncodingFromByteOrderMarks: true);
+
+            // A file that grows after the size check is cut off at the same cap as the XML reader's.
+            var text = new System.Text.StringBuilder();
+            var buffer = new char[64 * 1024];
+            int count;
+            while ((count = reader.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                text.Append(buffer, 0, count);
+                if (text.Length > AdmxLimits.MaxFileBytes)
+                {
+                    return null;
+                }
+            }
+
+            return text.ToString();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+        {
+            return null;
         }
     }
 

@@ -168,7 +168,7 @@ public static class TemplateLoader
 
     private static FileResult LoadFile(WorkItem item, string culture)
     {
-        var sink = new FailureSink();
+        var sink = new FailureSink(AdmxLimits.MaxFailuresPerFile);
         try
         {
             return new FileResult(ReadFile(item, culture, sink), sink.Items);

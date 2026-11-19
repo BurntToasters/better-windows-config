@@ -4,8 +4,17 @@ using System.Xml.Linq;
 namespace Bwc.Policy.Admx;
 
 /// <summary>Shared reading helpers: attribute access with failure recording for one file.</summary>
-internal sealed class ParseContext(string path, FailureSink sink)
+/// <param name="path">The file being read.</param>
+/// <param name="sink">Where failures of this file go.</param>
+/// <param name="readText">
+/// Reads the file text for the start tag position (a seam for tests). Null means <see cref="SafeXml.ReadText(string)"/>.
+/// It is called at most once per context.
+/// </param>
+internal sealed class ParseContext(string path, FailureSink sink, Func<string, string?>? readText = null)
 {
+    private bool textRead;
+    private string? text;
+
     internal string Path { get; } = path;
 
     internal static SourcePosition PositionOf(XElement element) =>
@@ -26,8 +35,23 @@ internal sealed class ParseContext(string path, FailureSink sink)
     internal void FailAtStartTagEnd(TemplateFailureCode code, XElement element, string detail)
     {
         var start = PositionOf(element);
-        var end = StartTagEnd(start) ?? start;
+
+        // Past the cap the position is never used, so the text is not scanned.
+        var end = sink.IsFull ? null : StartTagEnd(start);
+        end ??= start;
         sink.Add(code, Path, detail, end.Line, end.Position);
+    }
+
+    /// <summary>The file text with line breaks as <c>\n</c>, read at most once; null when it cannot be read.</summary>
+    private string? Text()
+    {
+        if (!textRead)
+        {
+            textRead = true;
+            text = (readText ?? SafeXml.ReadText)(Path)?.Replace("\r\n", "\n").Replace('\r', '\n');
+        }
+
+        return text;
     }
 
     private SourcePosition? StartTagEnd(SourcePosition start)
@@ -39,7 +63,12 @@ internal sealed class ParseContext(string path, FailureSink sink)
 
         try
         {
-            var text = File.ReadAllText(Path).Replace("\r\n", "\n").Replace('\r', '\n');
+            var text = Text();
+            if (text is null)
+            {
+                return null;
+            }
+
             var offset = 0;
             for (var line = 1; line < start.Line; line++)
             {
@@ -86,6 +115,12 @@ internal sealed class ParseContext(string path, FailureSink sink)
     }
 
     internal static string? Attr(XElement element, string name) => element.Attribute(name)?.Value;
+
+    /// <summary>
+    /// Reads a registry key attribute with its trailing backslashes removed: the registry layer refuses a key that ends in
+    /// one and Windows ships keys that do (failure mode 46). A leading backslash or an empty middle segment stays.
+    /// </summary>
+    internal static string? KeyAttr(XElement element, string name) => Attr(element, name)?.TrimEnd('\\');
 
     /// <summary>Reads an optional boolean attribute. A value that is not true, false, 1 or 0 is recorded and ignored.</summary>
     internal bool? OptionalBool(XElement element, string name)

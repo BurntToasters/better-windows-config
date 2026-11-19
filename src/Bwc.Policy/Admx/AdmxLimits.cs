@@ -29,4 +29,10 @@ public static class AdmxLimits
 
     /// <summary>The longest ADML string, in characters. A longer string is not stored.</summary>
     public const int MaxStringLength = 1024 * 1024;
+
+    /// <summary>
+    /// The most failures recorded for one template file. The one after that is a single
+    /// <see cref="TemplateFailureCode.TooManyFailures"/> entry and the rest are dropped.
+    /// </summary>
+    public const int MaxFailuresPerFile = 100;
 }

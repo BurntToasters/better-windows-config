@@ -23,7 +23,7 @@ Failure codes used below: `FolderNotFound`, `ReparsePoint`, `FileTooLarge`, `Fil
 `NameTooLong`, `StringTooLong`, `MissingAttribute`, `InvalidAttributeValue`, `DuplicatePolicy`, `DuplicateCategory`,
 `DuplicateElement`, `DuplicateSupportedOn`, `DuplicateString`, `DuplicatePresentation`, `UndefinedString`,
 `UndefinedPresentation`, `UndefinedPresentationRef`, `UndefinedUsing`, `UndefinedPrefix`, `UndefinedCategory`,
-`MissingCategory`, `UndefinedSupportedOn`, `CategoryCycle`, `InternalError`.
+`MissingCategory`, `UndefinedSupportedOn`, `CategoryCycle`, `InternalError`, `TooManyFailures`.
 
 ## Files and folders
 
@@ -308,7 +308,7 @@ Which failures reject the file:
   `FileNameTooLong`, `ReparsePoint`, `Unreadable`, `NotATemplate`, `MissingAdml`, `NameTooLong`, `StringTooLong`,
   `MissingAttribute`, `InvalidAttributeValue`, `DuplicatePolicy`, `DuplicateCategory`, `DuplicateElement`,
   `DuplicateSupportedOn`, `DuplicateString`, `DuplicatePresentation`, `UndefinedString`, `UndefinedPresentation`,
-  `UndefinedPresentationRef`, `InternalError`.
+  `UndefinedPresentationRef`, `InternalError`, `TooManyFailures`.
 - Set-level, which already drop the file: `DuplicateNamespace`, `NamespaceShadowed`.
 - Link-level dangling references keep the file: `UndefinedUsing`, `UndefinedPrefix`, `UndefinedCategory`,
   `MissingCategory`, `UndefinedSupportedOn`, `CategoryCycle`. Shipped client templates carry them (section 34) and classic
@@ -433,3 +433,78 @@ objects on every access, and the `Children` of a category and `Policies` of a ca
 ### 45. A template whose namespace differs only in case
 
 Two files whose namespaces differ only in case are duplicates (section 30 and 20): `DuplicateNamespace` for the later file.
+
+## Audit fixes (AF1)
+
+### 46. A key that ends in a backslash (ADMX-5)
+
+Windows ships three policies whose `key` ends in a backslash (`AppxPackageManager.admx`: `EnableMsixAllowedZones`,
+`EnableMsixSmartScreenCheck`; `TerminalServer.admx`: `TS_RemoteDesktopVirtualGraphics`). The registry layer
+(`PolDocument`) refuses a key with a trailing backslash, so a policy whose key kept it always read Not Configured and every
+edit threw. The parser therefore trims every trailing backslash from each `key` it reads: the policy `key`, an element
+`key`, a list item `key` and a list `defaultKey` (same shape, same defect). The trimmed text is what the model, the
+effective keys and the length checks see. Section 26 "recorded as written" holds for everything else.
+
+How it can fail (each has a test):
+
+- A policy, element or list item key keeps its backslash, so the state reads Not Configured over a `Registry.pol` that holds
+  the trimmed key, or an edit throws `ArgumentException`. Test: a template whose policy, element, item and default keys end
+  in one or several backslashes loads with them trimmed; the state over a document with the trimmed keys is Enabled; an
+  edit applies and writes the trimmed keys only.
+- The `defaultKey` is missed, so an item that falls back to it keeps the backslash. Same test (an item with no own key).
+- Any loaded policy, element or list item of the system folder has a key that ends in a backslash. Test: system folder
+  invariant (no specific policy is named, CI has other templates).
+- A key made only of backslashes becomes an empty key. For a policy that is a `MissingAttribute` for `key` (as an empty
+  `key=""` already was); for an element or item it is an empty key as `key=""` already was. Not otherwise handled.
+
+Open oracle question: a key with a leading backslash, or an empty middle segment (`A\\B`), is left unchanged and still
+fails in `PolDocument`. What classic does with it is not captured (add to oracle group H).
+
+### 47. Failure flood from one file (ADMX-1)
+
+Failures of one file are capped at `AdmxLimits.MaxFailuresPerFile` (100). The first 100 are recorded as usual. When the
+file records one more, the sink adds one final entry with `TooManyFailures` (file path, no line, `Detail` is the cap) and
+drops everything after it, so a file holds at most 101 failures. A file with any failure is rejected (section 35), so
+nothing is lost but the later messages. The text of the ADMX, which is needed to place a missing-attribute failure at the
+`>` of its start tag (section 36), is read at most once per file for that purpose, through the same name length, reparse
+point and size checks as the XML read, never by a second unchecked open of the path. Once the cap is reached no text is
+scanned.
+
+How it can fail (each has a test):
+
+- A template with 10,000 faulty items (each missing `key` or `valueName`) takes seconds or gigabytes. Test: it loads
+  within a stated limit, records at most the cap plus the final entry, and the text reader seam is called at most once.
+- The final entry is missing or repeated, or the cap lets a flood of another code through. Test: exactly one
+  `TooManyFailures`, and it comes last.
+- A file with fewer failures than the cap gets a `TooManyFailures` entry, or loses a failure. Test: the existing
+  per-failure position tests keep passing.
+- The one text read skips the checks (a reparse point is followed, or a file over the size cap is read). Test: the text
+  reader refuses the same files `SafeXml.Load` refuses.
+
+### 48. Unknown attributes count as a link (ADMX-2)
+
+`SafeXml.IsReparsePointPath` agrees with the other two path checks of the solution (`GpoPathChecks`,
+`TemplateStoreChecks`): attributes that exist but cannot be read count as a reparse point, because a path that cannot be
+inspected cannot be shown not to be a link. A path that does not exist (file or directory not found) is still not a
+link: the loader reports a missing path as missing (`FolderNotFound`, `MissingAdml`, a language folder that falls back),
+never as a link. Callers check existence first (`Directory.Exists`, `File.Exists`), so only a path that exists and
+cannot be read is refused, as `ReparsePoint`.
+
+How it can fail (each has a test, through an attribute-read seam because a real unreadable path needs elevation):
+
+- Access denied, a sharing violation or any other I/O error while reading the attributes returns "not a link".
+- A missing file or missing directory returns "link" and a missing language folder or ADML becomes a `ReparsePoint`
+  failure instead of a fallback.
+
+### 49. Comment drift about dropped items (ADMX-3)
+
+The parser class comment said that a text or reference fault is recorded and the item stays. The loader rejects the whole
+file when any failure was recorded while it was read (section 35), so the item does not stay. The comment now says the
+failure is recorded and the file is rejected by the loader. Documentation only.
+
+### 50. Letter case of `class` and boolean attributes (ADMX-4, open oracle question)
+
+`class` (Machine, User, Both) and the boolean attributes (`required`, `soft`, `storeAsText`, `expandable`, `additive`,
+`explicitValue`) are accepted in any letter case, and boolean values also with surrounding blanks. What classic accepts
+is not captured: it may refuse `class="machine"` or `required="True"`. Until a capture exists the parser stays lenient.
+Add to oracle group H. No code change.

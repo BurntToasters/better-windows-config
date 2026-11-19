@@ -130,9 +130,68 @@ public sealed class SystemTemplatesInvariantTests
             times.Add(elapsed);
         }
 
+        // The first run is cold (file cache, JIT), so the fastest of the five is the one that tells a regression.
         var message = $"files={set!.Files.Count} policies={set.Policies.Count} categories={set.Categories.Count} "
-            + $"failures={set.Failures.Count} runs_ms={string.Join(",", times)} limit_ms={LimitMilliseconds}";
-        Assert.IsTrue(times[0] <= LimitMilliseconds, message);
+            + $"failures={set.Failures.Count} runs_ms={string.Join(",", times)} fastest_ms={times.Min()} limit_ms={LimitMilliseconds}";
+        Assert.IsTrue(times.Min() <= LimitMilliseconds, message);
+    }
+
+    [TestMethod]
+    public void SystemFolder_NoKeyEndsInABackslash()
+    {
+        var set = Load(out _);
+        var bad = new List<string>();
+
+        void Check(string policy, string what, string? key)
+        {
+            if (key is not null && key.EndsWith('\\'))
+            {
+                bad.Add($"{policy} {what}");
+            }
+        }
+
+        void CheckList(string policy, string what, PolicyValueList? list)
+        {
+            if (list is null)
+            {
+                return;
+            }
+
+            Check(policy, what + " defaultKey", list.DefaultKey);
+            foreach (var item in list.Items)
+            {
+                Check(policy, what + " item key", item.Key);
+                Check(policy, what + " item effective key", item.EffectiveKey);
+            }
+        }
+
+        foreach (var policy in set.Policies)
+        {
+            Check(policy.FullName, "key", policy.Key);
+            CheckList(policy.FullName, "enabledList", policy.EnabledList);
+            CheckList(policy.FullName, "disabledList", policy.DisabledList);
+            foreach (var element in policy.Elements)
+            {
+                Check(policy.FullName, element.Id + " key", element.Key);
+                Check(policy.FullName, element.Id + " effective key", element.EffectiveKey);
+                switch (element)
+                {
+                    case BooleanElement boolean:
+                        CheckList(policy.FullName, element.Id + " trueList", boolean.TrueList);
+                        CheckList(policy.FullName, element.Id + " falseList", boolean.FalseList);
+                        break;
+                    case EnumElement choice:
+                        foreach (var item in choice.Items)
+                        {
+                            CheckList(policy.FullName, element.Id + " valueList", item.ValueList);
+                        }
+
+                        break;
+                }
+            }
+        }
+
+        Assert.AreEqual(0, bad.Count, string.Join("; ", bad));
     }
 
     [TestMethod]

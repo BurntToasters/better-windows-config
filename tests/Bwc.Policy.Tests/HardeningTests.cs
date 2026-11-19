@@ -196,6 +196,40 @@ public sealed class HardeningTests
     }
 
     [TestMethod]
+    public void AttributesThatCannotBeRead_CountAsALink()
+    {
+        // A real unreadable path needs elevation, so the attribute read is a seam (failure mode 48).
+        static FileAttributes Throw(Exception ex) => throw ex;
+        Assert.IsTrue(SafeXml.IsReparsePointPath("x", _ => Throw(new UnauthorizedAccessException())));
+        Assert.IsTrue(SafeXml.IsReparsePointPath("x", _ => Throw(new IOException("sharing violation"))));
+        Assert.IsTrue(SafeXml.IsReparsePointPath("x", _ => Throw(new ArgumentException("bad path"))));
+        Assert.IsTrue(SafeXml.IsReparsePointPath("x", _ => Throw(new NotSupportedException())));
+        Assert.IsTrue(SafeXml.IsReparsePointPath("x", _ => Throw(new PathTooLongException())));
+    }
+
+    [TestMethod]
+    public void AMissingPath_IsMissingNotALink()
+    {
+        static FileAttributes Throw(Exception ex) => throw ex;
+        Assert.IsFalse(SafeXml.IsReparsePointPath("x", _ => Throw(new FileNotFoundException())));
+        Assert.IsFalse(SafeXml.IsReparsePointPath("x", _ => Throw(new DirectoryNotFoundException())));
+        Assert.IsTrue(SafeXml.IsReparsePointPath("x", _ => FileAttributes.ReparsePoint | FileAttributes.Directory));
+        Assert.IsFalse(SafeXml.IsReparsePointPath("x", _ => FileAttributes.Directory));
+    }
+
+    [TestMethod]
+    public void MissingLanguageFolderAndAdml_StillFallBackToEnUs_NotALinkFailure()
+    {
+        using var temp = new TempTemplates();
+        temp.AddSimple("One", "T.One", GoodPolicy, """<string id="P">P</string>""");
+
+        var set = temp.Load("de-DE");
+
+        FailureAssert.None(set);
+        Assert.AreEqual("en-US", set.Files.Single().Culture);
+    }
+
+    [TestMethod]
     public void Reader_SettingsProhibitDtdAndCapTheDocument()
     {
         var settings = SafeXml.CreateSettings();

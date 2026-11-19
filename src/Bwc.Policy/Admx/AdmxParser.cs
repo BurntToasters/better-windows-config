@@ -16,7 +16,9 @@ internal sealed class ParsedAdmx(TemplateFile file)
 
 /// <summary>
 /// Reads an ADMX element tree. It never validates against the schema: it reads what it needs and ignores the rest.
-/// An item with a structural fault is dropped and recorded; a text or reference fault is recorded and the item stays.
+/// An item with a structural fault is dropped and recorded; a text or reference fault is recorded and the item is kept
+/// with a fallback. Either way the loader rejects the whole file when any failure was recorded while it was read, so
+/// nothing of a faulty file reaches the set (failure mode 35).
 /// </summary>
 internal static class AdmxParser
 {
@@ -209,7 +211,7 @@ internal static class AdmxParser
                 fatal = true;
             }
 
-            var key = ParseContext.Attr(element, "key");
+            var key = ParseContext.KeyAttr(element, "key");
             if (string.IsNullOrEmpty(key))
             {
                 context.Fail(TemplateFailureCode.MissingAttribute, element, "key");
@@ -355,7 +357,7 @@ internal static class AdmxParser
                 return null;
             }
 
-            var key = ParseContext.Attr(element, "key");
+            var key = ParseContext.KeyAttr(element, "key");
             if (key is not null && !context.CheckKey(element, "key", key))
             {
                 fatal = true;
@@ -466,7 +468,7 @@ internal static class AdmxParser
                 return null;
             }
 
-            var defaultKey = ParseContext.Attr(holder, "defaultKey");
+            var defaultKey = ParseContext.KeyAttr(holder, "defaultKey");
             if (defaultKey is not null && !context.CheckKey(holder, "defaultKey", defaultKey))
             {
                 fatal = true;
@@ -475,7 +477,7 @@ internal static class AdmxParser
             var items = new List<PolicyValueListItem>();
             foreach (var item in holder.Elements("item"))
             {
-                var key = ParseContext.Attr(item, "key");
+                var key = ParseContext.KeyAttr(item, "key");
                 if (key is not null && !context.CheckKey(item, "key", key))
                 {
                     fatal = true;

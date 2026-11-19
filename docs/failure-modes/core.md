@@ -33,6 +33,34 @@ finds the same files. When a tool runs as a different user, `LocalApplicationDat
 that user's profile, so it gets a separate tree instead of an access-denied error. A shared
 machine-wide override of `BWC_DATA_ROOT` deliberately opts out of that separation.
 
+### Elevated data folder and links (CORE-1)
+
+The Registry Editor and the Local Group Policy Editor run elevated, and a non-elevated process of the
+same user controls both `BWC_DATA_ROOT` (inherited through the consent prompt) and the default folder
+`%LOCALAPPDATA%\BetterWindowsConfig`. It could plant a junction, symlink, or hard link there and aim an
+elevated append, move, or delete at another file. Two decisions are pure functions (`DataPathPolicy`) so
+that no test needs an elevated process. Elevation comes from the process token (elevated or high
+integrity); a token that cannot be read counts as elevated.
+
+| Case | Behavior |
+| --- | --- |
+| Ship flavor, elevated, `BWC_DATA_ROOT` set | The variable is ignored and the per-user default is used. |
+| Ship flavor, not elevated, `BWC_DATA_ROOT` set | Honored as before (the ship E2E suite relies on it). |
+| E2E flavor, elevated, `BWC_DATA_ROOT` set | Honored (the elevated test runner needs its sandbox); the link rules below still apply. |
+| Elevation cannot be determined (token query fails) | Treated as elevated. |
+| Not elevated, any flavor | No link checks and no change from the behavior before this fix. |
+| Elevated, a folder from the data root down to the log or settings folder is a junction or symlink | No file log is opened and settings live in memory only. Nothing is created, written, moved, or deleted, and the link target is untouched. |
+| Elevated, the tool folder is replaced by a junction after start | The folders are opened once and held without delete sharing for the process lifetime, so they cannot be renamed or replaced while held. A replacement before the open is the junction case above. |
+| Elevated, the final path of a folder handle is not the expected path | Treated as unsafe, same as a junction. The expected path is the final path of the parent plus the folder name, so a profile relocated by a junction above the data root still works. |
+| Elevated, the log file (daily or part) is a hard link (link count above 1) or a symlink | That file is not appended to and not deleted; logging stops for the process. |
+| Elevated, the settings file is a hard link or a symlink | The store stops using disk: load returns defaults, save keeps the value in memory, and the file is not read, written, moved, or deleted. |
+| Elevated, the log directory given in `LogOptions` is outside the data root | Treated as unsafe; no file log. |
+| Elevated, a file handle's final path is not the expected file in the held folder | Treated as unsafe, same as a link. |
+
+Every elevated write, move, and delete goes through a handle that was opened with
+`FILE_FLAG_OPEN_REPARSE_POINT` and checked (not a reparse point, one hard link, expected final path), and
+a rename or delete is applied to that handle, not to a path.
+
 ## Log
 
 ### Relative or invalid directory override
@@ -175,6 +203,16 @@ corruption. The original file is moved, never deleted, to
 `<file>.bad-<yyyyMMddTHHmmssZ>` in the same directory. If a file with that exact name already
 exists, a numeric suffix is added so the older corrupt copy is preserved. The original bytes are
 unchanged by the move. `Load` then returns a fresh `T`.
+
+### Many corrupt copies kept (CORE-3)
+
+Each corrupt file is kept as `<file>.bad-*`, and a settings file that keeps corrupting would fill the
+folder. After a file is moved aside, only the newest 5 `<file>.bad-*` files are kept and the oldest are
+deleted first. Only names that match exactly what the store creates
+(`<file>.bad-<yyyyMMddTHHmmssZ>` with an optional `-<n>` suffix) are counted or deleted; other files,
+including `.tmp-*` and look-alike names, are left alone. A delete failure goes to the safe trace helper
+and does not fail the load. Exactly 5 or fewer copies are all kept. When elevated, the delete goes through
+a checked handle like every other elevated delete (see the elevated data folder section).
 
 ### Oversized file
 

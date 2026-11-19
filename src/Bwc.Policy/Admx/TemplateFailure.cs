@@ -98,6 +98,12 @@ public enum TemplateFailureCode
 
     /// <summary>An unexpected error while loading one file. The file is dropped and the type name is in the detail.</summary>
     InternalError,
+
+    /// <summary>
+    /// One file recorded more failures than <see cref="AdmxLimits.MaxFailuresPerFile"/>. This is the last entry of that file
+    /// and the later failures are not recorded. <see cref="TemplateFailure.Detail"/> holds the cap.
+    /// </summary>
+    TooManyFailures,
 }
 
 /// <summary>
