@@ -175,8 +175,8 @@
   <data name="ConsoleDescriptionHelpHeading" xml:space="preserve">
     <value>Description</value>
   </data>
-  <!-- BWC wording: the hint shown in the description pane when no item is selected. -->
+  <!-- The hint in the description pane when the node has no explain text; classic wording (probe.json). -->
   <data name="ConsoleDescriptionNoSelectionHint" xml:space="preserve">
-    <value>Select an item to see its description.</value>
+    <value>Select an item to view its description.</value>
   </data>
 </root>

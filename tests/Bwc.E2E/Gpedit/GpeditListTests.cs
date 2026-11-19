@@ -172,7 +172,7 @@ public sealed class GpeditListTests
             $"title='{run.DescriptionTitle}', text='{run.DescriptionText("hint")}'.");
 
         run.GoTo(Root, Computer, Admin, Oracle, "Elements");
-        checks.Record("noExplainText", ShellRun.WaitUntil(() => run.DescriptionTitle == "Elements" && run.DescriptionText("hint") == "Select an item to see its description."), $"title='{run.DescriptionTitle}', text='{run.DescriptionText("hint")}'.");
+        checks.Record("noExplainText", ShellRun.WaitUntil(() => run.DescriptionTitle == "Elements" && run.DescriptionText("hint") == "Select an item to view its description."), $"title='{run.DescriptionTitle}', text='{run.DescriptionText("hint")}'.");
 
         // A policy row: title, Requirements (supported on), Description (the help text) and the edit link.
         run.GoTo(Root, Computer, Admin, Oracle, "Basics");

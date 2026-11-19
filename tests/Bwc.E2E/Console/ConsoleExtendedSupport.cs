@@ -23,7 +23,7 @@ internal sealed class ExtendedRun : IDisposable
     internal const string ExtendedTabId = "ConsoleExtendedTab_Extended";
     internal const string StandardTabId = "ConsoleExtendedTab_Standard";
     internal const string LinkId = "ConsoleDescriptionLink_edit";
-    internal const string HintText = "Select an item to see its description.";
+    internal const string HintText = "Select an item to view its description.";
 
     private ExtendedRun(ListRun list)
     {

@@ -222,3 +222,54 @@ A test reads it with UIA, so the tests prove what the host believes and the UIA 
   DtdEntity, MissingAdml) and expects the good tree unchanged.
 - The toolbar Up One Level button selects the parent node in the real host (the frame host still only echoes the command).
 - A settings file with absurd numbers or unknown names is ignored per value (`Gpedit_Persistence_BadSettingsFile`).
+
+## 15. Blind review additions
+
+Added by the blind test pass (worker R2), derived from sections 1 to 14 only, before any product code or the first tests were read.
+Tests are in `tests/Bwc.E2E/Gpedit/Blind/GpeditTreeListBlindTests.cs` (`Gpedit_TreeBlind_*`, `Gpedit_ListBlind_*`).
+
+- **Zero-row categories (section 9).** A category that holds only subcategories (computer side BWC Oracle, user side User only)
+  has zero policy rows. Failure: the status bar is empty, or shows a count of the folder rows. Rule: the text is the fixed
+  format with N = 0 ("0 setting(s)"), and the format has no singular form ("1 setting(s)").
+- **Literal ampersand (sections 4, 6, 8, 9).** A name with `&` (category "Tools & Utilities", policy "Research & Development
+  flag") must show as written in the tree, the folder row, the policy row, the description title and the readout. Failure:
+  the `&` is dropped or the next letter becomes a mnemonic.
+- **Order inside a category (sections 4, 6).** Folder rows come first, each group sorted by display name ignoring case, ties in
+  source order ("alpha policy" before "Alpha Policy": same name ignoring case, defined in that order). The rule for runs of digits
+  ("Policy 10" against "Policy 2") is not stated: the doc says native collation only, so it stays an open question until the
+  capture matrix settles it. The leading `#` and the accented capital are only checked against their neighbors in the fixture.
+- **Which side's rows (section 4, 6).** All Settings holds every policy of the side exactly once: with the fixture 59 rows on the
+  computer side and 13 on the user side (70 policies, 2 of class Both). A class Machine policy never shows on the user side, a
+  class User policy never on the computer side.
+- **Tree expand and collapse (sections 4, 5).** Collapsing and expanding a node again gives the same children (no duplicates,
+  none lost; the children are cached on the node). A double click on a folder row selects that child and leaves its parent
+  expanded in the tree. The Right and Left keys expand and collapse the selected node, Up and Down move the selection and the
+  list follows each move.
+- **Node trail after a placeholder (section 5).** Leaving a placeholder page for a category brings back the list with the Setting,
+  State and Comment headers and the rows of the category (a stale single-column Name header from the Windows Settings list, or
+  the placeholder page left on screen, is the failure).
+- **Absent policy file (sections 1, 6).** A side that has no policy file at all (a sandbox with nothing seeded) is not an
+  unreadable file: nothing is Enabled or Disabled and no problem about that side is expected. The doc names only the unreadable
+  case (empty State) and the deny-all case ("empty or Not configured"), so whether classic's "Not configured" or an empty cell
+  shows for an absent file is open; the test accepts either and fails on Enabled or Disabled.
+- **Sandbox root outside the run root (section 1).** The deny-all rule for a root outside the run root has its own detector: the
+  readout says `Store=denyall` with at least one problem and the tree still loads.
+- **Missing template folder (section 2).** `BWC_E2E_ADMX_ROOT` pointing to a folder that does not exist gives `Templates=0`, a
+  problem, the skeleton tree and a live window. Administrative Templates shows no BWC Oracle.
+- **Persistence keys (section 11).** The doc lists the persisted values but not the key names of `settings.json`. The tests do not
+  assume names: they read the file the product wrote and rewrite every number in it to a bad value (0, negative, 10^9) and
+  every string to an unknown name, then require a normal start. Failure: a crash, an invisible or off-screen window, a zero
+  width pane.
+- **Selection is not persisted (section 11).** Selecting a category, closing and starting again shows the root selected.
+- **Fallback wording (section 8), settled.** The description pane text for a node with no explain text is classic's "Select an
+  item to view its description." (artifacts/oracle/gpedit/probe.json, 247 occurrences), not "see". It shows on the root node
+  ("Local Computer Policy"), on a category or folder node with no explain text (for example Elements), and for the same
+  folder when it is a selected row of the list. A folder with explain text shows that text instead. Navigation nodes other than
+  the root (Computer Configuration, User Configuration, Administrative Templates, All Settings) also show some hint text with
+  their own title and no Edit link (`Gpedit_ListBlind_ExtendedPane`); the fallback wording applies to every node that has no
+  text of its own. Detector: `Gpedit_ListBlind_ExtendedPaneFallbackWording`.
+- **Default column widths and persisted widths are DIPs (section 11).** Name 180, Setting 350, State 100, Comment 139 DIP at any
+  DPI, and `settings.json` stores column widths in DIPs (a drag adds DIPs, a restart shows the same DIP width, nothing is
+  scaled twice). Detectors: `Gpedit_ListBlind_DefaultColumnWidthsInDip` and `Gpedit_ListBlind_PersistedColumnWidthIsDip`. The
+  test process must be per monitor DPI aware (`ControlTestSupport.PrepareDpi`), or UI Automation rectangles come back
+  virtualized at half size on a 192 DPI machine and a correct product looks like Name 90 DIP.
