@@ -21,6 +21,9 @@ internal sealed class InstallerRun : IDisposable
     public const string UpdaterExeName = "BwcUpdate.exe";
     public const string UninstallerName = "Uninstall.exe";
 
+    /// <summary>The E2E uninstaller reads this as the folder that stands in for %ProgramData% (installer.md M65).</summary>
+    public const string ProgramDataVariable = "BWC_E2E_INSTALLER_PROGRAMDATA";
+
     public sealed record ProductShortcut(string Name, string AppId, string ExeName);
 
     /// <summary>
@@ -106,6 +109,12 @@ internal sealed class InstallerRun : IDisposable
 
     public string UpdaterExe => Path.Combine(InstallDir, UpdaterExeName);
 
+    /// <summary>
+    /// The stand-in for %ProgramData% inside this run's folder. The per-user uninstaller gets it through
+    /// <see cref="ProgramDataVariable"/>, so the template cleanup never looks at the real folder. Not created here.
+    /// </summary>
+    public string ProgramDataRoot => Path.Combine(Root, "programdata");
+
     public string UninstallerExe => Path.Combine(InstallDir, UninstallerName);
 
     private string RunKey => RegistryParent + @"\" + RunId;
@@ -170,11 +179,15 @@ internal sealed class InstallerRun : IDisposable
 
     /// <summary>
     /// Runs the uninstaller silently. NSIS uninstallers may copy themselves out and return early, so the test waits
-    /// for the install folder to go, not for the process.
+    /// for the install folder to go, not for the process. The per-user run passes <see cref="ProgramDataRoot"/> as the
+    /// data-root seam unless <paramref name="withProgramData"/> is false.
     /// </summary>
-    public bool Uninstall(TimeSpan timeout)
+    public bool Uninstall(TimeSpan timeout, bool withProgramData = true)
     {
-        using (Process process = Start(UninstallerExe, "/S /RUNID=" + RunId, environment: null))
+        Dictionary<string, string>? environment = withProgramData && !Machine
+            ? new Dictionary<string, string>(StringComparer.Ordinal) { [ProgramDataVariable] = ProgramDataRoot }
+            : null;
+        using (Process process = Start(UninstallerExe, "/S /RUNID=" + RunId, environment))
         {
             _ = process.WaitForExit(timeout);
         }

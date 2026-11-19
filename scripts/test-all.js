@@ -60,13 +60,20 @@ Runs the quality gate steps in order and writes artifacts/gate/result.json
 artifacts/gate/logs/<NN>-<step-name>.log; logs from earlier runs are removed first.
 The default RID comes from process.arch, never PROCESSOR_ARCHITECTURE.
 
-Steps: sync-version, registry-writer, policy-writer, no-em-dash, changelog-version,
-comment-lint, release-selftest, release-flow-selftest, release-assets-selftest,
-embed-key-selftest, signing-selftest, build-arm64, build-x64, test-core, test-gpo,
-test-policy, test-registry-e2e, test-registry-shipping, test-update.
+Steps: sync-version, registry-writer, registry-writer-selftest, policy-writer,
+policy-writer-selftest, no-em-dash, no-em-dash-selftest, regedit-strings, tracked-paths-selftest,
+tracked-paths, changelog-version, comment-lint, release-selftest, release-flow-selftest,
+release-assets-selftest, embed-key-selftest, signing-selftest, build-arm64, build-x64,
+test-core, test-gpo, test-policy, test-registry-e2e, test-registry-shipping, test-update,
+test-update-e2e.
 policy-writer is the static guard for the local group policy writer
-(scripts/check-policy-writer.js). test-gpo and test-policy run tests/Bwc.Gpo.Tests
-and tests/Bwc.Policy.Tests.
+(scripts/check-policy-writer.js). The -selftest steps run the --self-test of the
+writer guards, the em dash validator, and scripts/check-tracked-paths.js, so a guard that
+stops detecting fails the gate. tracked-paths fails on an absolute user-profile path in a
+tracked text file. test-update-e2e runs tests/Bwc.Update.Tests with -p:BwcFlavor=E2E, so the
+branch compiled only in that flavor runs too. test-gpo and test-policy run tests/Bwc.Gpo.Tests
+and tests/Bwc.Policy.Tests. A step that exits 3 (NOT RUN, for one e2e-ship from an elevated
+shell) is a failed step.
 Unless --quick, each RID then runs publish-ship, verify-flavor-ship, e2e-ship,
 publish-e2e, verify-flavor-e2e, e2e-flavor. verify-flavor-* checks the BwcFlavor
 metadata of the publish folder. E2E steps also record the counts from
@@ -209,9 +216,16 @@ function sharedSteps(testPlatform) {
   return [
     nodeStep("sync-version", "scripts/sync-version.js", ["--check"]),
     nodeStep("registry-writer", "scripts/check-registry-writer.js", []),
+    // Each guard's self-test proves the guard still detects what it exists to catch.
+    nodeStep("registry-writer-selftest", "scripts/check-registry-writer.js", ["--self-test"]),
     nodeStep("policy-writer", "scripts/check-policy-writer.js", []),
+    nodeStep("policy-writer-selftest", "scripts/check-policy-writer.js", ["--self-test"]),
     // Walk the working tree, not only git-tracked files, so new files are checked before commit.
     nodeStep("no-em-dash", "scripts/validate-no-em-dash.js", ["--root", ROOT]),
+    nodeStep("no-em-dash-selftest", "scripts/validate-no-em-dash.js", ["--self-test"]),
+    nodeStep("regedit-strings", "scripts/check-regedit-strings.js", []),
+    nodeStep("tracked-paths-selftest", "scripts/check-tracked-paths.js", ["--self-test"]),
+    nodeStep("tracked-paths", "scripts/check-tracked-paths.js", []),
     nodeStep("changelog-version", "scripts/validate-changelog-version.js", []),
     nodeStep("comment-lint", "scripts/lint-comments.mjs", []),
     // Release tooling self-tests. They run in the quick gate, so a broken release script fails CI.
@@ -309,6 +323,20 @@ function sharedSteps(testPlatform) {
         "-c",
         "Release",
         `-p:Platform=${testPlatform}`,
+        "--nologo",
+        "--filter",
+        NORMAL_TEST_FILTER,
+      ]),
+      project: "tests/Bwc.Update.Tests/Bwc.Update.Tests.csproj",
+    },
+    {
+      ...dotnetStep("test-update-e2e", [
+        "test",
+        "tests/Bwc.Update.Tests/Bwc.Update.Tests.csproj",
+        "-c",
+        "Release",
+        `-p:Platform=${testPlatform}`,
+        "-p:BwcFlavor=E2E",
         "--nologo",
         "--filter",
         NORMAL_TEST_FILTER,

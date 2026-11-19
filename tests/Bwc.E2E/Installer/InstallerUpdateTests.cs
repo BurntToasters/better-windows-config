@@ -15,7 +15,7 @@ namespace Bwc.E2E.Installer;
 /// artifacts/e2e/installer-update.json. Without that driver the tests are Inconclusive.
 /// </summary>
 [TestClass]
-public sealed class InstallerUpdateTests
+public sealed partial class InstallerUpdateTests
 {
     private const string HubTitle = "Better Windows Config";
     private const string AvailableTitle = "Update Available";
@@ -474,7 +474,15 @@ public sealed class InstallerUpdateTests
             using InstallerRun run = InstallerRun.Create(config, "uninstall");
             if (InstallSilently(run, inputs.InstallerA, inputs.VersionA, "uninstall.a"))
             {
-                bool gone = run.Uninstall(UninstallTimeout);
+                // Run without the data-root seam: the uninstaller must not look at the real %ProgramData% (installer.md M65).
+                string realProgramData = RealProgramDataRoot();
+                string realBefore = ListFolder(realProgramData);
+                bool gone = run.Uninstall(UninstallTimeout, withProgramData: false);
+                string realAfter = ListFolder(realProgramData);
+                InstallerChecks.Record(
+                    "uninstall.realProgramDataUntouched",
+                    realBefore == realAfter,
+                    "The real " + realProgramData + " was listed (read only) before and after the uninstall and did not change.");
                 InstallerChecks.Record(
                     "uninstall.files",
                     gone && !File.Exists(run.HubExe),

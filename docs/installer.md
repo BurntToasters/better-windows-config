@@ -196,8 +196,9 @@ new version is complete on disk, and a failure puts the old version back.
    64-bit and ARM64 processes.
 3. **Swap.** The files that the previous manifest lists are moved to `<install folder>.old`, and the
    new files are moved in from `<install folder>.new`. A failed move puts every old file back, removes
-   the new files that were moved in, and ends with "The upgrade was rolled back". If the restore
-   itself fails, both folders are kept and the message names them.
+   the new files that were moved in (and the folders the move-in created, when empty), and ends with "The upgrade was
+   rolled back". A first install that fails here also removes its empty install folder and ends with "The first install
+   failed and was rolled back". If the restore itself fails, both folders are kept and the message names them.
 4. **Finish.** The all-users shortcuts, the uninstall entry, and AppUserModelIDs are written (a shortcut or
    entry that cannot be written rolls the install back as a whole; a first install then leaves neither).
    Then the finish step
@@ -240,7 +241,10 @@ It deletes the installed files listed at build time, the two all-users shortcuts
 protected folder of the elevated updater, `<install folder>.upd`: only the `<32 hex>` folders in it, never
 through a link or junction, then the folder itself when it is empty. It no longer removes `%TEMP%\BWC-Update`
 (an elevated recursive delete in a folder that a standard user writes; the Hub prunes its own staging), and it
-never touches a user's data folder (`%LOCALAPPDATA%\BetterWindowsConfig`). The uninstall entry is removed last.
+never touches a user's data folder (`%LOCALAPPDATA%\BetterWindowsConfig`). It does remove the policy templates that the
+Local Group Policy Editor imported (`*.admx` in `%ProgramData%\BetterWindowsConfig\PolicyDefinitions`, `*.adml` in its
+language folders), the folders that leaves empty, and `%ProgramData%\BetterWindowsConfig` when it is then empty. The policy
+backups in `gpedit\backup` stay, and a link (junction or symbolic link) anywhere on that path skips the step. The uninstall entry is removed last.
 The entry is removed only when its `InstallLocation` is the folder being uninstalled (compared without case).
 An entry that names another folder is kept, and the log says why. The files are still removed.
 

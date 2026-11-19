@@ -335,3 +335,51 @@ Written before the tests and the code. The product has three shortcuts and three
     (`regedit.gpedit.open`), and the Hub's refusal text must name `Registry Editor` and `Local Group Policy Editor` (`regedit.hub.refusesWhileToolsOpen`).
     The process names the test stops at cleanup come from the same table.
 96. **Uninstall removes the third shortcut.** `uninstall.shortcuts` requires 0 remaining, which now includes the Gpedit shortcut.
+
+## Audit fixes (0.2.0): first-install rollback and template cleanup (installer.md M60 to M66)
+
+Written before the tests and the code. All of these run in the unelevated per-user sandbox. The uninstaller's data root is a
+folder inside the run's own folder (`<run folder>\programdata`), passed as `BWC_E2E_INSTALLER_PROGRAMDATA` to the uninstaller
+only. No case reads or writes the real `%ProgramData%`, the real registry, or Program Files.
+
+97. **A first install fails after the move-in and leaves a folder behind (M60).** `firstfail` puts a folder where the Hub shortcut
+    file goes (`<run>\shortcuts\Better Windows Config.lnk`), so `CreateShortCut` fails after the payload is in place and the setup
+    rolls back. Required: a non-zero exit (`firstfail.setup.exit`), no install folder at all (`firstfail.installDir`: before the fix
+    it held empty payload folders), no `installed-files.txt`, no uninstall key, no `.new` or `.old` (`firstfail.noLeftovers`). Then
+    the blocker is removed and the same setup runs again: exit 0, the Hub exe present, DisplayVersion A, three shortcuts
+    (`firstfail.rerun.*`). The rerun is what the old behavior broke: `BwcCheckInstDir` refused the leftover folder.
+98. **The first-install abort text (M61).** A silent setup shows no text, so no E2E check can read it. The NSIS source audit does
+    (`auditNsisSource`, run by `build-installer.js` and by this script for B): `BwcRollback` must hold the first-install text, and
+    that text must not say a previous version is installed. The audit is a build step, not a test of this file.
+99. **Uninstall removes the imported templates and keeps the backups (M62, M63).** `uninstallData` seeds the sandbox store
+    (`<programdata>\BetterWindowsConfig\PolicyDefinitions`): two `.admx` (one upper case), `.adml` in two language folders, an unrelated
+    `readme.txt` in the store and an unrelated `notes.txt` in one language folder, and a backup tree under `gpedit\backup` with
+    random bytes. After the uninstall: every `.admx` and `.adml` is gone (`uninstallData.templatesGone`), the language folder that
+    held only `.adml` files is gone and the one with `notes.txt` stays (`uninstallData.foldersEmptyOnly`), both unrelated files remain
+    byte for byte (`uninstallData.othersKept`), and every backup file is present with the same SHA-256 (`uninstallData.backupsKept`).
+100. **Only templates: the data root goes too (M62).** `uninstallClean` seeds the store with templates only. After the uninstall the
+    store, the language folders, and `<programdata>\BetterWindowsConfig` are gone, and the sandbox root `<programdata>` itself is
+    not touched (`uninstallClean.rootRemoved`). The data root is removed only because it is empty then (case 99 keeps it).
+101. **The store folder is a junction (M64).** `uninstallLinkStore` makes `PolicyDefinitions` a junction (`mklink /J`, no elevation)
+    to a folder of the run that holds `x.admx` and `en-US\x.adml`. After the uninstall the junction and every file behind it are
+    still there with the same SHA-256 (`uninstallLinkStore.targetUntouched`, `uninstallLinkStore.linkKept`). The cleanup removes the
+    junction as a link before the run folder is deleted, so the run's own recursive delete never meets it.
+102. **A language folder is a junction (M64).** `uninstallLinkLang` has a plain store folder with `a.admx` and `en-US` as a junction to
+    a folder that holds `a.adml`. The whole step is skipped: `a.admx` stays, the junction and its target file stay
+    (`uninstallLinkLang.skipped`). Skipping all of it, not only the linked folder, is the required behavior (M64).
+103. **The step never reads the real ProgramData (M65).** `uninstall.*` (the existing uninstall case) runs the uninstaller without the
+    variable, with the E2E flavor. The test lists the real `%ProgramData%\BetterWindowsConfig` (names, sizes, write times; read only)
+    before and after and requires the lists to be equal (`uninstall.realProgramDataUntouched`). This machine has no write to it from
+    any test.
+104. **The owner check (M67).** Cases 99, 100, and 102 already run the template cleanup over folders that the test user created, so
+    they prove that the E2E flavor's extra acceptance of the current user's SID lets the cleanup run (a broken `GetNamedSecurityInfoW`
+    or `EqualSid` call would skip the step and fail 99 and 100). The reverse, a folder owned by another principal that must make the
+    step skip, cannot be built without a privilege that an unelevated test lacks. That claim, and that the ship build has no
+    current-user acceptance and no read of the E2E variable, is the NSIS source audit (`auditTemplateCleanup` in
+    `scripts/build-installer.js`, run by `build-installer.js` and by this script for B). It is not a test of this file.
+105. **The policy-writer guard.** `tests/Bwc.E2E/Installer/InstallerRollbackAndDataTests.cs` names `PolicyDefinitions` and writes files
+    and folders, so `scripts/check-policy-writer.js` lists it in `policyPathAllowlist`. The reason: it writes only under the run's
+    stand-in `%ProgramData%` folder (`InstallerRun.ProgramDataRoot`, inside the temp run folder), never the real one. Only this file is
+    listed; no rule of the guard is widened.
+106. **A link left behind by a failed test.** A junction is always removed with a non-recursive delete in `finally`, before
+    `InstallerRun.Dispose` deletes the run folder. A junction that cannot be removed is a failed `cleanup.link` check naming the path.

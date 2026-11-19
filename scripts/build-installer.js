@@ -476,6 +476,66 @@ function printSigningPlan({ signing, publishDir, publishPresent, names }) {
 export const REQUIRED_PUBLISH_FILES = Object.freeze(BWC_ROOT_APPS.map((name) => `${name}.exe`));
 
 /**
+ * BwcRollback must remove the payload folders that the move-in created (installer.md M60) and must end a first install
+ * with its own abort text, which never says that a previous version is installed (M61). A silent setup shows no abort text,
+ * so this source check is the proof of the wording.
+ */
+export function auditRollbackFunction(scriptText, name = "installer/bwc.nsi") {
+  const found = /^\s*Function\s+BwcRollback\b([\s\S]*?)^\s*FunctionEnd/m.exec(scriptText);
+  if (!found) {
+    return [`${name}: no BwcRollback function`];
+  }
+  const problems = [];
+  const body = found[1];
+  if (!/^\s*!insertmacro\s+BWC_PAYLOAD_RMDIRS\b/m.test(body)) {
+    problems.push(`${name}: BwcRollback does not remove the payload folders (!insertmacro BWC_PAYLOAD_RMDIRS)`);
+  }
+  const aborts = [...body.matchAll(/^\s*Abort\s+"([^"]*)"/gm)].map((match) => match[1]);
+  const first = aborts.find((text) => /first install/i.test(text));
+  if (first === undefined) {
+    problems.push(`${name}: BwcRollback has no abort text for a first install`);
+  } else if (/previous version/i.test(first)) {
+    problems.push(`${name}: the first-install abort text of BwcRollback names a previous version`);
+  }
+  return problems;
+}
+
+/**
+ * The uninstaller deletes inside %ProgramData%\BetterWindowsConfig, which a standard user can own (installer.md M65,
+ * M67). In the ship branch, un.BwcOwnerOk must read the owner and accept only Administrators and SYSTEM, it must never
+ * accept the current user, un.BwcRemoveTemplates must check the data root, the store folder, and each language folder,
+ * and the E2E variable must not be read. The E2E-only blocks (!ifdef BWC_E2E up to !else or !endif) are removed before
+ * the ship text is checked. An unelevated test cannot hand a folder to another owner, so this check is the proof.
+ */
+export function auditTemplateCleanup(commonText, name = "installer/include/bwc-common.nsh") {
+  const bodyOf = (title) =>
+    new RegExp(`^\\s*Function\\s+${title.replace(".", "\\.")}\\b([\\s\\S]*?)^\\s*FunctionEnd`, "m").exec(commonText)?.[1];
+  const shipOnly = (text) =>
+    text.replace(/^\s*!ifdef\s+BWC_E2E\b[\s\S]*?^\s*(?:!else\b|!endif\b)[^\n]*\n/gm, "");
+  const owner = bodyOf("un.BwcOwnerOk");
+  const remove = bodyOf("un.BwcRemoveTemplates");
+  if (owner === undefined || remove === undefined) {
+    return [`${name}: un.BwcOwnerOk or un.BwcRemoveTemplates is missing`];
+  }
+  const problems = [];
+  const ship = shipOnly(owner);
+  const wellKnown = (id) => new RegExp(`IsWellKnownSid\\([^)]*,\\s*i\\s+${id}\\)`).test(ship);
+  if (!/GetNamedSecurityInfoW/.test(ship) || !wellKnown(26) || !wellKnown(22)) {
+    problems.push(`${name}: un.BwcOwnerOk must read the owner and accept only Administrators (26) and SYSTEM (22)`);
+  }
+  if (/EqualSid|GetTokenInformation|OpenProcessToken/.test(ship)) {
+    problems.push(`${name}: the ship branch of un.BwcOwnerOk accepts the current user`);
+  }
+  if ((remove.match(/Call\s+un\.BwcOwnerOk\b/g) ?? []).length < 3) {
+    problems.push(`${name}: un.BwcRemoveTemplates must check the owner of the data root, store folder, and language folders`);
+  }
+  if (/BWC_E2E_INSTALLER_PROGRAMDATA/.test(shipOnly(remove))) {
+    problems.push(`${name}: the ship branch of un.BwcRemoveTemplates reads BWC_E2E_INSTALLER_PROGRAMDATA`);
+  }
+  return problems;
+}
+
+/**
  * Checks installer/bwc.nsi and the files it includes, without NSIS. Reports: an include that does
  * not exist, a ${BWC_...} define that nothing defines, an !insertmacro BWC_... with no !macro, a
  * Call to a function that is not defined, and a label the payload jumps to that bwc.nsi lacks.
@@ -536,6 +596,9 @@ export function auditNsisSource({ scriptPath, installerDir, defines, payloadText
   if (!/^\s*BwcCommit_rollback:/m.test(scriptText)) {
     problems.push("the generated payload jumps to BwcCommit_rollback, which installer/bwc.nsi does not define");
   }
+  problems.push(...auditRollbackFunction(scriptText, sources[0].name));
+  const common = sources.find((source) => source.name.endsWith("bwc-common.nsh"));
+  problems.push(...(common ? auditTemplateCleanup(common.text, common.name) : ["bwc-common.nsh is not included"]));
   return problems;
 }
 

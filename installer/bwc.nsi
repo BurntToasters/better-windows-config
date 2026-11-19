@@ -350,9 +350,12 @@ Function BwcCommit
 FunctionEnd
 
 ; Puts the previous version back and removes what this run added. It always ends in Abort. The
-; staging and backup folders are removed only when every file is back in place.
+; staging and backup folders are removed only when every file is back in place. BWC_PAYLOAD_MOVE_IN creates the payload
+; folders, so after the file deletes the empty ones are removed too (RMDir without /r: a folder with anything else stays).
+; When no previous install is in place afterwards (no installed-files.txt in the install folder: the new one was deleted
+; and none came back from .old), this was a first install and the then-empty install folder goes as well (installer.md M60).
 Function BwcRollback
-  DetailPrint "The upgrade failed. Putting the previous version back."
+  DetailPrint "The install failed. Rolling it back."
   SetOutPath "$WINDIR"
   StrCmp $BwcMovedIn "1" BwcRb_removeNew BwcRb_restore
   BwcRb_removeNew:
@@ -361,6 +364,7 @@ Function BwcRollback
   Delete "$INSTDIR\THIRD-PARTY-NOTICES.txt"
   Delete "$INSTDIR\${BWC_MANIFEST}"
   Delete "$INSTDIR\${BWC_UNINSTALLER}"
+  !insertmacro BWC_PAYLOAD_RMDIRS
   BwcRb_restore:
   !insertmacro BWC_RESTORE_LISTED_BODY "rollback"
   StrCmp $BwcRestoreFailed "1" BwcRb_keep 0
@@ -380,6 +384,10 @@ Function BwcRollback
   BwcRb_noUninst:
   RMDir /r "$INSTDIR${BWC_STAGE_SUFFIX}"
   RMDir /r "$INSTDIR${BWC_BACKUP_SUFFIX}"
+  IfFileExists "$INSTDIR\${BWC_MANIFEST}" BwcRb_wasUpgrade 0
+  RMDir "$INSTDIR"
+  Abort "The first install failed and was rolled back. Nothing was installed and nothing else was changed."
+  BwcRb_wasUpgrade:
   Abort "The upgrade was rolled back. The previous version is still installed. Nothing else was changed."
   BwcRb_keep:
   Abort "The upgrade failed and the rollback did not finish. The previous files are in $INSTDIR${BWC_BACKUP_SUFFIX}. Restore them by hand, see docs/installer.md, then run the installer again."
@@ -596,6 +604,11 @@ Section "Uninstall"
   Call un.BwcRemoveProtected
   RMDir "$INSTDIR${BWC_PROTECTED_SUFFIX}"
   BwcUn_noUpd:
+
+  ; The imported policy templates in %ProgramData%\BetterWindowsConfig\PolicyDefinitions go, with the folders they leave
+  ; empty. The policy backups (gpedit\backup) stay. The step is skipped when a link is on the path (installer.md M62 to M65).
+  ; The E2E flavor reads its stand-in folder from BWC_E2E_INSTALLER_PROGRAMDATA and skips the step without it.
+  Call un.BwcRemoveTemplates
 
   ; Remove the folder only when it is empty. User files in it stay. A copy of the uninstaller (no _?=) deletes the
   ; original at once. An uninstaller that runs in place cannot delete itself or the folder it runs from, so the deletes

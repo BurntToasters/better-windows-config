@@ -211,6 +211,10 @@ const policyPathAllowlist = new Map([
     "scripts/check-registry-writer.js",
     "Writes only a temporary fixture tree under os.tmpdir() for its --self-test. Registry.pol appears only in an allowlist reason string.",
   ],
+  [
+    "tests/Bwc.E2E/Installer/InstallerRollbackAndDataTests.cs",
+    "Installer E2E: writes only under the run's stand-in %ProgramData% folder (a temp run folder), never the real one; PolicyDefinitions is a name it seeds there.",
+  ],
   ["tools/Bwc.Oracle.Capture/Gpedit/Session/**", oracleCaptureReason],
   ["tools/Bwc.Oracle.Capture/Gpedit/Driver/**", oracleCaptureReason],
   ["tools/Bwc.Oracle.Capture/Gpedit/Matrix/**", oracleCaptureReason],
