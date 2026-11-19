@@ -5,7 +5,7 @@ namespace Bwc.Oracle.Capture.Gpedit.Matrix;
 // Every case of every group, built from the fixture and checked before anything runs.
 internal sealed class MatrixPlan
 {
-    internal static readonly string[] GroupNames = { "A", "B", "C", "D", "E", "F", "G", "H" };
+    internal static readonly string[] GroupNames = { "A", "B", "C", "D", "E", "F", "G", "H", "K" };
 
     internal static readonly Dictionary<string, string> GroupTitles = new()
     {
@@ -17,6 +17,7 @@ internal sealed class MatrixPlan
         ["F"] = "visuals: tree, lists, menus, toolbar, dialog rectangles, keys",
         ["G"] = "refresh timing of the live registry",
         ["H"] = "template load errors",
+        ["K"] = "key edge cases: policy keys with a leading or trailing backslash",
     };
 
     internal List<MatrixCase> Cases { get; } = new();
@@ -38,6 +39,7 @@ internal sealed class MatrixPlan
         plan.Cases.AddRange(MatrixGroups.GroupF(context));
         plan.Cases.AddRange(MatrixGroups.GroupG(context));
         plan.Cases.AddRange(MatrixGroups.GroupH(context));
+        plan.Cases.AddRange(MatrixGroups.GroupK(context));
         plan.Check();
         return plan;
     }

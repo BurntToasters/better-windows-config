@@ -37,6 +37,12 @@ internal static partial class MatrixGroups
             Dword(basics, "MachineFlag", 1), Dword(basics, "ModeNumber", 5), Dword(basics, "MachineFlag", 1));
         yield return Machine("Dup_Key_TwoBlocks", "the same key in two separate runs of records", new[] { "Pol_Class_Machine", "Pol_Value_Decimal" },
             Dword(basics, "MachineFlag", 1), Dword(number, "MinMaxNumber", 100), Dword(basics, "ModeNumber", 5));
+        yield return Machine("Dup_DelBetween", "MachineFlag 1, a **del.MachineFlag record, MachineFlag 1 again (GPO-4: shown state and the next save)", new[] { "Pol_Class_Machine" },
+            Dword(basics, "MachineFlag", 1), Del(basics, "MachineFlag"), Dword(basics, "MachineFlag", 1));
+        yield return Machine("Dup_DelBetweenDifferent", "MachineFlag 1, a **del.MachineFlag record, MachineFlag 0 (GPO-4)", new[] { "Pol_Class_Machine" },
+            Dword(basics, "MachineFlag", 1), Del(basics, "MachineFlag"), Dword(basics, "MachineFlag", 0));
+        yield return Machine("Dup_DelvalsBetween", "MachineFlag 1, a **delvals. record, MachineFlag 0 (GPO-4)", new[] { "Pol_Class_Machine" },
+            Dword(basics, "MachineFlag", 1), Instruction(basics, "**delvals."), Dword(basics, "MachineFlag", 0));
         yield return Machine("Del_Only", "only a delete record for MachineFlag (the probe lead: Disabled or Not Configured)", new[] { "Pol_Class_Machine" },
             Del(basics, "MachineFlag"));
         yield return Machine("Del_ThenValue", "delete record, then the value", new[] { "Pol_Class_Machine" },
@@ -289,9 +295,13 @@ internal static partial class MatrixGroups
         string[] affected,
         string root,
         string unrelated,
-        string[]? alsoRoots = null)
+        string[]? alsoRoots = null,
+        string group = "D",
+        Func<string, PolicyInfo>? affectedPolicy = null)
     {
-        var builder = new CaseBuilder("D", id, description).StartWith(start);
+        // Group K reuses this with its own group letter and a lookup for its edge fixture policy; group D passes neither.
+        Func<string, PolicyInfo> lookup = affectedPolicy ?? f.Policy;
+        var builder = new CaseBuilder(group, id, description).StartWith(start);
         builder.Mark("start");
         IEnumerable<string> roots = new[] { root }.Concat(alsoRoots ?? Array.Empty<string>());
         foreach (string r in roots)
@@ -299,7 +309,7 @@ internal static partial class MatrixGroups
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (string name in affected)
             {
-                PolicyInfo policy = f.Policy(name);
+                PolicyInfo policy = lookup(name);
                 if (!policy.Roots.Contains(r))
                 {
                     continue;
@@ -314,7 +324,7 @@ internal static partial class MatrixGroups
 
             foreach (string name in affected)
             {
-                PolicyInfo policy = f.Policy(name);
+                PolicyInfo policy = lookup(name);
                 if (policy.Roots.Contains(r))
                 {
                     builder.Add(Edit(policy, r, label: "read state of " + name + " under " + r));

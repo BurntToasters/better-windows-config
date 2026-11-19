@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BWC oracle edge fixture. Authored by Better Windows Config. Not a Microsoft file. -->
+<policyDefinitions revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <policyNamespaces>
+    <target prefix="edge" namespace="BWC.Policies.Edge.KeyTrailingBackslash" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <supportedOn>
+    <definitions>
+      <definition name="SUPPORTED_Edge" displayName="$(string.SUPPORTED_Edge)" />
+    </definitions>
+  </supportedOn>
+  <categories>
+    <category name="EdgeRoot" displayName="$(string.EdgeRoot)" />
+    <category name="EdgeCat" displayName="$(string.EdgeCat)">
+      <parentCategory ref="EdgeRoot" />
+    </category>
+  </categories>
+  <policies>
+    <policy name="Pol_Edge" class="Machine" displayName="$(string.Pol_Edge)" explainText="$(string.Pol_Edge_Help)" key="Software\Policies\BWC-Oracle\Edge\Trailing\" valueName="EdgeValue">
+      <parentCategory ref="EdgeCat" />
+      <supportedOn ref="SUPPORTED_Edge" />
+    </policy>
+  </policies>
+</policyDefinitions>

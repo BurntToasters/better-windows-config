@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BWC oracle edge fixture. Authored by Better Windows Config. Not a Microsoft file. -->
+<policyDefinitionResources revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>BWC Oracle Edge KeyTrailingBackslash</displayName>
+  <description>A valid template whose policy key is spelled in an unusual way, used to test key handling.</description>
+  <resources>
+    <stringTable>
+      <string id="EdgeRoot">Edge fixture root</string>
+      <string id="EdgeCat">Edge fixture trailing backslash</string>
+      <string id="SUPPORTED_Edge">BWC oracle edge fixture</string>
+      <string id="Pol_Edge">Edge fixture policy</string>
+      <string id="Pol_Edge_Help">A policy whose key is spelled in an unusual way. Enabled writes 1 to the value EdgeValue.</string>
+    </stringTable>
+  </resources>
+</policyDefinitionResources>

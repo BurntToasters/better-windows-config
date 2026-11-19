@@ -231,6 +231,11 @@ internal static partial class MatrixGroups
             .Mark("start")
             .Step("machine", Edit(machine, "Computer", "Enabled"))
             .Build();
+        yield return new CaseBuilder("C", "Version_FromHighUser", "start gpt.ini with user version 65535 (Version=4294901760), one user save (does the high half wrap)")
+            .StartWith(Crafted.Files("gpt.ini with Version=4294901760", Crafted.Gpt("[General]", "Version=4294901760")))
+            .Mark("start")
+            .Step("user", Edit(user, "User", "Enabled"))
+            .Build();
         yield return new CaseBuilder("C", "GptIni_ForeignExtensions", "start gpt.ini with made up extension pairs in both lists; saves must keep them and add the pair")
             .StartWith(Crafted.Files(
                 "gpt.ini with made up gPCMachineExtensionNames and gPCUserExtensionNames and Version=2",

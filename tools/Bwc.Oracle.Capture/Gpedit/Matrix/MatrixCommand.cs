@@ -9,7 +9,7 @@ internal static class MatrixCommand
 {
     internal const string Usage =
         "usage: Bwc.Oracle.Capture gpedit matrix [--only A,B,...] [--case <Group/Id>] [--resume] [--dry-run] [--list]\n" +
-        "  --only A,B   run only these groups (A to H)\n" +
+        "  --only A,B   run only these groups (A to H and K)\n" +
         "  --case G/Id  run one case, for example B/Pol_Decimal_MinMax (see --list)\n" +
         "  --resume     skip cases whose golden is complete and was captured with the current plan\n" +
         "  --dry-run    print the case counts per group and the preflight; touches nothing, works unelevated\n" +

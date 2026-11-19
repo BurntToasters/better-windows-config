@@ -72,7 +72,7 @@ internal sealed class MatrixRunner
             }
 
             List<MatrixCase> todo = group.ToList();
-            if (group.Key == "H")
+            if (group.Key is "H" or "K")
             {
                 foreach (MatrixCase c in todo)
                 {
@@ -82,7 +82,7 @@ internal sealed class MatrixRunner
                         continue;
                     }
 
-                    GpeditSession.Run("matrix-H-" + c.Id, c.Templates(repo), ctx => RunCases(ctx, new List<MatrixCase> { c }));
+                    GpeditSession.Run("matrix-" + group.Key + "-" + c.Id, c.Templates(repo), ctx => RunCases(ctx, new List<MatrixCase> { c }));
                 }
             }
             else

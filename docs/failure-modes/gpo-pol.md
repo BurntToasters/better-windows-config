@@ -76,6 +76,9 @@ Record: `[` key NUL `;` name NUL `;` type(4) `;` size(4) `;` data(size) `]`, del
   the instruction instead, which keeps the order but drops the first value. Which result classic gives for such a file,
   and whether classic itself ever writes one, is unknown. Nothing in the codec changes until the oracle capture
   (matrix D) answers it; the open question lives in `PolDocument.ReplayLoaded` and `PolOrderRules.ReplaceByAppend`.
+  The capture cases are `D/Dup_DelBetween` (`X=1`, `**del.X`, `X=1`), `D/Dup_DelBetweenDifferent` (`X=1`, `**del.X`,
+  `X=0`) and `D/Dup_DelvalsBetween` (`X=1`, `**delvals.`, `X=0`). Each records the state classic shows and the file
+  after one unrelated save. They are in the plan and not yet captured.
 
 ### 1.6 Instructions (`**` value names)
 - `**del.<name>`, `**delvals.`, `**DeleteValues`, `**DeleteKeys`, `**SecureKey`, `**soft.<name>` and every other name

@@ -91,7 +91,7 @@ one named place so the correction touches one spot:
 | C15 | Machine and User halves of a policy of class Both | A Both policy is edited once per root. Each root is its own save, so each bumps its own half and adds its own pair. The store has no "both" save. |
 | C16 | `gpt.ini` absent | Read as a new file. The first save creates it in the probe order. |
 | C17 | A very large or binary file | A size cap (1 MiB) applies; over it is `GptIniFormatException`. NUL bytes are kept as ordinary bytes. |
-| C18 | Version half at 65535 (GPT-1, open oracle question) | `Bump` wraps the half from 65535 to 0 and leaves the other half alone. What classic does at that point is unknown: it may wrap, saturate, or carry into the other half. Not observable in practice (65536 saves of one side). Open question for the oracle capture; no code change until it is answered. |
+| C18 | Version half at 65535 (GPT-1, open oracle question) | `Bump` wraps the half from 65535 to 0 and leaves the other half alone. What classic does at that point is unknown: it may wrap, saturate, or carry into the other half. Not observable in practice (65536 saves of one side). Open question for the oracle capture; no code change until it is answered. The capture cases are `C/Version_FromHighMachine` (machine half 65535, one machine save) and `C/Version_FromHighUser` (user half 65535, `Version=4294901760`, one user save); they are in the plan and not yet captured. |
 
 ## D. comment.cmtx
 

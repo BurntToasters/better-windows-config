@@ -458,7 +458,11 @@ How it can fail (each has a test):
   `key=""` already was); for an element or item it is an empty key as `key=""` already was. Not otherwise handled.
 
 Open oracle question: a key with a leading backslash, or an empty middle segment (`A\\B`), is left unchanged and still
-fails in `PolDocument`. What classic does with it is not captured (add to oracle group H).
+fails in `PolDocument`. What classic does with it is not captured. The capture cases for the trailing and the leading
+backslash are in matrix group K, per fixture `KeyTrailingBackslash` and `KeyLeadingBackslash`: `K/<Name>_Enable` (the bytes
+classic writes), `K/<Name>_ReadTrimmed` and `K/<Name>_ReadAsWritten` (whether classic reads the state from a record under the
+trimmed key and from one under the key as written). They are in the plan and not yet captured. An empty middle segment has
+no case.
 
 ### 47. Failure flood from one file (ADMX-1)
 
@@ -507,4 +511,6 @@ failure is recorded and the file is rejected by the loader. Documentation only.
 `class` (Machine, User, Both) and the boolean attributes (`required`, `soft`, `storeAsText`, `expandable`, `additive`,
 `explicitValue`) are accepted in any letter case, and boolean values also with surrounding blanks. What classic accepts
 is not captured: it may refuse `class="machine"` or `required="True"`. Until a capture exists the parser stays lenient.
-Add to oracle group H. No code change.
+No code change. The capture cases are `H/ClassLowerCase` (one policy with `class="machine"`) and `H/BoolAttributeUpper` (one
+`decimal` element with `required="TRUE"`) and `H/BoolAttributeMixed` (one `decimal` element with `soft="True"`); they are in
+the plan and not yet captured.

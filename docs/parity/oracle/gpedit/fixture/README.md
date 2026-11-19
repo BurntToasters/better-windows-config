@@ -10,7 +10,8 @@ Nothing on the system reads these registry keys. The good fixture writes only be
 |---|---|---|
 | `BwcOracleBase.admx`, `en-US/BwcOracleBase.adml` | `BWC.Policies.OracleBase` (prefix `bwcbase`) | The top category "BWC Oracle" and three `supportedOn` definitions, the way `Windows.admx` does for Windows. |
 | `BwcOracle.admx`, `en-US/BwcOracle.adml` | `BWC.Policies.Oracle` (prefix `bwcoracle`, uses `bwcbase`) | 70 policies and the subcategories. |
-| `bad/<Case>/...` | `BWC.Policies.Bad.<Case>` | Eight broken templates for load-error tests. Each is loaded alone, never together with the good fixture. |
+| `bad/<Case>/...` | `BWC.Policies.Bad.<Case>` | Eleven templates for load-error tests (three of them, `ClassLowerCase`, `BoolAttributeUpper` and `BoolAttributeMixed`, may turn out to load in classic). Each is loaded alone, never together with the good fixture. |
+| `edge/<Name>/...` | `BWC.Policies.Edge.<Name>` | Two valid templates whose policy key is spelled in an unusual way (matrix group K). BWC loads them. |
 
 The good fixture is schema valid. It does not use any attribute that the classic schema rejects. The BWC parser must still not validate against the schema.
 
@@ -122,8 +123,26 @@ Each case has its own folder under `bad/`, its own namespace `BWC.Policies.Bad.<
 | `bad/DtdEntity` | The ADMX has a `DOCTYPE` with an internal entity `bwcvalue` that is used as a value name. | BWC refuses the file because DTD processing is prohibited, and reports it as a load failure. For classic the oracle records what happens. |
 | `bad/ListItemNoKey` | An `item` of an `enabledList` has no `key` attribute and the list has no `defaultKey`. | A load failure `MissingAttribute` that names `key`, the file, the line and the column. Classic refuses the file with "Expected attribute 'key' not found." (live capture). No content of the file is shown. |
 | `bad/BooleanNoValueName` | A `boolean` element has no `valueName` attribute and only a `trueList` and a `falseList`. | A load failure `MissingAttribute` that names `valueName`, the file, the line and the column. Classic refuses the file with "Expected attribute 'valueName' not found." (live capture). No content of the file is shown. |
+| `bad/ClassLowerCase` | The policy has `class="machine"` (lower case). | Open oracle question ADMX-4. The oracle records whether classic refuses the file or loads the policy (matrix case `H/ClassLowerCase`). BWC accepts any letter case today. |
+| `bad/BoolAttributeUpper` | A `decimal` element has `required="TRUE"` (upper case boolean) and no other flag. | Open oracle question ADMX-4. The oracle records whether classic refuses the file or loads the policy (matrix case `H/BoolAttributeUpper`). BWC accepts any letter case today. |
+| `bad/BoolAttributeMixed` | A `decimal` element has `soft="True"` (mixed case boolean) and no other flag. | Open oracle question ADMX-4. The oracle records whether classic refuses the file or loads the policy (matrix case `H/BoolAttributeMixed`). BWC accepts any letter case today. |
 
 The entity is internal and harmless. No external entity or network reference exists in any file.
+
+## Edge fixtures
+
+Each case has its own folder under `edge/` (not under `bad/`, because these files are valid and BWC loads them), its own namespace `BWC.Policies.Edge.<Name>`, a root category `EdgeRoot` with one child category `EdgeCat`, and one machine policy `Pol_Edge` (display name "Edge fixture policy") with the value name `EdgeValue`. Enabled writes DWORD 1. The only unusual thing is the spelling of the policy `key`. K stands for `Software\Policies\BWC-Oracle`.
+
+| Folder | Policy `key` | Question |
+|---|---|---|
+| `edge/KeyTrailingBackslash` | `K\Edge\Trailing\` (ends in a backslash) | What bytes classic writes for the key on Enabled, and whether classic reads the state from a `Registry.pol` record whose key is trimmed and from one whose key ends in a backslash. BWC trims the backslash (policy-admx.md section 46). |
+| `edge/KeyLeadingBackslash` | `\K\Edge\Leading` (starts with a backslash) | The same three captures for a leading backslash. BWC leaves a leading backslash unchanged today. |
+
+Matrix group K installs one edge fixture next to the good fixture per case (its own session, like group H). Each fixture has three cases:
+
+- `K/<Name>_Enable`: Enabled with OK, then Not Configured with OK, each with the five files recorded.
+- `K/<Name>_ReadTrimmed`: a start `Registry.pol` that holds `EdgeValue` 1 under the key with no leading or trailing backslash. The case reads the state of the policy (the dialog, then Cancel), then saves one unrelated policy and clears it, so the golden shows what classic keeps of the start file.
+- `K/<Name>_ReadAsWritten`: the same, with the record under the key exactly as the template spells it.
 
 ## Cleanup
 

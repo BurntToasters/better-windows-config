@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BWC oracle bad fixture. Authored by Better Windows Config. Not a Microsoft file. -->
+<policyDefinitionResources revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>BWC Oracle Bad ClassLowerCase</displayName>
+  <description>A deliberately broken template used to test load errors.</description>
+  <resources>
+    <stringTable>
+      <string id="BadRoot">Bad fixture ClassLowerCase</string>
+      <string id="SUPPORTED_Bad">BWC oracle bad fixture</string>
+      <string id="Pol_Bad">Bad fixture policy</string>
+      <string id="Pol_Bad_Help">A policy in a deliberately broken template.</string>
+    </stringTable>
+  </resources>
+</policyDefinitionResources>
