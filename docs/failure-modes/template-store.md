@@ -17,8 +17,8 @@ Rules for the whole piece:
   operation, the full path and the Win32 error). The engine formats no text.
 - Every import is a copy of bytes that were read once, checked, and read again to prove they did not change.
 - A cancelled call returns nothing and writes nothing that it cannot undo.
-- Linking `ProtectedAcl.cs` adds a public type `Bwc.Update.ProtectedAcl` to `Bwc.Policy.dll`. A project that references
-  both `Bwc.Policy` and `Bwc.Update` binaries and names the type gets an ambiguity error and must alias one reference.
+- Linking `ProtectedAcl.cs` adds a public type `Bwc.Update.ProtectedAcl` to `Bwc.Gpo.dll` (the link moved there from `Bwc.Policy` in AF5, so one
+  compiled copy serves both). A project that references both `Bwc.Gpo` and `Bwc.Update` binaries and names the type gets an ambiguity error and must alias one reference.
 
 ## Layout
 
@@ -125,8 +125,26 @@ code, the path and a detail.
 | --- | --- | --- | --- |
 | F1 | Ship rules in a non-elevated process | Cannot set the owner Administrators | A typed `AccessDenied` or `OwnerNotAllowed` (A9). The unit test checks the security descriptor `ProtectedAcl.Ship().NewSecurity()` in memory: protected, owner Administrators, SYSTEM and Administrators only. |
 | F2 | Sandbox rules (current user in place of Administrators) | The tests and E2E need a writable store | `ForCurrentUser()` creates the folder for real and the test reads the ACL back: inheritance off, current user and SYSTEM full control, no other entry. |
-| F3 | The ACL class is linked from the update project | A copy that drifts | Linked by `<Compile Include ... Link>`, not copied, so the rules stay one source. |
+| F3 | The ACL class is linked from the update project | A copy that drifts | Linked by `<Compile Include ... Link>` in `Bwc.Gpo.csproj` (once per dependency chain), not copied, so the rules stay one source. |
 | F4 | A parent folder that exists and is writable by users | A swap of the store folder | Detected by the owner and DACL check of the store folder (A3). A swapped folder is owned by the swapper. |
+
+## H. Protected data root (AF5, PD-1 and STORE-1)
+
+The store sits in the BWC data root, `%ProgramData%\BetterWindowsConfig`. Standard users may create folders in
+`%ProgramData%`, so a user can pre-create that root and own it, then rename the administrator-only store away, plant a
+folder that fails the check, or swap in a junction between the folder check and the temp file create. The shared helper
+`Bwc.Gpo\Store\ProtectedDataRoot.cs` (see `gpo-store.md`, section K) checks the chain from the root (the parent of the
+store folder) to the folder being used. The chain is the root, the store and the language folder.
+
+| ID | Case | Risk | Handling |
+| --- | --- | --- | --- |
+| H1 | The data root does not exist | A first import looks like an error | The elevated writer creates it with the protected access list (`ProtectedAcl.NewSecurity()`), then the store, then the language folder. Reading treats a missing root as a missing store (A1). |
+| H2 | The data root is a junction | Every write goes through the link | Refused with `ReparsePoint`, the message names the root. Nothing is created through it and the target stays untouched. Reading reports the store as `ReparsePoint` and does not load it. |
+| H3 | The data root is owned by another user | The owner can rename the store away or plant a folder | Refused with `OwnerNotAllowed` and Win32 1307, the same reason an owner the token cannot hold gives (A9); the message names the root. Never repaired. Reading reports `AclRejected` and does not load the store. |
+| H4 | The data root has an allow entry that grants write to another trustee (for example `BUILTIN\Users`), with a trusted owner | Same as H3 | Refused with `StoreAclRejected`, the message names the root. Never repaired. |
+| H5 | A language folder (or the store) is a junction | A write through a link between the check and the temp file | Refused with `ReparsePoint`, the message names that folder. The check runs on the whole chain before the folder is created and again before every file write. The junction target stays untouched. |
+| H6 | A refusal | The user cannot tell which folder is wrong | The `TemplateStoreException` message and `Path` name the folder that failed. |
+| H7 | A device name with a superscript digit: COM or LPT followed by U+00B9, U+00B2 or U+00B3 (six names) | Windows reserves these like `COM1` and `LPT1` | `TemplateFileNames.IsSafeSegment` refuses them, with or without an extension, in any case (STORE-1). |
 
 ## Blind review additions
 

@@ -72,10 +72,7 @@ internal static class GpeditStorePolicy
 
 #if !BWC_E2E
     private static string ImportStoreFolder() =>
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "BetterWindowsConfig",
-            "PolicyDefinitions");
+        Path.Combine(ProtectedDataRoot.DefaultPath, "PolicyDefinitions");
 #endif
 
     private static string SystemTemplateFolder() =>

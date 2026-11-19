@@ -9,4 +9,11 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <!-- The protected folder rules of the updater's elevated helper, linked by source so the rules stay one source. The data root
+       helper and the template import store use them; Bwc.Policy sees the type through its reference to this project, so each
+       dependency chain holds one compiled copy (docs/failure-modes/template-store.md, F3). -->
+  <ItemGroup>
+    <Compile Include="..\Bwc.Update\Helper\ProtectedAcl.cs" Link="Store\ProtectedAcl.cs" />
+  </ItemGroup>
+
 </Project>

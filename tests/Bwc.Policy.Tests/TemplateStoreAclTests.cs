@@ -89,7 +89,7 @@ public sealed class TemplateStoreAclTests
             Assert.IsTrue(
                 e.Reason is TemplateStoreFailure.AccessDenied or TemplateStoreFailure.OwnerNotAllowed,
                 "Unexpected reason " + e.Reason + ": " + e.Message);
-            Assert.AreEqual(box.StoreFolder, e.Path);
+            Assert.AreEqual(box.Root, e.Path, "The refusal names the data root (the store's parent), which this user owns.");
             Assert.IsFalse(Directory.Exists(box.StoreFolder), "A refused create must leave nothing.");
             return;
         }

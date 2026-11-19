@@ -286,7 +286,9 @@ public sealed class TemplateImportTests
     {
         using var box = new TemplateStoreSandbox();
         var source = box.AddTemplate(box.Folder("src"), "Imp", "T.Imp");
-        var importer = new TemplateImport(new TemplateSources(box.SystemFolder, box.StoreFolder, ProtectedAcl.Ship()));
+        // The store's parent is missing: an existing parent made by this user is refused up front as an untrusted owner.
+        var store = Path.Combine(box.Root, "outer", "store");
+        var importer = new TemplateImport(new TemplateSources(box.SystemFolder, store, ProtectedAcl.Ship()));
         var result = importer.Import(source);
         if (result.Imported)
         {
@@ -296,7 +298,7 @@ public sealed class TemplateImportTests
         var problem = result.Problems.Single();
         Assert.AreEqual(TemplateImportProblemCode.WriteFailed, problem.Code);
         Assert.IsTrue(problem.StoreFailure is TemplateStoreFailure.AccessDenied or TemplateStoreFailure.OwnerNotAllowed, problem.StoreFailure?.ToString());
-        Assert.IsFalse(Directory.Exists(box.StoreFolder));
+        Assert.IsFalse(Directory.Exists(Path.GetDirectoryName(store)));
     }
 
     [TestMethod]

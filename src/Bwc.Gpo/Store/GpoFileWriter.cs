@@ -179,6 +179,9 @@ public sealed class GpoFileWriter
             relatives.Add((full, Path.GetRelativePath(gpoRoot, full)));
         }
 
+        // The system policy's backup root sits in the BWC data root, which a user could pre-create. Create and check the
+        // chain first, so nothing is read or created through a folder that is not protected.
+        (_policy as SystemGpoStorePolicy)?.EnsureBackupRoot("Backup");
         var backupRoot = Path.GetFullPath(_policy.BackupRoot);
         var folder = NextBackupFolder(backupRoot);
         _policy.EnsureWriteAllowed(folder);
@@ -225,6 +228,7 @@ public sealed class GpoFileWriter
     /// <exception cref="GpoStoreException">The policy refuses a removal.</exception>
     public GpoStoreException? PruneBackups(int keep = BackupsToKeep)
     {
+        (_policy as SystemGpoStorePolicy)?.VerifyBackupRoot("Prune");
         var backupRoot = Path.GetFullPath(_policy.BackupRoot);
         if (!Directory.Exists(backupRoot))
         {

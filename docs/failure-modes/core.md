@@ -266,7 +266,8 @@ share a pipe by accident beyond the explicit `unknown` fallback.
 ### Mutex ownership
 
 The first instance creates the named mutex with initial ownership. A second instance opens the
-same mutex, sees `createdNew == false`, and starts no server. Disposal releases the mutex only
+same mutex, sees `createdNew == false`, and starts no server when the existing instance answers on the pipe
+(see "Client integrity level and a squatted mutex"). Disposal releases the mutex only
 when this object owns it and disposal happens on the creating thread, because Windows mutex
 ownership is thread affine. Closing the handle from another thread still releases the kernel
 object; it simply skips `ReleaseMutex` to avoid `ApplicationException`.
@@ -335,6 +336,34 @@ only to the current user SID. A different user cannot send activation messages e
 the pipe name. Because the key also includes the integrity level, a medium-integrity process and
 an elevated high-integrity process of the same user use different instances rather than fighting
 over one pipe.
+
+### Client integrity level and a squatted mutex (AF7, CORE-2 and CORE-3)
+
+The pipe ACL only separates users. A non-elevated process of the same user can compute the "high"
+pipe name of an elevated tool and connect to it. The message can carry a `.reg` path, which opens the
+import confirmation in the elevated window with no UAC prompt. After a client connects, the server
+reads the client process id (`GetNamedPipeClientProcessId`), opens that process and reads its token
+integrity level. `IntegrityPolicy.Accepts(serverLevel, clientLevel)` is the pure rule: a client below
+the server's own level is refused, a client whose process or level cannot be read is refused, and a
+client at the same level or higher is accepted. A server whose own level is unknown refuses every
+client (fail closed). A refused client is disconnected, nothing is delivered, and one line is logged.
+The client may still see `Sent` (the pipe is one way) or a broken pipe; the refusal is the server's decision.
+
+The same user can also create the mutex name first, which made the real tool believe another instance
+runs. When the mutex already exists, `Create` now connects to the pipe (no message) with the
+three-second timeout. Only when the existing instance answers is this launch a later instance
+(`IsFirstInstance` is false, and the caller sends its message and exits, as before). When nobody
+answers, the launch starts as the first instance: it serves the pipe without owning the mutex, and
+logs that the mutex was held without an answering instance. Disposal then does not release a mutex it
+never owned.
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| SI-I1 | Client integrity level below the server's | Non-elevated process drives the elevated window | Refused: disconnected, no message delivered, one log line | `ClientBelowServerLevelIsRefusedAndNothingIsDelivered`, `Accepts_ClientBelowServer_IsRefused` |
+| SI-I2 | Client process or level cannot be read | Unverifiable client treated as trusted | Refused | `ClientWithUnknownLevelIsRefused`, `Accepts_UnknownClient_IsRefused`, `Accepts_UnknownServer_IsRefused` |
+| SI-I3 | Client at the same level, or higher | Legitimate second launch refused | Accepted and delivered, as today | `ClientAtOrAboveServerLevelIsAccepted`, `Accepts_ClientAtOrAboveServer_IsAccepted`, `MessageRoundTripsToTheFirstInstance` |
+| SI-M1 | Mutex held by a process that serves no pipe | Real tool refuses to start | Starts as the first instance after the connect timeout; logs the held mutex | `MutexHeldWithoutAnswerDoesNotBlockTheStart` |
+| SI-M2 | Real second instance (mutex held, pipe answers) | Two windows | Not first; message delivered; the caller exits | `MutexHeldWithoutAnswerDoesNotBlockTheStart` (third start), `MessageRoundTripsToTheFirstInstance` |
 
 ### Dispose while accepting
 

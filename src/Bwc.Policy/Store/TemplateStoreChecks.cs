@@ -1,4 +1,4 @@
-using System.Security.AccessControl;
+using Bwc.Gpo.Store;
 using Bwc.Update;
 
 namespace Bwc.Policy.Store;
@@ -99,32 +99,59 @@ internal static class TemplateStoreChecks
         }
     }
 
-    /// <summary>Looks at a store or language folder: existence, reparse point, owner and access list.</summary>
-    internal static (TemplateStoreStatus Status, string Detail) Inspect(string folder, ProtectedAcl acl)
+    /// <summary>
+    /// The folder that holds the store (the BWC data root): its parent. Null for a path that has none, which the writer
+    /// refuses as a drive root before it gets here.
+    /// </summary>
+    internal static string? DataRootOf(string storeFolder) => Path.GetDirectoryName(storeFolder);
+
+    /// <summary>
+    /// Looks at a store or language folder and every folder from the data root down to it: existence, reparse point, owner
+    /// and access list (`ProtectedDataRoot.Verify`). A missing data root or store is <see cref="TemplateStoreStatus.Missing"/>.
+    /// When a folder above the one asked about fails, the detail names that folder.
+    /// </summary>
+    /// <param name="dataRoot">The data root, the parent of the store folder.</param>
+    /// <param name="folder">The store folder or a language folder under it.</param>
+    /// <param name="acl">The owner and access rules.</param>
+    internal static (TemplateStoreStatus Status, string Detail) Inspect(string dataRoot, string folder, ProtectedAcl acl)
     {
+        ProtectedFolderProblem? problem;
         try
         {
-            if (File.Exists(folder))
-            {
-                return (TemplateStoreStatus.NotADirectory, folder);
-            }
-
-            if (!Directory.Exists(folder))
-            {
-                return (TemplateStoreStatus.Missing, string.Empty);
-            }
-
-            if (IsReparsePoint(folder))
-            {
-                return (TemplateStoreStatus.ReparsePoint, folder);
-            }
-
-            var why = acl.Inspect(new DirectoryInfo(folder).GetAccessControl(AccessControlSections.Owner | AccessControlSections.Access));
-            return why is null ? (TemplateStoreStatus.Ready, string.Empty) : (TemplateStoreStatus.AclRejected, why);
+            problem = ProtectedDataRoot.Verify(dataRoot, folder, acl);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or SystemException)
+        catch (ArgumentException)
         {
-            return (TemplateStoreStatus.Unreadable, "0x" + e.HResult.ToString("X8", System.Globalization.CultureInfo.InvariantCulture));
+            return (TemplateStoreStatus.Unreadable, folder);
         }
+
+        return problem is null ? (TemplateStoreStatus.Ready, string.Empty) : Map(problem, folder);
+    }
+
+    /// <summary>Looks at a store folder and the data root above it.</summary>
+    internal static (TemplateStoreStatus Status, string Detail) Inspect(string folder, ProtectedAcl acl)
+    {
+        var root = DataRootOf(folder);
+        return root is null ? (TemplateStoreStatus.Unreadable, folder) : Inspect(root, folder, acl);
+    }
+
+    private static (TemplateStoreStatus Status, string Detail) Map(ProtectedFolderProblem problem, string asked)
+    {
+        var detail = problem.Status switch
+        {
+            ProtectedFolderStatus.OwnerRejected or ProtectedFolderStatus.AclRejected or ProtectedFolderStatus.Unreadable =>
+                IsSame(problem.Folder, asked) ? problem.Detail : problem.Folder + ": " + problem.Detail,
+            ProtectedFolderStatus.Missing => string.Empty,
+            _ => problem.Folder,
+        };
+        var status = problem.Status switch
+        {
+            ProtectedFolderStatus.Missing => TemplateStoreStatus.Missing,
+            ProtectedFolderStatus.NotADirectory => TemplateStoreStatus.NotADirectory,
+            ProtectedFolderStatus.ReparsePoint => TemplateStoreStatus.ReparsePoint,
+            ProtectedFolderStatus.OwnerRejected or ProtectedFolderStatus.AclRejected => TemplateStoreStatus.AclRejected,
+            _ => TemplateStoreStatus.Unreadable,
+        };
+        return (status, detail);
     }
 }

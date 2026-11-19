@@ -91,6 +91,7 @@ one named place so the correction touches one spot:
 | C15 | Machine and User halves of a policy of class Both | A Both policy is edited once per root. Each root is its own save, so each bumps its own half and adds its own pair. The store has no "both" save. |
 | C16 | `gpt.ini` absent | Read as a new file. The first save creates it in the probe order. |
 | C17 | A very large or binary file | A size cap (1 MiB) applies; over it is `GptIniFormatException`. NUL bytes are kept as ordinary bytes. |
+| C18 | Version half at 65535 (GPT-1, open oracle question) | `Bump` wraps the half from 65535 to 0 and leaves the other half alone. What classic does at that point is unknown: it may wrap, saturate, or carry into the other half. Not observable in practice (65536 saves of one side). Open question for the oracle capture; no code change until it is answered. |
 
 ## D. comment.cmtx
 
@@ -183,6 +184,28 @@ one named place so the correction touches one spot:
 | I8 | The token cannot be duplicated or the descriptor cannot be read | Treated as no write access, with no exception. |
 | I9 | The test process is elevated | The `GpoAccessTests` case that expects `NotElevated` is inconclusive. |
 
+## K. Protected data root (AF5, PD-1 and GPO-1)
+
+`%ProgramData%\BetterWindowsConfig` (the BWC data root) holds the backup root `gpedit\backup` and the template import store
+`PolicyDefinitions`. Standard users may create folders in `%ProgramData%`, so a user can pre-create the root and own it.
+`Store/ProtectedDataRoot.cs` is the one helper (compiled into `Bwc.Gpo`, used by `Bwc.Policy` through the reference). The
+elevated editor creates the root with the protected access list on first use; the installer does not. Every folder from the
+root down to the target must have a trusted owner, a protected access list that passes `ProtectedAcl.Inspect`, and must not
+be a reparse point (an attribute that cannot be read counts as a link). A folder that fails is refused, never repaired, and
+nothing is created through it. The refusal message names the folder (`GpoStoreException`, reason `PolicyDenied`).
+
+| ID | Case | Intended behavior |
+| --- | --- | --- |
+| K1 | The data root does not exist | Created with `ProtectedAcl.NewSecurity()` (owner, explicit protected list, no inheritance), then inspected. A missing `gpedit` and `backup` below it are created the same way. |
+| K2 | The data root is a junction or symlink | Refused with the root named. Nothing is created in it or through it, and the link target stays untouched. |
+| K3 | The data root is owned by another user | Refused with the root named (status `OwnerRejected`, kept apart from an access list problem). `GpoStoreException` has no owner reason, so the reason is `PolicyDenied`. Not repaired. |
+| K4 | The data root has an allow entry that grants write to another trustee (for example `BUILTIN\Users`) | Refused with the root named. Not repaired. |
+| K5 | `gpedit`, `backup` or any folder between the root and the target is a junction | Refused with that folder named. The backup writes nothing through it and the junction target stays untouched. Checked on every backup and every prune, not only the first. |
+| K6 | The folder is a file, or its owner or access list cannot be read | Refused with the folder named (the safe side). |
+| K7 | A folder fails after an earlier backup succeeded (swapped later) | The next backup or prune refuses. The write policy of the system policy re-checks the chain for every path under the backup root. |
+| K8 | The root cannot be created (not elevated, owner not allowed) | A typed `GpoStoreException` with the Win32 code. Nothing is left behind. |
+| K9 | The sandbox and E2E policies | They keep their own checks (`SandboxGpoStorePolicy` refuses a link between the run data root and its roots). `ProtectedDataRoot` is used by `SystemGpoStorePolicy` and the template store, with `ProtectedAcl.ForCurrentUser()` in tests. |
+
 ## J. Tests
 
 Everything runs in a temp sandbox under the test's own temp folder, through `SandboxGpoStorePolicy`. No test writes the
@@ -196,6 +219,7 @@ folders holds no literal, so `scripts/check-policy-writer.js` passes without an 
 | `CmtxTests` | Probe file byte for byte; add, edit, remove; namespaces; foreign content; escaping; hostile input. |
 | `GpoSaveTests` | Write order, no write on no change, re-read under lock, atomic replace and temp sweep, backup once and pruned to 10, user vs machine half, read-only mode, failure paths. |
 | `GpoStoreOpenTests` | Missing files, malformed files, snapshot. |
+| `ProtectedDataRootTests` | K1 to K8 against sandbox roots with the current user rules: missing root created protected, junction root, write entry for another trustee, owner rule through a crafted descriptor, junction on `gpedit` and `backup`, the system policy backup path. |
 | `SandboxGpoStorePolicyTests` | Refusals: outside, `..`, prefix sibling, reparse point, backup inside root, run data root itself. |
 | `GpoAccessTests` | Reasons, aggregation, the real access check against a temp folder and a system folder. |
 | `PolicyRefreshTests` | Recorder lines. |

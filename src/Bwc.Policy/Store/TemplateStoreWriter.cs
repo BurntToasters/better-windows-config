@@ -1,3 +1,4 @@
+using Bwc.Gpo.Store;
 using Bwc.Update;
 
 namespace Bwc.Policy.Store;
@@ -6,13 +7,16 @@ namespace Bwc.Policy.Store;
 /// The only code that writes into the BWC import store (scripts/check-policy-writer.js). It never names the system
 /// folder as a target: the system folder is passed only so a store root that is, contains or lies inside it is refused.
 /// Folders are created with the protected ACL, every file is written to a temp file in its own folder and moved into
-/// place, and a name is one safe segment that is re-checked here whatever the caller did. The cases are in
-/// docs/failure-modes/template-store.md, sections A, D, E and F.
+/// place, and a name is one safe segment that is re-checked here whatever the caller did. The store sits in the BWC data
+/// root (its parent folder), which a standard user could pre-create: the data root, the store and the language folder are
+/// created and checked together by <see cref="ProtectedDataRoot"/>, and a folder that fails is refused and named. The
+/// cases are in docs/failure-modes/template-store.md, sections A, D, E, F and H.
 /// </summary>
 public sealed class TemplateStoreWriter
 {
     private readonly ProtectedAcl acl;
     private readonly string systemFolder;
+    private readonly string dataRoot;
 
     /// <summary>Creates a writer. Nothing is touched until a method is called.</summary>
     /// <param name="storeRoot">The import store folder (an absolute local path).</param>
@@ -44,6 +48,7 @@ public sealed class TemplateStoreWriter
         }
 
         StoreRoot = root;
+        dataRoot = TemplateStoreChecks.DataRootOf(root)!;
         this.systemFolder = system;
     }
 
@@ -179,42 +184,53 @@ public sealed class TemplateStoreWriter
 
     private void EnsureFolder(string folder)
     {
+        ProtectedFolderProblem? problem;
         try
         {
-            if (File.Exists(folder))
-            {
-                throw TemplateStoreException.Refused(TemplateStoreFailure.NotADirectory, "Create", folder, "the path is a file");
-            }
-
-            if (!Directory.Exists(folder))
-            {
-                acl.NewSecurity().CreateDirectory(folder);
-            }
+            problem = ProtectedDataRoot.Ensure(dataRoot, folder, acl);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             throw TemplateStoreException.FromIo("Create", folder, e);
         }
 
-        CheckFolder(folder);
+        if (problem is not null)
+        {
+            throw Refusal(problem);
+        }
     }
 
     private void CheckFolder(string folder)
     {
-        var (status, detail) = TemplateStoreChecks.Inspect(folder, acl);
-        switch (status)
+        var problem = ProtectedDataRoot.Verify(dataRoot, folder, acl);
+        if (problem is not null)
         {
-            case TemplateStoreStatus.Ready:
-                return;
-            case TemplateStoreStatus.NotADirectory:
-                throw TemplateStoreException.Refused(TemplateStoreFailure.NotADirectory, "Check", folder, "the path is a file");
-            case TemplateStoreStatus.ReparsePoint:
-                throw TemplateStoreException.Refused(TemplateStoreFailure.ReparsePoint, "Check", folder, "the folder is a reparse point");
-            case TemplateStoreStatus.AclRejected:
-                throw TemplateStoreException.Refused(TemplateStoreFailure.StoreAclRejected, "Check", folder, detail);
-            default:
-                throw TemplateStoreException.Refused(TemplateStoreFailure.Io, "Check", folder, "the folder cannot be inspected (" + detail + ")");
+            throw Refusal(problem);
         }
+    }
+
+    private static TemplateStoreException Refusal(ProtectedFolderProblem problem)
+    {
+        if (problem.Error is not null)
+        {
+            return TemplateStoreException.FromIo("Create", problem.Folder, problem.Error);
+        }
+
+        if (problem.Status == ProtectedFolderStatus.OwnerRejected)
+        {
+            // The same reason and Win32 code that creating a folder with an owner the token cannot hold reports (A9, 1307).
+            return new TemplateStoreException(
+                TemplateStoreFailure.OwnerNotAllowed, "Check", problem.Folder, 1307, $"Check of '{problem.Folder}' refused: {problem.Describe()}.");
+        }
+
+        var reason = problem.Status switch
+        {
+            ProtectedFolderStatus.NotADirectory => TemplateStoreFailure.NotADirectory,
+            ProtectedFolderStatus.ReparsePoint => TemplateStoreFailure.ReparsePoint,
+            ProtectedFolderStatus.AclRejected => TemplateStoreFailure.StoreAclRejected,
+            _ => TemplateStoreFailure.Io,
+        };
+        return TemplateStoreException.Refused(reason, "Check", problem.Folder, problem.Describe());
     }
 
     private void WriteFile(string folder, string name, byte[] data)

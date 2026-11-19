@@ -222,6 +222,116 @@ public sealed class SingleInstanceTests
         Assert.AreEqual("after rude client", receivedMessage);
     }
 
+    [TestMethod]
+    public void ClientBelowServerLevelIsRefusedAndNothingIsDelivered()
+    {
+        // The server compares against an injected level above this process's level, so this client counts as lower.
+        IntegrityLevel own = IntegrityNative.ReadCurrent();
+        if (own is IntegrityLevel.Unknown or IntegrityLevel.System)
+        {
+            Assert.Inconclusive("this test process has no level a higher server level can be injected above.");
+        }
+
+        string toolId = NewToolId();
+        using var first = SingleInstance.Create(toolId, own + 1, readClientLevel: null);
+        using var second = SingleInstance.Create(toolId);
+        using var received = new ManualResetEventSlim(false);
+        first.MessageReceived += _ => received.Set();
+
+        // The client may see Sent or a broken pipe, depending on whether the server drops the connection first.
+        _ = second.TrySendMessage("from below");
+        Assert.IsTrue(
+            SpinWait.SpinUntil(() => first.RefusedClients >= 1, TimeSpan.FromSeconds(5)),
+            "the server did not refuse the lower-level client.");
+        Assert.IsFalse(received.Wait(TimeSpan.FromMilliseconds(1500)), "a refused client must deliver nothing.");
+    }
+
+    [TestMethod]
+    public void ClientWithUnknownLevelIsRefused()
+    {
+        string toolId = NewToolId();
+        using var first = SingleInstance.Create(toolId, IntegrityNative.ReadCurrent(), _ => IntegrityLevel.Unknown);
+        using var second = SingleInstance.Create(toolId);
+        using var received = new ManualResetEventSlim(false);
+        first.MessageReceived += _ => received.Set();
+
+        _ = second.TrySendMessage("unreadable client");
+        Assert.IsTrue(
+            SpinWait.SpinUntil(() => first.RefusedClients >= 1, TimeSpan.FromSeconds(5)),
+            "the server did not refuse the client whose level could not be read.");
+        Assert.IsFalse(received.Wait(TimeSpan.FromMilliseconds(1500)), "an unreadable client must deliver nothing.");
+    }
+
+    [TestMethod]
+    public void ClientAtOrAboveServerLevelIsAccepted()
+    {
+        IntegrityLevel own = IntegrityNative.ReadCurrent();
+        if (own == IntegrityLevel.Unknown)
+        {
+            Assert.Inconclusive("this test process level cannot be read.");
+        }
+
+        // The real client reader runs against this process, so the process id and token reads are exercised.
+        // A server level equal to, or below, this process's level accepts it.
+        foreach (IntegrityLevel serverLevel in new[] { own, IntegrityLevel.Low })
+        {
+            string toolId = NewToolId();
+            using var first = SingleInstance.Create(toolId, serverLevel, readClientLevel: null);
+            using var second = SingleInstance.Create(toolId);
+            using var received = new ManualResetEventSlim(false);
+            first.MessageReceived += _ => received.Set();
+
+            Assert.AreEqual(SingleInstanceSendResult.Sent, second.TrySendMessage("from level " + serverLevel));
+            Assert.IsTrue(received.Wait(TimeSpan.FromSeconds(5)), "a client at or above the server level was not delivered.");
+            Assert.AreEqual(0, first.RefusedClients);
+        }
+    }
+
+    [TestMethod]
+    public void MutexHeldWithoutAnswerDoesNotBlockTheStart()
+    {
+        string toolId = NewToolId();
+        string mutexName = LearnMutexName(toolId);
+
+        // A same-user process created the mutex first and serves no pipe.
+        using var squatter = new Mutex(initiallyOwned: true, mutexName, out bool createdNew);
+        Assert.IsTrue(createdNew, "the test must create the mutex first.");
+
+        var watch = Stopwatch.StartNew();
+        using var real = SingleInstance.Create(toolId);
+        watch.Stop();
+        Assert.IsTrue(real.IsFirstInstance, "a mutex held without an answering instance must not block the start.");
+        Assert.IsTrue(
+            watch.Elapsed < TimeSpan.FromSeconds(10),
+            "the wait for an answer must stop at the connect timeout.");
+
+        // A later launch finds the real instance answering, so it is a second instance and delivers its message.
+        using var later = SingleInstance.Create(toolId);
+        using var received = new ManualResetEventSlim(false);
+        string? receivedMessage = null;
+        real.MessageReceived += message =>
+        {
+            receivedMessage = message;
+            received.Set();
+        };
+
+        Assert.IsFalse(later.IsFirstInstance, "an answering instance makes the next launch a second instance.");
+        Assert.IsTrue(later.SendMessage("hello real instance"));
+        Assert.IsTrue(received.Wait(TimeSpan.FromSeconds(5)));
+        Assert.AreEqual("hello real instance", receivedMessage);
+
+        // Disposing the instance that never owned the mutex must leave the squatter's mutex alone.
+        real.Dispose();
+        squatter.ReleaseMutex();
+    }
+
+    private static string LearnMutexName(string toolId)
+    {
+        using SingleInstance probe = SingleInstance.Create(toolId);
+        Assert.IsTrue(probe.IsFirstInstance);
+        return probe.InstanceName;
+    }
+
     private static string LearnPipeName(string toolId)
     {
         using SingleInstance probe = SingleInstance.Create(toolId);
