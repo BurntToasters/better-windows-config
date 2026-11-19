@@ -221,17 +221,27 @@ const policyPathAllowlist = new Map([
   ["tools/Bwc.Oracle.Capture/Gpedit/Probe/**", oracleCaptureReason],
 ]);
 
-// Protected-scope writes that are allowed, by file. Unlike the whole-file allowlists above, an entry names one exact hit
-// label, the most hits of that label the file may have, and why. A hit of any other label in the file is still a
-// violation, and so is every hit of the label beyond the maximum.
+// Protected-scope writes that are allowed, by file. Unlike the whole-file allowlists above, an entry names exact hit
+// labels, the most hits of each label the file may have, and why. A hit of any other label in the file is still a
+// violation, and so is every hit of a label beyond its maximum.
 const countedWriteAllowlist = new Map([
   [
     "src/Bwc.Gpedit/GpeditRootView.Editor.cs",
     {
-      label: ".Save over a path",
-      max: 1,
+      allowances: [{ label: ".Save over a path", max: 1 }],
       reason:
         "Bwc.Core.SettingsStore<T>.Save writes the editor's view settings (window, tree width, columns, view mode, tab) to settings.json in the BWC data root. It never reaches the GPO folder or a template folder.",
+    },
+  ],
+  [
+    "src/Bwc.Gpo/Store/WriteLock.cs",
+    {
+      allowances: [
+        { label: "FileMode.OpenOrCreate", max: 1 },
+        { label: "Directory.CreateDirectory", max: 1 },
+      ],
+      reason:
+        "The write lock is a file in the protected backup root. It is opened with FileAccess.Read and FileShare.None, so it creates the empty lock file and writes no data; the single CreateDirectory makes a missing sandbox backup root after the write policy has checked the path. It writes no GPO file and no template.",
     },
   ],
 ]);
@@ -247,7 +257,9 @@ const refreshNameAllowlist = new Map([
 const launchAllowlist = new Map([]);
 
 function countedUsage() {
-  return [...countedWriteAllowlist].map(([file, entry]) => `${file}: ${entry.label} x${entry.max}`).join("; ");
+  return [...countedWriteAllowlist]
+    .map(([file, entry]) => `${file}: ${entry.allowances.map((item) => `${item.label} x${item.max}`).join(", ")}`)
+    .join("; ");
 }
 
 const usage = `Usage: node scripts/check-policy-writer.js [options]
@@ -826,12 +838,12 @@ function scanSource(relative, source, violations) {
   }
 
   if (inProtected && !isWriter) {
-    // A counted allowance covers the first max hits of its one label; every other hit is reported.
+    // A counted allowance covers the first max hits of each of its labels; every other hit is reported.
     const counted = countedWriteAllowlist.get(relative);
-    let allowedLeft = counted?.max ?? 0;
+    const allowedLeft = new Map((counted?.allowances ?? []).map((item) => [item.label, item.max]));
     for (const hit of writes) {
-      if (counted !== undefined && !hit.native && hit.detail === counted.label && allowedLeft > 0) {
-        allowedLeft -= 1;
+      if (!hit.native && (allowedLeft.get(hit.detail) ?? 0) > 0) {
+        allowedLeft.set(hit.detail, allowedLeft.get(hit.detail) - 1);
         continue;
       }
 
@@ -1539,11 +1551,17 @@ function runSelfTest() {
 
 // The counted allowlist cases. Each case runs on its own tree, because the allowlisted file is a real path.
 // (a) one allowed call passes, (b) a second call fails, (c) another write API in the file fails and the allowed call does
-// not, (d) the same call in another protected file fails.
+// not, (d) the same call in another protected file fails, (e) every allowance of the lock file passes once and a second
+// use of either label fails, and any other write API in it fails.
 function runCountedAllowlistSelfTest() {
   const [allowedFile] = [...countedWriteAllowlist.keys()];
   const save = "    internal static void M(object x, Store s) => s.Save(x);";
   const saveAgain = "    internal static void N(object x, Store s) => s.Save(x);";
+  const lockFile = "src/Bwc.Gpo/Store/WriteLock.cs";
+  const lockOpen = "    internal static void O(string p) { using var s = new FileStream(p, FileMode.OpenOrCreate, FileAccess.Read, FileShare.None); }";
+  const lockOpenAgain = "    internal static void P(string p) { using var s = new FileStream(p, FileMode.OpenOrCreate, FileAccess.Read, FileShare.None); }";
+  const lockFolder = "    internal static void D(string p) => Directory.CreateDirectory(p);";
+  const lockFolderAgain = "    internal static void E(string p) => Directory.CreateDirectory(p);";
   const cases = [
     {
       name: "(a) the allowlisted file with exactly one .Save(x)",
@@ -1580,6 +1598,30 @@ function runCountedAllowlistSelfTest() {
       exit: 1,
       expected: ["src/Bwc.Gpedit/Other.cs:3: protected-write: .Save over a path"],
       forbidden: [],
+    },
+    {
+      name: "(e1) the lock file with one OpenOrCreate open and one CreateDirectory",
+      files: { [lockFile]: ["internal static class L", "{", lockOpen, lockFolder, "}"] },
+      exit: 0,
+      expected: [],
+      forbidden: [lockFile],
+    },
+    {
+      name: "(e2) the lock file with a second OpenOrCreate open and a second CreateDirectory",
+      files: { [lockFile]: ["internal static class L", "{", lockOpen, lockFolder, lockOpenAgain, lockFolderAgain, "}"] },
+      exit: 1,
+      expected: [
+        `${lockFile}:5: protected-write: FileMode.OpenOrCreate`,
+        `${lockFile}:6: protected-write: Directory.CreateDirectory`,
+      ],
+      forbidden: [`${lockFile}:3:`, `${lockFile}:4:`],
+    },
+    {
+      name: "(e3) the lock file with another write API",
+      files: { [lockFile]: ["internal static class L", "{", lockOpen, '    internal static void W(string p) => File.WriteAllText(p, "x");', "}"] },
+      exit: 1,
+      expected: [`${lockFile}:4: protected-write: File.WriteAllText`],
+      forbidden: [`${lockFile}:3:`],
     },
   ];
 

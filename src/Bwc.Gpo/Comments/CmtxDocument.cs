@@ -17,6 +17,12 @@ public sealed class CmtxDocument
     /// <summary>The size cap; a larger file is refused.</summary>
     public const int MaxBytes = 4 * 1024 * 1024;
 
+    /// <summary>
+    /// The deepest element nesting accepted (the root is level 0). A real file is about 4 levels deep; a file nested far
+    /// deeper fits in the size cap and would overflow the stack of the recursive serializer.
+    /// </summary>
+    public const int MaxDepth = 64;
+
     private static readonly Regex PrefixNumber = new(@"^ns(\d+)$", RegexOptions.CultureInvariant);
 
     private readonly XDocument _document;
@@ -89,7 +95,22 @@ public sealed class CmtxDocument
                 MaxCharactersInDocument = MaxBytes,
                 IgnoreWhitespace = false,
             };
-            using var stream = new MemoryStream(bytes.ToArray(), false);
+            var buffer = bytes.ToArray();
+
+            // A flat read first: no tree and no recursion exist until the nesting is known to be sane.
+            using (var probeStream = new MemoryStream(buffer, false))
+            using (var probe = XmlReader.Create(probeStream, settings))
+            {
+                while (probe.Read())
+                {
+                    if (probe.Depth > MaxDepth)
+                    {
+                        throw new CmtxFormatException($"comment.cmtx is nested deeper than {MaxDepth} levels.");
+                    }
+                }
+            }
+
+            using var stream = new MemoryStream(buffer, false);
             using var reader = XmlReader.Create(stream, settings);
             document = XDocument.Load(reader, LoadOptions.PreserveWhitespace);
         }
@@ -142,22 +163,25 @@ public sealed class CmtxDocument
         var prefix = PrefixOf(namespaceUri) ?? AddNamespace(namespaceUri);
         var entry = FindEntry(prefix, policyName);
         var id = entry is null ? null : IdOf(entry);
+        var table = StringTable()!;
+
+        // An id that another entry shares, or a new id that a string or an entry already holds, is never reused: a comment
+        // edit changes this policy's text only (CMTX-1).
         if (entry is null)
         {
-            id = prefix + "_" + policyName;
+            id = FreeId(table, prefix + "_" + policyName);
             AdmTemplate()!.Add(WriteComment(prefix, policyName, id));
         }
-        else if (id is null)
+        else if (id is null || EntryElements().Any(e => !ReferenceEquals(e, entry) && IdOf(e) == id))
         {
-            id = prefix + "_" + policyName;
+            id = FreeId(table, prefix + "_" + policyName);
             entry.SetAttributeValue("commentText", "$(resource." + id + ")");
         }
 
-        var table = StringTable()!;
-        var existing = id is null ? null : FindString(table, id);
+        var existing = FindString(table, id!);
         if (existing is null)
         {
-            existing = new XElement(CmtxFormat.String, new XAttribute("id", id ?? prefix + "_" + policyName));
+            existing = new XElement(CmtxFormat.String, new XAttribute("id", id!));
             table.Add(existing);
         }
 
@@ -200,7 +224,42 @@ public sealed class CmtxDocument
     /// <returns>A new array.</returns>
     public byte[] ToBytes() => CmtxFormat.Serialize(_document);
 
-    private static bool IsXmlText(string text) => text.All(c => XmlConvert.IsXmlChar(c) || char.IsSurrogate(c));
+    /// <summary>True when every character is valid in XML 1.0. A surrogate counts only as half of a valid pair.</summary>
+    private static bool IsXmlText(string text)
+    {
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            if (char.IsHighSurrogate(c))
+            {
+                if (i + 1 >= text.Length || !XmlConvert.IsXmlSurrogatePair(text[i + 1], c))
+                {
+                    return false;
+                }
+
+                i++;
+            }
+            else if (!XmlConvert.IsXmlChar(c))
+            {
+                // A low surrogate on its own is not an XML character.
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>The first of <c>id</c>, <c>id_2</c>, <c>id_3</c>... that no string or entry holds.</summary>
+    private string FreeId(XElement table, string preferred)
+    {
+        var candidate = preferred;
+        for (var n = 2; FindString(table, candidate) is not null || EntryElements().Any(e => IdOf(e) == candidate); n++)
+        {
+            candidate = preferred + "_" + n.ToString(CultureInfo.InvariantCulture);
+        }
+
+        return candidate;
+    }
 
     private static void StripLayout(XDocument document)
     {

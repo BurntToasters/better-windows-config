@@ -31,7 +31,7 @@ public readonly record struct GpoWriteEvent(GpoWriteKind Kind, string Path);
 /// <summary>
 /// The only code in Bwc.Gpo that writes, replaces, copies or deletes files (scripts/check-policy-writer.js enforces
 /// this). Every public method asks the write policy first. Writes are atomic: a temp file next to the target, flushed,
-/// then swapped in. Not thread safe: the store serializes saves with its named mutex.
+/// then swapped in. Not thread safe: the store serializes saves with its write lock file.
 /// </summary>
 public sealed class GpoFileWriter
 {

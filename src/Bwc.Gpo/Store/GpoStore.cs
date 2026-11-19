@@ -5,7 +5,7 @@ namespace Bwc.Gpo.Store;
 
 /// <summary>
 /// The local GPO as three kinds of file: open reads them, save runs the contract's save sequence (re-read under the
-/// named lock, apply the caller's edit to the fresh models, skip everything when nothing changed, back up once per
+/// write lock file, apply the caller's edit to the fresh models, skip everything when nothing changed, back up once per
 /// session, write comment.cmtx then Registry.pol then gpt.ini, refresh). Every byte goes through
 /// <see cref="GpoFileWriter"/> and the write policy. One instance is one session: the backup is made once per instance.
 /// </summary>
@@ -17,7 +17,7 @@ public sealed class GpoStore
     private bool _backedUp;
 
     /// <summary>Creates a store.</summary>
-    /// <param name="policy">The write policy: roots, lock name, refresher and path check.</param>
+    /// <param name="policy">The write policy: roots, lock file, refresher and path check.</param>
     /// <param name="options">Settings and the test hook; null for the defaults.</param>
     public GpoStore(IGpoStorePolicy policy, GpoStoreOptions? options = null)
     {
@@ -82,7 +82,7 @@ public sealed class GpoStore
 
         GpoSaveResult result;
         bool polWritten;
-        using (WriteLock.Acquire(_policy.LockName, _options.LockTimeout))
+        using (WriteLock.Acquire(_policy, _options.LockTimeout))
         {
             (result, polWritten) = SaveLocked(side, edit, cancellationToken);
         }
@@ -159,24 +159,33 @@ public sealed class GpoStore
         }
 
         var written = new List<string>();
-        if (cmtxChanged)
-        {
-            _writer.WriteAtomic(cmtxPath, cmtx.Document!.ToBytes());
-            written.Add(cmtxPath);
-        }
-
-        if (polChanged)
-        {
-            _writer.WriteAtomic(polPath, pol.Document!.ToBytes());
-            written.Add(polPath);
-        }
-
         uint? version = null;
-        if (gptChanged)
+        try
         {
-            _writer.WriteAtomic(gptPath, gpt.Document!.ToBytes());
-            written.Add(gptPath);
-            version = gpt.Document.Version;
+            if (cmtxChanged)
+            {
+                _writer.WriteAtomic(cmtxPath, cmtx.Document!.ToBytes());
+                written.Add(cmtxPath);
+            }
+
+            if (polChanged)
+            {
+                _writer.WriteAtomic(polPath, pol.Document!.ToBytes());
+                written.Add(polPath);
+            }
+
+            if (gptChanged)
+            {
+                _writer.WriteAtomic(gptPath, gpt.Document!.ToBytes());
+                written.Add(gptPath);
+                version = gpt.Document.Version;
+            }
+        }
+        catch (GpoStoreException e) when (written.Count > 0)
+        {
+            // There is no rollback (docs/failure-modes/gpo-store.md, E10 and E15): say which files already reached disk.
+            e.SetWrittenFiles(written.ToArray());
+            throw;
         }
 
         var result = new GpoSaveResult

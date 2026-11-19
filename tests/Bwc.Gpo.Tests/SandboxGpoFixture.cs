@@ -119,6 +119,44 @@ internal sealed class SandboxGpoFixture : IDisposable
         _holds.Add(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite));
     }
 
+    /// <summary>Keeps a file open with no sharing at all, so nothing else can read, write or replace it.</summary>
+    public void HoldExclusive(string path)
+    {
+        _holds.Add(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None));
+    }
+
+    /// <summary>
+    /// Takes the sandbox write lock the way a second BWC process would: creates the lock file in the backup root when it
+    /// is missing and holds it with no sharing. Disposing the result frees the lock and leaves the file in place.
+    /// </summary>
+    public IDisposable HoldLockFile()
+    {
+        Directory.CreateDirectory(BackupRoot);
+        var hold = new FileStream(Policy.LockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        _holds.Add(hold);
+        return hold;
+    }
+
+    /// <summary>Opens a file for reading with every sharing mode allowed; fails when another handle excludes readers.</summary>
+    public static void OpenSharedForRead(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+    }
+
+    /// <summary>Creates a file symbolic link; false when the account may not create one.</summary>
+    public static bool TryMakeFileSymlink(string link, string target)
+    {
+        try
+        {
+            File.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (Exception e) when (e is UnauthorizedAccessException or IOException)
+        {
+            return false;
+        }
+    }
+
     public void ReleaseHolds()
     {
         foreach (var hold in _holds)

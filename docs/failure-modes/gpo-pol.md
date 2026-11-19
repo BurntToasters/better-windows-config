@@ -68,6 +68,14 @@ Record: `[` key NUL `;` name NUL `;` type(4) `;` size(4) `;` data(size) `]`, del
   Classic's result for a file with duplicates is *verify against oracle* (matrix D).
 - Two records of one key that are not adjacent in the file (`A`, `B`, `A`) are grouped under one key on write. Same
   caveat: a file not already in classic order may be normalized.
+- Duplicates with an instruction between them (GPO-4, open oracle question). `ReplayLoaded` keeps one record per key and
+  name, and an instruction record is an ordinary record that is never interpreted (1.6). A file with `X=1`, `**del.X`,
+  `X=1` (or `**delvals.` in place of `**del.X`) loads as `X=1`, `**del.X`: the later identical record changes nothing,
+  so it is dropped. A reader that applies records in order sees `X` set, deleted, then set again (X present) in the
+  file, but set and then deleted (X absent) after the next save. With different data the later record is appended after
+  the instruction instead, which keeps the order but drops the first value. Which result classic gives for such a file,
+  and whether classic itself ever writes one, is unknown. Nothing in the codec changes until the oracle capture
+  (matrix D) answers it; the open question lives in `PolDocument.ReplayLoaded` and `PolOrderRules.ReplaceByAppend`.
 
 ### 1.6 Instructions (`**` value names)
 - `**del.<name>`, `**delvals.`, `**DeleteValues`, `**DeleteKeys`, `**SecureKey`, `**soft.<name>` and every other name

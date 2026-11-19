@@ -5,10 +5,11 @@ namespace Bwc.Gpo.Store;
 
 /// <summary>
 /// The shipping policy: the machine's real local group policy folder, the backups under the common application data
-/// folder, the global lock and the real refresher. Builds only these paths; reads no environment variable. The backup
-/// root sits below the BWC data root, which a standard user could pre-create, so the data root and every folder down to
-/// the backup root must be protected folders (<see cref="ProtectedDataRoot"/>): checked before any backup is made and
-/// again for every write or removal under the backup root. The cases are in docs/failure-modes/gpo-store.md, section K.
+/// folder, the write lock file in the backup root and the real refresher. Builds only these paths; reads no
+/// environment variable. The backup root sits below the BWC data root, which a standard user could pre-create, so the
+/// data root and every folder down to the backup root must be protected folders (<see cref="ProtectedDataRoot"/>):
+/// checked before any backup is made and again for every write or removal under the backup root. The cases are in
+/// docs/failure-modes/gpo-store.md, section K.
 /// </summary>
 public sealed class SystemGpoStorePolicy : IGpoStorePolicy
 {
@@ -45,7 +46,7 @@ public sealed class SystemGpoStorePolicy : IGpoStorePolicy
     public string BackupRoot { get; }
 
     /// <inheritdoc />
-    public string LockName => "Global\\BetterWindowsConfig.GpoWrite";
+    public string LockPath => Path.Combine(BackupRoot, "write.lock");
 
     /// <inheritdoc />
     public IPolicyRefresher Refresher { get; }

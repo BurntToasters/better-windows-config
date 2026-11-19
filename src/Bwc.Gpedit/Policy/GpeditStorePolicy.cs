@@ -90,15 +90,12 @@ internal sealed class DenyAllGpoStorePolicy : IGpoStorePolicy
     {
         GpoRoot = Path.Combine(runDataRoot, "gpedit", "no-policy-object");
         BackupRoot = Path.Combine(runDataRoot, "gpedit", "no-policy-object.backup");
-        LockName = @"Local\BetterWindowsConfig.GpoWrite.Denied";
         Refresher = new DenyAllRefresher();
     }
 
     public string GpoRoot { get; }
 
     public string BackupRoot { get; }
-
-    public string LockName { get; }
 
     public IPolicyRefresher Refresher { get; }
 

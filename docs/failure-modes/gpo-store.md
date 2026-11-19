@@ -29,9 +29,9 @@ one named place so the correction touches one spot:
 | File | Role |
 | --- | --- |
 | `Store/GpoFileWriter.cs` | The only writer. Atomic temp-then-replace, attribute carry-over, backup, prune, line append for the recorder. Every public method asks the write policy first. |
-| `Store/IGpoStorePolicy.cs`, `SystemGpoStorePolicy.cs`, `SandboxGpoStorePolicy.cs`, `GpoPathChecks.cs` | GPO root, backup root, lock name, refresher, and the path check every write passes. |
+| `Store/IGpoStorePolicy.cs`, `SystemGpoStorePolicy.cs`, `SandboxGpoStorePolicy.cs`, `GpoPathChecks.cs` | GPO root, backup root, lock file path, refresher, and the path check every write passes. |
 | `Store/GptIni.cs`, `GptIniRules.cs` | gpt.ini model. In-memory only. |
-| `Store/GpoStore.cs` and its snapshot, session and result types | Open, and the save sequence under the named mutex. |
+| `Store/GpoStore.cs` and its snapshot, session and result types | Open, and the save sequence under the write lock file. |
 | `Store/GpoAccess.cs` | Read-only detection. Reads a DACL, writes nothing. |
 | `Comments/CmtxDocument.cs`, `CmtxFormat.cs` | comment.cmtx model, parser and the classic serializer. In-memory only. |
 | `Refresh/PolicyRefresh.cs` | `IPolicyRefresher`, the real one, and the recorder for the sandbox. |
@@ -53,7 +53,7 @@ one named place so the correction touches one spot:
 | A11 | Empty content | Written as zero bytes if the caller asks. The store never asks for it: `Registry.pol` always has at least the header. |
 | A12 | A path that is a directory, or a file path with an alternate data stream (`:name`) | Refused by the path check (`PolicyDenied`). |
 | A13 | The caller cancels | A write already started finishes. The token is checked before the first write of a save and between loads, never between two files of the same save, because the contract wants each file complete or untouched and the sequence to run to the end once started. |
-| A14 | Two threads in one process write the same path | The store serializes saves with the named mutex; the writer itself is not thread safe and documents that. The recorder append takes a lock. |
+| A14 | Two threads in one process write the same path | The store serializes saves with the write lock file; the writer itself is not thread safe and documents that. The recorder append takes a lock. |
 
 ## B. Backup
 
@@ -101,7 +101,7 @@ one named place so the correction touches one spot:
 | D2 | Foreign content (elements, attributes, comments, processing instructions, other namespaces) | Kept in the tree and written back in the same place. Layout is normalized to the classic shape. |
 | D3 | A comment on a policy with a namespace not yet listed | A `using` is added with the next free prefix `nsN` (N one past the highest existing number, so no existing reference changes). |
 | D4 | Comment text | Stored in the string table as `<string id="nsN_Policy">text</string>`, referenced by the `comment` entry. Setting the same text changes nothing. Empty or null text removes the entry and the string. |
-| D5 | Text with `<`, `&`, quotes, newlines, `>` | Escaped. `\r` is written as `&#xD;` so a CRLF in the text survives a parse. Characters that are not valid in XML 1.0 are refused with `ArgumentException` before the model changes. |
+| D5 | Text with `<`, `&`, quotes, newlines, `>` | Escaped. `\r` is written as `&#xD;` so a CRLF in the text survives a parse. Characters that are not valid in XML 1.0 are refused with `ArgumentException` before the model changes. A lone surrogate (a high surrogate not followed by a low one, or a low one on its own) is such a character (CMTX-1): it used to pass and be replaced silently on encode, so a comment, namespace or policy name that holds one is refused the same way. A valid surrogate pair (an emoji) is kept. |
 | D6 | A comment entry whose string is missing from the table | Read as no comment. Kept on disk until the entry is edited. |
 | D7 | Two entries for the same policy | The first wins for reading and editing; the rest stay as foreign content. |
 | D8 | An entry for a policy whose prefix is not declared | Kept as foreign content and never matched. |
@@ -110,12 +110,14 @@ one named place so the correction touches one spot:
 | D11 | Edit that is undone | `HasChanges` compares bytes with the baseline, so no write. |
 | D12 | The first-save namespace-list rewrite seen in the probe | See the table above: `RestrictNamespacesTo(uri)` keeps the namespace of the edited policy and any namespace that a comment still uses. Not called by the store. |
 | D13 | cmtx absent | Read as the empty classic document. The first comment or namespace change writes it. |
+| D14 | A file nested very deep (GPO-3): about 10,000 levels fit in the 4 MiB cap and overflowed the stack in the serializer, which ended the process with no error box | Nesting deeper than 64 levels (`CmtxDocument.MaxDepth`; a real file is about 4 deep: `policyComments`, `comments`, `admTemplate`, `comment`) is `CmtxFormatException` (malformed file), checked with a flat read of the bytes before any tree is built, so no recursive code sees a deep tree. The store reports it as `Malformed` per D9. Nesting at or under the cap parses and round-trips. |
+| D15 | A new comment's string id is taken (CMTX-1): the id is `<prefix>_<policyName>`, and the string table already has that id for another policy (a file written by another tool, or a name that collides with another prefix and name) | The new comment takes the next free id (`<id>_2`, `<id>_3`, ...; free means no string with that id and no entry that references it). The other policy's comment and its string text are never changed. An entry that already has its own id keeps it. If two entries share one id and one is edited, the edited entry gets a fresh id and the other keeps the old string and text. |
 
 ## E. Store: open and save
 
 | ID | Case | Intended behavior |
 | --- | --- | --- |
-| E1 | Open reads without the lock | Open never creates the mutex, so a non-elevated viewer cannot fail on the mutex ACL. It returns a snapshot that may mix files during another save; the save re-reads under the lock, so no write ever uses a stale snapshot. |
+| E1 | Open reads without the lock | Open never takes or creates the lock file, so a non-elevated viewer cannot fail on it. It returns a snapshot that may mix files during another save; the save re-reads under the lock, so no write ever uses a stale snapshot. |
 | E2 | Any of the five files missing | Empty documents. Not an error. |
 | E3 | `Registry.pol` with a bad header or truncated | The side's snapshot carries the `PolFormatException` and no document. A save on that side is refused (`Malformed`); the file is never overwritten. |
 | E4 | The GPO folder missing, or only `Machine` or `User` missing | Open returns empty documents. Save creates folders. |
@@ -124,23 +126,37 @@ one named place so the correction touches one spot:
 | E7 | An edit that changes nothing, or a net no-op | No backup, no write, no `gpt.ini` bump, no refresh. The result says `Wrote == false`. |
 | E8 | The edit callback throws | Nothing is written. The exception propagates unchanged. The lock is released. |
 | E9 | Write order | `comment.cmtx` (only when its bytes change), `Registry.pol` (only when its bytes change), `gpt.ini` (only after `Registry.pol` was written, or when a comment-only change is configured to bump), then refresh. |
-| E10 | A write fails in the middle | The sequence stops with the typed exception. Files already written stay (as in classic). The backup holds the pre-session state. The result is not returned; the exception carries the path. |
+| E10 | A write fails in the middle | The sequence stops with the typed exception. Files already written stay (as in classic; no rollback). The backup holds the pre-session state. The result is not returned; the exception carries the path and `GpoStoreException.WrittenFiles`, the full paths written before the failure in write order (empty when nothing was written). See E15. |
 | E11 | The store is read-only (access said so) | Every save throws `ReadOnlyMode` before the write policy runs and before any file is opened. |
 | E12 | A caller edits the model it got from Open and hands it to Save | There is no such API. Save takes only an edit delegate, applied to the model read under the lock. |
 | E13 | Save of the user side writes the machine half | Cannot happen: the edit session exposes one side, and the version bump and the pair follow that side only. Tested. |
-| E14 | Dispose or reuse | The store holds no handle between calls. Each save opens and closes its own mutex handle. |
+| E14 | Dispose or reuse | The store holds no handle between calls. Each save opens and closes its own lock file handle. |
+| E15 | A save fails after the first file was written (GPO-5): `comment.cmtx` written, then `Registry.pol` fails (in use, a failed replace) | The first failure of the three writes is thrown as the same typed exception (reason, operation, path and Win32 code unchanged) with `WrittenFiles` listing what already reached disk (`comment.cmtx` here), so a caller can tell the user which files changed. A failure of the first write, or before any write (policy, read-only, backup, lock), leaves `WrittenFiles` empty. There is no rollback: the written files stay, as in F4, and the next save re-reads the disk. |
 
 ## F. Locking
 
+The lock is a file, `write.lock`, in the backup root (`IGpoStorePolicy.LockPath`), opened with no sharing
+(`FileShare.None`) for the whole save and closed after the last write. It replaces the named mutex (GPO-2): any user can
+create a global mutex name first and hold it, so every save of the elevated editor would time out. The backup root is
+created and checked by `ProtectedDataRoot` (section K): its owner is trusted and no other trustee can write there, so a
+standard user can neither create the lock file first nor open it. The file is never deleted by BWC (a leftover file with no
+holder is free), so no process can lose a lock to a delete.
+
 | ID | Case | Intended behavior |
 | --- | --- | --- |
-| F1 | Another BWC instance is saving | This save waits on the named mutex, up to the lock timeout (default 15 s). |
-| F2 | The lock times out | Typed failure `LockTimeout` (path is the lock name). Nothing was read or written. |
-| F3 | The previous holder died holding the mutex (abandoned) | The wait succeeds, the state is re-read from disk, and the save goes on. A half-written state cannot exist because writes are atomic per file; a crash between files is case F4. |
+| F1 | Another BWC instance is saving | This save retries opening the lock file (sharing violation, every 25 ms) up to the lock timeout (default 15 s). |
+| F2 | The lock times out | Typed failure `LockTimeout` (path is the lock file path). Nothing was read or written. |
+| F3 | The previous holder died holding the lock | The operating system closes its handle, so the file is free at once: the wait succeeds, the state is re-read from disk and the save goes on. There is no abandoned state. A crash between files is case F4. |
 | F4 | Crash between the three files of a save | Files written before the crash stay; the rest are as they were. On the next save the store re-reads whatever is on disk and applies the edit again, so `gpt.ini` ends up bumped by the new save. Documented, as classic. If `Registry.pol` was written and `gpt.ini` was not, gpsvc may not notice the change until the next bump. |
-| F5 | Two stores in one thread | A Windows mutex is recursive for its owner thread. Saves never nest, so this is harmless. |
-| F6 | The mutex exists with an ACL that denies this user | Typed failure `LockUnavailable` (not a hang). Only an elevated process saves, and the elevated token owns the mutex. |
-| F7 | The sandbox | The lock name comes from the sandbox root (hash), so tests never collide with the real name or with each other, and use the `Local\` namespace so an unelevated test process works. |
+| F5 | Two stores in one thread | The second save waits for the first and times out (the lock is not recursive). Saves never nest, so this is a caller bug, not a normal state; the edit callback must not call the store (documented on `Save`). |
+| F6 | The lock file exists and this process may not open it (access denied) | Typed failure `LockUnavailable` (not a hang), path is the lock file. Only an elevated process saves, and the lock file in the protected root is owned by the elevated token. |
+| F7 | The sandbox | The lock file is `write.lock` in the sandbox policy's own backup root (inside the run data root), so tests and the E2E flavor never touch the real `%ProgramData%` and sandboxes do not collide. |
+| F8 | A standard user holds or squats the lock (GPO-2) | Cannot happen: the lock lives under the protected backup root. If the data root or a folder to the backup root was pre-created by another user or is writable by one, the chain check refuses it (K3, K4) before the lock file is opened, with `PolicyDenied` naming the folder; no lock file is created and the save writes nothing. |
+| F9 | The lock path, or a folder on the way to it, is a junction or symlink | Refused with `PolicyDenied` before the open (the write policy checks the chain and the path, K5). The file is opened without write access, and after the open the path is checked again; if it became a link the handle is closed and the save is refused. Nothing is created or written through the link, and the link target stays untouched. The lock path being a folder is refused the same way. |
+| F10 | Second holder | While one store holds the lock file, a second store on the same backup root waits, then fails with `LockTimeout` after the timeout. The edit callback of the second save never runs and nothing is written. When the first save ends, the next save takes the lock. |
+| F11 | The save is a no-change save | The lock file is still taken (the re-read happens under it), so a no-change save creates the backup root and the lock file, and nothing else: no backup folder, no GPO file, no refresh. |
+| F12 | The lock file cannot be created (disk full, folder missing and not creatable) | Typed failure `LockUnavailable` with the Win32 code; nothing else changes. |
+| F13 | A deny-all policy (`DenyAllGpoStorePolicy`, E2E flavor, no sandbox root) | A no-change save now fails at the lock with `PolicyDenied` (the write policy refuses the lock file path); before the lock file it returned NoChange. No save path uses the deny-all policy yet, so no caller sees this. |
 
 ## G. Write policy and sandbox
 
@@ -154,7 +170,7 @@ one named place so the correction touches one spot:
 | G6 | An environment variable steers the policy | None is read in `Bwc.Gpo`. The tool picks the policy. |
 | G7 | The tool passes no policy | There is no default. A writer without a policy cannot be built. |
 | G8 | Deny-all (E2E root unset) | Implemented by the tool as an `IGpoStorePolicy` whose `EnsureWriteAllowed` always throws. The writer's first action is that call, so no file operation precedes it. |
-| G9 | The system policy points at the wrong folder | `SystemGpoStorePolicy` builds `<SystemDirectory>\GroupPolicy` and `<CommonApplicationData>\BetterWindowsConfig\gpedit\backup` and nothing else. Tests assert only the shape of the strings; they never write there. |
+| G9 | The system policy points at the wrong folder | `SystemGpoStorePolicy` builds `<SystemDirectory>\GroupPolicy` and `<CommonApplicationData>\BetterWindowsConfig\gpedit\backup` and the lock file `write.lock` in that backup folder, and nothing else. Tests assert only the shape of the strings; they never write there. |
 | G10 | A test touches the real folder | No test writes there. One invariant test reads it (inconclusive when absent): it loads `gpt.ini` and both `comment.cmtx` files and requires byte-identical serialization. Tests never call `UserenvPolicyRefresher`. |
 
 ## H. Refresh
@@ -204,7 +220,7 @@ nothing is created through it. The refusal message names the folder (`GpoStoreEx
 | K6 | The folder is a file, or its owner or access list cannot be read | Refused with the folder named (the safe side). |
 | K7 | A folder fails after an earlier backup succeeded (swapped later) | The next backup or prune refuses. The write policy of the system policy re-checks the chain for every path under the backup root. |
 | K8 | The root cannot be created (not elevated, owner not allowed) | A typed `GpoStoreException` with the Win32 code. Nothing is left behind. |
-| K9 | The sandbox and E2E policies | They keep their own checks (`SandboxGpoStorePolicy` refuses a link between the run data root and its roots). `ProtectedDataRoot` is used by `SystemGpoStorePolicy` and the template store, with `ProtectedAcl.ForCurrentUser()` in tests. |
+| K9 | The sandbox and E2E policies | They keep their own checks (`SandboxGpoStorePolicy` refuses a link between the run data root and its roots). The lock file of the sandbox policy is in its own backup root, never in the real data root (F7). `ProtectedDataRoot` is used by `SystemGpoStorePolicy` and the template store, with `ProtectedAcl.ForCurrentUser()` in tests. |
 
 ## J. Tests
 
@@ -217,7 +233,9 @@ folders holds no literal, so `scripts/check-policy-writer.js` passes without an 
 | --- | --- |
 | `GptIniTests` | Probe file byte for byte; versions; bump halves; wrap; unknown content; pair add and duplicates; BOM; line endings; malformed. |
 | `CmtxTests` | Probe file byte for byte; add, edit, remove; namespaces; foreign content; escaping; hostile input. |
-| `GpoSaveTests` | Write order, no write on no change, re-read under lock, atomic replace and temp sweep, backup once and pruned to 10, user vs machine half, read-only mode, failure paths. |
+| `CmtxSafetyTests` | D14 (10,000 levels refused, the cap boundary parses), D15 (a taken id is never overwritten, shared ids), D5 (lone surrogates refused, pairs kept). |
+| `GpoSaveTests` | Write order, no write on no change, re-read under lock, atomic replace and temp sweep, backup once and pruned to 10, user vs machine half, read-only mode, failure paths, partial save names the written files (E15). |
+| `GpoWriteLockTests` | F1, F2, F3, F8 to F12: a second store waits and times out while the first holds the lock file, a leftover lock file is free, a lock path or backup root that is a junction or a file symlink is refused and nothing is written through it, the system policy refuses an unprotected chain before any lock file exists. |
 | `GpoStoreOpenTests` | Missing files, malformed files, snapshot. |
 | `ProtectedDataRootTests` | K1 to K8 against sandbox roots with the current user rules: missing root created protected, junction root, write entry for another trustee, owner rule through a crafted descriptor, junction on `gpedit` and `backup`, the system policy backup path. |
 | `SandboxGpoStorePolicyTests` | Refusals: outside, `..`, prefix sibling, reparse point, backup inside root, run data root itself. |

@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Bwc.Gpo.Refresh;
 
 namespace Bwc.Gpo.Store;
@@ -62,7 +60,7 @@ public sealed class SandboxGpoStorePolicy : IGpoStorePolicy
         }
 
         _roots = [GpoRoot, BackupRoot];
-        LockName = "Local\\BetterWindowsConfig.GpoWrite." + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(GpoRoot.ToUpperInvariant())), 0, 8);
+        LockPath = Path.Combine(BackupRoot, "write.lock");
         Refresher = refresher ?? new RecordingPolicyRefresher(Path.Combine(GpoRoot, RefreshRecordFileName), new GpoFileWriter(this));
     }
 
@@ -73,7 +71,7 @@ public sealed class SandboxGpoStorePolicy : IGpoStorePolicy
     public string BackupRoot { get; }
 
     /// <inheritdoc />
-    public string LockName { get; }
+    public string LockPath { get; }
 
     /// <inheritdoc />
     public IPolicyRefresher Refresher { get; }

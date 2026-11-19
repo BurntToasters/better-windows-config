@@ -18,10 +18,10 @@ public enum GpoStoreFailure
     /// <summary>The pre-session backup could not be made, so nothing was written.</summary>
     BackupFailed,
 
-    /// <summary>The named write lock could not be taken in time.</summary>
+    /// <summary>The write lock file could not be taken in time.</summary>
     LockTimeout,
 
-    /// <summary>The named write lock exists and this process may not open it.</summary>
+    /// <summary>The write lock file cannot be opened or created by this process.</summary>
     LockUnavailable,
 
     /// <summary>A file on disk is not valid and the operation needed it.</summary>
@@ -43,7 +43,7 @@ public sealed class GpoStoreException : Exception
     /// <summary>Creates a failure.</summary>
     /// <param name="reason">The reason code.</param>
     /// <param name="operation">The operation, for example <c>Replace</c>, <c>Backup</c>, <c>Read</c>.</param>
-    /// <param name="path">The full path involved, or the lock name.</param>
+    /// <param name="path">The full path involved (the lock file path for a lock failure).</param>
     /// <param name="win32Error">The Win32 error code, 0 when none.</param>
     /// <param name="message">A developer message.</param>
     /// <param name="inner">The cause, if any.</param>
@@ -67,6 +67,15 @@ public sealed class GpoStoreException : Exception
 
     /// <summary>The Win32 error code, 0 when none applies.</summary>
     public int Win32Error { get; }
+
+    /// <summary>
+    /// The full paths of the GPO files a save had already written when it failed, in write order. There is no rollback, so
+    /// these files stay on disk. Empty when nothing was written (every failure before the first write, and every
+    /// failure outside a save).
+    /// </summary>
+    public IReadOnlyList<string> WrittenFiles { get; private set; } = [];
+
+    internal void SetWrittenFiles(IReadOnlyList<string> files) => WrittenFiles = files;
 
     internal static int Win32Of(Exception exception) =>
         exception switch

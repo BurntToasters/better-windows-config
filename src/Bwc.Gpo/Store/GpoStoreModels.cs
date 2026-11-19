@@ -9,7 +9,7 @@ public sealed class GpoStoreOptions
     /// <summary>A test hook told after each completed write step; null in the app.</summary>
     public Action<GpoWriteEvent>? WriteObserver { get; set; }
 
-    /// <summary>How long a save waits for the named lock. Default 15 seconds.</summary>
+    /// <summary>How long a save waits for the write lock file. Default 15 seconds.</summary>
     public TimeSpan LockTimeout { get; set; } = TimeSpan.FromSeconds(15);
 
     /// <summary>Retries of a replace after a sharing or lock violation. Default 5.</summary>

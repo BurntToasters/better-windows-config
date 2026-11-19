@@ -69,7 +69,7 @@ public sealed class GpoSaveTests
         Assert.AreEqual(0, fx.Log.Count);
         Assert.AreEqual(0, fx.Events.Count);
         Assert.IsFalse(Directory.Exists(fx.GpoRoot), "not even the folder is created");
-        Assert.IsFalse(Directory.Exists(fx.BackupRoot));
+        Assert.AreEqual(0, fx.BackupFolders().Length, "no backup folder (the write lock file may exist)");
     }
 
     [TestMethod]
@@ -280,12 +280,15 @@ public sealed class GpoSaveTests
     public void Save_BackupFailure_StopsBeforeAnyGpoFileIsWritten()
     {
         using var fx = new SandboxGpoFixture();
-        fx.PutRawFile(fx.BackupRoot, [1]);
+        fx.Seed(fx.PolPath(GpoSide.User), PolBytesWith("Beta", 2));
+        fx.HoldExclusive(fx.PolPath(GpoSide.User));
+        fx.Log.Clear();
         var store = fx.NewStore();
 
         var ex = Assert.ThrowsExactly<GpoStoreException>(() => store.Save(GpoSide.Machine, SetAlpha));
 
         Assert.AreEqual(GpoStoreFailure.BackupFailed, ex.Reason);
+        Assert.AreEqual(0, ex.WrittenFiles.Count);
         Assert.AreEqual(0, fx.Log.Count);
         Assert.IsFalse(File.Exists(fx.PolPath(GpoSide.Machine)));
         Assert.AreEqual(0, fx.Refresher.Calls.Count);
@@ -419,32 +422,15 @@ public sealed class GpoSaveTests
     public void Save_LockTimeout_IsATypedFailure_AndNothingIsRead()
     {
         using var fx = new SandboxGpoFixture();
-        using var held = new ManualResetEventSlim();
-        using var release = new ManualResetEventSlim();
-        var holder = new Thread(() =>
-        {
-            using var mutex = new Mutex(false, fx.Policy.LockName);
-            mutex.WaitOne();
-            held.Set();
-            release.Wait();
-            mutex.ReleaseMutex();
-        });
-        holder.Start();
-        Assert.IsTrue(held.Wait(TimeSpan.FromSeconds(10)));
+        fx.HoldLockFile();
         var ran = false;
 
-        try
-        {
-            var store = fx.NewStore(o => o.LockTimeout = TimeSpan.FromMilliseconds(200));
-            var ex = Assert.ThrowsExactly<GpoStoreException>(() => store.Save(GpoSide.Machine, _ => ran = true));
-            Assert.AreEqual(GpoStoreFailure.LockTimeout, ex.Reason);
-        }
-        finally
-        {
-            release.Set();
-            holder.Join();
-        }
+        var store = fx.NewStore(o => o.LockTimeout = TimeSpan.FromMilliseconds(200));
+        var ex = Assert.ThrowsExactly<GpoStoreException>(() => store.Save(GpoSide.Machine, _ => ran = true));
 
+        Assert.AreEqual(GpoStoreFailure.LockTimeout, ex.Reason);
+        Assert.AreEqual(fx.Policy.LockPath, ex.Path);
+        Assert.AreEqual(0, ex.WrittenFiles.Count);
         Assert.IsFalse(ran);
         Assert.AreEqual(0, fx.Events.Count);
     }
@@ -453,44 +439,119 @@ public sealed class GpoSaveTests
     public void Save_WaitsForAnotherInstanceToFinish_ThenSucceeds()
     {
         using var fx = new SandboxGpoFixture();
-        using var held = new ManualResetEventSlim();
-        var holder = new Thread(() =>
+        var holder = fx.HoldLockFile();
+        var releaser = Task.Run(() =>
         {
-            using var mutex = new Mutex(false, fx.Policy.LockName);
-            mutex.WaitOne();
-            held.Set();
             Thread.Sleep(400);
-            mutex.ReleaseMutex();
+            holder.Dispose();
         });
-        holder.Start();
-        Assert.IsTrue(held.Wait(TimeSpan.FromSeconds(10)));
 
         var started = DateTime.UtcNow;
         var result = fx.NewStore().Save(GpoSide.Machine, SetAlpha);
         var waited = DateTime.UtcNow - started;
-        holder.Join();
+        releaser.Wait();
 
         Assert.IsTrue(result.Wrote);
         Assert.IsTrue(waited >= TimeSpan.FromMilliseconds(250), $"waited only {waited}");
     }
 
     [TestMethod]
-    public void Save_AbandonedLock_IsTaken_AndTheStateIsReReadFromDisk()
+    public void Save_ALockFileLeftByADeadHolder_IsFree_AndTheStateIsReReadFromDisk()
     {
         using var fx = new SandboxGpoFixture();
-        var holder = new Thread(() =>
-        {
-            var mutex = new Mutex(false, fx.Policy.LockName);
-            mutex.WaitOne();
-
-            // Exit the thread without releasing: the mutex is abandoned.
-        });
-        holder.Start();
-        holder.Join();
+        fx.HoldLockFile().Dispose();
+        Assert.IsTrue(File.Exists(fx.Policy.LockPath));
 
         var result = fx.NewStore().Save(GpoSide.Machine, SetAlpha);
 
         Assert.IsTrue(result.Wrote);
+    }
+
+    [TestMethod]
+    public void Save_FailureAtRegistryPol_AfterTheCommentFileWasWritten_NamesTheWrittenFile()
+    {
+        using var fx = new SandboxGpoFixture();
+        fx.Seed(fx.PolPath(GpoSide.Machine), PolBytesWith("Beta", 2));
+        fx.Seed(fx.GptPath, GptIniProbe.Bytes());
+        var polBefore = fx.Read(fx.PolPath(GpoSide.Machine));
+        fx.HoldOpenWithoutDelete(fx.PolPath(GpoSide.Machine));
+        fx.Log.Clear();
+
+        var ex = Assert.ThrowsExactly<GpoStoreException>(() => fx.NewStore().Save(GpoSide.Machine, s =>
+        {
+            SetAlpha(s);
+            s.Comments.SetComment(Namespace, "P", "note");
+        }));
+
+        Assert.AreEqual(GpoStoreFailure.InUse, ex.Reason, "the reason the caller sees is unchanged");
+        Assert.AreEqual(fx.PolPath(GpoSide.Machine), ex.Path);
+        CollectionAssert.AreEqual(new[] { fx.CmtxPath(GpoSide.Machine) }, ex.WrittenFiles.ToArray());
+        Assert.IsTrue(File.Exists(fx.CmtxPath(GpoSide.Machine)), "the comment file really is on disk");
+        fx.ReleaseHolds();
+        CollectionAssert.AreEqual(polBefore, fx.Read(fx.PolPath(GpoSide.Machine)));
+        CollectionAssert.AreEqual(GptIniProbe.Bytes(), fx.Read(fx.GptPath));
+        Assert.AreEqual(0, fx.Refresher.Calls.Count);
+    }
+
+    [TestMethod]
+    public void Save_FailureAtGptIni_AfterTheOtherTwoFilesWereWritten_NamesBothInOrder()
+    {
+        using var fx = new SandboxGpoFixture();
+        fx.Seed(fx.GptPath, GptIniProbe.Bytes());
+        fx.HoldOpenWithoutDelete(fx.GptPath);
+
+        var ex = Assert.ThrowsExactly<GpoStoreException>(() => fx.NewStore().Save(GpoSide.Machine, s =>
+        {
+            SetAlpha(s);
+            s.Comments.SetComment(Namespace, "P", "note");
+        }));
+
+        Assert.AreEqual(GpoStoreFailure.InUse, ex.Reason);
+        Assert.AreEqual(fx.GptPath, ex.Path);
+        CollectionAssert.AreEqual(new[] { fx.CmtxPath(GpoSide.Machine), fx.PolPath(GpoSide.Machine) }, ex.WrittenFiles.ToArray());
+    }
+
+    [TestMethod]
+    public void Save_FailureAtTheFirstWrite_HasNoWrittenFiles()
+    {
+        using var fx = new SandboxGpoFixture();
+        fx.Seed(fx.PolPath(GpoSide.Machine), PolBytesWith("Beta", 2));
+        fx.HoldOpenWithoutDelete(fx.PolPath(GpoSide.Machine));
+
+        var ex = Assert.ThrowsExactly<GpoStoreException>(() => fx.NewStore().Save(GpoSide.Machine, SetAlpha));
+
+        Assert.AreEqual(GpoStoreFailure.InUse, ex.Reason);
+        Assert.IsNotNull(ex.WrittenFiles);
+        Assert.AreEqual(0, ex.WrittenFiles.Count);
+    }
+
+    [TestMethod]
+    public void Save_RefusalBeforeAnyWrite_HasNoWrittenFiles()
+    {
+        using var fx = new SandboxGpoFixture();
+        fx.PutRawFile(fx.GptPath, GptIniProbe.Latin1("[General]\r\nVersion=abc\r\n"));
+
+        var ex = Assert.ThrowsExactly<GpoStoreException>(() => fx.NewStore().Save(GpoSide.Machine, SetAlpha));
+
+        Assert.AreEqual(GpoStoreFailure.Malformed, ex.Reason);
+        Assert.AreEqual(0, ex.WrittenFiles.Count);
+    }
+
+    [TestMethod]
+    public void Save_CommentFileNestedFarTooDeep_IsMalformed_OnlyWhenTheEditNeedsIt()
+    {
+        using var fx = new SandboxGpoFixture();
+        var deep = CmtxSafetyTests.DeepFile(10_000);
+        fx.PutRawFile(fx.CmtxPath(GpoSide.Machine), deep);
+        var store = fx.NewStore();
+
+        var result = store.Save(GpoSide.Machine, SetAlpha);
+        Assert.IsTrue(result.Wrote, "a save that does not need the comment file leaves it alone");
+        CollectionAssert.AreEqual(deep, fx.Read(fx.CmtxPath(GpoSide.Machine)));
+
+        var ex = Assert.ThrowsExactly<GpoStoreException>(() => store.Save(GpoSide.Machine, s => s.Comments.SetComment(Namespace, "P", "x")));
+        Assert.AreEqual(GpoStoreFailure.Malformed, ex.Reason);
+        CollectionAssert.AreEqual(deep, fx.Read(fx.CmtxPath(GpoSide.Machine)));
     }
 
     [TestMethod]

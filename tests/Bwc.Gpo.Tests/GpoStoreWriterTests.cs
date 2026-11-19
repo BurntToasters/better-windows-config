@@ -13,7 +13,7 @@ internal sealed class DenyAllPolicy(string root, string backupRoot) : IGpoStoreP
 
     public string BackupRoot => backupRoot;
 
-    public string LockName => "Local\\BetterWindowsConfig.GpoWrite.DenyAllTest";
+    public string LockPath => Path.Combine(backupRoot, "write.lock");
 
     public IPolicyRefresher Refresher => throw new InvalidOperationException("never refreshes");
 

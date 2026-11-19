@@ -180,17 +180,17 @@ public sealed class SandboxGpoStorePolicyTests
     }
 
     [TestMethod]
-    public void LockName_IsLocalAndDerivedFromTheRoot()
+    public void LockPath_IsAFileInTheSandboxBackupRoot_AndDiffersPerSandbox()
     {
         using var fx = new SandboxGpoFixture();
-        var same = new SandboxGpoStorePolicy(fx.GpoRoot.ToUpperInvariant(), fx.RunRoot);
+        var same = new SandboxGpoStorePolicy(fx.GpoRoot, fx.RunRoot);
         var other = new SandboxGpoStorePolicy(Path.Combine(fx.RunRoot, "other"), fx.RunRoot);
 
-        StringAssert.StartsWith(fx.Policy.LockName, "Local\\BetterWindowsConfig.GpoWrite.");
-        Assert.AreEqual(fx.Policy.LockName, same.LockName);
-        Assert.AreNotEqual(fx.Policy.LockName, other.LockName);
-        Assert.IsTrue(fx.Policy.LockName.Length < 200);
-        Assert.IsFalse(fx.Policy.LockName.Substring("Local\\".Length).Contains('\\'));
+        Assert.AreEqual(Path.Combine(fx.Policy.BackupRoot, "write.lock"), fx.Policy.LockPath);
+        Assert.AreEqual(fx.Policy.LockPath, same.LockPath);
+        Assert.AreNotEqual(fx.Policy.LockPath, other.LockPath);
+        fx.Policy.EnsureWriteAllowed(fx.Policy.LockPath);
+        StringAssert.StartsWith(fx.Policy.LockPath, fx.RunRoot, "the lock file never leaves the run data root");
     }
 
     [TestMethod]
@@ -202,7 +202,7 @@ public sealed class SandboxGpoStorePolicyTests
         Assert.IsTrue(
             policy.BackupRoot.EndsWith(Path.Combine("BetterWindowsConfig", "gpedit", "backup"), StringComparison.OrdinalIgnoreCase),
             policy.BackupRoot);
-        Assert.AreEqual("Global\\BetterWindowsConfig.GpoWrite", policy.LockName);
+        Assert.AreEqual(Path.Combine(policy.BackupRoot, "write.lock"), policy.LockPath);
         Assert.IsInstanceOfType<UserenvPolicyRefresher>(policy.Refresher);
 
         AssertDenied(() => policy.EnsureWriteAllowed(Path.Combine(Environment.SystemDirectory, "drivers", "x.sys")));
