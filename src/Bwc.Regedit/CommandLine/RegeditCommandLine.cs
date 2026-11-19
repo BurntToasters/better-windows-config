@@ -152,25 +152,37 @@ public static class RegeditCommandLine
             if (key is null)
             {
                 // No key means the whole registry, as classic regedit does: every root under Computer.
-                WriteWholeRegistryAtomically(store, file, format);
+                RegistryExportService wholeService = CreateExportService(store);
+                WriteAtomically(file, stream => wholeService.WriteRegFile(
+                    startKey: null,
+                    stream,
+                    format,
+                    RegistryExportScope.WholeRegistry,
+                    CancellationToken.None));
                 Log.Info($"Registry Editor export succeeded: {file}, the whole registry, {format} format.");
                 return 0;
             }
 
-            using var buffer = new MemoryStream();
-            RegFileDocument document = RegFileExporter.Export(store.Reader, key, format, CancellationToken.None);
-            if (format == RegFileFormat.V5)
-            {
-                RegFileWriter.WriteV5(document, buffer);
-            }
-            else
-            {
-                RegFileWriter.WriteRegedit4(document, buffer);
-            }
+            // The key is parsed and its start key read first, the same two reads the walk makes, so a key that does
+            // not exist or cannot be read fails here with the same message as before and no temp file is created.
+            ArgumentException.ThrowIfNullOrEmpty(key, "displayPath");
+            RegistryPath startKey = RegistryPath.Parse(key);
+            store.Reader.EnumerateValues(startKey, CancellationToken.None);
+            store.Reader.EnumerateSubKeyNames(startKey, CancellationToken.None);
 
-            File.WriteAllBytes(file, buffer.ToArray());
+            // The named key is read through the live reader in both builds. Only the whole-registry export maps
+            // HKEY_CURRENT_USER to the E2E sandbox.
+            var keyService = new RegistryExportService(store.Reader);
+            var counter = new KeyCounter();
+            WriteAtomically(file, stream => keyService.WriteRegFile(
+                startKey,
+                stream,
+                format,
+                RegistryExportScope.Selection,
+                CancellationToken.None,
+                counter));
             Log.Info(
-                $"Registry Editor export succeeded: {file}, {document.Keys.Count} key(s), {format} format.");
+                $"Registry Editor export succeeded: {file}, {counter.KeysExported} key(s), {format} format.");
             return 0;
         }
         catch (Exception ex)
@@ -184,10 +196,10 @@ public static class RegeditCommandLine
     }
 
     /// <summary>
-    /// Streams the whole registry to a temp file beside the target, then moves it over the target. A failure
+    /// Streams an export to a temp file beside the target, flushes it, then moves it over the target. A failure
     /// leaves the old target untouched and the temp file is removed.
     /// </summary>
-    private static void WriteWholeRegistryAtomically(RegistryStore store, string file, RegFileFormat format)
+    private static void WriteAtomically(string file, Action<Stream> write)
     {
         string fullPath = Path.GetFullPath(file);
         string directory = Path.GetDirectoryName(fullPath)
@@ -198,12 +210,7 @@ public static class RegeditCommandLine
         {
             using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
-                CreateExportService(store).WriteRegFile(
-                    startKey: null,
-                    stream,
-                    format,
-                    RegistryExportScope.WholeRegistry,
-                    CancellationToken.None);
+                write(stream);
                 stream.Flush(flushToDisk: true);
             }
 
@@ -226,8 +233,22 @@ public static class RegeditCommandLine
         }
     }
 
+    /// <summary>Keeps the key count of the final Completed report. Progress&lt;T&gt; posts later, so it is not used.</summary>
+    private sealed class KeyCounter : IProgress<ExportProgress>
+    {
+        public int KeysExported { get; private set; }
+
+        public void Report(ExportProgress value)
+        {
+            if (value.Phase == ExportPhase.Completed)
+            {
+                KeysExported = value.KeysExported;
+            }
+        }
+    }
+
     /// <summary>
-    /// The export service for a command line export. The ship build reads the live registry. The E2E build
+    /// The whole-registry export service for a command line export. The ship build reads the live registry. The E2E build
     /// maps HKEY_CURRENT_USER to the run sandbox, as the window's export does.
     /// </summary>
     private static RegistryExportService CreateExportService(RegistryStore store)

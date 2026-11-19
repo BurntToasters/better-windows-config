@@ -45,8 +45,9 @@ cap in the exporter.
 
 Export checks the cancellation token before every key, before reading that key's values, and
 before every value is added. Cancellation throws `OperationCanceledException` and returns no
-partial document. The command line exports into a `MemoryStream` and writes the file only after
-the complete document has been serialized, so a canceled export leaves the output path alone.
+partial document. The command line streams to a temp file beside the target and moves it over the
+target only after the whole export succeeded, so a canceled or failed export leaves the output path
+alone (`export.md`, "Command line: named-key export and walk depth").
 
 Import checks cancellation between complete key sections, not inside one. The contract says an
 import stops between two `.reg` entries, never inside one. A section that has already started is
