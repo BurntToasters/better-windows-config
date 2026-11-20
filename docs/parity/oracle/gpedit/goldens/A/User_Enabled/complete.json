@@ -1,0 +1,14 @@
+{
+  "case": "A/User_Enabled",
+  "planHash": "137c62a95b19523285280794b2c7355d3df71016b66595ea30cd41645c1a719d",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-saved/User.Registry.pol",
+    "step-02-saved/User.comment.cmtx",
+    "step-02-saved/gpt.ini"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "case": "A/Machine_NotConfigured",
+  "planHash": "1086ce399c29ee5673af1639a4a68b832b4690988e7c5a800ef78e5962068a7f",
+  "files": [
+    "case.json",
+    "gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-saved/gpt.ini"
+  ]
+}

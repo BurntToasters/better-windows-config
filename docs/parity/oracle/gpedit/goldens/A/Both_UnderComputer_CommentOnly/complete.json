@@ -1,0 +1,10 @@
+{
+  "case": "A/Both_UnderComputer_CommentOnly",
+  "planHash": "b6a15b3758b35a0689de1772a8a6f06e01d5cff6055f46e34d2b6c721dc122eb",
+  "files": [
+    "case.json",
+    "gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-saved/gpt.ini"
+  ]
+}

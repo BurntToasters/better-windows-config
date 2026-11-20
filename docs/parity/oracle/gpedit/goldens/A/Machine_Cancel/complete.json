@@ -1,0 +1,10 @@
+{
+  "case": "A/Machine_Cancel",
+  "planHash": "fb88827a9f7f70dfffd332f2c8c082a21a4bfec4c827400beb99a016f2ac55d9",
+  "files": [
+    "case.json",
+    "gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-saved/gpt.ini"
+  ]
+}

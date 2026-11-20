@@ -1,0 +1,14 @@
+{
+  "case": "A/Machine_Apply_Cancel",
+  "planHash": "836d79b800c93999777a8f0dd725830cf22052b59b135e041ec86e6e3176235a",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-saved/Machine.Registry.pol",
+    "step-02-saved/Machine.comment.cmtx",
+    "step-02-saved/gpt.ini"
+  ]
+}

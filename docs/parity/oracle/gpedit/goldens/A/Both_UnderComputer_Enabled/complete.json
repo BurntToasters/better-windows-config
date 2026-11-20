@@ -1,0 +1,14 @@
+{
+  "case": "A/Both_UnderComputer_Enabled",
+  "planHash": "05335743332ed78d3598bbaffa2c638ab57a025da8530933653cfc1f7ffd0ea1",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-saved/Machine.Registry.pol",
+    "step-02-saved/Machine.comment.cmtx",
+    "step-02-saved/gpt.ini"
+  ]
+}
