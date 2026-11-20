@@ -47,8 +47,10 @@ public sealed class GpeditListTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_List_Category()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("list", "category");
         GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-list-category");
         sandbox.SeedStandard();
@@ -96,8 +98,10 @@ public sealed class GpeditListTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_List_States()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("list", "states");
         GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-list-states");
         sandbox.SeedStandard();
@@ -148,8 +152,10 @@ public sealed class GpeditListTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_List_ExtendedPane()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("list", "extended");
         GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-list-extended");
         sandbox.SeedStandard();
@@ -207,8 +213,10 @@ public sealed class GpeditListTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_List_StatusBar()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("list", "status");
         GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-list-status");
         sandbox.SeedStandard();
@@ -242,8 +250,10 @@ public sealed class GpeditListTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_List_UnreadablePolicyFile()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("list", "unreadable");
         GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-list-unreadable");
         sandbox.SeedStandard();

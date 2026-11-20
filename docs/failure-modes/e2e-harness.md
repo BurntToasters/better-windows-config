@@ -598,6 +598,21 @@ file added; file removed; same size with different bytes; time stamp only; empty
 changed; a file held open with `FileShare.None` in one snapshot only; a capture that leaves the folder
 byte-identical with the same last write times. The check in the real run is named `gpo.real-unchanged`.
 
+## 45. Category guard, policy editor stand-in, Hub launch of the policy editor (GT1)
+
+The Gpedit and Console tests drive seams that only the E2E flavor has, and they carried no `E2EOnly` category,
+so the ship step selected them. The fake installer had no stand-in for the policy editor, and no test started the
+policy editor from the Hub.
+
+| Failure | Guard |
+| --- | --- |
+| A new test file in `tests/Bwc.E2E/Gpedit` (Blind included) or `tests/Bwc.E2E/Console` has no `E2EOnly` category, and the ship step selects it | `CategoryGuardTests` (category `Harness`, under `tests/Bwc.E2E/Harness`) walks every `[TestMethod]` of the test assembly. A test belongs to the group when its class lives in a `Gpedit` or `Console` folder of the test project (the namespace and the source folder both count) or it carries the category `Gpedit` or `Console`. The check fails and names each method that has no `E2EOnly` and is not on the allowlist. |
+| A test class outside those folders opens a console seam run (`ListRun.Open`, `ShellRun.Open` or `GpeditRun.Open`) and has no `E2EOnly` category. `Menus_ActionLookupSurvivesWrapperCollection` did this, and the ship step timed out waiting for a readout that the ship build never shows | The group of `CategoryGuardTests` also holds every test class anywhere under `tests/Bwc.E2E` whose source file text calls one of the three `Open` methods, so the same two checks apply to it. The category of that test (for example `Menus`) stays. |
+| An `E2EOnly` test in those folders forgets `E2EGuards.RequireE2EOnlyFlavor`, so a ship run reaches the seam and fails with a confusing message | The same test reads the source file of each such method and requires the call inside the method body, and fails naming the method when it is missing. |
+| The allowlist grows without proof that the test passes in the ship flavor | The allowlist is two names in the test source and each one was run in the ship flavor. A test that cannot pass in ship because it needs a seam becomes `E2EOnly` and leaves the list. |
+| The Hub or the installer payload names a policy editor that the stand-in installer does not provide, so an install, update or launch test ends in a missing file | `tests/Bwc.E2E.FakeInstaller` has a stand-in named `BwcGpedit` next to `BetterWindowsConfig` and `BwcRegedit`. It is used for the payload, the shortcut and every other place the Registry Editor stand-in appears. Existing install and update tests stay green. |
+| No test starts the policy editor from the Hub, so a wrong catalog entry, executable name or launch argument goes unseen | A Hub test starts the policy editor from its tool row, like the Registry Editor test, and checks that a window of the policy editor appears. It never runs where the launch would prompt for elevation: a launch that would show a UAC prompt is `E2EOnly` and runs against the E2E publish, which is `asInvoker`. |
+
 ## Verification artifact
 
 A successful harness run leaves `artifacts/e2e/result-<rid>-<flavor>.json` with schema 2, the run

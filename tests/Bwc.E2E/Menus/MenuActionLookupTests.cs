@@ -1,5 +1,6 @@
 using Bwc.E2E.Controls;
 using Bwc.E2E.ConsoleFrame;
+using Bwc.E2E.Harness;
 using Bwc.E2E.List;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -26,8 +27,10 @@ public sealed class MenuActionLookupTests
 
     [TestMethod]
     [TestCategory("Menus")]
+    [TestCategory("E2EOnly")]
     public void Menus_ActionLookupSurvivesWrapperCollection()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("actionlookup", "menus");
         var environment = new Dictionary<string, string>(StringComparer.Ordinal) { ["BWC_E2E_MENU_GC"] = "1" };
         using ListRun run = ListRun.Open("menu-gc", 8, environment);

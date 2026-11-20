@@ -23,8 +23,10 @@ public sealed class ConsoleListViewTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_List_ViewModes()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("views", "list");
         using ListRun run = ListRun.Open("views", 60);
         const int rows = 60;
@@ -168,8 +170,10 @@ public sealed class ConsoleListViewTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_List_ViewModesAndSelection()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("selection", "list");
         using ListRun run = ListRun.Open("selection", 300);
         run.FocusList();
@@ -228,8 +232,10 @@ public sealed class ConsoleListViewTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_List_MultiSelect()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("multi", "list");
         using ListRun run = ListRun.Open("multi", 30);
 

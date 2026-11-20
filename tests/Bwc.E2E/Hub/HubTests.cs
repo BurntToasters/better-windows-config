@@ -33,6 +33,8 @@ public sealed class HubTests
     private const string HubTitle = "Better Windows Config";
     private const string RegeditTitle = "Registry Editor";
     private const string RegeditProcessName = "BwcRegedit";
+    private const string GpeditTitle = "Local Group Policy Editor";
+    private const string GpeditProcessName = "BwcGpedit";
     private const string UpdateProcessName = "BwcUpdate";
     private const string HelperExeName = "BwcUpdate.exe";
     private const string HubProcessName = "BetterWindowsConfig";
@@ -47,6 +49,7 @@ public sealed class HubTests
     private const string NotInstalledTitle = "Update Not Installed";
     private const string InstallScope = "hub-install";
     private const string ElevatedGateScope = "hub-elevated-gate";
+    private const string GpeditLaunchScope = "hub-gpedit-launch";
     private const string RefuseScope = "hub-refuse";
     private const string MigrateScope = "hub-migrate";
     private const string KeepOffScope = "hub-keepoff";
@@ -161,7 +164,7 @@ public sealed class HubTests
 
         if (row is not null)
         {
-            VerifyRegeditLaunchWithEnter(hub, row);
+            VerifyToolLaunchWithEnter(hub, row, RegeditTool(config));
         }
 
         _ = HubUi.Foreground(hub.MainHwnd, TimeSpan.FromSeconds(3));
@@ -171,6 +174,36 @@ public sealed class HubTests
         E2EResults.Record("hub.closed", !IsRunning(hub.ProcessId), $"Hub pid {hub.ProcessId} was closed by the test.");
 
         AssertNoFailures("Hub window checks");
+    }
+
+    /// <summary>
+    /// The Hub starts the Local Group Policy Editor from its row: the row is selected with the mouse, Enter starts the
+    /// tool, a new BwcGpedit process from the publish folder shows its main window, and the test closes it. The Hub
+    /// and the harness never ask for elevation: the child inherits __COMPAT_LAYER=RunAsInvoker from the Hub, which the
+    /// harness sets on every process it starts, so the highestAvailable manifest of the ship tool shows no prompt
+    /// (docs/failure-modes/e2e-harness.md, sections 3 and 45). The test starts no stand-in and writes no policy.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Hub")]
+    public void Hub_LaunchesGpeditFromItsRow()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        EnsureExecutables(config);
+
+        using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, GpeditLaunchScope, null));
+        E2EResults.CurrentSession = hub;
+
+        AutomationElement? row = WaitFor(hub, "ToolRow_gpedit");
+        E2EResults.Record("hub.gpedit.toolRow", row is not null, row is null ? "ToolRow_gpedit was not found." : "ToolRow_gpedit was found.");
+        if (row is not null)
+        {
+            VerifyToolLaunchWithEnter(hub, row, GpeditTool(config));
+        }
+
+        hub.Close();
+        E2EResults.Record("hub.gpedit.hubClosed", !IsRunning(hub.ProcessId), $"Hub pid {hub.ProcessId} was closed by the test.");
+        AssertNoFailures("Hub policy editor launch checks");
     }
 
     /// <summary>
@@ -1072,9 +1105,16 @@ public sealed class HubTests
             }
 
             E2EResults.Note("hub.regedit.leftover", $"closing BwcRegedit pid {process.Id} this run started earlier.");
-            CloseChild(process);
+            CloseChild(process, RegeditTool(config));
         }
     }
+
+    /// <summary>A tool the Hub starts: its check id prefix, process name, publish image and window title.</summary>
+    private sealed record LaunchTool(string CheckPrefix, string ProcessName, string ExePath, string Title);
+
+    private static LaunchTool RegeditTool(E2EConfig config) => new("hub.regedit", RegeditProcessName, config.RegeditExePath, RegeditTitle);
+
+    private static LaunchTool GpeditTool(E2EConfig config) => new("hub.gpedit", GpeditProcessName, config.GpeditExePath, GpeditTitle);
 
     /// <summary>True when the process runs the publish folder's Registry Editor and started after this run began.</summary>
     private static bool IsRunOwnedRegedit(Process process, E2EConfig config) =>
@@ -1358,9 +1398,9 @@ public sealed class HubTests
         return shown;
     }
 
-    private static void VerifyRegeditLaunchWithEnter(AppSession hub, AutomationElement row)
+    private static void VerifyToolLaunchWithEnter(AppSession hub, AutomationElement row, LaunchTool tool)
     {
-        var before = SnapshotRegeditProcessIds();
+        var before = SnapshotProcessIds(tool.ProcessName);
         var startedUtc = DateTime.UtcNow;
 
         try
@@ -1371,10 +1411,10 @@ public sealed class HubTests
             bool selected = ControlTestSupport.IsSelected(row);
             ReleaseHeldKey(VkReturn);
             bool returnDown = IsKeyDown(VkReturn);
-            E2EResults.Note("hub.regedit.preenter", $"foreground={foreground}, row selected={selected}, Enter held={returnDown}, {HubUi.DescribeForeground(hub.MainHwnd)}");
+            E2EResults.Note($"{tool.CheckPrefix}.preenter", $"foreground={foreground}, row selected={selected}, Enter held={returnDown}, {HubUi.DescribeForeground(hub.MainHwnd)}");
             bool ready = foreground && selected && !returnDown && GetForegroundWindow() == hub.MainHwnd;
             E2EResults.Record(
-                "hub.regedit.enter.precondition",
+                $"{tool.CheckPrefix}.enter.precondition",
                 ready,
                 ready ? "The Hub is foreground, the row is selected, and Enter is up. Enter is sent." : "The Hub was not ready for Enter. No Enter was sent.");
             if (!ready)
@@ -1383,24 +1423,24 @@ public sealed class HubTests
             }
 
             Keyboard.Type(VirtualKeyShort.RETURN);
-            E2EResults.Note("hub.regedit.enter", "Enter pressed on the Registry Editor row.");
+            E2EResults.Note($"{tool.CheckPrefix}.enter", $"Enter pressed on the {tool.Title} row.");
         }
         catch (Exception ex)
         {
-            E2EResults.Record("hub.regedit.enter", false, "Enter on the tool row failed: " + ex.Message);
+            E2EResults.Record($"{tool.CheckPrefix}.enter", false, "Enter on the tool row failed: " + ex.Message);
             return;
         }
 
         Process? child = null;
         try
         {
-            child = WaitForNewRegedit(before, startedUtc, ProcessTimeout);
+            child = WaitForNewProcess(tool, before, startedUtc, ProcessTimeout);
             E2EResults.Record(
-                "hub.regedit.process",
+                $"{tool.CheckPrefix}.process",
                 child is not null,
                 child is null
-                    ? "No new BwcRegedit process appeared within 15 s. " + LaunchDiagnostics(hub)
-                    : $"Started BwcRegedit pid {child.Id}.");
+                    ? $"No new {tool.ProcessName} process appeared within 15 s. " + LaunchDiagnostics(hub)
+                    : $"Started {tool.ProcessName} pid {child.Id}.");
             if (child is null)
             {
                 return;
@@ -1408,31 +1448,31 @@ public sealed class HubTests
 
             var handle = WaitForMainWindow(child, ProcessTimeout);
             E2EResults.Record(
-                "hub.regedit.window",
+                $"{tool.CheckPrefix}.window",
                 handle != IntPtr.Zero,
                 handle == IntPtr.Zero
-                    ? $"BwcRegedit pid {child.Id} showed no main window within 15 s."
-                    : $"BwcRegedit pid {child.Id} main window is 0x{handle.ToInt64():X}.");
+                    ? $"{tool.ProcessName} pid {child.Id} showed no main window within 15 s."
+                    : $"{tool.ProcessName} pid {child.Id} main window is 0x{handle.ToInt64():X}.");
             if (handle == IntPtr.Zero)
             {
                 return;
             }
 
-            var windowTitle = ReadWindowTitle(handle, TimeSpan.FromSeconds(5));
+            var windowTitle = ReadWindowTitle(handle, tool.Title, TimeSpan.FromSeconds(5));
             E2EResults.Record(
-                "hub.regedit.title",
-                string.Equals(windowTitle, RegeditTitle, StringComparison.Ordinal),
-                $"expected '{RegeditTitle}', got '{windowTitle ?? "(none)"}'.");
+                $"{tool.CheckPrefix}.title",
+                string.Equals(windowTitle, tool.Title, StringComparison.Ordinal),
+                $"expected '{tool.Title}', got '{windowTitle ?? "(none)"}'.");
         }
         catch (Exception ex)
         {
-            E2EResults.Record("hub.regedit.error", false, ex.Message);
+            E2EResults.Record($"{tool.CheckPrefix}.error", false, ex.Message);
         }
         finally
         {
             if (child is not null)
             {
-                CloseChild(child);
+                CloseChild(child, tool);
             }
         }
     }
@@ -1946,10 +1986,10 @@ public sealed class HubTests
         return $"Hub status={text}, Hub log has a launch line={launched}, {HubUi.DescribeForeground(hub.MainHwnd)}.";
     }
 
-    private static HashSet<int> SnapshotRegeditProcessIds()
+    private static HashSet<int> SnapshotProcessIds(string processName)
     {
         var ids = new HashSet<int>();
-        foreach (var process in Process.GetProcessesByName(RegeditProcessName))
+        foreach (var process in Process.GetProcessesByName(processName))
         {
             using (process)
             {
@@ -1960,16 +2000,15 @@ public sealed class HubTests
         return ids;
     }
 
-    private static Process? WaitForNewRegedit(HashSet<int> before, DateTime notBeforeUtc, TimeSpan timeout)
+    private static Process? WaitForNewProcess(LaunchTool tool, HashSet<int> before, DateTime notBeforeUtc, TimeSpan timeout)
     {
-        E2EConfig config = GuiGate.Config;
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
             Process? match = null;
-            foreach (var process in Process.GetProcessesByName(RegeditProcessName))
+            foreach (var process in Process.GetProcessesByName(tool.ProcessName))
             {
-                if (before.Contains(process.Id) || !StartedSince(process, notBeforeUtc) || !InstallEvidence.HasImage(process, config.RegeditExePath))
+                if (before.Contains(process.Id) || !StartedSince(process, notBeforeUtc) || !InstallEvidence.HasImage(process, tool.ExePath))
                 {
                     process.Dispose();
                     continue;
@@ -2038,7 +2077,7 @@ public sealed class HubTests
         return IntPtr.Zero;
     }
 
-    private static string? ReadWindowTitle(IntPtr handle, TimeSpan timeout)
+    private static string? ReadWindowTitle(IntPtr handle, string expectedTitle, TimeSpan timeout)
     {
         using var automation = new UIA3Automation();
         var deadline = DateTime.UtcNow + timeout;
@@ -2048,7 +2087,7 @@ public sealed class HubTests
             try
             {
                 last = automation.FromHandle(handle).AsWindow().Title;
-                if (string.Equals(last, RegeditTitle, StringComparison.Ordinal))
+                if (string.Equals(last, expectedTitle, StringComparison.Ordinal))
                 {
                     return last;
                 }
@@ -2064,7 +2103,7 @@ public sealed class HubTests
         return last;
     }
 
-    private static void CloseChild(Process child)
+    private static void CloseChild(Process child, LaunchTool tool)
     {
         int processId = child.Id;
         try
@@ -2090,11 +2129,11 @@ public sealed class HubTests
 
         bool running = IsRunning(processId);
         E2EResults.Record(
-            "hub.regedit.closed",
+            $"{tool.CheckPrefix}.closed",
             !running,
             running
-                ? $"BwcRegedit pid {processId} is still running."
-                : $"Closed BwcRegedit pid {processId}.");
+                ? $"{tool.ProcessName} pid {processId} is still running."
+                : $"Closed {tool.ProcessName} pid {processId}.");
     }
 
     private static bool IsRunning(int processId)

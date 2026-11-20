@@ -29,8 +29,10 @@ public sealed class ConsoleExtendedTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Extended_Tabs()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("tabs", "extended");
         using ExtendedRun run = ExtendedRun.Open("tabs", 8);
         AutomationElement? strip = run.Find(ExtendedRun.TabsId);
@@ -87,8 +89,10 @@ public sealed class ConsoleExtendedTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Extended_DescriptionPane()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("pane", "extended");
         using ExtendedRun run = ExtendedRun.Open("pane", 8);
 
@@ -140,8 +144,10 @@ public sealed class ConsoleExtendedTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Extended_PaneWidth()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("width", "extended");
         var environment = new Dictionary<string, string>(StringComparer.Ordinal) { ["BWC_E2E_CONSOLE_HELP"] = "wide" };
         using ExtendedRun run = ExtendedRun.Open("width", 8, environment);
@@ -182,8 +188,10 @@ public sealed class ConsoleExtendedTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Extended_HelpShapes()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("help", "extended");
 
         // Empty help: the label stays, no body element, no unnamed Text.
@@ -261,8 +269,10 @@ public sealed class ConsoleExtendedTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Extended_TabSwitch()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("switch", "extended");
         using ExtendedRun run = ExtendedRun.Open("switch", 60);
         run.List.FocusList();
@@ -318,8 +328,10 @@ public sealed class ConsoleExtendedTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Extended_Link()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("link", "extended");
         using ExtendedRun run = ExtendedRun.Open("link", 8);
         run.SelectFirstRow();
@@ -364,8 +376,10 @@ public sealed class ConsoleExtendedTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Extended_HighContrast()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("contrast", "extended");
         var environment = new Dictionary<string, string>(StringComparer.Ordinal) { ["BWC_E2E_HIGH_CONTRAST"] = "1" };
         using ExtendedRun run = ExtendedRun.Open("contrast", 8, environment);

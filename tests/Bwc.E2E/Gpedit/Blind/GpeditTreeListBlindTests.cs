@@ -45,8 +45,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_TreeBlind_ShapeAndInitialState()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "tree-shape");
         using GpeditRun run = BlindKit.Open("blind-tree-shape", shape: true);
         Dictionary<string, string> readout = run.Readout();
@@ -96,8 +98,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_TreeBlind_ExpandCollapseAndKeys()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "tree-keys");
         using GpeditRun run = BlindKit.Open("blind-tree-keys");
 
@@ -157,8 +161,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_TreeBlind_PlaceholderPages()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "placeholders");
         using GpeditRun run = BlindKit.Open("blind-placeholders");
 
@@ -237,8 +243,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_TreeBlind_SystemTemplatesNoRoot()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "system-templates");
         var sandbox = GpeditSandbox.Create("blind-system-templates");
         using GpeditRun run = BlindKit.OpenWithEnvironment(
@@ -283,8 +291,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_TreeBlind_DenyAllStores()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "denyall");
         string outside = Path.Combine(Path.GetTempPath(), "bwc-blind-outside-root-" + Guid.NewGuid().ToString("N"));
         foreach ((string label, string? root) in new[] { ("unset", (string?)null), ("outside", outside) })
@@ -332,8 +342,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_TreeBlind_MissingTemplateFolder()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "missing-templates");
         var sandbox = GpeditSandbox.Create("blind-missing-templates");
         sandbox.SeedStandard();
@@ -363,8 +375,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_TreeBlind_BadTemplatesLeaveGoodTree()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "bad-templates");
         using GpeditRun run = BlindKit.Open("blind-bad-templates", sandbox => sandbox.UseTemplatesWithBadCases("MalformedXml", "DtdEntity", "MissingAdml"), shape: true);
 
@@ -391,8 +405,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_TreeBlind_AllBadTemplatesRecordedGoodTreeKept()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "all-bad-templates");
         string[] cases = ["MalformedXml", "MissingAdml", "UndefinedString", "UndefinedUsing", "DuplicatePolicy", "DtdEntity", "ListItemNoKey", "BooleanNoValueName"];
         using GpeditRun run = BlindKit.Open("blind-all-bad-templates", sandbox => sandbox.UseTemplatesWithBadCases(cases), shape: true);
@@ -428,8 +444,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_TreeBlind_FrameHostSeam()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "frame-host");
         using (ShellRun frame = ShellRun.Open("blind-frame-host"))
         {
@@ -452,8 +470,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_TreeBlind_PersistenceRestart()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "persistence");
         int treeAfter;
         int columnAfter;
@@ -508,8 +528,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_PersistedColumnWidthIsDip()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "persisted-width-dip");
         double dragDip;
         double afterDragDip;
@@ -557,8 +579,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_TreeBlind_BadSettingsFiles()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "bad-settings");
         using (GpeditRun first = BlindKit.Open("blind-bad-settings", seed: false))
         {
@@ -636,8 +660,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_DefaultColumnWidthsInDip()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "column-widths");
         using GpeditRun run = BlindKit.Open("blind-column-widths");
         run.GoTo(BlindKit.Root, BlindKit.Computer, "Windows Settings");
@@ -661,8 +687,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_CategoryRows()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "category");
         using GpeditRun run = BlindKit.Open("blind-category");
 
@@ -722,8 +750,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_States()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "states");
         using GpeditRun run = BlindKit.Open("blind-states");
 
@@ -761,8 +791,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_AllSettings()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "all-settings");
         using GpeditRun run = BlindKit.Open("blind-all-settings");
 
@@ -808,8 +840,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_SortCasesOrder()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "sort-cases");
         using GpeditRun run = BlindKit.Open("blind-sort-cases");
         run.GoTo(BlindKit.Path(BlindKit.Computer, "Sort cases"));
@@ -827,9 +861,11 @@ public sealed class GpeditTreeListBlindTests
     /// <summary>Section 15: the order of runs of digits is not stated in the doc (native collation only).</summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     [Ignore("open: does 'Policy 10' sort before or after 'Policy 2'? The doc says native collation at the user locale and does not say whether digit runs compare as numbers. The capture matrix settles it.")]
     public void Gpedit_ListBlind_SortCasesDigitRuns()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "sort-digits");
         using GpeditRun run = BlindKit.Open("blind-sort-digits");
         run.GoTo(BlindKit.Path(BlindKit.Computer, "Sort cases"));
@@ -846,8 +882,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_LiteralAmpersand()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "ampersand");
         using GpeditRun run = BlindKit.Open("blind-ampersand");
         run.GoTo(BlindKit.Path(BlindKit.Computer));
@@ -872,8 +910,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_FolderRowNavigation()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "folder-navigation");
         using GpeditRun run = BlindKit.Open("blind-folder-navigation");
         run.GoTo(BlindKit.Path(BlindKit.Computer, "Elements"));
@@ -894,8 +934,10 @@ public sealed class GpeditTreeListBlindTests
     /// <summary>Section 9: the status text of every kind of node.</summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_StatusBar()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "status");
         using GpeditRun run = BlindKit.Open("blind-status");
 
@@ -933,8 +975,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_ExtendedPane()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "extended-pane");
         using GpeditRun run = BlindKit.Open("blind-extended-pane");
 
@@ -1034,8 +1078,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_ExtendedPaneFallbackWording()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         const string classic = "Select an item to view its description.";
         var c = new GpeditChecks("blind", "fallback-wording");
         using GpeditRun run = BlindKit.Open("blind-fallback-wording");
@@ -1060,8 +1106,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_UnreadablePolicyFile()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "unreadable-pol");
         using GpeditRun run = BlindKit.Open("blind-unreadable-pol", sandbox => sandbox.WriteUnreadablePolicyFile(Bwc.Gpo.Store.GpoSide.Machine));
 
@@ -1088,8 +1136,10 @@ public sealed class GpeditTreeListBlindTests
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_ListBlind_AbsentPolicyFiles()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var c = new GpeditChecks("blind", "absent-pol");
         using GpeditRun run = BlindKit.Open("blind-absent-pol", seed: false);
         run.GoTo(BlindKit.Path(BlindKit.Computer, "Basics"));

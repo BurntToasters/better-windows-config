@@ -1,5 +1,6 @@
 using System.Drawing;
 using Bwc.E2E.Controls;
+using Bwc.E2E.Harness;
 using Bwc.E2E.List;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
@@ -44,8 +45,10 @@ public sealed class ConsoleListColumnTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_List_ColumnsAndHeaders()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("columns", "list");
         using (ListRun run = ListRun.Open("columns", 8))
         {
@@ -180,8 +183,10 @@ public sealed class ConsoleListColumnTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_List_SortBothWays()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("sort", "list");
         using ListRun run = ListRun.Open("sort", 12);
         int[] source = Enumerable.Range(0, 12).ToArray();
@@ -257,8 +262,10 @@ public sealed class ConsoleListColumnTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_List_ResizeAndAutoFit()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("resize", "list");
         using ListRun run = ListRun.Open("resize", 12, new Dictionary<string, string> { ["BWC_E2E_CONSOLE_LONGTEXT"] = "1" });
         double scale = run.Scale;

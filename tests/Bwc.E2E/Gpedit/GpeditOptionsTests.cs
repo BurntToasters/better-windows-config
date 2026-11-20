@@ -61,8 +61,10 @@ public sealed class GpeditOptionsTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Options_Elements()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("options", "elements");
         using GpeditRun run = Start("gpedit-options-elements", out _);
         run.GoTo(Root, Computer, Admin, Oracle, "Tools & Utilities");
@@ -138,8 +140,10 @@ public sealed class GpeditOptionsTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Options_Defaults()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("options", "defaults");
         using GpeditRun run = Start("gpedit-options-defaults", out _);
         run.GoTo(Root, Computer, Admin, Oracle, "Elements", "Numbers");
@@ -285,8 +289,10 @@ public sealed class GpeditOptionsTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Options_Numbers()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("options", "numbers");
         using GpeditRun run = Start("gpedit-options-numbers", out _);
         run.GoTo(Root, Computer, Admin, Oracle, "Elements", "Numbers");
@@ -375,8 +381,10 @@ public sealed class GpeditOptionsTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Options_Choices()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("options", "choices");
         using GpeditRun run = Start("gpedit-options-choices", out _);
         run.GoTo(Root, Computer, Admin, Oracle, "Elements", "Texts");
@@ -444,8 +452,10 @@ public sealed class GpeditOptionsTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Options_Roundtrip()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("options", "roundtrip");
         using GpeditRun run = Start("gpedit-options-roundtrip", out _);
 
@@ -535,8 +545,10 @@ public sealed class GpeditOptionsTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Options_List()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("options", "list");
         GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-options-list");
         sandbox.DialogEnabled = true;
@@ -720,8 +732,10 @@ public sealed class GpeditOptionsTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Options_Literal()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("options", "literal");
         using GpeditRun run = Start("gpedit-options-literal", out _);
         run.GoTo(Root, Computer, Admin, Oracle, "Tools & Utilities");
@@ -786,8 +800,10 @@ public sealed class GpeditOptionsTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Options_Validation()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("options", "validation");
         using GpeditRun run = Start("gpedit-options-validation", out _);
 
@@ -921,8 +937,10 @@ public sealed class GpeditOptionsTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Options_TabOrder()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("options", "taborder");
         using GpeditRun run = Start("gpedit-options-taborder", out _);
         run.GoTo(Root, Computer, Admin, Oracle, "Tools & Utilities");
@@ -976,8 +994,10 @@ public sealed class GpeditOptionsTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Options_Layout()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("options", "layout");
         using GpeditRun run = Start("gpedit-options-layout", out _);
         run.GoTo(Root, Computer, Admin, Oracle, "Tools & Utilities");
@@ -1044,8 +1064,10 @@ public sealed class GpeditOptionsTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Options_Navigation()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("options", "navigation");
         using GpeditRun run = Start("gpedit-options-navigation", out _);
         run.GoTo(Root, Computer, Admin, Oracle, "Tools & Utilities");

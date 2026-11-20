@@ -4,6 +4,7 @@ using System.Globalization;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using Bwc.E2E.Controls;
+using Bwc.E2E.Harness;
 using Bwc.E2E.List;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -33,8 +34,10 @@ public sealed class ConsoleListScaleTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_List_Large3000()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("large", "list");
         const int rows = 3000;
         var openWatch = Stopwatch.StartNew();
@@ -137,8 +140,10 @@ public sealed class ConsoleListScaleTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_List_ColumnState()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("state", "list");
         using ListRun run = ListRun.Open("state", 12, new Dictionary<string, string> { ["BWC_E2E_CONSOLE_STATE_MENU"] = "1" });
 

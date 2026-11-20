@@ -1,6 +1,7 @@
 using System.Drawing;
 using Bwc.E2E.ConsoleFrame;
 using Bwc.E2E.Controls;
+using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.WindowsAPI;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -77,8 +78,10 @@ public sealed class GpeditDialogTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Dialog_Frame()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("dialog", "frame");
         using GpeditRun run = Start("gpedit-dialog-frame", out _);
         run.GoTo(Root, Computer, Admin, Oracle, Basics);
@@ -172,8 +175,10 @@ public sealed class GpeditDialogTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Dialog_InitialStates()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("dialog", "states");
         using GpeditRun run = Start("gpedit-dialog-states", out _);
 
@@ -221,8 +226,10 @@ public sealed class GpeditDialogTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Dialog_Literal()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("dialog", "literal");
         using GpeditRun run = Start("gpedit-dialog-literal", out _);
         run.GoTo(Root, Computer, Admin, Oracle, "Tools & Utilities");
@@ -263,8 +270,10 @@ public sealed class GpeditDialogTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Dialog_ApplyOk()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("dialog", "applyok");
         using GpeditRun run = Start("gpedit-dialog-applyok", out _);
         run.GoTo(Root, Computer, Admin, Oracle, Basics);
@@ -347,8 +356,10 @@ public sealed class GpeditDialogTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Dialog_Cancel()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("dialog", "cancel");
         using GpeditRun run = Start("gpedit-dialog-cancel", out _);
         run.GoTo(Root, Computer, Admin, Oracle, Basics);
@@ -394,8 +405,10 @@ public sealed class GpeditDialogTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Dialog_OkWritesNothing()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("dialog", "nowrite");
         GpeditRun run = Start("gpedit-dialog-nowrite", out GpeditSandbox sandbox);
         SortedDictionary<string, string> before = sandbox.PolicyFileHashes();
@@ -454,8 +467,10 @@ public sealed class GpeditDialogTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Dialog_PreviousNext()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("dialog", "nav");
         using GpeditRun run = Start("gpedit-dialog-nav", out _);
         run.GoTo(Root, Computer, Admin, Oracle, Basics);
@@ -538,8 +553,10 @@ public sealed class GpeditDialogTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Dialog_ReadOnly()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("dialog", "readonly");
         using GpeditRun run = Start("gpedit-dialog-readonly", out _, readOnly: true);
         run.GoTo(Root, Computer, Admin, Oracle, Basics);
@@ -575,8 +592,10 @@ public sealed class GpeditDialogTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Dialog_Validation()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("dialog", "validation");
         using GpeditRun run = Start("gpedit-dialog-validation", out _);
         run.GoTo(Root, Computer, Admin, Oracle, "Elements", "Texts");
@@ -619,8 +638,10 @@ public sealed class GpeditDialogTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Dialog_Resize()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("dialog", "resize");
         using GpeditRun run = Start("gpedit-dialog-resize", out _);
         run.GoTo(Root, Computer, Admin, Oracle, Basics);

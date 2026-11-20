@@ -1,6 +1,7 @@
 using System.Drawing;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Editing;
+using Bwc.E2E.Harness;
 using Bwc.E2E.List;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
@@ -32,8 +33,10 @@ public sealed class ConsoleShellTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Shell_Layout()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("layout");
         using ShellRun run = ShellRun.Open("layout");
         run.Measure("expectedTreeLogical", 156);
@@ -167,8 +170,10 @@ public sealed class ConsoleShellTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Shell_SplitterDragAndLimits()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("splitter");
         using ShellRun run = ShellRun.Open("splitter");
         int width = Math.Min(1500, ShellRun.ScreenWidth - 300);
@@ -237,8 +242,10 @@ public sealed class ConsoleShellTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Shell_WindowNarrowerThanTree()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("narrow");
         using ShellRun run = ShellRun.Open("narrow");
         run.PlaceWindow(40, 40, 1400, 900);
@@ -271,8 +278,10 @@ public sealed class ConsoleShellTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Shell_FocusCycle()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("focus");
         using ShellRun run = ShellRun.Open("focus");
         run.ClickTreeNode(ComputerNode);
@@ -313,8 +322,10 @@ public sealed class ConsoleShellTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Shell_MenuKeyboard()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("menu");
         using ShellRun run = ShellRun.Open(
             "menu",
@@ -379,8 +390,10 @@ public sealed class ConsoleShellTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Shell_ShowHide()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("showhide");
         using ShellRun run = ShellRun.Open("showhide");
         run.ClickTreeNode(ComputerNode);
@@ -461,8 +474,10 @@ public sealed class ConsoleShellTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Shell_ToolbarStates()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("toolbar");
         using ShellRun run = ShellRun.Open("toolbar");
         run.ClickTreeNode(ComputerNode);
@@ -521,8 +536,10 @@ public sealed class ConsoleShellTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Shell_ContextMenuKey()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("context");
         using ShellRun run = ShellRun.Open("context");
         run.ClickTreeNode(ComputerNode);
@@ -572,8 +589,10 @@ public sealed class ConsoleShellTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Shell_StatusBar()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("status");
         string longText = string.Concat(Enumerable.Repeat("A very long status text. ", 200));
         using ShellRun run = ShellRun.Open(
@@ -608,8 +627,10 @@ public sealed class ConsoleShellTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Shell_ToolbarIconFallback()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("fallback");
         string missing = Path.Combine(Harness.GuiGate.Config.DataRootFor("console-fallback"), "no-such-module.exe");
         using ShellRun run = ShellRun.Open(

@@ -79,8 +79,10 @@ public sealed class GpeditTreeTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Tree_Shape()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("tree", "shape");
         GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-tree-shape");
         sandbox.SeedStandard();
@@ -116,8 +118,10 @@ public sealed class GpeditTreeTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Tree_PlaceholderPages()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("tree", "placeholders");
         GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-tree-placeholders");
         sandbox.SeedStandard();
@@ -156,8 +160,10 @@ public sealed class GpeditTreeTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Tree_BadTemplates()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("tree", "badtemplates");
         GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-tree-bad");
         sandbox.SeedStandard();

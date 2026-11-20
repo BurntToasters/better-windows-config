@@ -34,8 +34,10 @@ public sealed class GpeditPersistenceTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Persistence_Restart()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("persistence", "restart");
         const string name = "gpedit-persist-restart";
         GpeditSandbox sandbox = GpeditSandbox.Create(name);
@@ -144,8 +146,10 @@ public sealed class GpeditPersistenceTests
 
     [TestMethod]
     [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
     public void Gpedit_Persistence_BadSettingsFile()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("persistence", "badfile");
         const string name = "gpedit-persist-bad";
         GpeditSandbox sandbox = GpeditSandbox.Create(name);

@@ -1,5 +1,6 @@
 using System.Drawing;
 using Bwc.E2E.Controls;
+using Bwc.E2E.Harness;
 using Bwc.E2E.List;
 using FlaUI.Core.AutomationElements;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -22,8 +23,10 @@ public sealed class ConsoleListInputTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_List_ActivateAndContext()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("events", "list");
         using ListRun run = ListRun.Open("events", 12);
         string Status() => run.Shell.StatusText();
@@ -86,8 +89,10 @@ public sealed class ConsoleListInputTests
 
     [TestMethod]
     [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_List_TypeAhead()
     {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new ShellChecks("typeahead", "list");
         // Names: 0 Alpha, 1 Beta, 2 Bravo, 3 Charlie, 4 Delta, 5 Écho, 6 Foxtrot, 7 Zulu, 8 Ünder, 9 日本語.
         using ListRun run = ListRun.Open("typeahead", 10, new Dictionary<string, string> { ["BWC_E2E_CONSOLE_NAMES"] = "typeahead" });
