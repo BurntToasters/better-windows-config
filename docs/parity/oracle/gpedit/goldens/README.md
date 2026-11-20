@@ -5,7 +5,7 @@ What classic `gpedit.msc` writes when it saves, for the fixture templates in `..
 
 ## Layout
 
-`<group>/<case>/` for groups A to H. Group letters:
+`<group>/<case>/` for groups A to H and K. Group letters:
 
 | Group | Holds |
 | --- | --- |
@@ -17,6 +17,7 @@ What classic `gpedit.msc` writes when it saves, for the fixture templates in `..
 | F | visuals: tree order and icons, columns, status text, sort, filter, menus, toolbar, dialog rectangles, keys |
 | G | refresh timing of the live registry after OK, Apply and Not Configured |
 | H | template load errors (each bad fixture next to the good one) |
+| K | key edge cases: policy keys with a leading or trailing backslash (each edge fixture next to the good one, one session per case like H) |
 
 Inside a case folder:
 
@@ -25,6 +26,11 @@ Inside a case folder:
 - `start/`: the files the case placed before classic started (only for crafted starts).
 - `step-NN-<label>/`: the same five files after each recorded step, for cases with more than one step.
 - `case.json`: the plan hash, the operations, the steps (size and SHA-256 of every file, gpt.ini version) and what the driver observed.
+  Each entry of `ops` has `index`, `kind`, `label`, `plan` (a description sentence for people) and `op`: the whole operation as a JSON
+  object (camel case, null members left out), so a test can replay it. For `editPolicy`, `op.policyId` is the ADMX policy name,
+  `op.policyNamespace` is the target namespace of the template that defines it, and each entry of `op.options` has `elementId`, the ADMX
+  element id (group H leaves them out: its policy is a stand-in for a template that does not load). `planVersion` 2 is the first
+  version with `op`, with multi-line text typed by key presses and with both configuration roots expanded before the first operation.
 - `complete.json`: written last; a folder without it is not a golden. It holds the plan hash that `--resume` compares.
 
 ## Privacy

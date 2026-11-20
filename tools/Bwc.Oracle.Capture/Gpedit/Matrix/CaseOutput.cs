@@ -312,6 +312,7 @@ internal static class CaseOutput
                 ["kind"] = c.Ops[i].Kind,
                 ["label"] = c.Ops[i].Label,
                 ["plan"] = c.Ops[i].Describe(),
+                ["op"] = JsonSerializer.SerializeToNode(c.Ops[i], MatrixCase.OpJson),
                 ["optional"] = c.Optional.Contains(i) ? true : null,
             });
         }

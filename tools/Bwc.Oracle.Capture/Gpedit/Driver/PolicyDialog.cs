@@ -149,6 +149,9 @@ internal sealed partial class PolicyDialog
         return new JsonObject { ["set"] = "state", ["requested"] = state, ["before"] = before, ["observed"] = after, ["via"] = via };
     }
 
+    // The comment box is a multi-line edit: WM_SETTEXT would send it no change notification, so the dialog would not notice the edit (Apply
+    // stays disabled, OK writes nothing). The text is typed with key presses; an empty text is select all and delete. The enabled state of
+    // Apply before and after is recorded as evidence that the dialog noticed. Failure mode 30 of the driver document.
     internal JsonObject SetComment(string text)
     {
         AutomationElement box = Element("textBoxComment");
@@ -160,15 +163,30 @@ internal sealed partial class PolicyDialog
 
         RequireOwned(handle);
         string before = DriverNative.GetText(handle);
-        DriverNative.SetText(handle, text);
+        bool? applyBefore = ApplyEnabled();
+        TypeInto(handle, "the comment box", text, multiline: true, requireCleared: true);
+        Thread.Sleep(200);
         string observed = DriverNative.GetText(handle);
-        if (!string.Equals(observed, text, StringComparison.Ordinal))
+        bool? applyAfter = ApplyEnabled();
+        if (!string.Equals(NormalizeBreaks(observed), NormalizeBreaks(text), StringComparison.Ordinal))
         {
-            throw new DriverException($"the comment text did not stick (asked {text.Length} characters, read {observed.Length})");
+            throw new DriverException($"the comment text did not stick (asked {text.Length} characters, read {observed.Length}; Apply enabled before {applyBefore}, after {applyAfter})");
         }
 
-        return new JsonObject { ["set"] = "comment", ["requested"] = text, ["before"] = before, ["observed"] = observed };
+        return new JsonObject
+        {
+            ["set"] = "comment",
+            ["via"] = "keys",
+            ["requested"] = text,
+            ["before"] = before,
+            ["observed"] = observed,
+            ["applyEnabledBefore"] = applyBefore,
+            ["applyEnabledAfter"] = applyAfter,
+        };
     }
+
+    // The enabled state of the Apply button, or null when the dialog has none.
+    internal bool? ApplyEnabled() => GpeditDriver.ById(element, "buttonApply")?.Current.IsEnabled;
 
     // A control that is not inside this dialog is never written to.
     internal void RequireOwned(IntPtr control)
@@ -303,7 +321,7 @@ internal sealed partial class PolicyDialog
         }
         else if (IsOpen)
         {
-            result["applyEnabledAfter"] = GpeditDriver.ById(element, "buttonApply")?.Current.IsEnabled;
+            result["applyEnabledAfter"] = ApplyEnabled();
         }
 
         JsonObject settled = watch.Settle(driver.Context.Token, mayWrite ? 1200 : 300, mayWrite);

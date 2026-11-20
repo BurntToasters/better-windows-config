@@ -206,7 +206,8 @@ internal sealed class MatrixRunner
                 FileOps.DeleteTree(shotsDir);
             }
 
-            var file = new OpsFile { Name = name, Description = c.Description, Ops = c.Ops };
+            // Group H installs a bad template and must see classic's error UI through its own first operation, so it is not warmed up.
+            var file = new OpsFile { Name = name, Description = c.Description, Ops = c.Ops, ExpandRootsAtStart = c.Group != "H" };
             OpsRunner.RunSummary? run = null;
             string? runError = null;
             try

@@ -23,6 +23,7 @@ internal static class OptionChoices
             && policy.Elements.Count(e => string.Equals(e.Label, element.Label, StringComparison.Ordinal)) == 1;
         return new OptionSpec
         {
+            ElementId = element.Id,
             Label = uniqueLabel ? element.Label : null,
             Index = uniqueLabel ? null : element.ControlIndex,
             ExpectKind = ExpectKind(element),

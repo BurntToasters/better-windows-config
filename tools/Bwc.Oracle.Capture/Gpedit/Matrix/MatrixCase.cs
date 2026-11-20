@@ -20,7 +20,17 @@ internal sealed record RecordedStep(string Label, int SnapshotOp);
 // One matrix case. Ids are unique per group and safe as folder names.
 internal sealed class MatrixCase
 {
-    internal const int PlanVersion = 1;
+    // Version 2: the driver types multi-line text (the comment and multiText options) with key presses, because WM_SETTEXT was never noticed by
+    // the dialog and the comment-only goldens of version 1 wrote nothing; case.json holds each operation as data (`op`); both configuration
+    // roots are expanded before the first operation. A golden of version 1 is therefore not trusted by `--resume`: every case is captured again.
+    internal const int PlanVersion = 2;
+
+    // How an operation is written as data, in case.json and for the plan hash: camel case, nulls left out.
+    internal static readonly JsonSerializerOptions OpJson = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
 
     internal string Group { get; init; } = string.Empty;
 
@@ -83,11 +93,6 @@ internal sealed class MatrixCase
     // makes `--resume` redo a case that was captured with another plan.
     internal string PlanHash()
     {
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-        };
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         void Add(string text) => sha.AppendData(Encoding.UTF8.GetBytes(text + "\n"));
         Add("v" + PlanVersion);
@@ -101,7 +106,7 @@ internal sealed class MatrixCase
 
         foreach (GpeditOp op in Ops)
         {
-            Add(JsonSerializer.Serialize(op, options));
+            Add(JsonSerializer.Serialize(op, OpJson));
         }
 
         foreach ((string source, string relative) in ExtraTemplates)

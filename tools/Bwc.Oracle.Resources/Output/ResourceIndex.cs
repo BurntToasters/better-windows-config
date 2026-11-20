@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Bwc.Oracle.Resources.Model;
 using Bwc.Oracle.Resources.Native;
@@ -81,13 +82,97 @@ internal sealed class IndexWinFormsEntry
 internal static partial class ResourceIndex
 {
     /// Same options as the other dumps, then every array of integers is put on one line so the file stays reviewable.
-    public static string Serialize(IndexFile index) =>
-        NumberArray().Replace(GoldenJson.Serialize(index), m => "[" + Whitespace().Replace(m.Groups[1].Value, " ") + "]");
+    /// The result is checked before it is returned: it must parse as JSON and equal in content the parse of the plain
+    /// text, so the one-line rewrite can never change data. A failed check throws and nothing is written.
+    public static string Serialize(IndexFile index)
+    {
+        string plain = GoldenJson.Serialize(index);
+        string formatted = NumberArray().Replace(plain, m => "[" + Whitespace().Replace(m.Groups[1].Value, " ") + "]");
 
-    [GeneratedRegex(@"[s*(-?d+(?:,s*-?d+)*)s*]")]
+        JsonDocument formattedDoc;
+        try
+        {
+            formattedDoc = JsonDocument.Parse(formatted);
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException($"the formatted resource index is not valid JSON ({ex.Message}); the index was not written");
+        }
+
+        using (formattedDoc)
+        using (JsonDocument plainDoc = JsonDocument.Parse(plain))
+        {
+            string? difference = FirstDifference(plainDoc.RootElement, formattedDoc.RootElement, "$");
+            if (difference is not null)
+            {
+                throw new InvalidDataException($"the one-line rewrite of the resource index changed its content ({difference}); the index was not written");
+            }
+        }
+        return formatted;
+    }
+
+    /// Names a JSON path and the kind of difference only. No value is ever put in the message.
+    private static string? FirstDifference(JsonElement a, JsonElement b, string path)
+    {
+        if (a.ValueKind != b.ValueKind)
+        {
+            return $"{path}: value kind differs";
+        }
+
+        switch (a.ValueKind)
+        {
+            case JsonValueKind.Object:
+            {
+                var left = a.EnumerateObject().ToList();
+                var right = b.EnumerateObject().ToList();
+                if (left.Count != right.Count)
+                {
+                    return $"{path}: property count differs";
+                }
+                for (int i = 0; i < left.Count; i++)
+                {
+                    if (!string.Equals(left[i].Name, right[i].Name, StringComparison.Ordinal))
+                    {
+                        return $"{path}: property {i} name differs";
+                    }
+                    string? inner = FirstDifference(left[i].Value, right[i].Value, path + "." + left[i].Name);
+                    if (inner is not null)
+                    {
+                        return inner;
+                    }
+                }
+                return null;
+            }
+            case JsonValueKind.Array:
+            {
+                int length = a.GetArrayLength();
+                if (length != b.GetArrayLength())
+                {
+                    return $"{path}: array length differs";
+                }
+                for (int i = 0; i < length; i++)
+                {
+                    string? inner = FirstDifference(a[i], b[i], $"{path}[{i}]");
+                    if (inner is not null)
+                    {
+                        return inner;
+                    }
+                }
+                return null;
+            }
+            case JsonValueKind.String:
+                return string.Equals(a.GetString(), b.GetString(), StringComparison.Ordinal) ? null : $"{path}: string differs";
+            case JsonValueKind.Number:
+                return string.Equals(a.GetRawText(), b.GetRawText(), StringComparison.Ordinal) ? null : $"{path}: number differs";
+            default:
+                return null;
+        }
+    }
+
+    [GeneratedRegex(@"\[\s*(-?\d+(?:,\s*-?\d+)*)\s*\]")]
     private static partial Regex NumberArray();
 
-    [GeneratedRegex(@"s+")]
+    [GeneratedRegex(@"\s+")]
     private static partial Regex Whitespace();
 
     public static IndexFile Build(GoldenFile golden, FormsFile forms)

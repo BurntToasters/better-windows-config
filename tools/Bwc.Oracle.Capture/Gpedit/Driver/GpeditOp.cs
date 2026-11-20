@@ -27,7 +27,11 @@ internal sealed record OptionSpec
 
     public bool? ClearRows { get; init; }
 
+    // Types the text with key presses. A multi-line edit is always typed, whatever this says (failure mode 30 of the driver document).
     public bool? Typed { get; init; }
+
+    // Plan only: the ADMX element id this option belongs to. The driver ignores it; the matrix writes it into case.json for the engine tests.
+    public string? ElementId { get; init; }
 
     internal string Describe() => (Label ?? $"#{Index}") + " = " + (Text is not null ? (Typed is true ? "typed " : string.Empty) + $"text '{Text}'"
         : Checked is not null ? $"checked {Checked}"
@@ -111,6 +115,12 @@ internal sealed record GpeditOp
 
     public int? WaitMs { get; init; }
 
+    // Plan only (editPolicy): the ADMX policy name and the target namespace of the template that defines it. The driver ignores both when
+    // it runs the operation; the matrix writes them into case.json for the engine tests.
+    public string? PolicyId { get; init; }
+
+    public string? PolicyNamespace { get; init; }
+
     // pressKey: key names from GpeditDriver.KeySpecs; Name is the focus target ("tree" or "list").
     public List<string>? Keys { get; init; }
 
@@ -136,7 +146,7 @@ internal sealed record GpeditOp
         ["selectTab"] = (new[] { "tab" }, Array.Empty<string>()),
         ["editPolicy"] = (
             new[] { "policy" },
-            new[] { "root", "path", "occurrence", "state", "comment", "options", "press", "messageBoxAnswer", "readLists" }),
+            new[] { "root", "path", "occurrence", "state", "comment", "options", "press", "messageBoxAnswer", "readLists", "policyId", "policyNamespace" }),
         ["dumpMenu"] = (new[] { "menu" }, new[] { "root", "path", "policy", "occurrence" }),
         ["setFilter"] = (new[] { "filter" }, new[] { "root", "path", "press", "messageBoxAnswer" }),
         ["filterOn"] = (new[] { "filterOn" }, NodeFields),
@@ -413,6 +423,8 @@ internal sealed record GpeditOp
         Add("name", Name is not null);
         Add("waitMs", WaitMs is not null);
         Add("keys", Keys is not null);
+        Add("policyId", PolicyId is not null);
+        Add("policyNamespace", PolicyNamespace is not null);
         return set;
     }
 }
@@ -425,6 +437,10 @@ internal sealed record OpsFile
     public string? Description { get; init; }
 
     public List<GpeditOp> Ops { get; init; } = new();
+
+    // Expand Computer Configuration and User Configuration once right after classic starts, before any save (OpsRunner.Run,
+    // docs/failure-modes/oracle-gpedit-driver.md section 31). Off for a hand written file; the matrix runner turns it on except for group H.
+    public bool ExpandRootsAtStart { get; init; }
 
     internal static readonly JsonSerializerOptions Json = new()
     {

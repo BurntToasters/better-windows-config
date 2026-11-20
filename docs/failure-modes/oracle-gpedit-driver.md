@@ -2,7 +2,7 @@
 
 The driver (`tools/Bwc.Oracle.Capture/Gpedit/Driver`) drives classic `gpedit.msc` by UI Automation,
 Win32 messages and a few real key presses, inside a `GpeditSession` (see `oracle-gpedit-session.md`
-for what the session backs up and restores). A matrix runner (groups A to H of the oracle plan) feeds
+for what the session backs up and restores). A matrix runner (groups A to H and K of the oracle plan) feeds
 it operations and records what classic wrote. This document lists every way a driven step can lie, that
 is, report success while classic did something else, and what the driver does about each. It was
 written before the driver code. Sections 20 to 24 of the session document (stale list, DPI, tabs,
@@ -108,11 +108,14 @@ no UI Automation element at all in the control view.
 
 Focus can sit elsewhere, and a text edit and a numeric edit look alike.
 
-- Text is sent to the exact control window of the matched group (`WM_SETTEXT`, which also raises the
-  control change event), and read back with `WM_GETTEXT`. `typed: true` types it with real key events
+- Text of a single-line edit is sent to the exact control window of the matched group (`WM_SETTEXT`), and
+  read back with `WM_GETTEXT`. `typed: true` types it with real key events
   instead, after the control is focused and the focused element is read back as that control: the edit
   limit (a text `maxLength`) applies to typed text and not to `WM_SETTEXT`, so limit cases use `typed`. The read value must equal the requested text, except for a numeric control (section 9)
   where the read value is recorded as `observed` and compared by the caller.
+- A multi-line edit (window style `ES_MULTILINE`: the multi-text element and the comment box) is always typed with
+  real key events, whatever `typed` says, because `WM_SETTEXT` sends no change notification to such a control
+  (section 30).
 - Before any set, the control must be enabled (`IsWindowEnabled`); a disabled control (state is Not
   Configured or Disabled) fails with that reason. The op order is state first, then comment, then options.
 - The dialog is brought to the foreground and the control belongs to the dialog window that was
@@ -364,6 +367,8 @@ middle of a run on the VM.
   `mmcndmgr.dll` when Computer Configuration was expanded right after a user save). Before each tree expand the driver waits up to
   30 s for classic's input queue to be idle (`WaitForInputIdle`). When the wait times out, the expand still runs and the result
   records a note.
+- A second protection against that crash: for a matrix case the runner asks for both configuration roots to be expanded once right
+  after classic starts, before any save, so no root is expanded for the first time after a save (section 31).
 
 ## 28. Screenshots and result files
 
@@ -376,3 +381,51 @@ middle of a run on the VM.
 
 - Text read from classic (titles, help, labels, box texts, menu items) goes into git-ignored result
   files only. The sample ops file and this document name BWC fixture policies and no Microsoft text.
+
+## 30. Multi-line edit controls and the comment box need real key presses
+
+A multi-line edit control (`ES_MULTILINE`) sends no `EN_CHANGE` when its text is set with `WM_SETTEXT`. The setting dialog never
+notices the edit, so Apply stays disabled and OK writes nothing, while a read back of the control returns exactly the requested text.
+Seen in the first capture: the four comment-only goldens of group A had a disabled Apply button after the comment was set. The step
+looked successful and the golden was wrong.
+
+- The way a text is entered is decided by the window style of the target control, never by the caller: a control with `ES_MULTILINE`
+  is typed with key presses (focus, focus read back, Ctrl+A, Delete, then the text with Enter between lines) even when the option
+  says `typed: false` or says nothing. A single-line edit keeps `WM_SETTEXT` unless `typed` is true, because the case that sets a
+  too long text without typing (`E/Text_TooLong_SetText`) depends on the difference. The comment box is typed the same way.
+- The result records how the text was entered (`via`: `keys` or `WM_SETTEXT`). For the comment it also records the enabled state of
+  Apply before and after the text (`applyEnabledBefore`, `applyEnabledAfter`), so a golden audit can see that the dialog noticed the edit.
+- Typing goes to the wrong window. The foreground check of section 11 runs first. Before every line the driver checks again that the
+  setting dialog is still open, that the foreground window is a window of mmc and that the focused element is still the control. A
+  failed check stops typing at once with a message that names what was wrong.
+- Enter is the default button. A typed Enter that reaches the dialog's default button closes the dialog (or applies the setting),
+  and the rest of the text would go to another window or nowhere. The check before each line catches the closed dialog and throws a
+  `DriverException` that says the setting dialog is no longer open after a typed Enter. Text that follows is never sent.
+- Old text stays because Ctrl+A did not select it. After the select all and delete, a multi-line control or the comment box must be
+  empty; if not, the step fails before any text is typed.
+- Line breaks differ (`\n` in the plan, `\r\n` in the control). The text read back and the requested text are compared with every
+  line break normalized to one form. For the comment a difference is a `DriverException`. For a multi-text option the read back is
+  recorded as `observed` (and `clamped` when it differs), as for any typed option, because a limit of the element can legitimately
+  change what the control holds.
+- An empty comment text means select all and delete by keys, and the read back must be empty.
+
+## 31. The tree roots are expanded once at the start
+
+Classic crashed (access violation in `mmcndmgr.dll`) when the driver expanded Computer Configuration for the first time right after
+a save on the user side (case `A/User_Then_Machine`). The wait for an idle input queue (section 27) lowers the risk and does not remove it.
+
+- For a case run by the matrix runner (every group except H) the ops file sets `expandRootsAtStart`. After classic started and before
+  the start snapshot and the first operation, the driver expands Computer Configuration and then User Configuration: wait idle,
+  expand the root item with the same call the tree resolution uses (expanding an expanded node is a no-op, so a later expand of
+  the same node does nothing), and wait until the root shows its children and the list of names stopped changing. Nothing deeper
+  is expanded (not Administrative Templates) and the selection is not changed.
+- Group H installs a bad template and must see classic's error UI through its own first operation (`dismissDialogs`), so it does
+  not use the warm-up. The hand-run `gpedit ops` command leaves the flag off unless the file sets it.
+- A dialog of classic is open at that point (an error box of the start). The warm-up neither expands nor dismisses it; the result
+  records that the warm-up was skipped and names the dialog, so the first operation sees the dialog as before.
+- The result file holds a `warmUp` object: per root the expand state before and after and the number of children, or the skip
+  reason, or the error.
+- The warm-up fails (no root item, no ExpandCollapse pattern, no children within the limit, classic exited). That is a start error
+  of the case: the result carries `startError`, the case is not complete, and when classic ended the matrix runner's one retry with
+  a fresh classic applies (matrix document, section 15). A failure is never ignored, because the case would then run on a classic
+  whose state is not the state the goldens assume.

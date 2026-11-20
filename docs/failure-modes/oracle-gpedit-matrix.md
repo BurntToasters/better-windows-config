@@ -1,6 +1,6 @@
 # Oracle gpedit matrix runner failure modes
 
-The matrix runner (`tools/Bwc.Oracle.Capture/Gpedit/Matrix`) is the one big capture of 0.2.0: groups A to H of the oracle plan, driven
+The matrix runner (`tools/Bwc.Oracle.Capture/Gpedit/Matrix`) is the one big capture of 0.2.0: groups A to H and K of the oracle plan, driven
 through the driver (`oracle-gpedit-driver.md`) inside `GpeditSession` (`oracle-gpedit-session.md`). Its tracked output is the golden set
 under `docs/parity/oracle/gpedit/goldens/` that the engine packages E3 and E4 and the replay tests G4 compare against byte for byte. This
 document lists every way the run can produce a wrong golden, lose work, or leave the machine changed, and what the code does about each.
@@ -10,7 +10,7 @@ Commands: `gpedit matrix [--only A,B,...] [--case <id>] [--resume] [--dry-run] [
 nothing and write nothing. A real run needs an elevated terminal on the VM desktop and a VM snapshot taken first.
 
 Vocabulary: a case is one named scenario with its own start state, one classic start, a list of driver operations and one golden folder.
-A group (A to H) is a list of cases. A step is one recorded point inside a case (a snapshot of the five GPO files after an operation).
+A group (A to H, K) is a list of cases. A step is one recorded point inside a case (a snapshot of the five GPO files after an operation).
 
 ## 1. The machine's real policy leaks into a golden
 
@@ -106,6 +106,9 @@ Group H installs a broken template next to the good fixture.
 - Each H case is its own session (own template set: the good fixture plus that one bad fixture). Templates are installed from the manifest
   and removed by the restore by hash (session document, section 8); a bad template never outlives its case.
 - The bad fixture folders contain no file name that collides with the good set. A collision makes the session refuse before any change.
+- Group K does the same with the edge fixtures (`fixture/edge/<Name>`: a valid template with one policy whose key has a leading or
+  trailing backslash): each case is its own session with the good fixture plus that one edge fixture, installed and removed like a
+  bad fixture. The three cases of one edge fixture share its template, not a session.
 - Other groups install only the good fixture.
 
 ## 9. Crafted start files not restored, or crafted files mistaken for real ones
@@ -130,6 +133,11 @@ A crash, Ctrl+C, a locked machine or a kill leaves some cases done.
 - Ctrl+C is checked between cases and inside every wait (the token). The group's session restores the machine, the run prints which
   cases are done, and exits with code 1.
 - A group whose cases are all done is skipped without starting a session.
+- The plan version is part of the plan hash. It was raised to 2 when the driver began to type multi-line text with key presses (a
+  comment set with `WM_SETTEXT` was never noticed by the dialog, driver document section 30), when `case.json` began to carry the
+  operations as data (section 19) and when the roots are expanded at the start (driver document section 31). The goldens of
+  version 1 hold bytes the old driver wrote, so `--resume` must not trust them: with version 2 every case is captured again. A
+  change of the version without a reason in this list is a mistake, because it throws away hours of capture.
 
 ## 11. Rerun of one group, and output overwritten by a failed rerun
 
@@ -184,6 +192,11 @@ Menu text, message box text, dialog captions, status bar text, header names and 
   (a crash or the watchdog) runs once more with a fresh, cold classic before it counts as failed. Only the second result counts, and
   the log line names the first failure. A failure while classic is still running (a missing node, a wrong value) is not retried,
   because it would fail the same way.
+- The crash is also made less likely by the start order: for every group except H the runner sets `expandRootsAtStart`, and the
+  driver expands Computer Configuration and User Configuration once before the first operation (driver document section 31).
+  Group H is left out because its first operation must see the error UI of the bad template. A warm-up that fails is a start error
+  of the case, so a classic that crashed during it is covered by the retry above; a warm-up that fails with classic still running
+  (no children, no pattern) is not retried and fails the case with its message.
 - A locked screen or secure desktop makes every operation fail; the run stops after three failed cases in a row in one group (the cause
   is then the machine, not the case) and says so.
 
@@ -210,3 +223,26 @@ Menu text, message box text, dialog captions, status bar text, header names and 
   background, so the crop is taken with the node not selected where the driver can arrange it, and the hash is only a lead for a person.
 - Toolbar, column widths, control rectangles and tab order come from UI Automation and window messages; a value the driver cannot read is
   recorded as `null` with the reason in the log, never guessed.
+
+## 19. Operations in `case.json` that engine tests cannot use
+
+The engine tests replay goldens, so `case.json` has to say what each operation was, as data, not only as a sentence. A sentence
+cannot be parsed back, and a policy found by its display name or an option found by its label says nothing about the ADMX policy or
+element it stands for.
+
+- Each entry of `ops` holds `op`: the whole operation as a JSON object, written with the options that the plan hash uses (camel case,
+  nulls left out). `plan`, the description sentence, stays. The plan hash is computed from the same serialization, so what a
+  replay reads is what decided the hash.
+- Three plan-only fields name the ADMX identity: `policyId` (the policy name), `policyNamespace` (the target namespace of the template
+  that defines it) and, on an option, `elementId`. The driver ignores them when it runs an operation. They are set from the fixture
+  data (`MatrixOps.Edit` from the policy, the option builders from the element), never typed by hand per case, so a case cannot name
+  a policy that the fixture does not have. A lookup by label or position resolves to the element before the id is set; an element
+  that cannot be found fails the build of the plan.
+- A missing id would give a golden that cannot be replayed. Plan validation reports an `editPolicy` operation without `policyId`
+  and `policyNamespace`, and an option without `elementId`, as a plan problem (`--dry-run` and `--list` print it and exit with an
+  error). Group H is exempt: it edits a stand-in policy for a template that does not load, so no id exists. Its ids stay unset.
+- The ids are strings of this repository (fixture ids), so they need no scrubbing and no text observed from classic is written into
+  `ops`. The case's `observed` part keeps going through the scrubber. The ops file reader accepts the new fields on `editPolicy`
+  and refuses them on every other kind, like any other field.
+- The edge fixtures of group K have a namespace of their own. It is read from the edge ADMX (`policyNamespaces/target`), not
+  assumed to be the namespace of the good fixture.

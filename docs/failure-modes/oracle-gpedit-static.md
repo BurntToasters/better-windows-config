@@ -170,3 +170,23 @@ The same tool and the same scripts also produce the regedit oracle, which other 
   `probe` step belongs to the capture tool. `scripts/oracle.js --tool gpedit --only resources` never starts it.
 - Nothing here elevates. The `probe` step needs administrator rights and drives GUI, so the manager runs it by
   hand, never a worker.
+
+## 14. The tracked index is written but is not valid JSON, or the one-line rewrite changes data
+
+`ResourceIndex.Serialize` takes the normal JSON text and puts every array of integers on one line with two regular
+expressions. The two expressions once lost their backslashes (`s+` instead of the whitespace class, a character class
+of `[`, `s`, `*` instead of the array pattern). The rewrite then replaced single letters in the output, the tracked
+file was written anyway and it was not valid JSON. Nothing in the run noticed, because the run only wrote the text.
+
+- The rewrite is cosmetic. It must never change data. Before the index is written, the tool parses the formatted text
+  and parses the unformatted `GoldenJson.Serialize(index)` text, and compares the two parsed values by content
+  (object property names and values, array order, number values).
+- The formatted text is not valid JSON, or the two parsed values differ: the tool throws before it writes anything,
+  so the tracked index keeps its previous content. It prints `error: ...` that names the check that failed and where
+  the first difference is, and exits with code 1. `scripts/oracle.js` stops the run and records the failed step.
+- The check runs before the first file of the run is written, so a failed check also leaves the untracked dumps of
+  the previous run untouched and a half updated output folder is not produced.
+- The error text names a path inside the JSON and the kind of difference only. It never prints a value, so a failure
+  cannot copy any text into a log by way of the index.
+- Check: `npm run oracle -- --tool gpedit --only resources` twice with equal `git hash-object` results, and a
+  `JSON.parse` of the tracked index that succeeds.

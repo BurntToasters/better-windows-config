@@ -318,14 +318,19 @@ internal sealed partial class PolicyDialog
     private static string Require(string? value, string field, OptionGroup group) =>
         value ?? throw new DriverException($"'{field}' does not apply to option '{group.Label}' ({group.Kind})");
 
-    // Sets edit text with WM_SETTEXT, moves focus to OK so a numeric edit validates, and reads the text again: observed can differ
-    // from requested (clamped to the range, or reset), which is the point of the numeric cases.
+    // Sets edit text, moves focus to OK so a numeric edit validates, and reads the text again: observed can differ from requested (clamped
+    // to the range, or reset), which is the point of the numeric cases. A single-line edit takes WM_SETTEXT unless the option says typed. A
+    // multi-line edit (ES_MULTILINE) is always typed with key presses: WM_SETTEXT sends it no EN_CHANGE, so the dialog would not notice the
+    // edit (failure mode 30 of the driver document). The edit inside a combo box has the style on the combo, not on the edit, so it is
+    // never counted as multi-line.
     private JsonObject SetEdit(OptionGroup group, string text, bool numeric, bool notifyCombo = false, bool typed = false)
     {
+        bool multiline = group.Kind != "comboBox" && (DriverNative.Style(group.Control) & DriverNative.EsMultiline) != 0;
+        bool keys = typed || multiline;
         string before = DriverNative.GetText(group.Control);
-        if (typed)
+        if (keys)
         {
-            TypeInto(group, text);
+            TypeInto(group.Control, $"the control of '{group.Label}'", text, multiline, requireCleared: multiline);
         }
         else
         {
@@ -340,46 +345,95 @@ internal sealed partial class PolicyDialog
         CommitFocus();
         string observed = DriverNative.GetText(group.Control);
         bool isNumeric = numeric && NumericKinds.Contains(group.Kind);
-        if (!isNumeric && !typed && !string.Equals(observed, text, StringComparison.Ordinal))
+        bool same = multiline
+            ? string.Equals(NormalizeBreaks(observed), NormalizeBreaks(text), StringComparison.Ordinal)
+            : string.Equals(observed, text, StringComparison.Ordinal);
+        if (!isNumeric && !keys && !same)
         {
             throw new DriverException($"the text of '{group.Label}' did not stick (asked '{text}', read '{observed}')");
         }
 
         return new JsonObject
         {
-            ["typed"] = typed,
+            ["typed"] = keys,
+            ["via"] = keys ? "keys" : "WM_SETTEXT",
+            ["multiline"] = multiline,
             ["requested"] = text,
             ["before"] = before,
             ["immediate"] = immediate,
             ["observed"] = observed,
-            ["clamped"] = !string.Equals(observed, text, StringComparison.Ordinal),
+            ["clamped"] = !same,
         };
     }
 
-    // Real key presses, as a user types: the edit limit (maxLength) applies to typed text and not to WM_SETTEXT. The control must have
-    // the keyboard focus, which is read back before any key is sent.
-    private void TypeInto(OptionGroup group, string text)
+    private static string NormalizeBreaks(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+
+    // Real key presses, as a user types: the edit limit (maxLength) applies to typed text and not to WM_SETTEXT, and a multi-line edit
+    // only tells the dialog about the edit when it is typed. The control must have the keyboard focus, which is read back before any key
+    // is sent. A multi-line text is split at any line break and Enter is pressed between the lines; before every line after the first the
+    // dialog must still be open (Enter can press its default button) and the focus must still be on the control. name is the control as
+    // the messages call it. requireCleared: after select all and delete the control must be empty. Failure mode 30 of the driver document.
+    private void TypeInto(IntPtr control, string name, string text, bool multiline, bool requireCleared)
     {
         DriverInput.RequireForeground(Hwnd, driver.Pid);
-        ProbeUia.Focus(AutomationElement.FromHandle(group.Control));
+        ProbeUia.Focus(AutomationElement.FromHandle(control));
         Thread.Sleep(200);
         AutomationElement? focused = AutomationElement.FocusedElement;
-        if (focused is null || focused.Current.NativeWindowHandle != group.Control.ToInt32())
+        if (focused is null || focused.Current.NativeWindowHandle != control.ToInt32())
         {
-            throw new DriverException($"the control of '{group.Label}' did not get the keyboard focus, so nothing was typed");
+            throw new DriverException($"{name} did not get the keyboard focus, so nothing was typed");
         }
 
         DriverInput.Chord(new[] { DriverInput.VkControl }, DriverInput.VkA);
         DriverInput.Key(DriverInput.VkDelete);
-        string[] lines = text.Split("\r\n");
+        if (requireCleared)
+        {
+            string left = DriverNative.GetText(control);
+            if (left.Length > 0)
+            {
+                throw new DriverException($"the old text of {name} ({left.Length} characters) was not removed by select all and delete, so nothing was typed");
+            }
+        }
+
+        string[] lines = multiline ? NormalizeBreaks(text).Split('\n') : text.Split("\r\n");
         for (int i = 0; i < lines.Length; i++)
         {
             if (i > 0)
             {
                 DriverInput.Key(ProbeInput.VkReturn);
+                RequireTypingTarget(control, name, afterEnter: true);
             }
 
             DriverInput.TypeText(lines[i]);
+        }
+
+        if (multiline)
+        {
+            RequireTypingTarget(control, name, afterEnter: lines.Length > 1);
+        }
+    }
+
+    // Nothing more is typed unless the setting dialog is open, the foreground window belongs to mmc and the focus is on the control.
+    private void RequireTypingTarget(IntPtr control, string name, bool afterEnter)
+    {
+        if (!IsOpen)
+        {
+            throw new DriverException(afterEnter
+                ? $"the setting dialog is no longer open after a typed Enter while {name} was typed: Enter pressed its default button. Nothing more was typed."
+                : $"the setting dialog is no longer open while {name} was typed. Nothing more was typed.");
+        }
+
+        IntPtr front = DriverNative.GetForegroundWindow();
+        if (front == IntPtr.Zero || DriverNative.ProcessOf(front) != (uint)driver.Pid)
+        {
+            throw new DriverException(
+                $"focus stolen while {name} was typed: the foreground window is 0x{front:X} '{ProbeWindows.ClassOf(front)}' '{ProbeWindows.TitleOf(front)}', not a window of mmc.exe (pid {driver.Pid}). No more keys were sent.");
+        }
+
+        AutomationElement? focused = AutomationElement.FocusedElement;
+        if (focused is null || focused.Current.NativeWindowHandle != control.ToInt32())
+        {
+            throw new DriverException($"the keyboard focus left {name} while it was typed. No more keys were sent.");
         }
     }
 

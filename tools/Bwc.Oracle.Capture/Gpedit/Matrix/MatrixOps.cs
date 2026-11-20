@@ -25,6 +25,8 @@ internal static class MatrixOps
             Root = root,
             Path = policy.NodePath,
             Policy = policy.DisplayName,
+            PolicyId = policy.Namespace.Length > 0 ? policy.Name : null,
+            PolicyNamespace = policy.Namespace.Length > 0 ? policy.Namespace : null,
             State = state,
             Comment = comment,
             Options = options,
@@ -55,6 +57,15 @@ internal static class MatrixOps
 
     internal static GpeditOp Shot(string name) => new() { Kind = "screenshot", Name = name };
 
-    internal static OptionSpec Text(string label, string text, string kind, bool typed = false) =>
-        new() { Label = label, Text = text, ExpectKind = kind, Typed = typed ? true : null };
+    // A text option found by its label; the element id comes from the policy's element with that label.
+    internal static OptionSpec Text(PolicyInfo policy, string label, string text, string kind, bool typed = false) =>
+        new()
+        {
+            Label = label,
+            Text = text,
+            ExpectKind = kind,
+            Typed = typed ? true : null,
+            ElementId = policy.Elements.SingleOrDefault(e => string.Equals(e.Label, label, StringComparison.Ordinal))?.Id
+                ?? throw new InvalidOperationException($"{policy.Name} has no single element labelled '{label}'"),
+        };
 }

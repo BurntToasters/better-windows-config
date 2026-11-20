@@ -39,6 +39,11 @@ internal static class OpsRunner
         {
             driver = GpeditDriver.Start(ctx, Path.Combine(outDir, name));
             root["pid"] = driver.Pid;
+            if (file.ExpandRootsAtStart)
+            {
+                WarmUp(driver, root, resultPath, ref failed, ok, skipped);
+            }
+
             driver.LastSnapshot = Snapshot(ctx.Paths, "start");
             root["liveRegistryAtStart"] = LiveRegistry.Read();
 
@@ -111,6 +116,27 @@ internal static class OpsRunner
 
         ctx.Log($"wrote {resultPath}: {ok} ok, {failed} failed, {skipped} skipped");
         return new RunSummary(ok, failed, skipped, resultPath);
+    }
+
+    // Expands both roots before the first operation (failure mode 31 of the driver document). A failure is a start error of the case: the
+    // result gets startError and the exception ends the run, so the matrix runner can retry a classic that ended (the driver is closed by
+    // the finally block of Run, which records whether classic was still there).
+    private static void WarmUp(GpeditDriver driver, JsonObject root, string resultPath, ref int failed, int ok, int skipped)
+    {
+        try
+        {
+            root["warmUp"] = driver.WarmUpRoots();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            string message = ex is DriverException ? ex.Message : ex.GetType().Name + ": " + ex.Message;
+            root["warmUp"] = new JsonObject { ["error"] = message };
+            root["startError"] = "expanding the tree roots at the start failed: " + message;
+            root["startEvidence"] = (ex as DriverException)?.Evidence?.DeepClone();
+            failed++;
+            Write(resultPath, root, ok, failed, skipped);
+            throw new DriverException("expanding the tree roots at the start failed: " + message, fatal: true, evidence: (ex as DriverException)?.Evidence?.DeepClone());
+        }
     }
 
     private static void Write(string path, JsonObject root, int ok, int failed, int skipped)

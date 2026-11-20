@@ -147,6 +147,88 @@ internal sealed partial class GpeditDriver
         return current;
     }
 
+    // Expands Computer Configuration and then User Configuration once, right after classic started and before any save, so no root is
+    // expanded for the first time after a save (classic crashed that way). Only the two root items are expanded, never Administrative
+    // Templates or anything deeper, and the selection is not changed. A dialog of classic that is open is neither dismissed nor worked
+    // around: that root is skipped and the reason recorded. A failure throws (a start error of the case). Failure mode 31 of the driver document.
+    internal JsonObject WarmUpRoots()
+    {
+        var roots = new JsonArray();
+        bool skipped = false;
+        foreach (string root in GpeditOp.Roots)
+        {
+            ctx.ThrowIfCancelled();
+            ThrowIfDead();
+            List<WinInfo> open = Dialogs();
+            if (open.Count > 0)
+            {
+                skipped = true;
+                roots.Add(new JsonObject
+                {
+                    ["root"] = RootName(root),
+                    ["skipped"] = true,
+                    ["reason"] = "a dialog of classic is open (" + string.Join("; ", open.Select(w => $"{Classify(w)}, class {w.Class}")) + "); the warm-up neither expands nor dismisses it",
+                });
+                continue;
+            }
+
+            roots.Add(WarmUpRoot(root));
+        }
+
+        return new JsonObject { ["skipped"] = skipped, ["roots"] = roots };
+    }
+
+    private JsonObject WarmUpRoot(string root)
+    {
+        DateTime start = DateTime.UtcNow;
+        string name = RootName(root);
+        AutomationElement item = ResolveNode(root, Array.Empty<string>(), null);
+        if (!item.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out object? pattern))
+        {
+            throw new DriverException($"the tree item '{name}' has no ExpandCollapse pattern, so it was not expanded at the start");
+        }
+
+        var expandCollapse = (ExpandCollapsePattern)pattern;
+        string before = expandCollapse.Current.ExpandCollapseState.ToString();
+        WaitIdle();
+        ProbeUia.Expand(item);
+
+        // The root is expanded when it shows children and the list of names stopped changing.
+        DateTime lastChange = DateTime.UtcNow;
+        List<string>? previous = null;
+        while (true)
+        {
+            ctx.ThrowIfCancelled();
+            ThrowIfDead();
+            var names = ChildItems(item).Select(ProbeUia.NameOf).ToList();
+            if (previous is null || !previous.SequenceEqual(names))
+            {
+                previous = names;
+                lastChange = DateTime.UtcNow;
+            }
+
+            if (names.Count > 0 && (DateTime.UtcNow - lastChange).TotalMilliseconds >= 1500)
+            {
+                return new JsonObject
+                {
+                    ["root"] = name,
+                    ["stateBefore"] = before,
+                    ["stateAfter"] = expandCollapse.Current.ExpandCollapseState.ToString(),
+                    ["children"] = names.Count,
+                    ["ms"] = (int)(DateTime.UtcNow - start).TotalMilliseconds,
+                };
+            }
+
+            if ((DateTime.UtcNow - start).TotalSeconds >= 60)
+            {
+                throw new DriverException(
+                    $"'{name}' showed {(names.Count == 0 ? "no children" : "a child list that kept changing")} 60 s after it was expanded at the start (state before {before}, now {expandCollapse.Current.ExpandCollapseState})");
+            }
+
+            Thread.Sleep(300);
+        }
+    }
+
     // Selects the node, checks the selection by reading it back, and waits for the result list to settle.
     internal JsonObject SelectNode(string root, IReadOnlyList<string> path)
     {

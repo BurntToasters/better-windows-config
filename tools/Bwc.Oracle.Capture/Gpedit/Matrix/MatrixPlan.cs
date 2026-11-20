@@ -67,6 +67,11 @@ internal sealed class MatrixPlan
                 }
             }
 
+            for (int i = 0; i < c.Ops.Count; i++)
+            {
+                CheckIds(c, i);
+            }
+
             foreach (RecordedStep step in c.Steps)
             {
                 if (step.SnapshotOp < 0 || step.SnapshotOp >= c.Ops.Count || c.Ops[step.SnapshotOp].Kind != "snapshot")
@@ -93,6 +98,30 @@ internal sealed class MatrixPlan
             if (c.Description.Contains('\u2014'))
             {
                 Problems.Add($"{c.FullId}: the description holds an em dash");
+            }
+        }
+    }
+
+    // The engine tests replay goldens from case.json, so every editPolicy operation names the ADMX policy and the namespace of its template,
+    // and every option names its element. Group H edits a stand-in for a template that does not load and has no ids.
+    private void CheckIds(MatrixCase c, int index)
+    {
+        GpeditOp op = c.Ops[index];
+        if (op.Kind != "editPolicy" || c.Group == "H")
+        {
+            return;
+        }
+
+        if (string.IsNullOrEmpty(op.PolicyId) || string.IsNullOrEmpty(op.PolicyNamespace))
+        {
+            Problems.Add($"{c.FullId} op[{index}] editPolicy '{op.Policy}': policyId and policyNamespace must both be set");
+        }
+
+        for (int i = 0; i < (op.Options?.Count ?? 0); i++)
+        {
+            if (string.IsNullOrEmpty(op.Options![i].ElementId))
+            {
+                Problems.Add($"{c.FullId} op[{index}] editPolicy '{op.Policy}': options[{i}] has no elementId");
             }
         }
     }

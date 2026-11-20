@@ -83,6 +83,21 @@ internal static partial class MatrixGroups
         throw new InvalidDataException($"the edge fixture {dir} has no policy with a key attribute.");
     }
 
+    // The target namespace of the edge fixture's ADMX (policyNamespaces/target), which differs per edge fixture.
+    private static string EdgeNamespace(string dir)
+    {
+        foreach (string admx in Directory.GetFiles(dir, "*.admx"))
+        {
+            Match m = Regex.Match(File.ReadAllText(admx), "<target [^>]*\\bnamespace=\"([^\"]*)\"");
+            if (m.Success)
+            {
+                return System.Net.WebUtility.HtmlDecode(m.Groups[1].Value);
+            }
+        }
+
+        throw new InvalidDataException($"the edge fixture {dir} has no policyNamespaces/target namespace.");
+    }
+
     // A stand-in PolicyInfo for the edge fixture policy: the display names come from its ADML (strings EdgeRoot, EdgeCat and Pol_Edge).
     private static PolicyInfo EdgePolicy(string dir, string key)
     {
@@ -103,6 +118,7 @@ internal static partial class MatrixGroups
         return new PolicyInfo
         {
             Name = "Pol_Edge",
+            Namespace = EdgeNamespace(dir),
             Class = "Machine",
             DisplayName = StringOf("Pol_Edge"),
             Key = key,

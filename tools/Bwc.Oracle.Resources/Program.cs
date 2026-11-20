@@ -169,6 +169,8 @@ internal static class Program
 
         var msc = ConsoleFileParser.Parse(mscPath);
         IndexFile index = ResourceIndex.Build(golden, forms);
+        // Checked before anything is written: a failed check leaves every output file as it was.
+        string indexText = ResourceIndex.Serialize(index);
 
         Directory.CreateDirectory(outDir);
         string[] written =
@@ -189,7 +191,7 @@ internal static class Program
                 regenerate: "npm run oracle -- --tool gpedit --only resources"));
         WriteAtomic(written[2], GoldenJson.Serialize(forms));
         WriteAtomic(written[3], GoldenJson.Serialize(msc));
-        WriteAtomic(written[4], ResourceIndex.Serialize(index));
+        WriteAtomic(written[4], indexText);
 
         foreach (string path in written)
         {

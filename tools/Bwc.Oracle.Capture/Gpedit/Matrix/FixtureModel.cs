@@ -58,6 +58,10 @@ internal sealed class PolicyInfo
 {
     internal string Name { get; init; } = string.Empty;
 
+    // The target namespace of the template that defines the policy (policyNamespaces/target in the ADMX). Empty for a stand-in policy of a
+    // template that does not load (group H); such an operation carries no policy id.
+    internal string Namespace { get; init; } = string.Empty;
+
     // Machine, User or Both
     internal string Class { get; init; } = string.Empty;
 
@@ -191,6 +195,12 @@ internal sealed class FixtureModel
 
         foreach (XDocument admx in documents)
         {
+            string templateNamespace = (string?)admx.Descendants(Ns + "policyNamespaces").Elements(Ns + "target").Attributes("namespace").FirstOrDefault() ?? string.Empty;
+            if (templateNamespace.Length == 0)
+            {
+                throw new InvalidDataException("an oracle fixture ADMX has no policyNamespaces/target namespace.");
+            }
+
             foreach (XElement policy in admx.Descendants(Ns + "policy"))
             {
                 string? parent = (string?)policy.Element(Ns + "parentCategory")?.Attribute("ref");
@@ -206,6 +216,7 @@ internal sealed class FixtureModel
                 model.Policies.Add(new PolicyInfo
                 {
                     Name = (string?)policy.Attribute("name") ?? string.Empty,
+                    Namespace = templateNamespace,
                     Class = (string?)policy.Attribute("class") ?? string.Empty,
                     DisplayName = Resolve((string?)policy.Attribute("displayName"), "string"),
                     Key = (string?)policy.Attribute("key") ?? string.Empty,
