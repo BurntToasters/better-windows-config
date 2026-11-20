@@ -360,6 +360,10 @@ middle of a run on the VM.
 - Ctrl+C sets the session cancellation token; the runner checks it between operations and inside waits
   and ends with a cancelled result file; the session restores the machine.
 - A dead mmc (`HasExited`) is fatal. The result file keeps everything recorded before it.
+- An expand that reaches classic while classic is still busy with a save can crash classic (seen: an access violation in
+  `mmcndmgr.dll` when Computer Configuration was expanded right after a user save). Before each tree expand the driver waits up to
+  30 s for classic's input queue to be idle (`WaitForInputIdle`). When the wait times out, the expand still runs and the result
+  records a note.
 
 ## 28. Screenshots and result files
 

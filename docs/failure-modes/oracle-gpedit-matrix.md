@@ -174,6 +174,16 @@ Menu text, message box text, dialog captions, status bar text, header names and 
 - Every operation has the driver's bounded waits. A hung call ends the case with an error, not the run.
 - `--list` prints an estimate per group (start time per case plus a per operation cost) and the total. It is an estimate for planning,
   never used by the code.
+- Cold start. The first classic start of a session (the fixture templates were just installed) and the first start after classic
+  crashed can take minutes before the console tree answers. Seen on the VM: 230 s in group A, 195 s plus 292 s in group B, and more
+  than 7 minutes right after a crash. UI Automation calls block for that time. A watchdog sized for a warm start then closed classic
+  in the middle of a case that would have finished. The watchdog gives the first case of a session, and every case run after a failed
+  case, 20 more minutes.
+- Classic crashes on its own. Seen on the VM: an access violation in `mmcndmgr.dll` (exception codes `c0000005`, then `c000041d`)
+  while the driver expanded Computer Configuration right after a user save. A case whose classic ended before the driver closed it
+  (a crash or the watchdog) runs once more with a fresh, cold classic before it counts as failed. Only the second result counts, and
+  the log line names the first failure. A failure while classic is still running (a missing node, a wrong value) is not retried,
+  because it would fail the same way.
 - A locked screen or secure desktop makes every operation fail; the run stops after three failed cases in a row in one group (the cause
   is then the machine, not the case) and says so.
 

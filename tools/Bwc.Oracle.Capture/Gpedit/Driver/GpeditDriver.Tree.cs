@@ -106,6 +106,28 @@ internal sealed partial class GpeditDriver
         }
     }
 
+    // Classic can crash when an expand arrives while it still handles a save, so each expand waits for its input queue to be idle first.
+    // Failure mode 27 in docs/failure-modes/oracle-gpedit-driver.md.
+    private void WaitIdle()
+    {
+        ThrowIfDead();
+        bool idle;
+        try
+        {
+            idle = mmc.WaitForInputIdle(30000);
+        }
+        catch (InvalidOperationException)
+        {
+            ThrowIfDead();
+            throw;
+        }
+
+        if (!idle)
+        {
+            Note("classic was not idle 30 s before a tree expand; the expand ran anyway");
+        }
+    }
+
     // The tree item of the node, with each parent expanded on the way. Expansion uses ExpandCollapse only.
     private AutomationElement ResolveNode(string root, IReadOnlyList<string> path, JsonArray? hops)
     {
@@ -115,6 +137,7 @@ internal sealed partial class GpeditDriver
         hops?.Add(ProbeUia.NameOf(current));
         foreach (string segment in new[] { RootName(root) }.Concat(path))
         {
+            WaitIdle();
             ProbeUia.Expand(current);
             current = WaitChild(current, segment, where);
             where += "/" + segment;
@@ -169,6 +192,7 @@ internal sealed partial class GpeditDriver
     internal JsonObject TreeChildren(string root, IReadOnlyList<string> path)
     {
         AutomationElement item = ResolveNode(root, path, null);
+        WaitIdle();
         ProbeUia.Expand(item);
         DateTime start = DateTime.UtcNow;
         DateTime lastChange = start;

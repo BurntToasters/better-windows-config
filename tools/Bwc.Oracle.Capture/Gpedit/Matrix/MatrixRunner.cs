@@ -12,6 +12,9 @@ internal sealed class MatrixRunner
     private const int MaxFailuresInARow = 3;
     private const long MinFreeBytes = 500L * 1024 * 1024;
 
+    // Extra watchdog time for a cold classic: the first case of a session and every case after a failed case (failure mode 15).
+    private const int ColdStartSeconds = 1200;
+
     private readonly RepoPaths repo;
     private readonly MatrixPlan plan;
     private readonly bool resume;
@@ -97,6 +100,7 @@ internal sealed class MatrixRunner
 
     private void RunCases(GpeditContext ctx, List<MatrixCase> cases)
     {
+        bool cold = true;
         for (int i = 0; i < cases.Count; i++)
         {
             MatrixCase c = cases[i];
@@ -123,7 +127,16 @@ internal sealed class MatrixRunner
             }
 
             ctx.Log($"[{c.FullId}] {c.Description}");
-            CaseOutcome outcome = RunOne(ctx, c, out double seconds);
+            CaseOutcome outcome = RunOne(ctx, c, cold, out double seconds, out bool classicEnded);
+            if (!outcome.Complete && classicEnded)
+            {
+                // Classic crashed or hung (failure mode 15): one more run with a fresh classic, sized for a cold start.
+                ctx.Log($"[{c.FullId}] classic ended before the case did ({outcome.Failure}); running the case once more with a fresh classic");
+                outcome = RunOne(ctx, c, true, out double again, out _);
+                seconds += again;
+            }
+
+            cold = !outcome.Complete;
             summary.Add(new JsonObject
             {
                 ["case"] = c.FullId,
@@ -164,8 +177,10 @@ internal sealed class MatrixRunner
         }
     }
 
-    private CaseOutcome RunOne(GpeditContext ctx, MatrixCase c, out double seconds)
+    // classicEnded: mmc was gone before the driver closed it (a crash, or the watchdog closed it).
+    private CaseOutcome RunOne(GpeditContext ctx, MatrixCase c, bool cold, out double seconds, out bool classicEnded)
     {
+        classicEnded = false;
         DateTime began = DateTime.UtcNow;
         string name = $"matrix-{c.Group}-{c.Id}";
         string resultPath = Path.Combine(ctx.Paths.OutputDir, "ops", name + ".result.json");
@@ -176,7 +191,7 @@ internal sealed class MatrixRunner
         {
             Console.WriteLine($"[{c.FullId}] taking too long, closing classic");
             StrayMmc.Close(startedLocal);
-        }, null, TimeSpan.FromSeconds((c.EstimatedSeconds * 4) + 180), Timeout.InfiniteTimeSpan);
+        }, null, TimeSpan.FromSeconds((c.EstimatedSeconds * 4) + 180 + (cold ? ColdStartSeconds : 0)), Timeout.InfiniteTimeSpan);
         try
         {
             StrayMmc.Close(startedLocal);
@@ -210,6 +225,7 @@ internal sealed class MatrixRunner
             else
             {
                 JsonObject result = JsonNode.Parse(File.ReadAllText(resultPath))!.AsObject();
+                classicEnded = result["close"] is JsonObject close && close["alreadyExited"]?.GetValue<bool>() == true;
                 if (runError is not null && result["startError"] is null)
                 {
                     result["startError"] = runError;
