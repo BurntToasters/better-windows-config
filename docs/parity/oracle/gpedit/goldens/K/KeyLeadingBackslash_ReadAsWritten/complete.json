@@ -1,0 +1,10 @@
+{
+  "case": "K/KeyLeadingBackslash_ReadAsWritten",
+  "planHash": "7a1364741abd4b2ca3ebaf5e45b7ca2469843812d0a8de6a1cca80abf052cd9d",
+  "files": [
+    "Machine.Registry.pol",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.Registry.pol"
+  ]
+}
