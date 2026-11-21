@@ -290,7 +290,7 @@ public sealed class AppServicesTests
             // Real drag of the splitter to the right. The tree pane grows by the same number of DIPs.
             // The window must finish its first render before the splitter has real bounds to drag.
             _ = app.WaitFor(ListRow0, UiTimeout);
-            _ = app.WaitFor("TreeRow_0", UiTimeout);
+            _ = AppServicesSupport.WaitUntil(() => AnyTreeRow(app) is not null, UiTimeout);
             Thread.Sleep(800);
             AutomationElement? splitter = app.WaitFor(SplitterId, UiTimeout);
             if (splitter is null)
@@ -686,8 +686,25 @@ public sealed class AppServicesTests
         address.Focus();
         address.AsTextBox().Text = path;
         Keyboard.Type(VirtualKeyShort.ENTER);
-        _ = AppServicesSupport.WaitUntil(() => AddressText(app) == path, UiTimeout);
+        // The address bar shows the key under its Computer root, so the wait is for that full form of the path.
+        string shown = @"Computer\" + path;
+        _ = AppServicesSupport.WaitUntil(
+            () => string.Equals(AddressText(app), shown, StringComparison.OrdinalIgnoreCase) || AddressText(app) == path,
+            UiTimeout);
         Thread.Sleep(300);
+    }
+
+    /// <summary>Any realized tree row. The first row is not realized once a deep key is selected.</summary>
+    private static AutomationElement? AnyTreeRow(RegeditProcess app)
+    {
+        try
+        {
+            return app.Window.FindFirstDescendant(cf => cf.ByControlType(ControlType.TreeItem));
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private static string AddressText(RegeditProcess app)

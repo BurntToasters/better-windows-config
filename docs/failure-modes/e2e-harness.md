@@ -651,6 +651,21 @@ counted, two calls from one line aggregate, a recorder failure does not escape, 
 nested wait is counted once, and the residual adds up and is never negative.
 `node scripts/e2e-timing-report.js --self-test` covers the report.
 
+## 47. Waits that never see their state, and blocking invokes (ST2)
+
+The ST0 timing record showed waits that always run to their timeout in a passing run, because the condition cannot be
+true, and one test that spends a minute inside a single UI Automation call. ST2 fixes the conditions and the call.
+No timeout of a wait for something to appear is shortened, no wait that proves an absence is touched, and no check
+id or check order changes.
+
+| Failure | Guard |
+| --- | --- |
+| A fixed wait condition passes early on a stale value, or never passes because it compares with a form the app does not show (the address bar shows `Computer\HKEY_...`, the test waits for `HKEY_...`; a menu of an expanded key is waited for with the names of a collapsed key; a tree row that is scrolled out of the realized rows is waited for by id; a row count of the whole list is waited for against the realized rows only) | The condition is changed to the state the app really reaches, with the same timeout and the same step after it. The old form is not dropped when the new one cannot be mistaken for an older state: the address wait accepts only the full `Computer\` form of the same path, which the initial `Computer` text cannot match. A wait that is a deliberate probe for an absent cell, row or element keeps its length. |
+| A non-blocking invoke returns before the command ran, and the caller reads the state at once | `EditingDriver.Invoke` still calls the UI Automation Invoke pattern, now on a background task, and waits for it up to a grace period (5 s). A command that returns inside the grace period behaves as before, including the click fallback when the invoke throws. Only a call that is still inside the command after the grace period (a command that shows a native modal window and does not return until it closes) is reported as invoked, and the callers of such a command already wait for the window they expect with their own timeout. |
+| The background invoke throws after the grace period and nobody sees it, or it blocks a pool thread for a long time | The task catches every exception, so it never becomes an unobserved task exception. A thread that is stuck in a modal call is released when the window closes or the process ends. |
+| A speed change in a drag test makes the drag less real, so a test that proves nothing happened passes without a drag | Only the approach to the start point is changed (the cursor is placed there instead of animated across the screen). The button press, the stepped move and the release are unchanged. |
+| A focus test never gets the focus it checks, because its key went in before the window took keyboard focus, and it checks the unfocused control after a full timeout | The test puts the focus in the tree pane first, as the sibling tests do, then sends the key. The check text is unchanged. |
+
 ## Verification artifact
 
 A successful harness run leaves `artifacts/e2e/result-<rid>-<flavor>.json` with schema 2, the run

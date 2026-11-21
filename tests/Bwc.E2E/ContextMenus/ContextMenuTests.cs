@@ -38,6 +38,19 @@ public sealed class ContextMenuTests
         "Copy Key Name",
     ];
 
+    // The same menu once the key is expanded: its first command reads Collapse.
+    private static readonly string[] ExpandedTreeMenuNames =
+    [
+        "Collapse",
+        "New",
+        "Find...",
+        "Delete",
+        "Rename",
+        "Export",
+        "Permissions...",
+        "Copy Key Name",
+    ];
+
     private static readonly string[] ValueMenuNames =
     [
         "Modify...",
@@ -176,7 +189,7 @@ public sealed class ContextMenuTests
 
         MenuSnapshot? newSnapshot = menus.RightClickForMenu(
             () => FindTreeRow(session, config.RunId),
-            TreeMenuNames);
+            ExpandedTreeMenuNames);
         bool newMenu = newSnapshot is not null;
         bool submenu = newMenu && menus.OpenSubmenu(516) && menus.WaitForItem(663) is not null;
         E2EGuards.RequireSandboxSelection(session, sandbox, "contextmenu.sandbox.newkey");
@@ -210,7 +223,7 @@ public sealed class ContextMenuTests
 
         MenuSnapshot? renameSnapshot = menus.RightClickForMenu(
             () => FindTreeRow(session, config.RunId),
-            TreeMenuNames);
+            ExpandedTreeMenuNames);
         bool renameMenu = renameSnapshot is not null;
         bool renameInvoked = renameMenu && menus.Invoke(914);
         bool treeRenameBox = renameInvoked && ControlTestSupport.WaitUntil(

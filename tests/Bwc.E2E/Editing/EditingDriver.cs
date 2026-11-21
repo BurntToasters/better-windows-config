@@ -17,6 +17,9 @@ internal sealed class EditingDriver : IDisposable
 {
     private static readonly TimeSpan UiTimeout = TimeSpan.FromSeconds(15);
 
+    // How long an Invoke call may run before the command counts as started and still running.
+    private static readonly TimeSpan InvokeGrace = TimeSpan.FromSeconds(5);
+
     private readonly AppSession _session;
     private readonly UIA3Automation _automation;
 
@@ -52,7 +55,7 @@ internal sealed class EditingDriver : IDisposable
             {
                 if (element.Patterns.Invoke.IsSupported)
                 {
-                    element.Patterns.Invoke.Pattern.Invoke();
+                    InvokePattern(element);
                 }
                 else
                 {
@@ -63,6 +66,21 @@ internal sealed class EditingDriver : IDisposable
             {
                 element.Click();
             }
+        }
+    }
+
+    /// <summary>
+    /// Calls the Invoke pattern on a background task. A command that shows a native modal window does not return from
+    /// the call until the window closes, so the call is given a grace period and then counts as started. A call that
+    /// returns or throws inside the grace period behaves as a direct call, so the callers keep their click fallback.
+    /// </summary>
+    private static void InvokePattern(AutomationElement element)
+    {
+        Task call = Task.Run(() => element.Patterns.Invoke.Pattern.Invoke());
+        if (!call.Wait(InvokeGrace))
+        {
+            // The call is still inside the command. Its end, or its failure, is observed here and ignored.
+            _ = call.ContinueWith(static finished => _ = finished.Exception, TaskContinuationOptions.OnlyOnFaulted);
         }
     }
 
@@ -157,7 +175,7 @@ internal sealed class EditingDriver : IDisposable
         {
             if (element.Patterns.Invoke.IsSupported)
             {
-                element.Patterns.Invoke.Pattern.Invoke();
+                InvokePattern(element);
                 return true;
             }
         }

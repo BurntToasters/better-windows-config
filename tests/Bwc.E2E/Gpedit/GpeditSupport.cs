@@ -432,7 +432,17 @@ internal sealed class GpeditRun : IDisposable
         }
 
         // The list is rebuilt for the node; its row count is reported with the readout.
-        _ = ShellRun.WaitUntil(() => Int("Rows") == Rows().Count, TimeSpan.FromSeconds(8));
+        // A long list realizes only the rows in view, so the realized count stays below the readout. The list reports
+        // its whole row count through the grid pattern, and that count must match the readout.
+        _ = ShellRun.WaitUntil(
+            () =>
+            {
+                int total = Int("Rows");
+                int realized = Rows().Count;
+                return realized == total ||
+                    (realized > 0 && realized < total && ListElement?.Patterns.Grid.PatternOrDefault?.RowCount.ValueOrDefault == total);
+            },
+            TimeSpan.FromSeconds(8));
     }
 
     // ---- the list ---------------------------------------------------------------------------------

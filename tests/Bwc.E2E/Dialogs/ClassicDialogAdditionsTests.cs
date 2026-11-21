@@ -659,7 +659,8 @@ public sealed class ClassicDialogAdditionsTests
     /// <summary>Presses the left button at <paramref name="from"/> and moves the pointer by the offset in steps.</summary>
     private static void DragBy(System.Drawing.Point from, int dx, int dy)
     {
-        Mouse.MoveTo(from);
+        // The approach has no button down, so the cursor is placed on the corner. The press and the move are real.
+        Mouse.Position = from;
         Thread.Sleep(150);
         Mouse.Down(MouseButton.Left);
         const int steps = 12;
