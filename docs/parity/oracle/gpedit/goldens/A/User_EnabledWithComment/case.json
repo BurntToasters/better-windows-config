@@ -1,8 +1,8 @@
 {
   "case": "A/User_EnabledWithComment",
   "description": "first save: Enabled with a comment (user)",
-  "planVersion": 1,
-  "planHash": "064847b524abfeffe2b459dd055d30585bacbbae159459b325d8b078a57ccc51",
+  "planVersion": 2,
+  "planHash": "9f9a8c9df7f9e49d31afd2b5191c2d240960d2c578337e83b428e28f31f18736",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -14,6 +14,10 @@
       "kind": "snapshot",
       "label": "step start",
       "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
       "optional": null
     },
     {
@@ -21,6 +25,20 @@
       "kind": "editPolicy",
       "label": null,
       "plan": "editPolicy 'Class user flag' state Enabled comment press [OK] at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class user flag",
+        "state": "Enabled",
+        "comment": "bwc comment one",
+        "policyId": "Pol_Class_User",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
       "optional": null
     },
     {
@@ -28,6 +46,10 @@
       "kind": "snapshot",
       "label": "step saved",
       "plan": "snapshot  [step saved]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step saved"
+      },
       "optional": null
     }
   ],
@@ -162,7 +184,9 @@
             "set": "#c44bb2fd5169",
             "requested": "bwc comment one",
             "before": "",
-            "observed": "bwc comment one"
+            "observed": "bwc comment one",
+            "applyEnabledBefore": true,
+            "applyEnabledAfter": true
           }
         ],
         "afterSet": {

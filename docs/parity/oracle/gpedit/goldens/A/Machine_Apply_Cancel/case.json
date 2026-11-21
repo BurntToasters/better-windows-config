@@ -1,8 +1,8 @@
 {
   "case": "A/Machine_Apply_Cancel",
   "description": "first save by Apply, then Cancel of the dialog",
-  "planVersion": 1,
-  "planHash": "836d79b800c93999777a8f0dd725830cf22052b59b135e041ec86e6e3176235a",
+  "planVersion": 2,
+  "planHash": "3317d9b46499cc14b936d2e7d0061d009922b221acd60204c0dd241003cd3109",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -14,6 +14,10 @@
       "kind": "snapshot",
       "label": "step start",
       "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
       "optional": null
     },
     {
@@ -21,6 +25,23 @@
       "kind": "editPolicy",
       "label": null,
       "plan": "editPolicy 'Class machine flag' state Enabled press [Apply, Cancel] at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class machine flag",
+        "state": "Enabled",
+        "press": [
+          "Apply",
+          "Cancel"
+        ],
+        "policyId": "Pol_Class_Machine",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
       "optional": null
     },
     {
@@ -28,6 +49,10 @@
       "kind": "snapshot",
       "label": "step saved",
       "plan": "snapshot  [step saved]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step saved"
+      },
       "optional": null
     }
   ],

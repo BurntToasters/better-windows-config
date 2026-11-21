@@ -1,8 +1,8 @@
 {
   "case": "A/Machine_Disabled",
   "description": "first save: a machine policy Disabled",
-  "planVersion": 1,
-  "planHash": "a0867e24e6b0b917b5b3a2f5a07f39022552f3ee7d93502a882c3e1a7baff426",
+  "planVersion": 2,
+  "planHash": "40fff6ae1b96c0fd52f9fbb56447e32e6e6fad6e846db6e86480854074711616",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -14,6 +14,10 @@
       "kind": "snapshot",
       "label": "step start",
       "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
       "optional": null
     },
     {
@@ -21,6 +25,19 @@
       "kind": "editPolicy",
       "label": null,
       "plan": "editPolicy 'Class machine flag' state Disabled press [OK] at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class machine flag",
+        "state": "Disabled",
+        "policyId": "Pol_Class_Machine",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
       "optional": null
     },
     {
@@ -28,6 +45,10 @@
       "kind": "snapshot",
       "label": "step saved",
       "plan": "snapshot  [step saved]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step saved"
+      },
       "optional": null
     }
   ],

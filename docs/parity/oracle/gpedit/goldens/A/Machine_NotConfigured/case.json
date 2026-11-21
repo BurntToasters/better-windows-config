@@ -1,8 +1,8 @@
 {
   "case": "A/Machine_NotConfigured",
   "description": "OK on a Not Configured policy in an empty folder (does classic write anything)",
-  "planVersion": 1,
-  "planHash": "1086ce399c29ee5673af1639a4a68b832b4690988e7c5a800ef78e5962068a7f",
+  "planVersion": 2,
+  "planHash": "6f0240e6d91b0f5721ce9735173d23a36647e21ed6f28d9109ab1c473371a325",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -14,6 +14,10 @@
       "kind": "snapshot",
       "label": "step start",
       "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
       "optional": null
     },
     {
@@ -21,6 +25,22 @@
       "kind": "editPolicy",
       "label": null,
       "plan": "editPolicy 'Class machine flag' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class machine flag",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Class_Machine",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
       "optional": null
     },
     {
@@ -28,6 +48,10 @@
       "kind": "snapshot",
       "label": "step saved",
       "plan": "snapshot  [step saved]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step saved"
+      },
       "optional": null
     }
   ],

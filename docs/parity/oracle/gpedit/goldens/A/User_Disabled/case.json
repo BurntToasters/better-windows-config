@@ -1,8 +1,8 @@
 {
   "case": "A/User_Disabled",
   "description": "first save: a user policy Disabled",
-  "planVersion": 1,
-  "planHash": "8d1ea21a9d67ac1ab3bb4bea9bf1ab7559c169fd09cd0798013f167c84037b99",
+  "planVersion": 2,
+  "planHash": "43e0989d67fae7f6c042348701b23878a53fb7c349b2234914fc0585fd5df81d",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -14,6 +14,10 @@
       "kind": "snapshot",
       "label": "step start",
       "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
       "optional": null
     },
     {
@@ -21,6 +25,19 @@
       "kind": "editPolicy",
       "label": null,
       "plan": "editPolicy 'Class user flag' state Disabled press [OK] at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class user flag",
+        "state": "Disabled",
+        "policyId": "Pol_Class_User",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
       "optional": null
     },
     {
@@ -28,6 +45,10 @@
       "kind": "snapshot",
       "label": "step saved",
       "plan": "snapshot  [step saved]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step saved"
+      },
       "optional": null
     }
   ],

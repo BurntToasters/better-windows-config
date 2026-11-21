@@ -1,8 +1,8 @@
 {
   "case": "A/Machine_Then_User",
   "description": "empty folder, a machine save and then a user save",
-  "planVersion": 1,
-  "planHash": "970c8b9ca74b6b9b6fd2b5488f179b8e7d5fb6cf940bf444a5248098ad2a1b44",
+  "planVersion": 2,
+  "planHash": "1b1cbc380fc2ccab12b6e180a113c63c3d7e01f746d19adf606a14d1a762d837",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -14,6 +14,10 @@
       "kind": "snapshot",
       "label": "step start",
       "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
       "optional": null
     },
     {
@@ -21,6 +25,19 @@
       "kind": "editPolicy",
       "label": null,
       "plan": "editPolicy 'Class machine flag' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class machine flag",
+        "state": "Enabled",
+        "policyId": "Pol_Class_Machine",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
       "optional": null
     },
     {
@@ -28,6 +45,10 @@
       "kind": "snapshot",
       "label": "step machine",
       "plan": "snapshot  [step machine]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step machine"
+      },
       "optional": null
     },
     {
@@ -35,6 +56,19 @@
       "kind": "editPolicy",
       "label": null,
       "plan": "editPolicy 'Class user flag' state Enabled press [OK] at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class user flag",
+        "state": "Enabled",
+        "policyId": "Pol_Class_User",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
       "optional": null
     },
     {
@@ -42,6 +76,10 @@
       "kind": "snapshot",
       "label": "step user",
       "plan": "snapshot  [step user]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step user"
+      },
       "optional": null
     }
   ],

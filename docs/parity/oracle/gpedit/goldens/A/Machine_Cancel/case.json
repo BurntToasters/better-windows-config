@@ -1,8 +1,8 @@
 {
   "case": "A/Machine_Cancel",
   "description": "Cancel after choosing Enabled writes nothing",
-  "planVersion": 1,
-  "planHash": "fb88827a9f7f70dfffd332f2c8c082a21a4bfec4c827400beb99a016f2ac55d9",
+  "planVersion": 2,
+  "planHash": "ba03f922381a9d2cd809257b72cf85da126fc6d37e3714896e9ce0e61dd18e58",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -14,6 +14,10 @@
       "kind": "snapshot",
       "label": "step start",
       "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
       "optional": null
     },
     {
@@ -21,6 +25,22 @@
       "kind": "editPolicy",
       "label": null,
       "plan": "editPolicy 'Class machine flag' state Enabled press [Cancel] at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class machine flag",
+        "state": "Enabled",
+        "press": [
+          "Cancel"
+        ],
+        "policyId": "Pol_Class_Machine",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
       "optional": null
     },
     {
@@ -28,6 +48,10 @@
       "kind": "snapshot",
       "label": "step saved",
       "plan": "snapshot  [step saved]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step saved"
+      },
       "optional": null
     }
   ],

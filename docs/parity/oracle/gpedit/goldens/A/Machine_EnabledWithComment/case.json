@@ -1,8 +1,8 @@
 {
   "case": "A/Machine_EnabledWithComment",
   "description": "first save: Enabled with a comment (machine)",
-  "planVersion": 1,
-  "planHash": "0330e09d58a78759d70f05eb4b2a7580db834c35a2cd9b99f0c9fe174868ab4a",
+  "planVersion": 2,
+  "planHash": "c7f024dbc6518aa2a9102276bb69fbe57805b13a827c3d1a9981c682f3aa8dfc",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -14,6 +14,10 @@
       "kind": "snapshot",
       "label": "step start",
       "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
       "optional": null
     },
     {
@@ -21,6 +25,20 @@
       "kind": "editPolicy",
       "label": null,
       "plan": "editPolicy 'Class machine flag' state Enabled comment press [OK] at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class machine flag",
+        "state": "Enabled",
+        "comment": "bwc comment one",
+        "policyId": "Pol_Class_Machine",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
       "optional": null
     },
     {
@@ -28,6 +46,10 @@
       "kind": "snapshot",
       "label": "step saved",
       "plan": "snapshot  [step saved]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step saved"
+      },
       "optional": null
     }
   ],
@@ -162,7 +184,9 @@
             "set": "#c44bb2fd5169",
             "requested": "bwc comment one",
             "before": "",
-            "observed": "bwc comment one"
+            "observed": "bwc comment one",
+            "applyEnabledBefore": true,
+            "applyEnabledAfter": true
           }
         ],
         "afterSet": {

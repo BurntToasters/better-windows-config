@@ -1,8 +1,8 @@
 {
   "case": "A/Both_UnderUser_CommentOnly",
   "description": "first save: only a comment on a class Both policy under User Configuration",
-  "planVersion": 1,
-  "planHash": "a198cb5c78d531c44232e9270e82454d0aed5c213d1df3541494adce67546d6b",
+  "planVersion": 2,
+  "planHash": "039630e83bb8089cadad3ad7c9d64046140a594f3f90b031a29af197b9379200",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -14,6 +14,10 @@
       "kind": "snapshot",
       "label": "step start",
       "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
       "optional": null
     },
     {
@@ -21,6 +25,20 @@
       "kind": "editPolicy",
       "label": null,
       "plan": "editPolicy 'Class both flag' state Not Configured comment press [OK] at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class both flag",
+        "state": "Not Configured",
+        "comment": "bwc comment one",
+        "policyId": "Pol_Class_Both",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
       "optional": null
     },
     {
@@ -28,6 +46,10 @@
       "kind": "snapshot",
       "label": "step saved",
       "plan": "snapshot  [step saved]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step saved"
+      },
       "optional": null
     }
   ],
@@ -61,18 +83,36 @@
       "files": {
         "Machine.Registry.pol": null,
         "gpt.ini": {
-          "size": 11,
-          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+          "size": 26,
+          "sha256": "e64889db9424e16b10b89e1074319b15ce136d80602ce74e8c03745a9f460091"
         },
         "Machine.comment.cmtx": null,
-        "User.Registry.pol": null,
-        "User.comment.cmtx": null
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "9cd6754fc24742e757fee19d232a075785c3cd649a99f26348ebcfd3ef4fcbd2"
+        }
       },
-      "gptVersion": null,
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
       "listing": [
         {
           "path": "gpt.ini",
-          "size": 11
+          "size": 26
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 718
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 8
         }
       ]
     }
@@ -98,6 +138,13 @@
       "index": 1,
       "kind": "editPolicy",
       "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol",
+        "User\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 65536,
       "data": {
         "policy": "Class both flag",
         "before": {
@@ -137,7 +184,9 @@
             "set": "#c44bb2fd5169",
             "requested": "bwc comment one",
             "before": "",
-            "observed": "bwc comment one"
+            "observed": "bwc comment one",
+            "applyEnabledBefore": false,
+            "applyEnabledAfter": true
           }
         ],
         "afterSet": {
@@ -149,7 +198,7 @@
           "help": "A policy of class Both. It appears under Computer Configuration and under User Configuration and writes to the matching hive file of each.",
           "buttons": {
             "Apply": {
-              "enabled": false
+              "enabled": true
             },
             "OK": {
               "enabled": true
@@ -175,16 +224,29 @@
             "messageBoxes": [],
             "closed": true,
             "files": {
-              "changed": false,
-              "changedFiles": [],
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol",
+                "User\\comment.cmtx"
+              ],
               "groups": {
                 "machine": false,
-                "user": false,
-                "gptIni": false
+                "user": true,
+                "gptIni": true
               },
               "settleTimedOut": false,
-              "writes": {},
-              "gptVersionAfter": null
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1,
+                "User\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              }
             }
           }
         ],
@@ -198,14 +260,24 @@
       "state": {
         "Machine.Registry.pol": null,
         "gpt.ini": {
-          "size": 11,
-          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+          "size": 26,
+          "sha256": "e64889db9424e16b10b89e1074319b15ce136d80602ce74e8c03745a9f460091"
         },
         "Machine.comment.cmtx": null,
-        "User.Registry.pol": null,
-        "User.comment.cmtx": null
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "9cd6754fc24742e757fee19d232a075785c3cd649a99f26348ebcfd3ef4fcbd2"
+        }
       },
-      "gptVersion": null
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      }
     }
   ]
 }

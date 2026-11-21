@@ -1,8 +1,8 @@
 {
   "case": "A/Both_UnderUser_Enabled",
   "description": "first save: a class Both policy Enabled under User Configuration",
-  "planVersion": 1,
-  "planHash": "4f5bd7c30858c92184d1eab2aff95cb81783e364198ec2e142212cd4c155c9d5",
+  "planVersion": 2,
+  "planHash": "7cb5f865e0a3f9976dea6b4bc930838b8f299a52f5b20fdba84613e7b3833a21",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -14,6 +14,10 @@
       "kind": "snapshot",
       "label": "step start",
       "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
       "optional": null
     },
     {
@@ -21,6 +25,19 @@
       "kind": "editPolicy",
       "label": null,
       "plan": "editPolicy 'Class both flag' state Enabled press [OK] at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class both flag",
+        "state": "Enabled",
+        "policyId": "Pol_Class_Both",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
       "optional": null
     },
     {
@@ -28,6 +45,10 @@
       "kind": "snapshot",
       "label": "step saved",
       "plan": "snapshot  [step saved]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step saved"
+      },
       "optional": null
     }
   ],

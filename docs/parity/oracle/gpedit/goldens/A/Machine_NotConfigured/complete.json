@@ -1,6 +1,6 @@
 {
   "case": "A/Machine_NotConfigured",
-  "planHash": "1086ce399c29ee5673af1639a4a68b832b4690988e7c5a800ef78e5962068a7f",
+  "planHash": "6f0240e6d91b0f5721ce9735173d23a36647e21ed6f28d9109ab1c473371a325",
   "files": [
     "case.json",
     "gpt.ini",

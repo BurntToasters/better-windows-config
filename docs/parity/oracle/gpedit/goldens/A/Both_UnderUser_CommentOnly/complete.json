@@ -1,10 +1,14 @@
 {
   "case": "A/Both_UnderUser_CommentOnly",
-  "planHash": "a198cb5c78d531c44232e9270e82454d0aed5c213d1df3541494adce67546d6b",
+  "planHash": "039630e83bb8089cadad3ad7c9d64046140a594f3f90b031a29af197b9379200",
   "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
     "case.json",
     "gpt.ini",
     "step-01-start/gpt.ini",
+    "step-02-saved/User.Registry.pol",
+    "step-02-saved/User.comment.cmtx",
     "step-02-saved/gpt.ini"
   ]
 }
