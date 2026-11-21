@@ -458,3 +458,56 @@ what is clicked, typed, read or waited for changes.
   a screenshot name. Collecting it can itself fail while the tree is missing (the window is gone, a UIA call throws, the screenshot
   hangs). Every part is collected inside its own `try` and a failed part is recorded as an error text, so the original start error
   and its message are always the ones that are thrown. The message text is not changed.
+
+## 33. Where a tree hop spends its time, and a start that classic refuses
+
+A one-case run (`A/Machine_Enabled`, 71 s) showed two costs that section 32 could not explain. Both roots were already Expanded with three
+children, so the warm-up took its early return, and still each root took 8.2 s, all of it inside `ResolveNode` before the early-return check.
+The `nodeSelection` phase of the `editPolicy` operation took 29.9 s for 5 hops, about 6 s a hop, also for hops that were already expanded
+(no expand call). Note that `nodeSelection` is the whole of `SelectNode`: the hops, the select call, the wait for the selection to read
+back, the fixed 400 ms pause and the wait for the result list to settle. So the time may also sit outside the hops. This section makes the
+next run say which step it is, and teaches the driver one more start outcome. It does not change what is clicked, typed, read or waited for.
+
+Per-hop timing:
+
+- `ResolveNode` (and `FindTree`) record, per call and per hop, how long each step took: `FindTree`, `WaitIdle` (and whether it returned
+  idle), the expand (whether an expand call was made, which means the item was Collapsed; whether the bounded call timed out; the time to get
+  the pattern, to read the state and to call it), each `ChildItems` call, the `NameOf` reads and the number of `WaitChild` polls with the
+  time slept. `SelectNode` also records the time of its own steps after the hops: the select call, each `SelectedPath` read while waiting for
+  the selection, the 400 ms pause, the wait for the list to settle and the last `SelectedPath`. The warm-up root entry gets the same detail
+  under `resolve`, plus the time of its own child count and, on the slow path, of its expand and its polling.
+- Where it goes: a `hopPhases` array on the operation entry (one object per `ResolveNode` or `SelectNode` call, in the order they ran) and
+  `warmUp.roots[].resolve`. Never `data`, never `files`, never the `hops` array of `SelectNode` (which stays a list of names). The golden
+  builder copies `data` whole for most operation kinds and `hops` is the only one of these keys it drops by name, so a timing inside `data`
+  would reach a tracked golden. The driver therefore keeps the hop detail in a list of its own, which the runner copies into the entry next
+  to `phases`. The scrubber also drops `phases`, `hopPhases` and `timing` by name from anything it cleans, and the self test builds a
+  golden from a result that carries all three and from a `data` that carries `hopPhases`, and requires none of them in any file of the golden.
+- Measuring must not add or reorder a UI Automation call. The expand split uses the same `TryGetCurrentPattern`, state read and bounded call
+  as before, only with a stopwatch around each; the "was Expand called" answer comes from that same state read, not from a new one. The
+  per-call lists are capped (20 values, then a count and a total), so a long poll cannot make the result file huge.
+- A hop that throws (no such child, classic gone) still leaves its detail up to the failure, because it is added to the list before the
+  steps run and filled in as they end. Building the JSON is inside a `try`: a failure drops the hop detail and keeps the operation result.
+
+A start that classic refuses:
+
+- Seen: a Registry.pol with a key that has a leading backslash (written as the edge template spells it) makes classic show a `#32770` dialog
+  and no console tree. The first start evidence recorded `noConsoleTree` for it and the case failed on every `--resume`, but the refusal
+  is the answer for that case. A case can say its start files are crafted and so may be refused (`StartMayBeRefused` on the case, set for
+  every case built from crafted start files, which are the cases of group D and the read cases of group K). Cases that start from an empty
+  or normal GPO never say so, and for them a missing console tree stays a failed start.
+- The refusal is decided only when all of these hold after the 30 s wait for the tree has ended without a tree: the case allows it, mmc.exe
+  is alive, a last look for the tree finds none, and a visible top level window of the mmc process with class `#32770` and a non empty
+  rectangle exists. A timeout alone, or a missing tree with no such dialog, is still `no console tree within 30 seconds`. The class is
+  the test, never the dialog text, so the decision does not depend on the language of the VM.
+- A slow start that shows a transient dialog is not taken for a refusal: the 30 s wait is not shortened, a last look for the tree runs
+  before a dialog is accepted, and the same dialog window must still be visible, with the tree still missing, after the evidence and the
+  screenshots were taken (that takes a moment). A dialog that went away, or a tree that appeared, ends in the normal start error or the normal start.
+- The dialog is not dismissed before the evidence exists: first the window list, the main window's child classes, the texts of every
+  control of each such dialog (class and text) and the screenshots, then the flag. The dialog texts are Microsoft text and go into the
+  result file under `artifacts` only (section 29). Classic is then closed by the same `Close` a normal case ends with (message boxes
+  answered, other windows cancelled, then `WM_CLOSE`); the session restore and the runner's stray `mmc` close are still behind it.
+- The result gets `startRefused: true` and a `startRefusal` object (dialog classes, titles, control texts, screenshot names) and no
+  `startError`. The operations are reported `skipped: true` with a reason, never `ok: false`. The GroupPolicy files are read once more
+  after classic closed (`filesAfterRefusal`) so the golden can state whether they still equal the start files.
+- A refusal whose dialog window is the one this driver took for the main window (its title holds "Group Policy") is handled the same way,
+  because the check looks at every visible top level window of the process, not at `Dialogs()`, which leaves the main window out.

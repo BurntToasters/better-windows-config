@@ -33,6 +33,7 @@ internal sealed partial class GpeditDriver
     private IntPtr main;
     private AutomationElement? mainElement;
     private IntPtr lastListHwnd;
+    private bool allowStartRefusal;
 
     private GpeditDriver(GpeditContext ctx, Process mmc, string shotDir)
     {
@@ -62,22 +63,30 @@ internal sealed partial class GpeditDriver
 
     internal int TreeReadyMs { get; private set; }
 
+    // The hop detail of the operation that runs now (failure mode 33). The runner puts a new list here before each operation and
+    // copies it into the result entry next to `phases`; it never goes into an operation's data.
+    internal List<HopTimes> HopTimings { get; set; } = new();
+
+    // Set when the case allowed it and classic refused to open the GPO: a dialog and no console tree. The evidence of that moment, kept for
+    // the result file. Null for a normal start.
+    internal JsonObject? StartRefusal { get; private set; }
+
     // Starts classic gpedit through the session context (inherits elevation, pid recorded for the restore) and waits for its window.
-    internal static GpeditDriver Start(GpeditContext ctx, string shotDir)
+    internal static GpeditDriver Start(GpeditContext ctx, string shotDir, bool allowStartRefusal = false)
     {
         Directory.CreateDirectory(shotDir);
         Stopwatch sinceStart = Stopwatch.StartNew();
         Process process = ctx.StartMmc(ctx.Paths.GpeditMsc);
-        return Attach(ctx, process, shotDir, sinceStart);
+        return Attach(ctx, process, shotDir, sinceStart, allowStartRefusal);
     }
 
     // Takes over an mmc.exe that the session started (the Process returned by GpeditContext.StartMmc). The stopwatch, when given, started
     // before the process did.
-    internal static GpeditDriver Attach(GpeditContext ctx, Process process, string shotDir, Stopwatch? sinceStart = null)
+    internal static GpeditDriver Attach(GpeditContext ctx, Process process, string shotDir, Stopwatch? sinceStart = null, bool allowStartRefusal = false)
     {
         Directory.CreateDirectory(shotDir);
         sinceStart ??= Stopwatch.StartNew();
-        var driver = new GpeditDriver(ctx, process, shotDir);
+        var driver = new GpeditDriver(ctx, process, shotDir) { allowStartRefusal = allowStartRefusal };
         driver.WaitForMainWindow();
         driver.ClassicStartMs = (int)sinceStart.ElapsedMilliseconds;
         Stopwatch populated = Stopwatch.StartNew();
@@ -150,6 +159,14 @@ internal sealed partial class GpeditDriver
             TimeSpan.FromSeconds(30));
         if (tree is null)
         {
+            // A case with crafted start files may be refused by classic: a dialog and no console tree. Decided only after the wait above ran
+            // out, so the wait itself is unchanged (failure mode 33).
+            if (allowStartRefusal && ConfirmStartRefusal() is { } refusal)
+            {
+                StartRefusal = refusal;
+                return;
+            }
+
             throw new DriverException("no console tree within 30 seconds", fatal: true, evidence: CollectStartEvidence("noConsoleTree"));
         }
 
@@ -210,6 +227,85 @@ internal sealed partial class GpeditDriver
         }
 
         return evidence;
+    }
+
+    // Classic's process alive, no console tree on a last look, and a visible top level #32770 dialog of the process (the main window the driver
+    // holds can itself be that dialog, so every top level window is looked at, not Dialogs()). The dialog is not dismissed: the evidence and
+    // the screenshots come first, then the same dialog must still be there and the tree still missing, so a transient dialog of a slow
+    // start is not taken for a refusal. Null when it is not a refusal. Every part is collected inside a try.
+    private JsonObject? ConfirmStartRefusal()
+    {
+        long begun = Stopwatch.GetTimestamp();
+        List<WinInfo> dialogs;
+        try
+        {
+            dialogs = StartRefusalDialogs();
+        }
+        catch (Exception ex) when (ex is DriverException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
+
+        if (dialogs.Count == 0)
+        {
+            return null;
+        }
+
+        JsonObject evidence = CollectStartEvidence("noConsoleTree");
+        var seen = new JsonArray();
+        foreach (WinInfo dialog in dialogs)
+        {
+            var node = new JsonObject { ["window"] = ProbeWindows.ToJson(dialog), ["isMainWindow"] = dialog.Hwnd == main };
+            try
+            {
+                node["controls"] = new JsonArray(ProbeWindows.Children(dialog.Hwnd)
+                    .Select(c => (JsonNode?)new JsonObject { ["class"] = c.Class, ["text"] = c.Title, ["visible"] = c.Visible, ["id"] = Win32.GetDlgCtrlID(c.Hwnd) }).ToArray());
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                node["controlsError"] = ex.GetType().Name + ": " + ex.Message;
+            }
+
+            try
+            {
+                node["captured"] = CaptureWindow(dialog);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or ElementNotAvailableException)
+            {
+                node["capturedError"] = ex.GetType().Name + ": " + ex.Message;
+            }
+
+            seen.Add(node);
+        }
+
+        try
+        {
+            List<WinInfo> still = StartRefusalDialogs();
+            if (!dialogs.Any(d => still.Any(s => s.Hwnd == d.Hwnd)))
+            {
+                return null;
+            }
+        }
+        catch (Exception ex) when (ex is DriverException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
+
+        return new JsonObject
+        {
+            ["stage"] = "noConsoleTree",
+            ["dialogs"] = seen,
+            ["evidence"] = evidence,
+            ["confirmedAfterMs"] = HopTimes.Ms(begun),
+        };
+    }
+
+    // The dialogs that make this start a refusal right now; empty when mmc ended, the tree appeared or no such dialog is visible.
+    private List<WinInfo> StartRefusalDialogs()
+    {
+        bool alive = !mmc.HasExited;
+        bool treeFound = alive && (ProbeUia.OfType(Main(), ControlType.Tree).FirstOrDefault() ?? ProbeUia.OfClass(Main(), "SysTreeView32").FirstOrDefault()) is not null;
+        return RefusedStart.Dialogs(allowStartRefusal, alive, treeFound, alive ? ProbeWindows.TopLevel(mmc.Id) : new List<WinInfo>());
     }
 
     internal static AutomationElement? ById(AutomationElement root, string id) =>

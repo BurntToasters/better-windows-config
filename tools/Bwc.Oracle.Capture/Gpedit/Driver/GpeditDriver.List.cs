@@ -74,14 +74,14 @@ internal sealed partial class GpeditDriver
     }
 
     // True when two reads of the visible list's row names 400 ms apart agree before the limit.
-    private bool WaitListStable(TimeSpan limit)
+    private bool WaitListStable(TimeSpan limit, HopTimes? times = null)
     {
         DateTime end = DateTime.UtcNow + limit;
         string? previous = null;
         while (DateTime.UtcNow < end)
         {
             ctx.ThrowIfCancelled();
-            string signature = ListSignature();
+            string signature = times is null ? ListSignature() : times.Time("listSignature", () => ListSignature());
             if (signature == previous)
             {
                 return true;

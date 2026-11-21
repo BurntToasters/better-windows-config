@@ -31,6 +31,10 @@ Inside a case folder:
   `op.policyNamespace` is the target namespace of the template that defines it, and each entry of `op.options` has `elementId`, the ADMX
   element id (group H leaves them out: its policy is a stand-in for a template that does not load). `planVersion` 2 is the first
   version with `op`, with multi-line text typed by key presses and with both configuration roots expanded before the first operation.
+- A case with crafted start files can end because classic refused to open the GPO (a dialog and no console tree). Its folder then holds
+  `start/`, the five files as found after classic closed, and a `case.json` with `startRefused: true`, `startFilesUnchanged` (the files
+  equal the start files) and, per operation, only `skipped: true` and `startRefused: true`. It has one step, `after-refusal`. What the
+  dialog said is not tracked (it is in the untracked result file). `--resume` treats it as complete.
 - `complete.json`: written last; a folder without it is not a golden. It holds the plan hash that `--resume` compares.
 
 ## Privacy

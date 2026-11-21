@@ -8,7 +8,7 @@ namespace Bwc.Oracle.Capture.Gpedit.Session;
 // `gpedit selftest`: the session code against a sandbox folder under artifacts/oracle/gpedit/selftest/ and one HKCU key.
 // It never touches the real GroupPolicy, PolicyDefinitions or MMC state, never starts mmc.exe and needs no elevation.
 // Output: selftest.json, one pass or fail line per case (docs/failure-modes/oracle-gpedit-session.md, section 19).
-internal static class SelfTest
+internal static partial class SelfTest
 {
     private const string AdmxName = "BwcSelftest.admx";
     private const string AdmlName = "en-US\\BwcSelftest.adml";
@@ -249,6 +249,8 @@ internal static class SelfTest
             Expect(Throws(() => GpeditRegistry.Delete(new RegistryTarget(true, GpeditPaths.SelftestKey))), "the self test key under HKLM was not refused");
             Expect(!GpeditRegistry.Exists(paths.RegistryTargets[0]), "the self test key exists after a reset");
         });
+
+        MatrixCases(repo, paths, Case);
 
         var report = new JsonObject
         {

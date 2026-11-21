@@ -9,7 +9,7 @@ using Bwc.Oracle.Capture.Gpedit.Session;
 
 namespace Bwc.Oracle.Capture.Gpedit.Matrix;
 
-internal sealed record CaseOutcome(bool Complete, bool Changed, int OptionalFailures, string? Failure, List<string> ChangedFiles);
+internal sealed record CaseOutcome(bool Complete, bool Changed, int OptionalFailures, string? Failure, List<string> ChangedFiles, bool StartRefused = false);
 
 // Turns one case's driver result into the tracked golden folder: the five GPO files after each recorded step, the crafted start files, and
 // case.json (scrubbed). Written into a temp folder first and swapped in only when complete (failure modes 10, 11, 12, 17).
@@ -23,7 +23,9 @@ internal static class CaseOutput
 
     internal static string GoldensDir(RepoPaths repo) => Path.Combine(repo.Root, "docs", "parity", "oracle", "gpedit", "goldens");
 
-    internal static string CaseDir(RepoPaths repo, MatrixCase c) => Path.Combine(GoldensDir(repo), c.Group, c.DirName);
+    internal static string CaseDir(RepoPaths repo, MatrixCase c) => CaseDir(GoldensDir(repo), c);
+
+    internal static string CaseDir(string goldensDir, MatrixCase c) => Path.Combine(goldensDir, c.Group, c.DirName);
 
     // Machine\Registry.pol becomes Machine.Registry.pol; gpt.ini stays.
     internal static string GoldenName(string polName) => polName.Replace('\\', '.');
@@ -31,9 +33,11 @@ internal static class CaseOutput
     internal static string SafeStep(string label) => Regex.Replace(label, "[^A-Za-z0-9_.-]", "-");
 
     // A folder counts only with complete.json whose plan hash is the current one.
-    internal static bool IsComplete(RepoPaths repo, MatrixCase c)
+    internal static bool IsComplete(RepoPaths repo, MatrixCase c) => IsComplete(GoldensDir(repo), c);
+
+    internal static bool IsComplete(string goldensDir, MatrixCase c)
     {
-        string marker = Path.Combine(CaseDir(repo, c), "complete.json");
+        string marker = Path.Combine(CaseDir(goldensDir, c), "complete.json");
         if (!File.Exists(marker))
         {
             return false;
@@ -78,6 +82,38 @@ internal static class CaseOutput
         }
     }
 
+    // The driver saw classic refuse to open the GPO (a dialog and no console tree) for a case that allowed it.
+    internal static bool IsRefusedStart(JsonObject result) => result["startRefused"]?.GetValue<bool>() == true;
+
+    // A refusal is the observed result only for a case with crafted start files. Every operation must then be skipped (none ran without a
+    // console tree) and the files after classic closed must be there for the golden. A refusal anywhere else is a failed start.
+    private static bool EvaluateRefusal(MatrixCase c, JsonArray ops, JsonObject result, out string? why)
+    {
+        why = null;
+        if (!c.StartMayBeRefused)
+        {
+            why = "classic refused to start, and this case does not start from crafted files, so that is a failure";
+            return false;
+        }
+
+        if (result["filesAfterRefusal"]?["files"] is not JsonObject)
+        {
+            why = "classic refused to start, but the files after it closed were not read";
+            return false;
+        }
+
+        for (int i = 0; i < ops.Count; i++)
+        {
+            if (ops[i]?["skipped"]?.GetValue<bool>() != true)
+            {
+                why = $"operation {i} ({c.Ops[i].Kind}) is not reported skipped although classic refused to start";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     // Every operation must be ok, except the case's optional ones (their failure is an observation). Skipped operations never count.
     internal static bool Evaluate(MatrixCase c, JsonObject result, out int optionalFailures, out string? why)
     {
@@ -108,6 +144,11 @@ internal static class CaseOutput
             return false;
         }
 
+        if (IsRefusedStart(result))
+        {
+            return EvaluateRefusal(c, ops, result, out why);
+        }
+
         for (int i = 0; i < ops.Count; i++)
         {
             JsonObject entry = ops[i]!.AsObject();
@@ -135,9 +176,13 @@ internal static class CaseOutput
         return true;
     }
 
-    internal static CaseOutcome Write(RepoPaths repo, MatrixCase c, JsonObject result, Scrubber scrub, int optionalFailures)
+    internal static CaseOutcome Write(RepoPaths repo, MatrixCase c, JsonObject result, Scrubber scrub, int optionalFailures) =>
+        Write(GoldensDir(repo), c, result, scrub, optionalFailures);
+
+    internal static CaseOutcome Write(string goldensDir, MatrixCase c, JsonObject result, Scrubber scrub, int optionalFailures)
     {
-        string group = Path.Combine(GoldensDir(repo), c.Group);
+        bool refused = IsRefusedStart(result);
+        string group = Path.Combine(goldensDir, c.Group);
         Directory.CreateDirectory(group);
         string tmp = Path.Combine(group, c.DirName + ".tmp");
         string final = Path.Combine(group, c.DirName);
@@ -158,7 +203,22 @@ internal static class CaseOutput
             JsonArray ops = result["ops"]!.AsArray();
             var steps = new JsonArray();
             JsonObject? last = null;
-            for (int i = 0; i < c.Steps.Count; i++)
+            JsonObject? refusalFiles = refused ? result["filesAfterRefusal"]!.AsObject() : null;
+            if (refusalFiles is not null)
+            {
+                // The one recorded point of a refused case: the files as they were after classic closed.
+                steps.Add(new JsonObject
+                {
+                    ["number"] = 1,
+                    ["label"] = "after-refusal",
+                    ["folder"] = ".",
+                    ["files"] = WriteSnapshotFiles(tmp, refusalFiles),
+                    ["gptVersion"] = refusalFiles["gptVersion"]?.DeepClone(),
+                    ["listing"] = refusalFiles["listing"]?.DeepClone(),
+                });
+            }
+
+            for (int i = 0; refusalFiles is null && i < c.Steps.Count; i++)
             {
                 RecordedStep step = c.Steps[i];
                 JsonObject snapshot = ops[step.SnapshotOp]!["data"]!["snapshot"]!.AsObject();
@@ -182,6 +242,13 @@ internal static class CaseOutput
             }
 
             JsonObject caseJson = BuildCaseJson(c, result, scrub, steps, optionalFailures);
+            if (refusalFiles is not null)
+            {
+                // Booleans only: what classic said in its dialog stays in the untracked result file.
+                caseJson["startRefused"] = true;
+                caseJson["startFilesUnchanged"] = FilesEqualStart(c, refusalFiles);
+            }
+
             List<string> leaks = scrub.Leaks(caseJson["observed"]);
             if (leaks.Count > 0)
             {
@@ -217,7 +284,7 @@ internal static class CaseOutput
                 FileOps.DeleteTree(old);
             }
 
-            return new CaseOutcome(true, changedFiles.Count > 0, optionalFailures, null, changedFiles);
+            return new CaseOutcome(true, changedFiles.Count > 0, optionalFailures, null, changedFiles, refused);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or KeyNotFoundException or NullReferenceException or FormatException or InvalidOperationException or JsonException)
         {
@@ -233,6 +300,34 @@ internal static class CaseOutput
 
             return new CaseOutcome(false, false, optionalFailures, "golden not written: " + ex.Message, new List<string>());
         }
+    }
+
+    // The GroupPolicy files after the refusal hold exactly the start files and nothing else.
+    private static bool FilesEqualStart(MatrixCase c, JsonObject snapshot)
+    {
+        foreach (string name in PolFiles.Names)
+        {
+            JsonNode? file = snapshot["files"]?[name];
+            bool exists = file?["exists"]?.GetValue<bool>() == true;
+            StartFile? start = c.Start.Files.FirstOrDefault(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (start is null)
+            {
+                if (exists)
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
+            string expected = Convert.ToHexString(SHA256.HashData(start.Bytes)).ToLowerInvariant();
+            if (!exists || !string.Equals(file!["sha256"]?.GetValue<string>(), expected, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return (snapshot["listing"] as JsonArray)?.Count == c.Start.Files.Count;
     }
 
     private static void WriteBytes(string path, byte[] bytes)
@@ -321,7 +416,9 @@ internal static class CaseOutput
         JsonArray entries = result["ops"]!.AsArray();
         for (int i = 0; i < entries.Count; i++)
         {
-            observed.Add(Observe(c, i, entries[i]!.AsObject(), scrub));
+            observed.Add(IsRefusedStart(result)
+                ? new JsonObject { ["index"] = i, ["kind"] = c.Ops[i].Kind, ["ok"] = false, ["skipped"] = true, ["startRefused"] = true }
+                : Observe(c, i, entries[i]!.AsObject(), scrub));
         }
 
         return new JsonObject

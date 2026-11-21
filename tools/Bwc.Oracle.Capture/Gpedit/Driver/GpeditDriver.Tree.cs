@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using System.Windows.Automation;
 using Bwc.Oracle.Capture.Gpedit.Probe;
@@ -10,13 +11,68 @@ internal sealed partial class GpeditDriver
 {
     internal static string RootName(string root) => root == "User" ? "User Configuration" : "Computer Configuration";
 
-    internal AutomationElement FindTree() =>
-        ProbeUia.OfType(Main(), ControlType.Tree).FirstOrDefault()
-            ?? ProbeUia.OfClass(Main(), "SysTreeView32").FirstOrDefault()
-            ?? throw new DriverException("no console tree control found");
+    internal AutomationElement FindTree() => FindTree(null);
+
+    // The same two lookups in the same order as ever; times, when given, only has a stopwatch around them (failure mode 33).
+    private AutomationElement FindTree(HopTimes? times)
+    {
+        long start = Stopwatch.GetTimestamp();
+        try
+        {
+            AutomationElement? tree = ProbeUia.OfType(Main(), ControlType.Tree).FirstOrDefault();
+            if (tree is null)
+            {
+                if (times is not null)
+                {
+                    times.FindTreeViaClass = true;
+                }
+
+                tree = ProbeUia.OfClass(Main(), "SysTreeView32").FirstOrDefault();
+            }
+
+            return tree ?? throw new DriverException("no console tree control found");
+        }
+        finally
+        {
+            if (times is not null)
+            {
+                times.FindTreeMs = HopTimes.Ms(start);
+            }
+        }
+    }
 
     private static List<AutomationElement> ChildItems(AutomationElement parent) =>
         ProbeUia.OfType(parent, ControlType.TreeItem, TreeScope.Children);
+
+    private static List<AutomationElement> ChildItems(AutomationElement parent, HopStep? step)
+    {
+        long start = Stopwatch.GetTimestamp();
+        try
+        {
+            return ChildItems(parent);
+        }
+        finally
+        {
+            step?.AddChildItems(HopTimes.Ms(start));
+        }
+    }
+
+    // The names of the items, read one by one as always; the time of the reads goes to the step.
+    private static List<string> NamesOf(List<AutomationElement> items, HopStep? step)
+    {
+        long start = Stopwatch.GetTimestamp();
+        try
+        {
+            return items.Select(ProbeUia.NameOf).ToList();
+        }
+        finally
+        {
+            if (step is not null)
+            {
+                step.NameOfMs += HopTimes.Ms(start);
+            }
+        }
+    }
 
     // The selected node as its names from the first item (Local Computer Policy) down, or null when nothing is selected.
     internal List<string>? SelectedPath()
@@ -68,7 +124,7 @@ internal sealed partial class GpeditDriver
 
     // The direct child tree item with exactly this name. A node fills lazily after it is expanded: names are polled until the child
     // appears; the wait ends early when the list of names stopped changing (3 s, or 8 s while the node still shows no child).
-    private AutomationElement WaitChild(AutomationElement parent, string name, string where)
+    private AutomationElement WaitChild(AutomationElement parent, string name, string where, HopStep? step = null)
     {
         DateTime start = DateTime.UtcNow;
         DateTime lastChange = start;
@@ -77,8 +133,13 @@ internal sealed partial class GpeditDriver
         {
             ctx.ThrowIfCancelled();
             ThrowIfDead();
-            List<AutomationElement> items = ChildItems(parent);
-            var names = items.Select(ProbeUia.NameOf).ToList();
+            if (step is not null)
+            {
+                step.Polls++;
+            }
+
+            List<AutomationElement> items = ChildItems(parent, step);
+            List<string> names = NamesOf(items, step);
             for (int i = 0; i < names.Count; i++)
             {
                 if (string.Equals(names[i], name, StringComparison.Ordinal))
@@ -102,13 +163,18 @@ internal sealed partial class GpeditDriver
                     evidence: new JsonArray(names.Select(n => (JsonNode?)JsonValue.Create(n)).ToArray()));
             }
 
+            long slept = Stopwatch.GetTimestamp();
             Thread.Sleep(300);
+            if (step is not null)
+            {
+                step.SleptMs += HopTimes.Ms(slept);
+            }
         }
     }
 
     // Classic can crash when an expand arrives while it still handles a save, so each expand waits for its input queue to be idle first.
     // Failure mode 27 in docs/failure-modes/oracle-gpedit-driver.md.
-    private void WaitIdle()
+    private bool WaitIdle()
     {
         ThrowIfDead();
         bool idle;
@@ -126,22 +192,65 @@ internal sealed partial class GpeditDriver
         {
             Note("classic was not idle 30 s before a tree expand; the expand ran anyway");
         }
+
+        return idle;
     }
 
     // The tree item of the node, with each parent expanded on the way. Expansion uses ExpandCollapse only.
-    private AutomationElement ResolveNode(string root, IReadOnlyList<string> path, JsonArray? hops)
+    // times, when given, collects where each step of each hop spent its time (failure mode 33); it changes no call and no wait.
+    private AutomationElement ResolveNode(string root, IReadOnlyList<string> path, JsonArray? hops, HopTimes? times = null)
     {
-        AutomationElement tree = FindTree();
-        AutomationElement current = ChildItems(tree).FirstOrDefault() ?? throw new DriverException("the console tree has no root item");
-        string where = ProbeUia.NameOf(current);
-        hops?.Add(ProbeUia.NameOf(current));
+        AutomationElement tree = FindTree(times);
+        HopStep? rootStep = times?.NextHop("(root item)");
+        AutomationElement current;
+        string where;
+        try
+        {
+            current = ChildItems(tree, rootStep).FirstOrDefault() ?? throw new DriverException("the console tree has no root item");
+            long named = Stopwatch.GetTimestamp();
+            where = ProbeUia.NameOf(current);
+            hops?.Add(ProbeUia.NameOf(current));
+            if (rootStep is not null)
+            {
+                rootStep.NameOfMs += HopTimes.Ms(named);
+            }
+        }
+        finally
+        {
+            rootStep?.Finish();
+        }
+
         foreach (string segment in new[] { RootName(root) }.Concat(path))
         {
-            WaitIdle();
-            ProbeUia.Expand(current);
-            current = WaitChild(current, segment, where);
-            where += "/" + segment;
-            hops?.Add(segment);
+            HopStep? step = times?.NextHop(segment);
+            try
+            {
+                long idleStart = Stopwatch.GetTimestamp();
+                try
+                {
+                    bool idle = WaitIdle();
+                    if (step is not null)
+                    {
+                        step.WaitIdleReturnedIdle = idle;
+                    }
+                }
+                finally
+                {
+                    if (step is not null)
+                    {
+                        step.WaitIdleMs = HopTimes.Ms(idleStart);
+                    }
+                }
+
+                ProbeUia.Expand(current, 4000, step?.Expand);
+                current = WaitChild(current, segment, where, step);
+                where += "/" + segment;
+                hops?.Add(segment);
+            }
+            finally
+            {
+                step?.Finish();
+            }
         }
 
         return current;
@@ -182,20 +291,20 @@ internal sealed partial class GpeditDriver
     {
         DateTime start = DateTime.UtcNow;
         string name = RootName(root);
-        AutomationElement item = ResolveNode(root, Array.Empty<string>(), null);
-        if (!item.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out object? pattern))
-        {
-            throw new DriverException($"the tree item '{name}' has no ExpandCollapse pattern, so it was not expanded at the start");
-        }
-
-        var expandCollapse = (ExpandCollapsePattern)pattern;
-        string before = expandCollapse.Current.ExpandCollapseState.ToString();
+        var times = new HopTimes("warm-up " + name);
+        HopTimings.Add(times);
+        AutomationElement item = ResolveNode(root, Array.Empty<string>(), null, times);
+        ExpandCollapsePattern expandCollapse = times.Time("rootPattern", () =>
+            item.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out object? pattern)
+                ? (ExpandCollapsePattern)pattern!
+                : throw new DriverException($"the tree item '{name}' has no ExpandCollapse pattern, so it was not expanded at the start"));
+        string before = times.Time("rootState", () => expandCollapse.Current.ExpandCollapseState.ToString());
 
         // A root that is already Expanded and already shows a child needs no expand and no stability wait. Expanded alone is not enough:
         // classic can report it before the children are loaded, so a root without a child takes the full path below (failure mode 32).
         if (before == nameof(ExpandCollapseState.Expanded))
         {
-            int existing = ChildItems(item).Count;
+            int existing = times.Time("existingChildItems", () => ChildItems(item).Count);
             if (existing > 0)
             {
                 return new JsonObject
@@ -207,12 +316,14 @@ internal sealed partial class GpeditDriver
                     ["ms"] = (int)(DateTime.UtcNow - start).TotalMilliseconds,
                     ["skippedWait"] = true,
                     ["skippedWaitReason"] = "the root was already Expanded and showed " + existing + " child item(s) before the warm-up",
+                    ["resolve"] = times.ToJson(),
                 };
             }
         }
 
-        WaitIdle();
-        ProbeUia.Expand(item);
+        times.Time("waitIdle", () => WaitIdle());
+        var expandTiming = new ExpandTiming();
+        times.Time("expand", () => ProbeUia.Expand(item, 4000, expandTiming));
 
         // The root is expanded when it shows children and the list of names stopped changing.
         DateTime lastChange = DateTime.UtcNow;
@@ -221,7 +332,7 @@ internal sealed partial class GpeditDriver
         {
             ctx.ThrowIfCancelled();
             ThrowIfDead();
-            var names = ChildItems(item).Select(ProbeUia.NameOf).ToList();
+            List<string> names = times.Time("pollChildItemsAndNames", () => ChildItems(item).Select(ProbeUia.NameOf).ToList());
             if (previous is null || !previous.SequenceEqual(names))
             {
                 previous = names;
@@ -237,6 +348,8 @@ internal sealed partial class GpeditDriver
                     ["stateAfter"] = expandCollapse.Current.ExpandCollapseState.ToString(),
                     ["children"] = names.Count,
                     ["ms"] = (int)(DateTime.UtcNow - start).TotalMilliseconds,
+                    ["resolve"] = times.ToJson(),
+                    ["expandTiming"] = expandTiming.ToJson(),
                 };
             }
 
@@ -254,17 +367,21 @@ internal sealed partial class GpeditDriver
     internal JsonObject SelectNode(string root, IReadOnlyList<string> path)
     {
         var hops = new JsonArray();
-        AutomationElement item = ResolveNode(root, path, hops);
+        var times = new HopTimes("selectNode " + RootName(root) + "/" + string.Join("/", path));
+        HopTimings.Add(times);
+        AutomationElement item = ResolveNode(root, path, hops, times);
         string via = "SelectionItem";
-        if (!ProbeUia.Select(item))
+        if (!times.Time("select", () => ProbeUia.Select(item)))
         {
-            ProbeUia.Click(item, doubleClick: false);
+            times.Time("clickFallback", () => ProbeUia.Click(item, doubleClick: false));
             via = "mouse click";
         }
 
+        long waitStart = Stopwatch.GetTimestamp();
         List<string>? selected = ProbeUia.Wait(
-            () => SelectedPath() is { } p && PathMatches(p, root, path) ? p : null,
+            () => times.Time("selectedPathWhileWaiting", () => SelectedPath()) is { } p && PathMatches(p, root, path) ? p : null,
             TimeSpan.FromSeconds(6));
+        times.Record("waitForSelection", HopTimes.Ms(waitStart));
         if (selected is null)
         {
             List<string>? actual = SelectedPath();
@@ -272,9 +389,9 @@ internal sealed partial class GpeditDriver
                 $"the node was not selected (selected: '{string.Join("/", actual ?? new List<string>())}', wanted '{RootName(root)}/{string.Join("/", path)}')");
         }
 
-        Thread.Sleep(400);
-        bool stable = WaitListStable(TimeSpan.FromSeconds(8));
-        if (SelectedPath() is not { } after || !PathMatches(after, root, path))
+        times.Time("pause400", () => Thread.Sleep(400));
+        bool stable = times.Time("waitListStable", () => WaitListStable(TimeSpan.FromSeconds(8), times));
+        if (times.Time("selectedPathFinal", () => SelectedPath()) is not { } after || !PathMatches(after, root, path))
         {
             throw new DriverException("the tree selection moved away while the list was loading");
         }
@@ -294,16 +411,18 @@ internal sealed partial class GpeditDriver
     // The children of a node by name, without selecting it. The node is expanded; names are read until they stop changing.
     internal JsonObject TreeChildren(string root, IReadOnlyList<string> path)
     {
-        AutomationElement item = ResolveNode(root, path, null);
-        WaitIdle();
-        ProbeUia.Expand(item);
+        var times = new HopTimes("treeChildren " + RootName(root) + "/" + string.Join("/", path));
+        HopTimings.Add(times);
+        AutomationElement item = ResolveNode(root, path, null, times);
+        times.Time("waitIdle", () => WaitIdle());
+        times.Time("expand", () => ProbeUia.Expand(item));
         DateTime start = DateTime.UtcNow;
         DateTime lastChange = start;
         List<string>? previous = null;
         while (true)
         {
             ctx.ThrowIfCancelled();
-            var names = ChildItems(item).Select(ProbeUia.NameOf).ToList();
+            List<string> names = times.Time("pollChildItemsAndNames", () => ChildItems(item).Select(ProbeUia.NameOf).ToList());
             if (previous is null || !previous.SequenceEqual(names))
             {
                 previous = names;

@@ -246,3 +246,49 @@ element it stands for.
   and refuses them on every other kind, like any other field.
 - The edge fixtures of group K have a namespace of their own. It is read from the edge ADMX (`policyNamespaces/target`), not
   assumed to be the namespace of the good fixture.
+
+## 20. `--resume` decides before any setup, and a refusal by classic is an outcome
+
+`--resume` used to open the session of a group first and look at `complete.json` inside it, so every skipped case still cost a GroupPolicy
+backup, a template install, a restore and a verify, and held the GUI lock. This section replaces the "skipped without starting a
+session" line of section 10, which the code did not honour.
+
+Resume before setup:
+
+- With `--resume` the runner splits each group's cases into complete ones and the rest before it opens anything. A complete case logs
+  `[<id>] already complete, skipped (--resume)` and counts as skipped. A group (or, for H and K, a single case) with no case left opens
+  no session: no GUI lock, no backup, no manifest, no template install, no restore.
+- A group with at least one case left opens one session as before (H and K: one per case that is left), and the cases that run go through
+  the same backup, install, reset, run, restore and verify as before. The first case that runs in a session is still the cold one.
+- Without `--resume` nothing is skipped and every case runs. The preflight (elevation, desktop, no manifest, free templates, disk) still
+  runs once at the start of a real run, resume or not, so a stale manifest is still refused.
+- A skipped case never leaves a manifest or backup behind because no session ever existed for it. A case whose folder is complete but whose
+  plan hash differs from the current plan is not complete and runs.
+- The split is a function of the case list and a completeness test, and the runner can be given a fake session opener, so `gpedit selftest`
+  checks the decision (no session for a fully complete group, one session for a group with a case left, one per case for H and K, no
+  skip without `--resume`) without starting classic.
+
+A start refusal as the result:
+
+- Group K now also records that classic refuses a Registry.pol whose key has a leading backslash, written as the template spells it
+  (`K/KeyLeadingBackslash_ReadAsWritten`): classic shows a `#32770` error dialog and no console tree. Driver document section 33 says how
+  the driver decides this. For a case with crafted start files (the cases of group D and the read cases of group K) that refusal is the
+  observed result and the case is complete; for any other case it is a failed start, as before.
+- The golden of a refused case holds `start/` (the crafted files), `case.json` with `startRefused: true` and `startFilesUnchanged`
+  (whether the GroupPolicy files after classic closed equal the start files), the planned `ops`, and for each operation only
+  `skipped: true` and `startRefused: true`. It holds the five files as found after classic closed as the one step `after-refusal`. No
+  string read from classic is in it: the dialog texts, titles and control texts stay in the untracked result file (section 12).
+- `complete.json` is written as for any case, so `CaseOutput.IsComplete` and `--resume` treat the case as done and stop retrying it.
+- The log line says that classic refused to start and that this was recorded as the result; the summary entry has `startRefused: true`.
+
+What can go wrong, and the guard:
+
+| Risk | Guard |
+| --- | --- |
+| A slow start with a transient dialog is read as a refusal | The refusal needs the 30 s wait to end without a tree, a last tree lookup that finds none, a live mmc and the same visible `#32770` still there after the evidence was taken (driver document, section 33). |
+| A refusal on a normal case hides as success | Only a case built from crafted start files allows it. `Evaluate` fails a refused result for any other case, and the driver does not look for a refusal at all unless the case allows it. A refused result whose operations are not all `skipped` also fails. |
+| A refused case's golden is incomplete | The golden of a refused case is built by its own path: start files, the five files after close, `case.json`, `complete.json` written last, all in `<case>.tmp` first. The self test builds one and requires `complete.json`, `IsComplete` and the unchanged flag. |
+| A timing field reaches a golden | Timings live in `phases`, `hopPhases` and `timing` of the untracked result, never in `data`; the scrubber drops those keys by name; the self test scans a built golden for them. |
+| Dialog text reaches a tracked file | `case.json` of a refused case gets booleans, numbers and BWC text only; the golden self check (section 12) still runs; the self test builds a golden from a result with a marker text in the dialog and requires the marker in no file. |
+| Resume skips a case and leaves a manifest | No session is opened for a skipped case (see above); the self test counts the sessions. |
+| `--resume` retries a refused case forever | The refused golden is complete with the case's plan hash, so `IsComplete` is true. The plan hash is not changed by this section, so the 24 goldens already captured stay complete. |

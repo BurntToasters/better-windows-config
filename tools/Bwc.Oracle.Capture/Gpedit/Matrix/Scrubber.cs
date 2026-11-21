@@ -28,6 +28,8 @@ internal sealed partial class Scrubber
         "snapshot", "hex", "screenshot", "screenshotDialog", "notes", "evidence", "exception", "hwnd", "listHwnd", "tree", "uiaTexts", "uiaButtons",
         "beforeHashes", "afterHashes", "diff", "via", "selectedVia", "hops", "opened", "pid", "plan", "dpiAwareness", "className", "node",
         "gapPixels", "closedBy", "attributes", "epilogue", "epilogueError", "epilogueEvidence", "fileCheckError", "parts",
+        // Timings and refusal evidence live beside the data in the untracked result; if one ever ends up inside data it is still dropped.
+        "phases", "hopPhases", "timing", "startRefusal", "filesAfterRefusal",
     };
 
     private readonly HashSet<string> allowed;

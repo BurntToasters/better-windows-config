@@ -56,6 +56,11 @@ internal sealed class MatrixCase
     // Registry content is part of the observed state (group G).
     internal bool KeepRegistry { get; init; }
 
+    // The start files are crafted, so classic may refuse to open the GPO (a dialog and no console tree). That refusal is then the observed
+    // result of the case, not a failed start. Not part of the plan hash: it only changes how a refusal is judged, so the goldens already
+    // captured stay valid (docs/failure-modes/oracle-gpedit-matrix.md section 20).
+    internal bool StartMayBeRefused { get; init; }
+
     // The live registry under the BWC-Oracle keys must be empty at the start (always true after the reset; recorded for G).
     internal string FullId => Group + "/" + Id;
 
@@ -150,6 +155,7 @@ internal sealed class CaseBuilder
     private readonly HashSet<string> authored = new(StringComparer.Ordinal);
     private StartState start = StartState.Empty;
     private bool keepRegistry;
+    private bool startMayBeRefused;
 
     internal CaseBuilder(string group, string id, string description)
     {
@@ -161,6 +167,13 @@ internal sealed class CaseBuilder
     internal CaseBuilder StartWith(StartState state)
     {
         start = state;
+        return this;
+    }
+
+    // A refusal by classic to open the GPO is this case's observed result (crafted start files only).
+    internal CaseBuilder AllowStartRefusal()
+    {
+        startMayBeRefused = true;
         return this;
     }
 
@@ -240,6 +253,7 @@ internal sealed class CaseBuilder
             ExtraTemplates = templates,
             Authored = authored,
             KeepRegistry = keepRegistry,
+            StartMayBeRefused = startMayBeRefused,
         };
     }
 

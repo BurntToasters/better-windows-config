@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Windows.Automation;
@@ -232,14 +233,50 @@ internal static class ProbeUia
         return false;
     }
 
-    internal static bool Expand(AutomationElement element, int timeoutMs = 4000)
+    internal static bool Expand(AutomationElement element, int timeoutMs = 4000) => Expand(element, timeoutMs, null);
+
+    // The same calls in the same order as ever; timing, when given, only has a stopwatch around each (failure mode 33 of the driver document).
+    internal static bool Expand(AutomationElement element, int timeoutMs, ExpandTiming? timing)
     {
-        if (element.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out object? expand))
+        long start = Stopwatch.GetTimestamp();
+        bool hasPattern = element.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out object? expand);
+        if (timing is not null)
         {
-            var pattern = (ExpandCollapsePattern)expand;
-            if (pattern.Current.ExpandCollapseState == ExpandCollapseState.Collapsed)
+            timing.PatternMs = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+            timing.HasPattern = hasPattern;
+        }
+
+        if (hasPattern)
+        {
+            var pattern = (ExpandCollapsePattern)expand!;
+            start = Stopwatch.GetTimestamp();
+            ExpandCollapseState state = pattern.Current.ExpandCollapseState;
+            if (timing is not null)
             {
-                RunBounded(() => pattern.Expand(), timeoutMs);
+                timing.StateMs = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+                timing.State = state.ToString();
+            }
+
+            if (state == ExpandCollapseState.Collapsed)
+            {
+                start = Stopwatch.GetTimestamp();
+                try
+                {
+                    bool completed = RunBounded(() => pattern.Expand(), timeoutMs);
+                    if (timing is not null)
+                    {
+                        timing.Called = true;
+                        timing.TimedOut = !completed;
+                    }
+                }
+                finally
+                {
+                    if (timing is not null)
+                    {
+                        timing.Called = true;
+                        timing.CallMs = (long)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+                    }
+                }
             }
 
             return true;
@@ -248,18 +285,21 @@ internal static class ProbeUia
         return false;
     }
 
-    private static void RunBounded(Action action, int timeoutMs)
+    // False when the call was still running after timeoutMs (it is then treated as started).
+    private static bool RunBounded(Action action, int timeoutMs)
     {
         Task task = Task.Run(action);
         if (task.Wait(timeoutMs) is false)
         {
-            return;
+            return false;
         }
 
         if (task.IsFaulted)
         {
             throw task.Exception!.InnerException ?? task.Exception;
         }
+
+        return true;
     }
 
     internal static bool Collapse(AutomationElement element)
@@ -318,4 +358,34 @@ internal static class ProbeUia
 
         return sb.ToString();
     }
+}
+
+// What one ProbeUia.Expand call spent its time on: getting the pattern, reading the state, and the bounded Expand call itself.
+internal sealed class ExpandTiming
+{
+    internal bool HasPattern { get; set; }
+
+    internal string? State { get; set; }
+
+    // The item was Collapsed, so the bounded Expand call was made.
+    internal bool Called { get; set; }
+
+    internal bool TimedOut { get; set; }
+
+    internal long PatternMs { get; set; }
+
+    internal long StateMs { get; set; }
+
+    internal long CallMs { get; set; }
+
+    internal JsonObject ToJson() => new()
+    {
+        ["hasPattern"] = HasPattern,
+        ["state"] = State,
+        ["called"] = Called,
+        ["timedOut"] = TimedOut,
+        ["patternMs"] = PatternMs,
+        ["stateMs"] = StateMs,
+        ["callMs"] = CallMs,
+    };
 }

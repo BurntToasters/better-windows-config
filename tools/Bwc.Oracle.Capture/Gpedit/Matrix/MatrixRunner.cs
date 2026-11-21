@@ -15,6 +15,10 @@ internal sealed class MatrixRunner
     // Extra watchdog time for a cold classic: the first case of a session and every case after a failed case (failure mode 15).
     private const int ColdStartSeconds = 1200;
 
+    // Opens one session (backup, template install, body, restore, verify) and runs the body in it. GpeditSession.Run in a real run; the self
+    // test passes a counter instead, to check which cases open a session at all.
+    internal delegate void SessionOpener(string name, TemplateSet templates, Action<GpeditContext> body);
+
     private readonly RepoPaths repo;
     private readonly MatrixPlan plan;
     private readonly bool resume;
@@ -29,6 +33,12 @@ internal sealed class MatrixRunner
         this.plan = plan;
         this.resume = resume;
     }
+
+    // Whether a case's golden is complete with the current plan. The real check by default; the self test replaces it.
+    internal Func<MatrixCase, bool>? CompleteCheck { get; init; }
+
+    // Where the skip lines go. The console; the self test discards them.
+    internal Action<string> Log { get; init; } = Console.WriteLine;
 
     internal int Done { get; private set; }
 
@@ -65,16 +75,30 @@ internal sealed class MatrixRunner
             CaseOutput.Recover(repo, group);
         }
 
+        RunGroups(selected, GpeditSession.Run);
+        WriteSummary(paths);
+        return Failed > 0 || stopped ? 1 : 0;
+    }
+
+    // With --resume a complete case is skipped here, before any session: no GUI lock, no backup, no template install, no restore. A group
+    // (or, for H and K, a case) with nothing left opens no session at all (matrix document, section 20).
+    internal void RunGroups(IReadOnlyList<MatrixCase> selected, SessionOpener open)
+    {
         var groups = selected.GroupBy(c => c.Group).OrderBy(g => g.Key, StringComparer.Ordinal).ToList();
         foreach (IGrouping<string, MatrixCase> group in groups)
         {
+            List<MatrixCase> todo = Pending(group.ToList());
             if (stopped)
             {
-                NotRun += group.Count();
+                NotRun += todo.Count;
                 continue;
             }
 
-            List<MatrixCase> todo = group.ToList();
+            if (todo.Count == 0)
+            {
+                continue;
+            }
+
             if (group.Key is "H" or "K")
             {
                 foreach (MatrixCase c in todo)
@@ -85,17 +109,40 @@ internal sealed class MatrixRunner
                         continue;
                     }
 
-                    GpeditSession.Run("matrix-" + group.Key + "-" + c.Id, c.Templates(repo), ctx => RunCases(ctx, new List<MatrixCase> { c }));
+                    open("matrix-" + group.Key + "-" + c.Id, c.Templates(repo), ctx => RunCases(ctx, new List<MatrixCase> { c }));
                 }
             }
             else
             {
-                GpeditSession.Run("matrix-" + group.Key, FixtureTemplates.Load(repo), ctx => RunCases(ctx, todo));
+                open("matrix-" + group.Key, FixtureTemplates.Load(repo), ctx => RunCases(ctx, todo));
+            }
+        }
+    }
+
+    // The cases that still have to run. Without --resume that is every case. With it the complete ones are counted and logged as skipped.
+    private List<MatrixCase> Pending(List<MatrixCase> cases)
+    {
+        if (!resume)
+        {
+            return cases;
+        }
+
+        Func<MatrixCase, bool> isComplete = CompleteCheck ?? (c => CaseOutput.IsComplete(repo, c));
+        var pending = new List<MatrixCase>();
+        foreach (MatrixCase c in cases)
+        {
+            if (isComplete(c))
+            {
+                Skipped++;
+                Log($"matrix: [{c.FullId}] already complete, skipped (--resume)");
+            }
+            else
+            {
+                pending.Add(c);
             }
         }
 
-        WriteSummary(paths);
-        return Failed > 0 || stopped ? 1 : 0;
+        return pending;
     }
 
     private void RunCases(GpeditContext ctx, List<MatrixCase> cases)
@@ -109,13 +156,6 @@ internal sealed class MatrixRunner
             {
                 NotRun += cases.Count - i;
                 return;
-            }
-
-            if (resume && CaseOutput.IsComplete(repo, c))
-            {
-                Skipped++;
-                ctx.Log($"[{c.FullId}] already complete, skipped (--resume)");
-                continue;
             }
 
             if (!EnoughDisk(repo))
@@ -145,6 +185,7 @@ internal sealed class MatrixRunner
                 ["changedFiles"] = new JsonArray(outcome.ChangedFiles.Select(f => (JsonNode?)f).ToArray()),
                 ["optionalFailures"] = outcome.OptionalFailures,
                 ["failure"] = outcome.Failure,
+                ["startRefused"] = outcome.StartRefused,
                 ["seconds"] = (int)seconds,
             });
             if (outcome.Complete)
@@ -154,6 +195,11 @@ internal sealed class MatrixRunner
                 if (outcome.Changed)
                 {
                     Changed++;
+                }
+
+                if (outcome.StartRefused)
+                {
+                    ctx.Log($"[{c.FullId}] classic refused to start; that refusal is the recorded result of this case");
                 }
 
                 ctx.Log($"[{c.FullId}] done in {(int)seconds} s{(outcome.Changed ? "  CHANGED against the earlier golden: " + string.Join(", ", outcome.ChangedFiles) : string.Empty)}" +
@@ -207,7 +253,7 @@ internal sealed class MatrixRunner
             }
 
             // Group H installs a bad template and must see classic's error UI through its own first operation, so it is not warmed up.
-            var file = new OpsFile { Name = name, Description = c.Description, Ops = c.Ops, ExpandRootsAtStart = c.Group != "H" };
+            var file = new OpsFile { Name = name, Description = c.Description, Ops = c.Ops, ExpandRootsAtStart = c.Group != "H", StartMayBeRefused = c.StartMayBeRefused };
             OpsRunner.RunSummary? run = null;
             string? runError = null;
             try

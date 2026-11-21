@@ -36,26 +36,43 @@ internal static class OpsRunner
         int skipped = 0;
         GpeditDriver? driver = null;
         string? stopReason = null;
+        bool refused = false;
         try
         {
-            driver = GpeditDriver.Start(ctx, Path.Combine(outDir, name));
+            driver = GpeditDriver.Start(ctx, Path.Combine(outDir, name), file.StartMayBeRefused);
             root["pid"] = driver.Pid;
             var timing = new JsonObject { ["classicStartMs"] = driver.ClassicStartMs, ["treeReadyMs"] = driver.TreeReadyMs };
             root["timing"] = timing;
-            if (file.ExpandRootsAtStart)
+            if (driver.StartRefusal is { } refusal)
             {
-                var warmUpWatch = Stopwatch.StartNew();
-                try
+                // Classic refused to open the GPO: that is the observed result of a case with crafted start files. No warm-up and no operation
+                // can run without a console tree; they are reported skipped. The dialog is closed by the Close below, after its evidence.
+                refused = true;
+                root["startRefused"] = true;
+                root["startRefusal"] = refusal.DeepClone();
+                stopReason = "classic refused to start (a dialog of classic and no console tree), recorded as the result of this case";
+                ctx.Log("classic refused to start: a dialog and no console tree. The operations are skipped, the refusal is the result.");
+                Write(resultPath, root, ok, failed, skipped);
+            }
+            else
+            {
+                if (file.ExpandRootsAtStart)
                 {
-                    WarmUp(driver, root, resultPath, ref failed, ok, skipped);
+                    var warmUpWatch = Stopwatch.StartNew();
+                    driver.HopTimings = new List<HopTimes>();
+                    try
+                    {
+                        WarmUp(driver, root, resultPath, ref failed, ok, skipped);
+                    }
+                    finally
+                    {
+                        timing["warmUpMs"] = (int)warmUpWatch.ElapsedMilliseconds;
+                    }
                 }
-                finally
-                {
-                    timing["warmUpMs"] = (int)warmUpWatch.ElapsedMilliseconds;
-                }
+
+                driver.LastSnapshot = Snapshot(ctx.Paths, "start");
             }
 
-            driver.LastSnapshot = Snapshot(ctx.Paths, "start");
             root["liveRegistryAtStart"] = LiveRegistry.Read();
 
             for (int i = 0; i < file.Ops.Count; i++)
@@ -120,6 +137,19 @@ internal static class OpsRunner
                     root["close"] = new JsonObject { ["error"] = ex.Message };
                 }
 
+                if (refused)
+                {
+                    // After classic closed: the files the refusal left, so the golden can say whether they still equal the start files.
+                    try
+                    {
+                        root["filesAfterRefusal"] = Snapshot(ctx.Paths, "after refusal");
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        root["filesAfterRefusalError"] = ex.Message;
+                    }
+                }
+
                 root["finishedUtc"] = DateTime.UtcNow.ToString("O");
                 Write(resultPath, root, ok, failed, skipped);
             }
@@ -141,7 +171,7 @@ internal static class OpsRunner
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             string message = ex is DriverException ? ex.Message : ex.GetType().Name + ": " + ex.Message;
-            root["warmUp"] = new JsonObject { ["error"] = message };
+            root["warmUp"] = new JsonObject { ["error"] = message, ["hopPhases"] = HopTimingJson(driver) };
             root["startError"] = "expanding the tree roots at the start failed: " + message;
             root["startEvidence"] = (ex as DriverException)?.Evidence?.DeepClone();
             failed++;
@@ -185,6 +215,7 @@ internal static class OpsRunner
         DateTime started = DateTime.UtcNow;
         PhaseRecorder phases = new();
         driver.Phases = phases;
+        driver.HopTimings = new List<HopTimes>();
         JsonObject beforeSnapshot = driver.LastSnapshot ?? phases.Run("snapshotBefore", () => Snapshot(ctx.Paths, "before"));
         driver.LastSnapshot = beforeSnapshot;
         FileWatch watch = phases.Run("fileWatchBegin", () => FileWatch.Begin(ctx.Paths, beforeSnapshot));
@@ -277,15 +308,42 @@ internal static class OpsRunner
             }
         }
 
-        // Timings sit beside the data, never in it: the golden builder copies data whole for most kinds (failure mode 32).
+        // Timings sit beside the data, never in it: the golden builder copies data whole for most kinds (failure modes 32 and 33).
         if (phases.ToJson() is { } phaseJson)
         {
             entry["phases"] = phaseJson;
         }
 
+        if (HopTimingJson(driver) is { Count: > 0 } hopJson)
+        {
+            entry["hopPhases"] = hopJson;
+        }
+
         entry["ok"] = ok;
         entry["ms"] = (int)(DateTime.UtcNow - started).TotalMilliseconds;
         return entry;
+    }
+
+    // The hop detail of the operation that ran, as one array. Never throws: a failure drops it and the operation keeps its result.
+    private static JsonArray HopTimingJson(GpeditDriver driver)
+    {
+        var json = new JsonArray();
+        try
+        {
+            foreach (HopTimes times in driver.HopTimings)
+            {
+                if (times.ToJson() is { } one)
+                {
+                    json.Add(one);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            return new JsonArray();
+        }
+
+        return json;
     }
 
     private static void Fail(JsonObject entry, Exception ex, ref bool fatal, ref string? fatalReason)

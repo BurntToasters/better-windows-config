@@ -302,6 +302,12 @@ internal static partial class MatrixGroups
         // Group K reuses this with its own group letter and a lookup for its edge fixture policy; group D passes neither.
         Func<string, PolicyInfo> lookup = affectedPolicy ?? f.Policy;
         var builder = new CaseBuilder(group, id, description).StartWith(start);
+        if (start.Files.Count > 0)
+        {
+            // Crafted start files: classic may refuse to open the GPO, and that refusal is then the case's result (matrix document, section 20).
+            builder.AllowStartRefusal();
+        }
+
         builder.Mark("start");
         IEnumerable<string> roots = new[] { root }.Concat(alsoRoots ?? Array.Empty<string>());
         foreach (string r in roots)

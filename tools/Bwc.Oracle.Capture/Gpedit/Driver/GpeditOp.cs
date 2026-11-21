@@ -442,6 +442,11 @@ internal sealed record OpsFile
     // docs/failure-modes/oracle-gpedit-driver.md section 31). Off for a hand written file; the matrix runner turns it on except for group H.
     public bool ExpandRootsAtStart { get; init; }
 
+    // Classic may refuse to open a GPO built from crafted start files (a dialog and no console tree). When set, that refusal is recorded as the
+    // start outcome (startRefused) instead of a start error; the operations are then skipped. Off for hand written files and every case that
+    // starts from an empty or normal GPO (OpsRunner.Run, docs/failure-modes/oracle-gpedit-driver.md section 33).
+    public bool StartMayBeRefused { get; init; }
+
     internal static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
