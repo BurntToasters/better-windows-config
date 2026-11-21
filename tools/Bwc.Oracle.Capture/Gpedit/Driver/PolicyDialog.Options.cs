@@ -26,6 +26,12 @@ internal sealed class OptionGroup
     internal IntPtr Control { get; init; }
 
     internal NativeRect Rect { get; init; }
+
+    // How the state of a check box is read (failure mode 35 of the driver document).
+    internal CheckReader Reader { get; init; } = CheckReader.BmGetCheck;
+
+    // What the test for a check box saw on a BUTTON child: style, UI Automation answer. Untracked.
+    internal JsonObject? CheckEvidence { get; init; }
 }
 
 // Options pane of the setting dialog. The controls are created in code by classic, so they are found by what they are (an EDIT, a
@@ -36,12 +42,6 @@ internal sealed partial class PolicyDialog
     private static readonly string[] NumericKinds = { "decimalTextBox", "longDecimalTextBox", "spinner" };
 
     private static bool Has(WinInfo window, string className) => window.Class.Contains("." + className + ".", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsCheckStyle(uint style)
-    {
-        uint type = style & DriverNative.BsTypeMask;
-        return type is 2 or 3 or 5 or 6;
-    }
 
     private static bool IsPushStyle(uint style)
     {
@@ -70,7 +70,26 @@ internal sealed partial class PolicyDialog
             IntPtr control = IntPtr.Zero;
             string controlId = string.Empty;
             string className = child.Class;
-            if (Has(child, "BUTTON") && IsCheckStyle(DriverNative.Style(child.Hwnd)))
+            CheckReader? reader = null;
+            JsonObject? checkEvidence = null;
+            if (CheckBoxRead.IsButtonClass(child.Class))
+            {
+                uint buttonStyle = DriverNative.Style(child.Hwnd);
+                CheckUia? uia = CheckBoxRead.NeedsUia(child.Class, buttonStyle) ? ReadCheckUia(child.Hwnd) : null;
+                reader = CheckBoxRead.Judge(child.Class, buttonStyle, uia);
+                checkEvidence = new JsonObject
+                {
+                    ["buttonStyle"] = $"0x{buttonStyle:X8}",
+                    ["bsType"] = (int)(buttonStyle & DriverNative.BsTypeMask),
+                    ["ownerDraw"] = CheckBoxRead.IsOwnerDraw(buttonStyle),
+                    ["uiaControlType"] = uia?.ControlType,
+                    ["uiaHasToggle"] = uia?.HasToggle,
+                    ["panelIdHint"] = CheckBoxRead.PanelHint(GpeditDriver.IdOf(child.Hwnd)),
+                    ["reader"] = reader is { } chosen ? CheckBoxRead.ViaName(chosen) : null,
+                };
+            }
+
+            if (reader is not null)
             {
                 kind = "checkBox";
                 label = child.Title;
@@ -136,6 +155,8 @@ internal sealed partial class PolicyDialog
                 Container = child.Hwnd,
                 Control = control,
                 Rect = child.Rect,
+                Reader = reader ?? CheckReader.BmGetCheck,
+                CheckEvidence = checkEvidence,
             });
             if (kind != "staticText")
             {
@@ -144,6 +165,44 @@ internal sealed partial class PolicyDialog
         }
 
         return groups;
+    }
+
+    // UI Automation facts about an owner-drawn BUTTON. No answer (the window went away, the element is not available) is no evidence.
+    private static CheckUia? ReadCheckUia(IntPtr hwnd)
+    {
+        try
+        {
+            AutomationElement element = AutomationElement.FromHandle(hwnd);
+            ControlType type = element.Current.ControlType;
+            bool toggle = element.TryGetCurrentPattern(TogglePattern.Pattern, out _);
+            return new CheckUia(type == ControlType.CheckBox, toggle, type.ProgrammaticName);
+        }
+        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or ArgumentException
+            or System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
+    }
+
+    // The state of a check box in the BM_GETCHECK numbers (0 off, 1 on, 2 indeterminate). A check box that is not a native check style is read
+    // through TogglePattern; if the pattern is missing it falls back to BM_GETCHECK, which is unreliable for an owner-drawn button, and via says so.
+    private static int ReadCheckState(OptionGroup group, out string via)
+    {
+        if (group.Reader == CheckReader.TogglePattern)
+        {
+            AutomationElement button = AutomationElement.FromHandle(group.Control);
+            if (button.TryGetCurrentPattern(TogglePattern.Pattern, out object? toggle))
+            {
+                via = CheckBoxRead.ViaName(CheckReader.TogglePattern);
+                return CheckBoxRead.ToCheckState(((TogglePattern)toggle).Current.ToggleState);
+            }
+
+            via = CheckBoxRead.ViaName(CheckReader.BmGetCheck) + " (TogglePattern missing)";
+            return DriverNative.CheckState(group.Control);
+        }
+
+        via = CheckBoxRead.ViaName(CheckReader.BmGetCheck);
+        return DriverNative.CheckState(group.Control);
     }
 
     internal JsonArray ReadOptions(bool readLists)
@@ -170,6 +229,11 @@ internal sealed partial class PolicyDialog
             ["className"] = group.ClassName,
             ["rect"] = new JsonArray(group.Rect.Left, group.Rect.Top, group.Rect.Width, group.Rect.Height),
         };
+        if (group.CheckEvidence is not null)
+        {
+            node["checkEvidence"] = group.CheckEvidence.DeepClone();
+        }
+
         if (group.Control == IntPtr.Zero)
         {
             return node;
@@ -187,7 +251,8 @@ internal sealed partial class PolicyDialog
                 node["lines"] = new JsonArray(text.Split("\r\n").Select(l => (JsonNode?)JsonValue.Create(l)).ToArray());
                 break;
             case "checkBox":
-                node["checkState"] = DriverNative.CheckState(group.Control);
+                node["checkState"] = ReadCheckState(group, out string stateVia);
+                node["checkStateVia"] = stateVia;
                 break;
             case "dropdownList" or "comboBox":
                 List<string> items = DriverNative.ComboItems(group.Control);
@@ -439,7 +504,7 @@ internal sealed partial class PolicyDialog
 
     private JsonObject SetCheck(OptionGroup group, bool wanted)
     {
-        int before = DriverNative.CheckState(group.Control);
+        int before = ReadCheckState(group, out string readVia);
         string via = "none needed";
         if ((before == 1) != wanted)
         {
@@ -458,12 +523,14 @@ internal sealed partial class PolicyDialog
             Thread.Sleep(300);
         }
 
-        int observed = DriverNative.CheckState(group.Control);
+        int observed = ReadCheckState(group, out string afterVia);
+        readVia = JoinVia(readVia, afterVia);
         if ((observed == 1) != wanted)
         {
             DriverNative.Click(group.Control);
             Thread.Sleep(300);
-            observed = DriverNative.CheckState(group.Control);
+            observed = ReadCheckState(group, out string againVia);
+            readVia = JoinVia(readVia, againVia);
             via += " then BM_CLICK";
         }
 
@@ -472,8 +539,10 @@ internal sealed partial class PolicyDialog
             throw new DriverException($"the check box '{group.Label}' did not reach {wanted} (check state {observed})");
         }
 
-        return new JsonObject { ["requested"] = wanted, ["beforeCheckState"] = before, ["observedCheckState"] = observed, ["via"] = via };
+        return new JsonObject { ["requested"] = wanted, ["beforeCheckState"] = before, ["observedCheckState"] = observed, ["via"] = via, ["checkStateVia"] = readVia };
     }
+
+    private static string JoinVia(string all, string next) => all.Split(" then ").Contains(next) ? all : all + " then " + next;
 
     // Drop-down item by exact text (raw, with any ampersand) or by position. A drop-down list only takes an existing item.
     private JsonObject SetCombo(OptionGroup group, OptionSpec spec)

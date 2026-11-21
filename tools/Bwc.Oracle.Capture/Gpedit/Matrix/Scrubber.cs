@@ -30,6 +30,8 @@ internal sealed partial class Scrubber
         "gapPixels", "closedBy", "attributes", "epilogue", "epilogueError", "epilogueEvidence", "fileCheckError", "parts",
         // Timings and refusal evidence live beside the data in the untracked result; if one ever ends up inside data it is still dropped.
         "phases", "hopPhases", "timing", "startRefusal", "filesAfterRefusal",
+        // Which reader gave a check box state, and what the test for a check box saw (failure mode 35 of the driver document).
+        "checkStateVia", "checkEvidence",
     };
 
     private readonly HashSet<string> allowed;

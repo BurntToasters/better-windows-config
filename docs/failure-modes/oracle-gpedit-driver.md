@@ -571,3 +571,50 @@ operations) and `DistinctTabs` (a TabItem search over the main window, run by th
 is about 8 s a call. `ListCandidates` asks for the HeaderItem descendants of each visible list on every `VisibleList()` call, which runs
 in each poll of `WaitListStable` (inside every `SelectNode`) and of `FindPolicyRow`. Its cost on a list of several hundred rows was not
 measured.
+
+## 35. A Windows Forms check box that is not a native check style
+
+The first three cases that set a check box option (`B/Pol_Bool_TrueFalseValues`, `B/Pol_Bool_StringValues`, `B/Pol_Bool_TrueFalseLists`)
+stopped with `no option labelled 'Number check'. Labels found: '' (unknown)`. The recorded option was `kind: unknown`, label empty, panel id
+`checkBoxNumber check`, class `WindowsForms10.BUTTON.app.0.297b065_r40_ad1`. The check box is a direct child of the options panel with a
+BUTTON class, but its style is not one of the native check styles (BS_CHECKBOX, BS_AUTOCHECKBOX, BS_3STATE, BS_AUTO3STATE). A Windows Forms
+`CheckBox` whose `FlatStyle` is not `System` is created owner-drawn (BS_OWNERDRAW, type 0xB). `DiscoverOptions` then fell into the branch
+for a container, looked for STATIC, EDIT and COMBOBOX children, found none, and left kind and label empty. This section teaches the driver
+to recognize that control and to read its state. It changes no wait, timeout or sleep and no action sent to classic other than the check box
+path of `SetCheck`. A native check box is found, read and set exactly as before, and no UI Automation call is made for it.
+
+Recognition: a direct child with a BUTTON class is a check box when its style is a native check style (as before), or when its BS_ type is
+owner-draw and its UI Automation element (`AutomationElement.FromHandle`) has the control type CheckBox or supports `TogglePattern`. The
+label is the window text, as for a native check box. The decision is a pure function over plain values (class, style, control type, whether
+the toggle pattern exists) in `Driver/CheckBoxRead.cs`, covered by `gpedit selftest` before the code was written.
+
+Reading the state: a native check style keeps BM_GETCHECK. A check box recognized through UI Automation is read through
+`TogglePattern.Current.ToggleState`, mapped to the BM_GETCHECK numbers (Off 0, On 1, Indeterminate 2). `DescribeGroup` and all three reads of
+`SetCheck` (before, after, and the read-back after the extra click) use the same reader.
+
+What can go wrong and the guard of each:
+
+- The owner-drawn check box is not recognized (this failure). The guard is the recognition above. If a case still fails, the option keeps
+  `kind: unknown` and the evidence of the unknown option now holds the BUTTON style, the BS_ type, the UI Automation control type and
+  whether a toggle pattern exists (`checkEvidence`, untracked), so the next run says which of the tests failed instead of an empty label.
+- BM_GETCHECK is wrong for an owner-drawn button. Windows Forms draws the check mark itself and the native state of such a button is not
+  kept, so BM_GETCHECK can answer 0 for a checked box. The guard is the reader: a check box that is not a native check style is never read
+  with BM_GETCHECK while the toggle pattern exists. If the pattern is missing at a read, the reader falls back to BM_GETCHECK and says so in
+  `checkStateVia`, so a state read that way is known to be unreliable. `SetCheck` still fails when the read-back does not equal the wanted state.
+- A push button, a radio button or a check box of another kind is taken as a check box. An owner-drawn BUTTON is a check box only with the
+  UI Automation evidence (control type CheckBox or a toggle pattern). A push button has the type Button and no toggle pattern, a Windows Forms
+  radio button has RadioButton and no toggle pattern, so both stay as before (unknown, or handled by the container branch). The panel id
+  prefix `checkBox` is written into the evidence as a hint only and never decides. A UI Automation read that throws (window gone,
+  element not available) is "no evidence", so the child stays as before.
+- A toggle that did not take. `SetCheck` uses the toggle pattern first, as before, waits as before, reads the state with the same reader and,
+  if it is not the wanted state, clicks once and reads again, as before. The operation fails when the state is still not the wanted one. The
+  two readers are never mixed within one call, so a toggle cannot be judged by a reader that cannot see it. If the toggle pattern is missing
+  at the toggle, the fallback (BM_CLICK) is unchanged.
+- Three-state check boxes. Indeterminate is 2 for both readers and is kept as a value (`checkState: 2`), never turned into On or Off. The
+  test `state == 1` for "checked" is unchanged, so an indeterminate box is not checked and `SetCheck` toggles it when Checked is wanted. Whether a
+  toggle from Indeterminate lands on On or Off is decided by the read-back, not assumed.
+- A diagnostic field leaks into a golden. The reader name is written next to the state as `checkStateVia`, and the evidence as
+  `checkEvidence`. The `readOptions` data goes through the scrubber into the golden, so both keys are in the scrubber's drop list, as the
+  other diagnostics are. The golden holds `kind: "checkBox"`, the label and `checkState`, as for a native check box, and the self test builds
+  a golden from an option node that carries both keys and requires that neither text appears in it. The goldens already captured hold native
+  check boxes only and are not changed (the plan version and hash are not touched).
