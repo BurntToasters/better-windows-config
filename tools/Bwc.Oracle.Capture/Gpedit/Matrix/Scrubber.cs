@@ -32,6 +32,8 @@ internal sealed partial class Scrubber
         "phases", "hopPhases", "timing", "startRefusal", "filesAfterRefusal",
         // Which reader gave a check box state, and what the test for a check box saw (failure mode 35 of the driver document).
         "checkStateVia", "checkEvidence",
+        // What the test for the Show button of a list saw on each inner BUTTON (failure mode 36 of the driver document).
+        "pushEvidence",
     };
 
     private readonly HashSet<string> allowed;

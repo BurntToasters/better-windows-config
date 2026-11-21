@@ -32,6 +32,9 @@ internal sealed class OptionGroup
 
     // What the test for a check box saw on a BUTTON child: style, UI Automation answer. Untracked.
     internal JsonObject? CheckEvidence { get; init; }
+
+    // What the test for the Show button of a list saw on each inner BUTTON: style, UI Automation answer, verdict (failure mode 36). Untracked.
+    internal JsonArray? PushEvidence { get; init; }
 }
 
 // Options pane of the setting dialog. The controls are created in code by classic, so they are found by what they are (an EDIT, a
@@ -42,12 +45,6 @@ internal sealed partial class PolicyDialog
     private static readonly string[] NumericKinds = { "decimalTextBox", "longDecimalTextBox", "spinner" };
 
     private static bool Has(WinInfo window, string className) => window.Class.Contains("." + className + ".", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsPushStyle(uint style)
-    {
-        uint type = style & DriverNative.BsTypeMask;
-        return type is 0 or 1;
-    }
 
     internal List<OptionGroup> DiscoverOptions()
     {
@@ -72,6 +69,7 @@ internal sealed partial class PolicyDialog
             string className = child.Class;
             CheckReader? reader = null;
             JsonObject? checkEvidence = null;
+            JsonArray? pushEvidence = null;
             if (CheckBoxRead.IsButtonClass(child.Class))
             {
                 uint buttonStyle = DriverNative.Style(child.Hwnd);
@@ -107,7 +105,12 @@ internal sealed partial class PolicyDialog
                 label = inner.FirstOrDefault(d => Has(d, "STATIC") && d.Title.Length > 0)?.Title ?? string.Empty;
                 WinInfo? combo = inner.FirstOrDefault(d => Has(d, "COMBOBOX"));
                 WinInfo? edit = inner.FirstOrDefault(d => Has(d, "EDIT"));
-                WinInfo? push = inner.FirstOrDefault(d => Has(d, "BUTTON") && IsPushStyle(DriverNative.Style(d.Hwnd)));
+                WinInfo? push = null;
+                if (combo is null && edit is null)
+                {
+                    (push, pushEvidence) = FindPushButton(inner);
+                }
+
                 if (combo is not null)
                 {
                     uint style = DriverNative.Style(combo.Hwnd) & DriverNative.CbsMask;
@@ -157,6 +160,7 @@ internal sealed partial class PolicyDialog
                 Rect = child.Rect,
                 Reader = reader ?? CheckReader.BmGetCheck,
                 CheckEvidence = checkEvidence,
+                PushEvidence = pushEvidence,
             });
             if (kind != "staticText")
             {
@@ -165,6 +169,54 @@ internal sealed partial class PolicyDialog
         }
 
         return groups;
+    }
+
+    // The first inner BUTTON that is a push button: a native push style as ever, or an owner-drawn Windows Forms button that UI Automation says
+    // is a Button or offers Invoke and is not a check box (failure mode 36). The evidence lists every inner BUTTON that was looked at.
+    private static (WinInfo? Push, JsonArray? Evidence) FindPushButton(List<WinInfo> inner)
+    {
+        JsonArray? evidence = null;
+        foreach (WinInfo candidate in inner.Where(d => CheckBoxRead.IsButtonClass(d.Class)))
+        {
+            uint style = DriverNative.Style(candidate.Hwnd);
+            PushUia? uia = PushButtonRead.NeedsUia(candidate.Class, style) ? ReadPushUia(candidate.Hwnd) : null;
+            bool isPush = PushButtonRead.IsPush(candidate.Class, style, uia);
+            evidence ??= new JsonArray();
+            evidence.Add(new JsonObject
+            {
+                ["buttonStyle"] = $"0x{style:X8}",
+                ["bsType"] = (int)(style & DriverNative.BsTypeMask),
+                ["ownerDraw"] = CheckBoxRead.IsOwnerDraw(style),
+                ["uiaControlType"] = uia?.ControlType,
+                ["uiaHasInvoke"] = uia?.HasInvoke,
+                ["uiaHasToggle"] = uia?.HasToggle,
+                ["isPush"] = isPush,
+            });
+            if (isPush)
+            {
+                return (candidate, evidence);
+            }
+        }
+
+        return (null, evidence);
+    }
+
+    // UI Automation facts about an owner-drawn BUTTON that may be a push button. No answer is no evidence.
+    private static PushUia? ReadPushUia(IntPtr hwnd)
+    {
+        try
+        {
+            AutomationElement element = AutomationElement.FromHandle(hwnd);
+            ControlType type = element.Current.ControlType;
+            bool invoke = element.TryGetCurrentPattern(InvokePattern.Pattern, out _);
+            bool toggle = element.TryGetCurrentPattern(TogglePattern.Pattern, out _);
+            return new PushUia(type == ControlType.Button, invoke, type == ControlType.CheckBox, toggle, type.ProgrammaticName);
+        }
+        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or ArgumentException
+            or System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
     }
 
     // UI Automation facts about an owner-drawn BUTTON. No answer (the window went away, the element is not available) is no evidence.
@@ -232,6 +284,11 @@ internal sealed partial class PolicyDialog
         if (group.CheckEvidence is not null)
         {
             node["checkEvidence"] = group.CheckEvidence.DeepClone();
+        }
+
+        if (group.PushEvidence is not null)
+        {
+            node["pushEvidence"] = group.PushEvidence.DeepClone();
         }
 
         if (group.Control == IntPtr.Zero)
