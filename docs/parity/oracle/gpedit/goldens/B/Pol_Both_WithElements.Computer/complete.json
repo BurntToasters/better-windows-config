@@ -1,0 +1,22 @@
+{
+  "case": "B/Pol_Both_WithElements.Computer",
+  "planHash": "c5300251abf24deb3b24546db5af18e9234cfa4079e08f9a217c23352904c5bf",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/Machine.Registry.pol",
+    "step-01-enabled-defaults/Machine.comment.cmtx",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-enabled-alt1-value/Machine.Registry.pol",
+    "step-02-enabled-alt1-value/Machine.comment.cmtx",
+    "step-02-enabled-alt1-value/gpt.ini",
+    "step-03-disabled/Machine.Registry.pol",
+    "step-03-disabled/Machine.comment.cmtx",
+    "step-03-disabled/gpt.ini",
+    "step-04-not-configured/Machine.Registry.pol",
+    "step-04-not-configured/Machine.comment.cmtx",
+    "step-04-not-configured/gpt.ini"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "case": "B/Pol_Value_DisabledListOnly",
+  "planHash": "eb05592e5b01e7590e36a03e17c990cfd8e4380cd42adf0556cf224b7421f946",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/Machine.Registry.pol",
+    "step-01-enabled-defaults/Machine.comment.cmtx",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-disabled/Machine.Registry.pol",
+    "step-02-disabled/Machine.comment.cmtx",
+    "step-02-disabled/gpt.ini",
+    "step-03-not-configured/Machine.Registry.pol",
+    "step-03-not-configured/Machine.comment.cmtx",
+    "step-03-not-configured/gpt.ini"
+  ]
+}

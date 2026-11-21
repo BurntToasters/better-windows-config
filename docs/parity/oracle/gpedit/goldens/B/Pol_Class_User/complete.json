@@ -1,0 +1,19 @@
+{
+  "case": "B/Pol_Class_User",
+  "planHash": "0fdd49dc9ff1438dab624d302f78b50e0fae7faa155683aad6bc179e67dff63e",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/User.Registry.pol",
+    "step-01-enabled-defaults/User.comment.cmtx",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-disabled/User.Registry.pol",
+    "step-02-disabled/User.comment.cmtx",
+    "step-02-disabled/gpt.ini",
+    "step-03-not-configured/User.Registry.pol",
+    "step-03-not-configured/User.comment.cmtx",
+    "step-03-not-configured/gpt.ini"
+  ]
+}

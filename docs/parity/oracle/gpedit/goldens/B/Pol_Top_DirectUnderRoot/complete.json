@@ -1,0 +1,19 @@
+{
+  "case": "B/Pol_Top_DirectUnderRoot",
+  "planHash": "ce5a6b25b0612acb33b4b116bc693ffe4f733ed4bb712c4c87e99790518214c5",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/User.Registry.pol",
+    "step-01-enabled-defaults/User.comment.cmtx",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-disabled/User.Registry.pol",
+    "step-02-disabled/User.comment.cmtx",
+    "step-02-disabled/gpt.ini",
+    "step-03-not-configured/User.Registry.pol",
+    "step-03-not-configured/User.comment.cmtx",
+    "step-03-not-configured/gpt.ini"
+  ]
+}

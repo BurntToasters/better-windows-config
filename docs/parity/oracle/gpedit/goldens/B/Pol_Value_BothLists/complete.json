@@ -1,0 +1,19 @@
+{
+  "case": "B/Pol_Value_BothLists",
+  "planHash": "884064dd6b50c19d42e95d9f520687fb5fdda714ad7e536c556127ba898fb5c4",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/Machine.Registry.pol",
+    "step-01-enabled-defaults/Machine.comment.cmtx",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-disabled/Machine.Registry.pol",
+    "step-02-disabled/Machine.comment.cmtx",
+    "step-02-disabled/gpt.ini",
+    "step-03-not-configured/Machine.Registry.pol",
+    "step-03-not-configured/Machine.comment.cmtx",
+    "step-03-not-configured/gpt.ini"
+  ]
+}
