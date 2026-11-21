@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Bwc.E2E.ConsoleFrame;
@@ -706,7 +707,10 @@ internal sealed class GpeditDialog : IDisposable
 
     internal string Read(string key) => Readout().GetValueOrDefault(key, string.Empty);
 
-    internal bool WaitForReadout() => ShellRun.WaitUntil(() => Readout().ContainsKey("Policy"), TimeSpan.FromSeconds(5));
+    internal bool WaitForReadout(
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
+        ShellRun.WaitUntil(() => Readout().ContainsKey("Policy"), TimeSpan.FromSeconds(5), callerFile: callerFile, callerLine: callerLine);
 
     /// <summary>
     /// The rectangle of a control in DIP relative to the client
@@ -921,10 +925,16 @@ internal sealed class GpeditDialog : IDisposable
     }
 
     /// <summary>Closes the message box with Enter and waits until it is gone.</summary>
-    internal bool DismissMessage()
+    internal bool DismissMessage(
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         Press(VirtualKeyShort.RETURN);
-        return ShellRun.WaitUntil(() => Find("DialogMessage", 0.3) is null, TimeSpan.FromSeconds(8));
+        return ShellRun.WaitUntil(
+            () => Find("DialogMessage", 0.3) is null,
+            TimeSpan.FromSeconds(8),
+            callerFile: callerFile,
+            callerLine: callerLine);
     }
 
     internal string Screenshot(string name)
@@ -1087,7 +1097,10 @@ internal sealed class GpeditContents
 
     internal bool Cancel() => Press("buttonCancel");
 
-    internal bool WaitClosed() => ShellRun.WaitUntil(() => !IsOpen, TimeSpan.FromSeconds(8));
+    internal bool WaitClosed(
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
+        ShellRun.WaitUntil(() => !IsOpen, TimeSpan.FromSeconds(8), callerFile: callerFile, callerLine: callerLine);
 
     private bool Press(string id)
     {

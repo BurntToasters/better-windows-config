@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Bwc.E2E.Controls;
@@ -119,10 +120,18 @@ internal sealed class RegeditProcess : IDisposable
         }
     }
 
-    public AutomationElement? WaitFor(string automationId, TimeSpan timeout)
+    public AutomationElement? WaitFor(
+        string automationId,
+        TimeSpan timeout,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         AutomationElement? found = null;
-        _ = ControlTestSupport.WaitUntil(() => (found = Find(automationId)) is not null, timeout);
+        _ = ControlTestSupport.WaitUntil(
+            () => (found = Find(automationId)) is not null,
+            timeout,
+            callerFile: callerFile,
+            callerLine: callerLine);
         return found;
     }
 
@@ -298,8 +307,12 @@ internal static class AppServicesSupport
         return config.DataRootFor(scope);
     }
 
-    internal static bool WaitUntil(Func<bool> condition, TimeSpan timeout) =>
-        ControlTestSupport.WaitUntil(condition, timeout);
+    internal static bool WaitUntil(
+        Func<bool> condition,
+        TimeSpan timeout,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
+        ControlTestSupport.WaitUntil(condition, timeout, callerFile: callerFile, callerLine: callerLine);
 
     internal static void Kill(Process process)
     {

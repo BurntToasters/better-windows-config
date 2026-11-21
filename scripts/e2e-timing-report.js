@@ -3,16 +3,20 @@
 // The harness writes a top-level "timings" object into artifacts/e2e/result-<rid>-<flavor>.json (tests/Bwc.E2E/Harness/E2ETimings.cs).
 // docs/failure-modes/e2e-harness.md (section 46) and docs/failure-modes/quality-gate.md (TIME-1, TIME-2) list the cases.
 //
-// One file: ranks the tests, the sessions by executable and the wait call sites.
+// One file: ranks the tests, the tests with the most untimed time, the sessions by executable, the wait call sites,
+// the screenshot totals and the element lookup totals.
 // Two files: compares the total time, the time of each test and the check id sets. A check id of the first file that is
 // missing in the second is a removed or renamed check and fails the comparison. New ids are listed and allowed.
 // A file without "timings" (an older run) is not an error: it prints a note and still takes part in the check id comparison.
+// A file with timings from before the residual, capture and lookup fields skips those sections.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { isDirectExecutionOf } from "./direct-execution.mjs";
 
 const TOP_TESTS = 15;
 const TOP_WAITS = 10;
+const TOP_UNTIMED = 15;
+const TOP_CAPTURES = 10;
 const TOP_DELTAS = 15;
 
 const usage = `Usage:
@@ -20,7 +24,8 @@ const usage = `Usage:
   node scripts/e2e-timing-report.js <before.json> <after.json>
   node scripts/e2e-timing-report.js --self-test
 
-One file: ranks the slowest tests, the sessions by executable (count, start and close time) and the wait call sites.
+One file: ranks the slowest tests, the tests with the largest untimed time, the sessions by executable (count, start and
+close time), the wait call sites, the screenshot totals and the element lookup totals.
 Two files: compares the total time, the per test time and the check ids. A check id of <before> that is missing in
 <after> is listed and exits 1. New ids are listed and allowed.
 A file without a timings object prints a note and still takes part in the check id comparison.
@@ -56,6 +61,59 @@ export function rankTests(result, limit = TOP_TESTS) {
     .slice(0, limit);
 }
 
+// Tests with the largest untimedMs (duration minus waits, sessions and captures). A test without the field is left out,
+// so an older file gives an empty list.
+export function rankUntimed(result, limit = TOP_UNTIMED) {
+  if (!hasTimings(result)) {
+    return [];
+  }
+  return listOf(result.timings.tests)
+    .filter((test) => typeof test.untimedMs === "number")
+    .map((test) => ({
+      name: String(test.test ?? `${test.class}.${test.method}`),
+      untimedMs: test.untimedMs,
+      durationMs: numberOrZero(test.durationMs),
+      waitMs: numberOrZero(test.waitMs),
+      sessionMs: numberOrZero(test.sessionMs),
+      captureMs: numberOrZero(test.captureMs),
+      clamped: test.untimedClamped === true,
+    }))
+    .sort((a, b) => b.untimedMs - a.untimedMs || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+    .slice(0, limit);
+}
+
+// The screenshot totals and the slowest capture sites. Null when the file has no capture section.
+export function captureReport(result, limit = TOP_CAPTURES) {
+  if (!hasTimings(result) || !Array.isArray(result.timings.capture)) {
+    return null;
+  }
+  const sites = result.timings.capture
+    .map((row) => ({
+      site: `${row.file}:${row.line}`,
+      calls: numberOrZero(row.calls),
+      totalMs: numberOrZero(row.totalMs),
+      maxMs: numberOrZero(row.maxMs),
+      unsettled: numberOrZero(row.unsettled),
+    }))
+    .sort((a, b) => b.totalMs - a.totalMs || (a.site < b.site ? -1 : a.site > b.site ? 1 : 0));
+  return {
+    calls: sites.reduce((sum, row) => sum + row.calls, 0),
+    totalMs: sites.reduce((sum, row) => sum + row.totalMs, 0),
+    unsettled: sites.reduce((sum, row) => sum + row.unsettled, 0),
+    sites: sites.slice(0, limit),
+  };
+}
+
+// The element lookup counters, the largest total first. Null when the file has no lookups section.
+export function lookupReport(result) {
+  if (!hasTimings(result) || !Array.isArray(result.timings.lookups)) {
+    return null;
+  }
+  return result.timings.lookups
+    .map((row) => ({ name: String(row.name), calls: numberOrZero(row.calls), totalMs: numberOrZero(row.totalMs) }))
+    .sort((a, b) => b.totalMs - a.totalMs || (a.name < b.name ? -1 : 1));
+}
+
 // One row per executable: session count, time to the main window, time spent in Close, kills, sessions only disposed.
 export function rankSessionsByExe(result) {
   if (!hasTimings(result)) {
@@ -88,9 +146,50 @@ export function rankWaits(result, limit = TOP_WAITS) {
       totalMs: numberOrZero(wait.totalMs),
       maxMs: numberOrZero(wait.maxMs),
       timeouts: numberOrZero(wait.timeouts),
+      nestedCalls: numberOrZero(wait.nestedCalls),
     }))
     .sort((a, b) => b.totalMs - a.totalMs || (a.site < b.site ? -1 : a.site > b.site ? 1 : 0))
     .slice(0, limit);
+}
+
+function nestedText(wait) {
+  return wait.nestedCalls > 0 ? `, nested ${wait.nestedCalls}` : "";
+}
+
+// The untimed, capture and lookup sections shared by the report and the run summary. Empty for an older file.
+function residualLines(result, captureSites) {
+  const lines = [];
+  const untimed = rankUntimed(result);
+  if (untimed.length > 0) {
+    const totals = result.timings.totals ?? {};
+    lines.push(
+      "",
+      `Largest untimed time (top ${TOP_UNTIMED}; duration minus waits, sessions and captures, total ${ms(totals.untimedMs)} ms):`,
+    );
+    for (const test of untimed) {
+      lines.push(
+        `  ${pad(ms(test.untimedMs), 11)} ms  ${test.name}  (duration ${ms(test.durationMs)}, waits ${ms(test.waitMs)}, ` +
+          `sessions ${ms(test.sessionMs)}, captures ${ms(test.captureMs)}${test.clamped ? ", clamped at 0" : ""})`,
+      );
+    }
+  }
+  const capture = captureReport(result, captureSites);
+  if (capture !== null) {
+    lines.push("", `Screenshots: ${capture.calls} calls, ${ms(capture.totalMs)} ms, ${capture.unsettled} hit the settle timeout`);
+    for (const site of capture.sites) {
+      lines.push(
+        `  ${pad(ms(site.totalMs), 11)} ms  ${site.site}  calls ${site.calls}, max ${ms(site.maxMs)} ms, unsettled ${site.unsettled}`,
+      );
+    }
+  }
+  const lookups = lookupReport(result);
+  if (lookups !== null) {
+    lines.push("", "Element lookups:");
+    for (const row of lookups) {
+      lines.push(`  ${pad(ms(row.totalMs), 11)} ms  ${row.name}  calls ${row.calls}`);
+    }
+  }
+  return lines;
 }
 
 export function checkIds(result) {
@@ -145,9 +244,10 @@ export function reportLines(result, label = "result") {
   lines.push("", `Slowest wait sites (top ${TOP_WAITS}, by total):`);
   for (const wait of rankWaits(result)) {
     lines.push(
-      `  ${pad(ms(wait.totalMs), 11)} ms  ${wait.site}  calls ${wait.calls}, max ${ms(wait.maxMs)} ms, timeouts ${wait.timeouts}`,
+      `  ${pad(ms(wait.totalMs), 11)} ms  ${wait.site}  calls ${wait.calls}, max ${ms(wait.maxMs)} ms, timeouts ${wait.timeouts}${nestedText(wait)}`,
     );
   }
+  lines.push(...residualLines(result, TOP_CAPTURES));
   return lines;
 }
 
@@ -167,8 +267,9 @@ export function summaryLines(result) {
   }
   lines.push(`slowest wait sites (top ${TOP_WAITS}, by total):`);
   for (const wait of rankWaits(result)) {
-    lines.push(`  ${pad(ms(wait.totalMs), 11)} ms  ${wait.site}  calls ${wait.calls}, timeouts ${wait.timeouts}`);
+    lines.push(`  ${pad(ms(wait.totalMs), 11)} ms  ${wait.site}  calls ${wait.calls}, timeouts ${wait.timeouts}${nestedText(wait)}`);
   }
+  lines.push(...residualLines(result, 5));
   return lines;
 }
 
@@ -317,7 +418,7 @@ export function runCli(args, io) {
   }
 }
 
-function sampleResult({ ids, tests, withTimings = true, durationMs = 1000 }) {
+function sampleResult({ ids, tests, withTimings = true, withResidual = false, durationMs = 1000 }) {
   const result = { schema: 2, pass: true, durationMs, checks: ids.map((id) => ({ id, pass: true, notes: "" })) };
   if (withTimings) {
     result.timings = {
@@ -335,6 +436,27 @@ function sampleResult({ ids, tests, withTimings = true, durationMs = 1000 }) {
       totals: { testMs: tests.reduce((sum, [, value]) => sum + value, 0), sessionStartMs: 1800, sessionCloseMs: 4150, waitMs: 9420 },
       problems: [],
     };
+    if (withResidual) {
+      // untimedMs of a test: the duration minus 100 ms of waits, so the order differs from the duration order.
+      tests.forEach(([, value], index) => {
+        const row = result.timings.tests[index];
+        row.waitMs = 100;
+        row.sessionMs = 10;
+        row.captureMs = 5;
+        row.untimedMs = Math.max(0, value - 115);
+        row.untimedClamped = value < 100;
+      });
+      result.timings.capture = [
+        { file: "Shots.cs", line: 7, calls: 3, totalMs: 6000, maxMs: 3000, unsettled: 1 },
+        { file: "Other.cs", line: 2, calls: 9, totalMs: 900, maxMs: 200, unsettled: 0 },
+      ];
+      result.timings.lookups = [
+        { name: "ContextMenuDriver.DesktopFindAllDescendants", calls: 5, totalMs: 50 },
+        { name: "EditingDriver.FindElement", calls: 1717, totalMs: 90000 },
+      ];
+      result.timings.waits[1].nestedCalls = 4;
+      result.timings.totals.untimedMs = result.timings.tests.reduce((sum, row) => sum + row.untimedMs, 0);
+    }
   }
   return result;
 }
@@ -375,6 +497,35 @@ function runSelfTest() {
   const noDuration = sampleResult({ ids: ["a"], tests: [["A.One", 10]] });
   noDuration.timings.tests.push({ test: "A.NoClock", class: "A", method: "NoClock", durationMs: null, outcome: "Passed", sessions: [] });
   expect("ranking-null-duration-left-out", rankTests(noDuration).length === 1);
+
+  // The residual, capture and lookup sections: ranked by untimed time, not by duration.
+  const withParts = sampleResult({
+    ids: ["a"],
+    tests: [["A.Slow", 9000], ["A.Mid", 500], ["A.Tiny", 50]].concat(Array.from({ length: 20 }, (_, i) => [`B.T${i}`, 1000 + i])),
+    withResidual: true,
+  });
+  const untimed = rankUntimed(withParts);
+  expect("untimed-limit-15", untimed.length === 15);
+  expect("untimed-order", untimed[0].name === "A.Slow" && untimed[0].untimedMs === 8885 && untimed[1].name === "B.T19");
+  expect("untimed-clamp-flag", rankUntimed(withParts, 30).find((row) => row.name === "A.Tiny").clamped === true);
+  const captureInfo = captureReport(withParts);
+  expect("capture-totals", captureInfo.calls === 12 && captureInfo.totalMs === 6900 && captureInfo.unsettled === 1);
+  expect("capture-order", captureInfo.sites[0].site === "Shots.cs:7");
+  const lookupInfo = lookupReport(withParts);
+  expect("lookup-order", lookupInfo[0].name === "EditingDriver.FindElement" && lookupInfo[0].calls === 1717);
+  expect("nested-calls-ranked", rankWaits(withParts).find((wait) => wait.site === "Big.cs:9").nestedCalls === 4);
+  const fullReport = capture({ "p.json": withParts }, ["p.json"]);
+  expect("report-untimed-section", fullReport.code === 0 && fullReport.out.includes("Largest untimed time"));
+  expect("report-capture-section", fullReport.out.includes("Screenshots: 12 calls, 6900.0 ms, 1 hit the settle timeout") && fullReport.out.includes("Shots.cs:7"));
+  expect("report-lookup-section", fullReport.out.includes("EditingDriver.FindElement  calls 1717"));
+  expect("report-nested-wait", fullReport.out.includes("nested 4"));
+  const summary = summaryLines(withParts).join("\n");
+  expect("summary-has-new-sections", summary.includes("Largest untimed time") && summary.includes("Screenshots: 12 calls") && summary.includes("Element lookups"));
+  // A file with timings but none of the new fields still prints, without those sections.
+  expect("no-residual-fields", rankUntimed(base).length === 0 && captureReport(base) === null && lookupReport(base) === null);
+  const plain = reportLines(base).join("\n");
+  expect("no-residual-sections-printed", !plain.includes("untimed") && !plain.includes("Screenshots") && !plain.includes("Element lookups"));
+  expect("no-residual-summary", !summaryLines(base).join("\n").includes("Screenshots"));
 
   // One file prints a ranking and exits 0.
   const single = capture({ "one.json": base }, ["one.json"]);

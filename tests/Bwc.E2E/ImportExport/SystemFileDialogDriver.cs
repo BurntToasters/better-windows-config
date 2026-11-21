@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text;
 using Bwc.E2E.AppServices;
 using Bwc.E2E.Controls;
@@ -30,12 +31,17 @@ internal sealed class SystemFileDialogDriver : IDisposable
         _automation = new UIA3Automation();
     }
 
-    internal IntPtr WaitForDialog(TimeSpan timeout)
+    internal IntPtr WaitForDialog(
+        TimeSpan timeout,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         IntPtr found = IntPtr.Zero;
         _ = ControlTestSupport.WaitUntil(
             () => (found = FindDialog()) != IntPtr.Zero,
-            timeout);
+            timeout,
+            callerFile: callerFile,
+            callerLine: callerLine);
         if (found != IntPtr.Zero)
         {
             // The dialog is checked as it appeared, before any input activates it.
@@ -102,15 +108,26 @@ internal sealed class SystemFileDialogDriver : IDisposable
         return null;
     }
 
-    internal bool WaitGone(IntPtr dialog, TimeSpan timeout) =>
-        ControlTestSupport.WaitUntil(() => !Win32.IsWindow(dialog), timeout);
+    internal bool WaitGone(
+        IntPtr dialog,
+        TimeSpan timeout,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
+        ControlTestSupport.WaitUntil(() => !Win32.IsWindow(dialog), timeout, callerFile: callerFile, callerLine: callerLine);
 
-    internal bool TrySetFileName(IntPtr dialog, string path, out string notes)
+    internal bool TrySetFileName(
+        IntPtr dialog,
+        string path,
+        out string notes,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         AutomationElement? edit = null;
         _ = ControlTestSupport.WaitUntil(
             () => (edit = FindFileNameEdit(dialog)) is not null,
-            UiTimeout);
+            UiTimeout,
+            callerFile: callerFile,
+            callerLine: callerLine);
 
         if (edit is null)
         {
@@ -331,12 +348,18 @@ internal sealed class SystemFileDialogDriver : IDisposable
     }
 
     /// <summary>Waits for the shell to finish creating the file type combo.</summary>
-    internal AutomationElement? WaitForFileTypeCombo(IntPtr dialog, TimeSpan timeout)
+    internal AutomationElement? WaitForFileTypeCombo(
+        IntPtr dialog,
+        TimeSpan timeout,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         AutomationElement? combo = null;
         _ = ControlTestSupport.WaitUntil(
             () => (combo = FindFileTypeCombo(dialog)) is not null,
-            timeout);
+            timeout,
+            callerFile: callerFile,
+            callerLine: callerLine);
         return combo;
     }
 

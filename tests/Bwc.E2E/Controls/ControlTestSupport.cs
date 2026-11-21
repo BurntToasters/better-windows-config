@@ -61,10 +61,17 @@ internal static class ControlTestSupport
         [CallerFilePath] string callerFile = "",
         [CallerLineNumber] int callerLine = 0)
     {
-        long started = E2ETimings.Now();
-        bool satisfied = PollUntil(condition, timeout);
-        E2ETimings.Current.RecordWait(callerFile, callerLine, started, timedOut: !satisfied);
-        return satisfied;
+        long started = E2ETimings.Current.BeginWait();
+        bool satisfied = false;
+        try
+        {
+            satisfied = PollUntil(condition, timeout);
+            return satisfied;
+        }
+        finally
+        {
+            E2ETimings.Current.EndWait(callerFile, callerLine, started, timedOut: !satisfied);
+        }
     }
 
     private static bool PollUntil(Func<bool> condition, TimeSpan timeout)
@@ -378,11 +385,18 @@ internal static class ControlTestSupport
         }
     }
 
-    internal static bool WaitForTreeSelection(AppSession session, string name, TimeSpan? timeout = null)
+    internal static bool WaitForTreeSelection(
+        AppSession session,
+        string name,
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         return WaitUntil(
             () => IsSelected(FindRowByName(session, TreeControl, ControlType.TreeItem, name)),
-            timeout ?? TimeSpan.FromSeconds(5));
+            timeout ?? TimeSpan.FromSeconds(5),
+            callerFile: callerFile,
+            callerLine: callerLine);
     }
 
     private const string AddressBarId = "AddressBar";
@@ -440,7 +454,12 @@ internal static class ControlTestSupport
     /// Types a path into the address bar and presses Enter. Succeeds when the address bar shows the
     /// path and the expected row is selected with keyboard focus back in the tree.
     /// </summary>
-    private static bool NavigateViaAddressBar(AppSession session, string typedPath, string selectedRow)
+    private static bool NavigateViaAddressBar(
+        AppSession session,
+        string typedPath,
+        string selectedRow,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         if (!ClearInput(session) || !FocusAddressBar(session))
         {
@@ -470,7 +489,9 @@ internal static class ControlTestSupport
 
         if (!WaitUntil(
                 () => string.Equals(ReadAddress(session), typedPath, StringComparison.OrdinalIgnoreCase),
-                TimeSpan.FromSeconds(5)))
+                TimeSpan.FromSeconds(5),
+                callerFile: callerFile,
+                callerLine: callerLine))
         {
             return false;
         }
@@ -490,7 +511,9 @@ internal static class ControlTestSupport
                     E2EGuards.NormalizeKeyPath(typedPath),
                     StringComparison.OrdinalIgnoreCase) &&
                 IsSelected(FindRowByName(session, TreeControl, ControlType.TreeItem, selectedRow)),
-            TimeSpan.FromSeconds(5));
+            TimeSpan.FromSeconds(5),
+            callerFile: callerFile,
+            callerLine: callerLine);
         return arrived && WaitForTreeKeyboardFocus(session, selectedRow, KeyboardFocusTimeout);
     }
 
@@ -775,11 +798,18 @@ internal static class ControlTestSupport
         }
     }
 
-    internal static bool WaitForTreeRow(AppSession session, string name, TimeSpan? timeout = null)
+    internal static bool WaitForTreeRow(
+        AppSession session,
+        string name,
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         return WaitUntil(
             () => FindRowByName(session, TreeControl, ControlType.TreeItem, name) is not null,
-            timeout ?? ExpandTimeout);
+            timeout ?? ExpandTimeout,
+            callerFile: callerFile,
+            callerLine: callerLine);
     }
 
     /// <summary>
@@ -788,7 +818,12 @@ internal static class ControlTestSupport
     /// closed dialog took is handed back. Returns false when that does not hold before the timeout,
     /// and the caller must not send keyboard input in that case.
     /// </summary>
-    internal static bool WaitForTreeKeyboardFocus(AppSession session, string rowName, TimeSpan timeout)
+    internal static bool WaitForTreeKeyboardFocus(
+        AppSession session,
+        string rowName,
+        TimeSpan timeout,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         return WaitUntil(
             () =>
@@ -797,7 +832,9 @@ internal static class ControlTestSupport
                 FocusRow(session, rowName);
                 return IsTreeKeyboardFocused(session, rowName);
             },
-            timeout);
+            timeout,
+            callerFile: callerFile,
+            callerLine: callerLine);
     }
 
     /// <summary>

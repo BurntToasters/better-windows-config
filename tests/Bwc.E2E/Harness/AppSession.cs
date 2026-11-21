@@ -125,7 +125,7 @@ public sealed class AppSession : IDisposable
         [CallerFilePath] string callerFile = "",
         [CallerLineNumber] int callerLine = 0)
     {
-        long started = E2ETimings.Now();
+        long started = E2ETimings.Current.BeginWait();
         bool found = false;
         try
         {
@@ -135,7 +135,7 @@ public sealed class AppSession : IDisposable
         }
         finally
         {
-            E2ETimings.Current.RecordWait(callerFile, callerLine, started, timedOut: !found);
+            E2ETimings.Current.EndWait(callerFile, callerLine, started, timedOut: !found);
         }
     }
 
@@ -176,10 +176,17 @@ public sealed class AppSession : IDisposable
         [CallerFilePath] string callerFile = "",
         [CallerLineNumber] int callerLine = 0)
     {
-        long started = E2ETimings.Now();
-        string? text = PollForText(automationId, expected, timeout);
-        E2ETimings.Current.RecordWait(callerFile, callerLine, started, timedOut: !string.Equals(text, expected, StringComparison.Ordinal));
-        return text;
+        long started = E2ETimings.Current.BeginWait();
+        string? text = null;
+        try
+        {
+            text = PollForText(automationId, expected, timeout);
+            return text;
+        }
+        finally
+        {
+            E2ETimings.Current.EndWait(callerFile, callerLine, started, timedOut: !string.Equals(text, expected, StringComparison.Ordinal));
+        }
     }
 
     private string? PollForText(string automationId, string expected, TimeSpan? timeout)

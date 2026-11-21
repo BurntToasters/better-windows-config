@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
@@ -77,32 +78,51 @@ internal sealed class EditingDriver : IDisposable
         }
     }
 
-    internal bool WaitForDialog(TimeSpan? timeout = null) =>
-        WaitForElement("DialogRoot", timeout ?? UiTimeout) is not null;
+    internal bool WaitForDialog(
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
+        WaitForElement("DialogRoot", timeout ?? UiTimeout, callerFile, callerLine) is not null;
 
     /// <summary>
     /// Dismisses a message box whose OK button has the focus. Enter is sent once, and the message text must
     /// clear. A prompt underneath is left open.
     /// </summary>
-    internal bool DismissErrorBox(TimeSpan? timeout = null)
+    internal bool DismissErrorBox(
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         Keyboard.Type(VirtualKeyShort.RETURN);
         return ControlTestSupport.WaitUntil(
             () => TextOf("DialogErrorText").Length == 0,
-            timeout ?? TimeSpan.FromSeconds(10));
+            timeout ?? TimeSpan.FromSeconds(10),
+            callerFile: callerFile,
+            callerLine: callerLine);
     }
 
-    internal bool WaitForNoDialog(TimeSpan? timeout = null) =>
+    internal bool WaitForNoDialog(
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
         ControlTestSupport.WaitUntil(
             () => FindElement("DialogRoot") is null,
-            timeout ?? TimeSpan.FromSeconds(10));
+            timeout ?? TimeSpan.FromSeconds(10),
+            callerFile: callerFile,
+            callerLine: callerLine);
 
-    internal AutomationElement? WaitForElement(string automationId, TimeSpan? timeout = null)
+    internal AutomationElement? WaitForElement(
+        string automationId,
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         AutomationElement? result = null;
         _ = ControlTestSupport.WaitUntil(
             () => (result = FindElement(automationId)) is not null,
-            timeout ?? UiTimeout);
+            timeout ?? UiTimeout,
+            callerFile: callerFile,
+            callerLine: callerLine);
         return result;
     }
 
@@ -261,7 +281,21 @@ internal sealed class EditingDriver : IDisposable
         return $"0x{foreground.ToInt64():X} class='{Win32.ClassNameOf(foreground)}' main={foreground == _session.MainHwnd}";
     }
 
+    // Counted for the timing record: this lookup enumerates every desktop window on each call.
     private AutomationElement? FindElement(string automationId)
+    {
+        long started = E2ETimings.Now();
+        try
+        {
+            return FindElementUncounted(automationId);
+        }
+        finally
+        {
+            E2ETimings.Current.RecordLookup("EditingDriver.FindElement", started);
+        }
+    }
+
+    private AutomationElement? FindElementUncounted(string automationId)
     {
         try
         {

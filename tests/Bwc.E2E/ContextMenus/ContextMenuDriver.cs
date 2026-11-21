@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
@@ -141,7 +142,11 @@ internal sealed class ContextMenuDriver : IDisposable
     /// snapshot is returned even when the names do not match so the caller can report the actual
     /// content instead of an opaque timeout.
     /// </summary>
-    internal MenuSnapshot? WaitForMenu(IReadOnlyList<string> expectedNames, TimeSpan? timeout = null)
+    internal MenuSnapshot? WaitForMenu(
+        IReadOnlyList<string> expectedNames,
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         MenuSnapshot? latest = null;
         _ = ControlTestSupport.WaitUntil(
@@ -150,26 +155,39 @@ internal sealed class ContextMenuDriver : IDisposable
                 latest = Snapshot();
                 return latest is not null && NamesEqual(latest.Names, expectedNames);
             },
-            timeout ?? UiTimeout);
+            timeout ?? UiTimeout,
+            callerFile: callerFile,
+            callerLine: callerLine);
 
         return latest;
     }
 
-    internal MenuSnapshot? WaitForMenu(TimeSpan? timeout = null)
+    internal MenuSnapshot? WaitForMenu(
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         MenuSnapshot? latest = null;
         _ = ControlTestSupport.WaitUntil(
             () => (latest = Snapshot()) is not null,
-            timeout ?? UiTimeout);
+            timeout ?? UiTimeout,
+            callerFile: callerFile,
+            callerLine: callerLine);
         return latest;
     }
 
-    internal MenuEntry? WaitForItem(int commandId, TimeSpan? timeout = null)
+    internal MenuEntry? WaitForItem(
+        int commandId,
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         MenuEntry? found = null;
         _ = ControlTestSupport.WaitUntil(
             () => (found = Snapshot()?.Find(commandId)) is not null,
-            timeout ?? UiTimeout);
+            timeout ?? UiTimeout,
+            callerFile: callerFile,
+            callerLine: callerLine);
         return found;
     }
 
@@ -241,11 +259,16 @@ internal sealed class ContextMenuDriver : IDisposable
         }
     }
 
-    internal bool WaitForNoMenu(TimeSpan? timeout = null)
+    internal bool WaitForNoMenu(
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         return ControlTestSupport.WaitUntil(
             () => Snapshot() is null,
-            timeout ?? TimeSpan.FromSeconds(5));
+            timeout ?? TimeSpan.FromSeconds(5),
+            callerFile: callerFile,
+            callerLine: callerLine);
     }
 
     private MenuSnapshot? Snapshot()
@@ -269,9 +292,18 @@ internal sealed class ContextMenuDriver : IDisposable
             try
             {
                 AutomationElement desktop = _automation.GetDesktop();
-                Collect(
-                    desktop.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem)),
-                    entries);
+                AutomationElement[] items;
+                long lookupStarted = E2ETimings.Now();
+                try
+                {
+                    items = desktop.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem));
+                }
+                finally
+                {
+                    E2ETimings.Current.RecordLookup("ContextMenuDriver.DesktopFindAllDescendants", lookupStarted);
+                }
+
+                Collect(items, entries);
             }
             catch (Exception)
             {
