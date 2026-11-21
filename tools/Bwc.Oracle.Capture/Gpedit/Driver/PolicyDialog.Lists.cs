@@ -428,6 +428,66 @@ internal sealed partial class PolicyDialog
             evidence: new JsonObject { ["passes"] = passes, ["tree"] = ProbeUia.Tree(Grid(dialog), 4, 300, rawView: false) });
     }
 
+    private static JsonArray Copies(JsonArray boxes) => new(boxes.Select(b => b?.DeepClone()).ToArray());
+
+    private JsonArray OpenWindows() => new(driver.Dialogs().Select(w => (JsonNode?)new JsonObject
+    {
+        ["title"] = w.Title,
+        ["class"] = w.Class,
+        ["kind"] = driver.Classify(w).ToString(),
+    }).ToArray());
+
+    // OK of Show Contents brought a message box (already captured and answered in `close`). Reads whether the dialog is still open, which
+    // takes up to 1.5 s because a dialog that classic accepts after the box may need a moment to go. When it is still open the list was
+    // refused: the dialog is cancelled and the read says it closed. The fields go to the set entry (ListRefusal). A dialog that does not close
+    // after Cancel is a driver failure, with the result so far and the open windows as evidence. Failure mode 38 of the driver document.
+    private void RecordMessageBoxOnOk(WinInfo dialog, JsonObject close, JsonObject result)
+    {
+        JsonArray boxes = close["messageBoxes"]!.AsArray();
+        var known = driver.Dialogs().Select(w => w.Hwnd).ToHashSet();
+        DateTime end = DateTime.UtcNow + TimeSpan.FromMilliseconds(1500);
+        bool open;
+        while (true)
+        {
+            driver.Context.ThrowIfCancelled();
+            driver.ThrowIfDead();
+            foreach (JsonNode? more in Copies(driver.AnswerNewMessageBoxes(known, null)))
+            {
+                boxes.Add(more);
+            }
+
+            open = GpeditDriver.IsOpen(dialog.Hwnd);
+            if (!open || DateTime.UtcNow >= end)
+            {
+                break;
+            }
+
+            Thread.Sleep(100);
+        }
+
+        bool? cancelled = null;
+        string? route = null;
+        var afterCancel = new JsonArray();
+        if (ListRefusal.IsRefused(boxes.Count, open))
+        {
+            var knownBeforeCancel = driver.Dialogs().Select(w => w.Hwnd).ToHashSet();
+            route = driver.CancelWindow(InfoOf(dialog.Hwnd));
+            foreach (JsonNode? more in Copies(driver.AnswerNewMessageBoxes(knownBeforeCancel, null)))
+            {
+                afterCancel.Add(more);
+            }
+
+            cancelled = !GpeditDriver.IsOpen(dialog.Hwnd);
+        }
+
+        ListRefusal.Apply(result, boxes, open, cancelled, route, afterCancel);
+        if (cancelled == false)
+        {
+            result["openWindows"] = OpenWindows();
+            throw new DriverException("the Show Contents dialog stayed open after the message box on OK and Cancel", evidence: result);
+        }
+    }
+
     private JsonObject EditList(OptionGroup group, OptionSpec spec)
     {
         WinInfo dialog = OpenShowContents(group);
@@ -466,7 +526,8 @@ internal sealed partial class PolicyDialog
             result["close"] = close;
             if (close["blockedByMessageBox"]?.GetValue<bool>() == true)
             {
-                throw new DriverException("the Show Contents dialog was blocked by a message box on OK", evidence: close);
+                // Classic can refuse a list (an empty one, for one) with a message box. That is an observed outcome, not a driver failure.
+                RecordMessageBoxOnOk(dialog, close, result);
             }
 
             return result;

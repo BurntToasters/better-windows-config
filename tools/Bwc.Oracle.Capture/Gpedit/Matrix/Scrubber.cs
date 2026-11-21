@@ -36,6 +36,8 @@ internal sealed partial class Scrubber
         "pushEvidence",
         // How the Show Contents grid was classified, and what each delete pass of a clear saw (failure mode 37 of the driver document).
         "gridRead", "clearPasses",
+        // The route that closed the Show Contents dialog after a refused list (failure mode 38 of the driver document).
+        "cancelClosedBy",
     };
 
     private readonly HashSet<string> allowed;

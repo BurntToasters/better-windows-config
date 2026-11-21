@@ -760,3 +760,71 @@ Unproved, for the next real run to confirm from `result.json` (`ops[n].data` of 
 - Whether a list with explicit values (name and value) exposes two data cells per row, and whether Right moves between them: not seen yet.
   The first run with `B/Pol_List_ExplicitValue` will show it in `gridRead.rows[].cells`.
 - Whether classic keeps an empty entry as a row after OK and reopening, which decides whether a committed empty row can exist at all.
+
+## 38. Classic refuses a list on OK of Show Contents
+
+Section 37 made the list grid work, and the case `B/Pol_List_Plain` then passed operations 2 and 4 (Enabled, list cleared, 2 rows or 1 row
+written, OK) with the cells read back. Operation 6, the `rows0` variant (Enabled, open Show Contents, clear the grid, write nothing, OK),
+failed with `the Show Contents dialog was blocked by a message box on OK`. The evidence holds one message box (title "Group Policy", class
+`#32770`, one OK button) that the driver answered with BM_CLICK. So classic does not accept an empty list from the Show Contents dialog: it says
+so in a message box and keeps the dialog. That is classic behaviour, and recording it is the job of the oracle. The driver treated it as its
+own failure and threw, which stopped the operation before the rest of the options and the presses of the policy dialog, so the files written
+after the policy dialog's OK were never captured. Group E plans the same kind of list on purpose (`List_Plain_EmptyEntry`,
+`List_Explicit_EmptyName`, `List_Explicit_EmptyValue`, `List_Explicit_NameOnly`) and Group C has `ListNone` with `ClearRows` and no rows, so
+all of them would have failed the same way. This section turns the refusal into an observed outcome. It changes no wait before the press, no
+timeout of the existing steps, no plan version and no golden.
+
+What the driver does now, when OK of Show Contents brings a message box:
+
+1. The message box is captured and answered exactly as before (`CloseShowContents` and `AnswerNewMessageBoxes`, the same path a press of the
+   policy dialog takes). The fields of the box are the ones every box carries (`title`, `class`, `kind`, `texts`, `buttons`, `answeredWith`,
+   `answeredVia`, `answerRequested`, `answerFallback`, plus the untracked `uiaTexts`, `uiaButtons` and `screenshot`).
+2. The driver then reads whether the Show Contents dialog is still open. It polls for up to 1.5 s in steps of 100 ms, because a dialog that
+   classic accepts after the box may need a moment to go away, and a read at once could call that dialog refused. The wait is new and only on
+   this path. No existing wait is shortened.
+3. When the dialog is still open, the list was refused. The driver cancels the dialog with the existing `CancelWindow` route and reads that
+   it closed. The edit operation then continues as for any other option: the other options, the read after the sets, and the planned presses of
+   the policy dialog, so the files written after the OK of the policy dialog are captured like every other step.
+4. When the dialog is gone after the box, classic took the list and only warned. That is not a refusal. The set entry says the box appeared
+   and that the dialog closed, and nothing is cancelled.
+
+How it shows in `result.json` and in a golden: the set entry of the option (`ops[n].data.sets[m]`) has `close` (as before, with `button`,
+`messageBoxes` and `blockedByMessageBox`) and, new, `okMessageBox: true`, `refused` (true or false), `dialogOpenAfterBox` (true or false) and,
+only for a refusal, `cancelled` (the dialog closed after Cancel, true or false) and `cancelClosedBy`. The golden keeps `okMessageBox`, `refused`,
+`dialogOpenAfterBox`, `cancelled` and the message boxes. These are classic behaviour: that it refused, which box it showed and whether it kept
+the dialog. The text of the box is not in the golden. It goes through the same scrubber as the message boxes of a press: `title` and `texts`
+are not BWC text and become the hash form `#` plus 12 hex digits, the button texts and the driver tokens (`OK`, `#32770`, `MessageBox`,
+`BM_CLICK`) stay as they are, and `uiaTexts`, `uiaButtons` and `screenshot` are dropped. `cancelClosedBy` names the route that closed the
+dialog and is a diagnostic, like `closedBy`, so it is in the scrubber's drop list. The same hash for the same text lets two goldens show that two
+refusals showed the same box, and no Microsoft sentence is learned.
+
+What can go wrong and the guard of each:
+
+- A refusal is taken for a failure (this failure). The guard is the rule above. A message box on OK of Show Contents is an observed outcome and
+  `EditList` no longer throws for it.
+- The dialog closed after the box and the list was taken as refused. The guard is the 1.5 s poll before the decision, and `refused` is true only
+  when the dialog is still open after it. A dialog that closes later than that would be cancelled by the driver that found it open, so the
+  `cancelled` field says what really happened (`already closed` is a closed dialog). This cannot be told apart from a real refusal without
+  classic. The next run reads it from `dialogOpenAfterBox`.
+- The dialog does not close after Cancel. That is a driver failure, as before: the operation throws with the box, the Cancel route and the
+  windows that are open as evidence. The `finally` of `EditList` still tries Cancel once more, and the cleanup after the operation closes what is left.
+- A second message box comes after the first, or while the dialog is cancelled. The driver answers boxes that exist when it looks, in every
+  step of the poll for the open state and again after Cancel. A box that stops Cancel from closing the dialog makes the dialog stay open, which is the failure above
+  with the windows as evidence. A box found after Cancel is recorded in `messageBoxesAfterCancel`.
+- A message box at any other moment of the list path (opening Show Contents, reading or writing the grid, the clear) is not a refusal. It
+  stays a failure with the box as evidence, as before.
+- A diagnostic or Microsoft text reaches a golden. The box takes the path of every box (section 12 and the scrubber). The self test builds the
+  set entry of a refused list with a box whose title and text carry a marker and requires that the marker is not in the cleaned data, that the
+  box is in the cleaned data in its hash form, and that `refused`, `dialogOpenAfterBox` and `cancelled` are. It also checks that
+  `cancelClosedBy` is dropped.
+- A refusal hides a driver problem. The set entry holds `before`, `clearPasses`, `cells` and `afterEdit` as for a list that was accepted, so a
+  grid that was not written as planned is still caught by the read-back of every cell before OK. A refusal does not weaken that check.
+
+Unproved, for the next real run to confirm from `result.json`:
+
+- That the empty-list message box is the only box on OK of an empty list, and that the dialog stays open after it (`dialogOpenAfterBox`).
+- That Cancel closes the Show Contents dialog after the box (`cancelled`, `cancelClosedBy`).
+- What classic holds in the file after the policy dialog's OK when the list was refused, and what the read after the sets shows
+  (`afterSet`): the list as before the edit, or empty.
+- Whether the Group E cases (empty entry, empty name, empty value, name only) are refused by the same box or accepted, and whether any of them
+  shows a second box.

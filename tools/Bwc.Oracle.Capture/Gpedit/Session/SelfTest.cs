@@ -254,6 +254,7 @@ internal static partial class SelfTest
         CheckBoxCases(repo, Case);
         PushButtonCases(repo, Case);
         GridCases(repo, Case);
+        ListRefusalCases(repo, Case);
 
         var report = new JsonObject
         {
