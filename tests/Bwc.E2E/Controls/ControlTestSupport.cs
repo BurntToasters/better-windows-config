@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
@@ -54,7 +55,19 @@ internal static class ControlTestSupport
         SendKeys(session, text);
     }
 
-    internal static bool WaitUntil(Func<bool> condition, TimeSpan timeout)
+    internal static bool WaitUntil(
+        Func<bool> condition,
+        TimeSpan timeout,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
+    {
+        long started = E2ETimings.Now();
+        bool satisfied = PollUntil(condition, timeout);
+        E2ETimings.Current.RecordWait(callerFile, callerLine, started, timedOut: !satisfied);
+        return satisfied;
+    }
+
+    private static bool PollUntil(Func<bool> condition, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (true)

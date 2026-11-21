@@ -613,6 +613,30 @@ policy editor from the Hub.
 | The Hub or the installer payload names a policy editor that the stand-in installer does not provide, so an install, update or launch test ends in a missing file | `tests/Bwc.E2E.FakeInstaller` has a stand-in named `BwcGpedit` next to `BetterWindowsConfig` and `BwcRegedit`. It is used for the payload, the shortcut and every other place the Registry Editor stand-in appears. Existing install and update tests stay green. |
 | No test starts the policy editor from the Hub, so a wrong catalog entry, executable name or launch argument goes unseen | A Hub test starts the policy editor from its tool row, like the Registry Editor test, and checks that a window of the policy editor appears. It never runs where the launch would prompt for elevation: a launch that would show a UAC prompt is `E2EOnly` and runs against the E2E publish, which is `asInvoker`. |
 
+## 46. Timing record of the run (ST0)
+
+The full E2E flavor run takes about 45 minutes and nothing measured a test, an app start, an app close or a wait, so a
+speed fix would have been a guess. The result file now has one more top-level object, `timings`, beside the existing
+fields (schema stays 2, no existing field changes). It has `tests` (class, method, duration, outcome and the session ids
+a test started), `sessions` (id, exe, test, ms to the main window, ms in `Close`, whether it had to kill, ms alive),
+`sessionsNotClosed`, `waits` (one row per call site: file relative to `tests/Bwc.E2E`, line, calls, total ms, max ms,
+timeouts) and `totals`. Recording is measurement only: no test, timeout, interval, check id or outcome changes.
+
+| Failure | Guard |
+| --- | --- |
+| The timing recorder throws into a test (a null, a lock, a bad key, a serializer error) and a passing test fails because of the measurement | Every public entry point of `E2ETimings` is one try block that swallows the exception and adds one entry to an internal problem list. The list is written as `timings.problems` and as the note `timings.problem`, so a broken recorder is visible and never fatal. When the object cannot be built, `Finish` leaves `timings` out, still writes the artifact, and notes each problem as `timings.problem`. A Harness test makes the recorder throw on purpose and asserts that nothing escapes. |
+| A wait site is attributed to the wrong line because a helper wraps `WaitUntil` (for example `AppServicesSupport.WaitUntil` or `WaitForTreeRow` call `ControlTestSupport.WaitUntil`), so the site is the helper line and many tests share it | Accepted and stated: the caller file and line come from `[CallerFilePath]` and `[CallerLineNumber]`, so a wrapper is the site. The row is still true (the total time of that helper), and a reader who wants the test reads the `tests` list. The report prints the file and line so the wrapper is easy to find. No test is edited to hide the wrapper. Private `WaitUntil` copies in `MenuTests`, `ShellTests`, `ShellKeyboardTests`, `KeyboardParityTests` and `InstallerRun` are not timed in this piece. |
+| The caller parameters bind to a positional argument of an existing call and change its meaning | They are trailing optional parameters after `timeout`, so a call with the old argument count compiles to the same call. No call passes a third positional argument, and no method group of these methods is converted to a delegate (both were searched before the change). The build and the whole E2E project compile unchanged. |
+| A session is never closed through `Close` (the test only disposes it, or the test throws first) and its close time is missing | `Dispose` calls `Close`, so the time is still measured there. A session whose `Close` was never called by the test is counted in `sessionsNotClosed` (disposed only) and its row has `closedViaClose: false`. A session never disposed at all has no end time: the row has `aliveMs` `null` and is counted in `sessionsNeverDisposed` at `Finish`. |
+| The clock is not started for a test (`GlobalTestInitialize` did not run, a test is skipped, or two tests run at once) | The clock is keyed by class and method name, not by thread. A cleanup with no start is recorded with `durationMs` `null` and counted in `testsWithoutStart`, never as zero and never as a throw. The sum of test time ignores those rows. A session or wait that happens with no current test is attributed to `(none)`. |
+| The result file grows too large (one row per wait call instead of per site, a session list with no end) | Waits aggregate per site, so the count is the number of call sites (a few hundred), not the number of calls. Tests and sessions have one row each. A size guard in `Finish` writes the `timings` object only when the serialized part is at most 2 MB and otherwise writes the counts and totals with `truncated: true`, plus a problem entry that appears as the note `timings.problem`. |
+| The report treats an old result file (no `timings`) as broken | `scripts/test-e2e.js` prints nothing extra and exits as before. `scripts/e2e-timing-report.js` prints that the file has no timings, still compares the check id sets of two files, and the exit code depends only on removed check ids. Its `--self-test` has a case with an old file. |
+| A rename or removal of a check slips in with a speed change | `node scripts/e2e-timing-report.js <before.json> <after.json>` exits 1 when a check id of the first file is missing in the second and lists those ids. New ids are listed and allowed. |
+
+Self test: the `Harness` tests in `HarnessTests.cs` exercise the recorder without a window: a wait that times out is
+counted, two calls from one line aggregate, a recorder failure does not escape, and the JSON has the documented fields.
+`node scripts/e2e-timing-report.js --self-test` covers the report.
+
 ## Verification artifact
 
 A successful harness run leaves `artifacts/e2e/result-<rid>-<flavor>.json` with schema 2, the run
@@ -624,4 +648,6 @@ the `notes` array, and the `knownGaps` array (sections 17 to 19 describe each ar
 not affect `pass`. A failed run leaves the same artifact with `pass: false`, failed check ids,
 notes, and screenshots under `artifacts/e2e/screenshots` when capture succeeded.
 `scripts/test-e2e.js` prints passed, failed, and total checks, the known gaps grouped by work
-package, and the notes count. It requires schema 2 and at least one check.
+package, and the notes count. It requires schema 2 and at least one check. Since ST0 the file also has
+the `timings` object (section 46), and `scripts/test-e2e.js` prints the slowest tests, session totals and
+slowest wait sites from it when it exists.

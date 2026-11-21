@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FlaUI.Core.Capturing;
 
 namespace Bwc.E2E.Harness;
@@ -233,6 +234,12 @@ public static class E2EResults
         GapEntry[] gaps;
         DateTime startedUtc;
 
+        // Before the snapshot, so a recorder problem is one of the notes below.
+        foreach (string problem in E2ETimings.Current.Problems())
+        {
+            Note("timings.problem", problem);
+        }
+
         lock (Sync)
         {
             config = _config ?? throw new InvalidOperationException("E2EResults.Begin was not called.");
@@ -270,11 +277,28 @@ public static class E2EResults
         };
 
         Directory.CreateDirectory(config.ArtifactsDir);
-        var json = JsonSerializer.Serialize(payload, JsonOptions) + Environment.NewLine;
+        var json = ToResultJson(payload, E2ETimings.Current) + Environment.NewLine;
         foreach (string name in ResultFileNames(config))
         {
             File.WriteAllText(Path.Combine(config.ArtifactsDir, name), json);
         }
+    }
+
+    /// <summary>
+    /// Serializes the result payload and adds the top-level <c>timings</c> object after its other fields. A recorder
+    /// that cannot produce the object leaves it out and the rest of the artifact is unchanged.
+    /// </summary>
+    internal static string ToResultJson(object payload, E2ETimings timings)
+    {
+        JsonNode? timingsNode = timings.ToJson();
+        if (timingsNode is null)
+        {
+            return JsonSerializer.Serialize(payload, JsonOptions);
+        }
+
+        JsonObject root = JsonSerializer.SerializeToNode(payload, JsonOptions)!.AsObject();
+        root["timings"] = timingsNode;
+        return root.ToJsonString(JsonOptions);
     }
 
     /// <summary>

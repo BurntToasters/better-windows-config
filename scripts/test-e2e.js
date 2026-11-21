@@ -5,6 +5,7 @@ import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { elevationState } from "./elevated-runner/elevation.mjs";
+import { summaryLines } from "./e2e-timing-report.js";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -273,6 +274,19 @@ function printResult(result, verdict = result.pass === true) {
 
   console.log(`artifact: ${resultPath}`);
   console.log(`run artifact: ${runResultPath}`);
+  printTimings(result);
+}
+
+// Prints the slowest tests, the session totals and the slowest waits when the artifact has a timings object.
+// An older artifact has none: nothing extra is printed. A failure here never changes the result.
+function printTimings(result) {
+  try {
+    for (const line of summaryLines(result)) {
+      console.log(line);
+    }
+  } catch (error) {
+    console.error(`test-e2e: the timing summary could not be printed: ${error.message}`);
+  }
 }
 
 function groupedWorkPackages(knownGaps) {

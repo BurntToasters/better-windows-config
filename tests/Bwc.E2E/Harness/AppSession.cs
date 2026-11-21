@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
@@ -22,6 +23,7 @@ public sealed class AppSession : IDisposable
     private readonly UIA3Automation _automation;
     private bool _disposed;
     private bool _foregroundRecorded;
+    private readonly int _timingId;
     private readonly List<(string Name, Action Action)> _onDispose = new();
 
     public AppSession(
@@ -53,6 +55,7 @@ public sealed class AppSession : IDisposable
             }
         }
 
+        long startedAt = E2ETimings.Now();
         var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException($"Process.Start returned no process for '{exePath}'.");
 
@@ -77,12 +80,14 @@ public sealed class AppSession : IDisposable
         }
         catch
         {
+            _ = E2ETimings.Current.SessionStarted(_exeName, startedAt, startFailed: true);
             automation.Dispose();
             Kill(process);
             process.Dispose();
             throw;
         }
 
+        _timingId = E2ETimings.Current.SessionStarted(_exeName, startedAt, startFailed: false);
         ProcessId = process.Id;
 
         // The window keeps its own z order. Nothing here raises it: a dialog that opens behind the main
@@ -114,7 +119,27 @@ public sealed class AppSession : IDisposable
         }
     }
 
-    public AutomationElement WaitForElement(string automationId, TimeSpan? timeout = null)
+    public AutomationElement WaitForElement(
+        string automationId,
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
+    {
+        long started = E2ETimings.Now();
+        bool found = false;
+        try
+        {
+            AutomationElement element = PollForElement(automationId, timeout);
+            found = true;
+            return element;
+        }
+        finally
+        {
+            E2ETimings.Current.RecordWait(callerFile, callerLine, started, timedOut: !found);
+        }
+    }
+
+    private AutomationElement PollForElement(string automationId, TimeSpan? timeout)
     {
         var limit = timeout ?? TimeSpan.FromSeconds(15);
         var deadline = DateTime.UtcNow + limit;
@@ -144,7 +169,20 @@ public sealed class AppSession : IDisposable
             (lastError is null ? "The element was not present." : $"Last UIA error: {lastError.Message}"));
     }
 
-    public string? WaitForText(string automationId, string expected, TimeSpan? timeout = null)
+    public string? WaitForText(
+        string automationId,
+        string expected,
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
+    {
+        long started = E2ETimings.Now();
+        string? text = PollForText(automationId, expected, timeout);
+        E2ETimings.Current.RecordWait(callerFile, callerLine, started, timedOut: !string.Equals(text, expected, StringComparison.Ordinal));
+        return text;
+    }
+
+    private string? PollForText(string automationId, string expected, TimeSpan? timeout)
     {
         var limit = timeout ?? TimeSpan.FromSeconds(15);
         var deadline = DateTime.UtcNow + limit;
@@ -222,11 +260,28 @@ public sealed class AppSession : IDisposable
     /// <summary>The check id for the main window's foreground state before input.</summary>
     internal string ForegroundCheckId => $"gui.foreground.{Path.GetFileNameWithoutExtension(_exePath).ToLowerInvariant()}";
 
-    public void Close()
+    public void Close() => TimedClose(viaClose: true);
+
+    /// <summary>Closes the process and adds the time to this session's record. Dispose is not a Close call by a test.</summary>
+    private void TimedClose(bool viaClose)
+    {
+        long started = E2ETimings.Now();
+        bool killed = false;
+        try
+        {
+            killed = CloseCore();
+        }
+        finally
+        {
+            E2ETimings.Current.SessionClosed(_timingId, started, killed, viaClose);
+        }
+    }
+
+    private bool CloseCore()
     {
         if (_process.HasExited)
         {
-            return;
+            return false;
         }
 
         try
@@ -235,14 +290,17 @@ public sealed class AppSession : IDisposable
         }
         catch (InvalidOperationException)
         {
-            return;
+            return false;
         }
 
         if (!_process.WaitForExit(TimeSpan.FromSeconds(10)))
         {
             Kill(_process);
             _process.WaitForExit(TimeSpan.FromSeconds(5));
+            return true;
         }
+
+        return false;
     }
 
     /// <summary>
@@ -267,10 +325,11 @@ public sealed class AppSession : IDisposable
 
         try
         {
-            Close();
+            TimedClose(viaClose: false);
         }
         finally
         {
+            E2ETimings.Current.SessionDisposed(_timingId);
             _automation.Dispose();
             _process.Dispose();
             for (int i = _onDispose.Count - 1; i >= 0; i--)

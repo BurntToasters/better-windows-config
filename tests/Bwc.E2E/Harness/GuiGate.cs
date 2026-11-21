@@ -54,6 +54,10 @@ public sealed class GuiGate
         AcquireGate();
     }
 
+    /// <summary>Starts the clock of one test. The matching stop is in <see cref="RecordTestOutcome"/>.</summary>
+    [GlobalTestInitialize]
+    public static void StartTestClock(TestContext testContext) => E2ETimings.Current.TestStarted(testContext);
+
     /// <summary>
     /// Runs after every test method. It records one outcome check per test, so the artifact fails when dotnet
     /// reports a failed test, even when the test threw before it recorded a check. An Inconclusive test records
@@ -62,6 +66,7 @@ public sealed class GuiGate
     [GlobalTestCleanup]
     public static void RecordTestOutcome(TestContext testContext)
     {
+        E2ETimings.Current.TestFinished(testContext);
         string className = testContext.FullyQualifiedTestClassName ?? "UnknownClass";
         string id = $"test.{className[(className.LastIndexOf('.') + 1)..]}.{testContext.TestName}.outcome";
         UnitTestOutcome outcome = testContext.CurrentTestOutcome;

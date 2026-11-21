@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Bwc.E2E.Controls;
@@ -343,7 +344,19 @@ internal sealed class ShellRun : IDisposable
         }
     }
 
-    internal static bool WaitUntil(Func<bool> condition, TimeSpan? timeout = null)
+    internal static bool WaitUntil(
+        Func<bool> condition,
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
+    {
+        long started = E2ETimings.Now();
+        bool satisfied = PollUntil(condition, timeout);
+        E2ETimings.Current.RecordWait(callerFile, callerLine, started, timedOut: !satisfied);
+        return satisfied;
+    }
+
+    private static bool PollUntil(Func<bool> condition, TimeSpan? timeout)
     {
         DateTime deadline = DateTime.UtcNow + (timeout ?? UiTimeout);
         do

@@ -62,7 +62,7 @@ The default RID comes from process.arch, never PROCESSOR_ARCHITECTURE.
 
 Steps: sync-version, registry-writer, registry-writer-selftest, policy-writer,
 policy-writer-selftest, no-em-dash, no-em-dash-selftest, regedit-strings, tracked-paths-selftest,
-tracked-paths, oracle-json-selftest, oracle-json, changelog-version, comment-lint, release-selftest,
+tracked-paths, oracle-json-selftest, oracle-json, e2e-timing-selftest, changelog-version, comment-lint, release-selftest,
 release-flow-selftest,
 release-assets-selftest, embed-key-selftest, signing-selftest, build-arm64, build-x64,
 test-core, test-gpo, test-policy, test-registry-e2e, test-registry-shipping, test-update,
@@ -72,6 +72,8 @@ policy-writer is the static guard for the local group policy writer
 writer guards, the em dash validator, and scripts/check-tracked-paths.js, so a guard that
 stops detecting fails the gate. tracked-paths fails on an absolute user-profile path in a
 tracked text file. oracle-json fails on a tracked docs/parity JSON file that does not parse.
+e2e-timing-selftest runs the --self-test of scripts/e2e-timing-report.js, the ranking and the
+check id comparison of E2E result files.
 test-update-e2e runs tests/Bwc.Update.Tests with -p:BwcFlavor=E2E, so the
 branch compiled only in that flavor runs too. test-gpo and test-policy run tests/Bwc.Gpo.Tests
 and tests/Bwc.Policy.Tests. A step that exits 3 (NOT RUN, for one e2e-ship from an elevated
@@ -230,6 +232,7 @@ function sharedSteps(testPlatform) {
     nodeStep("tracked-paths", "scripts/check-tracked-paths.js", []),
     nodeStep("oracle-json-selftest", "scripts/check-oracle-json.js", ["--self-test"]),
     nodeStep("oracle-json", "scripts/check-oracle-json.js", []),
+    nodeStep("e2e-timing-selftest", "scripts/e2e-timing-report.js", ["--self-test"]),
     nodeStep("changelog-version", "scripts/validate-changelog-version.js", []),
     nodeStep("comment-lint", "scripts/lint-comments.mjs", []),
     // Release tooling self-tests. They run in the quick gate, so a broken release script fails CI.
