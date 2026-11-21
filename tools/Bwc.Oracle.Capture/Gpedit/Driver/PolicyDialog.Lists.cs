@@ -44,33 +44,68 @@ internal sealed partial class PolicyDialog
         throw new DriverException($"no Show Contents dialog opened for '{group.Label}'");
     }
 
-    private static List<AutomationElement> GridRowElements(AutomationElement grid)
-    {
-        List<AutomationElement> children = ProbeUia.Find(grid, TreeScope.Children, Condition.TrueCondition);
-        List<AutomationElement> rows = children.Where(c => c.Current.ControlType == ControlType.DataItem).ToList();
-        if (rows.Count == 0)
-        {
-            rows = children.Where(c => c.Current.ControlType != ControlType.Header && c.Current.ControlType != ControlType.ScrollBar
-                && ProbeUia.Find(c, TreeScope.Children, Condition.TrueCondition).Count > 0).ToList();
-        }
+    // The grid as read from UI Automation: the classification of GridRead and the elements it points at (children and, per child, its cells).
+    private sealed record GridLive(GridShape Shape, List<AutomationElement> Children, List<List<AutomationElement>> Cells, List<GridChildInfo> Infos);
 
-        return rows;
+    private static string TypeName(AutomationElement element) =>
+        element.Current.ControlType.ProgrammaticName.Replace("ControlType.", string.Empty, StringComparison.Ordinal);
+
+    private static GridCellInfo CellInfo(AutomationElement cell)
+    {
+        string? value = cell.TryGetCurrentPattern(ValuePattern.Pattern, out object? pattern) ? ((ValuePattern)pattern).Current.Value ?? string.Empty : null;
+        return new GridCellInfo(TypeName(cell), value, ProbeUia.NameOf(cell), cell.TryGetCurrentPattern(GridItemPattern.Pattern, out _));
     }
 
-    private static string CellValue(AutomationElement cell)
+    private static GridLive ReadLive(AutomationElement grid)
     {
-        if (cell.TryGetCurrentPattern(ValuePattern.Pattern, out object? value))
+        var children = new List<AutomationElement>();
+        var cells = new List<List<AutomationElement>>();
+        var infos = new List<GridChildInfo>();
+        foreach (AutomationElement child in ProbeUia.Find(grid, TreeScope.Children, Condition.TrueCondition))
         {
-            return ((ValuePattern)value).Current.Value ?? string.Empty;
+            try
+            {
+                string type = TypeName(child);
+                // A scroll bar is never a row, so its buttons are not read.
+                List<AutomationElement> own = type == "ScrollBar" ? new List<AutomationElement>() : ProbeUia.Find(child, TreeScope.Children, Condition.TrueCondition);
+                infos.Add(new GridChildInfo(type, ProbeUia.NameOf(child), own.Select(CellInfo).ToList()));
+                children.Add(child);
+                cells.Add(own);
+            }
+            catch (ElementNotAvailableException)
+            {
+                // The row went away while the grid was read (a delete is under way): it is not a row any more.
+            }
         }
 
-        return ProbeUia.NameOf(cell);
+        return new GridLive(GridRead.Classify(infos), children, cells, infos);
     }
 
+    // The rows of the list (the new row is not one), each as the text of its data cells, "(null)" shown as empty.
     private static List<List<string>> GridCells(AutomationElement grid) =>
-        GridRowElements(grid).Select(r => ProbeUia.Find(r, TreeScope.Children, Condition.TrueCondition).Select(CellValue).ToList()).ToList();
+        ReadLive(grid).Shape.Rows.Select(r => r.Texts.Select(GridRead.Shown).ToList()).ToList();
 
-    private static bool IsEmptyRow(List<string> cells) => cells.All(c => string.IsNullOrWhiteSpace(c));
+    private static int FilledRows(GridShape shape) => shape.Rows.Count(r => !r.IsEmpty);
+
+    // How the grid was classified, for the result file (a diagnostic, never part of a golden).
+    private static JsonObject GridEvidence(GridLive live)
+    {
+        GridShape shape = live.Shape;
+        return new JsonObject
+        {
+            ["children"] = new JsonArray(live.Infos.Select(i => (JsonNode?)JsonValue.Create($"{i.ControlType}: {i.Name} ({i.Cells.Count} cells)")).ToArray()),
+            ["headerRows"] = new JsonArray(shape.HeaderChildren.Select(i => (JsonNode?)JsonValue.Create(live.Infos[i].Name)).ToArray()),
+            ["placeholder"] = shape.Placeholder is { } p ? shape.All[p].Name : null,
+            ["rows"] = new JsonArray(shape.All.Select(r => (JsonNode?)new JsonObject
+            {
+                ["name"] = r.Name,
+                ["child"] = r.ChildIndex,
+                ["rowHeaderCell"] = r.RowHeader,
+                ["cells"] = new JsonArray(r.CellIndexes.Select(i => (JsonNode?)JsonValue.Create(i)).ToArray()),
+                ["texts"] = new JsonArray(r.Texts.Select(t => (JsonNode?)JsonValue.Create(t)).ToArray()),
+            }).ToArray()),
+        };
+    }
 
     private AutomationElement Grid(IntPtr dialog)
     {
@@ -83,18 +118,19 @@ internal sealed partial class PolicyDialog
     {
         AutomationElement root = AutomationElement.FromHandle(dialog);
         AutomationElement grid = Grid(dialog);
-        List<List<string>> cells = GridCells(grid);
+        GridLive live = ReadLive(grid);
+        List<List<string>> cells = live.Shape.Rows.Select(r => r.Texts.Select(GridRead.Shown).ToList()).ToList();
         var rows = new JsonArray(cells.Select(r => (JsonNode?)new JsonArray(r.Select(c => (JsonNode?)JsonValue.Create(c)).ToArray())).ToArray());
-        int filled = cells.Count(r => !IsEmptyRow(r));
         var node = new JsonObject
         {
             ["title"] = ProbeWindows.TitleOf(dialog),
             ["label"] = GpeditDriver.ById(root, "label") is { } label ? ProbeUia.NameOf(label) : null,
             ["rowCount"] = cells.Count,
-            ["filledRows"] = filled,
+            ["filledRows"] = FilledRows(live.Shape),
             ["rows"] = rows,
+            ["gridRead"] = GridEvidence(live),
         };
-        if (cells.Count == 0)
+        if (live.Shape.All.Count == 0)
         {
             node["tree"] = ProbeUia.Tree(grid, 4, 300, rawView: false);
         }
@@ -164,6 +200,8 @@ internal sealed partial class PolicyDialog
         }
     }
 
+    // The keyboard route to a data row: Ctrl+Home goes to the first data cell, then one Down press per data row. The new row, when it exists, is
+    // the data row after the last row of the list.
     private void SelectGridRow(IntPtr dialog, AutomationElement grid, int row)
     {
         DriverInput.RequireForeground(dialog, driver.Pid);
@@ -176,7 +214,8 @@ internal sealed partial class PolicyDialog
         }
     }
 
-    // Writes one cell with the keyboard (Ctrl+Home, Down and Right to the cell, F2, select all, type, Enter). The caller reads the grid back.
+    // Writes one cell with the keyboard (Ctrl+Home, Down and Right to the cell, F2, select all, type, Enter). The row is the data row index
+    // and the column the data cell index, both as GridRead counts them. The caller reads the grid back.
     private string WriteCell(IntPtr dialog, int row, int column, string text)
     {
         AutomationElement grid = Grid(dialog);
@@ -194,31 +233,199 @@ internal sealed partial class PolicyDialog
         return "keyboard";
     }
 
+    // The same data cell WriteCell wrote, "(null)" read as empty. The row may be the new row of the grid, which holds the text just written.
     private string? ReadCell(IntPtr dialog, int row, int column)
     {
-        List<List<string>> cells = GridCells(Grid(dialog));
-        return row < cells.Count && column < cells[row].Count ? cells[row][column] : null;
+        GridShape shape = ReadLive(Grid(dialog)).Shape;
+        return row < shape.All.Count && column < shape.All[row].Texts.Count ? GridRead.Shown(shape.All[row].Texts[column]) : null;
     }
 
-    private void ClearGrid(IntPtr dialog)
-    {
-        for (int pass = 0; pass < 200; pass++)
-        {
-            List<List<string>> cells = GridCells(Grid(dialog));
-            int last = cells.FindLastIndex(r => !IsEmptyRow(r));
-            if (last < 0)
-            {
-                return;
-            }
+    private const int MaxClearPasses = 200;
+    private const int MaxStalledPasses = 3;
 
-            AutomationElement grid = Grid(dialog);
-            SelectGridRow(dialog, grid, last);
-            DriverInput.Chord(new[] { DriverInput.VkShift }, DriverInput.VkSpace);
-            DriverInput.Key(DriverInput.VkDelete);
-            Thread.Sleep(300);
+    // Says why a cell editor is open, or null when none is. An editor is a child of the grid of control type Edit, or the focused element when
+    // it is an Edit with its own window handle in mmc (a cell is an Edit too, but it has no window handle).
+    private string? OpenEditor(AutomationElement grid)
+    {
+        foreach (AutomationElement child in ProbeUia.Find(grid, TreeScope.Children, Condition.TrueCondition))
+        {
+            try
+            {
+                if (child.Current.ControlType == ControlType.Edit)
+                {
+                    return "an Edit child of the grid";
+                }
+            }
+            catch (ElementNotAvailableException)
+            {
+                // Gone while looked at: not an editor.
+            }
         }
 
-        throw new DriverException("the grid still has rows after 200 delete passes", evidence: ProbeUia.Tree(Grid(dialog), 4, 300, rawView: false));
+        try
+        {
+            AutomationElement focused = AutomationElement.FocusedElement;
+            if (focused.Current.ControlType == ControlType.Edit && focused.Current.NativeWindowHandle != 0 && focused.Current.ProcessId == driver.Pid)
+            {
+                return "the focused element is an Edit with a window handle";
+            }
+        }
+        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException)
+        {
+            // No focused element could be read: no evidence of an editor.
+        }
+
+        return null;
+    }
+
+    // Before a key press of a clear: no cell may be in edit mode, or the key would reach the editor. Escape leaves the edit mode. It is pressed only
+    // when an editor was seen, because Escape in the dialog would cancel it. What was done goes into the pass log.
+    private void CloseEditorBeforeKeys(IntPtr dialog, AutomationElement grid, JsonObject entry)
+    {
+        string? editor = OpenEditor(grid);
+        if (editor is null)
+        {
+            return;
+        }
+
+        entry["editorSeen"] = editor;
+        for (int attempt = 0; attempt < 2 && editor is not null; attempt++)
+        {
+            DriverInput.RequireForeground(dialog, driver.Pid);
+            DriverInput.Key(ProbeInput.VkEscape);
+            Thread.Sleep(300);
+            editor = OpenEditor(grid);
+        }
+
+        entry["editorEscaped"] = true;
+        if (editor is not null)
+        {
+            throw new DriverException($"a cell editor stays open after Escape ({editor}); no key was sent into the grid", evidence: entry);
+        }
+    }
+
+    // What UI Automation says about the selection of a row: the row, or its header, when one offers SelectionItemPattern. A Windows Forms grid
+    // may offer none, then the answer is unknown.
+    private static string SelectionOf(params AutomationElement?[] candidates)
+    {
+        foreach (AutomationElement? element in candidates)
+        {
+            if (element is not null && element.TryGetCurrentPattern(SelectionItemPattern.Pattern, out object? pattern))
+            {
+                return ((SelectionItemPattern)pattern).Current.IsSelected ? "selected" : "not selected";
+            }
+        }
+
+        return "unknown";
+    }
+
+    // Selects one data row to delete: first by invoking its row header (which selects the whole row), then the keyboard route when the row has
+    // no header, the invoke did not work, or UI Automation says the row is not selected. Returns the route used.
+    private string SelectRowForDelete(IntPtr dialog, AutomationElement grid, GridLive live, int target, JsonObject entry)
+    {
+        GridRowRead row = live.Shape.All[target];
+        int slot = row.ChildIndex;
+        AutomationElement? rowElement = slot >= 0 && slot < live.Children.Count ? live.Children[slot] : null;
+        AutomationElement? header = row.RowHeader is { } h && slot >= 0 && slot < live.Cells.Count && h < live.Cells[slot].Count ? live.Cells[slot][h] : null;
+        if (header is null)
+        {
+            entry["headerInvoke"] = "the row has no row header";
+        }
+        else
+        {
+            bool invoked;
+            try
+            {
+                invoked = ProbeUia.Invoke(header);
+            }
+            catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException)
+            {
+                invoked = false;
+                entry["headerInvokeError"] = ex.Message;
+            }
+
+            Thread.Sleep(200);
+            string selection = SelectionOf(rowElement, header);
+            entry["selection"] = selection;
+            if (!invoked)
+            {
+                entry["headerInvoke"] = "no Invoke pattern, or it failed";
+            }
+            else if (selection == "not selected")
+            {
+                entry["headerInvoke"] = "invoked, but the row is not selected";
+            }
+            else
+            {
+                entry["headerInvoke"] = "invoked";
+                DriverInput.RequireForeground(dialog, driver.Pid);
+                ProbeUia.Focus(grid);
+                Thread.Sleep(150);
+                return "rowHeader";
+            }
+        }
+
+        // The old route: the row is made the current row with the keyboard and selected with Shift+Space.
+        SelectGridRow(dialog, grid, target);
+        DriverInput.Chord(new[] { DriverInput.VkShift }, DriverInput.VkSpace);
+        return "keyboard";
+    }
+
+    private static JsonArray RowValues(GridShape shape) =>
+        new(shape.Rows.Select(r => (JsonNode?)new JsonArray(r.Texts.Select(t => (JsonNode?)JsonValue.Create(t)).ToArray())).ToArray());
+
+    // Deletes the data rows one by one, the last first. Returns the log of the passes. Stops with the log and the grid tree when
+    // MaxStalledPasses passes in a row did not lower the number of rows, and never runs more than MaxClearPasses. No key sent here is text.
+    private JsonArray ClearGrid(IntPtr dialog)
+    {
+        var passes = new JsonArray();
+        int stalled = 0;
+        for (int pass = 0; pass < MaxClearPasses; pass++)
+        {
+            AutomationElement grid = Grid(dialog);
+            GridLive before = ReadLive(grid);
+            int count = before.Shape.Rows.Count;
+            if (count == 0)
+            {
+                return passes;
+            }
+
+            int target = count - 1;
+            var entry = new JsonObject
+            {
+                ["pass"] = pass,
+                ["row"] = target,
+                ["rowName"] = before.Shape.Rows[target].Name,
+                ["rowsBefore"] = count,
+                ["filledBefore"] = FilledRows(before.Shape),
+                ["beforeValues"] = RowValues(before.Shape),
+            };
+            passes.Add(entry);
+            CloseEditorBeforeKeys(dialog, grid, entry);
+            entry["route"] = SelectRowForDelete(dialog, grid, before, target, entry);
+            DriverInput.RequireForeground(dialog, driver.Pid);
+            DriverInput.Key(DriverInput.VkDelete);
+            Thread.Sleep(300);
+
+            AutomationElement gridAfter = Grid(dialog);
+            GridLive after = ReadLive(gridAfter);
+            int left = after.Shape.Rows.Count;
+            entry["rowsAfter"] = left;
+            entry["filledAfter"] = FilledRows(after.Shape);
+            entry["afterValues"] = RowValues(after.Shape);
+            entry["editorOpenAfter"] = OpenEditor(gridAfter);
+            stalled = left < count ? 0 : stalled + 1;
+            if (stalled >= MaxStalledPasses)
+            {
+                throw new DriverException(
+                    $"{MaxStalledPasses} delete passes in a row did not remove a row ({left} rows left)",
+                    evidence: new JsonObject { ["passes"] = passes, ["gridRead"] = GridEvidence(after), ["tree"] = ProbeUia.Tree(gridAfter, 4, 300, rawView: false) });
+            }
+        }
+
+        throw new DriverException(
+            $"the grid still has rows after {MaxClearPasses} delete passes",
+            evidence: new JsonObject { ["passes"] = passes, ["tree"] = ProbeUia.Tree(Grid(dialog), 4, 300, rawView: false) });
     }
 
     private JsonObject EditList(OptionGroup group, OptionSpec spec)
@@ -230,9 +437,8 @@ internal sealed partial class PolicyDialog
             result["before"] = ReadGrid(dialog.Hwnd);
             if (spec.ClearRows is true)
             {
-                ClearGrid(dialog.Hwnd);
-                List<List<string>> afterClear = GridCells(Grid(dialog.Hwnd));
-                if (afterClear.Any(r => !IsEmptyRow(r)))
+                result["clearPasses"] = ClearGrid(dialog.Hwnd);
+                if (ReadLive(Grid(dialog.Hwnd)).Shape.Rows.Count > 0)
                 {
                     throw new DriverException("rows remain after clearing", evidence: ReadGrid(dialog.Hwnd));
                 }

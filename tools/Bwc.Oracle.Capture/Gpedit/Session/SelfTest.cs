@@ -253,6 +253,7 @@ internal static partial class SelfTest
         MatrixCases(repo, paths, Case);
         CheckBoxCases(repo, Case);
         PushButtonCases(repo, Case);
+        GridCases(repo, Case);
 
         var report = new JsonObject
         {

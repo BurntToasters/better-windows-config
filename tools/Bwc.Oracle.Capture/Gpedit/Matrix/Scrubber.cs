@@ -34,6 +34,8 @@ internal sealed partial class Scrubber
         "checkStateVia", "checkEvidence",
         // What the test for the Show button of a list saw on each inner BUTTON (failure mode 36 of the driver document).
         "pushEvidence",
+        // How the Show Contents grid was classified, and what each delete pass of a clear saw (failure mode 37 of the driver document).
+        "gridRead", "clearPasses",
     };
 
     private readonly HashSet<string> allowed;

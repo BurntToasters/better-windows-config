@@ -660,10 +660,103 @@ Read and not changed, because it cannot be proved without classic (for the next 
 
 - `PolicyDialog.GridRowElements` expects the rows as UI Automation `DataItem` children of `dataGrid`, with a fallback to any child that has
   children. `PolicyDialog.CellValue` reads a cell through `ValuePattern` and falls back to its name. A Windows Forms `DataGridView` may expose
-  other types. An empty `rows` in the result with the grid tree attached would show it.
+  other types. An empty `rows` in the result with the grid tree attached would show it. Answered by the run that found section 37: the rows
+  are `Custom` elements, not `DataItem`, and the fallback took the column header row as a data row. Section 37 replaces both.
 - `PolicyDialog.WriteCell` and `SelectGridRow` assume `ProbeUia.Focus(grid)` puts the keyboard focus in the grid, that Ctrl+Home goes to the
-  first cell and that F2 opens the edit mode. The read-back of each cell fails the operation if not.
+  first cell and that F2 opens the edit mode. The read-back of each cell fails the operation if not. Still open after section 37. Section 37
+  fixes only the row and column numbers these two functions were given.
 - `GpeditDriver.CancelWindow` falls back to `GetDlgItem(IDCANCEL)` and BM_CLICK, which assumes a native dialog id. For the Show Contents dialog
   the first route (`buttonCancel` by automation id, Invoke) is the one in use, and Escape follows. The fallback is harmless on a Forms dialog.
 - `GpeditDriver.IsOpen` (`IsWindow` and `IsWindowVisible`) decides that the dialog closed. A `ShowDialog` form is hidden before it is
   destroyed, so it is read as closed from the hide.
+
+## 37. The Show Contents grid as Windows Forms exposes it
+
+The Show button now opens the dialog (section 36), and the three list cases (`B/Pol_List_Plain`, `B/Pol_List_EmptyPrefix`,
+`B/Pol_List_Additive`) then failed in the steps that clear the list and write 2, 1 or 0 rows (operations 2, 4 and 6) with `the grid still has rows
+after 200 delete passes`, thrown from `ClearGrid`. In operations 4 and 6 the grid held no entry at all, and the clear still looped. The failure
+was in how the driver read the grid, not in the keys it sent. This section changes how rows and cells are told apart and how a row is selected
+and deleted. It changes no wait, timeout or sleep, no plan version and no golden.
+
+What the grid looks like (UI Automation control view, `evidence` of operation 2 in `artifacts/oracle/gpedit/matrix/B/Pol_List_Plain/result.json`):
+`dataGrid` is a Windows Forms `DataGridView`, control type Table, patterns Grid and Table. Its children are not `DataItem` elements:
+
+- `Top Row`, control type Custom, no patterns. Its children are two Header elements: `Top Left Header Cell` and the column header `Value`.
+- `Row 0`, control type Custom. Its children are a Header named `Row 0` (patterns Invoke and Value, value empty), which is the row header, and
+  an Edit named `Value Row 0, Not sorted.` (patterns Invoke, Value, GridItem, TableItem), which is the data cell. Its value was `e`.
+- `Row 1`, the same shape, with the data cell value `(null)`. This is the new row of the grid (`AllowUserToAddRows`). `(null)` is the text
+  Windows Forms accessibility gives a null cell value. Operations 4 and 6 held only `Top Row` and one row with `(null)`.
+
+Why the clear never ended, from reading the code against that tree:
+
+1. `GridRowElements` found no `DataItem` and fell back to every child that is not a Header and has children. `Top Row` is such a child, so
+   the column header row counted as a data row. Its cells read the header names through the name fallback of `CellValue`, so it was never empty.
+2. Every row's children include the row header, so the cell indexes of `ReadCell` were one more than the indexes `WriteCell` walks (Ctrl+Home
+   goes to the first data cell, then Right).
+3. `IsEmptyRow` took `(null)` as content, so the new row was a row to delete, and it cannot be deleted.
+4. The row index used for the Down presses of `SelectGridRow` counted `Top Row`, so it pointed one row too far.
+
+What the code does now. The classification is a pure function over plain values in `Driver/GridRead.cs`, covered by `gpedit selftest` before the
+code was written. Input is, per child of the grid, its control type and name, and per cell of that child its control type, value (null when
+there is no `ValuePattern`), name and whether it has `GridItemPattern`. Output:
+
+- The header row is any child whose cells are all Header elements. It is never a data row. A child of control type ScrollBar or Edit (a cell
+  editor that is open) is never a row. When any child is a `DataItem`, the `DataItem` children are the rows (the shape the code first assumed);
+  otherwise every other child with at least one cell is a row.
+- The data cells of a row are its non-Header cells, and when some of them have `GridItemPattern`, only those. The row header is never a data
+  cell, so cell column 0 is the first value column for the read and the write alike.
+- The text of a data cell is its value. A cell with `GridItemPattern` and no value reads as empty (its name is a description such as
+  `Value Row 0, Not sorted.`, not the content). A cell without `GridItemPattern` falls back to its name, as `CellValue` did.
+- A cell text of exactly `(null)`, null, or only white space is empty. The new row is the last data row when all its data cells are empty. It is
+  not a row of the list: it is not reported, not counted and never deleted. An empty row that is followed by a filled row is a real row.
+- A row is filled when any data cell is not empty. The row index used for the keyboard (Down presses after Ctrl+Home) is the index among the data
+  rows, where the new row, when it exists, is the last.
+
+`ClearGrid` deletes the last data row that is not the new row, one per pass, until none is left. A pass selects the row by invoking its row
+header (the Windows Forms row header does select the whole row on its default action), then moves the keyboard focus to the grid and presses
+Delete. If the row has no row header, or the invoke fails, or UI Automation says the row is not selected, the old keyboard route is used
+(Ctrl+Home, Down to the row, Shift+Space, Delete). Before any key press the driver checks that no cell editor is open (a child of the grid with
+control type Edit, or a focused Edit element that has a window handle) and presses Escape first if one is. The clear never types text. After each
+pass the grid is read again. The pass log holds the route, whether an editor was closed, what UI Automation said about the selection, the data
+row count and filled row count before and after, and the data cell values before and after. The clear stops with the pass log and the grid tree
+as evidence when 3 passes in a row do not lower the data row count, and keeps 200 as the hard cap.
+
+`ReadGrid` reports the data rows only (`rowCount`, `filledRows`, `rows`), with `(null)` shown as an empty string. `WriteCell` keeps the keyboard
+route with the data row index, and `ReadCell` reads the same data cell and compares with `(null)` read as empty. Writing into the new row makes
+a row, which is expected, and a new last row appears.
+
+What can go wrong and the guard of each:
+
+- The header row is counted as data. The guard is the rule that a row whose cells are all Header elements is the header row. The self test has
+  the shape of operation 2 and an empty grid with only the header row.
+- The row header shifts the cell columns. The guard is that Header cells are never data cells, in the read, the read-back and the evidence. The
+  self test has a one column and a two column grid.
+- The new row is deleted or counted. The guard is the placeholder rule, plus the stop after 3 passes without progress, so a new row that was not
+  recognized ends the clear with evidence and not after 200 passes of key presses.
+- A planned cell is the text `(null)`. That text would be read as empty. The guard is a matrix plan check (`gpedit selftest`) that no planned
+  list cell is exactly `(null)`.
+- Keys land in a cell editor. This is how the stray `e` in data row 0 during operation 2 might have come about (the dialog was cancelled, so
+  nothing was saved), but the cause is not proved. The guards are the editor check with Escape before each key, no typing key in a clear, and
+  the per pass log, so a stray character shows in `afterValues` of the pass in which it appeared.
+- The row header invoke does not select the row. The grid has no selection pattern, and neither the rows nor the headers offer
+  `SelectionItemPattern`, so the selection is most likely not observable and is recorded as `unknown`. The guard is the progress rule. A pass
+  that does not delete anything is logged, and the third in a row stops the clear.
+- A delete removes more than one row, or a different row than the last. The pass log has the values before and after, so it shows. The clear
+  aims at an empty list, so it carries on from what it reads.
+- The grid reads late after a delete, so a pass looks like no progress. The 300 ms pause after the key stays, the read comes after it, and the
+  limit of 3 passes absorbs one late read.
+- A diagnostic field leaks into a golden. The classification is written next to the grid as `gridRead` and the pass log as `clearPasses`. Both
+  are in the scrubber's drop list, and the self test builds a golden from a node that carries both keys and requires that neither text appears.
+  The goldens already captured hold no list option and are not changed.
+
+Unproved, for the next real run to confirm from `result.json` (`ops[n].data` of the list steps, or `ops[n].evidence` on a failure):
+
+- Whether the row header invoke selects the row and whether Delete then removes it: `clearPasses[].route`, `selection`, `rowsBefore` and
+  `rowsAfter`.
+- Whether the new row always reads `(null)` (or empty), also after rows were written: `gridRead.placeholder` and the row values.
+- Whether the keyboard write into the new row creates the row and moves the new row down: the `cells` entries of `EditList` and the
+  `afterEdit` grid.
+- Where the stray `e` came from: `afterValues` of each clear pass.
+- Whether a list with explicit values (name and value) exposes two data cells per row, and whether Right moves between them: not seen yet.
+  The first run with `B/Pol_List_ExplicitValue` will show it in `gridRead.rows[].cells`.
+- Whether classic keeps an empty entry as a row after OK and reopening, which decides whether a committed empty row can exist at all.
