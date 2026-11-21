@@ -1,0 +1,1630 @@
+{
+  "case": "B/Pol_Enum_NoSortDefaultItem",
+  "description": "Pol_Enum_NoSortDefaultItem under Computer Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
+  "planVersion": 2,
+  "planHash": "efe057ee788395f0f432412e17e1ac1bde00f4f38f20a6cef6eb08aaa297d59e",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice without sorting and with a default item' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice without sorting and with a default item",
+        "state": "Enabled",
+        "policyId": "Pol_Enum_NoSortDefaultItem",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step enabled-defaults",
+      "plan": "snapshot  [step enabled-defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice without sorting and with a default item' state Enabled options [Unsorted choice: = item 'Zulu'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice without sorting and with a default item",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Unsorted choice:",
+            "expectKind": "dropdownList",
+            "item": "Zulu",
+            "elementId": "UnsortedChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_NoSortDefaultItem",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step enabled-alt1-item0",
+      "plan": "snapshot  [step enabled-alt1-item0]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt1-item0"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice without sorting and with a default item' state Enabled options [Unsorted choice: = item 'Alpha'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice without sorting and with a default item",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Unsorted choice:",
+            "expectKind": "dropdownList",
+            "item": "Alpha",
+            "elementId": "UnsortedChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_NoSortDefaultItem",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step enabled-alt2-item1",
+      "plan": "snapshot  [step enabled-alt2-item1]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt2-item1"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice without sorting and with a default item' state Enabled options [Unsorted choice: = item 'Mike'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice without sorting and with a default item",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Unsorted choice:",
+            "expectKind": "dropdownList",
+            "item": "Mike",
+            "elementId": "UnsortedChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_NoSortDefaultItem",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step enabled-alt3-item2",
+      "plan": "snapshot  [step enabled-alt3-item2]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt3-item2"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice without sorting and with a default item' state Disabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice without sorting and with a default item",
+        "state": "Disabled",
+        "policyId": "Pol_Enum_NoSortDefaultItem",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice without sorting and with a default item' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice without sorting and with a default item",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Enum_NoSortDefaultItem",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled-defaults",
+      "folder": "step-01-enabled-defaults",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 152,
+          "sha256": "70395fa948ca8969581a62099a23b95102d2bb6201deff9e2d8e93e49a4389e8"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 152
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-alt1-item0",
+      "folder": "step-02-enabled-alt1-item0",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 152,
+          "sha256": "591a14b187239e3e85602aff97a17018eabb7075dcb377792367895f416b605f"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 152
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "enabled-alt2-item1",
+      "folder": "step-03-enabled-alt2-item1",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 152,
+          "sha256": "70395fa948ca8969581a62099a23b95102d2bb6201deff9e2d8e93e49a4389e8"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 152
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "enabled-alt3-item2",
+      "folder": "step-04-enabled-alt3-item2",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 152,
+          "sha256": "a9b41abdc8897b9dd1386429e074f55478acc982a4dae7e53d89894e8f173244"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 152
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "disabled",
+      "folder": "step-05-disabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 164,
+          "sha256": "698e12404aa8dc9a00710dc071fbfd011489624832ed3f441203d413b8183b2f"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "3d7852515a0bf5fb21e7bd617587b28631bf49dfe21ba731d567c4c55a6f2f16"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 164
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "label": "not-configured",
+      "folder": "step-06-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "6fb49111183180e61d7a344bfbd124a68a8cfcc2a0b289591fe9b6f8c22badfe"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 6,
+        "machine": 6,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Choice without sorting and with a default item",
+        "before": {
+          "title": "Choice without sorting and with a default item",
+          "windowTitle": "Choice without sorting and with a default item",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list that keeps the order of the template and starts on the second item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Unsorted choice:",
+              "panelId": "#54ce0943daeb",
+              "controlId": "#3cfbb9be1a2b",
+              "rect": [
+                76,
+                640,
+                412,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Zulu",
+                "Alpha",
+                "Mike"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice without sorting and with a default item",
+          "windowTitle": "Choice without sorting and with a default item",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list that keeps the order of the template and starts on the second item.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Unsorted choice:",
+              "panelId": "#54ce0943daeb",
+              "controlId": "#3cfbb9be1a2b",
+              "rect": [
+                76,
+                640,
+                412,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Zulu",
+                "Alpha",
+                "Mike"
+              ],
+              "selectedIndex": 1,
+              "selectedText": "Alpha"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice without sorting and with a default item",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice without sorting and with a default item"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 152,
+          "sha256": "70395fa948ca8969581a62099a23b95102d2bb6201deff9e2d8e93e49a4389e8"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Choice without sorting and with a default item",
+        "before": {
+          "title": "Choice without sorting and with a default item",
+          "windowTitle": "Choice without sorting and with a default item",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list that keeps the order of the template and starts on the second item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Unsorted choice:",
+              "panelId": "#54ce0943daeb",
+              "controlId": "#3cfbb9be1a2b",
+              "rect": [
+                128,
+                692,
+                412,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Zulu",
+                "Alpha",
+                "Mike"
+              ],
+              "selectedIndex": 1,
+              "selectedText": "Alpha"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Zulu",
+            "requestedIndex": 0,
+            "beforeIndex": 1,
+            "observedIndex": 0,
+            "observedText": "Zulu",
+            "items": [
+              "Zulu",
+              "Alpha",
+              "Mike"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Unsorted choice:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#3cfbb9be1a2b"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice without sorting and with a default item",
+          "windowTitle": "Choice without sorting and with a default item",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list that keeps the order of the template and starts on the second item.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Unsorted choice:",
+              "panelId": "#54ce0943daeb",
+              "controlId": "#3cfbb9be1a2b",
+              "rect": [
+                128,
+                692,
+                412,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Zulu",
+                "Alpha",
+                "Mike"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Zulu"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice without sorting and with a default item",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice without sorting and with a default item"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 152,
+          "sha256": "591a14b187239e3e85602aff97a17018eabb7075dcb377792367895f416b605f"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 2,
+      "gptVersionAfter": 3,
+      "data": {
+        "policy": "Choice without sorting and with a default item",
+        "before": {
+          "title": "Choice without sorting and with a default item",
+          "windowTitle": "Choice without sorting and with a default item",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list that keeps the order of the template and starts on the second item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Unsorted choice:",
+              "panelId": "#54ce0943daeb",
+              "controlId": "#3cfbb9be1a2b",
+              "rect": [
+                180,
+                744,
+                412,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Zulu",
+                "Alpha",
+                "Mike"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Zulu"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Alpha",
+            "requestedIndex": 1,
+            "beforeIndex": 0,
+            "observedIndex": 1,
+            "observedText": "Alpha",
+            "items": [
+              "Zulu",
+              "Alpha",
+              "Mike"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Unsorted choice:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#3cfbb9be1a2b"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice without sorting and with a default item",
+          "windowTitle": "Choice without sorting and with a default item",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list that keeps the order of the template and starts on the second item.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Unsorted choice:",
+              "panelId": "#54ce0943daeb",
+              "controlId": "#3cfbb9be1a2b",
+              "rect": [
+                180,
+                744,
+                412,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Zulu",
+                "Alpha",
+                "Mike"
+              ],
+              "selectedIndex": 1,
+              "selectedText": "Alpha"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice without sorting and with a default item",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice without sorting and with a default item"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 152,
+          "sha256": "70395fa948ca8969581a62099a23b95102d2bb6201deff9e2d8e93e49a4389e8"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 3,
+      "gptVersionAfter": 4,
+      "data": {
+        "policy": "Choice without sorting and with a default item",
+        "before": {
+          "title": "Choice without sorting and with a default item",
+          "windowTitle": "Choice without sorting and with a default item",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list that keeps the order of the template and starts on the second item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Unsorted choice:",
+              "panelId": "#54ce0943daeb",
+              "controlId": "#3cfbb9be1a2b",
+              "rect": [
+                232,
+                796,
+                412,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Zulu",
+                "Alpha",
+                "Mike"
+              ],
+              "selectedIndex": 1,
+              "selectedText": "Alpha"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Mike",
+            "requestedIndex": 2,
+            "beforeIndex": 1,
+            "observedIndex": 2,
+            "observedText": "Mike",
+            "items": [
+              "Zulu",
+              "Alpha",
+              "Mike"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Unsorted choice:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#3cfbb9be1a2b"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice without sorting and with a default item",
+          "windowTitle": "Choice without sorting and with a default item",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list that keeps the order of the template and starts on the second item.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Unsorted choice:",
+              "panelId": "#54ce0943daeb",
+              "controlId": "#3cfbb9be1a2b",
+              "rect": [
+                232,
+                796,
+                412,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Zulu",
+                "Alpha",
+                "Mike"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "Mike"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice without sorting and with a default item",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice without sorting and with a default item"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 152,
+          "sha256": "a9b41abdc8897b9dd1386429e074f55478acc982a4dae7e53d89894e8f173244"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 4,
+      "gptVersionAfter": 5,
+      "data": {
+        "policy": "Choice without sorting and with a default item",
+        "before": {
+          "title": "Choice without sorting and with a default item",
+          "windowTitle": "Choice without sorting and with a default item",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list that keeps the order of the template and starts on the second item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Unsorted choice:",
+              "panelId": "#54ce0943daeb",
+              "controlId": "#3cfbb9be1a2b",
+              "rect": [
+                284,
+                848,
+                412,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Zulu",
+                "Alpha",
+                "Mike"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "Mike"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice without sorting and with a default item",
+          "windowTitle": "Choice without sorting and with a default item",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list that keeps the order of the template and starts on the second item.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Unsorted choice:",
+              "panelId": "#54ce0943daeb",
+              "controlId": "#3cfbb9be1a2b",
+              "rect": [
+                284,
+                848,
+                412,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Zulu",
+                "Alpha",
+                "Mike"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Zulu"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice without sorting and with a default item",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 5,
+                "machine": 5,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice without sorting and with a default item"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 164,
+          "sha256": "698e12404aa8dc9a00710dc071fbfd011489624832ed3f441203d413b8183b2f"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "3d7852515a0bf5fb21e7bd617587b28631bf49dfe21ba731d567c4c55a6f2f16"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      }
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 5,
+      "gptVersionAfter": 6,
+      "data": {
+        "policy": "Choice without sorting and with a default item",
+        "before": {
+          "title": "Choice without sorting and with a default item",
+          "windowTitle": "Choice without sorting and with a default item",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list that keeps the order of the template and starts on the second item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Unsorted choice:",
+              "panelId": "#54ce0943daeb",
+              "controlId": "#3cfbb9be1a2b",
+              "rect": [
+                336,
+                900,
+                412,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Zulu",
+                "Alpha",
+                "Mike"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice without sorting and with a default item",
+          "windowTitle": "Choice without sorting and with a default item",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list that keeps the order of the template and starts on the second item.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Unsorted choice:",
+              "panelId": "#54ce0943daeb",
+              "controlId": "#3cfbb9be1a2b",
+              "rect": [
+                336,
+                900,
+                412,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Zulu",
+                "Alpha",
+                "Mike"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice without sorting and with a default item",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 5,
+                "machine": 5,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 6,
+                "machine": 6,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice without sorting and with a default item"
+      }
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "6fb49111183180e61d7a344bfbd124a68a8cfcc2a0b289591fe9b6f8c22badfe"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 6,
+        "machine": 6,
+        "user": 0
+      }
+    }
+  ]
+}

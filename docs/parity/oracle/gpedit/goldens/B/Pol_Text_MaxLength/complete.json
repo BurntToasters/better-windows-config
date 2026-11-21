@@ -1,0 +1,22 @@
+{
+  "case": "B/Pol_Text_MaxLength",
+  "planHash": "68bb3232cb5b587cdb9f5a62b2939d9388ced782142a7353512559de1b56a3c0",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/User.Registry.pol",
+    "step-01-enabled-defaults/User.comment.cmtx",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-enabled-alt1-text/User.Registry.pol",
+    "step-02-enabled-alt1-text/User.comment.cmtx",
+    "step-02-enabled-alt1-text/gpt.ini",
+    "step-03-disabled/User.Registry.pol",
+    "step-03-disabled/User.comment.cmtx",
+    "step-03-disabled/gpt.ini",
+    "step-04-not-configured/User.Registry.pol",
+    "step-04-not-configured/User.comment.cmtx",
+    "step-04-not-configured/gpt.ini"
+  ]
+}

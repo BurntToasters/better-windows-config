@@ -1,0 +1,1972 @@
+{
+  "case": "B/Pol_Enum_DecimalItems",
+  "description": "Pol_Enum_DecimalItems under Computer Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
+  "planVersion": 2,
+  "planHash": "aa3356fea3d6e608aefaa12874236bae149cc53efe40e4b00e52448d6800e44c",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with decimal items' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with decimal items",
+        "state": "Enabled",
+        "policyId": "Pol_Enum_DecimalItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step enabled-defaults",
+      "plan": "snapshot  [step enabled-defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with decimal items' state Enabled options [Number choice: = item 'Zero'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with decimal items",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Number choice:",
+            "expectKind": "dropdownList",
+            "item": "Zero",
+            "elementId": "DecimalChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_DecimalItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step enabled-alt1-item0",
+      "plan": "snapshot  [step enabled-alt1-item0]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt1-item0"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with decimal items' state Enabled options [Number choice: = item 'One'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with decimal items",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Number choice:",
+            "expectKind": "dropdownList",
+            "item": "One",
+            "elementId": "DecimalChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_DecimalItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step enabled-alt2-item1",
+      "plan": "snapshot  [step enabled-alt2-item1]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt2-item1"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with decimal items' state Enabled options [Number choice: = item 'Two'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with decimal items",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Number choice:",
+            "expectKind": "dropdownList",
+            "item": "Two",
+            "elementId": "DecimalChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_DecimalItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step enabled-alt3-item2",
+      "plan": "snapshot  [step enabled-alt3-item2]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt3-item2"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with decimal items' state Enabled options [Number choice: = item 'Three'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with decimal items",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Number choice:",
+            "expectKind": "dropdownList",
+            "item": "Three",
+            "elementId": "DecimalChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_DecimalItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step enabled-alt4-item3",
+      "plan": "snapshot  [step enabled-alt4-item3]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt4-item3"
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with decimal items' state Disabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with decimal items",
+        "state": "Disabled",
+        "policyId": "Pol_Enum_DecimalItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 12,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with decimal items' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with decimal items",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Enum_DecimalItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 13,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled-defaults",
+      "folder": "step-01-enabled-defaults",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-alt1-item0",
+      "folder": "step-02-enabled-alt1-item0",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "1b316e38896289e18754c4c84948781765d643647394bbc41d1e75e92582d9fa"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 150
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "enabled-alt2-item1",
+      "folder": "step-03-enabled-alt2-item1",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "6f87adb80c9b87759ec0139a223d91ea231c66d281a0cb6aca74aa4b7867cfd7"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 150
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "enabled-alt3-item2",
+      "folder": "step-04-enabled-alt3-item2",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "be38c5a363c0d7781bbd469c2367672df7984ab4759ebc6161dc1d2f4704fefc"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 150
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "enabled-alt4-item3",
+      "folder": "step-05-enabled-alt4-item3",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "9dbd1644931e94972bb4087750863e8309bd1fcbce472aa83ae51ad01dc3cc76"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 150
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "label": "disabled",
+      "folder": "step-06-disabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 162,
+          "sha256": "38f75a50e27d8d6a52c7749cdf912ea23c8e902e5287394df3fa74c5c0e46df0"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "3d7852515a0bf5fb21e7bd617587b28631bf49dfe21ba731d567c4c55a6f2f16"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 162
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "label": "not-configured",
+      "folder": "step-07-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "6fb49111183180e61d7a344bfbd124a68a8cfcc2a0b289591fe9b6f8c22badfe"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 6,
+        "machine": 6,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Choice with decimal items",
+        "before": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                336,
+                900,
+                404,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                336,
+                900,
+                404,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with decimal items",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#0474db6e43e3"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "applyEnabledAfter": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                336,
+                900,
+                404,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "Choice with decimal items",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": null
+          }
+        },
+        "finalTitle": "Choice with decimal items"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Choice with decimal items",
+        "before": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                388,
+                952,
+                404,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Zero",
+            "requestedIndex": 3,
+            "beforeIndex": -1,
+            "observedIndex": 3,
+            "observedText": "Zero",
+            "items": [
+              "One",
+              "Three",
+              "Two",
+              "Zero"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Number choice:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#e0213a884046"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                388,
+                952,
+                404,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": 3,
+              "selectedText": "Zero"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with decimal items",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice with decimal items"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "1b316e38896289e18754c4c84948781765d643647394bbc41d1e75e92582d9fa"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Choice with decimal items",
+        "before": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                440,
+                1004,
+                404,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": 3,
+              "selectedText": "Zero"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "One",
+            "requestedIndex": 0,
+            "beforeIndex": 3,
+            "observedIndex": 0,
+            "observedText": "One",
+            "items": [
+              "One",
+              "Three",
+              "Two",
+              "Zero"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Number choice:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#e0213a884046"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                440,
+                1004,
+                404,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "One"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with decimal items",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice with decimal items"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "6f87adb80c9b87759ec0139a223d91ea231c66d281a0cb6aca74aa4b7867cfd7"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 2,
+      "gptVersionAfter": 3,
+      "data": {
+        "policy": "Choice with decimal items",
+        "before": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                492,
+                1056,
+                404,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "One"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Two",
+            "requestedIndex": 2,
+            "beforeIndex": 0,
+            "observedIndex": 2,
+            "observedText": "Two",
+            "items": [
+              "One",
+              "Three",
+              "Two",
+              "Zero"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Number choice:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#e0213a884046"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                492,
+                1056,
+                404,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "Two"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with decimal items",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice with decimal items"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "be38c5a363c0d7781bbd469c2367672df7984ab4759ebc6161dc1d2f4704fefc"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 3,
+      "gptVersionAfter": 4,
+      "data": {
+        "policy": "Choice with decimal items",
+        "before": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                544,
+                1108,
+                404,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "Two"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Three",
+            "requestedIndex": 1,
+            "beforeIndex": 2,
+            "observedIndex": 1,
+            "observedText": "Three",
+            "items": [
+              "One",
+              "Three",
+              "Two",
+              "Zero"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Number choice:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#e0213a884046"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                544,
+                1108,
+                404,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": 1,
+              "selectedText": "Three"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with decimal items",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice with decimal items"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "9dbd1644931e94972bb4087750863e8309bd1fcbce472aa83ae51ad01dc3cc76"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      }
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 4,
+      "gptVersionAfter": 5,
+      "data": {
+        "policy": "Choice with decimal items",
+        "before": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                596,
+                1160,
+                404,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": 1,
+              "selectedText": "Three"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                596,
+                1160,
+                404,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "One"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with decimal items",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 5,
+                "machine": 5,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice with decimal items"
+      }
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 162,
+          "sha256": "38f75a50e27d8d6a52c7749cdf912ea23c8e902e5287394df3fa74c5c0e46df0"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "3d7852515a0bf5fb21e7bd617587b28631bf49dfe21ba731d567c4c55a6f2f16"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      }
+    },
+    {
+      "index": 12,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 5,
+      "gptVersionAfter": 6,
+      "data": {
+        "policy": "Choice with decimal items",
+        "before": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                76,
+                640,
+                404,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with decimal items",
+          "windowTitle": "Choice with decimal items",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the numbers 0 to 3.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Number choice:",
+              "panelId": "#f03eb9df5e54",
+              "controlId": "#e0213a884046",
+              "rect": [
+                76,
+                640,
+                404,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "One",
+                "Three",
+                "Two",
+                "Zero"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with decimal items",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 5,
+                "machine": 5,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 6,
+                "machine": 6,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice with decimal items"
+      }
+    },
+    {
+      "index": 13,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "6fb49111183180e61d7a344bfbd124a68a8cfcc2a0b289591fe9b6f8c22badfe"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 6,
+        "machine": 6,
+        "user": 0
+      }
+    }
+  ]
+}
