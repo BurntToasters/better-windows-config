@@ -41,7 +41,7 @@ internal static class OpsRunner
         {
             driver = GpeditDriver.Start(ctx, Path.Combine(outDir, name), file.StartMayBeRefused);
             root["pid"] = driver.Pid;
-            var timing = new JsonObject { ["classicStartMs"] = driver.ClassicStartMs, ["treeReadyMs"] = driver.TreeReadyMs };
+            var timing = new JsonObject { ["classicStartMs"] = driver.ClassicStartMs, ["treeReadyMs"] = driver.TreeReadyMs, ["treeReadyVia"] = driver.TreeReadyVia };
             root["timing"] = timing;
             if (driver.StartRefusal is { } refusal)
             {

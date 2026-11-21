@@ -511,3 +511,63 @@ A start that classic refuses:
   after classic closed (`filesAfterRefusal`) so the golden can state whether they still equal the start files.
 - A refusal whose dialog window is the one this driver took for the main window (its title holds "Group Policy") is handled the same way,
   because the check looks at every visible top level window of the process, not at `Dialogs()`, which leaves the main window out.
+
+## 34. Finding the console tree and the selected node without a search of the whole window
+
+The per-hop timing of section 33 (`A/Machine_Enabled`, 76 s) showed where the time goes. `FindTree` costs about 8.1 s a call: a
+`TreeScope.Descendants` search for a Tree over the whole main window, then a second one by class name when the first finds nothing. It runs
+in each warm-up root, each `ResolveNode` and inside each `SelectedPath()`, which then adds a `FindFirst` for the selected item and costs about
+10.5 s. The tree-ready wait and the start refusal check use the same search. The hops themselves cost under 100 ms. About 50 s of the 76 s
+are these searches. This section replaces how the two elements are looked up and nothing else: no wait, timeout or sleep is shortened,
+removed or reordered, no action sent to classic changes (expand, select, click, keys), and the data read is the data read before. Every fast
+route has a fallback to the old search, so the worst case is the old cost.
+
+The routes:
+
+- Tree by window. The visible `SysTreeView32` window below the main window is found with Win32 (the same child enumeration the list lookup
+  and `FindTreeWindow` use), and its element is taken with `AutomationElement.FromHandle`. The route name is `hwnd`. The old searches
+  keep the names `uiaType` (Descendants search for ControlType Tree) and `uiaClass` (Descendants search for class `SysTreeView32`), and
+  `findTreeVia` in the hop timing says which one found the tree (`timing.treeReadyVia` says it for the tree-ready wait at the start). There is no cache: the window lookup costs milliseconds, and a cache
+  would need the checks below on every use anyway.
+- Selected node by pattern. The tree element's `SelectionPattern.GetSelection()` gives the selected item. The path is then built with the
+  same parent walk and the same names as before. The route is counted in the hop timing under `routes` (`selectedPath.selectionPattern`
+  or the reason for the fallback, `selectedPath.fallback...`), and the tree route of the lookup inside `SelectedPath()` under
+  `selectedPath.findTree.<route>`.
+
+What can go wrong and the guard of each:
+
+- Two visible `SysTreeView32` windows (a snap-in that shows a second tree, a tree inside the result pane). The old search returned the first
+  match in UI Automation order, and the window order of Win32 need not be the same. The fast route is used only when exactly one visible
+  `SysTreeView32` window with an area exists. Two or more means the old search runs.
+- A hidden `SysTreeView32` (MMC keeps views it showed before, and a favorites tree). A window that is not visible, or has an empty
+  rectangle, is not a candidate. One visible window next to hidden ones is the tree.
+- The handle of a window that is destroyed between the enumeration and the use. `FromHandle` throws (`ElementNotAvailableException`,
+  `ArgumentException`, `InvalidOperationException`, `COMException`, `Win32Exception`) or the window is gone when checked after it. Every
+  such outcome falls back to the old search. The window must also still exist and still be visible after the element was taken, and the
+  element's native window handle must be that handle.
+- `FromHandle` of a window that UI Automation does not know yet (classic is still starting). The element is accepted only when its control
+  type is Tree or its class name is `SysTreeView32`, which is what the old searches accepted. Any other element, or a read of those two
+  properties that throws, falls back. While classic still shows no tree window at all, the tree-ready wait polls as before: no window means
+  the old search for that poll, and the 30 s wait, its timeout and its failure evidence stay unchanged.
+- `SelectionPattern` missing on the tree element (the proxy of the tree view may not offer it). No pattern means the old `FindFirst`.
+  A pattern call that throws (element gone, classic busy) means the old `FindFirst`, which then throws or answers exactly as it did
+  before. When classic is dead, `Main()` and the old search throw the same dead-process error as before.
+- `GetSelection()` returns no item. That is also what a tree with nothing selected returns, but it can also be a proxy that does not
+  report the selection, so it is not taken as the answer: the old `FindFirst` runs and decides (null when it finds none, as before).
+- `GetSelection()` returns more than one item. The console tree selects one node, so this is unexpected and falls back.
+- The returned element is not a TreeItem. The parent walk would then stop at once and give a short or empty list. It falls back.
+- The returned item does not report `IsSelected` through its `SelectionItemPattern`. The old search matched on exactly that property,
+  so an item that does not report it is not the one the old search would have found. It falls back. This is the guard for a selection
+  that differs between the routes: the fast answer is used only when it satisfies the old condition (TreeItem and IsSelected), and
+  everything after is the same walk, so the same UI state gives the same list of names.
+- A stale cached element. Nothing is cached across calls (tree element, selected item or handle), so there is nothing to go stale. Each
+  call enumerates the windows and takes a fresh element.
+- Wrong timing data. The route names go only to the untracked result file (`hopPhases` and `warmUp.roots[].resolve`), never into `data`,
+  and the scrubber and the golden builder drop them by name as they drop the other timing keys (section 33).
+
+Not changed here, found while reading the code: other `TreeScope.Descendants` searches under the main window. `ReadStatus` (UI Automation names
+of the status bar, a StatusBar search over the main window on each call, run by the `readList` and `readStatus` operations and by the filter
+operations) and `DistinctTabs` (a TabItem search over the main window, run by the tab operations) have the cost of the old `FindTree`, which
+is about 8 s a call. `ListCandidates` asks for the HeaderItem descendants of each visible list on every `VisibleList()` call, which runs
+in each poll of `WaitListStable` (inside every `SelectNode`) and of `FindPolicyRow`. Its cost on a list of several hundred rows was not
+measured.

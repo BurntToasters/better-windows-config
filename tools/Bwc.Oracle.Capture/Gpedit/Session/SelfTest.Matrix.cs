@@ -136,7 +136,7 @@ internal static partial class SelfTest
             CaseOutcome outcome = CaseOutput.Write(goldens, c, result, scrub, optional);
             Expect(outcome.Complete, "the golden was not written: " + outcome.Failure);
             string dir = CaseOutput.CaseDir(goldens, c);
-            foreach (string key in new[] { "\"phases\"", "\"hopPhases\"", "\"timing\"", "findTreeMs", "pollCount", "waitIdleMs" })
+            foreach (string key in new[] { "\"phases\"", "\"hopPhases\"", "\"timing\"", "findTreeMs", "findTreeVia", "\"routes\"", "pollCount", "waitIdleMs" })
             {
                 ExpectNoText(dir, key, "a timing field reached the golden");
             }
@@ -167,6 +167,63 @@ internal static partial class SelfTest
             Expect(first["childItemsMs"]!.AsArray().Count == 20, "the list of ChildItems times is not capped");
             Expect(first["childItemsTotalMs"]!.GetValue<long>() == Enumerable.Range(0, 50).Sum(), "the total of the capped list is wrong");
             Expect(new HopTimes("n").ToJson() is not null, "a hop list with no hop does not give json");
+        });
+
+        Case("tree route: the window route is taken only for one visible SysTreeView32 with an area", () =>
+        {
+            Expect(TreeRoute.ChooseTreeWindow(new[] { Win(1, "SysTreeView32", true, 200) }) == new IntPtr(1), "the one visible tree window was not chosen");
+            Expect(TreeRoute.ChooseTreeWindow(Array.Empty<WinInfo>()) is null, "a window was chosen from an empty list");
+            Expect(TreeRoute.ChooseTreeWindow(new[] { Win(1, "SysTreeView32", false, 200) }) is null, "a hidden tree window was chosen");
+            Expect(TreeRoute.ChooseTreeWindow(new[] { Win(1, "SysTreeView32", true, 0) }) is null, "a tree window with no area was chosen");
+            Expect(TreeRoute.ChooseTreeWindow(new[] { Win(1, "SysListView32", true, 200) }) is null, "a list view was chosen as the tree");
+            Expect(TreeRoute.ChooseTreeWindow(new[] { Win(1, "systreeview32", true, 200) }) is null, "a class that differs in case was chosen");
+            Expect(TreeRoute.ChooseTreeWindow(new[] { Win(1, "SysTreeView32", true, 200), Win(2, "SysTreeView32", true, 150) }) is null, "one of two visible trees was chosen");
+            Expect(TreeRoute.ChooseTreeWindow(new[] { Win(1, "SysTreeView32", false, 200), Win(2, "SysListView32", true, 300), Win(3, "SysTreeView32", true, 150) }) == new IntPtr(3), "the visible tree next to a hidden one and a list was not chosen");
+            Expect(TreeRoute.ChooseTreeWindow(new[] { Win(1, "SysTreeView32", false, 200), Win(2, "SysTreeView32", false, 150) }) is null, "a hidden tree was chosen when all are hidden");
+        });
+
+        Case("tree route: an element is accepted as the old searches accepted it, and the handle must be the same live window", () =>
+        {
+            Expect(TreeRoute.AcceptsTreeElement(true, "Anything"), "a Tree control type was not accepted");
+            Expect(TreeRoute.AcceptsTreeElement(false, "SysTreeView32"), "the class SysTreeView32 was not accepted");
+            Expect(!TreeRoute.AcceptsTreeElement(false, "SysListView32"), "a list view element was accepted as the tree");
+            Expect(!TreeRoute.AcceptsTreeElement(false, null), "an element with no class and no Tree type was accepted");
+            Expect(TreeRoute.HandleStillValid(new IntPtr(5), new IntPtr(5), windowExists: true, windowVisible: true), "a live visible window with the same handle was refused");
+            Expect(!TreeRoute.HandleStillValid(new IntPtr(5), new IntPtr(5), windowExists: false, windowVisible: false), "a destroyed window was accepted");
+            Expect(!TreeRoute.HandleStillValid(new IntPtr(5), new IntPtr(5), windowExists: true, windowVisible: false), "a window that became hidden was accepted");
+            Expect(!TreeRoute.HandleStillValid(new IntPtr(5), new IntPtr(6), windowExists: true, windowVisible: true), "an element of another window was accepted");
+            Expect(!TreeRoute.HandleStillValid(IntPtr.Zero, IntPtr.Zero, windowExists: true, windowVisible: true), "a null handle was accepted");
+        });
+
+        Case("tree route: a selection from the pattern is used only when it is one selected TreeItem", () =>
+        {
+            Expect(TreeRoute.JudgeSelection(1, isTreeItem: true, reportsSelected: true) is null, "one selected tree item was not used");
+            Expect(TreeRoute.JudgeSelection(0, isTreeItem: true, reportsSelected: true) is not null, "no item was taken as the answer 'nothing selected'");
+            Expect(TreeRoute.JudgeSelection(2, isTreeItem: true, reportsSelected: true) is not null, "two items were used");
+            Expect(TreeRoute.JudgeSelection(1, isTreeItem: false, reportsSelected: true) is not null, "an item that is not a TreeItem was used");
+            Expect(TreeRoute.JudgeSelection(1, isTreeItem: true, reportsSelected: false) is not null, "an item that does not report IsSelected was used");
+            Expect(TreeRoute.JudgeSelection(1, isTreeItem: false, reportsSelected: false) is not null, "an item that is neither was used");
+        });
+
+        Case("tree route: the route names reach the hop json and nothing else", () =>
+        {
+            var hop = new HopTimes("n");
+            Expect(hop.ToJson()!["findTreeVia"] is null, "a route is named before any lookup ran");
+            hop.FindTreeVia = TreeRoute.ViaHwnd;
+            hop.CountRoute("selectedPath." + TreeRoute.SelectionPatternRoute);
+            hop.CountRoute("selectedPath." + TreeRoute.SelectionPatternRoute);
+            hop.CountRoute("selectedPath.fallback.noPattern");
+            JsonObject json = hop.ToJson()!;
+            Expect(json["findTreeVia"]!.GetValue<string>() == "hwnd", "the tree route is not in the hop json");
+            JsonObject routes = json["routes"]!.AsObject();
+            Expect(routes["selectedPath.selectionPattern"]!.GetValue<int>() == 2, "the count of a route is wrong");
+            Expect(routes["selectedPath.fallback.noPattern"]!.GetValue<int>() == 1, "the fallback route is not counted");
+            for (int i = 0; i < 500; i++)
+            {
+                hop.CountRoute("selectedPath.route" + i);
+            }
+
+            Expect(hop.ToJson()!["routes"]!.AsObject().Count <= 40, "the route list is not capped");
         });
 
         Case("resume: a complete case opens no session, setup or lock", () =>
@@ -209,6 +266,8 @@ internal static partial class SelfTest
     {
         ["segment"] = "x",
         ["findTreeMs"] = 1,
+        ["findTreeVia"] = "hwnd",
+        ["routes"] = new JsonObject { ["selectedPath.selectionPattern"] = 1 },
         ["waitIdleMs"] = 2,
         ["pollCount"] = 3,
     };

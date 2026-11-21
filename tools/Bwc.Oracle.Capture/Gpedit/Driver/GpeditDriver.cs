@@ -63,6 +63,10 @@ internal sealed partial class GpeditDriver
 
     internal int TreeReadyMs { get; private set; }
 
+    // The route of the last lookup the tree-ready wait made: "hwnd", "uiaType", "uiaClass", or "none" when it ended without a tree
+    // (failure mode 34). Null until the wait ran.
+    internal string? TreeReadyVia { get; private set; }
+
     // The hop detail of the operation that runs now (failure mode 33). The runner puts a new list here before each operation and
     // copies it into the result entry next to `phases`; it never goes into an operation's data.
     internal List<HopTimes> HopTimings { get; set; } = new();
@@ -155,7 +159,12 @@ internal sealed partial class GpeditDriver
     private void WaitPopulated()
     {
         AutomationElement? tree = ProbeUia.Wait(
-            () => ProbeUia.OfType(Main(), ControlType.Tree).FirstOrDefault() ?? ProbeUia.OfClass(Main(), "SysTreeView32").FirstOrDefault(),
+            () =>
+            {
+                AutomationElement? found = TryFindTree(out string via);
+                TreeReadyVia = via;
+                return found;
+            },
             TimeSpan.FromSeconds(30));
         if (tree is null)
         {
@@ -304,7 +313,7 @@ internal sealed partial class GpeditDriver
     private List<WinInfo> StartRefusalDialogs()
     {
         bool alive = !mmc.HasExited;
-        bool treeFound = alive && (ProbeUia.OfType(Main(), ControlType.Tree).FirstOrDefault() ?? ProbeUia.OfClass(Main(), "SysTreeView32").FirstOrDefault()) is not null;
+        bool treeFound = alive && TryFindTree(out _) is not null;
         return RefusedStart.Dialogs(allowStartRefusal, alive, treeFound, alive ? ProbeWindows.TopLevel(mmc.Id) : new List<WinInfo>());
     }
 

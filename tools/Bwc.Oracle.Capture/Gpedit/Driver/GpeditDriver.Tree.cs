@@ -13,23 +13,67 @@ internal sealed partial class GpeditDriver
 
     internal AutomationElement FindTree() => FindTree(null);
 
-    // The same two lookups in the same order as ever; times, when given, only has a stopwatch around them (failure mode 33).
+    // The console tree element, or null when no route finds one. The route that found it is in via (failure mode 34): the visible
+    // SysTreeView32 window taken with FromHandle, and only when that gives nothing the two UI Automation searches over the main window,
+    // the same two in the same order as ever. Main() runs first, so a dead process or a missing window throws as it always did.
+    private AutomationElement? TryFindTree(out string via)
+    {
+        AutomationElement window = Main();
+        AutomationElement? tree = TryTreeByWindow();
+        if (tree is not null)
+        {
+            via = TreeRoute.ViaHwnd;
+            return tree;
+        }
+
+        tree = ProbeUia.OfType(window, ControlType.Tree).FirstOrDefault();
+        if (tree is not null)
+        {
+            via = TreeRoute.ViaUiaType;
+            return tree;
+        }
+
+        tree = ProbeUia.OfClass(Main(), TreeRoute.TreeClass).FirstOrDefault();
+        via = tree is null ? "none" : TreeRoute.ViaUiaClass;
+        return tree;
+    }
+
+    // The element of the one visible SysTreeView32 window below the main window, or null when there is not exactly one, the element is
+    // not a tree, the window is gone or not visible any more, or any call fails. Nothing is cached: each call looks again.
+    private AutomationElement? TryTreeByWindow()
+    {
+        try
+        {
+            if (TreeRoute.ChooseTreeWindow(ProbeWindows.Children(main)) is not { } hwnd)
+            {
+                return null;
+            }
+
+            AutomationElement element = AutomationElement.FromHandle(hwnd);
+            AutomationElement.AutomationElementInformation info = element.Current;
+            if (!TreeRoute.AcceptsTreeElement(info.ControlType == ControlType.Tree, info.ClassName)
+                || !TreeRoute.HandleStillValid(hwnd, new IntPtr(info.NativeWindowHandle), Win32Ext.IsWindow(hwnd), Win32.IsWindowVisible(hwnd)))
+            {
+                return null;
+            }
+
+            return element;
+        }
+        catch (Exception ex) when (ex is ElementNotAvailableException or ArgumentException or InvalidOperationException
+            or System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
+    }
+
+    // Times, when given, only has a stopwatch around the lookup and says which route found the tree (failure modes 33 and 34).
     private AutomationElement FindTree(HopTimes? times)
     {
         long start = Stopwatch.GetTimestamp();
+        string via = "none";
         try
         {
-            AutomationElement? tree = ProbeUia.OfType(Main(), ControlType.Tree).FirstOrDefault();
-            if (tree is null)
-            {
-                if (times is not null)
-                {
-                    times.FindTreeViaClass = true;
-                }
-
-                tree = ProbeUia.OfClass(Main(), "SysTreeView32").FirstOrDefault();
-            }
-
+            AutomationElement? tree = TryFindTree(out via);
             return tree ?? throw new DriverException("no console tree control found");
         }
         finally
@@ -37,6 +81,8 @@ internal sealed partial class GpeditDriver
             if (times is not null)
             {
                 times.FindTreeMs = HopTimes.Ms(start);
+                times.FindTreeVia = via;
+                times.FindTreeViaClass = via == TreeRoute.ViaUiaClass;
             }
         }
     }
@@ -75,14 +121,21 @@ internal sealed partial class GpeditDriver
     }
 
     // The selected node as its names from the first item (Local Computer Policy) down, or null when nothing is selected.
-    internal List<string>? SelectedPath()
+    internal List<string>? SelectedPath() => SelectedPath(null);
+
+    // The selected item comes from the tree's SelectionPattern when that gives one usable item, otherwise from the old FindFirst over the
+    // tree; the path is built the same way from either. The routes taken are counted in times when given (failure mode 34).
+    private List<string>? SelectedPath(HopTimes? times)
     {
-        AutomationElement tree = FindTree();
-        AutomationElement? selected = tree.FindFirst(
-            TreeScope.Descendants,
-            new AndCondition(
-                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.TreeItem),
-                new PropertyCondition(SelectionItemPattern.IsSelectedProperty, true)));
+        AutomationElement? found = TryFindTree(out string via);
+        times?.CountRoute("selectedPath.findTree." + via);
+        AutomationElement tree = found ?? throw new DriverException("no console tree control found");
+        AutomationElement? selected = SelectedByPattern(tree, times)
+            ?? tree.FindFirst(
+                TreeScope.Descendants,
+                new AndCondition(
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.TreeItem),
+                    new PropertyCondition(SelectionItemPattern.IsSelectedProperty, true)));
         if (selected is null)
         {
             return null;
@@ -97,6 +150,41 @@ internal sealed partial class GpeditDriver
         }
 
         return names;
+    }
+
+    // The one selected TreeItem from the tree's SelectionPattern, or null when the pattern is missing, throws or gives anything but exactly
+    // one TreeItem that reports IsSelected (the condition the old search matched on). Null means the old search runs.
+    private static AutomationElement? SelectedByPattern(AutomationElement tree, HopTimes? times)
+    {
+        string route = "selectedPath.fallback.noPattern";
+        try
+        {
+            if (tree.TryGetCurrentPattern(SelectionPattern.Pattern, out object? pattern))
+            {
+                AutomationElement[] items = ((SelectionPattern)pattern).Current.GetSelection();
+                AutomationElement? first = items.Length > 0 ? items[0] : null;
+                bool isTreeItem = first is not null && first.Current.ControlType == ControlType.TreeItem;
+                bool reportsSelected = isTreeItem
+                    && first!.TryGetCurrentPattern(SelectionItemPattern.Pattern, out object? itemPattern)
+                    && ((SelectionItemPattern)itemPattern).Current.IsSelected;
+                string? reason = TreeRoute.JudgeSelection(items.Length, isTreeItem, reportsSelected);
+                if (reason is null)
+                {
+                    times?.CountRoute("selectedPath." + TreeRoute.SelectionPatternRoute);
+                    return first;
+                }
+
+                route = "selectedPath.fallback." + reason;
+            }
+        }
+        catch (Exception ex) when (ex is ElementNotAvailableException or ArgumentException or InvalidOperationException
+            or System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception)
+        {
+            route = "selectedPath.fallback.threw";
+        }
+
+        times?.CountRoute(route);
+        return null;
     }
 
     private static bool PathMatches(List<string>? selected, string root, IReadOnlyList<string> path)
@@ -379,19 +467,19 @@ internal sealed partial class GpeditDriver
 
         long waitStart = Stopwatch.GetTimestamp();
         List<string>? selected = ProbeUia.Wait(
-            () => times.Time("selectedPathWhileWaiting", () => SelectedPath()) is { } p && PathMatches(p, root, path) ? p : null,
+            () => times.Time("selectedPathWhileWaiting", () => SelectedPath(times)) is { } p && PathMatches(p, root, path) ? p : null,
             TimeSpan.FromSeconds(6));
         times.Record("waitForSelection", HopTimes.Ms(waitStart));
         if (selected is null)
         {
-            List<string>? actual = SelectedPath();
+            List<string>? actual = SelectedPath(times);
             throw new DriverException(
                 $"the node was not selected (selected: '{string.Join("/", actual ?? new List<string>())}', wanted '{RootName(root)}/{string.Join("/", path)}')");
         }
 
         times.Time("pause400", () => Thread.Sleep(400));
         bool stable = times.Time("waitListStable", () => WaitListStable(TimeSpan.FromSeconds(8), times));
-        if (times.Time("selectedPathFinal", () => SelectedPath()) is not { } after || !PathMatches(after, root, path))
+        if (times.Time("selectedPathFinal", () => SelectedPath(times)) is not { } after || !PathMatches(after, root, path))
         {
             throw new DriverException("the tree selection moved away while the list was loading");
         }

@@ -10,10 +10,12 @@ namespace Bwc.Oracle.Capture.Gpedit.Driver;
 internal sealed class HopTimes
 {
     private const int MaxSteps = 60;
+    private const int MaxRoutes = 40;
 
     private readonly List<HopStep> hops = new();
     private readonly List<KeyValuePair<string, long>> steps = new();
     private readonly Dictionary<string, long[]> totals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> routes = new(StringComparer.Ordinal);
     private int droppedSteps;
 
     internal HopTimes(string node)
@@ -26,6 +28,20 @@ internal sealed class HopTimes
     internal long FindTreeMs { get; set; }
 
     internal bool FindTreeViaClass { get; set; }
+
+    // Which lookup found the tree for the resolution: "hwnd", "uiaType" or "uiaClass" (failure mode 34). Null until a lookup ran.
+    internal string? FindTreeVia { get; set; }
+
+    // Counts a route that a fast lookup took or fell back with (failure mode 34). The distinct names are capped, the counts are not.
+    internal void CountRoute(string name)
+    {
+        if (!routes.TryGetValue(name, out int count) && routes.Count >= MaxRoutes)
+        {
+            return;
+        }
+
+        routes[name] = count + 1;
+    }
 
     internal HopStep NextHop(string segment)
     {
@@ -89,6 +105,8 @@ internal sealed class HopTimes
                 ["node"] = Node,
                 ["findTreeMs"] = FindTreeMs,
                 ["findTreeViaClass"] = FindTreeViaClass,
+                ["findTreeVia"] = FindTreeVia,
+                ["routes"] = new JsonObject(routes.Select(r => new KeyValuePair<string, JsonNode?>(r.Key, r.Value))),
                 ["hops"] = new JsonArray(hops.Select(h => (JsonNode?)h.ToJson()).ToArray()),
                 ["afterHops"] = new JsonArray(steps.Select(s => (JsonNode?)new JsonObject { ["name"] = s.Key, ["ms"] = s.Value }).ToArray()),
             };
