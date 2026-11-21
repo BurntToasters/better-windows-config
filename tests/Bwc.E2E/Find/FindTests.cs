@@ -1153,17 +1153,10 @@ public sealed class FindTests
         {
             try
             {
-                AutomationElement desktop = _automation.GetDesktop();
-                foreach (AutomationElement window in desktop.FindAllChildren(
-                    cf => cf.ByControlType(ControlType.Window)))
+                foreach (AutomationElement window in ProcessWindows.Of(_automation, _session.ProcessId))
                 {
                     try
                     {
-                        if (window.Properties.ProcessId.Value != _session.ProcessId)
-                        {
-                            continue;
-                        }
-
                         AutomationElement? found = FindInWindow(window, automationId);
                         if (found is not null)
                         {
@@ -1188,17 +1181,10 @@ public sealed class FindTests
         {
             try
             {
-                AutomationElement desktop = _automation.GetDesktop();
-                foreach (AutomationElement window in desktop.FindAllChildren(
-                    cf => cf.ByControlType(ControlType.Window)))
+                foreach (AutomationElement window in ProcessWindows.Of(_automation, _session.ProcessId))
                 {
                     try
                     {
-                        if (window.Properties.ProcessId.Value != _session.ProcessId)
-                        {
-                            continue;
-                        }
-
                         if (FindInWindow(window, automationId) is not null)
                         {
                             return window;

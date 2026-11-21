@@ -628,9 +628,8 @@ public sealed class RobustnessTests
             .Any(element => element.Name.Contains(expected, StringComparison.Ordinal));
 
     private static AutomationElement? FindOwnedMessageBox(UIA3Automation automation, int processId) =>
-        automation.GetDesktop().FindAllChildren(cf => cf.ByName(PolicyCaption))
-            .FirstOrDefault(window => window.Properties.ProcessId.IsSupported &&
-                window.Properties.ProcessId.Value == processId);
+        ProcessWindows.Of(automation, processId)
+            .FirstOrDefault(window => string.Equals(ControlTestSupport.SafeName(window), PolicyCaption, StringComparison.Ordinal));
 
     private static Process StartRegedit(
         E2EConfig config,

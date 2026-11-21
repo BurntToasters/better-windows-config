@@ -666,6 +666,23 @@ id or check order changes.
 | A speed change in a drag test makes the drag less real, so a test that proves nothing happened passes without a drag | Only the approach to the start point is changed (the cursor is placed there instead of animated across the screen). The button press, the stepped move and the release are unchanged. |
 | A focus test never gets the focus it checks, because its key went in before the window took keyboard focus, and it checks the unfocused control after a full timeout | The test puts the focus in the tree pane first, as the sibling tests do, then sends the key. The check text is unchanged. |
 
+## 48. Address bar value set and window lookup scoped to the app process (ST2c, ST1)
+
+Two speed pieces. The address bar helper of the Registry Editor tests set the path by typing it (about 43 ms per
+character, about 3 s per navigation), and `EditingDriver.FindElement` asked UI Automation for every top-level window
+of the desktop on each poll (about 47 ms a call, 2322 calls in a run). The path is now set through the value of the
+address bar text box, and the window scans that already filter by the app process id read the windows of that process
+through `ProcessWindows`. No timeout, fixed sleep, check id, check order or check text changes.
+
+| Failure | Guard |
+| --- | --- |
+| The value set does not raise the text change that the product listens to, so the box shows the new path but the product still holds the old one and Enter navigates to a stale path | The helper keeps the read-back wait, then Enter, then the arrival wait that needs the address text and the selected tree row of the same path. A navigation to a stale path ends in a failed arrival wait, and the existing retries (the type-ahead route and the second attempt from the root) still run. The arrival wait is unchanged and never accepts the starting text. |
+| The read-back passes on a stale value: the box already held the wanted path from an earlier step, so the wait is true before the set took effect | The text box is cleared first and the read-back must see the full path, as before. When the set throws or the read-back wait fails, the helper falls back once to the old keyboard route (clear, type, the same read-back wait) before it returns false, so a run is never less reliable than the typed route. |
+| `EnumWindows` misses a window that the desktop scan found: an owned popup, a window that is not visible yet when the poll runs, or a window of a type the UIA window condition did not list | `ProcessWindows` keeps the visible filter of the desktop scan, because a hidden window is not in the UIA desktop list either and a hidden leftover must not satisfy a lookup. A WinUI flyout is a separate visible top-level window of the same process, which `EnumWindows` lists (the Hub tests and `MenuOpen` already rely on this). A lookup that falls back to the desktop tree (`EditingDriver.FindElement`, `SystemFileDialogDriver.FindProcessElement`) still does so when no window of the process was listed or `FromHandle` skipped one, so a window the scoped scan could not read is still found by the wider search. With every visible window read, that search can only repeat the scoped scan and costs about 60 ms a miss, so it is not run. A poll that misses a window that is about to appear is repeated by the wait around it. |
+| A scan that collects every match (the menu items of `MenuTests` and `ContextMenuDriver`) counts a popup item twice, because the popup is reached from its own handle and again below its owner, and a menu then shows twice its items | The collected elements go through `ProcessWindows.Distinct`, which keeps one element for each automation id, class, name and rectangle. First-match scans are not affected. The first run of this change failed seven menu tests for this reason before the dedupe was added. |
+| A window closes between `EnumWindows` and `FromHandle`, or UIA cannot reach it yet | The lookup of one handle is in a try block that skips only that window (COM error, invalid operation, element not available). The other windows of the process are still returned, and the next poll tries again. |
+| A scan that must see windows of other processes is narrowed by mistake (a system file dialog hosted elsewhere, classic regedit) | Only scans that already compared the process id of each window with the app process id use `ProcessWindows`. A scan with another process or no process filter is left as it was and is listed in the piece report. |
+
 ## Verification artifact
 
 A successful harness run leaves `artifacts/e2e/result-<rid>-<flavor>.json` with schema 2, the run

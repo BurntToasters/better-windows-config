@@ -24,7 +24,7 @@ internal static class HubUi
         DateTime deadline = DateTime.UtcNow + timeout;
         do
         {
-            foreach (AutomationElement window in ProcessWindows(automation, processId))
+            foreach (AutomationElement window in ProcessWindows.Of(automation, processId))
             {
                 if (!IsProcess(window, processId))
                 {
@@ -58,7 +58,7 @@ internal static class HubUi
         DateTime deadline = DateTime.UtcNow + timeout;
         do
         {
-            foreach (AutomationElement window in ProcessWindows(automation, processId))
+            foreach (AutomationElement window in ProcessWindows.Of(automation, processId))
             {
                 if (IsProcess(window, processId) && string.Equals(SafeName(window), title, StringComparison.Ordinal))
                 {
@@ -88,7 +88,7 @@ internal static class HubUi
         DateTime deadline = DateTime.UtcNow + timeout;
         do
         {
-            foreach (AutomationElement window in ProcessWindows(automation, processId))
+            foreach (AutomationElement window in ProcessWindows.Of(automation, processId))
             {
                 if (!string.Equals(SafeName(window), title, StringComparison.Ordinal))
                 {
@@ -122,7 +122,7 @@ internal static class HubUi
         do
         {
             bool present = false;
-            foreach (AutomationElement window in ProcessWindows(automation, processId))
+            foreach (AutomationElement window in ProcessWindows.Of(automation, processId))
             {
                 if (IsProcess(window, processId) && string.Equals(SafeName(window), title, StringComparison.Ordinal))
                 {
@@ -218,43 +218,6 @@ internal static class HubUi
             }
         }
         while (DateTime.UtcNow < deadline);
-    }
-
-    /// <summary>
-    /// The visible top-level windows of one process, read by window handle. The UIA desktop children
-    /// do not reliably include a window that is owned by another window, and the Hub's dialogs are
-    /// owned by the Hub's main window, so the desktop list missed them. An error on one window skips it.
-    /// </summary>
-    private static AutomationElement[] ProcessWindows(UIA3Automation automation, int processId)
-    {
-        var handles = new List<IntPtr>();
-        _ = EnumWindows(
-            (hwnd, _) =>
-            {
-                if (IsWindowVisible(hwnd) && GetWindowThreadProcessId(hwnd, out uint owner) != 0 && owner == unchecked((uint)processId))
-                {
-                    handles.Add(hwnd);
-                }
-
-                return true;
-            },
-            IntPtr.Zero);
-
-        var windows = new List<AutomationElement>(handles.Count);
-        foreach (IntPtr hwnd in handles)
-        {
-            try
-            {
-                windows.Add(automation.FromHandle(hwnd));
-            }
-            catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException
-                or FlaUI.Core.Exceptions.ElementNotAvailableException)
-            {
-                // The window closed between the enumeration and the lookup, or UIA could not reach it yet.
-            }
-        }
-
-        return windows.ToArray();
     }
 
     /// <summary>Presses Alt+H, which opens the Help menu through the menu router.</summary>
@@ -512,16 +475,6 @@ internal static class HubUi
 
 #pragma warning disable SYSLIB1054
     private const uint DwmwaExtendedFrameBounds = 9;
-
-    private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool IsWindowVisible(IntPtr hwnd);
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);

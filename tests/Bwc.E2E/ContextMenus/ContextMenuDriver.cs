@@ -291,19 +291,29 @@ internal sealed class ContextMenuDriver : IDisposable
         {
             try
             {
-                AutomationElement desktop = _automation.GetDesktop();
-                AutomationElement[] items;
+                // A flyout is a top-level window of the app process, so only those windows are searched.
+                var items = new List<AutomationElement>();
                 long lookupStarted = E2ETimings.Now();
                 try
                 {
-                    items = desktop.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem));
+                    foreach (AutomationElement window in ProcessWindows.Of(_automation, _session.ProcessId))
+                    {
+                        try
+                        {
+                            items.AddRange(window.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem)));
+                        }
+                        catch (Exception)
+                        {
+                            // A window that closed during the search is skipped.
+                        }
+                    }
                 }
                 finally
                 {
                     E2ETimings.Current.RecordLookup("ContextMenuDriver.DesktopFindAllDescendants", lookupStarted);
                 }
 
-                Collect(items, entries);
+                Collect(ProcessWindows.Distinct(items), entries);
             }
             catch (Exception)
             {

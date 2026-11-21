@@ -299,7 +299,8 @@ internal sealed class EditingDriver : IDisposable
         return $"0x{foreground.ToInt64():X} class='{Win32.ClassNameOf(foreground)}' main={foreground == _session.MainHwnd}";
     }
 
-    // Counted for the timing record: this lookup enumerates every desktop window on each call.
+    // Counted for the timing record. The windows come from the app process. The desktop tree is asked only when
+    // no window of the process was listed or one of them could not be read.
     private AutomationElement? FindElement(string automationId)
     {
         long started = E2ETimings.Now();
@@ -317,25 +318,9 @@ internal sealed class EditingDriver : IDisposable
     {
         try
         {
-            AutomationElement desktop = _automation.GetDesktop();
-
-            foreach (AutomationElement window in desktop.FindAllChildren(cf => cf.ByControlType(ControlType.Window)))
+            AutomationElement[] windows = ProcessWindows.Of(_automation, _session.ProcessId, out int skipped);
+            foreach (AutomationElement window in windows)
             {
-                int processId;
-                try
-                {
-                    processId = window.Properties.ProcessId.Value;
-                }
-                catch (Exception)
-                {
-                    continue;
-                }
-
-                if (processId != _session.ProcessId)
-                {
-                    continue;
-                }
-
                 try
                 {
                     AutomationElement? found = window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
@@ -350,10 +335,14 @@ internal sealed class EditingDriver : IDisposable
                 }
             }
 
-            AutomationElement? global = desktop.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
-            if (global is not null && global.Properties.ProcessId.Value == _session.ProcessId)
+            if (windows.Length == 0 || skipped > 0)
             {
-                return global;
+                AutomationElement desktop = _automation.GetDesktop();
+                AutomationElement? global = desktop.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
+                if (global is not null && global.Properties.ProcessId.Value == _session.ProcessId)
+                {
+                    return global;
+                }
             }
         }
         catch (Exception)

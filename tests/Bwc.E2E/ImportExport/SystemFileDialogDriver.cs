@@ -59,25 +59,9 @@ internal sealed class SystemFileDialogDriver : IDisposable
     {
         try
         {
-            AutomationElement desktop = _automation.GetDesktop();
-
-            foreach (AutomationElement window in desktop.FindAllChildren(cf => cf.ByControlType(ControlType.Window)))
+            AutomationElement[] windows = ProcessWindows.Of(_automation, _session.ProcessId, out int skipped);
+            foreach (AutomationElement window in windows)
             {
-                int processId;
-                try
-                {
-                    processId = window.Properties.ProcessId.Value;
-                }
-                catch (Exception)
-                {
-                    continue;
-                }
-
-                if (processId != _session.ProcessId)
-                {
-                    continue;
-                }
-
                 try
                 {
                     AutomationElement? found = window.FindFirstDescendant(
@@ -93,11 +77,16 @@ internal sealed class SystemFileDialogDriver : IDisposable
                 }
             }
 
-            AutomationElement? global = desktop.FindFirstDescendant(
-                cf => cf.ByAutomationId(automationId));
-            if (global is not null && global.Properties.ProcessId.Value == _session.ProcessId)
+            // The desktop tree is asked only when no window of the process was listed or one could not be read.
+            if (windows.Length == 0 || skipped > 0)
             {
-                return global;
+                AutomationElement desktop = _automation.GetDesktop();
+                AutomationElement? global = desktop.FindFirstDescendant(
+                    cf => cf.ByAutomationId(automationId));
+                if (global is not null && global.Properties.ProcessId.Value == _session.ProcessId)
+                {
+                    return global;
+                }
             }
         }
         catch (Exception)

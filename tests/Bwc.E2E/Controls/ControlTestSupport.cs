@@ -451,7 +451,7 @@ internal static class ControlTestSupport
     }
 
     /// <summary>
-    /// Types a path into the address bar and presses Enter. Succeeds when the address bar shows the
+    /// Sets a path in the address bar and presses Enter. Succeeds when the address bar shows the
     /// path and the expected row is selected with keyboard focus back in the tree.
     /// </summary>
     private static bool NavigateViaAddressBar(
@@ -472,6 +472,10 @@ internal static class ControlTestSupport
             return false;
         }
 
+        // The path is set through the value of the text box, which takes milliseconds where typing takes about
+        // 43 ms a character. A value that cannot be set, or that the read-back does not show, is retried once by
+        // typing the path, so the helper is never less reliable than the typed route.
+        bool valueSet = false;
         try
         {
             address.AsTextBox().Text = string.Empty;
@@ -480,20 +484,20 @@ internal static class ControlTestSupport
                 return false;
             }
 
-            Keyboard.Type(typedPath);
+            address.AsTextBox().Text = typedPath;
+            valueSet = true;
         }
         catch (Exception)
         {
-            return false;
+            // The typed route below covers a value that could not be set.
         }
 
-        if (!WaitUntil(
-                () => string.Equals(ReadAddress(session), typedPath, StringComparison.OrdinalIgnoreCase),
-                TimeSpan.FromSeconds(5),
-                callerFile: callerFile,
-                callerLine: callerLine))
+        if (!valueSet || !WaitForAddressText(session, typedPath, callerFile, callerLine))
         {
-            return false;
+            if (!TypeAddressPath(session, typedPath) || !WaitForAddressText(session, typedPath, callerFile, callerLine))
+            {
+                return false;
+            }
         }
 
         try
@@ -516,6 +520,39 @@ internal static class ControlTestSupport
             callerLine: callerLine);
         return arrived && WaitForTreeKeyboardFocus(session, selectedRow, KeyboardFocusTimeout);
     }
+
+    /// <summary>Clears the address bar and types the path with the keyboard. False when the window is not foreground.</summary>
+    private static bool TypeAddressPath(AppSession session, string typedPath)
+    {
+        try
+        {
+            AutomationElement? address = session.Find(AddressBarId);
+            if (address is null)
+            {
+                return false;
+            }
+
+            address.AsTextBox().Text = string.Empty;
+            if (!EnsureForeground(session))
+            {
+                return false;
+            }
+
+            Keyboard.Type(typedPath);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static bool WaitForAddressText(AppSession session, string typedPath, string callerFile, int callerLine) =>
+        WaitUntil(
+            () => string.Equals(ReadAddress(session), typedPath, StringComparison.OrdinalIgnoreCase),
+            TimeSpan.FromSeconds(5),
+            callerFile: callerFile,
+            callerLine: callerLine);
 
     /// <summary>
     /// Expands HKCU, Software, BWC-E2E and the run key with Right, then selects each row by type-ahead.

@@ -808,34 +808,19 @@ public sealed class MenuTests
 
     /// <summary>
     /// Every MenuItem in the top-level windows of the session's process: the main window, and the popup
-    /// windows that WinUI creates for flyouts. The desktop children are filtered by process id.
+    /// windows that WinUI creates for flyouts. The windows are read by handle for the process id.
     /// </summary>
     private static AutomationElement[] ProcessMenuItems(AppSession session)
     {
         try
         {
             var found = new List<AutomationElement>();
-            foreach (AutomationElement top in Automation.GetDesktop().FindAllChildren())
+            foreach (AutomationElement top in ProcessWindows.Of(Automation, session.ProcessId))
             {
-                int processId;
-                try
-                {
-                    processId = top.Properties.ProcessId.Value;
-                }
-                catch (Exception)
-                {
-                    continue;
-                }
-
-                if (processId != session.ProcessId)
-                {
-                    continue;
-                }
-
                 found.AddRange(top.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem)));
             }
 
-            return found.ToArray();
+            return ProcessWindows.Distinct(found);
         }
         catch (Exception)
         {
