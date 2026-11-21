@@ -618,3 +618,52 @@ What can go wrong and the guard of each:
   other diagnostics are. The golden holds `kind: "checkBox"`, the label and `checkState`, as for a native check box, and the self test builds
   a golden from an option node that carries both keys and requires that neither text appears in it. The goldens already captured hold native
   check boxes only and are not changed (the plan version and hash are not touched).
+
+## 36. A Windows Forms push button that is not a native push style, and the Show Contents dialog behind it
+
+The first three list cases (`B/Pol_List_Plain`, `B/Pol_List_EmptyPrefix`, `B/Pol_List_Additive`) stopped with `option 'Plain entries:' is a unknown
+(class WindowsForms10.Window.8.app.0.297b065_r40_ad1, id ''), not a list`. The recorded option had the panel id `flowLayoutPanelPlain entries:`
+and the label, so the container and its STATIC were found, but the inner `Show...` button was not. `DiscoverOptions` took the button only when
+its BS_ type was 0 (BS_PUSHBUTTON) or 1 (BS_DEFPUSHBUTTON). A Windows Forms `Button` whose `FlatStyle` is not `System` is created owner-drawn
+(BS_OWNERDRAW, type 0xB), exactly as the check box of section 35, so the button was left out and the container got no kind. No list option was
+ever captured before this run, so nothing after the button had run against classic either. This section teaches the driver to recognize the
+button and records what was read in the list path and not changed. It changes no wait, timeout or sleep and no action sent to classic. A
+native push button is found as before, and no UI Automation call is made for it.
+
+Recognition: an inner BUTTON child of a container is the list's push button when its style is a native push style (as before), or when its
+BS_ type is owner-draw and its UI Automation element (`AutomationElement.FromHandle`) has the control type Button or supports `InvokePattern`
+and is not a check box (control type CheckBox or `TogglePattern`). The decision is a pure function over plain values in
+`Driver/PushButtonRead.cs`, next to `CheckBoxRead`, covered by `gpedit selftest` before the code was written. The search for the push button
+runs only when the container holds no COMBOBOX and no EDIT, so a container of another kind makes no extra UI Automation call.
+
+What can go wrong and the guard of each:
+
+- The owner-drawn push button is not recognized (this failure). The guard is the recognition above. If a case still fails, the option keeps
+  `kind: unknown` and carries `pushEvidence` (untracked), one entry per inner BUTTON child: style, BS_ type, owner-draw flag, UI Automation
+  control type, whether Invoke and Toggle patterns exist and what the judge decided, so the next run says which test failed.
+- A check box is taken for a push button. An owner-drawn BUTTON is a push button only with UI Automation evidence, and a control type
+  CheckBox or a toggle pattern always excludes it. A check box that is a direct child of the panel never reaches this search (section 35
+  takes it first). A check box that is nested in a container with no combo or edit is not a list. It stays unknown. A radio button (control
+  type RadioButton, no Invoke) is not a push button either, and a UI Automation read that throws is "no evidence".
+- The Show Contents dialog is also Windows Forms. Every step of it was read for the same native-only assumptions (BM_GETCHECK, BS style,
+  native LISTVIEW or EDIT, class name). `OpenShowContents`, `ReadGrid`, `WriteCell`, `ReadCell`, `ClearGrid` and `CloseShowContents` use UI
+  Automation ids and patterns plus real key presses, and the dialog is classified by the automation id `ListBoxDialog` after the class
+  prefix `WindowsForms10`. None of them tests a BS style or sends a BM_ message other than the BM_CLICK fallback, which a Forms button
+  answers. They need no change. What cannot be proved without classic is listed below and stays as it is, and each of its failures carries
+  the grid tree as evidence.
+- A diagnostic field leaks into a golden. `pushEvidence` is written next to the option and reaches the scrubber through the `readOptions`
+  data, so it is in the scrubber's drop list with the other diagnostics, and the self test builds a golden from an option node that carries
+  it and requires that the text does not appear. The goldens already captured hold no list option and are not changed (the plan version and
+  hash are not touched).
+
+Read and not changed, because it cannot be proved without classic (for the next run to confirm from its evidence):
+
+- `PolicyDialog.GridRowElements` expects the rows as UI Automation `DataItem` children of `dataGrid`, with a fallback to any child that has
+  children. `PolicyDialog.CellValue` reads a cell through `ValuePattern` and falls back to its name. A Windows Forms `DataGridView` may expose
+  other types. An empty `rows` in the result with the grid tree attached would show it.
+- `PolicyDialog.WriteCell` and `SelectGridRow` assume `ProbeUia.Focus(grid)` puts the keyboard focus in the grid, that Ctrl+Home goes to the
+  first cell and that F2 opens the edit mode. The read-back of each cell fails the operation if not.
+- `GpeditDriver.CancelWindow` falls back to `GetDlgItem(IDCANCEL)` and BM_CLICK, which assumes a native dialog id. For the Show Contents dialog
+  the first route (`buttonCancel` by automation id, Invoke) is the one in use, and Escape follows. The fallback is harmless on a Forms dialog.
+- `GpeditDriver.IsOpen` (`IsWindow` and `IsWindowVisible`) decides that the dialog closed. A `ShowDialog` form is hidden before it is
+  destroyed, so it is read as closed from the hide.
