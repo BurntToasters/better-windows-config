@@ -248,19 +248,22 @@ internal sealed partial class PolicyDialog
         result["titleBefore"] = titleBefore;
         var known = driver.Dialogs().Select(w => w.Hwnd).ToHashSet();
         bool mayWrite = button != "Cancel";
-        FileWatch watch = FileWatch.Begin(driver.Context.Paths, driver.LastSnapshot);
+        FileWatch watch = driver.Phases.Run("pressFileWatchBegin", () => FileWatch.Begin(driver.Context.Paths, driver.LastSnapshot));
 
-        ProbeInput.Foreground(Hwnd);
-        ProbeUia.Focus(target);
-        Thread.Sleep(250);
-        if (!ProbeUia.Invoke(target))
+        using (driver.Phases.Begin("pressInvoke"))
         {
-            ProbeUia.Click(target, doubleClick: false);
-            result["via"] = "guarded click";
-        }
-        else
-        {
-            result["via"] = "Invoke";
+            ProbeInput.Foreground(Hwnd);
+            ProbeUia.Focus(target);
+            Thread.Sleep(250);
+            if (!ProbeUia.Invoke(target))
+            {
+                ProbeUia.Click(target, doubleClick: false);
+                result["via"] = "guarded click";
+            }
+            else
+            {
+                result["via"] = "Invoke";
+            }
         }
 
         result["pressed"] = true;
@@ -269,39 +272,42 @@ internal sealed partial class PolicyDialog
         bool closed = false;
         DateTime end = DateTime.UtcNow + (closes ? TimeSpan.FromSeconds(15) : button == "Apply" ? TimeSpan.FromMilliseconds(1200) : TimeSpan.FromSeconds(6));
         DateTime started = DateTime.UtcNow;
-        while (DateTime.UtcNow < end)
+        using (driver.Phases.Begin("pressWaitLoop"))
         {
-            driver.Context.ThrowIfCancelled();
-            driver.ThrowIfDead();
-            JsonArray found = driver.AnswerNewMessageBoxes(known, answer);
-            if (found.Count > 0)
+            while (DateTime.UtcNow < end)
             {
-                foreach (JsonNode? box in found)
+                driver.Context.ThrowIfCancelled();
+                driver.ThrowIfDead();
+                JsonArray found = driver.AnswerNewMessageBoxes(known, answer);
+                if (found.Count > 0)
                 {
-                    boxes.Add(box?.DeepClone());
+                    foreach (JsonNode? box in found)
+                    {
+                        boxes.Add(box?.DeepClone());
+                    }
+
+                    result["blockedByMessageBox"] = true;
+                    break;
                 }
 
-                result["blockedByMessageBox"] = true;
-                break;
-            }
+                if (closes && !IsOpen)
+                {
+                    closed = true;
+                    break;
+                }
 
-            if (closes && !IsOpen)
-            {
-                closed = true;
-                break;
-            }
+                if (button is "Previous" or "Next" && MovedTo(known, titleBefore))
+                {
+                    break;
+                }
 
-            if (button is "Previous" or "Next" && MovedTo(known, titleBefore))
-            {
-                break;
-            }
+                if (button == "Apply" && (DateTime.UtcNow - started).TotalMilliseconds >= 800)
+                {
+                    break;
+                }
 
-            if (button == "Apply" && (DateTime.UtcNow - started).TotalMilliseconds >= 800)
-            {
-                break;
+                Thread.Sleep(100);
             }
-
-            Thread.Sleep(100);
         }
 
         result["messageBoxes"] = boxes;
@@ -324,7 +330,7 @@ internal sealed partial class PolicyDialog
             result["applyEnabledAfter"] = ApplyEnabled();
         }
 
-        JsonObject settled = watch.Settle(driver.Context.Token, mayWrite ? 1200 : 300, mayWrite);
+        JsonObject settled = driver.Phases.Run("pressFileSettle", () => watch.Settle(driver.Context.Token, mayWrite ? 1200 : 300, mayWrite));
         if (watch.AfterSnapshot is not null)
         {
             driver.LastSnapshot = watch.AfterSnapshot;

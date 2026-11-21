@@ -190,6 +190,27 @@ internal sealed partial class GpeditDriver
 
         var expandCollapse = (ExpandCollapsePattern)pattern;
         string before = expandCollapse.Current.ExpandCollapseState.ToString();
+
+        // A root that is already Expanded and already shows a child needs no expand and no stability wait. Expanded alone is not enough:
+        // classic can report it before the children are loaded, so a root without a child takes the full path below (failure mode 32).
+        if (before == nameof(ExpandCollapseState.Expanded))
+        {
+            int existing = ChildItems(item).Count;
+            if (existing > 0)
+            {
+                return new JsonObject
+                {
+                    ["root"] = name,
+                    ["stateBefore"] = before,
+                    ["stateAfter"] = expandCollapse.Current.ExpandCollapseState.ToString(),
+                    ["children"] = existing,
+                    ["ms"] = (int)(DateTime.UtcNow - start).TotalMilliseconds,
+                    ["skippedWait"] = true,
+                    ["skippedWaitReason"] = "the root was already Expanded and showed " + existing + " child item(s) before the warm-up",
+                };
+            }
+        }
+
         WaitIdle();
         ProbeUia.Expand(item);
 

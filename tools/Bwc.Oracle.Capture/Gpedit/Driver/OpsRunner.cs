@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Bwc.Oracle.Capture.Gpedit.Probe;
 using Bwc.Oracle.Capture.Gpedit.Session;
@@ -39,9 +40,19 @@ internal static class OpsRunner
         {
             driver = GpeditDriver.Start(ctx, Path.Combine(outDir, name));
             root["pid"] = driver.Pid;
+            var timing = new JsonObject { ["classicStartMs"] = driver.ClassicStartMs, ["treeReadyMs"] = driver.TreeReadyMs };
+            root["timing"] = timing;
             if (file.ExpandRootsAtStart)
             {
-                WarmUp(driver, root, resultPath, ref failed, ok, skipped);
+                var warmUpWatch = Stopwatch.StartNew();
+                try
+                {
+                    WarmUp(driver, root, resultPath, ref failed, ok, skipped);
+                }
+                finally
+                {
+                    timing["warmUpMs"] = (int)warmUpWatch.ElapsedMilliseconds;
+                }
             }
 
             driver.LastSnapshot = Snapshot(ctx.Paths, "start");
@@ -172,15 +183,17 @@ internal static class OpsRunner
             ["startedUtc"] = DateTime.UtcNow.ToString("O"),
         };
         DateTime started = DateTime.UtcNow;
-        JsonObject beforeSnapshot = driver.LastSnapshot ?? Snapshot(ctx.Paths, "before");
+        PhaseRecorder phases = new();
+        driver.Phases = phases;
+        JsonObject beforeSnapshot = driver.LastSnapshot ?? phases.Run("snapshotBefore", () => Snapshot(ctx.Paths, "before"));
         driver.LastSnapshot = beforeSnapshot;
-        FileWatch watch = FileWatch.Begin(ctx.Paths, beforeSnapshot);
+        FileWatch watch = phases.Run("fileWatchBegin", () => FileWatch.Begin(ctx.Paths, beforeSnapshot));
         bool ok = false;
         try
         {
             ctx.ThrowIfCancelled();
             driver.ThrowIfDead();
-            entry["data"] = Execute(driver, op, entry);
+            entry["data"] = phases.Run("execute", () => Execute(driver, op, entry));
             ok = true;
         }
         catch (OperationCanceledException)
@@ -199,8 +212,14 @@ internal static class OpsRunner
 
         try
         {
-            JsonArray left = driver.EnsureNoDialogs();
-            int menus = driver.CloseMenus();
+            JsonArray left = new();
+            int menus = 0;
+            using (phases.Begin("epilogue"))
+            {
+                left = driver.EnsureNoDialogs();
+                menus = driver.CloseMenus();
+            }
+
             if (left.Count > 0 || menus > 0)
             {
                 entry["epilogue"] = new JsonObject { ["dialogsClosed"] = left, ["menusClosed"] = menus };
@@ -227,10 +246,10 @@ internal static class OpsRunner
         {
             try
             {
-                JsonObject settle = watch.Settle(ctx.Token, graceMs: 150, waitRegistry: false);
+                JsonObject settle = phases.Run("fileSettle", () => watch.Settle(ctx.Token, graceMs: 150, waitRegistry: false));
                 if (settle["changed"]!.GetValue<bool>())
                 {
-                    settle = watch.Settle(ctx.Token, graceMs: 1200, waitRegistry: true);
+                    settle = phases.Run("fileSettleRegistry", () => watch.Settle(ctx.Token, graceMs: 1200, waitRegistry: true));
                     entry["unexpectedFileChange"] = settle;
                     ok = false;
                     entry["error"] ??= "files changed during an operation that must not write";
@@ -247,15 +266,21 @@ internal static class OpsRunner
         }
 
         JsonObject afterSnapshot = driver.LastSnapshot ?? beforeSnapshot;
-        entry["files"] = PolFiles.Diff(beforeSnapshot, afterSnapshot);
+        entry["files"] = phases.Run("fileDiff", () => PolFiles.Diff(beforeSnapshot, afterSnapshot));
         entry["gptVersion"] = afterSnapshot["gptVersion"]?.DeepClone();
-        entry["liveRegistry"] = LiveRegistry.Read();
+        entry["liveRegistry"] = phases.Run("liveRegistry", LiveRegistry.Read);
         if (!ok || op.Screenshot is true)
         {
             if (!driver.HasExited)
             {
-                entry["screenshot"] = driver.Shot(driver.MainWindow, $"{index:000}-{op.Kind}");
+                entry["screenshot"] = phases.Run("screenshot", () => driver.Shot(driver.MainWindow, $"{index:000}-{op.Kind}"));
             }
+        }
+
+        // Timings sit beside the data, never in it: the golden builder copies data whole for most kinds (failure mode 32).
+        if (phases.ToJson() is { } phaseJson)
+        {
+            entry["phases"] = phaseJson;
         }
 
         entry["ok"] = ok;
@@ -296,7 +321,7 @@ internal static class OpsRunner
             return;
         }
 
-        entry["node"] = driver.SelectNode(op.Root, op.Path);
+        entry["node"] = driver.Phases.Run("nodeSelection", () => driver.SelectNode(op.Root, op.Path));
     }
 
     private static JsonNode? Execute(GpeditDriver driver, GpeditOp op, JsonObject entry)

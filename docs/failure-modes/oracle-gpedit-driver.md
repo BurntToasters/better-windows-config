@@ -424,8 +424,37 @@ a save on the user side (case `A/User_Then_Machine`). The wait for an idle input
 - A dialog of classic is open at that point (an error box of the start). The warm-up neither expands nor dismisses it; the result
   records that the warm-up was skipped and names the dialog, so the first operation sees the dialog as before.
 - The result file holds a `warmUp` object: per root the expand state before and after and the number of children, or the skip
-  reason, or the error.
+  reason, or the error. A root that was already Expanded with at least one child before the warm-up is not waited for: its entry
+  says `skippedWait: true` with the reason (section 32).
 - The warm-up fails (no root item, no ExpandCollapse pattern, no children within the limit, classic exited). That is a start error
   of the case: the result carries `startError`, the case is not complete, and when classic ended the matrix runner's one retry with
   a fresh classic applies (matrix document, section 15). A failure is never ignored, because the case would then run on a classic
   whose state is not the state the goldens assume.
+
+## 32. Phase times, the warm-up early return and start evidence
+
+The first 24 goldens showed that the capture is slow in places nothing measured: the warm-up took about 10 s per root although classic
+already had both roots expanded, and about 43 s of one `editPolicy` operation was unexplained. The driver now records how long each
+phase takes, skips the one wait that was not needed, and keeps evidence when the console tree does not appear. Nothing else about
+what is clicked, typed, read or waited for changes.
+
+- The warm-up returns at once for a root that was Expanded before the call and already shows at least one child item. The root's
+  entry in `warmUp` then holds `skippedWait: true` and `skippedWaitReason`. Expanded alone is not enough: classic can report a root as
+  Expanded while its children are not loaded yet, and returning then would leave the first operation to meet a tree that is still
+  filling (the crash of section 31). A root that is collapsed, or expanded with no child yet, runs the old code path exactly: expand,
+  then wait until the list of names stopped changing for 1500 ms, with the 60 s limit.
+- The result file gets a `timing` object at the root (classic start, tree ready, warm-up total, all in milliseconds) and a `phases`
+  array on every operation entry (`{ "name": ..., "ms": ... }`, in the order the phases ended). A phase that wraps others, such as
+  `execute`, ends after them and so is listed after them. Timings are new keys and never part of `data` or `files`, because the
+  golden builder copies `data` whole for most operation kinds: a timing inside `data` would reach a tracked golden and make every
+  recapture differ. The plan hash and `GpeditOp.Describe()` are not changed.
+- The recorder must never break an operation. It only measures with `Stopwatch` and adds to a list, and the runner builds the JSON
+  of the phases inside a `try`: when that fails the phases are dropped and the operation result stays. A phase that ended with an
+  exception is still recorded, then the exception continues unchanged.
+- The measurement must not change behaviour. No sleep, timeout or wait is added, shortened or reordered. The recorder does no UI
+  automation call and does not touch classic.
+- A failed start ("no console tree within 30 seconds", "the console tree stayed empty for 30 seconds") now carries evidence in
+  `startEvidence`: the visible top-level windows of the mmc process, the class names of the direct children of the main window and
+  a screenshot name. Collecting it can itself fail while the tree is missing (the window is gone, a UIA call throws, the screenshot
+  hangs). Every part is collected inside its own `try` and a failed part is recorded as an error text, so the original start error
+  and its message are always the ones that are thrown. The message text is not changed.

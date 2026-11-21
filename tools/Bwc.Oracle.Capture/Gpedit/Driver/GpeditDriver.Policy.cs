@@ -57,55 +57,65 @@ internal sealed partial class GpeditDriver
     // Select the row, check that the focused element is that row, press Enter, wait for a new setting dialog, check its title.
     internal PolicyDialog OpenPolicy(string policy, int? occurrence)
     {
-        JsonArray leftOver = EnsureNoDialogs();
+        JsonArray leftOver = Phases.Run("closeLeftoverDialogs", EnsureNoDialogs);
         if (leftOver.Count > 0)
         {
             Note("dialogs closed before opening the policy: " + leftOver.ToJsonString());
         }
 
-        AutomationElement row = FindPolicyRow(policy, occurrence);
+        AutomationElement row = Phases.Run("findPolicyRow", () => FindPolicyRow(policy, occurrence));
         var known = Dialogs().Select(w => w.Hwnd).ToHashSet();
-        ProbeInput.Foreground(main);
         string method = "SelectionItem";
-        if (!ProbeUia.Select(row))
+        using (Phases.Begin("rowSelectAndFocus"))
         {
-            ProbeUia.Click(row, doubleClick: false);
-            method = "click";
-        }
+            ProbeInput.Foreground(main);
+            if (!ProbeUia.Select(row))
+            {
+                ProbeUia.Click(row, doubleClick: false);
+                method = "click";
+            }
 
-        ProbeUia.Focus(row);
-        Thread.Sleep(300);
-        string focused = ProbeUia.NameOf(AutomationElement.FocusedElement ?? row);
-        if (!string.Equals(focused, policy, StringComparison.Ordinal))
-        {
             ProbeUia.Focus(row);
             Thread.Sleep(300);
-            focused = ProbeUia.NameOf(AutomationElement.FocusedElement ?? row);
+            string focused = ProbeUia.NameOf(AutomationElement.FocusedElement ?? row);
+            if (!string.Equals(focused, policy, StringComparison.Ordinal))
+            {
+                ProbeUia.Focus(row);
+                Thread.Sleep(300);
+                focused = ProbeUia.NameOf(AutomationElement.FocusedElement ?? row);
+            }
+
+            Note($"focused element before Enter: '{focused}'");
+            if (!string.Equals(focused, policy, StringComparison.Ordinal))
+            {
+                throw new DriverException($"the focused element is '{focused}', not '{policy}'. Enter was not sent.");
+            }
         }
 
-        Note($"focused element before Enter: '{focused}'");
-        if (!string.Equals(focused, policy, StringComparison.Ordinal))
+        using (Phases.Begin("sendEnter"))
         {
-            throw new DriverException($"the focused element is '{focused}', not '{policy}'. Enter was not sent.");
+            DriverInput.RequireForeground(main, Pid);
+            DriverInput.Key(ProbeInput.VkReturn);
         }
 
-        DriverInput.RequireForeground(main, Pid);
-        DriverInput.Key(ProbeInput.VkReturn);
         method += "+Enter";
-        WinInfo? dialog = WaitSettingDialog(known, TimeSpan.FromSeconds(10), policy);
+        WinInfo? dialog = Phases.Run("waitSettingDialog", () => WaitSettingDialog(known, TimeSpan.FromSeconds(10), policy));
         if (dialog is null)
         {
-            try
+            using (Phases.Begin("doubleClickFallback"))
             {
-                ProbeUia.Click(row, doubleClick: true);
-                method += ", then double click";
-            }
-            catch (InvalidOperationException ex)
-            {
-                Note("double click not made: " + ex.Message);
-            }
+                try
+                {
+                    ProbeUia.Click(row, doubleClick: true);
+                    method += ", then double click";
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Note("double click not made: " + ex.Message);
+                }
 
-            dialog = WaitSettingDialog(known, TimeSpan.FromSeconds(10), policy);
+                dialog = WaitSettingDialog(known, TimeSpan.FromSeconds(10), policy);
+            }
         }
 
         if (dialog is null)
@@ -113,9 +123,9 @@ internal sealed partial class GpeditDriver
             throw new DriverException($"no setting dialog opened for '{policy}' (tried {method})");
         }
 
-        Thread.Sleep(600);
+        Phases.Run("settleAfterDialogOpen", () => Thread.Sleep(600));
         var result = new PolicyDialog(this, dialog.Hwnd, policy, method);
-        result.VerifyTitle();
+        Phases.Run("verifyTitle", result.VerifyTitle);
         return result;
     }
 
@@ -169,7 +179,7 @@ internal sealed partial class GpeditDriver
     internal JsonObject EditPolicy(GpeditOp op)
     {
         bool readLists = op.ReadLists ?? true;
-        PolicyDialog dialog = OpenPolicy(op.Policy!, op.Occurrence);
+        PolicyDialog dialog = Phases.Run("openPolicy", () => OpenPolicy(op.Policy!, op.Occurrence));
         var data = new JsonObject
         {
             ["policy"] = op.Policy,
@@ -177,40 +187,41 @@ internal sealed partial class GpeditDriver
         };
         try
         {
-            data["before"] = dialog.Read(readLists);
+            data["before"] = Phases.Run("readBefore", () => dialog.Read(readLists));
             bool anySet = op.State is not null || op.Comment is not null || op.Options is { Count: > 0 };
             var sets = new JsonArray();
             if (op.State is not null)
             {
-                sets.Add(dialog.SetState(op.State));
+                sets.Add(Phases.Run("setState", () => dialog.SetState(op.State)));
             }
 
             if (op.Comment is not null)
             {
-                sets.Add(dialog.SetComment(op.Comment));
+                sets.Add(Phases.Run("setComment", () => dialog.SetComment(op.Comment)));
             }
 
+            int optionNumber = 0;
             foreach (OptionSpec option in op.Options ?? new List<OptionSpec>())
             {
-                sets.Add(dialog.SetOption(option));
+                sets.Add(Phases.Run("setOption " + optionNumber++, () => dialog.SetOption(option)));
             }
 
             data["sets"] = sets;
             if (anySet)
             {
-                data["afterSet"] = dialog.Read(readLists);
+                data["afterSet"] = Phases.Run("readAfter", () => dialog.Read(readLists));
             }
 
             if (op.Screenshot is true)
             {
-                data["screenshotDialog"] = Shot(dialog.Hwnd, "dialog-" + SafeName(op.Policy!));
+                data["screenshotDialog"] = Phases.Run("screenshotDialog", () => Shot(dialog.Hwnd, "dialog-" + SafeName(op.Policy!)));
             }
 
             var presses = new JsonArray();
             bool anyBlocked = false;
             foreach (string button in op.EffectivePress())
             {
-                JsonObject press = dialog.Press(button, op.MessageBoxAnswer);
+                JsonObject press = Phases.Run("press " + button, () => dialog.Press(button, op.MessageBoxAnswer));
                 presses.Add(press);
                 if (press["blockedByMessageBox"]?.GetValue<bool>() == true)
                 {
@@ -232,8 +243,8 @@ internal sealed partial class GpeditDriver
 
             if (dialog.IsOpen)
             {
-                data["dialogStillOpen"] = dialog.Read(readLists);
-                JsonObject cancel = dialog.Press("Cancel", null);
+                data["dialogStillOpen"] = Phases.Run("readThird", () => dialog.Read(readLists));
+                JsonObject cancel = Phases.Run("press Cancel at end", () => dialog.Press("Cancel", null));
                 data["cancelledAtEnd"] = cancel;
             }
 

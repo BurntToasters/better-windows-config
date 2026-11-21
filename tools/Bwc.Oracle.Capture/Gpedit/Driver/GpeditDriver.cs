@@ -54,21 +54,35 @@ internal sealed partial class GpeditDriver
     // The folder screenshots go to.
     internal string ShotDir => shotDir;
 
+    // The phase times of the operation that runs now. The runner puts a new recorder here before each operation.
+    internal PhaseRecorder Phases { get; set; } = new();
+
+    // Milliseconds from the process start to the main window, and for the console tree to show an item. Zero until measured.
+    internal int ClassicStartMs { get; private set; }
+
+    internal int TreeReadyMs { get; private set; }
+
     // Starts classic gpedit through the session context (inherits elevation, pid recorded for the restore) and waits for its window.
     internal static GpeditDriver Start(GpeditContext ctx, string shotDir)
     {
         Directory.CreateDirectory(shotDir);
+        Stopwatch sinceStart = Stopwatch.StartNew();
         Process process = ctx.StartMmc(ctx.Paths.GpeditMsc);
-        return Attach(ctx, process, shotDir);
+        return Attach(ctx, process, shotDir, sinceStart);
     }
 
-    // Takes over an mmc.exe that the session started (the Process returned by GpeditContext.StartMmc).
-    internal static GpeditDriver Attach(GpeditContext ctx, Process process, string shotDir)
+    // Takes over an mmc.exe that the session started (the Process returned by GpeditContext.StartMmc). The stopwatch, when given, started
+    // before the process did.
+    internal static GpeditDriver Attach(GpeditContext ctx, Process process, string shotDir, Stopwatch? sinceStart = null)
     {
         Directory.CreateDirectory(shotDir);
+        sinceStart ??= Stopwatch.StartNew();
         var driver = new GpeditDriver(ctx, process, shotDir);
         driver.WaitForMainWindow();
+        driver.ClassicStartMs = (int)sinceStart.ElapsedMilliseconds;
+        Stopwatch populated = Stopwatch.StartNew();
         driver.WaitPopulated();
+        driver.TreeReadyMs = (int)populated.ElapsedMilliseconds;
         return driver;
     }
 
@@ -136,7 +150,7 @@ internal sealed partial class GpeditDriver
             TimeSpan.FromSeconds(30));
         if (tree is null)
         {
-            throw new DriverException("no console tree within 30 seconds", fatal: true);
+            throw new DriverException("no console tree within 30 seconds", fatal: true, evidence: CollectStartEvidence("noConsoleTree"));
         }
 
         List<AutomationElement>? items = ProbeUia.Wait(
@@ -148,8 +162,54 @@ internal sealed partial class GpeditDriver
             TimeSpan.FromSeconds(30));
         if (items is null)
         {
-            throw new DriverException("the console tree stayed empty for 30 seconds", fatal: true);
+            throw new DriverException("the console tree stayed empty for 30 seconds", fatal: true, evidence: CollectStartEvidence("emptyConsoleTree"));
         }
+    }
+
+    // What classic showed when the console tree did not come: the visible top-level windows of mmc, the class names of the direct children
+    // of the main window and a screenshot name. Every part has its own try, so a failure here (window gone, UIA error) is recorded as text
+    // and the start error that called this is the one that is thrown. Failure mode 32 in docs/failure-modes/oracle-gpedit-driver.md.
+    private JsonObject CollectStartEvidence(string stage)
+    {
+        var evidence = new JsonObject { ["stage"] = stage };
+        try
+        {
+            evidence["mmcExited"] = mmc.HasExited;
+        }
+        catch (Exception ex)
+        {
+            evidence["mmcExitedError"] = ex.GetType().Name + ": " + ex.Message;
+        }
+
+        try
+        {
+            evidence["windows"] = new JsonArray(ProbeWindows.TopLevel(mmc.Id).Where(w => w.Visible).Select(w => (JsonNode?)ProbeWindows.ToJson(w)).ToArray());
+        }
+        catch (Exception ex)
+        {
+            evidence["windowsError"] = ex.GetType().Name + ": " + ex.Message;
+        }
+
+        try
+        {
+            evidence["mainChildClasses"] = new JsonArray(
+                ProbeWindows.Children(main).Where(c => Win32.GetParent(c.Hwnd) == main).Select(c => (JsonNode?)JsonValue.Create(c.Class)).ToArray());
+        }
+        catch (Exception ex)
+        {
+            evidence["mainChildClassesError"] = ex.GetType().Name + ": " + ex.Message;
+        }
+
+        try
+        {
+            evidence["screenshot"] = Shot(main, "start-" + stage);
+        }
+        catch (Exception ex)
+        {
+            evidence["screenshotError"] = ex.GetType().Name + ": " + ex.Message;
+        }
+
+        return evidence;
     }
 
     internal static AutomationElement? ById(AutomationElement root, string id) =>
