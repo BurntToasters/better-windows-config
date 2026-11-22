@@ -72,6 +72,8 @@ internal sealed class MatrixPlan
                 CheckIds(c, i);
             }
 
+            Problems.AddRange(UnnoticedEdit.PlanProblems(c, Fixture));
+
             foreach (RecordedStep step in c.Steps)
             {
                 if (step.SnapshotOp < 0 || step.SnapshotOp >= c.Ops.Count || c.Ops[step.SnapshotOp].Kind != "snapshot")

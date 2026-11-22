@@ -292,3 +292,66 @@ What can go wrong, and the guard:
 | Dialog text reaches a tracked file | `case.json` of a refused case gets booleans, numbers and BWC text only; the golden self check (section 12) still runs; the self test builds a golden from a result with a marker text in the dialog and requires the marker in no file. |
 | Resume skips a case and leaves a manifest | No session is opened for a skipped case (see above); the self test counts the sessions. |
 | `--resume` retries a refused case forever | The refused golden is complete with the case's plan hash, so `IsComplete` is true. The plan hash is not changed by this section, so the 24 goldens already captured stay complete. |
+
+## 21. A number box set without keys on a policy that is already Enabled is never noticed
+
+Evidence: the engine audit of 2026-11-22 (CAP-4), read from `case.json` of 12 steps in 11 cases. Each step Enabled a policy that was already
+Enabled and set its number box with `WM_SETTEXT` (`via: WM_SETTEXT`, `typed: false`). The set entry shows the text changed (`before` 25,
+`observed` 173) and the state radio unchanged (`before` and `observed` both Enabled). `afterSet.buttons.Apply.enabled` is `false`, no message
+box came, and the press of OK wrote no file (`presses[].files.changed: false`). A person who types the same number gets a write. When the state
+changes in the same step (Not Configured to Enabled), classic reads the text at OK and writes it, so the first step of each case was right.
+The control is a Windows Forms number control with a range, and it sends no change notification for `WM_SETTEXT`; a number box without a range
+(a plain edit, `Pol_Decimal_Required`, `Pol_LongDecimal_RequiredSoftText`) and any text box did notice, so only elements with both `minValue` and
+`maxValue` are affected. The goldens recorded "no change" where classic writes.
+
+The 11 cases and the steps that were wrong:
+
+| Case | Wrong step | What changes in the plan |
+| --- | --- | --- |
+| `B/Pol_Both_WithElements.Computer`, `B/Pol_Both_WithElements.User` | `enabled-alt1-value` | the value is typed |
+| `B/Pol_Decimal_MinMax`, `B/Pol_Decimal_Soft`, `B/Pol_Decimal_StoreAsText` | `enabled-alt1-value` | the value is typed |
+| `B/Pol_LongDecimal_Basic` | `enabled-alt1-value` | the value is typed |
+| `E/Decimal_EdgeValues` | `max`, `max-plus-one` | a Not Configured step before each |
+| `E/Decimal_NotNumber` | `negative` | a Not Configured step before it |
+| `E/Decimal_Soft_OutOfRange` | `below` | a Not Configured step before it |
+| `E/Decimal_StoreAsText_OutOfRange` | `negative` | a Not Configured step before it |
+| `E/LongDecimal_AboveMax` | `huge` | a Not Configured step before it |
+
+What the plan does now:
+
+- Group B types the in-range value of every decimal and long decimal element that has both limits (`OptionChoices.Steps(policy, typeRanges: true)`,
+  called by group B only). Group G reuses `Steps` for its own cases and does not pass the flag, so no group G plan hash changes (those steps change
+  the state in the same operation and were never wrong).
+- Group E does not type the out-of-range values. Typing above the maximum triggers another classic behaviour (a box and a reset to the maximum),
+  which `E/Decimal_TypedAboveMax` covers. The five E cases are built with `CaseClearing`: before every step after the first, the case gets a recorded
+  step `clear-before-<label>` (Not Configured, OK). Each later step then starts from Not Configured, so the state change carries the edit exactly as
+  in the first step. The clear steps appear in the golden as steps of their own, so the replay sees every write.
+- Only these 11 plan hashes change. `gpedit matrix --dry-run` reports 336 valid cases and 325 complete; the 11 are incomplete until the user
+  recaptures them (`gpedit matrix --only B,E --resume`).
+
+What the tool checks now, so the pattern cannot return:
+
+- Plan check (`MatrixPlan.Check`, `UnnoticedEdit.PlanProblems`): a step whose only options are number boxes with a range and no `typed`, on a policy that the
+  same case already Enabled in the same root, is a plan problem. `--dry-run` and `--list` print it and exit with an error. The state of a policy
+  is followed only through the operations of the case; a policy with no earlier operation is not judged.
+- Result check (`CaseOutput.Evaluate`, `UnnoticedEdit.Find`): an `editPolicy` operation fails the case, with no golden written, when a set changed the
+  text of a control (`before` differs from `observed`), no state set changed the radio, `afterSet` reports Apply disabled, and no message box
+  refused the edit (no `boxesBeforePress` and no `messageBoxes` in any press). This applies to optional operations too, because the group E
+  steps are all optional and an optional failure would still write a golden. An operation with no `presses` (it failed before them) is not judged,
+  because the boxes are not known. The failure text names the operation, the control and the evidence, and says that the edit was not noticed.
+
+What can go wrong and the guard of each:
+
+| Risk | Guard |
+| --- | --- |
+| A typed value reaches the dialog differently from classic's own typing | `TypeInto` is the path of `E/Decimal_TypedAboveMax`; the commit and the read back are unchanged (`immediate`, `observed`). The recapture shows it. |
+| A Not Configured step writes and changes the numbering that a replay expects | The step is recorded as a step of its own; its files are in the golden. Only the 11 cases get it. |
+| The Not Configured step fails because the policy is already Not Configured | OK with no change closes the dialog and writes nothing; the step is not optional, so a real failure fails the case. |
+| The result check fires on a legitimate case | It needs all four facts together. A state change, a box, a typed set that ends where it started, an Apply that is enabled, or a press-less result each stop it. The self test builds one result for each fact. |
+| The plan check misses a pattern that is not a ranged number | It is a guard for the known kind. The result check is the general one: it reads classic's own Apply state. |
+| A recapture with the old plan keeps the wrong goldens | The 11 plan hashes changed, so `--resume` runs those cases and skips the 325 others. |
+| Another group's hash changes by accident | `--dry-run` counts the complete cases against `complete.json`; any count other than 325 is a defect of the change. |
+
+The self test (`gpedit selftest`, no classic needed) checks: the pure decision for each combination of the four facts, the evaluation of a made-up result
+(an unnoticed edit fails the case, also as an optional operation; each fact that clears the pattern lets it pass), the plan check on a made-up case and
+on the real plan (no problem), that group B types exactly the ranged number steps, and that the five E cases carry the clear steps.

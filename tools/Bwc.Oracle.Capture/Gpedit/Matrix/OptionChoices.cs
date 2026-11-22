@@ -106,8 +106,11 @@ internal static class OptionChoices
         return alt;
     }
 
-    // The option lists for each step after the defaults: step k takes variant k of every element.
-    internal static List<(string Tag, List<OptionSpec> Specs)> Steps(PolicyInfo policy)
+    // The option lists for each step after the defaults: step k takes variant k of every element. typeRanges types the value of a number box
+    // that has a range: such a step runs on a policy that is already Enabled, and classic does not notice a number box set with WM_SETTEXT then
+    // (failure mode 21 of the matrix document). Group B passes it. Group G reuses these steps in the step that changes the state, which was
+    // never wrong, so it does not.
+    internal static List<(string Tag, List<OptionSpec> Specs)> Steps(PolicyInfo policy, bool typeRanges = false)
     {
         List<List<Variant>> all = policy.Elements.Select(e => Variants(policy, e)).ToList();
         int count = all.Count == 0 ? 0 : all.Max(v => v.Count);
@@ -119,7 +122,8 @@ internal static class OptionChoices
             foreach (List<Variant> variants in all)
             {
                 Variant pick = variants[Math.Min(k, variants.Count - 1)];
-                specs.Add(pick.Spec);
+                bool keys = typeRanges && policy.Elements.FirstOrDefault(e => e.Id == pick.Spec.ElementId) is { } element && UnnoticedEdit.NeedsKeys(element);
+                specs.Add(keys ? pick.Spec with { Typed = true } : pick.Spec);
                 tags.Add(pick.Tag);
             }
 

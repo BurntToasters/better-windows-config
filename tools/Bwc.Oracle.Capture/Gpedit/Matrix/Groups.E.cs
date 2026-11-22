@@ -15,16 +15,32 @@ internal static partial class MatrixGroups
         List<OptionSpec> One(PolicyInfo policy, string text, bool typed = false, int element = 0) =>
             new() { OptionChoices.Base(policy, policy.Elements[element]) with { Text = text, Typed = typed ? true : null } };
 
-        MatrixCase Case(string id, string description, PolicyInfo policy, string root, params (string Label, List<OptionSpec>? Options, string[]? Press)[] steps)
+        // clearBetween: a recorded Not Configured step (OK) before every step after the first. A number box with a range set without keys is not
+        // noticed on a policy that is already Enabled, and typing an out-of-range value is another classic behaviour (Decimal_TypedAboveMax), so each
+        // later step starts from Not Configured and the state change carries the edit, as in the first step (failure mode 21 of the matrix document).
+        MatrixCase Build(bool clearBetween, string id, string description, PolicyInfo policy, string root, (string Label, List<OptionSpec>? Options, string[]? Press)[] steps)
         {
             var builder = new CaseBuilder("E", id, description);
+            bool first = true;
             foreach ((string label, List<OptionSpec>? options, string[]? press) in steps)
             {
+                if (clearBetween && !first)
+                {
+                    builder.Step($"clear-before-{label}", Edit(policy, root, "Not Configured", press: new[] { "OK" }));
+                }
+
+                first = false;
                 builder.Step(label, Edit(policy, root, "Enabled", options: options, press: press), isOptional: true);
             }
 
             return builder.Build();
         }
+
+        MatrixCase Case(string id, string description, PolicyInfo policy, string root, params (string Label, List<OptionSpec>? Options, string[]? Press)[] steps) =>
+            Build(false, id, description, policy, root, steps);
+
+        MatrixCase CaseClearing(string id, string description, PolicyInfo policy, string root, params (string Label, List<OptionSpec>? Options, string[]? Press)[] steps) =>
+            Build(true, id, description, policy, root, steps);
 
         PolicyInfo minMax = f.Policy("Pol_Decimal_MinMax");
         PolicyInfo requiredNumber = f.Policy("Pol_Decimal_Required");
@@ -42,16 +58,16 @@ internal static partial class MatrixGroups
 
         yield return Case("Decimal_AboveMax", "decimal 10 to 500 given 9999, then OK", minMax, "Computer", ("ok", One(minMax, "9999"), null));
         yield return Case("Decimal_BelowMin", "decimal 10 to 500 given 1, then OK", minMax, "Computer", ("ok", One(minMax, "1"), null));
-        yield return Case("Decimal_NotNumber", "decimal given letters, then OK", minMax, "Computer", ("letters", One(minMax, "abc"), null), ("negative", One(minMax, "-5"), null));
+        yield return CaseClearing("Decimal_NotNumber", "decimal given letters, then OK", minMax, "Computer", ("letters", One(minMax, "abc"), null), ("negative", One(minMax, "-5"), null));
         yield return Case("Decimal_Empty", "decimal given an empty text, then OK", minMax, "Computer", ("empty", One(minMax, string.Empty), null));
-        yield return Case("Decimal_EdgeValues", "decimal 10 to 500 at 10, 500 and 501", minMax, "Computer", ("min", One(minMax, "10"), null), ("max", One(minMax, "500"), null), ("max-plus-one", One(minMax, "501"), null));
+        yield return CaseClearing("Decimal_EdgeValues", "decimal 10 to 500 at 10, 500 and 501", minMax, "Computer", ("min", One(minMax, "10"), null), ("max", One(minMax, "500"), null), ("max-plus-one", One(minMax, "501"), null));
         yield return Case("Decimal_TypedAboveMax", "decimal typed key by key: 9999", minMax, "Computer", ("typed", One(minMax, "9999", typed: true), null));
         yield return Case("Decimal_TypedLetters", "decimal typed key by key: 12ab", minMax, "Computer", ("typed", One(minMax, "12ab", typed: true), null));
         yield return Case("Decimal_Apply", "decimal out of range pressed with Apply, then Cancel", minMax, "Computer", ("apply", One(minMax, "9999"), new[] { "Apply", "Cancel" }));
         yield return Case("Decimal_Required_Empty", "required decimal left empty and given an empty text", requiredNumber, "User", ("defaults", null, null), ("empty", One(requiredNumber, string.Empty), null));
-        yield return Case("Decimal_Soft_OutOfRange", "soft decimal 1 to 100 given 1000 and 0", soft, "Computer", ("above", One(soft, "1000"), null), ("below", One(soft, "0"), null));
-        yield return Case("Decimal_StoreAsText_OutOfRange", "storeAsText decimal 0 to 65535 given 65536 and -1", storeText, "Computer", ("above", One(storeText, "65536"), null), ("negative", One(storeText, "-1"), null));
-        yield return Case("LongDecimal_AboveMax", "long decimal given 9000000000001 and a 25 digit number", longNumber, "Computer", ("above", One(longNumber, "9000000000001"), null), ("huge", One(longNumber, "9999999999999999999999999"), null));
+        yield return CaseClearing("Decimal_Soft_OutOfRange", "soft decimal 1 to 100 given 1000 and 0", soft, "Computer", ("above", One(soft, "1000"), null), ("below", One(soft, "0"), null));
+        yield return CaseClearing("Decimal_StoreAsText_OutOfRange", "storeAsText decimal 0 to 65535 given 65536 and -1", storeText, "Computer", ("above", One(storeText, "65536"), null), ("negative", One(storeText, "-1"), null));
+        yield return CaseClearing("LongDecimal_AboveMax", "long decimal given 9000000000001 and a 25 digit number", longNumber, "Computer", ("above", One(longNumber, "9000000000001"), null), ("huge", One(longNumber, "9999999999999999999999999"), null));
         yield return Case("LongDecimal_Required_Empty", "required long decimal given an empty text and a letter", longRequired, "User", ("defaults", null, null), ("empty", One(longRequired, string.Empty), null), ("letter", One(longRequired, "x"), null));
         yield return Case("Text_TooLong_Typed", "text with maxLength 12 typed with 20 characters", shortText, "User", ("typed", One(shortText, "abcdefghijklmnopqrst", typed: true), null));
         yield return Case("Text_TooLong_SetText", "text with maxLength 12 set with 20 characters without typing", shortText, "User", ("set", One(shortText, "abcdefghijklmnopqrst"), null));

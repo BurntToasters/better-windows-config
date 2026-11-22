@@ -158,7 +158,17 @@ internal static class CaseOutput
                 return false;
             }
 
-            if (entry["ok"]?.GetValue<bool>() == true)
+            bool entryOk = entry["ok"]?.GetValue<bool>() == true;
+
+            // An edit the dialog never noticed records "no change" where classic writes (failure mode 21 of the matrix document). It fails the case
+            // even when the operation is optional, because an optional failure would still write the golden.
+            if ((entryOk || c.Optional.Contains(i)) && c.Ops[i].Kind == "editPolicy" && entry["data"] is JsonObject data && UnnoticedEdit.Find(data) is { } unnoticed)
+            {
+                why = $"operation {i} (editPolicy{(c.Ops[i].Label is null ? string.Empty : " " + c.Ops[i].Label)}) {unnoticed}";
+                return false;
+            }
+
+            if (entryOk)
             {
                 continue;
             }

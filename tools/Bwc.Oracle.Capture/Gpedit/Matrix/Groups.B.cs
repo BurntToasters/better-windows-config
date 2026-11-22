@@ -20,7 +20,7 @@ internal static partial class MatrixGroups
                 CaseBuilder builder = new("B", id, description);
                 builder.Step("enabled-defaults", Edit(policy, root, "Enabled"));
                 int number = 0;
-                foreach ((string tag, List<OptionSpec> specs) in OptionChoices.Steps(policy))
+                foreach ((string tag, List<OptionSpec> specs) in OptionChoices.Steps(policy, typeRanges: true))
                 {
                     number++;
                     builder.Step($"enabled-alt{number}-{tag}", Edit(policy, root, "Enabled", options: specs));

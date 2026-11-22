@@ -255,6 +255,7 @@ internal static partial class SelfTest
         PushButtonCases(repo, Case);
         GridCases(repo, Case);
         ListRefusalCases(repo, Case);
+        UnnoticedEditCases(repo, Case);
         UiaCases(repo, Case);
 
         var report = new JsonObject
