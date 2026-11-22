@@ -214,7 +214,7 @@ check("release:win step list is exact", () => {
     [
       { name: "release:policy", args: [] },
       { name: "release:preflight", args: ["--", "--require-trusted-key"] },
-      { name: "test:all", args: ["--", "--quick", "--rid", "all"] },
+      { name: "test:all", args: ["--", "--rid", "all"] },
       { name: "release:session:create", args: ["--", "--require-gate", "--force"] },
       { name: "release:clean", args: [] },
       { name: "release:win:continue", args: [] },
@@ -324,13 +324,31 @@ check("quality gate proof: missing, failed, or wrong-commit gates are refused", 
   );
 });
 
-check("quality gate proof: a quick pass records e2e skipped; a full pass records e2e passed", () => {
+check("quality gate proof: a quick pass is refused; a full pass for both rids records e2e passed", () => {
   const quick = qualityGateProof({ pass: true, quick: true, git: { commit: HEAD } }, HEAD);
-  assertEqual(quick.ok, true, "quick ok");
-  assertEqual(quick.record.mode, "quick", "quick mode");
-  assertEqual(quick.record.e2e, "skipped", "quick e2e");
-  const full = qualityGateProof({ pass: true, quick: false, git: { commit: HEAD } }, HEAD);
+  assertEqual(quick.ok, false, "quick refused");
+  assertEqual(quick.reason, "gate-quick", "quick reason");
+  const oneRid = qualityGateProof(
+    { pass: true, quick: false, git: { commit: HEAD }, rids: [{ rid: "win-x64", status: "pass" }], steps: [] },
+    HEAD,
+  );
+  assertEqual(oneRid.reason, "gate-rid-missing", "one rid");
+  const e2eStep = (name, rid) => ({ name, rid, pass: true, exitCode: 0, e2eResult: { exists: true, pass: true, failed: 0 } });
+  const rids = ["win-arm64", "win-x64"];
+  const full = qualityGateProof(
+    {
+      pass: true,
+      quick: false,
+      git: { commit: HEAD },
+      rids: rids.map((rid) => ({ rid, status: "pass" })),
+      steps: rids.flatMap((rid) => [e2eStep("e2e-ship", rid), e2eStep("e2e-flavor", rid)]),
+    },
+    HEAD,
+  );
+  assertEqual(full.ok, true, "full ok");
+  assertEqual(full.record.mode, "full", "full mode");
   assertEqual(full.record.e2e, "passed", "full e2e");
+  assertEqual(full.record.rids, rids, "full rids");
 });
 
 // ---- trusted set from TrustedKeys.cs ----------------------------------------------------------

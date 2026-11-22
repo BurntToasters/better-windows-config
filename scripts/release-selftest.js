@@ -1410,10 +1410,41 @@ function writeRepository(temp, { placeholder = false, embedded = [] } = {}) {
 
 const GATE_PATH = path.join("artifacts", "gate", "result.json");
 
-/** Writes artifacts/gate/result.json. Fields not given describe a passing quick gate for HEAD. */
+/** The result of one e2e step of a full gate, shaped like a test-all.js step entry. */
+function e2eGateStep(name, rid, flavor, overrides = {}) {
+  return {
+    name,
+    rid,
+    pass: true,
+    exitCode: 0,
+    e2eResult: { path: `artifacts/e2e/result-${rid}-${flavor}.json`, exists: true, pass: true, passed: 4, failed: 0, total: 4, error: null },
+    ...overrides,
+  };
+}
+
+/** The rids and steps a full `test-all.js --rid all` records, with a shared step and both e2e steps per rid. */
+function fullGateRids(rids = ["win-arm64", "win-x64"]) {
+  return {
+    rids: rids.map((rid) => ({ rid, platform: "windows", status: "pass", steps: ["e2e-ship", "e2e-flavor"] })),
+    steps: [
+      { name: "validate", rid: null, pass: true, exitCode: 0, e2eResult: null },
+      ...rids.flatMap((rid) => [e2eGateStep("e2e-ship", rid, "ship"), e2eGateStep("e2e-flavor", rid, "e2e")]),
+    ],
+  };
+}
+
+/** Writes artifacts/gate/result.json. Fields not given describe a passing full gate for both rids on HEAD. */
 function writeGate(repo, fields = {}) {
   const head = git(repo, ["rev-parse", "HEAD"]);
-  writeJson(path.join(repo, GATE_PATH), { schema: 1, pass: true, quick: true, git: { commit: head, dirty: false }, ...fields });
+  writeJson(path.join(repo, GATE_PATH), {
+    schema: 1,
+    rid: "all",
+    quick: false,
+    pass: true,
+    git: { commit: head, dirty: false },
+    ...fullGateRids(),
+    ...fields,
+  });
 }
 
 function commitAll(temp, message) {
@@ -1847,10 +1878,42 @@ async function runSessionGateCases(temp, fixture, cases) {
   expectRefusal("session create refuses a gate for another commit (gate-commit-mismatch)", create(), ["gate-commit-mismatch"], cases);
   writeGate(repo, { git: { commit: head, dirty: true } });
   expectRefusal("session create refuses a gate recorded on a dirty tree (gate-dirty-tree)", create(), ["gate-dirty-tree"], cases);
+  writeGate(repo, { quick: true, rid: "all", rids: fullGateRids().rids.map((entry) => ({ ...entry, status: "skipped" })), steps: [] });
+  expectRefusal("session create refuses a quick gate (gate-quick)", create(), ["gate-quick"], cases);
+  expectCheck("a refused quick gate writes no session file", !fs.existsSync(session), "", cases);
+  writeGate(repo, { rid: "win-arm64", ...fullGateRids(["win-arm64"]) });
+  expectRefusal("session create refuses a full gate for win-arm64 only (gate-rid-missing)", create(), ["gate-rid-missing"], cases);
+  writeGate(repo, { rid: "win-x64", ...fullGateRids(["win-x64"]) });
+  expectRefusal("session create refuses a full gate for win-x64 only (gate-rid-missing)", create(), ["gate-rid-missing"], cases);
+  const noE2e = fullGateRids();
+  noE2e.steps = noE2e.steps.filter((step) => !(step.rid === "win-x64" && step.name === "e2e-flavor"));
+  writeGate(repo, noE2e);
+  expectRefusal("session create refuses a gate with a missing e2e step (gate-e2e-not-run)", create(), ["gate-e2e-not-run"], cases);
+  const failedStep = fullGateRids();
+  failedStep.steps.find((step) => step.rid === "win-arm64" && step.name === "e2e-ship").pass = false;
+  writeGate(repo, failedStep);
+  expectRefusal("session create refuses a gate where one step failed (gate-failed)", create(), ["gate-failed"], cases);
+  const notRun = fullGateRids();
+  notRun.rids.find((entry) => entry.rid === "win-x64").status = "not-run";
+  writeGate(repo, notRun);
+  expectRefusal("session create refuses a rid that is not-run (gate-rid-missing)", create(), ["gate-rid-missing"], cases);
+  const noResult = fullGateRids();
+  noResult.steps.find((step) => step.rid === "win-x64" && step.name === "e2e-ship").e2eResult.exists = false;
+  writeGate(repo, noResult);
+  expectRefusal("session create refuses an e2e step whose result file is absent (gate-e2e-not-run)", create(), ["gate-e2e-not-run"], cases);
+  const failingResult = fullGateRids();
+  Object.assign(failingResult.steps.find((step) => step.rid === "win-arm64" && step.name === "e2e-flavor").e2eResult, { pass: false, failed: 1 });
+  writeGate(repo, failingResult);
+  expectRefusal("session create refuses an e2e step whose result has failures (gate-e2e-not-run)", create(), ["gate-e2e-not-run"], cases);
   writeGate(repo);
-  expectPass("session create records a passing quick gate without any flag", create(), cases, "quality gate recorded");
+  expectPass("session create records a passing full gate for both rids without any flag", create(), cases, "quality gate recorded");
   const recorded = JSON.parse(fs.readFileSync(session, "utf8")).qualityGate;
-  expectCheck("the recorded quick gate has e2e skipped", recorded?.mode === "quick" && recorded?.e2e === "skipped", JSON.stringify(recorded), cases);
+  expectCheck(
+    "the recorded gate is full, names both rids, and has e2e passed",
+    recorded?.mode === "full" && recorded?.e2e === "passed" && JSON.stringify(recorded?.rids) === '["win-arm64","win-x64"]',
+    JSON.stringify(recorded),
+    cases,
+  );
   expectPass("--require-gate is still accepted as a no-op", create(["--require-gate", "--force"]), cases, "accepted");
   expectPass("session verify passes with a recorded gate", run("scripts/release-session.js", ["verify", ...common]), cases, "gate present");
 
@@ -1889,10 +1952,15 @@ function runDetachedBranchCases(temp, cases) {
 
 /** Pure gate-proof and manifest-URL cases: a dirty gate and a malformed escape are refusals, not throws. */
 function runGateProofAndUrlCases(cases) {
-  const dirty = qualityGateProof({ pass: true, quick: true, git: { commit: FAKE_COMMIT, dirty: true } }, FAKE_COMMIT);
+  const fullGate = (git) => ({ pass: true, quick: false, git, ...fullGateRids() });
+  const dirty = qualityGateProof(fullGate({ commit: FAKE_COMMIT, dirty: true }), FAKE_COMMIT);
   expectCheck("qualityGateProof refuses git.dirty true (gate-dirty-tree)", dirty.reason === "gate-dirty-tree", JSON.stringify(dirty), cases);
-  const clean = qualityGateProof({ pass: true, quick: true, git: { commit: FAKE_COMMIT, dirty: false } }, FAKE_COMMIT);
-  expectCheck("qualityGateProof accepts git.dirty false for HEAD", clean.ok === true, JSON.stringify(clean), cases);
+  const clean = qualityGateProof(fullGate({ commit: FAKE_COMMIT, dirty: false }), FAKE_COMMIT);
+  expectCheck("qualityGateProof accepts a full gate for both rids on a clean HEAD", clean.ok === true && clean.record.mode === "full", JSON.stringify(clean), cases);
+  const quick = qualityGateProof({ pass: true, quick: true, git: { commit: FAKE_COMMIT, dirty: false } }, FAKE_COMMIT);
+  expectCheck("qualityGateProof refuses a quick gate (gate-quick)", quick.reason === "gate-quick", JSON.stringify(quick), cases);
+  const noRids = qualityGateProof({ pass: true, quick: false, git: { commit: FAKE_COMMIT, dirty: false } }, FAKE_COMMIT);
+  expectCheck("qualityGateProof refuses a full gate with no rids array (gate-rid-missing)", noRids.reason === "gate-rid-missing", JSON.stringify(noRids), cases);
 
   const base = `https://github.com/BurntToasters/better-windows-config/releases/download/v${VERSION}`;
   const manifest = {
