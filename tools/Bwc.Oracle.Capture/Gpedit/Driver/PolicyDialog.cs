@@ -231,11 +231,46 @@ internal sealed partial class PolicyDialog
 
     // Presses one button of the dialog. The button gets focus first (a pending numeric edit validates), then Invoke. The result says
     // whether the dialog closed, whether a message box blocked it (captured and answered), and what classic wrote (settled files).
+    // Message boxes of the process that are open before a press, answered and recorded, up to 5 rounds (failure mode 45).
+    private JsonArray AnswerBoxesBeforePress(string? answer)
+    {
+        var answered = new JsonArray();
+        for (int round = 0; round < 5; round++)
+        {
+            List<WinInfo> boxes = driver.Dialogs().Where(w => driver.Classify(w) == DialogKind.MessageBox).ToList();
+            if (boxes.Count == 0)
+            {
+                break;
+            }
+
+            foreach (WinInfo box in boxes)
+            {
+                answered.Add(driver.DismissMessageBox(box, answer));
+            }
+
+            Thread.Sleep(200);
+        }
+
+        return answered;
+    }
+
     internal JsonObject Press(string button, string? answer)
     {
         var result = new JsonObject { ["button"] = button };
         AutomationElement target = Element(IdFor(button));
         bool enabled = target.Current.IsEnabled;
+        JsonArray boxesBefore = AnswerBoxesBeforePress(answer);
+        if (boxesBefore.Count > 0)
+        {
+            // A box from a typed value disabled the dialog (failure mode 45). It is answered, recorded, and the button gets 2 s to come back.
+            result["boxesBeforePress"] = boxesBefore;
+            DateTime enabledBy = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+            while (!(enabled = target.Current.IsEnabled) && DateTime.UtcNow < enabledBy)
+            {
+                Thread.Sleep(100);
+            }
+        }
+
         result["enabledBefore"] = enabled;
         if (!enabled)
         {

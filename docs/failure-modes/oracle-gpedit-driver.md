@@ -1028,6 +1028,12 @@ Unproved, for the next real run to confirm from `result.json`:
   and that operation 30 selects `Sort cases` again after the clear.
 - That the same happens for the later variants that hide the node, and for none of the first four.
 
+Result of the next run: operations 27 to 70 pass, and the hidden description and the ancestor route work as written. Operation 71 failed. It is
+a plain `selectNode` of `Basics` while the filter "configured yes" stays on, and `Basics` holds no configured policy, so classic hides it (the
+parent shows only `Sort cases`). `selectNode` was not one of the operations above. Now it is: when selecting the node fails with a gap and
+Filter On is checked, `selectNode` returns the same hidden description as `readList` and selects nothing else. When the node is found,
+`selectNode` returns exactly what it returned before, so no golden of a visible node changes. A gap with the filter off still fails.
+
 ## 43. The numeric edit of a number control never passes the focus check
 
 `E/Decimal_TypedAboveMax` and `E/Decimal_TypedLetters` (the cases that type into a number control) failed in operation 0 with
@@ -1104,3 +1110,32 @@ Unproved, for the next real run to confirm from `result.json`:
 
 - That operation 4 of `E/LongDecimal_Required_Empty` records `stayedOpen: true`, no file change, `dialogStillOpen` and a Cancel that closes the dialog.
 - Whether other Group E cases stay open without a box (a letter in the other number controls). This change records them the same way.
+
+Result of the next run: operation 4 of `E/LongDecimal_Required_Empty` records `stayedOpen: true`, no file change, and a Cancel at the end
+that closes the dialog.
+
+## 45. A message box from a typed value is open when the press comes
+
+Evidence: the first real run after section 43, case `E/Decimal_TypedAboveMax`. The keys `9999` reached the number control, classic reset the
+value to 500 and showed a message box (title "Group Policy", one OK button) that it shows when a number is above the maximum. The box was open
+when the driver pressed OK of the setting dialog, so the dialog and all its buttons were disabled. The press recorded "the button is
+disabled", the Cancel at the end too, and only the cleanup after the operation answered the box. The golden would say that OK is disabled after
+typing a large number, which is not what classic does: a person answers the box and then presses OK.
+
+What the driver does now: before every press of a setting dialog button, the driver looks for message boxes of the process. Each one is
+answered the same way as a box after a press (`DismissMessageBox`, with the operation's `messageBoxAnswer`) and recorded in
+`boxesBeforePress` of the press entry. The driver then waits up to 2 s for the button to be enabled again and presses it as before.
+`boxesBeforePress` reaches the golden: the boxes go through the scrubber like every box (title and texts hashed, the screenshot and the UI
+Automation texts dropped), because the box is classic behaviour.
+
+What can go wrong and the guard of each:
+
+- A box from something else is taken for one from the typed value. Every operation ends with the cleanup that closes all dialogs, so a box
+  open at a press was opened within the operation. The recorded box shows which one it was.
+- The button stays disabled after the box is answered. The press records "the button is disabled" as before, after the 2 s wait, with the
+  answered boxes in the entry.
+- A second box comes after the first is answered. The driver looks again until no box is open, up to 5 rounds, and records each one.
+- A golden of a case with no such box changes. It cannot: `boxesBeforePress` is written only when a box was answered.
+
+Unproved, for the next real run to confirm from `result.json`: that `E/Decimal_TypedAboveMax` records the box in `boxesBeforePress`, that OK
+is then pressed, and what classic writes (500 is expected).

@@ -402,7 +402,15 @@ internal static class OpsRunner
         switch (op.Kind)
         {
             case "selectNode":
-                return driver.SelectNode(op.Root!, op.Path!);
+                try
+                {
+                    return driver.SelectNode(op.Root!, op.Path!);
+                }
+                catch (DriverException ex) when (ex.Gap is not null)
+                {
+                    // A node the filter hides is a result (failure mode 42); a gap with the filter off throws again in EnsureNodeOrHidden.
+                    return EnsureNodeOrHidden(driver, op, entry, selectAncestor: false) ?? driver.SelectNode(op.Root!, op.Path!);
+                }
 
             case "treeChildren":
                 return driver.TreeChildren(op.Root!, op.Path!);
