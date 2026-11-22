@@ -868,3 +868,10 @@ Unproved, for the next real run to confirm from `result.json`:
   `Machine\comment.cmtx`, and that the file holds the rows that were typed.
 - That operation 0 (Enabled, empty list) still shows the message box. That would make it classic behaviour for an empty list, and not a
   side effect of the read.
+
+Result of the next run (case `B/Pol_List_Plain` alone, then the long capture): the first explanation is right. In all ten list cases of
+group B, the 2-row and 1-row steps now press OK with no message box and write the files, and the Enabled step with an empty list still shows
+the box, so that box is classic behaviour. The `rows0` step (Show Contents refused, then cancelled) writes nothing and shows no box: the list
+classic saves is the one loaded when the policy dialog opened (1 row), so nothing changed. Classic's Cancel of Show Contents therefore puts the
+list back to its value from the file, not to the value of the last OK. The read before the sets stays as it is: it cancels before any edit,
+when the two values are the same. BWC may differ here on purpose; the audit decides.
