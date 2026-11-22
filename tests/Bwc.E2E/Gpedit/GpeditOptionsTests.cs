@@ -573,7 +573,15 @@ public sealed class GpeditOptionsTests
             _ = dialog.Select(GpeditDialog.Enabled);
             checks.Record("plain.buttonEnabled", dialog.IsEnabled(PlainButton), "the Show... button is enabled once Enabled is selected.");
             _ = dialog.Invoke(GpeditDialog.Apply);
-            checks.Record("plain.baseline", ShellRun.WaitUntil(() => !dialog.IsEnabled(GpeditDialog.Apply), TimeSpan.FromSeconds(3)), "an empty list can be applied (the list is not required).");
+
+            // Classic, B/Pol_List_Plain operation 0: Enabled with the empty list is refused with a message box, the dialog stays
+            // open and Apply stays enabled. The G3 expectation, that an empty list can be applied, was wrong.
+            (string Caption, string Text)? emptyRefusal = dialog.WaitMessage();
+            checks.Record("plain.baseline", emptyRefusal is not null && dialog.IsEnabled(GpeditDialog.Apply), $"an Enabled list with no rows is refused with a message box (B/Pol_List_Plain operation 0) and Apply stays enabled: message={emptyRefusal?.Text}.");
+            if (emptyRefusal is not null)
+            {
+                _ = dialog.DismissMessage();
+            }
 
             _ = dialog.Invoke(PlainButton);
             GpeditContents? contents = GpeditContents.Wait(dialog);
@@ -596,7 +604,7 @@ public sealed class GpeditOptionsTests
             checks.Record("plain.rowDeleted", contents.Rows(1).Select(r => r[0]).SequenceEqual(["one", "three"]), $"rows={string.Join("|", contents.Rows(1).Select(r => r[0]))}.");
             _ = contents.Cancel();
             checks.Record("plain.cancelCloses", contents.WaitClosed(), "Cancel closes Show Contents.");
-            checks.Record("plain.cancelKeeps", ListData(dialog, "PlainList").Length == 0 && !dialog.IsEnabled(GpeditDialog.Apply), $"after Cancel the list holds {ListData(dialog, "PlainList").Length} entries and Apply is {(dialog.IsEnabled(GpeditDialog.Apply) ? "enabled" : "disabled")}.");
+            checks.Record("plain.cancelKeeps", ListData(dialog, "PlainList").Length == 0 && dialog.IsEnabled(GpeditDialog.Apply), $"after Cancel the list holds {ListData(dialog, "PlainList").Length} entries and Apply is {(dialog.IsEnabled(GpeditDialog.Apply) ? "enabled" : "disabled")}; the refused Apply above left the state change pending, as classic does (B/Pol_List_Plain operation 0).");
 
             _ = dialog.Invoke(PlainButton);
             contents = GpeditContents.Wait(dialog);

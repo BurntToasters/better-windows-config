@@ -236,3 +236,59 @@ control labels.
    hooks for a changed option and for the values of an Enabled edit.
 5. For piece G4: replace `InMemoryPolicyEditStore` with a store that saves; `PolicySettingDialog` and the wiring in
    `GpeditRootView.Editor.cs` need no other change.
+
+## 15. Saving from the dialog (piece G4)
+
+This section was written before the code (dispatch T). It replaces what sections 7, 8 and 10 say about writing: from G4 on, OK
+and Apply save the local policy object byte for byte as classic `gpedit.msc` does, through `PolicySave.Save(store, side, policy,
+edit, comment)` (`docs/failure-modes/policy-save.md`) and one `GpoStore.Save`. The tests are in `tests/Bwc.E2E/Gpedit/Replay`
+(`Gpedit_Replay_*`, `Gpedit_Save_*`, `Gpedit_Dialog_Defaults`, `Gpedit_Options_List_EmptyRefused`, `Gpedit_ReadOnly_Notice`) and
+write their checks under the ids `gpedit.replay.*`, `gpedit.save.*`, `gpedit.dialog.defaults.*`, `gpedit.options.listemptyrefused.*`
+and `gpedit.readonly.notice.*`. The replay tests also write `artifacts/e2e/visual/gpedit/gpedit-replay-<name>.json`: the size and
+SHA-256 of every file of every step as classic captured it and as the editor saved it. It holds no time, so a second run with the
+same code writes the same bytes.
+
+The contract the code must meet (the names are the ones the tests look for):
+
+1. The store seam. `IPolicyEditStore` has one implementation in the ship build: a store over `SystemGpoStorePolicy` that calls
+   `PolicySave.Save`. `InMemoryPolicyEditStore` exists only under `#if BWC_E2E`. The E2E flavor uses a sandbox store over
+   `BWC_E2E_GPO_ROOT`, and a deny-all policy when the variable is unset.
+2. The side is the side of the request (`PolicyRef.Side`), one `PolicySave.Save` per side. It is never derived from the policy class.
+3. After a successful save the host replaces the loaded model with a snapshot read back from disk and rebuilds the list rows. The
+   dialog baseline (state, comment, option values) becomes what was saved.
+4. A failure of the store becomes a message box owned by the dialog whose text has the automation id `DialogSaveError.<Kind>`:
+   `ReadOnlyFile` (`ReadOnlyTarget`), `Malformed`, `LockTimeout` (and `LockUnavailable`), `InUse`, `Partial` (a save that wrote some
+   files before it failed: `GpoStoreException.WrittenFiles` is not empty), `RefreshFailed`, and `Failed` for the rest (`Io`,
+   `BackupFailed`, `PolicyDenied`). Each kind has its own text. The dialog stays open, keeps the pending change and stays dirty.
+5. A read-only store (`GpoAccess.Check`: not elevated, no write access, Home) shows the notice `GpeditReadOnlyNotice` in the
+   window and `DialogReadOnlyNotice` in the setting dialog. In read-only mode OK and Apply are disabled or show the notice; OK
+   never closes the dialog without saying why.
+6. The option controls load the values of `PolicyDefaults.For(policy)` when Enabled is chosen on a policy that was not Enabled.
+
+| Id | Way it fails | Expected | E2E check |
+|---|---|---|---|
+| W1 | A class Both policy saved under one root writes the files of the other side, or the dialog derives the side from the policy class. | Only the side of the request changes; every file of the other side stays absent or as it was. | `Gpedit_Replay_GroupA`: `A/Both_UnderComputer_Enabled`, `A/Both_UnderUser_Enabled`, `A/Both_Computer_Then_User`, `A/Both_UnderComputer_CommentOnly`, `A/Both_UnderUser_CommentOnly` |
+| W2 | The dialog or the store writes although the edit has a validation problem (an empty required text, an Enabled list with no rows). | A message box, the dialog stays open and dirty, no file locked or changed, no refresh. | `Gpedit_Options_List_EmptyRefused` (hashes of the five files); `Gpedit_Replay_GroupB_ElementKinds`: `B/Pol_Enum_StringItems` and `B/Pol_List_Plain` operation 0 |
+| W3 | Another process holds the write lock file. The save waits for ever, hangs the window, or reports a generic failure. | After the lock timeout (15 s) the message `DialogSaveError.LockTimeout` appears; the window does not stay unresponsive; the dialog stays open; nothing is written; OK saves once the lock is free. | `Gpedit_Save_Errors_LockHeld` |
+| W4 | `Registry.pol` has the read-only attribute and the save clears it, writes the other files first, or shows a generic text. | `DialogSaveError.ReadOnlyFile`, the attribute is kept, no file of the five changed (the store checks every target before its first write), OK saves once the attribute is gone. | `Gpedit_Save_Errors_ReadOnlyFile` |
+| W5 | `Registry.pol` turned malformed between open and save and the save overwrites it, or works from the model of open time. | The store reads under the lock, finds the malformed file and throws `Malformed`; `DialogSaveError.Malformed`; the bad file is left as it is; nothing else is written. | `Gpedit_Save_Errors_MalformedAtSave` |
+| W6 | A save writes some files and then fails (a write error on the second file) and the dialog says "not saved", or keeps the old model. | The store does not roll back. The dialog says that files were written (`DialogSaveError.Partial`), the model is read back from disk, the list shows what is on disk. | none through the window: the E2E sandbox cannot fail the second write. Engine: `tests/Bwc.Gpo.Tests/GpoSaveTests.cs` (`WriteObserver`, `WrittenFiles`). The message mapping is covered by `Gpedit_Save_Errors_TextsDiffer` for the three kinds a user can cause |
+| W7 | The refresh after a write fails and the dialog treats the save as failed (the user saves again and the version rises twice), or hides the failure. | `RefreshFailed` is a notice, not an error: the files are on disk, the model is replaced, the baseline is clean, and the message `DialogSaveError.RefreshFailed` says the change takes effect at the next policy refresh. | none through the window (the sandbox refresher only records). Engine: `GpoSaveTests` |
+| W8 | The loaded model is not replaced by the saved result: the list shows the memory edit, F5 shows something else, or the dialog reopens with the pre-save state. | After OK the list shows the saved state and comment; the dialog reopens clean with the saved values; after F5 the same; F5 writes nothing. | `Gpedit_Save_ModelReplaced` |
+| W9 | Cancel after Apply reverts the change, saves again or writes a version bump; OK after Apply writes again. | Apply writes the files of the capture; Cancel changes nothing; OK after Apply (nothing pending) writes nothing. | `Gpedit_Replay_GroupA`: `A/Machine_Apply_Cancel`, `A/Machine_Apply_OK` |
+| W10 | Previous Setting or Next Setting drops a pending change, or moves on and leaves it unsaved while the list claims it is saved. | The pending change is saved (OQ-D1), then the dialog moves; if the save fails the dialog stays on the policy with the message. The policy left behind shows its saved state, and returning to it shows the saved values with Apply disabled. | `Gpedit_Save_PreviousNextSavesPending` |
+| W11 | In read-only mode OK closes the dialog with no word and the user believes it was saved; or the window shows no sign that it cannot save. | `GpeditReadOnlyNotice` in the window, `DialogReadOnlyNotice` in the dialog or OK and Apply disabled. The test never presses OK or Apply on the real policy. | `Gpedit_ReadOnly_Notice` (ship flavor, not elevated, real policy object); `Gpedit_Dialog_ReadOnly` (sandbox, flag) |
+| W12 | The defaults of the option controls differ from classic: a number with no `defaultValue` shows 0 or the minimum instead of 1, an enum with no `defaultItem` selects its first item instead of nothing, a text or check box default is lost. | The values of `PolicyDefaults.For`: number 1 (clamped to its range) or its `defaultValue`, text and combo box the default text, check box `defaultChecked`, enum the `defaultItem` or nothing, multi-text and list nothing. | `Gpedit_Dialog_Defaults` (`B/Pol_Decimal_Required`, `B/Pol_Enum_StringItems`, `B/Pol_Value_NoValueName_ElementsOnly`); the "Enabled, defaults" steps of every replayed B case |
+| W13 | The ship build wires `InMemoryPolicyEditStore`: OK and Apply change memory only and the change is lost on exit (GPE-1). | The class is named only under `#if BWC_E2E` or in tests. | `node scripts/check-policy-writer.js --self-test` (rule `in-memory-store`, cases (a) to (f)); `Gpedit_ReadOnly_Notice` runs the ship app on the real object and finds it read-only |
+| W14 | The E2E flavor with no `BWC_E2E_GPO_ROOT` falls back to the real policy folder. | A deny-all policy: nothing is written. | `Gpedit_ReadOnly_Notice` (E2E flavor part), `gpo.real-unchanged` of every run |
+| W15 | One generic text covers every failure, so the user cannot tell a read-only file from a held lock. | One text and one automation id per kind (item 4); the texts differ. | `Gpedit_Save_Errors_TextsDiffer`, and the `notOther` checks of the three `Gpedit_Save_Errors_*` tests |
+| W16 | A save differs from classic in any byte, a file that must be absent exists, or a file the capture does not know appears in the policy folder. | Every file of every step equals the capture byte for byte; an absent file is absent; the folder holds the five files only (and the refresh record of the sandbox). | `Gpedit_Replay_GroupA` (all 19 cases), `Gpedit_Replay_GroupB_ElementKinds` (one case per element kind: check box, text box, combo box, number box, long number box, drop-down list, multi-line text, list) |
+
+Cases that are not replayed through the window, and why: the cases of `awaiting-recapture.txt` (CAP-4: classic did not notice a
+number box edit made without key presses, so their goldens are stale until a recapture); groups C, D, E and K stay engine
+replays (`tests/Bwc.Policy.Tests/Golden`), because the window adds no behavior to them beyond what groups A and B show.
+
+Tests written before G4 that the code piece must change, because they state the G3a behavior: `Gpedit_Options_List` (two checks,
+changed in this dispatch to classic's refusal of an empty list), `Gpedit_Dialog_OkWritesNothing` (section 8: OK and Apply now
+write), `Gpedit_Dialog_ReadOnly` (section 10: OK must not close silently) and `Gpedit_Options_Defaults` (`choiceNoDefault.first`
+expects the first item of an enum with no `defaultItem`; classic selects nothing, W12).

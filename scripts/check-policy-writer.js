@@ -1539,6 +1539,7 @@ function runSelfTest() {
     }
 
     runCountedAllowlistSelfTest();
+    runInMemoryStoreSelfTest();
 
     console.log(
       `check-policy-writer self-test: ${expectedFragments.length + 2} fixture violations detected across C#, NativeMethods.txt, script, and tool files; comments, prose, read-only opens, the named writers, the oracle capture, and the adjacent NativeMethods.txt passed.`,
@@ -1649,6 +1650,136 @@ function runCountedAllowlistSelfTest() {
       for (const fragment of testCase.forbidden) {
         if (output.includes(fragment)) {
           throw new Error(`Self-test case ${testCase.name} reported "${fragment}", which must pass.\n${output}`);
+        }
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+}
+
+// The in-memory store rule (piece G4, dispatch T: these cases are written before the rule exists, so --self-test fails until
+// the rule does). InMemoryPolicyEditStore changes memory only. The ship build must not be able to name it: a file may name it
+// only inside #if BWC_E2E (the part that is compiled in the E2E flavor, not an #else or #if !BWC_E2E part) or in a file under
+// tests/. The rule id is in-memory-store, and a hit is reported as
+// "<file>:<line>: in-memory-store: InMemoryPolicyEditStore". Comments are stripped before matching, as for every rule. Each
+// case runs on its own tree.
+function runInMemoryStoreSelfTest() {
+  const store = "InMemoryPolicyEditStore";
+  const cases = [
+    {
+      name: "(a) a source file names the store with no conditional",
+      files: { "src/Bwc.Gpedit/GpeditWire.cs": ["internal static class W", "{", `    internal static object Make() => new ${store}();`, "}"] },
+      exit: 1,
+      expected: [`src/Bwc.Gpedit/GpeditWire.cs:3: in-memory-store: ${store}`],
+      forbidden: [],
+    },
+    {
+      name: "(b) the definition of the store is not inside #if BWC_E2E",
+      files: { "src/Bwc.Gpedit.Editor/Dialog/Unwrapped.cs": [`internal sealed class ${store}`, "{", "}"] },
+      exit: 1,
+      expected: [`src/Bwc.Gpedit.Editor/Dialog/Unwrapped.cs:1: in-memory-store: ${store}`],
+      forbidden: [],
+    },
+    {
+      name: "(c) the store is named under #if !BWC_E2E",
+      files: {
+        "src/Bwc.Gpedit/NotE2E.cs": ["internal static class N", "{", "#if !BWC_E2E", `    internal static object Make() => new ${store}();`, "#endif", "}"],
+      },
+      exit: 1,
+      expected: [`src/Bwc.Gpedit/NotE2E.cs:4: in-memory-store: ${store}`],
+      forbidden: [],
+    },
+    {
+      name: "(d) the store is named in the #else part of #if BWC_E2E",
+      files: {
+        "src/Bwc.Gpedit/ElsePart.cs": [
+          "internal static class E",
+          "{",
+          "#if BWC_E2E",
+          "    internal static int Mode => 1;",
+          "#else",
+          `    internal static object Make() => new ${store}();`,
+          "#endif",
+          "}",
+        ],
+      },
+      exit: 1,
+      expected: [`src/Bwc.Gpedit/ElsePart.cs:6: in-memory-store: ${store}`],
+      forbidden: [],
+    },
+    {
+      name: "(e) the store is named after the #endif of #if BWC_E2E",
+      files: {
+        "src/Bwc.Gpedit/AfterEndif.cs": [
+          "internal static class A",
+          "{",
+          "#if BWC_E2E",
+          "    internal static int Mode => 1;",
+          "#endif",
+          `    internal static object Make() => new ${store}();`,
+          "}",
+        ],
+      },
+      exit: 1,
+      expected: [`src/Bwc.Gpedit/AfterEndif.cs:6: in-memory-store: ${store}`],
+      forbidden: [],
+    },
+    {
+      name: "(f) the store is named under #if BWC_E2E, defined whole file, used in tests, and mentioned in a comment",
+      files: {
+        "src/Bwc.Gpedit/WireE2E.cs": [
+          "internal static class W",
+          "{",
+          "#if BWC_E2E",
+          `    internal static object Make() => new ${store}();`,
+          "#endif",
+          "}",
+        ],
+        "src/Bwc.Gpedit.Editor/Dialog/InMemoryPolicyEditStore.cs": [
+          "#if BWC_E2E",
+          `internal sealed class ${store}`,
+          "{",
+          "}",
+          "#endif",
+        ],
+        "src/Bwc.Gpedit/Comment.cs": [`// ${store} is E2E only.`, "internal static class C", "{", "}"],
+        "tests/Bwc.E2E/Fixture/UsesStore.cs": ["internal static class T", "{", `    internal static object Make() => new ${store}();`, "}"],
+        "tests/Bwc.Gpedit.Tests/UsesStore.cs": ["internal static class U", "{", `    internal static object Make() => new ${store}();`, "}"],
+      },
+      exit: 0,
+      expected: [],
+      forbidden: ["in-memory-store"],
+    },
+  ];
+
+  for (const testCase of cases) {
+    const root = mkdtempSync(path.join(tmpdir(), "bwc-policy-writer-memory-"));
+    try {
+      for (const [relative, lines] of Object.entries(testCase.files)) {
+        writeFixture(root, relative, lines);
+      }
+
+      const result = spawnSync(process.execPath, [scriptPath, "--root", root], { encoding: "utf8" });
+      const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+      if (result.status !== testCase.exit) {
+        throw new Error(
+          `Self-test case ${testCase.name} expected exit code ${testCase.exit} but got ${result.status}.
+${output}`,
+        );
+      }
+
+      for (const fragment of testCase.expected) {
+        if (!output.includes(fragment)) {
+          throw new Error(`Self-test case ${testCase.name} did not report "${fragment}".
+${output}`);
+        }
+      }
+
+      for (const fragment of testCase.forbidden) {
+        if (output.includes(fragment)) {
+          throw new Error(`Self-test case ${testCase.name} reported "${fragment}", which must pass.
+${output}`);
         }
       }
     } finally {
