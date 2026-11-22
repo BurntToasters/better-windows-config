@@ -108,3 +108,29 @@ filter could fail that the sections above do not state.
 | E9 | A culture that changes the case rules (Turkish) | The keyword `TITLE` misses `title` | The result is the same under `tr-TR` as under the invariant culture (A7). |
 | E10 | A platform key written with other case or a policy whose definition has another case | A selected platform misses its policy | The key comparison ignores case (C7). A stale key beside a valid key in Any mode still matches through the valid key. |
 | E11 | `AllSettings` order and sides | A reordered or duplicated list | Source order, one entry per policy, class Machine only on the Machine side, User only on the User side, Both on each. |
+
+## F. Filter results of the captures (E6c)
+
+`F/Filter_Options` sets 17 filters on the `Sort cases` node of the Computer side, after four saves (one Enabled, one
+Disabled, one Not Configured with a comment, one Enabled with a comment), and reads the list after each one. The list shows
+display names; a setting with no row in the capture (no `rows` member) means the node showed nothing. The test
+`PolicyFilterGoldenTests` replays the four saves in a sandbox through `PolicySave`, builds the subjects from the state and
+comment the engine reads, applies `PolicyFilter` with the options of each `setFilter` operation and compares the set of
+display names (classic's list is sorted, the engine keeps source order).
+
+| Id | Way it fails | Expected | Case, operation |
+|---|---|---|---|
+| FC1 | Configured Yes shows a policy that is Not Configured with a comment, or hides Disabled. | Yes: `Policy 2`, `alpha policy`, `Zulu sort case`. No: the other five. | operations 6 and 10 |
+| FC2 | Commented counts by the state, or counts a Not Configured policy with a comment as no comment. | Yes: `Policy 10`, `Policy 2`. No: the other six. | operations 14 and 18 |
+| FC3 | Managed Yes shows nothing (the fixture keys are below `Software\Policies`) or Managed No shows the fixture. | Yes: all eight. No: none. | operations 22 and 26 |
+| FC4 | Two tri-state parts are not combined with AND. | Configured Yes and Commented Yes: `Policy 2`. | operation 30 |
+| FC5 | A keyword is searched in a text that is not ticked. | `zulu` in title: `Zulu sort case`. `comment` in comment: `Policy 10`, `Policy 2`. `policy` in title: the seven policies with the word in the name, not `Zulu sort case`. | operations 34, 42, 46 |
+| FC6 | `sort` in the help text shows every policy or none. | Every one of the eight shows (the help of every sort case policy holds the word). | operation 38 |
+| FC7 | Match Any with two words, in title only. | `zulu alpha`: `alpha policy`, `Alpha Policy`, `Zulu sort case`. | operation 50 |
+| FC8 | Match All finds words in different ticked texts. | `policy sort` in title and help: nothing shows, so the words must be found in one text (`KeywordAllMayUseDifferentTexts` is false in classic). | operation 54 |
+| FC9 | Match Exact with a phrase that has a digit. | `Policy 2` exact in title: `Policy 2` only (not `Policy 10`, `Policy 1`). | operation 58 |
+| FC10 | The requirements filter on with no platform is applied. | Classic shows a message box and keeps the list unfiltered (all eight). The options are invalid with `PlatformsMissing` and `TryCreate` returns no filter. | operation 62 |
+| FC11 | The requirements filter with every platform selected. | Classic's platform list holds two products of the machine's own templates (hashed in the capture), none of them a supported-on definition of the fixture, so no fixture policy matched and the node was hidden. The engine's list is the definitions of the loaded set. The row selects two keys no fixture policy uses and expects nothing to show; the difference in the list is recorded in the audit. | operation 66 |
+| FC12 | A filter that hides every policy of a category leaves a count the node does not match. | The `Basics` node under Configured Yes shows none (it was hidden in classic, operation 72); the engine counts 0 of the number of its policies. | operation 72 |
+| FC13 | The All Settings captures hold results the test does not compare. | `F/AllSettings_Computer` and `F/AllSettings_User` record "untracked" for the status text and the rows (they depend on the machine's own templates), so there is no list to compare. The test checks the capture still says so and fails when it holds rows, so a recapture with rows must extend the test. | `F/AllSettings_*` |
+| FC14 | The test passes with no `setFilter` operation read. | The case must hold the 17 `setFilter` operations. | `F/Filter_Options` |

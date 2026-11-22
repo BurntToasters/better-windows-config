@@ -94,6 +94,25 @@ Record: `[` key NUL `;` name NUL `;` type(4) `;` size(4) `;` data(size) `]`, del
   `AddDeleteInstruction` writes the canonical form (type 1, size 4, data `20 00 00 00`). The instruction calls of
   section 2.5a write the same canonical form.
 
+### 1.7 What classic opened and refused in group D (E6c)
+
+Crafted files of group D tell where the reader's strictness meets classic's. Six were refused (the store tests are in
+gpo-store.md, L). These that look malformed or odd were opened:
+
+- `D/File_TrailingBytes`: two stray bytes after the last record. Classic opened the file and the next save wrote it
+  without them (the third record of the start file is the stray tail, the saved file holds the other two plus the new
+  ones). Section 1.3 says the reader refuses any byte after the last record (`ExpectedRecordStart`). That is stricter than
+  classic and the replay row of the case fails on it until the C dispatch decides: accept a tail that cannot start a record
+  (and drop it on save), or declare a difference.
+- `D/File_HeaderOnly`: the 8-byte header with no record is an empty document (1.2); opens and saves.
+- `D/File_LargeValueName`: a value name of 300 characters; opens, is kept and saved as written (no name length limit in
+  the reader).
+- `D/Instruction_*`, `D/Soft_*`, `D/Delvals*`: instructions in any place; kept.
+
+Ways this can fail: a zero-byte file reads as "no policy yet" and a save overwrites it (it is `Empty` and refused); a stray
+tail refuses the file where classic opened it (above); a long value name is refused; the unrelated save changes the
+bytes of the records it did not touch.
+
 ## 2. Editing
 
 ### 2.1 Set to different data moves to the end (classic probe, 2026-11-18)

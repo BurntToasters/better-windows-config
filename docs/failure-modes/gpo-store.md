@@ -243,3 +243,19 @@ folders holds no literal, so `scripts/check-policy-writer.js` passes without an 
 | `GpoAccessTests` | Reasons, aggregation, the real access check against a temp folder and a system folder. |
 | `PolicyRefreshTests` | Recorder lines. |
 | `GpoStoreRealFolderTests` | Read-only invariant over the real folder. |
+
+## L. Refused starts of group D (E6c, D9)
+
+Classic refused to open a GPO whose `Machine\Registry.pol` is one of six malformed files (`D/File_BadHeader`,
+`D/File_Empty`, `D/File_MissingCloseBracket`, `D/File_OnlyGarbage`, `D/File_TruncatedLastRecord`, `D/File_VersionTwo`: a dialog
+and no console tree). The store must refuse them as it refuses any malformed file (E3), and a stray tail
+(`D/File_TrailingBytes`) is not one of them: classic opened it. Test class `PolMalformedStartGoldenTests` in
+`tests/Bwc.Gpo.Tests/Golden`; the policy-level rows are in policy-save.md, X.
+
+| ID | Case | Intended behavior |
+| --- | --- | --- |
+| L1 | A zero-byte `Registry.pol` (D9) | `Open` gives no `Pol` and a `PolFailure`; `Save` throws `Malformed` and the file stays zero bytes. |
+| L2 | Each of the other five files | The same as L1, with the file byte for byte as it was. |
+| L3 | `Save` of the refused side, whatever the edit does | The exception comes from the first read of `session.Pol`; no backup folder, no lock file left, no gpt.ini or comment file, no refresh. |
+| L4 | The set of refused starts in the captures changes | The test fails unless group D has exactly these six `startRefused` cases. |
+| L5 | `D/File_TrailingBytes` and `D/File_LargeValueName` | Open and edit normally (see gpo-pol.md, 1.7). |

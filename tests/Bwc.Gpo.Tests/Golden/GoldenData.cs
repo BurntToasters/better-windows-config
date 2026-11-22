@@ -50,6 +50,50 @@ internal static class GoldenData
         return bytes;
     }
 
+    /// <summary>The names of the case folders of one group, in name order.</summary>
+    /// <param name="group">The group folder name, for example a single capital letter.</param>
+    /// <returns>The case folder names.</returns>
+    internal static string[] CasesOf(string group) =>
+        Directory.GetDirectories(Path.Combine(Root.Value, group)).Select(d => Path.GetFileName(d)!).Order(StringComparer.Ordinal).ToArray();
+
+    /// <summary>Whether classic refused to open the start files of a case (startRefused in case.json).</summary>
+    /// <param name="caseId">The case.</param>
+    /// <returns>True when the capture says classic refused the start.</returns>
+    internal static bool StartRefused(string caseId)
+    {
+        var caseJson = Path.Combine(Root.Value, caseId.Replace('/', Path.DirectorySeparatorChar), "case.json");
+        Assert.IsTrue(File.Exists(caseJson), $"Capture case {caseId} has no case.json.");
+        return JsonNode.Parse(File.ReadAllText(caseJson))!["startRefused"]?.GetValue<bool>() ?? false;
+    }
+
+    /// <summary>The bytes of one start file of a case (the startState of case.json, held in the start folder),
+    /// checked against the
+    /// size and SHA-256 recorded there.</summary>
+    /// <param name="caseId">The case.</param>
+    /// <param name="flatName">The flat file name: a side, a dot and the file name.</param>
+    /// <returns>The bytes, or null when the case starts without that file.</returns>
+    internal static byte[]? StartBytes(string caseId, string flatName)
+    {
+        var caseFolder = Path.Combine(Root.Value, caseId.Replace('/', Path.DirectorySeparatorChar));
+        var files = (JsonArray)JsonNode.Parse(File.ReadAllText(Path.Combine(caseFolder, "case.json")))!["startState"]!["files"]!;
+        var entry = files.OfType<JsonObject>().FirstOrDefault(f => f["name"]!.GetValue<string>() == flatName);
+        if (entry is null)
+        {
+            return null;
+        }
+
+        var path = Path.Combine(caseFolder, "start", flatName);
+        Assert.IsTrue(File.Exists(path), $"Start file {caseId}/start/{flatName} is missing.");
+        var bytes = File.ReadAllBytes(path);
+        Assert.AreEqual(entry["size"]!.GetValue<long>(), bytes.LongLength, $"Start file {caseId}/start/{flatName}: the size differs from case.json.");
+        Assert.AreEqual(
+            entry["sha256"]!.GetValue<string>(),
+            Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
+            true,
+            $"Start file {caseId}/start/{flatName}: the SHA-256 differs from case.json.");
+        return bytes;
+    }
+
     internal static byte[]? Gpt(string caseId, string step) => Bytes(caseId, step, GpoFileNames.GptIniFile);
 
     internal static byte[]? Pol(string caseId, string step, GpoSide side) => Bytes(caseId, step, FlatName(side, GpoFileNames.RegistryPol));

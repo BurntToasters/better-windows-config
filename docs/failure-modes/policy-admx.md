@@ -514,3 +514,30 @@ is not captured: it may refuse `class="machine"` or `required="True"`. Until a c
 No code change. The capture cases are `H/ClassLowerCase` (one policy with `class="machine"`) and `H/BoolAttributeUpper` (one
 `decimal` element with `required="TRUE"`) and `H/BoolAttributeMixed` (one `decimal` element with `soft="True"`); they are in
 the plan and not yet captured.
+
+## Group H captures (E6c)
+
+### 51. What classic does with each bad template (H/*)
+
+Each H case installs one bad fixture of `docs/parity/oracle/gpedit/fixture/bad` next to the good fixture and records the
+message boxes at start and the tree. The captures show no message text (it is hashed): they show whether a box appeared,
+whether the bad template's category is in the tree, whether its policy can be opened, and that the good fixture is still
+there with its seven categories. Tests: `PolicyTemplateGoldenTests` in `tests/Bwc.Policy.Tests/Golden`.
+
+| Case | Classic | Expected in the loader |
+|---|---|---|
+| `H/MalformedXml`, `H/DtdEntity`, `H/MissingAdml`, `H/DuplicatePolicy`, `H/UndefinedString`, `H/ListItemNoKey`, `H/BooleanNoValueName` | One message box at start; the category of the bad template is not in the tree; selecting it, listing it and opening its policy fail. | At least one `TemplateFailure` whose file is in the bad fixture; no file, category, policy or supported-on definition of its namespace in the set. |
+| `H/ClassLowerCase`, `H/BoolAttributeUpper`, `H/BoolAttributeMixed` | The same: one message box and nothing of the template shown. This answers section 50: classic refuses `class="machine"`, `required="TRUE"` and `soft="True"`. | As above. The parser is lenient today (section 50), so these three rows fail until the C dispatch makes the letter case strict and rewrites section 50. |
+| `H/UndefinedUsing` | No message box; the category `Bad fixture UndefinedUsing` is in the tree and its policy opens with its text and supported-on text. | No file is rejected; the category and the policy are in the set (section 35, link-level failures keep the file). |
+
+How the loader can fail against them:
+
+| Id | Way it fails | Expected |
+|---|---|---|
+| H1 | A bad template leaks part of its content (a category without the policy, a policy without its category) into the set. | Nothing of the namespace. Test per case. |
+| H2 | The good fixture is hidden or changed because a bad one sits in the next folder. | The good fixture's file, categories and policies are the same as when it loads alone (classic: `BWC Oracle` shows its seven categories in every H case). This is the BWC rule "one bad template does not hide the rest". The captures show classic does the same for these eleven; the inventory has no DIFF row for it, so it is not a declared difference. |
+| H3 | A failure of the bad fixture is attributed to the good fixture, or the failures name a file outside the bad folder. | Every failure's file is under the bad fixture's folder. |
+| H4 | Classic's one box per bad template becomes several failures reported as several problems. | One bad template gives failures from one folder; the UI groups them (G6). The test checks the folder, not the count. |
+| H5 | The root of Administrative Templates shows the category of a bad template. | The root categories of the set are the good fixture's root only (classic: `BWC Oracle`), for the ten refused templates. |
+| H6 | `H/UndefinedUsing` is rejected, or its policy loses the display name or the supported-on text. | The category, the policy `Bad fixture policy` and the supported-on text `BWC oracle bad fixture` are in the set. |
+| H7 | A capture is missing, incomplete or answers differently after a recapture and the test passes. | The test reads every H case from the capture (the dialog count at start, the tree children, whether the bad category could be selected) and fails when the set of refused templates is not the ten named above. |

@@ -345,3 +345,25 @@ engine must not turn it into a silent write of a wrong record.
 
 The one save that applies an edit and its comment to the files, and the replay of the captures against it, are in
 `docs/failure-modes/policy-save.md`.
+
+### 17. Crafted files (group D, E6c)
+
+The 113 cases of group D put one crafted `Registry.pol` (two files for the class Both and the user cases) in front of
+classic, read the state its dialog shows for the affected policies, then saved one unrelated policy and cleared it. The
+dialog states are `before.state` of each `editPolicy` operation. `PolicyStateMatrixTests` compares the engine's reader with
+them and `PolicyGoldenReplayDETests` compares the files after the saves (policy-save.md, M and X). The families and the
+ways the reader can fail each:
+
+| Family | Cases | Way it fails | Expected |
+|---|---|---|---|
+| Duplicates | `D/Dup_Identical`, `D/Dup_DifferentFirstWins`, `D/Dup_DifferentLastWins`, `D/Dup_NonAdjacent`, `D/Dup_Key_TwoBlocks`, `D/Dup_DelBetween`, `D/Dup_DelBetweenDifferent`, `D/Dup_DelvalsBetween` | The first record wins where classic read the last (or the other way round), the state follows a delete record that sits between two values, or the unrelated save keeps both records. | The state of the dialog; the save drops the earlier record (one record per key and name afterwards). |
+| Delete and soft records | `D/Del_Only`, `D/Del_OtherName`, `D/Del_ThenValue`, `D/Del_DisabledValuePolicy`, `D/Value_ThenDel`, `D/Soft_Only`, `D/Soft_WithValue` | A lone `**del.` reads as Disabled for every policy, a delete record before or after the value is ignored, a soft record counts as the value. | D7 of the plan: a policy with an enabled value only reads a lone delete record as Not Configured; with a value name and both values it reads Disabled. The order of delete record and value decides which one is the state. |
+| `**delvals.` and key instructions | `D/Delvals`, `D/Delvals_After`, `D/Instruction_KeyLevel`, `D/Instruction_Unknown`, `D/Instruction_UnknownAlone` | A `**delvals.` record changes the state, a key-level instruction is turned into a policy record, an unknown instruction alone in an unknown key is dropped. | The states of the dialog; unknown instructions stay in the file. |
+| Value mismatch | `D/Mismatch_*` | A value that is not the enabled or the disabled value reads as Enabled or as Disabled, a decimal outside the range shows the stored number, a string compared with another letter case matches. | The states of the dialog; the dialog shows a decimal held inside its range; the string comparison follows the capture of `D/Mismatch_StringCase`. |
+| Wrong types | `D/WrongType_*` | A flag stored as a string, binary, a qword, eight bytes or a short size reads as the policy value; a list entry or a text of the wrong type shows. | Each case the state of the dialog. |
+| Partial values | `D/Partial_*` | A policy with a value name and elements reads Enabled from the gate alone, or elements with no gate read Enabled; a check box with no value shows the wrong state. | The state of the dialog for each shape of OQ-03. |
+| Lists | `D/List_*`, `D/EnabledList_*`, `D/DisabledList_*`, `D/BothLists_*`, `D/EnumValueList_*` | A list key with a `**delvals.` record, gap names, word names or entries of the wrong type is read as another state. | The state of the dialog (OQ-06). |
+| Case | `D/Case_*` | A key or value name in other letter case is not matched. | Matched ignoring case; the state of the dialog. |
+| Order | `D/Order_*` | The unrelated save reorders keys or values that classic left in place. | The byte compare of the replay. |
+| Foreign | `D/Foreign_*` | See policy-save.md, F. | Kept. |
+| User and both | `D/User_*`, `D/Both_*` | The user flag is read from the machine file, a class Both flag from the other side. | policy-save.md, M2. |

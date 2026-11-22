@@ -311,7 +311,7 @@ public sealed class StateBlindTests
 
     // Doc section 2 table, enabledList only: Disabled writes "nothing for the list; no value record can say Disabled".
     [TestMethod]
-    [Ignore("open: enabledList-only Disabled writes **del. per item or nothing; pending matrix B")]
+    [Ignore("open: enabledList-only Disabled writes **del. per item or nothing; no capture answers it: B/Pol_Value_EnabledListOnly disables only after Enabled, never on an empty document")]
     public void Sec02_EnabledListOnly_DisabledOnAnEmptyDocument_WritesNothing()
     {
         var e = PolDocument.Create();
@@ -1288,7 +1288,7 @@ public sealed class StateBlindTests
     // (a, c, b). The table row for a non-additive list says "clear the values of the key, `**delvals.` at the front,
     // then the entries in order" (a, b, c). The product does the second.
     [TestMethod]
-    [Ignore("open: non-additive list with one changed entry: moves only the changed entry (7.1 item 3, a,c,b) or clears and rewrites all in entry order (7.1 table row 1, a,b,c)?")]
+    [Ignore("open: non-additive list with one changed entry: moves only the changed entry (7.1 item 3, a,c,b) or clears and rewrites all in entry order (7.1 table row 1, a,b,c)? No capture answers it: B/Pol_List_ExplicitValue op 4 only drops an entry and no capture changes one value of a list of three")]
     public void Sec07_1_ChangingOneEntryMovesOnlyThatEntry_DelvalsStaysFirst()
     {
         var d = PolDocument.Create();

@@ -718,7 +718,7 @@ public sealed class AdmxBlindTests
         AssertMissing("namespace", t => Std(t, "a", "Blind.A", P("Pol"), ["Pol"], usings: "    <using prefix=\"o\" />\n"));
 
     [TestMethod]
-    [Ignore("open: is a present but empty required attribute (name=\"\") a MissingAttribute, an InvalidAttributeValue, or accepted? Doc section 17 and 40 are silent.")]
+    [Ignore("open: is a present but empty required attribute (name=\"\") a MissingAttribute, an InvalidAttributeValue, or accepted? Doc section 17 and 40 are silent. No capture answers it: the eleven H cases have no empty name attribute")]
     public void Sec40_EmptyName_IsNotTheSameAsAbsent_OpenQuestion()
     {
         using var t = new TempTemplates();
