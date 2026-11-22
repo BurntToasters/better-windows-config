@@ -22,19 +22,21 @@ public sealed class GpeditListTests
     private const string Admin = "Administrative Templates";
     private const string Oracle = "BWC Oracle";
 
+    // The default order of the policy rows is the order of the policy ids, not of the display names (F/Nodes_Computer op 4 and
+    // F/Sort_Columns op 17: Pol_Both_WithElements, Pol_Class_Both, Pol_Class_Machine, Pol_Element_KeyOverride, and so on).
     private static readonly string[] ComputerBasics =
     [
-        "Class both flag setting",
         "Class both with an element setting",
+        "Class both flag setting",
         "Class machine flag setting",
+        "Element key differs from policy key setting",
+        "Key outside the policy roots setting",
+        "Enabled list and disabled list with value name setting",
         "Decimal enabled and disabled values setting",
         "Disabled list only setting",
         "Disabled value only setting",
-        "Element key differs from policy key setting",
-        "Enabled list and disabled list with value name setting",
         "Enabled list only setting",
         "Enabled value only setting",
-        "Key outside the policy roots setting",
         "No value name, elements only setting",
     ];
 
@@ -115,10 +117,10 @@ public sealed class GpeditListTests
         string[] machineComments = computer.Select(r => r.Cells.ElementAtOrDefault(2) ?? string.Empty).ToArray();
         string[] expectedMachineStates =
         [
-            "Enabled", "Not configured", "Enabled", "Disabled", "Not configured", "Not configured",
-            "Not configured", "Not configured", "Not configured", "Not configured", "Not configured", "Not configured",
+            "Not configured", "Enabled", "Enabled", "Not configured", "Not configured", "Not configured",
+            "Disabled", "Not configured", "Not configured", "Not configured", "Not configured", "Not configured",
         ];
-        string[] expectedMachineComments = ["Yes", "No", "Yes", "No", "No", "No", "No", "No", "No", "No", "No", "No"];
+        string[] expectedMachineComments = ["No", "Yes", "Yes", "No", "No", "No", "No", "No", "No", "No", "No", "No"];
         checks.Record("computerStates", machineStates.SequenceEqual(expectedMachineStates), $"states={string.Join("|", machineStates)}.");
         checks.Record("computerComments", machineComments.SequenceEqual(expectedMachineComments), $"comments={string.Join("|", machineComments)}.");
         run.WriteArtifacts("gpedit-list-states-computer.png");
@@ -128,15 +130,15 @@ public sealed class GpeditListTests
         List<GpeditRow> user = run.Rows();
         string[] expectedUser =
         [
-            "Class both flag setting",
             "Class both with an element setting",
+            "Class both flag setting",
             "Class user flag setting",
             "String enabled and disabled values setting",
         ];
         checks.Record("userOrder", user.Select(r => r.Name).SequenceEqual(expectedUser), $"rows={string.Join("|", user.Select(r => r.Name))}.");
         string[] userStates = user.Select(r => r.Cells.ElementAtOrDefault(1) ?? string.Empty).ToArray();
         string[] userComments = user.Select(r => r.Cells.ElementAtOrDefault(2) ?? string.Empty).ToArray();
-        checks.Record("userStates", userStates.SequenceEqual(["Disabled", "Not configured", "Enabled", "Not configured"]), $"states={string.Join("|", userStates)}.");
+        checks.Record("userStates", userStates.SequenceEqual(["Not configured", "Disabled", "Enabled", "Not configured"]), $"states={string.Join("|", userStates)}.");
         checks.Record("userComments", userComments.SequenceEqual(["No", "No", "No", "No"]), $"comments={string.Join("|", userComments)}; the comment of Class both flag is in the computer file only.");
 
         // UI Automation names a policy row "<name> setting" and a folder row by its plain name.

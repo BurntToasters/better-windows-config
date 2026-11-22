@@ -405,7 +405,7 @@
 | VIEW-010 | State column text: three names, from admtmpl.dll strings 8, 9 and 10 (Enabled, Disabled, Not configured as the list spells them). Folder rows show no state. | F/Nodes_Computer, F/Nodes_User | G1 | open |
 | VIEW-011 | Comment column text: a yes or no word, from admtmpl.dll strings 2001 and 2002. Folder rows show nothing. | F/Nodes_Computer, F/Nodes_User | G1 | open |
 | VIEW-012 | Rows of a node: folder rows first (child categories), then the policies of the side. Mixed nodes (a category with both) show both kinds. | F/Nodes_Computer, F/Nodes_User | G1 | open |
-| VIEW-013 | Default row order: ascending by the first column, for folder rows and for policy rows. | F/Nodes_Computer, F/Sort_Columns | G1, G5 | open |
+| VIEW-013 | Default row order, no sort mark: folder rows first, by name; policy rows in the order of their policy ids (ordinal compare), which is not the display-name order. | F/Nodes_Computer, F/Sort_Columns | G1, G5 | open |
 | VIEW-014 | Header click sorting: each of the three columns clicked three times; the order after each click is recorded. Another node keeps its own sort. | F/Sort_Columns | G5 | open |
 | VIEW-015 | Text order of the first column for digits (1, 10, 2), upper and lower case, a leading symbol and non-ASCII names. | F/Sort_Columns; B/Pol_Sort_* | G5 | open |
 | VIEW-016 | Tab strip of the result pane with two tabs, Extended and Standard. Extended is active at start. Switching tabs keeps the rows. | F/Tabs_Extended_Standard | U2c, G1 | open |

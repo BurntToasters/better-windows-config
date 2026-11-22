@@ -787,7 +787,10 @@ public sealed class GpeditTreeListBlindTests
 
     /// <summary>
     /// Section 6 and 15: All Settings lists every policy of the side exactly once (59 and 13 in the fixture), policies only,
-    /// sorted by display name, with the seeded states, and the status text counts them.
+    /// sorted by display name, with the seeded states, and the status text counts them. The captures F/AllSettings_Computer and
+    /// F/AllSettings_User do not track the rows ("depends on the machine's own templates"), so the order of this node is not
+    /// a capture fact; ADMX-022 says by display name and no capture contradicts it. The headers of both captures list four
+    /// columns, the fourth being the path.
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
@@ -808,7 +811,8 @@ public sealed class GpeditTreeListBlindTests
         c.Record("user.no-machine-policy", user.All(r => r.Name != "Class machine flag setting"), "a class Machine policy never shows on the user side.");
         Dictionary<string, (string State, string Comment)> userStates = BlindKit.StateMap(run);
         c.Record("user.states", userStates.GetValueOrDefault("Class user flag") == ("Enabled", "No") && userStates.GetValueOrDefault("Class both flag") == ("Disabled", "No"), $"Class user flag = {BlindKit.Show(userStates, "Class user flag")}, Class both flag = {BlindKit.Show(userStates, "Class both flag")}.");
-        c.Record("user.three-columns", user.All(r => r.Cells.Length == 3), "Setting, State and Comment (the Path column belongs to G5).");
+        c.Record("user.four-columns", user.All(r => r.Cells.Length == 4), $"Setting, State, Comment and Path: F/AllSettings_User lists four headers (VIEW-009); cells per row {string.Join(",", user.Select(r => r.Cells.Length).Distinct())}.");
+        c.Record("user.path-header", run.HeaderNames("path")[0].Length > 0, "the fourth header (id path) exists at All Settings.");
 
         run.GoTo(BlindKit.Root, BlindKit.Computer, BlindKit.Templates, "All Settings");
         _ = ShellRun.WaitUntil(() => run.Int("Rows") == 59 && run.Rows().Count > 20, TimeSpan.FromSeconds(10));
@@ -835,8 +839,10 @@ public sealed class GpeditTreeListBlindTests
     }
 
     /// <summary>
-    /// Sections 4 and 6 and 15: policies sort by display name ignoring case; a tie keeps the source order; a leading symbol
-    /// and an accented capital sit where the collation puts them. The order of Policy 1, 10 and 2 is a separate open test.
+    /// Sections 4 and 6 and 15: a node with no sort mark lists its policies in the order of the policy ids, not of the display
+    /// names (capture F/Sort_Columns op 5, F/Nodes_Computer op 28). The ids of the Sort cases node are Pol_Sort_Digit1,
+    /// Pol_Sort_Digit10, Pol_Sort_Digit2, Pol_Sort_LeadingSymbol, Pol_Sort_LowerAlpha, Pol_Sort_NonAscii, Pol_Sort_UpperAlpha
+    /// and Pol_Sort_Zulu. The sort by display name comes from a header click (Gpedit_Sort_Columns_ThreeClicksEach).
     /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
@@ -848,21 +854,26 @@ public sealed class GpeditTreeListBlindTests
         using GpeditRun run = BlindKit.Open("blind-sort-cases");
         run.GoTo(BlindKit.Path(BlindKit.Computer, "Sort cases"));
         string[] names = run.Rows().Select(r => r.Name).ToArray();
+        string[] classic =
+        [
+            "Policy 1 setting", "Policy 10 setting", "Policy 2 setting", "#Symbol policy setting",
+            "alpha policy setting", "Éclair policy setting", "Alpha Policy setting", "Zulu sort case setting",
+        ];
         c.Record("count", names.Length == 8 && run.Shell.StatusText() == "8 setting(s)", $"rows {names.Length}, status '{run.Shell.StatusText()}'.");
-        c.Record("symbol-first", names.Length > 0 && names[0] == "#Symbol policy setting", $"first row '{names.FirstOrDefault()}'.");
-        c.Record("case-tie-source-order", names.Length > 2 && names[1] == "alpha policy setting" && names[2] == "Alpha Policy setting", $"rows 2 and 3: '{(names.Length > 2 ? names[1] : "")}', '{(names.Length > 2 ? names[2] : "")}' (same name ignoring case: source order, lower case defined first).");
-        c.Record("accent-after-alpha", names.Length > 3 && names[3] == "Éclair policy setting", $"row 4: '{(names.Length > 3 ? names[3] : "")}'.");
-        c.Record("digits-between", names.Length > 6 && names[4..7].OrderBy(n => n, StringComparer.Ordinal).SequenceEqual(["Policy 1 setting", "Policy 10 setting", "Policy 2 setting"]), $"rows 5 to 7: {string.Join("|", names.Skip(4).Take(3))}.");
-        c.Record("zulu-last", names.Length > 0 && names[^1] == "Zulu sort case setting", $"last row '{names.LastOrDefault()}'.");
+        c.Record("default-order", names.SequenceEqual(classic), $"rows {string.Join("|", names)}; classic (F/Sort_Columns op 5): {string.Join("|", classic)}.");
+        c.Record("case-tie-source-order", names.Length > 5 && names[4] == "alpha policy setting" && names[6] == "Alpha Policy setting", "alpha policy comes before Alpha Policy (their ids order them, F/Sort_Columns op 5).");
         run.WriteArtifacts($"gpedit-{run.Name}.png");
         c.AssertAllPassed();
     }
 
-    /// <summary>Section 15: the order of runs of digits is not stated in the doc (native collation only).</summary>
+    /// <summary>
+    /// Section 15: the order of runs of digits. Answered by the capture F/Sort_Columns (SORT-1): classic compares digits as
+    /// text, so Policy 10 comes before Policy 2 in the Setting column (op 6, the first click on Setting: Policy 1, Policy 10,
+    /// Policy 2). The default order, by policy id, puts the three in the same relative order (op 5).
+    /// </summary>
     [TestMethod]
     [TestCategory("Gpedit")]
     [TestCategory("E2EOnly")]
-    [Ignore("open: does 'Policy 10' sort before or after 'Policy 2'? The doc says native collation at the user locale and does not say whether digit runs compare as numbers. The capture matrix settles it.")]
     public void Gpedit_ListBlind_SortCasesDigitRuns()
     {
         E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
@@ -871,7 +882,7 @@ public sealed class GpeditTreeListBlindTests
         run.GoTo(BlindKit.Path(BlindKit.Computer, "Sort cases"));
         string[] names = run.Rows().Select(r => r.Name).ToArray();
         string[] digits = names.Where(n => n.StartsWith("Policy ", StringComparison.Ordinal)).ToArray();
-        c.Record("digit-runs", digits.SequenceEqual(["Policy 1 setting", "Policy 2 setting", "Policy 10 setting"]), $"digit rows: {string.Join("|", digits)}.");
+        c.Record("digit-runs", digits.SequenceEqual(["Policy 1 setting", "Policy 10 setting", "Policy 2 setting"]), $"digit rows: {string.Join("|", digits)}; classic compares digit runs as text (F/Sort_Columns).");
         c.AssertAllPassed();
     }
 
@@ -1229,26 +1240,28 @@ internal static class BlindKit
 
     internal static readonly string[] OracleComputerFolders = ["Basics", "Elements", "Explain text", "Machine only", "Shared keys", "Sort cases", "Tools & Utilities"];
 
+    // The default order of policy rows is the order of the policy ids (F/Nodes_Computer op 4, F/Nodes_User op 4 and
+    // F/Sort_Columns op 17), so the list below is not alphabetical.
     internal static readonly string[] BasicsComputer =
     [
-        "Class both flag",
         "Class both with an element",
+        "Class both flag",
         "Class machine flag",
+        "Element key differs from policy key",
+        "Key outside the policy roots",
+        "Enabled list and disabled list with value name",
         "Decimal enabled and disabled values",
         "Disabled list only",
         "Disabled value only",
-        "Element key differs from policy key",
-        "Enabled list and disabled list with value name",
         "Enabled list only",
         "Enabled value only",
-        "Key outside the policy roots",
         "No value name, elements only",
     ];
 
     internal static readonly string[] BasicsUser =
     [
-        "Class both flag",
         "Class both with an element",
+        "Class both flag",
         "Class user flag",
         "String enabled and disabled values",
     ];
