@@ -828,3 +828,43 @@ Unproved, for the next real run to confirm from `result.json`:
   (`afterSet`): the list as before the edit, or empty.
 - Whether the Group E cases (empty entry, empty name, empty value, name only) are refused by the same box or accepted, and whether any of them
   shows a second box.
+
+## 39. A Show Contents read after the edit loses the list
+
+After section 38 the case `B/Pol_List_Plain` ran without a driver failure, and the result was still wrong. Operations 2 and 4 (Enabled, 2 rows
+or 1 row written into the grid, every cell read back, OK of Show Contents closed the dialog) both ended with the same message box on OK of the
+policy dialog as operation 0, the Enabled step with an empty list: classic said that no entries were added, kept the policy dialog, and the
+driver cancelled it at the end. No file changed in any Enabled step. A golden made from that run says that classic cannot save a list, which is
+false: a person who types the rows and presses OK twice gets them saved.
+
+What the driver did between the OK of Show Contents and the OK of the policy dialog, and a person does not do: the read after the sets
+(`afterSet`) opened Show Contents a second time to read the list, and closed it with Cancel. The read showed both rows, and so did the read
+after the refusal (`dialogStillOpen`). The best explanation is that classic keeps the grid of the dialog but takes the list it saves from the
+last close of the dialog, so a Cancel there leaves it with no list. Another explanation is that the OK of Show Contents through UI Automation
+never handed the rows over. The rows in the second read do not tell these two apart, because the dialog may be built from its own grid and not
+from the list of the policy dialog.
+
+What the driver does now: the reads of the policy dialog after the sets (`afterSet`) and after a press that left the dialog open
+(`dialogStillOpen`) no longer open Show Contents. The list option there records its button as before (text, enabled, the push evidence) and no
+`contents`. What the grid held is in the set entry of the list (`before`, `cells`, `afterEdit`), read while the edit was open and before its
+OK. The read before the sets (`readBefore`) still opens Show Contents and cancels it: it comes before any edit of the case, and an edit of the
+list opens the dialog again and closes it with OK. No wait, timeout or plan version changes. No tracked golden holds a list case yet.
+
+What can go wrong and the guard of each:
+
+- The cause is the second explanation, so this change does not help. The next run of `B/Pol_List_Plain` shows it: operations 2 and 4 still
+  bring the message box and no file changes. Then the next fix is the route of the OK of Show Contents (a real mouse click on it, as a person
+  does), and this section says so.
+- A case with a list that is already filled (from an earlier step or a start file) is read before the sets, cancelled, and then saved with no
+  edit of the list. If the first explanation is right, classic would then save that policy with no list or refuse it, and the golden would
+  record a Cancel that the case never planned. The next run decides the explanation. If it is the first, the read before the sets must close
+  a filled list with OK, or skip it, before groups C and D run, and this section is extended with that rule.
+- A golden loses the list contents of `afterSet`. No tracked golden is a list case, so no tracked golden changes. The contents are in the set
+  entry, which the golden keeps.
+
+Unproved, for the next real run to confirm from `result.json`:
+
+- That operations 2 and 4 of `B/Pol_List_Plain` now press OK with no message box and change `Machine\Registry.pol`, `gpt.ini` and
+  `Machine\comment.cmtx`, and that the file holds the rows that were typed.
+- That operation 0 (Enabled, empty list) still shows the message box. That would make it classic behaviour for an empty list, and not a
+  side effect of the read.

@@ -209,7 +209,8 @@ internal sealed partial class GpeditDriver
             data["sets"] = sets;
             if (anySet)
             {
-                data["afterSet"] = Phases.Run("readAfter", () => dialog.Read(readLists));
+                // After a set, Show Contents is not opened again: a Cancel there seems to lose the list in classic (section 39).
+                data["afterSet"] = Phases.Run("readAfter", () => dialog.Read(readLists: false));
             }
 
             if (op.Screenshot is true)
@@ -243,7 +244,7 @@ internal sealed partial class GpeditDriver
 
             if (dialog.IsOpen)
             {
-                data["dialogStillOpen"] = Phases.Run("readThird", () => dialog.Read(readLists));
+                data["dialogStillOpen"] = Phases.Run("readThird", () => dialog.Read(readLists: false));
                 JsonObject cancel = Phases.Run("press Cancel at end", () => dialog.Press("Cancel", null));
                 data["cancelledAtEnd"] = cancel;
             }
