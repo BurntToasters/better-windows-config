@@ -70,6 +70,7 @@ The declared differences of section 3 of the inventory, and the two user decisio
 | DIFF-004 | A backup of the three GPO files (Registry.pol, gpt.ini, comment.cmtx) is kept before the first write of a session in `%ProgramData%\BetterWindowsConfig\gpedit\backup`, last 10. | Recovery from a bad edit; classic keeps no backup. | E3 |
 | DIFF-005 | Imported templates live in the BWC store, not the system folder. Classic `.adm` files are not supported. | Keeps system files untouched and the store admin-only. | G6, E5 |
 | DIFF-006 | Help Topics and About follow the precedent set by the Registry Editor. | Consistent with the existing tool. | U3b |
+| DIFF-007 | Refresh is a BWC addition: the Action menu, all three context menus, the toolbar button and F5 reload the templates and the policy files. Classic has no Refresh entry in any dump and F5 does nothing (ACC-004, ACC-027, ACC-044, BEH-022). | A policy file or template that changes while the editor runs is otherwise visible only after a restart. | G2 |
 | MENU-037 | No Favorites menu. | Removed by the user decision of 2026-11-22. Classic shows no Favorites menu at run time, so BWC builds none. | none |
 | TREE-020 | No Extra Registry Settings node. | Removed by the user decision of 2026-11-22. Classic shows no Extra Registry Settings node; records that match no policy stay invisible (BEH-014). | none |
 | BEH-012 | Retired: the Extra Registry Settings node row. | Retired by the user decision of 2026-11-22 (no Extra Registry Settings node); replaced by BEH-014. | none |

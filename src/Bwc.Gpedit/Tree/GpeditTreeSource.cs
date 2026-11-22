@@ -63,6 +63,58 @@ internal sealed class GpeditTreeSource
         return string.Join(NodeSeparator, names);
     }
 
+    /// <summary>The names from the root to the node. Empty for null.</summary>
+    internal static List<string> NamesOf(TreeNode? node)
+    {
+        var names = new List<string>();
+        for (TreeNode? current = node; current is not null; current = current.Parent)
+        {
+            names.Add(current.Name);
+        }
+
+        names.Reverse();
+        return names;
+    }
+
+    /// <summary>
+    /// Finds the node with these names from the root, creating the category nodes on the way. When a name does not exist
+    /// the nearest ancestor that does is returned, and <paramref name="matched"/> is smaller than the number of names.
+    /// Null when even the root does not match.
+    /// </summary>
+    internal TreeNode? Resolve(IReadOnlyList<string> names, GpeditModel model, out int matched)
+    {
+        matched = 0;
+        if (names.Count == 0 || !string.Equals(names[0], Root.Name, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        TreeNode node = Root;
+        matched = 1;
+        while (matched < names.Count)
+        {
+            TreeNode? next = null;
+            foreach (TreeNode child in EnsureChildren(node, model))
+            {
+                if (string.Equals(child.Name, names[matched], StringComparison.Ordinal))
+                {
+                    next = child;
+                    break;
+                }
+            }
+
+            if (next is null)
+            {
+                break;
+            }
+
+            node = next;
+            matched++;
+        }
+
+        return node;
+    }
+
     /// <summary>
     /// The children of a node, creating the category nodes of Administrative Templates and of a category the first time.
     /// A node that has children already (the skeleton, or a category built before) returns them unchanged.

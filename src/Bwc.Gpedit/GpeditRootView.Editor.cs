@@ -20,9 +20,11 @@ using Windows.Graphics;
 namespace Bwc.Gpedit;
 
 /// <summary>
-/// The editor wiring of the view (piece G1): the console tree over the template categories, the result list with State and
-/// Comment read from the side's policy file, the description pane, the status text, the persisted view state and the E2E
-/// readout. Reading only: no save and no commands (docs/failure-modes/gpedit-tree-list.md).
+/// The editor wiring of the view: the console tree over the template categories, the result list with State and Comment
+/// read from the side's policy file, the description pane, the status text, the setting dialog, the persisted view state
+/// and the E2E readout (docs/failure-modes/gpedit-tree-list.md). The commands are in GpeditRootView.Commands.cs and the
+/// model load in GpeditRootView.Reload.cs. The window takes its saved place from the head before it is shown; the view
+/// keeps the settings and writes them back.
 /// </summary>
 public sealed partial class GpeditRootView
 {
@@ -42,7 +44,6 @@ public sealed partial class GpeditRootView
 
     private readonly Dictionary<string, double> _columnWidths = new(StringComparer.Ordinal);
     private readonly GpeditPlaceholderPage _placeholder = new();
-    private readonly CancellationTokenSource _loadCancel = new();
 
     private GpeditSettings _settings = new();
     private GpeditTreeSource _source = null!;
@@ -63,6 +64,18 @@ public sealed partial class GpeditRootView
     /// The view itself subscribes and opens the setting dialog (piece G3a, <see cref="OpenPolicyDialog"/>).
     /// </summary>
     public event EventHandler<GpeditPolicyEditEventArgs>? PolicyEditRequested;
+
+    /// <summary>
+    /// The window rectangle saved at the last close, for the head to apply before the first show. Null when none was saved.
+    /// Whether the rectangle is usable is for the head to decide.
+    /// </summary>
+    public GpeditSavedPlacement? SavedPlacement =>
+        _settings.WindowX is { } x && _settings.WindowY is { } y && _settings.WindowWidth is { } width && _settings.WindowHeight is { } height
+            ? new GpeditSavedPlacement(x, y, width, height, _settings.WindowMaximized)
+            : null;
+
+    /// <summary>Tells the view the normal (not maximized) rectangle the head gave the window; it is saved at close.</summary>
+    public void NoteNormalBounds(int x, int y, int width, int height) => _normalBounds = new RectInt32(x, y, width, height);
 
     private void InitializeEditor()
     {
@@ -94,6 +107,7 @@ public sealed partial class GpeditRootView
         // The classic list names a row by its text plus a word for a policy; the list control adds nothing itself.
         _list.ItemNameFormatter = GpeditListBuilder.RowName;
         _list.ItemActivated += OnEditorItemActivated;
+        _list.ContextMenuRequested += OnEditorListContext;
         _list.ViewModeChanged += (_, _) =>
         {
             SyncViewChecks();
@@ -120,43 +134,13 @@ public sealed partial class GpeditRootView
         Shell.TreePaneWidthChanged += (_, _) => ScheduleSettingsSave();
     }
 
-    // ---- model --------------------------------------------------------------------------------------
+    // ---- state --------------------------------------------------------------------------------------
 
-    private void StartModelLoad()
+    /// <summary>The state that the commands and the readout show has changed.</summary>
+    private void StateChanged()
     {
-        CancellationToken token = _loadCancel.Token;
-        Task<GpeditModel> task = Task.Run(() => GpeditModel.Load(token), token);
-        _source = new GpeditTreeSource(task);
-        _ = AwaitModelAsync(task);
-    }
-
-    private async Task AwaitModelAsync(Task<GpeditModel> task)
-    {
-        try
-        {
-            GpeditModel model = await task;
-            _model = model;
-            Log.Info(
-                $"Local Group Policy Editor model loaded in {model.LoadTime.TotalMilliseconds:0} ms: " +
-                $"{model.Templates.Files.Count} templates, {model.Templates.Categories.Count} categories, " +
-                $"{model.Templates.Policies.Count} policies, {model.Problems.Count} problems.");
-            if (Shell.TreeContent.SelectedNode is { } selected)
-            {
-                ShowNode(selected);
-            }
-            else
-            {
-                UpdateReadout();
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // The window closed while the templates were loading.
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            Log.Warn("Local Group Policy Editor model could not be applied: " + ex.Message);
-        }
+        UpdateCommandStates();
+        UpdateReadout();
     }
 
     // ---- showing a node -----------------------------------------------------------------------------
@@ -191,7 +175,7 @@ public sealed partial class GpeditRootView
 
         _extended.Description = content.Description;
         Shell.StatusText = content.StatusText;
-        UpdateReadout();
+        StateChanged();
     }
 
     private void ShowPlaceholder(TreeNode node)
@@ -254,7 +238,7 @@ public sealed partial class GpeditRootView
         IReadOnlyList<ConsoleListRow> selected = _list.SelectedRows;
         ConsoleDescriptionModel? row = selected.Count == 1 ? GpeditListBuilder.DescribeRow(selected[0]) : null;
         _extended.Description = row ?? _nodeDescription;
-        UpdateReadout();
+        StateChanged();
     }
 
     // ---- activation and edit requests ---------------------------------------------------------------
@@ -315,6 +299,7 @@ public sealed partial class GpeditRootView
     {
         _editRequests++;
         _lastEdit = policy.FullName;
+        RecordCommand(CommandEdit);
         try
         {
             PolicyEditRequested?.Invoke(this, new GpeditPolicyEditEventArgs(policy, side));
@@ -324,7 +309,7 @@ public sealed partial class GpeditRootView
             Log.Warn($"The edit request of '{policy.FullName}' failed: {ex.Message}");
         }
 
-        UpdateReadout();
+        StateChanged();
     }
 
     // ---- the setting dialog -------------------------------------------------------------------------
@@ -395,8 +380,17 @@ public sealed partial class GpeditRootView
         }
         finally
         {
+            // Nothing here may throw: the task is not awaited, so an exception would end up unobserved.
             _policyDialog = null;
-            SelectPolicyRow(dialog.Shown);
+            try
+            {
+                SelectPolicyRow(dialog.Shown);
+                StateChanged();
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                Log.Warn("The window could not be updated after the setting dialog closed: " + ex.Message);
+            }
         }
     }
 
@@ -568,10 +562,6 @@ public sealed partial class GpeditRootView
 
             _appWindow.Closing += OnAppWindowClosing;
             _appWindow.Changed += OnAppWindowChanged;
-
-            // The head resizes the window in its own Loaded handler, which runs after this one. The saved placement is
-            // applied once the dispatcher is idle again.
-            _ = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, ApplySavedPlacement);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -581,7 +571,19 @@ public sealed partial class GpeditRootView
 
     private void OnEditorUnloaded(object sender, RoutedEventArgs e)
     {
-        _loadCancel.Cancel();
+        _saveTimer?.Stop();
+        CloseLoads();
+        DetachWindow();
+    }
+
+    private void DetachWindow()
+    {
+        if (_appWindow is { } window)
+        {
+            window.Closing -= OnAppWindowClosing;
+            window.Changed -= OnAppWindowChanged;
+            _appWindow = null;
+        }
     }
 
     private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
@@ -596,43 +598,8 @@ public sealed partial class GpeditRootView
     {
         _saveTimer?.Stop();
         SaveSettings();
-        _loadCancel.Cancel();
-    }
-
-    /// <summary>
-    /// Moves and sizes the window from the saved rectangle, fitted into the work area of the display it overlaps (or the
-    /// nearest one). Nothing is changed when no usable rectangle was saved.
-    /// </summary>
-    private void ApplySavedPlacement()
-    {
-        if (_appWindow is not { } window
-            || _settings.WindowX is not { } x || _settings.WindowY is not { } y
-            || _settings.WindowWidth is not { } width || _settings.WindowHeight is not { } height
-            || width <= 0 || height <= 0 || width > 32767 || height > 32767)
-        {
-            return;
-        }
-
-        try
-        {
-            var saved = new RectInt32(x, y, width, height);
-            RectInt32 work = DisplayArea.GetFromRect(saved, DisplayAreaFallback.Nearest).WorkArea;
-            int fittedWidth = Math.Min(width, work.Width);
-            int fittedHeight = Math.Min(height, work.Height);
-            int fittedX = Math.Clamp(x, work.X, work.X + work.Width - fittedWidth);
-            int fittedY = Math.Clamp(y, work.Y, work.Y + work.Height - fittedHeight);
-            var fitted = new RectInt32(fittedX, fittedY, fittedWidth, fittedHeight);
-            window.MoveAndResize(fitted);
-            _normalBounds = fitted;
-            if (_settings.WindowMaximized && window.Presenter is OverlappedPresenter presenter)
-            {
-                presenter.Maximize();
-            }
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            Log.Warn("The saved window placement could not be applied: " + ex.Message);
-        }
+        CloseLoads();
+        DetachWindow();
     }
 
     // ---- E2E readout --------------------------------------------------------------------------------
@@ -676,6 +643,10 @@ public sealed partial class GpeditRootView
         Add("Links", _linkInvocations);
         Add("Edits", _editRequests);
         Add("LastEdit", _lastEdit);
+        Add("Refreshes", _refreshes);
+        Add("Reloading", _loadInFlight && !_loadIsInitial ? 1 : 0);
+        Add("HelpRequests", _helpRequests);
+        Add("LastCommand", _lastCommand);
         AutomationProperties.SetHelpText(this, text.ToString());
 
         if (model is not null && Environment.GetEnvironmentVariable("BWC_E2E_GPEDIT_SHAPE") == "1")

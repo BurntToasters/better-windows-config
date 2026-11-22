@@ -36,6 +36,14 @@
     <WriteLinesToFile File="$(BwcFlavorStampFile)" Lines="$(BwcFlavor)" Overwrite="true" WriteOnlyWhenDifferent="true" />
   </Target>
 
+  <!--
+    WindowPlacement (fits a saved rectangle into a work area) is the Registry Editor's own source file. The head compiles
+    that one file instead of a copy, so the two heads cannot drift, and takes no reference to the Registry Editor.
+  -->
+  <ItemGroup>
+    <Compile Include="..\Bwc.Regedit\Controllers\WindowPlacement.cs" Link="Shared\WindowPlacement.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" />
   </ItemGroup>

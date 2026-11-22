@@ -200,6 +200,24 @@ The comments of `MainWindow.xaml.cs` and `GpeditRootView.xaml.cs` still say the 
 pieces, and the fixture help text says Disabled writes 0 while the captures show a delete record. They are corrected in the
 code dispatch; there is no E2E check. The fixture wording is not a check here: the existing dialog tests read it.
 
+## Decisions of the code dispatch
+
+- A Refresh while the setting dialog is open is refused (logged, no state change, `LastCommand` keeps its value). A load that
+  finishes while the dialog is open is dropped, so the model under the dialog is never replaced.
+- A Refresh while a reload is in flight cancels it and starts one more load; the replaced load is never applied, so a burst
+  gives one applied reload (`Refreshes` counts applied reloads only). A Refresh during the first load waits for it, then loads
+  again.
+- The history holds the nodes of the tree in use, at most 100. A reload maps each entry to the node with the same names in the
+  new tree and drops the ones that no longer exist; the current entry is the node that is selected after the reload. A history
+  step to a node that the tree cannot show (an ancestor was collapsed since) leaves the selection where it was and drops
+  the entry.
+- The Action popup is built once with Edit, Refresh and Help; Edit is shown only while a policy row is selected (a removed
+  popup entry stays in the popup's visual tree, so hiding is used). The context menus are built new for each request.
+- Help in the ship flavor shows the native About box (DIFF-006, the Registry Editor's Help); in the E2E flavor it only counts.
+- Alt+Up goes up one level while the console tree holds the focus; with the focus in the result pane it does nothing (ACC-032).
+- The window placement is applied by the head before the first show with the Registry Editor's `WindowPlacement` source file,
+  which the head compiles by link. It lives in `Bwc.Regedit`, not in `Bwc.UI`; moving it to `Bwc.UI` is a later cleanup.
+
 ## Safety and repeatability
 
 The tests run on the E2E flavor only, with the sandbox policy object, the F1 fixture templates (or a copy of them under the run
