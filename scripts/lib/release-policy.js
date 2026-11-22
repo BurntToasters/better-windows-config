@@ -666,10 +666,16 @@ export const GATE_REQUIRED_RIDS = Object.freeze(["win-arm64", "win-x64"]);
 const GATE_E2E_STEPS = Object.freeze(["e2e-ship", "e2e-flavor"]);
 
 /**
+ * The full-gate-only step that test-all.js runs after the per-RID steps of every RID. It belongs to no rid.
+ * The proof finds it by name, never by its position among the steps.
+ */
+const GATE_RELEASE_STEP = "test-policy-release-gate";
+
+/**
  * Checks a quality-gate result for the release commit. Only a full gate counts: one run of
- * `test-all.js --rid all` (no --quick) that passed on a clean HEAD, with both architectures and their
- * GUI E2E steps passed. A quick gate, a gate for one rid, and a gate with a skipped, NOT RUN, or
- * failed step are refused.
+ * `test-all.js --rid all` (no --quick) that passed on a clean HEAD, with both architectures, their
+ * GUI E2E steps and the release gate step (test-policy-release-gate, which runs last) passed. A quick
+ * gate, a gate for one rid, and a gate with a skipped, NOT RUN, or failed step are refused.
  */
 export function qualityGateProof(gate, head) {
   if (!gate || typeof gate !== "object") {
@@ -733,6 +739,14 @@ export function qualityGateProof(gate, head) {
         };
       }
     }
+  }
+  const releaseStep = steps.find((candidate) => candidate?.name === GATE_RELEASE_STEP);
+  if (!releaseStep || releaseStep.pass !== true || releaseStep.exitCode !== 0) {
+    return {
+      ok: false,
+      reason: "gate-release-step-not-run",
+      detail: `the quality gate has no passing ${GATE_RELEASE_STEP} (it runs last, after every rid; it did not run or did not pass)`,
+    };
   }
   return {
     ok: true,

@@ -77,12 +77,13 @@ The shared steps run once, in this order:
   (`Bwc.Registry.Shipping.Tests`), `test-update` (`Bwc.Update.Tests`), and `test-update-e2e`
   (`Bwc.Update.Tests` compiled in the E2E flavor). The normal steps skip tests tagged `Elevated` or
   `ReleaseGate`.
-- `test-policy-release-gate`, only in a full gate (no `--quick`). It runs the tests tagged `ReleaseGate`
-  in `Bwc.Policy.Tests`, and fails while a capture case still awaits a recapture.
-
-`--quick` runs the shared steps except `test-policy-release-gate`. Without it, each RID then runs
+`--quick` runs only the shared steps. Without it, each RID then runs
 `publish-ship`, `verify-flavor-ship`, `e2e-ship`, `publish-e2e`, `verify-flavor-e2e`, and `e2e-flavor`.
 `--rid all` runs the shared steps once and the publish, flavor, and E2E steps once for each RID.
+After the steps of every RID, a full gate (no `--quick`) runs `test-policy-release-gate` last. It runs
+the tests tagged `ReleaseGate` in `Bwc.Policy.Tests`, and fails while a capture case still awaits a
+recapture. It belongs to no RID (`rid` is null in `steps`), and it fails the gate when it fails, but the
+GUI evidence of every RID is collected before it runs.
 A release needs one full `--rid all` gate that passed on a clean HEAD (see `docs/RELEASE.md`).
 
 The test projects always build and run for the host architecture (`process.arch`:
@@ -104,7 +105,7 @@ Schema 2 fields of `result.json`:
 - `git`: `commit` (full SHA), `branch`, `dirty`, `dirtyPaths` (from `git status --porcelain -z`; a rename reads `new (from old)`), `error`
 - `environment`: `node` (version), `dotnet` (`version`, `error` from `dotnet --version`), `os` (`type`, `version`, `release`), `arch` (`process.arch`)
 - `rids`: one entry per requested RID with `platform`, `status` (`pass`, `fail`, `not-run` after an earlier failure, or `skipped` in quick mode), and its step names
-- `steps`: every step that ran, in order, with `name`, `rid` (null for shared steps), `command`, `pass`, `exitCode`, `durationMs`, `summary`, `log` (repo-relative path), and `e2eResult` (set on the two E2E steps of each RID, null otherwise)
+- `steps`: every step that ran, in order, with `name`, `rid` (null for shared steps and for `test-policy-release-gate`), `command`, `pass`, `exitCode`, `durationMs`, `summary`, `log` (repo-relative path), and `e2eResult` (set on the two E2E steps of each RID, null otherwise)
 
 `e2eResult` is `{ path, exists, pass, passed, failed, total, error }`. `path` is
 `artifacts/e2e/result-<rid>-<flavor>.json`. Counts are read only when that file exists,

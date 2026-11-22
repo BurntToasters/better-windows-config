@@ -364,6 +364,7 @@ otherwise.
 | Q13 | Gate with `rids[].status` `fail`, or any step with `pass` other than `true` (the overall `pass` was edited) | A failed step is hidden | Refuse `gate-failed`, naming the rid or step. Exit 1. |
 | Q14 | A full gate lacks `e2e-ship` or `e2e-flavor` for a rid, a step has a non-zero exit (a NOT RUN exits 3), or its `e2eResult` is absent, not `pass: true`, or has failed checks | GUI E2E counted as run when it was skipped or never started | Refuse `gate-e2e-not-run`, naming the step and rid. Exit 1. |
 | Q15 | `quick` is missing or not `false` in the gate result | A hand-edited or old result passes as full | Refuse `gate-quick`. Exit 1. |
+| Q16 | A full gate has no `test-policy-release-gate` step, or it did not pass. `test-all.js` runs it last, after the steps of every rid, so a gate that stopped earlier, or a result edited to drop the step, lacks it | A release goes out while a capture case still awaits a recapture, or the proof depends on where the step sits in the list | Refuse `gate-failed` when the step failed and `gate-release-step-not-run` when it is missing or has a non-zero exit. The proof finds the step by name, not by position. Exit 1. No session is written. |
 
 ### Package scripts (`package.json`)
 

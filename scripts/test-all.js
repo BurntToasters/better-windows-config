@@ -66,7 +66,7 @@ tracked-paths, oracle-json-selftest, oracle-json, e2e-timing-selftest, changelog
 release-flow-selftest,
 release-assets-selftest, embed-key-selftest, signing-selftest, build-arm64, build-x64,
 test-core, test-gpo, test-policy, test-registry-e2e, test-registry-shipping, test-update,
-test-update-e2e, and, only without --quick, test-policy-release-gate.
+test-update-e2e.
 policy-writer is the static guard for the local group policy writer
 (scripts/check-policy-writer.js). The -selftest steps run the --self-test of the
 writer guards, the em dash validator, and scripts/check-tracked-paths.js, so a guard that
@@ -77,11 +77,13 @@ check id comparison of E2E result files.
 test-update-e2e runs tests/Bwc.Update.Tests with -p:BwcFlavor=E2E, so the
 branch compiled only in that flavor runs too. test-gpo and test-policy run tests/Bwc.Gpo.Tests
 and tests/Bwc.Policy.Tests without the tests tagged ReleaseGate. test-policy-release-gate runs
-only those tests of tests/Bwc.Policy.Tests, in a full gate only: it fails while a capture case
+only those tests of tests/Bwc.Policy.Tests, in a full gate only, last: it fails while a capture case
 still awaits a recapture (docs/failure-modes/quality-gate.md). A step that exits 3 (NOT RUN, for one e2e-ship from an elevated
 shell) is a failed step.
 Unless --quick, each RID then runs publish-ship, verify-flavor-ship, e2e-ship,
-publish-e2e, verify-flavor-e2e, e2e-flavor. verify-flavor-* checks the BwcFlavor
+publish-e2e, verify-flavor-e2e, e2e-flavor, and after the steps of every RID the one
+full-gate-only step test-policy-release-gate runs last (it belongs to no RID, and it fails
+the gate when it fails, but never stops the GUI evidence from being collected). verify-flavor-* checks the BwcFlavor
 metadata of the publish folder. E2E steps also record the counts from
 artifacts/e2e/result-<rid>-<flavor>.json when that file exists. Tests tagged
 Elevated are skipped by every step; scripts/elevated-runner/run.js runs them.
@@ -356,8 +358,9 @@ function sharedSteps(testPlatform) {
   ].map((step) => ({ ...step, rid: null }));
 }
 
-// Steps that only a full (non-quick) gate runs. test-policy-release-gate runs the ReleaseGate tests of
-// tests/Bwc.Policy.Tests, which fail while a capture case still awaits a recapture.
+// Steps that only a full (non-quick) gate runs, after the per-RID steps of every RID (see buildPlan).
+// test-policy-release-gate runs the ReleaseGate tests of tests/Bwc.Policy.Tests, which fail while a
+// capture case still awaits a recapture.
 function releaseGateSteps(testPlatform) {
   return [
     {
@@ -397,13 +400,14 @@ function ridSteps(rid) {
   ].map((step) => ({ ...step, rid }));
 }
 
-// Shared steps run once. Each RID then gets its own publish, flavor, and E2E steps.
+// Shared steps run once. Each RID then gets its own publish, flavor, and E2E steps. The full-gate-only
+// release gate steps come last, after every RID, and belong to no RID.
 function buildPlan(options) {
   const everyRid = options.rid === ALL_RIDS;
-  const shared = [
-    ...sharedSteps(hostPlatform()),
-    ...(options.quick ? [] : releaseGateSteps(hostPlatform())),
-  ];
+  const shared = sharedSteps(hostPlatform());
+  // The release gate step runs after the per-RID steps of every RID, so a capture case that awaits a
+  // recapture cannot stop the gate before the GUI evidence is collected. It still fails the gate.
+  const final = options.quick ? [] : releaseGateSteps(hostPlatform());
   const rids = (everyRid ? ALL_RID_ORDER : [options.rid]).map(
     (rid) => ({
       rid,
@@ -412,7 +416,7 @@ function buildPlan(options) {
     }),
   );
   return {
-    steps: [...shared, ...rids.flatMap((entry) => entry.steps)],
+    steps: [...shared, ...rids.flatMap((entry) => entry.steps), ...final],
     rids: rids.map(({ rid, platform, steps }) => ({
       rid,
       platform,

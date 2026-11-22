@@ -48,17 +48,29 @@ public sealed class GpeditSaveTests
     [TestMethod]
     [TestCategory("Gpedit")]
     [TestCategory("E2EOnly")]
-    public void Gpedit_Save_Errors_ReadOnlyFile() => OneFault(ReadOnlyFile);
+    public void Gpedit_Save_Errors_ReadOnlyFile()
+    {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
+        OneFault(ReadOnlyFile);
+    }
 
     [TestMethod]
     [TestCategory("Gpedit")]
     [TestCategory("E2EOnly")]
-    public void Gpedit_Save_Errors_MalformedAtSave() => OneFault(Malformed);
+    public void Gpedit_Save_Errors_MalformedAtSave()
+    {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
+        OneFault(Malformed);
+    }
 
     [TestMethod]
     [TestCategory("Gpedit")]
     [TestCategory("E2EOnly")]
-    public void Gpedit_Save_Errors_LockHeld() => OneFault(LockHeld);
+    public void Gpedit_Save_Errors_LockHeld()
+    {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
+        OneFault(LockHeld);
+    }
 
     [TestMethod]
     [TestCategory("Gpedit")]

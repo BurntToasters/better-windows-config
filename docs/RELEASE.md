@@ -90,11 +90,13 @@ This runs, in order:
      and `signing-selftest`.
    - Builds and test projects, run once: `build-arm64`, `build-x64`, `test-core`, `test-gpo`, `test-policy`,
      `test-registry-e2e`, `test-registry-shipping`, `test-update`, and `test-update-e2e`.
-   - `test-policy-release-gate`, which runs only in a full gate. It runs the tests tagged `ReleaseGate` in
-     `tests/Bwc.Policy.Tests` and fails while a capture case still awaits a recapture.
    - For each rid (`win-arm64`, then `win-x64`): `publish-ship`, `verify-flavor-ship`, `e2e-ship`, `publish-e2e`,
      `verify-flavor-e2e`, and `e2e-flavor`. The two E2E steps must each have a passing
      `artifacts/e2e/result-<rid>-<flavor>.json`.
+   - `test-policy-release-gate`, last, after the steps of every rid, and only in a full gate. It runs the
+     tests tagged `ReleaseGate` in `tests/Bwc.Policy.Tests` and fails while a capture case still awaits a
+     recapture. It belongs to no rid. It must have passed (`qualityGateProof` refuses `gate-release-step-not-run`
+     when it is missing or did not pass).
 4. A release session that records the gate with `mode: "full"`, both rids, and E2E `passed`.
 5. A clean `artifacts/release/<version>/` folder, then `npm run release:win:continue`.
 
@@ -621,7 +623,7 @@ A dry run that finds a refusal still prints the plan and exits 1.
 | `key-missing`, `key-unreadable`, `key-malformed` | No key source, a key given as text on the command line, or an environment value that is neither minisign key text, a key path, nor base64 of one. The value is never printed. |
 | `stable-override` | A stable release set a beta override (`SKIP_WIN_CODESIGN`, `FORCE_UPLOAD`, `SKIP_RELEASE_MIRROR`, `ALLOW_ASSET_REPLACE`, `SKIP_E2E`) or a non-canonical GitHub target. Exit 1. |
 | `asset-replace-stable` | `--replace-assets` was given for a stable release. Exit 1. |
-| `gate-missing`, `gate-failed`, `gate-commit-mismatch`, `gate-dirty-tree`, `gate-quick`, `gate-rid-missing`, `gate-e2e-not-run` | `release-session.js create` found no full quality gate that passed on HEAD for both rids: none, a failed step, another commit, a dirty tree, a quick run, a missing rid, or a skipped E2E step. The gate is required by default. Exit 1, no session written. |
+| `gate-missing`, `gate-failed`, `gate-commit-mismatch`, `gate-dirty-tree`, `gate-quick`, `gate-rid-missing`, `gate-e2e-not-run`, `gate-release-step-not-run` | `release-session.js create` found no full quality gate that passed on HEAD for both rids: none, a failed step, another commit, a dirty tree, a quick run, a missing rid, a skipped E2E step, or a release gate step that did not run. The gate is required by default. Exit 1, no session written. |
 | `missing-quality-gate` | `release-session.js verify` (and the draft, verify, and publish checks) found a session with no recorded gate. Exit 1. |
 | `asset-incomplete` | A draft asset is not in the `uploaded` state. Pass `--replace-assets` to delete and re-upload it. Exit 1. |
 | `asset-url-malformed` | A manifest installer URL has a malformed percent escape. Exit 1. |

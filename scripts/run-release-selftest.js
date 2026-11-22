@@ -335,13 +335,23 @@ check("quality gate proof: a quick pass is refused; a full pass for both rids re
   assertEqual(oneRid.reason, "gate-rid-missing", "one rid");
   const e2eStep = (name, rid) => ({ name, rid, pass: true, exitCode: 0, e2eResult: { exists: true, pass: true, failed: 0 } });
   const rids = ["win-arm64", "win-x64"];
+  const releaseStep = (pass) => ({ name: "test-policy-release-gate", rid: null, pass, exitCode: pass ? 0 : 1, e2eResult: null });
+  const gateOf = (last) => ({
+    pass: true,
+    quick: false,
+    git: { commit: HEAD },
+    rids: rids.map((rid) => ({ rid, status: "pass" })),
+    steps: [...rids.flatMap((rid) => [e2eStep("e2e-ship", rid), e2eStep("e2e-flavor", rid)]), ...last],
+  });
+  assertEqual(qualityGateProof(gateOf([releaseStep(false)]), HEAD).reason, "gate-failed", "release gate step failed after the rids passed");
+  assertEqual(qualityGateProof(gateOf([]), HEAD).reason, "gate-release-step-not-run", "release gate step did not run");
   const full = qualityGateProof(
     {
       pass: true,
       quick: false,
       git: { commit: HEAD },
       rids: rids.map((rid) => ({ rid, status: "pass" })),
-      steps: rids.flatMap((rid) => [e2eStep("e2e-ship", rid), e2eStep("e2e-flavor", rid)]),
+      steps: [...rids.flatMap((rid) => [e2eStep("e2e-ship", rid), e2eStep("e2e-flavor", rid)]), releaseStep(true)],
     },
     HEAD,
   );

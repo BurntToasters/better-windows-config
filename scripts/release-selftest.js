@@ -1422,13 +1422,19 @@ function e2eGateStep(name, rid, flavor, overrides = {}) {
   };
 }
 
-/** The rids and steps a full `test-all.js --rid all` records, with a shared step and both e2e steps per rid. */
+/** The release gate step of a full gate. test-all.js runs it last, after the steps of every rid, and it belongs to no rid. */
+function releaseGateStep(overrides = {}) {
+  return { name: "test-policy-release-gate", rid: null, pass: true, exitCode: 0, e2eResult: null, ...overrides };
+}
+
+/** The rids and steps a full `test-all.js --rid all` records: a shared step, both e2e steps per rid, then the release gate step. */
 function fullGateRids(rids = ["win-arm64", "win-x64"]) {
   return {
     rids: rids.map((rid) => ({ rid, platform: "windows", status: "pass", steps: ["e2e-ship", "e2e-flavor"] })),
     steps: [
       { name: "validate", rid: null, pass: true, exitCode: 0, e2eResult: null },
       ...rids.flatMap((rid) => [e2eGateStep("e2e-ship", rid, "ship"), e2eGateStep("e2e-flavor", rid, "e2e")]),
+      releaseGateStep(),
     ],
   };
 }
@@ -1893,6 +1899,16 @@ async function runSessionGateCases(temp, fixture, cases) {
   failedStep.steps.find((step) => step.rid === "win-arm64" && step.name === "e2e-ship").pass = false;
   writeGate(repo, failedStep);
   expectRefusal("session create refuses a gate where one step failed (gate-failed)", create(), ["gate-failed"], cases);
+  const releaseFailed = fullGateRids();
+  releaseFailed.steps[releaseFailed.steps.length - 1] = releaseGateStep({ pass: false, exitCode: 1 });
+  writeGate(repo, { ...releaseFailed, pass: false });
+  expectRefusal("session create refuses a gate where the release gate step failed after the rids passed (gate-failed)", create(), ["gate-failed"], cases);
+  writeGate(repo, releaseFailed);
+  expectRefusal("session create refuses a gate whose recorded pass hides a failed release gate step (gate-failed)", create(), ["gate-failed"], cases);
+  const releaseMissing = fullGateRids();
+  releaseMissing.steps = releaseMissing.steps.filter((step) => step.name !== "test-policy-release-gate");
+  writeGate(repo, releaseMissing);
+  expectRefusal("session create refuses a gate where the release gate step did not run (gate-release-step-not-run)", create(), ["gate-release-step-not-run"], cases);
   const notRun = fullGateRids();
   notRun.rids.find((entry) => entry.rid === "win-x64").status = "not-run";
   writeGate(repo, notRun);
@@ -1957,6 +1973,18 @@ function runGateProofAndUrlCases(cases) {
   expectCheck("qualityGateProof refuses git.dirty true (gate-dirty-tree)", dirty.reason === "gate-dirty-tree", JSON.stringify(dirty), cases);
   const clean = qualityGateProof(fullGate({ commit: FAKE_COMMIT, dirty: false }), FAKE_COMMIT);
   expectCheck("qualityGateProof accepts a full gate for both rids on a clean HEAD", clean.ok === true && clean.record.mode === "full", JSON.stringify(clean), cases);
+  const releaseFailed = fullGate({ commit: FAKE_COMMIT, dirty: false });
+  releaseFailed.steps[releaseFailed.steps.length - 1] = releaseGateStep({ pass: false, exitCode: 1 });
+  releaseFailed.pass = false;
+  const failedAfterRids = qualityGateProof(releaseFailed, FAKE_COMMIT);
+  expectCheck("qualityGateProof refuses a gate where the release gate step failed after the rids passed (gate-failed)", failedAfterRids.reason === "gate-failed", JSON.stringify(failedAfterRids), cases);
+  releaseFailed.pass = true;
+  const hiddenFailure = qualityGateProof(releaseFailed, FAKE_COMMIT);
+  expectCheck("qualityGateProof refuses a passing gate whose release gate step failed (gate-failed)", hiddenFailure.reason === "gate-failed", JSON.stringify(hiddenFailure), cases);
+  const releaseMissing = fullGate({ commit: FAKE_COMMIT, dirty: false });
+  releaseMissing.steps = releaseMissing.steps.filter((step) => step.name !== "test-policy-release-gate");
+  const notRunProof = qualityGateProof(releaseMissing, FAKE_COMMIT);
+  expectCheck("qualityGateProof refuses a gate where the release gate step did not run (gate-release-step-not-run)", notRunProof.reason === "gate-release-step-not-run", JSON.stringify(notRunProof), cases);
   const quick = qualityGateProof({ pass: true, quick: true, git: { commit: FAKE_COMMIT, dirty: false } }, FAKE_COMMIT);
   expectCheck("qualityGateProof refuses a quick gate (gate-quick)", quick.reason === "gate-quick", JSON.stringify(quick), cases);
   const noRids = qualityGateProof({ pass: true, quick: false, git: { commit: FAKE_COMMIT, dirty: false } }, FAKE_COMMIT);
