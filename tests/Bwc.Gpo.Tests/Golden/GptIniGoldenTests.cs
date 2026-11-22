@@ -144,4 +144,36 @@ public sealed class GptIniGoldenTests
 
         AssertGpt(fx, caseId, "step-02-not-configured");
     }
+
+    [TestMethod]
+    public void D3_C_Comment_Enabled_AddEditRemove_EveryCommentOnlySaveOfAnExistingPolicyFileRaisesTheVersion()
+    {
+        const string caseId = "C/Comment_Enabled_AddEditRemove";
+        using var fx = new SandboxGpoFixture();
+        fx.Seed(fx.GptPath, GoldenData.Gpt(caseId, "step-01-enabled")!);
+        fx.Seed(fx.PolPath(GpoSide.Machine), GoldenData.Pol(caseId, "step-01-enabled", GpoSide.Machine)!);
+        fx.Seed(fx.CmtxPath(GpoSide.Machine), GoldenData.Cmtx(caseId, "step-01-enabled", GpoSide.Machine)!);
+        var store = fx.NewStore();
+
+        store.Save(GpoSide.Machine, s => s.Comments.SetComment(Ns, "Pol_Class_Machine", "bwc comment one"));
+        AssertGpt(fx, caseId, "step-02-add");
+        store.Save(GpoSide.Machine, s => s.Comments.SetComment(Ns, "Pol_Class_Machine", "bwc comment two"));
+        AssertGpt(fx, caseId, "step-03-edit");
+        store.Save(GpoSide.Machine, s => s.Comments.SetComment(Ns, "Pol_Class_Machine", null));
+        AssertGpt(fx, caseId, "step-04-remove");
+    }
+
+    [TestMethod]
+    public void D4_C_GptIni_PairRemoval_ClearingTheLastRecordOfTheMachineSide_KeepsTheLineWithOneSpace()
+    {
+        const string caseId = "C/GptIni_PairRemoval";
+        using var fx = new SandboxGpoFixture();
+        fx.Seed(fx.GptPath, GoldenData.Gpt(caseId, "step-01-machine")!);
+        fx.Seed(fx.PolPath(GpoSide.Machine), GoldenData.Pol(caseId, "step-01-machine", GpoSide.Machine)!);
+        fx.Seed(fx.CmtxPath(GpoSide.Machine), GoldenData.Cmtx(caseId, "step-01-machine", GpoSide.Machine)!);
+
+        fx.NewStore().Save(GpoSide.Machine, s => s.Pol.RemoveValue(Key, "MachineFlag"));
+
+        AssertGpt(fx, caseId, "step-02-machine-cleared");
+    }
 }

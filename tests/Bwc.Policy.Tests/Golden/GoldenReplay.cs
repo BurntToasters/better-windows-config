@@ -15,6 +15,9 @@ internal static class GoldenReplay
 {
     private static readonly Lazy<TemplateSet> Templates = new(LoadTemplates);
 
+    /// <summary>The fixture templates the captures were made with, including the edge fixtures.</summary>
+    internal static TemplateSet LoadedTemplates => Templates.Value;
+
     private static TemplateSet LoadTemplates()
     {
         var folders = new List<string> { Fixture.Root };
@@ -138,6 +141,12 @@ internal static class GoldenReplay
             }
 
             var press = k < observed.Count ? observed[k] : throw new AssertFailedException($"{ctx}: press {k} ({presses[k]}) was not observed.");
+            if (press["pressed"] is JsonValue pressedFlag && pressedFlag.TryGetValue(out bool wasPressed) && !wasPressed)
+            {
+                // The button was disabled and the driver did not press it (C/NoChange_Apply): nothing is saved.
+                continue;
+            }
+
             if ((press["messageBoxes"] as JsonArray)?.Count > 0)
             {
                 ExpectRefusal(sandbox, ctx, side, policy, edit, comment, dialogRefusal);
@@ -164,6 +173,7 @@ internal static class GoldenReplay
         var ctx = $"{golden.Id} operation {op.Index}";
         var options = op.Op["options"] as JsonArray;
         var state = op.Text("state") ?? (options is null ? null : "Enabled");
+        GoldenOptions.RequireEnabledForOptions(golden.Id, op.Index, state, options);
         switch (state)
         {
             case null:
@@ -173,28 +183,25 @@ internal static class GoldenReplay
             case "Not Configured":
                 return (PolicyEdit.NotConfigured, null);
             case "Enabled":
-                var mapped = GoldenOptions.Map(golden.Id, op.Index, policy, options);
+                // The dialog shows the stored values of an Enabled policy and the defaults of the presentation for the rest.
+                var stored = current.State == PolicyState.Enabled ? current.Elements : new Dictionary<string, ElementValue>();
+                var mapped = GoldenOptions.Map(golden.Id, op.Index, policy, options, stored);
                 var values = new Dictionary<string, ElementValue>(StringComparer.OrdinalIgnoreCase);
-                var missing = new List<string>();
+                var defaults = new Lazy<IReadOnlyDictionary<string, ElementValue>>(() => PolicyDefaults.For(policy));
                 foreach (var element in policy.Elements)
                 {
                     if (mapped.Values.TryGetValue(element.Id, out var given))
                     {
                         values[element.Id] = given;
                     }
-                    else if (current.State == PolicyState.Enabled && current.Elements.TryGetValue(element.Id, out var kept))
+                    else if (stored.TryGetValue(element.Id, out var kept))
                     {
                         values[element.Id] = kept;
                     }
-                    else if (mapped.DialogRefusal is null)
+                    else if (mapped.DialogRefusal is null && defaults.Value.TryGetValue(element.Id, out var shown))
                     {
-                        missing.Add(element.Id);
+                        values[element.Id] = shown;
                     }
-                }
-
-                if (missing.Count > 0)
-                {
-                    Assert.Fail($"{ctx}: Enabled for '{policy.Name}' shows default values for [{string.Join(", ", missing)}] and the defaults function is written by piece E6b; none is invented here.");
                 }
 
                 return (PolicyEdit.EnabledWith(values), mapped.DialogRefusal);

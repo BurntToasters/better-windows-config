@@ -159,4 +159,28 @@ public sealed class CmtxGoldenTests
         Assert.IsNull(GoldenData.Cmtx("A/Machine_NotConfigured", "step-02-saved", GpoSide.Machine), "classic wrote no comment file");
         Assert.IsNull(fx.Read(fx.CmtxPath(GpoSide.Machine)));
     }
+
+    [TestMethod]
+    public void D6_C_Cmtx_FirstSave_ForeignNamespaces_ReplacesTheUsingLinesAndAddsMinRequiredRevisionToResources()
+    {
+        const string caseId = "C/Cmtx_FirstSave_ForeignNamespaces";
+        var start = GoldenData.Cmtx(caseId, "step-01-start", GpoSide.Machine)!;
+        var document = CmtxDocument.Parse(start);
+
+        document.RestrictNamespacesTo(Oracle);
+
+        AssertBytes(caseId, "step-02-first-save", GpoSide.Machine, document);
+    }
+
+    [TestMethod]
+    public void D6_C_Cmtx_FirstSave_ForeignNamespaces_ACommentOnTheSecondSaveKeepsTheRestOfTheFile()
+    {
+        const string caseId = "C/Cmtx_FirstSave_ForeignNamespaces";
+        var document = CmtxDocument.Parse(GoldenData.Cmtx(caseId, "step-03-second-save", GpoSide.Machine)!);
+
+        document.SetComment(Oracle, "Pol_Class_Machine", Comment);
+        document.RestrictNamespacesTo(Oracle);
+
+        AssertBytes(caseId, "step-04-comment", GpoSide.Machine, document);
+    }
 }

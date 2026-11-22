@@ -5,7 +5,8 @@ uses), the replay harness in `tests/Bwc.Policy.Tests/Golden`, and the file-rule 
 This page was written before the code (dispatch T); dispatch C wrote the code and marked the rules settled. The rules it names are settled by the captures in
 `docs/parity/oracle/gpedit/goldens` (groups A and K for this piece); a capture is the specification. The reader and writer
 rules are in `docs/failure-modes/policy-state.md`, the store in `docs/failure-modes/gpo-store.md`, the file codec in
-`docs/failure-modes/gpo-pol.md`.
+`docs/failure-modes/gpo-pol.md`. Piece E6b (groups B and C, the option mapping and the defaults function) is in
+`docs/failure-modes/policy-defaults.md`.
 
 The contract of `PolicySave.Save(store, side, policy, edit, comment)`:
 
@@ -35,6 +36,7 @@ The contract of `PolicySave.Save(store, side, policy, edit, comment)`:
 | S14 | The cancellation token is checked after the first write. | Cancelled before the first write: `OperationCanceledException`, nothing written. | store tests |
 | S15 | A malformed `Registry.pol` is overwritten, or a comment-only save skips reading it and bumps the version on top of it. | The save throws a malformed-file failure and writes nothing (D9). | `K/KeyLeadingBackslash_ReadAsWritten` (refused start), `PolicySaveContractTests.S15_...` |
 | S16 | Read-only mode, lock timeout or a write failure are hidden in the outcome. | `GpoStoreException` reaches the caller unchanged. | `tests/Bwc.Gpo.Tests` (store tests) |
+| S17 | `PolicyStateWriter.Apply` returns problems inside the store edit (the template changed between the dialog and the lock) and the edit returns with a model that is partly changed, or after the comment was set. | `PolicySave.Save` returns the problems and `Changed` false, the comment is not set, the store writes nothing and does not refresh (S2). | `PolicySaveContractTests.S17_...` |
 
 Not decided and not tested here: a policy of class Machine saved with side User (the UI never offers it).
 
@@ -71,7 +73,7 @@ these ways, and none of them is a skip.
 | R10 | A case is on `awaiting-recapture.txt`. | Its row reports "awaiting recapture" with `Assert.Inconclusive`; it is never replayed. |
 | R11 | The list names a case that has no folder, appears twice, or no longer shows CAP-4 (it was recaptured). | Fails: the list is wrong. |
 | R12 | The list is not empty at a release. | `AwaitingRecaptureListIsEmpty` (`ReleaseGate`) fails while it holds any case. The quick gate leaves `ReleaseGate` out; the full gate runs it in the step `test-policy-release-gate` (quality-gate.md, GATE-5). |
-| R13 | An Enabled operation of a policy with elements gives no value for an element and the policy was not Enabled: the dialog showed defaults. | Fails with "needs the defaults function of E6b"; no default is invented here. |
+| R13 | An Enabled operation leaves an element with no option value and no stored value: the dialog showed its default. | The value comes from `PolicyDefaults.For` (E6b, policy-defaults.md, F and B3). Until that function is written the row fails with `NotImplementedException`; the harness invents no default. |
 | R14 | An option value cannot be mapped (unknown element id, enum item that is not a label, a number that is not text of digits while classic showed no box). | Fails naming the option. |
 | R15 | A start that classic refused (`startRefused`) opens, saves or changes in the engine. | Fails: the store must report a failure on open, a save must throw a malformed-file failure, and the start files stay byte-identical. |
 | R16 | The state the engine reads before an operation differs from the state the dialog showed (`before.state`). | Fails naming the operation (K read cases). |
