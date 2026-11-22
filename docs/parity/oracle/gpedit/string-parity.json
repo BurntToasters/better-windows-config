@@ -11,10 +11,10 @@
     "src/Bwc.UI/Console/**/*.cs (excluding bin and obj)"
   ],
   "counts": {
-    "equal": 104,
+    "equal": 128,
     "differs": 2,
     "template": 32,
-    "absent": 2046
+    "absent": 2022
   },
   "strings": [
     {
@@ -467,35 +467,35 @@
     },
     {
       "id": "admtmpl.dll:3002",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3003",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3004",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3005",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3100",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3101",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3102",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3103",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3104",
@@ -507,11 +507,11 @@
     },
     {
       "id": "admtmpl.dll:3106",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3117",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3118",
@@ -1003,35 +1003,35 @@
     },
     {
       "id": "admtmpl.dll.mui:3002",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3003",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3004",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3005",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3100",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3101",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3102",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3103",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3104",
@@ -1043,11 +1043,11 @@
     },
     {
       "id": "admtmpl.dll.mui:3106",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3117",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3118",
@@ -1663,7 +1663,7 @@
     },
     {
       "id": "gpedit.dll:156",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll:157",
@@ -1987,7 +1987,7 @@
     },
     {
       "id": "gpedit.dll:293",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll:294",
@@ -2707,7 +2707,7 @@
     },
     {
       "id": "gpedit.dll.mui:156",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll.mui:157",
@@ -3031,7 +3031,7 @@
     },
     {
       "id": "gpedit.dll.mui:293",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll.mui:294",
