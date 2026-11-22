@@ -281,6 +281,37 @@ public sealed class PolDocument
         return count;
     }
 
+    /// <summary>
+    /// Rewrites every key that ends in a backslash without it, the way classic's model spells keys when it saves (capture
+    /// K/KeyTrailingBackslash_ReadAsWritten: after the next save the record sits under the trimmed key). Records keep their
+    /// order; records that land in a key that already exists are appended to it.
+    /// </summary>
+    /// <returns>The number of keys that were rewritten.</returns>
+    public int TrimTrailingKeyBackslashes()
+    {
+        var rewritten = 0;
+        foreach (var bucket in _keys.Values.Where(b => b.Spelling.EndsWith('\\')).ToList())
+        {
+            var trimmed = bucket.Spelling.TrimEnd('\\');
+            if (trimmed.Length == 0)
+            {
+                continue;
+            }
+
+            _keys.Remove(bucket.Spelling);
+            _recordCount -= bucket.Records.Count;
+            foreach (var record in bucket.Records)
+            {
+                ReplayLoaded(PolRecord.Create(trimmed, record.ValueName, record.Type, record.Data.Span));
+            }
+
+            rewritten++;
+            Version++;
+        }
+
+        return rewritten;
+    }
+
     /// <summary>Serializes the document: header, keys in registry order, records in model order.</summary>
     /// <returns>A new array.</returns>
     public byte[] ToBytes() => IsEmpty ? PolOrderRules.EmptyDocumentBytes() : PolWriter.Write(SortedBuckets().SelectMany(b => b.Records));

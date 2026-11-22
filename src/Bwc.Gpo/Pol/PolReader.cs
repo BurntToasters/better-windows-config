@@ -96,6 +96,11 @@ internal static class PolReader
             return failure;
         }
 
+        if (key.StartsWith('\\'))
+        {
+            return new PolFormatException(start, PolFormatReason.KeyLeadingBackslash);
+        }
+
         failure = ExpectSeparator(b, ref pos);
         if (failure is not null)
         {

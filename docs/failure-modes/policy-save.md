@@ -2,7 +2,7 @@
 
 Scope: piece E6a of release 0.2.0. `PolicySave.Save` in `src/Bwc.Policy/Model/PolicySave.cs` (the one save every store
 uses), the replay harness in `tests/Bwc.Policy.Tests/Golden`, and the file-rule tests in `tests/Bwc.Gpo.Tests/Golden`.
-This page was written before the code (dispatch T). The rules it names are settled by the captures in
+This page was written before the code (dispatch T); dispatch C wrote the code and marked the rules settled. The rules it names are settled by the captures in
 `docs/parity/oracle/gpedit/goldens` (groups A and K for this piece); a capture is the specification. The reader and writer
 rules are in `docs/failure-modes/policy-state.md`, the store in `docs/failure-modes/gpo-store.md`, the file codec in
 `docs/failure-modes/gpo-pol.md`.
@@ -11,7 +11,7 @@ The contract of `PolicySave.Save(store, side, policy, edit, comment)`:
 
 1. Validate with `PolicyEditValidator` first. A problem returns the problems and reads, locks and writes nothing.
 2. One `GpoStore.Save` of the side. Inside it: `PolicyStateWriter.Apply` on the models read under the lock, then the
-   comment, then `RestrictNamespacesTo(policy.Namespace)` when the state or the comment changed.
+   comment, then `RestrictNamespacesTo(policy.Namespace)` when the state the dialog shows, a record or the comment changed.
 3. `edit == null` saves the comment alone. The Registry.pol model is still read, so a malformed file refuses the save.
 4. Nothing is written when the edit throws, and nothing when nothing changed.
 
@@ -70,7 +70,7 @@ these ways, and none of them is a skip.
 | R9 | The step shows CAP-4: a set changed an option's text, the state did not change, Apply stayed disabled, no message box. The golden is then a write that a person would get and the capture did not. | Fails with the tool's wording (rule ported from `UnnoticedEdit.Find`). |
 | R10 | A case is on `awaiting-recapture.txt`. | Its row reports "awaiting recapture" with `Assert.Inconclusive`; it is never replayed. |
 | R11 | The list names a case that has no folder, appears twice, or no longer shows CAP-4 (it was recaptured). | Fails: the list is wrong. |
-| R12 | The list is not empty at a release. | `AwaitingRecaptureListIsEmpty` (`ReleaseGate`) fails while it holds any case. |
+| R12 | The list is not empty at a release. | `AwaitingRecaptureListIsEmpty` (`ReleaseGate`) fails while it holds any case. The quick gate leaves `ReleaseGate` out; the full gate runs it in the step `test-policy-release-gate` (quality-gate.md, GATE-5). |
 | R13 | An Enabled operation of a policy with elements gives no value for an element and the policy was not Enabled: the dialog showed defaults. | Fails with "needs the defaults function of E6b"; no default is invented here. |
 | R14 | An option value cannot be mapped (unknown element id, enum item that is not a label, a number that is not text of digits while classic showed no box). | Fails naming the option. |
 | R15 | A start that classic refused (`startRefused`) opens, saves or changes in the engine. | Fails: the store must report a failure on open, a save must throw a malformed-file failure, and the start files stay byte-identical. |

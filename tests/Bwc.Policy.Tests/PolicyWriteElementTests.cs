@@ -352,7 +352,8 @@ public sealed class PolicyWriteElementTests
         AssertBytes(document, RecDw(Lists, "ListSwitch", 1), delvals, RecSz(key, "z", "z"));
 
         Apply("Pol_List_PolicyValueName", document, PolicyEdit.Disabled);
-        AssertBytes(document, RecDw(Lists, "ListSwitch", 0), delvals);
+        // Capture A/Machine_Disabled: Disabled of a plain value-name policy writes the delete instruction, not DWORD 0.
+        AssertBytes(document, Del(Lists, "ListSwitch"), delvals);
         Assert.AreEqual(PolicyState.Disabled, Read("Pol_List_PolicyValueName", document).State);
 
         Apply("Pol_List_PolicyValueName", document, PolicyEdit.NotConfigured);
@@ -433,6 +434,8 @@ public sealed class PolicyWriteElementTests
         Assert.AreEqual(PolicyState.Disabled, disabled.State);
         Assert.IsNotNull(document.GetValue(Basics, "BothListOff"));
         Assert.IsNull(document.GetValue(Basics, "BothListOn"));
-        Assert.AreEqual(0u, PolData.TryGetDWord(document.GetValue(Basics, "ListMaster")!.Data.Span));
+        // Capture A/Machine_Disabled: the switch is deleted with an instruction, not set to DWORD 0.
+        Assert.IsNull(document.GetValue(Basics, "ListMaster"));
+        Assert.IsNotNull(document.GetValue(Basics, "**del.ListMaster"));
     }
 }

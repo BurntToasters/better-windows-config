@@ -13,13 +13,13 @@ one named place so the correction touches one spot:
 
 | Choice | Place | Current value |
 | --- | --- | --- |
-| Line order of a new `gpt.ini`, and where a missing key is inserted into an existing one | `GptIniRules.NewFileLineOrder`, `GptIniRules.InsertionIndex` | `gPCMachineExtensionNames`, `Version`, `gPCUserExtensionNames` (the probe file's order). Only the saved side's extension line is added. |
+| Where a missing key is inserted into `gpt.ini` | `GptIniRules.InsertionIndex` | After the last non-blank line of the General section, so a new file holds the lines in the order they are first written (capture `A/User_Enabled`, `A/User_Then_Machine`, `A/Machine_Then_User`; settled, D2). Only the saved side's extension line is added. |
 | Extension pair add: group order and tool order inside a group | `GptIniRules.AddPair` | A new `[{CSE}{tool}]` group is inserted in ordinal GUID order; a tool GUID joins an existing group in ordinal order. Existing text is never reordered. |
-| When a pair is removed | `GptIniRules.RemovesPairWhenSideEmpty` | Never (false). |
+| When a side holds no setting after a save | `GptIniRules.EmptiedSideBlanksPairLine` | An existing extension line of that side keeps its key and its value becomes one space; a missing line is not added (capture `K/KeyTrailingBackslash_Enable` step 2 and `C/GptIni_PairRemoval`, settled, D4; `A/Machine_CommentOnly`, D11). |
 | Version at 16-bit overflow | `GptIniRules.Bump` | The half wraps to 0 and the other half is left alone (no carry). Not observable in practice (65536 saves). |
-| Does a comment-only change bump the version | `GptIniRules.CommentOnlyChangeBumpsVersion` | False. A comment-only save writes `comment.cmtx` only. |
+| Does a comment-only change bump the version | `GptIniRules.CommentOnlyChangeBumpsVersion` | True. A comment-only first save writes `comment.cmtx`, the empty 8-byte `Registry.pol` and `gpt.ini` with the version raised (capture `A/Machine_CommentOnly`, `A/User_CommentOnly`, settled, D3, D10). |
 | Shape of a comment entry | `CmtxFormat.WriteComment` | `<comment policyRef="ns0:Name" commentText="$(resource.ns0_Name)"></comment>` under `admTemplate`, and `<string id="ns0_Name">text</string>` in `stringTable`. |
-| The first-save rewrite of the namespace list | `CmtxDocument.RestrictNamespacesTo` | Offered as a method. The store does not call it. The policy layer calls it inside its edit once group C settles the rule. |
+| The first-save rewrite of the namespace list | `CmtxDocument.RestrictNamespacesTo` | The store does not call it. `PolicySave.Save` calls it inside its edit when something changed, so the first save writes one `using` line (capture `A/Machine_Enabled`, `A/User_Enabled`, settled, D5). |
 | Refresh call and flags | `PolicyRefresh.cs`, `UserenvPolicyRefresher` | `RefreshPolicyEx(machine, RP_FORCE)` after every save that wrote `Registry.pol`, for the saved side only (group G). |
 | Zero-byte `Registry.pol` | `GpoStore` load | Read as an empty document (no policy yet); a bad header is a failure, never overwritten (matrix D). |
 | Home detection | `GpoAccess.IsHomeEdition` | `EditionID` starts with `Core` (Core, CoreN, CoreSingleLanguage, CoreCountrySpecific). |
@@ -86,10 +86,10 @@ one named place so the correction touches one spot:
 | C10 | Extension pair for one side | The pair `{35378EAC-683F-11D2-A89A-00C04FBBCFA2}{D02B1F72-...}` (machine) or `{...F73-...}` (user) is added to `gPCMachineExtensionNames` or `gPCUserExtensionNames` when absent. Re-adding does nothing, so there are no duplicates. Compared case-insensitively on the GUID text. |
 | C11 | The line has other extension groups (`[{AAAA...}{BBBB...}]`) | Kept as written. The registry group is found by its first GUID. Where a new group goes is *verify against oracle* (ordinal order). A tool GUID joins an existing registry group in ordinal order. |
 | C12 | The extension line is not a list of bracket groups | `GptIniFormatException` on save. The line is never rewritten. |
-| C13 | Pair removal | Never done. Whether classic removes the pair when a side's last setting is cleared is *verify against oracle*; leaving it is harmless (the CSE finds an empty `Registry.pol`). |
+| C13 | A side holds no setting after a save | The side's extension line stays with one space as its value (capture `K/KeyTrailingBackslash_Enable` step 2, settled, D4). A missing line is not added when `Registry.pol` holds no record (capture `A/Machine_CommentOnly`, D11). A line that lists more than the registry pair is left alone; no capture settles it (E6c). |
 | C14 | Save with no policy change | `gpt.ini` bytes unchanged, so it is not written. The model reports `HasChanges` by byte comparison. |
 | C15 | Machine and User halves of a policy of class Both | A Both policy is edited once per root. Each root is its own save, so each bumps its own half and adds its own pair. The store has no "both" save. |
-| C16 | `gpt.ini` absent | Read as a new file. The first save creates it in the probe order. |
+| C16 | `gpt.ini` absent | Read as a new file. The first save creates it, the extension line first and then `Version` (capture `A/Machine_Enabled`, `A/User_Enabled`). |
 | C17 | A very large or binary file | A size cap (1 MiB) applies; over it is `GptIniFormatException`. NUL bytes are kept as ordinary bytes. |
 | C18 | Version half at 65535 (GPT-1, open oracle question) | `Bump` wraps the half from 65535 to 0 and leaves the other half alone. What classic does at that point is unknown: it may wrap, saturate, or carry into the other half. Not observable in practice (65536 saves of one side). Open question for the oracle capture; no code change until it is answered. The capture cases are `C/Version_FromHighMachine` (machine half 65535, one machine save) and `C/Version_FromHighUser` (user half 65535, `Version=4294901760`, one user save); they are in the plan and not yet captured. |
 

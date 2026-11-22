@@ -22,20 +22,21 @@ public static class GptIniRules
     public const string VersionKey = "Version";
 
     /// <summary>
-    /// Verify against oracle (group C): whether a comment-only change bumps the version. Assumed false: a comment-only
-    /// save writes only the comment file.
+    /// A comment-only change bumps the version and writes gpt.ini. Settled by capture A/Machine_CommentOnly and
+    /// A/User_CommentOnly (D3).
     /// </summary>
-    public const bool CommentOnlyChangeBumpsVersion = false;
+    public const bool CommentOnlyChangeBumpsVersion = true;
 
     /// <summary>
-    /// Verify against oracle (groups A and C): whether classic removes a pair when a side's last setting is cleared.
-    /// Assumed false.
+    /// When the saved side holds no setting any more and its extension line exists, the line keeps its key and its value
+    /// becomes one space, and a missing line is not added. Settled by capture K/KeyTrailingBackslash_Enable step 2 and
+    /// C/GptIni_PairRemoval (D4), and by A/Machine_CommentOnly for the missing line (D11).
     /// </summary>
-    public const bool RemovesPairWhenSideEmpty = false;
+    public const bool EmptiedSideBlanksPairLine = true;
 
     /// <summary>
-    /// Verify against oracle (group A): the order of the lines in a new gpt.ini, which is also the order a missing key
-    /// is inserted next to its neighbours in an existing one. The probe file's order.
+    /// The keys the store writes: the extension line of each side and Version. Their order no longer places a missing key (see
+    /// <see cref="InsertionIndex"/>); a new file gets its keys in the order they are first written.
     /// </summary>
     public static IReadOnlyList<string> NewFileLineOrder { get; } = ["gPCMachineExtensionNames", VersionKey, "gPCUserExtensionNames"];
 
@@ -69,9 +70,9 @@ public static class GptIniRules
     }
 
     /// <summary>
-    /// Verify against oracle (group C): where a missing key goes inside the General section. After the last existing key
-    /// that precedes it in <see cref="NewFileLineOrder"/>, else before the first existing key that follows it, else
-    /// after the last non-blank line of the section.
+    /// Where a missing key goes inside the General section: after the last non-blank line of the section, whatever the other
+    /// keys are. Settled by capture A/User_Enabled, A/User_Then_Machine and A/Machine_Then_User (D2): the first save of a
+    /// side writes its extension line and then Version, and a later save of the other side appends its line last.
     /// </summary>
     /// <param name="keys">For each line after the header, the key name, or null when the line is not a key.</param>
     /// <param name="blank">For each of those lines, whether it is blank.</param>
@@ -79,37 +80,6 @@ public static class GptIniRules
     /// <returns>An index into the section's lines (0 means right after the header).</returns>
     public static int InsertionIndex(IReadOnlyList<string?> keys, IReadOnlyList<bool> blank, string key)
     {
-        var position = IndexOfOrder(key);
-        var after = -1;
-        var before = -1;
-        for (var i = 0; i < keys.Count; i++)
-        {
-            var existing = keys[i] is null ? -1 : IndexOfOrder(keys[i]!);
-            if (existing < 0 || existing == position)
-            {
-                continue;
-            }
-
-            if (existing < position)
-            {
-                after = i;
-            }
-            else if (before < 0)
-            {
-                before = i;
-            }
-        }
-
-        if (after >= 0)
-        {
-            return after + 1;
-        }
-
-        if (before >= 0)
-        {
-            return before;
-        }
-
         var last = keys.Count - 1;
         while (last >= 0 && blank[last])
         {
@@ -150,18 +120,5 @@ public static class GptIniRules
         var index = groups.FindIndex(g => string.Compare(g[0], RegistryExtension, StringComparison.OrdinalIgnoreCase) > 0);
         groups.Insert(index < 0 ? groups.Count : index, [RegistryExtension, tool]);
         return true;
-    }
-
-    private static int IndexOfOrder(string key)
-    {
-        for (var i = 0; i < NewFileLineOrder.Count; i++)
-        {
-            if (string.Equals(NewFileLineOrder[i], key, StringComparison.OrdinalIgnoreCase))
-            {
-                return i;
-            }
-        }
-
-        return -1;
     }
 }

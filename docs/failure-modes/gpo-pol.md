@@ -51,9 +51,13 @@ Record: `[` key NUL `;` name NUL `;` type(4) `;` size(4) `;` data(size) `]`, del
   An `IOException` from the stream itself is not a format problem and propagates unchanged.
 
 ### 1.4 Keys
-- A key with a trailing backslash, a leading backslash, empty segments (`A\\B`) or an empty key is accepted by the
-  reader and kept as written. The model does not normalize it; `A\B` and `A\B\` are two different keys. Whether classic
-  tolerates these is *verify against oracle*. The edit API refuses to create them.
+- A key with a leading backslash is refused by the reader (`PolFormatReason.KeyLeadingBackslash`): classic refuses to open
+  such a file (capture `K/KeyLeadingBackslash_ReadAsWritten`). Only that shape is refused here; the other strictness
+  decisions are *verify against oracle* (D9, piece E6c).
+- A key with a trailing backslash, empty segments (`A\\B`) or an empty key is accepted by the reader and kept as
+  written. The model does not normalize it; `A\B` and `A\B\` are two different keys. The policy layer reads such a key as the
+  trimmed one and a save that changes something rewrites it trimmed (`PolDocument.TrimTrailingKeyBackslashes`, captures
+  `K/KeyTrailingBackslash_*`). The edit API refuses to create them.
 - Key names are compared case-insensitively (ordinal, by uppercase). The first spelling seen for a key is kept by the
   records already stored; no record is rewritten to unify spelling.
 - Name length limits (255 per key segment, 16383 for a value name) are not enforced by the codec. `Bwc.Policy` checks

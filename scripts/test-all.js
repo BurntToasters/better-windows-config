@@ -66,7 +66,7 @@ tracked-paths, oracle-json-selftest, oracle-json, e2e-timing-selftest, changelog
 release-flow-selftest,
 release-assets-selftest, embed-key-selftest, signing-selftest, build-arm64, build-x64,
 test-core, test-gpo, test-policy, test-registry-e2e, test-registry-shipping, test-update,
-test-update-e2e.
+test-update-e2e, and, only without --quick, test-policy-release-gate.
 policy-writer is the static guard for the local group policy writer
 (scripts/check-policy-writer.js). The -selftest steps run the --self-test of the
 writer guards, the em dash validator, and scripts/check-tracked-paths.js, so a guard that
@@ -76,7 +76,9 @@ e2e-timing-selftest runs the --self-test of scripts/e2e-timing-report.js, the ra
 check id comparison of E2E result files.
 test-update-e2e runs tests/Bwc.Update.Tests with -p:BwcFlavor=E2E, so the
 branch compiled only in that flavor runs too. test-gpo and test-policy run tests/Bwc.Gpo.Tests
-and tests/Bwc.Policy.Tests. A step that exits 3 (NOT RUN, for one e2e-ship from an elevated
+and tests/Bwc.Policy.Tests without the tests tagged ReleaseGate. test-policy-release-gate runs
+only those tests of tests/Bwc.Policy.Tests, in a full gate only: it fails while a capture case
+still awaits a recapture (docs/failure-modes/quality-gate.md). A step that exits 3 (NOT RUN, for one e2e-ship from an elevated
 shell) is a failed step.
 Unless --quick, each RID then runs publish-ship, verify-flavor-ship, e2e-ship,
 publish-e2e, verify-flavor-e2e, e2e-flavor. verify-flavor-* checks the BwcFlavor
@@ -91,7 +93,7 @@ Options:
                the builds and the test projects once, and the publish and
                E2E steps once for each RID.
   --quick      Run both architecture builds and all test projects, but
-               skip the publish, flavor, and E2E steps.
+               skip the publish, flavor, E2E and release gate steps.
   --help       Show this help.
 
 Exit codes: 0 every step passed, 1 a step failed, 2 argument error.`);
@@ -214,7 +216,8 @@ function e2eStep(name, rid, flavor) {
 }
 
 // Normal gate runs skip tests tagged Elevated, so the gate never needs an administrator token.
-const NORMAL_TEST_FILTER = "TestCategory!=Elevated";
+// They also skip tests tagged ReleaseGate, which only the full gate runs (see releaseGateSteps).
+const NORMAL_TEST_FILTER = "TestCategory!=Elevated&TestCategory!=ReleaseGate";
 
 function sharedSteps(testPlatform) {
   return [
@@ -353,6 +356,26 @@ function sharedSteps(testPlatform) {
   ].map((step) => ({ ...step, rid: null }));
 }
 
+// Steps that only a full (non-quick) gate runs. test-policy-release-gate runs the ReleaseGate tests of
+// tests/Bwc.Policy.Tests, which fail while a capture case still awaits a recapture.
+function releaseGateSteps(testPlatform) {
+  return [
+    {
+      ...dotnetStep("test-policy-release-gate", [
+        "test",
+        "tests/Bwc.Policy.Tests/Bwc.Policy.Tests.csproj",
+        "-c",
+        "Release",
+        `-p:Platform=${testPlatform}`,
+        "--nologo",
+        "--filter",
+        "TestCategory=ReleaseGate",
+      ]),
+      project: "tests/Bwc.Policy.Tests/Bwc.Policy.Tests.csproj",
+    },
+  ].map((step) => ({ ...step, rid: null }));
+}
+
 function ridSteps(rid) {
   return [
     nodeStep("publish-ship", "scripts/dotnet-build.js", [
@@ -377,7 +400,10 @@ function ridSteps(rid) {
 // Shared steps run once. Each RID then gets its own publish, flavor, and E2E steps.
 function buildPlan(options) {
   const everyRid = options.rid === ALL_RIDS;
-  const shared = sharedSteps(hostPlatform());
+  const shared = [
+    ...sharedSteps(hostPlatform()),
+    ...(options.quick ? [] : releaseGateSteps(hostPlatform())),
+  ];
   const rids = (everyRid ? ALL_RID_ORDER : [options.rid]).map(
     (rid) => ({
       rid,

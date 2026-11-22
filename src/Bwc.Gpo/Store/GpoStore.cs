@@ -118,8 +118,11 @@ public sealed class GpoStore
 
         edit(new GpoEditSession(side, polPath, cmtxPath, pol.Document, pol.Failure, cmtx.Document, cmtx.Failure));
 
-        var polChanged = pol.Document is { HasChanges: true };
         var cmtxChanged = cmtx.Document is { HasChanges: true };
+
+        // The first save of a side creates its Registry.pol even when the edit adds no record: capture A/Machine_CommentOnly
+        // and K/KeyLeadingBackslash_Enable (D10), where the file is the 8-byte empty document.
+        var polChanged = pol.Document is { HasChanges: true } || (pol.Document is not null && !pol.Exists && cmtxChanged);
         if (!polChanged && !cmtxChanged)
         {
             return (GpoSaveResult.NoChange, false);
@@ -128,7 +131,7 @@ public sealed class GpoStore
         var gptChanged = polChanged || (cmtxChanged && GptIniRules.CommentOnlyChangeBumpsVersion);
         if (gptChanged)
         {
-            PrepareGpt(gpt, gptPath, side);
+            PrepareGpt(gpt, gptPath, side, pol.Document is null ? null : pol.Document.RecordCount > 0);
         }
 
         // Nothing is written until every target is known to be writable, so a read-only file cannot split a save.
@@ -198,7 +201,7 @@ public sealed class GpoStore
         return (result, polChanged);
     }
 
-    private static void PrepareGpt(Loaded<GptIni> gpt, string gptPath, GpoSide side)
+    private static void PrepareGpt(Loaded<GptIni> gpt, string gptPath, GpoSide side, bool? sideHasSettings)
     {
         if (gpt.Document is null)
         {
@@ -209,7 +212,15 @@ public sealed class GpoStore
 
         try
         {
-            gpt.Document.EnsureExtensionPair(side);
+            if (sideHasSettings == true)
+            {
+                gpt.Document.EnsureExtensionPair(side);
+            }
+            else if (sideHasSettings == false && GptIniRules.EmptiedSideBlanksPairLine)
+            {
+                gpt.Document.BlankExtensionPair(side);
+            }
+
             gpt.Document.BumpVersion(side);
         }
         catch (GptIniFormatException e)

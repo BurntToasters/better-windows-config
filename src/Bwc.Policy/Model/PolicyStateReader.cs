@@ -18,6 +18,13 @@ public static class PolicyStateReader
         ArgumentNullException.ThrowIfNull(policy);
         ArgumentNullException.ThrowIfNull(document);
 
+        // Classic matches a key whose file spelling ends in a backslash as if it did not (capture
+        // K/KeyTrailingBackslash_ReadAsWritten).
+        if (PolKeySpelling.HasTrailingBackslash(document))
+        {
+            document = PolKeySpelling.TrimmedCopy(document);
+        }
+
         var found = ReadElements(policy, document);
         var state = ReadState(policy, document, found.Count);
         var elements = new Dictionary<string, ElementValue>(StringComparer.OrdinalIgnoreCase);
@@ -81,7 +88,7 @@ public static class PolicyStateReader
             return PolicyState.Enabled;
         }
 
-        var disabled = PolicyLayout.DisabledLiteral(policy);
+        var disabled = PolicyLayout.DisabledReadLiteral(policy);
         if (disabled is not null && PolicyEncoding.Matches(document, new ValueWrite(slot, disabled)))
         {
             return PolicyState.Disabled;

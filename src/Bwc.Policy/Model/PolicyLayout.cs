@@ -62,9 +62,15 @@ internal static class PolicyLayout
 {
     public static PolicyValue EnabledLiteral(PolicyDefinition policy) => policy.EnabledValue ?? PolicyRules.DefaultEnabledValue;
 
+    /// <summary>The value Disabled writes at the policy value, or null when Disabled deletes the value.</summary>
     public static PolicyValue? DisabledLiteral(PolicyDefinition policy) =>
         policy.DisabledValue
         ?? (policy.EnabledValue is null && PolicyRules.PlainValueNameDisabledWritesZero ? PolicyRules.DefaultDisabledValue : null);
+
+    /// <summary>The value that reads as Disabled at the policy value, or null when none does.</summary>
+    public static PolicyValue? DisabledReadLiteral(PolicyDefinition policy) =>
+        policy.DisabledValue
+        ?? (policy.EnabledValue is null && PolicyRules.PlainValueNameZeroReadsAsDisabled ? PolicyRules.DefaultDisabledValue : null);
 
     public static IReadOnlyList<ValueWrite> ListWrites(PolicyValueList? list)
     {

@@ -97,15 +97,17 @@ public sealed class StateBlindTests
     // ---------------------------------------------------------------- 1. Policy value
 
     [TestMethod]
-    public void Sec01_PlainValueName_EnabledWritesDword1_DisabledDword0_NotConfiguredRemoves()
+    public void Sec01_PlainValueName_EnabledWritesDword1_DisabledWritesDeleteInstruction_NotConfiguredRemoves()
     {
         var d = PolDocument.Create();
         Assert.IsTrue(Apply("Pol_Class_Machine", d, PolicyEdit.Enabled()).Changed);
         Assert.AreEqual(1u, Dw(d, Basics, "MachineFlag"));
         Assert.AreEqual(PolicyState.Enabled, Read("Pol_Class_Machine", d).State);
 
+        // Capture A/Machine_Disabled: Disabled writes the delete instruction, not DWORD 0.
         Apply("Pol_Class_Machine", d, PolicyEdit.Disabled);
-        Assert.AreEqual(0u, Dw(d, Basics, "MachineFlag"));
+        Assert.IsNull(d.GetValue(Basics, "MachineFlag"));
+        Assert.IsNotNull(d.GetValue(Basics, "**del.MachineFlag"));
         Assert.AreEqual(PolicyState.Disabled, Read("Pol_Class_Machine", d).State);
 
         Apply("Pol_Class_Machine", d, PolicyEdit.NotConfigured);
@@ -387,7 +389,9 @@ public sealed class StateBlindTests
         Assert.AreEqual(PolicyState.Enabled, Read("Pol_Value_BothLists", d).State);
 
         Apply("Pol_Value_BothLists", d, PolicyEdit.Disabled);
-        Assert.AreEqual(0u, Dw(d, Basics, "ListMaster"));
+        // Capture A/Machine_Disabled: the switch is deleted with an instruction, not set to DWORD 0.
+        Assert.IsNull(d.GetValue(Basics, "ListMaster"));
+        Assert.IsNotNull(d.GetValue(Basics, "**del.ListMaster"));
         Assert.AreEqual(0u, Dw(d, Basics, "BothListOff"));
         Assert.IsNull(d.GetValue(Basics, "BothListOn"));
         Assert.IsNull(d.GetValue(Basics + @"\BothListKey", "BothListOnOther"));
@@ -985,9 +989,9 @@ public sealed class StateBlindTests
         Apply("Pol_Shared_Zeta", d, PolicyEdit.Enabled());
         Apply("Pol_Shared_Alpha", d, PolicyEdit.Enabled());
         CollectionAssert.AreEqual(new[] { "Zeta", "Alpha" }, Names(d, key));
+        // Capture A/Machine_Disabled: Disabled writes the delete instruction at the end of the key, not DWORD 0.
         Apply("Pol_Shared_Zeta", d, PolicyEdit.Disabled);
-        CollectionAssert.AreEqual(new[] { "Alpha", "Zeta" }, Names(d, key));
-        Assert.AreEqual(0u, Dw(d, key, "Zeta"));
+        CollectionAssert.AreEqual(new[] { "Alpha", "**del.Zeta" }, Names(d, key));
     }
 
     [TestMethod]
@@ -998,8 +1002,9 @@ public sealed class StateBlindTests
         Apply("Pol_Class_User", d, PolicyEdit.Enabled());
         Apply("Pol_Class_Machine", d, PolicyEdit.Enabled());
         CollectionAssert.AreEqual(new[] { "MachineFlag", "UserFlag" }, Names(d, Basics));
+        // Capture A/Machine_Disabled: Disabled writes the delete instruction at the end of the key, not DWORD 0.
         Apply("Pol_Class_Machine", d, PolicyEdit.Disabled);
-        CollectionAssert.AreEqual(new[] { "UserFlag", "MachineFlag" }, Names(d, Basics));
+        CollectionAssert.AreEqual(new[] { "UserFlag", "**del.MachineFlag" }, Names(d, Basics));
     }
 
     [TestMethod]
@@ -1063,10 +1068,13 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec05_ATemplateKeyThePolDocumentRefuses_ThrowsArgumentException()
+    public void Sec05_ATemplateKeyThePolDocumentRefuses_LeadingBackslashWritesNothing_ValueNameStarThrows()
     {
+        // Capture K/KeyLeadingBackslash_Enable: classic saves a policy whose key starts with a backslash and writes no record.
         var leading = Tmp("Pol", "", key: @"\Software\Bad");
-        Assert.Throws<ArgumentException>(() => PolicyStateWriter.Apply(leading, PolDocument.Create(), PolicyEdit.Enabled()));
+        var empty = PolDocument.Create();
+        Assert.IsFalse(PolicyStateWriter.Apply(leading, empty, PolicyEdit.Enabled()).Changed);
+        Assert.IsTrue(empty.IsEmpty);
         var star = Tmp("Pol", "", valueName: "**oops");
         Assert.Throws<ArgumentException>(() => PolicyStateWriter.Apply(star, PolDocument.Create(), PolicyEdit.Enabled()));
     }
@@ -1365,7 +1373,9 @@ public sealed class StateBlindTests
         CollectionAssert.AreEqual(new[] { "**delvals.", "a", "b" }, Names(d, switched));
         Assert.AreEqual(PolicyState.Enabled, Read("Pol_List_PolicyValueName", d).State);
         Apply("Pol_List_PolicyValueName", d, PolicyEdit.Disabled);
-        Assert.AreEqual(0u, Dw(d, K + @"\Lists", "ListSwitch"));
+        // Capture A/Machine_Disabled: the switch is deleted with an instruction, not set to DWORD 0.
+        Assert.IsNull(d.GetValue(K + @"\Lists", "ListSwitch"));
+        Assert.IsNotNull(d.GetValue(K + @"\Lists", "**del.ListSwitch"));
         CollectionAssert.AreEqual(new[] { "**delvals." }, Names(d, switched));
         Assert.AreEqual(PolicyState.Disabled, Read("Pol_List_PolicyValueName", d).State);
     }

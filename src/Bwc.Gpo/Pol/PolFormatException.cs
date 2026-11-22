@@ -35,6 +35,12 @@ public enum PolFormatReason
 
     /// <summary>A stream is longer than the reader's size cap.</summary>
     FileTooLarge,
+
+    /// <summary>
+    /// A record's key starts with a backslash. Classic refuses to open such a file (capture
+    /// K/KeyLeadingBackslash_ReadAsWritten).
+    /// </summary>
+    KeyLeadingBackslash,
 }
 
 /// <summary>The one failure type of the Registry.pol reader: a reason and the byte offset where it was found.</summary>

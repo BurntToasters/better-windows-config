@@ -19,10 +19,11 @@ public sealed class PolicyWriteProbeTests
         AssertBytes(document, RecDw(Shared, "Zeta", 1), RecDw(Shared, "Alpha", 1));
 
         Assert.IsTrue(Apply("Pol_Shared_Zeta", document, PolicyEdit.Disabled).Changed);
-        AssertBytes(document, RecDw(Shared, "Alpha", 1), RecDw(Shared, "Zeta", 0));
+        // Capture A/Machine_Disabled: Disabled of a plain value-name policy writes the delete instruction, not DWORD 0.
+        AssertBytes(document, RecDw(Shared, "Alpha", 1), Del(Shared, "Zeta"));
 
         Assert.IsTrue(Apply("Pol_Shared_Alpha", document, PolicyEdit.NotConfigured).Changed);
-        AssertBytes(document, RecDw(Shared, "Zeta", 0));
+        AssertBytes(document, Del(Shared, "Zeta"));
     }
 
     [TestMethod]

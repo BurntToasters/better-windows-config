@@ -149,19 +149,21 @@ public sealed class GpoSaveTests
     }
 
     [TestMethod]
-    public void Save_CommentOnly_WritesOnlyCmtx_NoVersionBump_NoRefresh()
+    public void Save_CommentOnly_WritesCmtxAndTheEmptyPol_BumpsTheVersion_Refreshes()
     {
+        // Captures A/Machine_CommentOnly and A/User_CommentOnly (D3, D10): a comment-only first save writes comment.cmtx, the
+        // empty 8-byte Registry.pol and gpt.ini with the version raised, and the side is refreshed.
         using var fx = new SandboxGpoFixture();
         fx.Seed(fx.GptPath, GptIniProbe.Bytes());
         fx.Log.Clear();
 
         var result = fx.NewStore().Save(GpoSide.Machine, s => s.Comments.SetComment(Namespace, "P", "note"));
 
-        CollectionAssert.AreEqual(new[] { WroteMachineCmtx }, fx.Log);
-        CollectionAssert.AreEqual(GptIniProbe.Bytes(), fx.Read(fx.GptPath));
+        CollectionAssert.AreEqual(new[] { WroteMachineCmtx, WroteMachinePol, WroteGpt, "refresh:Machine" }, fx.Log);
+        CollectionAssert.AreEqual(PolDocument.Create().ToBytes(), fx.Read(fx.PolPath(GpoSide.Machine)));
+        StringAssert.Contains(GptIniProbe.Latin1(fx.Read(fx.GptPath)!), "Version=720909\r\n");
         Assert.IsTrue(result.Wrote);
-        Assert.IsFalse(result.Refreshed);
-        Assert.IsFalse(File.Exists(fx.PolPath(GpoSide.Machine)));
+        Assert.IsTrue(result.Refreshed);
     }
 
     [TestMethod]
@@ -174,8 +176,9 @@ public sealed class GpoSaveTests
         fx.NewStore().Save(GpoSide.Machine, SetAlpha);
 
         var text = GptIniProbe.Latin1(fx.Read(fx.GptPath)!);
-        StringAssert.Contains(text, "Version=5\r\n; mine\r\n[Extra]\r\nk=v\r\n");
-        StringAssert.Contains(text, "gPCMachineExtensionNames=[");
+        // Capture A/User_Enabled (D2): the missing extension line goes at the end of the General section, after the unknown line.
+        StringAssert.Contains(text, "Version=5\r\n; mine\r\ngPCMachineExtensionNames=[");
+        StringAssert.Contains(text, "]\r\n[Extra]\r\nk=v\r\n");
     }
 
     [TestMethod]

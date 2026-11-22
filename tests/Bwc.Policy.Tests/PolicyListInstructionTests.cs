@@ -266,7 +266,7 @@ public sealed class PolicyListInstructionTests
     }
 
     [TestMethod]
-    public void ValueNamePolicy_Disabled_WritesTheValueAndTheDelvalsOfItsList()
+    public void ValueNamePolicy_Disabled_WritesTheDeleteInstructionAndTheDelvalsOfItsList()
     {
         var key = Lists + @"\Switched";
         var document = ApplyTwice("Pol_List_PolicyValueName", PolicyEdit.Enabled(("SwitchedList", L("z"))));
@@ -274,7 +274,8 @@ public sealed class PolicyListInstructionTests
 
         Apply("Pol_List_PolicyValueName", document, PolicyEdit.Disabled);
 
-        AssertBytes(document, RecDw(Lists, "ListSwitch", 0), Delvals(key));
+        // Capture A/Machine_Disabled: Disabled of a plain value-name policy writes the delete instruction, not DWORD 0.
+        AssertBytes(document, Del(Lists, "ListSwitch"), Delvals(key));
         Assert.AreEqual(PolicyState.Disabled, Read("Pol_List_PolicyValueName", document).State);
 
         Apply("Pol_List_PolicyValueName", document, PolicyEdit.NotConfigured);

@@ -35,6 +35,27 @@ public static class PolicyStateWriter
         }
 
         var before = document.ToBytes();
+        if (PolKeySpelling.HasTrailingBackslash(document))
+        {
+            // Classic spells every key without the trailing backslash once a save changes something, and a save that changes
+            // nothing leaves the file alone (capture K/KeyTrailingBackslash_ReadAsWritten). A copy tells which one this is.
+            var probe = PolKeySpelling.TrimmedCopy(document);
+            var trimmedBefore = probe.ToBytes();
+            ApplyPlan(policy, probe, edit);
+            if (probe.ToBytes().AsSpan().SequenceEqual(trimmedBefore))
+            {
+                return new PolicyApplyResult(problems, false);
+            }
+
+            document.TrimTrailingKeyBackslashes();
+        }
+
+        ApplyPlan(policy, document, edit);
+        return new PolicyApplyResult(problems, !document.ToBytes().AsSpan().SequenceEqual(before));
+    }
+
+    private static void ApplyPlan(PolicyDefinition policy, PolDocument document, PolicyEdit edit)
+    {
         var plan = new WritePlan();
         switch (edit.State)
         {
@@ -50,7 +71,6 @@ public static class PolicyStateWriter
         }
 
         plan.Execute(document);
-        return new PolicyApplyResult(problems, !document.ToBytes().AsSpan().SequenceEqual(before));
     }
 
     private static void PlanEnabled(WritePlan plan, PolicyDefinition policy, PolDocument document, PolicyEdit edit)
@@ -467,12 +487,14 @@ public static class PolicyStateWriter
                 }
             }
 
-            foreach (var key in deleteValuesWrites)
+            foreach (var key in deleteValuesWrites.Where(k => !PolKeySpelling.HasLeadingBackslash(k)))
             {
                 document.AddDeleteValuesInstruction(key);
             }
 
-            foreach (var (slot, isDelete, type, data) in writes)
+            // A key with a leading backslash is never written: classic saves such a policy and adds no record (capture
+            // K/KeyLeadingBackslash_Enable).
+            foreach (var (slot, isDelete, type, data) in writes.Where(w => !PolKeySpelling.HasLeadingBackslash(w.Slot.Key)))
             {
                 if (isDelete)
                 {

@@ -97,12 +97,15 @@ records the golden before the engine is frozen:
   Disabled. Matrix D settles it.
 - *verify against oracle*: what Not Configured removes from a key shared by several policies or by a
   list.
-- *verify against oracle*: what is written when the file ends up with no records (an emptied
-  file).
+- Settled by capture A and K: a first save creates the empty 8-byte `Registry.pol` even when it
+  adds no record (`A/Machine_CommentOnly`, `K/KeyLeadingBackslash_Enable`). *verify against oracle*:
+  what is written when a file that had records ends up with none (group C).
 - *verify against oracle*: how list values are named (the value name pattern for lists that use
   `valuePrefix`, `additive`, or `explicitValue`).
-- *verify against oracle*: when `gpt.ini` extension pairs are removed, and whether a comment-only
-  change bumps the version.
+- Settled by capture A and K: a comment-only change bumps the version (`A/Machine_CommentOnly`),
+  and a side that holds no setting keeps its extension line with one space as its value
+  (`K/KeyTrailingBackslash_Enable` step 2). Pairs of other extensions are still *verify against
+  oracle* (group C, piece E6c).
 - *verify against oracle*: which `**` instructions classic keeps or shows.
 - *verify against oracle*: the contents of the "Extra Registry Settings" node.
 
@@ -111,14 +114,18 @@ records the golden before the engine is frozen:
 - Encoding is the system ANSI code page, line endings are CRLF.
 - `Version` is one 32-bit number. The user version is in the high 16 bits and the machine version
   is in the low 16 bits. A machine save bumps the low half and a user save bumps the high half.
-  Which saves bump the number is the save sequence below, and the comment-only case is *verify
-  against oracle*.
+  Which saves bump the number is the save sequence below; a comment-only save bumps it too
+  (`A/Machine_CommentOnly`).
 - The extension lists name pairs of GUIDs. The pair is the client-side extension for registry
   policy `{35378EAC-683F-11D2-A89A-00C04FBBCFA2}` followed by the snap-in that edited the
   policy: `{D02B1F72-3407-48AE-BA88-E8213C6761F1}` for Computer Configuration (machine) and
   `{D02B1F73-3407-48AE-BA88-E8213C6761F1}` for User Configuration (user). Existing entries for
-  other extensions are preserved. The exact line text and ordering are fixed by the goldens from
-  oracle groups A and C. When classic removes a pair is *verify against oracle*.
+  other extensions are preserved. The exact line text and ordering are fixed by `GptIniGoldenTests`
+  (captures `A/User_Enabled`, `A/Machine_Then_User`, `A/User_Then_Machine`): a missing line goes at the
+  end of the General section. When a side holds no setting the line stays with one space as its
+  value (`K/KeyTrailingBackslash_Enable` step 2), and a missing line is not added when `Registry.pol`
+  holds no record (`A/Machine_CommentOnly`). Foreign extension groups are *verify against oracle*
+  (group C).
 
 ## `Bwc.Gpo`: comment.cmtx
 
@@ -148,9 +155,11 @@ Rules for the whole sequence:
 - Every file write is atomic: write a temp file next to the target, flush it, then replace the
   target. A failed write leaves the old file in place and removes the temp file.
 - Read, modify, write runs under one lock for the three files, held across steps 1 to 4. The lock
-  is a named mutex (`Global\BetterWindowsConfig.GpoWrite`, or a name derived from the sandbox root
-  in the E2E flavor), not a file in the GPO folder, so the folder holds only what classic writes.
-  Another BWC instance waits. A lock that cannot be taken in a bounded time is a typed failure.
+  is a file, `write.lock`, in the protected backup root (`IGpoStorePolicy.LockPath`), opened with no
+  sharing for the whole save (`src/Bwc.Gpo/Store/WriteLock.cs`). It is not a named mutex, which any
+  user could take first (GPO-2), and not a file in the GPO folder, so the folder holds only what
+  classic writes. Another BWC instance waits. A lock that cannot be taken in a bounded time is a
+  typed failure (`GpoStoreFailure.LockTimeout`).
 - Every byte written to the GPO folder or the backup folder goes through one file:
   `src/Bwc.Gpo/Store/GpoFileWriter.cs` (atomic temp-then-replace, backup copies). Every refresh call
   goes through `src/Bwc.Gpo/Refresh/PolicyRefresh.cs`. `scripts/check-policy-writer.js` enforces both.
@@ -165,7 +174,9 @@ Rules for the whole sequence:
   and its flags are part of oracle group G.
 - On the first save of a session, classic rewrote `Machine\comment.cmtx` even with no comment change:
   its `policyNamespaces` list changed to hold only the namespace of the edited policy. Later saves in
-  the same session left it alone. The rule for that list is *verify against oracle* (group C).
+  the same session left it alone. For a first save with no comment the list holds one `using` line
+  (`A/Machine_Enabled`, `A/User_Enabled`); `PolicySave.Save` calls `RestrictNamespacesTo` when a save
+  changed something. The rule for which namespaces stay beyond that is *verify against oracle* (group C).
 
 ## `Bwc.Gpo`: write policy and E2E seams
 

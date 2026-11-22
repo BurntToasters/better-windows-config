@@ -22,9 +22,10 @@ public sealed record PolicySaveOutcome(IReadOnlyList<PolicyEditProblem> Problems
 /// locked or written.</item>
 /// <item>Otherwise one <see cref="GpoStore.Save"/> of the side runs. Inside it the edit is applied with
 /// <see cref="PolicyStateWriter.Apply"/> to the models read under the lock, then the comment is set.</item>
-/// <item>When the state or the comment changed, <c>RestrictNamespacesTo</c> of the policy namespace runs,
-/// as classic does on a save, so the first save writes comment.cmtx with one using line even with no
-/// comment. When nothing changed it does not run, so a save that changes nothing writes nothing.</item>
+/// <item>When the state the dialog shows, a record or the comment changed, <c>RestrictNamespacesTo</c> of the
+/// policy namespace runs, as classic does on a save, so the first save writes comment.cmtx with one using
+/// line even with no comment. When nothing changed it does not run, so a save that changes nothing writes
+/// nothing.</item>
 /// <item>An exception inside the edit (a template fault, a malformed file) leaves the files as they were,
 /// because the store writes only after the edit returns.</item>
 /// <item>The files written, their order, the gpt.ini rules and the empty Registry.pol of a first save
@@ -50,5 +51,65 @@ public static class PolicySave
         PolicyEdit? edit,
         string comment,
         CancellationToken cancellationToken = default) =>
-        throw new NotImplementedException("PolicySave.Save is written by piece E6a, dispatch C.");
+        SaveCore(store, side, policy, edit, comment, cancellationToken);
+
+    private static PolicySaveOutcome SaveCore(
+        GpoStore store, GpoSide side, PolicyDefinition policy, PolicyEdit? edit, string comment, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(policy);
+        ArgumentNullException.ThrowIfNull(comment);
+        if (edit is not null)
+        {
+            var problems = PolicyEditValidator.Validate(policy, edit);
+            if (problems.Count > 0)
+            {
+                return new PolicySaveOutcome(problems, false, null);
+            }
+        }
+
+        IReadOnlyList<PolicyEditProblem>? lateProblems = null;
+        var result = store.Save(
+            side,
+            session =>
+            {
+                // The policy file is always read, so a malformed one refuses a comment-only save too.
+                var pol = session.Pol;
+                var dirty = false;
+                if (edit is not null)
+                {
+                    // Classic saves when the state the dialog shows changes, even if no record is written: capture
+                    // K/KeyLeadingBackslash_Enable. The state it shows is read before the edit.
+                    var shown = PolicyStateReader.Read(policy, pol).State;
+                    var applied = PolicyStateWriter.Apply(policy, pol, edit);
+                    if (!applied.IsValid)
+                    {
+                        lateProblems = applied.Problems;
+                        return;
+                    }
+
+                    dirty = applied.Changed || shown != edit.State;
+                }
+
+                var comments = session.Comments;
+                var stored = comments.GetComment(policy.Namespace, policy.Name) ?? string.Empty;
+                if (!string.Equals(stored, comment, StringComparison.Ordinal))
+                {
+                    comments.SetComment(policy.Namespace, policy.Name, comment.Length == 0 ? null : comment);
+                    dirty = true;
+                }
+
+                // Classic rewrites the namespace list on a save that changes something (captures A/Machine_Enabled and
+                // A/User_Enabled: one using line, no comment); a save that changes nothing writes nothing
+                // (A/Machine_NotConfigured).
+                if (dirty)
+                {
+                    comments.RestrictNamespacesTo(policy.Namespace);
+                }
+            },
+            cancellationToken);
+        return lateProblems is not null
+            ? new PolicySaveOutcome(lateProblems, false, null)
+            : new PolicySaveOutcome([], result.Wrote, result);
+    }
 }

@@ -104,7 +104,40 @@ public sealed class GptIni
         }
 
         var value = string.Concat(groups.Select(g => "[" + string.Concat(g) + "]"));
+        if (index >= 0 && ValueOf(_lines[index].Text).Trim().Length == 0)
+        {
+            _lines[index].Text = key + "=" + value;
+            return;
+        }
+
         SetKey(key, value);
+    }
+
+    /// <summary>
+    /// Blanks the side's extension line after the side lost its last setting: the key stays and its value becomes one space
+    /// (capture K/KeyTrailingBackslash_Enable step 2, C/GptIni_PairRemoval). A missing line is not added. A line that lists
+    /// anything but the registry pair is left alone, because no capture settles that case.
+    /// </summary>
+    /// <param name="side">The side.</param>
+    /// <exception cref="GptIniFormatException">The existing extension line is not a list of GUID groups.</exception>
+    public void BlankExtensionPair(GpoSide side)
+    {
+        var key = GptIniRules.ExtensionKey(side);
+        var index = FindKey(key);
+        if (index < 0 || ValueOf(_lines[index].Text).Trim().Length == 0)
+        {
+            return;
+        }
+
+        var groups = ParseGroups(ValueOf(_lines[index].Text), key);
+        var onlyOurs = groups.Count == 1
+            && groups[0].Count == 2
+            && string.Equals(groups[0][0], GptIniRules.RegistryExtension, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(groups[0][1], GptIniRules.Tool(side), StringComparison.OrdinalIgnoreCase);
+        if (onlyOurs)
+        {
+            SetKey(key, " ");
+        }
     }
 
     /// <summary>Serializes the file.</summary>

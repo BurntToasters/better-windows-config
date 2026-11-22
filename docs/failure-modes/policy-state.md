@@ -27,7 +27,7 @@ Rules for the whole piece:
 
 | Shape | Enabled writes | Disabled writes | Reads |
 |---|---|---|---|
-| value name, no enabledValue and no disabledValue | value = DWORD 1 (*probe-confirmed*) | value = DWORD 0 (*verify against oracle*, `[Rule: PlainValueNameDisabledWritesZero]`; the probe saw Zeta move to the end of its key, which needs a written 0) | record equal to 1: Enabled; equal to 0: Disabled |
+| value name, no enabledValue and no disabledValue | value = DWORD 1 (*probe-confirmed*) | remove the value record, append `**del.<name>` (`[Rule: PlainValueNameDisabledWritesZero]`, false; captures `A/Machine_Disabled`, `A/User_Disabled`, settled; the earlier guess of DWORD 0 was wrong) | record equal to 1: Enabled; `**del.` only: Disabled (captures `A/Machine_Disabled`, `A/User_Disabled`); a DWORD 0 still reads as Disabled (`[Rule: PlainValueNameZeroReadsAsDisabled]`, *verify against oracle*, group D) |
 | enabledValue and disabledValue | enabledValue | disabledValue (*probe-confirmed* for DWORD) | equal to either |
 | enabledValue only | enabledValue | remove the value record, append `**del.<name>` (*probe-confirmed*) | equal to enabledValue: Enabled; `**del.` only: Disabled |
 | disabledValue only | DWORD 1 (default) | disabledValue | equal to either |
@@ -181,9 +181,10 @@ stays.
   `**soft.` record for those names, and every record of a list key. The result list and "Extra Registry Settings" use it.
 - Class Both: the policy reads and writes each document on its own; an Enabled machine side says nothing about the user
   side.
-- A key or value name the template gives that `PolDocument` refuses (a name starting with `**`, a key with a leading
-  backslash) throws `ArgumentException` from the document call. This is a template fault the loader should have
-  refused; the apply may then be partial. It is not a user error.
+- A value name starting with `**` that `PolDocument` refuses throws `ArgumentException` from the document call. This is a
+  template fault the loader should have refused; the apply may then be partial. It is not a user error. A key with a
+  leading backslash is not refused: the save succeeds and writes no record for it (section 12, capture
+  `K/KeyLeadingBackslash_Enable`).
 - A document that changes between `Read` and `Apply` is fine: `Apply` reads the document it is given, and the save
   sequence rereads the files under the lock (contract, "Save sequence").
 - `Apply` with a policy that has no value name, no list and no elements (Enabled) writes nothing and reports no change.
@@ -210,7 +211,7 @@ member of `PolicyRules`.
 | Edit | Non-additive list | Additive list |
 |---|---|---|
 | Enabled with entries | clear the values of the key, `**delvals.` at the front, then the entries in order. When the values already equal the entries only `**delvals.` is ensured (`[Rule: ListReplaceWritesDelvals]`) | set the entries; values that are not entries stay; remove the entries in `ListValue.Removed` that still hold the data; remove a `**delvals.` of the key (`[Rule: AdditiveListKeepsOtherValues]`, `[Rule: AdditiveListRemovesDelvals]`) |
-| Enabled with no entries | remove the values and the `**delvals.`; nothing is written (`[Rule: EmptyEnabledListWritesDelvals]`, false) | remove the `Removed` entries and a `**delvals.`; nothing else |
+| Enabled with no entries | remove the values and the `**delvals.`; nothing is written (`[Rule: EnabledEmptyListWritesDelvals]`, false) | remove the `Removed` entries and a `**delvals.`; nothing else |
 | Disabled | remove every value of the key, write `**delvals.` (`[Rule: DisabledListWritesDelvals]`, true) | the same: the policy cannot tell its own values from foreign ones, so it clears the key like the non-additive list |
 | Not Configured | remove every value and the `**delvals.` of the key (`[Rule: NotConfiguredClearsWholeListKey]`) | the same |
 
@@ -295,6 +296,19 @@ limit that was broken.
 A record is found whatever the case of its key and value name in the file (`PolDocument` semantics), so a file written
 with other spelling of the key still reads the same state. Writes keep the spelling the document already has.
 
+Backslashes at the ends of a key (captures group K):
+
+- A key that ends in a backslash in the file reads as the trimmed key (`K/KeyTrailingBackslash_ReadAsWritten`):
+  `PolicyStateReader.Read` reads from a copy with the trailing backslashes removed (`PolKeySpelling`).
+- A save that changes something rewrites those keys without the trailing backslash (`PolDocument.TrimTrailingKeyBackslashes`,
+  `K/KeyTrailingBackslash_Enable`); a save that changes nothing leaves the file alone. A key with a trailing backslash
+  in the template is written trimmed.
+- A `Registry.pol` that holds a key starting with a backslash is refused when the store opens it
+  (`PolFormatReason.KeyLeadingBackslash`, `GpoStoreFailure.Malformed`, `K/KeyLeadingBackslash_ReadAsWritten`). Only that
+  one shape is refused; the general strictness of the reader (D9) belongs to E6c.
+- A policy whose template key starts with a backslash is saved and no record is written for it (`PolicyStateWriter`,
+  `K/KeyLeadingBackslash_Enable`); `Changed` is false and `PolicySave.Save` still writes, because the state shown changed.
+
 ### 13. Order of elements in the output
 
 Elements are written in template document order, not in name order, even when they share a key
@@ -308,8 +322,8 @@ Disabled or Not Configured of this policy, and is not in `OwnedRecords`.
 
 ### 15. A template fault reaches the document call
 
-A policy whose key has a leading backslash, or whose value name starts with `**`, makes the document refuse the call
-(section 5). The exception is `ArgumentException`. The loader may accept such a template (it only limits length), so the
+A policy whose value name starts with `**` makes the document refuse the call (section 5). The exception is
+`ArgumentException`. A policy whose key has a leading backslash writes nothing and does not throw (section 12). The loader may accept such a template (it only limits length), so the
 engine must not turn it into a silent write of a wrong record.
 
 ### 16. Saving

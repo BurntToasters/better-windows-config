@@ -17,12 +17,17 @@ internal static class PolicyRules
     public static readonly PolicyValue DefaultDisabledValue = new(PolicyValueKind.Decimal, 0, null);
 
     /// <summary>
-    /// A policy with a value name and neither an enabledValue nor a disabledValue writes
-    /// <see cref="DefaultDisabledValue"/> when Disabled. False makes it delete the value and write <c>**del.</c>, like a
-    /// policy that has only an enabledValue. The probe saw a value move to the end of its key on Disabled, which needs a
-    /// written value.
+    /// A policy with a value name and neither an enabledValue nor a disabledValue writes <see cref="DefaultDisabledValue"/>
+    /// when Disabled (true), or deletes the value and writes <c>**del.</c>, like a policy that has only an enabledValue
+    /// (false). Classic does the second: capture A/Machine_Disabled and A/User_Disabled (D1).
     /// </summary>
-    public static readonly bool PlainValueNameDisabledWritesZero = true;
+    public static readonly bool PlainValueNameDisabledWritesZero = false;
+
+    /// <summary>
+    /// A DWORD 0 at the value of a plain value-name policy reads as Disabled, as the earlier version of this engine wrote it.
+    /// No capture of a crafted file settles it yet; verify against oracle (group D).
+    /// </summary>
+    public static readonly bool PlainValueNameZeroReadsAsDisabled = true;
 
     /// <summary>A delete literal (the template delete element) removes the value and writes <c>**del.</c>.</summary>
     public static readonly bool DeleteLiteralWritesDeleteInstruction = true;

@@ -89,8 +89,9 @@ public sealed class GptIniTests
     }
 
     [TestMethod]
-    public void NewFile_UserSave_PutsVersionBeforeUserLine_WhateverTheCallOrder()
+    public void NewFile_UserSave_WritesLinesInTheOrderTheyAreFirstWritten()
     {
+        // Capture A/User_Enabled (D2): the store writes the extension line first, then Version, so the line comes first.
         var first = GptIni.CreateNew();
         first.EnsureExtensionPair(GpoSide.User);
         first.BumpVersion(GpoSide.User);
@@ -99,19 +100,37 @@ public sealed class GptIniTests
         second.BumpVersion(GpoSide.User);
         second.EnsureExtensionPair(GpoSide.User);
 
-        var expected = "[General]\r\nVersion=65536\r\ngPCUserExtensionNames=[" + Cse + UserTool + "]\r\n";
-        Assert.AreEqual(expected, GptIniProbe.Latin1(first.ToBytes()));
-        Assert.AreEqual(expected, GptIniProbe.Latin1(second.ToBytes()));
+        Assert.AreEqual(
+            "[General]\r\ngPCUserExtensionNames=[" + Cse + UserTool + "]\r\nVersion=65536\r\n",
+            GptIniProbe.Latin1(first.ToBytes()));
+        Assert.AreEqual(
+            "[General]\r\nVersion=65536\r\ngPCUserExtensionNames=[" + Cse + UserTool + "]\r\n",
+            GptIniProbe.Latin1(second.ToBytes()));
     }
 
     [TestMethod]
-    public void NewFile_BothSides_ReproducesProbeFileExactly()
+    public void NewFile_UserThenMachine_ReproducesTheCapturedFileExactly()
     {
+        // Capture A/User_Then_Machine step 3 (D2): user line, Version=65537, machine line.
         var ini = GptIni.CreateNew();
         ini.EnsureExtensionPair(GpoSide.User);
         ini.BumpVersion(GpoSide.User);
         ini.EnsureExtensionPair(GpoSide.Machine);
         ini.BumpVersion(GpoSide.Machine);
+        Assert.AreEqual(
+            "[General]\r\n" + GptIniProbe.UserLine + "\r\nVersion=65537\r\n" + GptIniProbe.MachineLine + "\r\n",
+            GptIniProbe.Latin1(ini.ToBytes()));
+    }
+
+    [TestMethod]
+    public void NewFile_MachineThenUser_ReproducesTheCapturedFileExactly()
+    {
+        // Capture A/Machine_Then_User step 3 (D2): machine line, Version=65537, user line.
+        var ini = GptIni.CreateNew();
+        ini.EnsureExtensionPair(GpoSide.Machine);
+        ini.BumpVersion(GpoSide.Machine);
+        ini.EnsureExtensionPair(GpoSide.User);
+        ini.BumpVersion(GpoSide.User);
         Assert.AreEqual(GptIniProbe.Text(65537), GptIniProbe.Latin1(ini.ToBytes()));
     }
 
@@ -125,13 +144,14 @@ public sealed class GptIniTests
     }
 
     [TestMethod]
-    public void MissingLines_AreInsertedBesideTheirNeighboursInProbeOrder()
+    public void MissingLines_AreAppendedAtTheEndOfTheSection()
     {
+        // Captures A/User_Then_Machine and A/Machine_Then_User (D2): a missing line goes after the last non-blank line.
         var ini = GptIni.Parse(GptIniProbe.Latin1("[General]\nVersion=1\n; note\n"));
         ini.EnsureExtensionPair(GpoSide.Machine);
         ini.EnsureExtensionPair(GpoSide.User);
         Assert.AreEqual(
-            "[General]\ngPCMachineExtensionNames=[" + Cse + MachineTool + "]\nVersion=1\ngPCUserExtensionNames=[" + Cse + UserTool + "]\n; note\n",
+            "[General]\nVersion=1\n; note\ngPCMachineExtensionNames=[" + Cse + MachineTool + "]\ngPCUserExtensionNames=[" + Cse + UserTool + "]\n",
             GptIniProbe.Latin1(ini.ToBytes()));
     }
 
