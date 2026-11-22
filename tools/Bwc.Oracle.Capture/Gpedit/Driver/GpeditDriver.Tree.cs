@@ -212,7 +212,8 @@ internal sealed partial class GpeditDriver
 
     // The direct child tree item with exactly this name. A node fills lazily after it is expanded: names are polled until the child
     // appears; the wait ends early when the list of names stopped changing (3 s, or 8 s while the node still shows no child).
-    private AutomationElement WaitChild(AutomationElement parent, string name, string where, HopStep? step = null)
+    // parentPath, when given, is the path below the root configuration node of the parent: a missing child then carries a TreeGap (failure mode 42).
+    private AutomationElement WaitChild(AutomationElement parent, string name, string where, HopStep? step = null, IReadOnlyList<string>? parentPath = null)
     {
         DateTime start = DateTime.UtcNow;
         DateTime lastChange = start;
@@ -248,7 +249,10 @@ internal sealed partial class GpeditDriver
             {
                 throw new DriverException(
                     $"no tree node '{name}' under '{where}'. Children: [{string.Join(" | ", names)}]",
-                    evidence: new JsonArray(names.Select(n => (JsonNode?)JsonValue.Create(n)).ToArray()));
+                    evidence: new JsonArray(names.Select(n => (JsonNode?)JsonValue.Create(n)).ToArray()))
+                {
+                    Gap = parentPath is null ? null : new TreeGap(name, parentPath, names),
+                };
             }
 
             long slept = Stopwatch.GetTimestamp();
@@ -308,8 +312,12 @@ internal sealed partial class GpeditDriver
             rootStep?.Finish();
         }
 
+        int segmentIndex = 0;
         foreach (string segment in new[] { RootName(root) }.Concat(path))
         {
+            // The root configuration node (index 0) has no parent path; the segment at index n is path[n - 1] and its parent is path[0..n-1).
+            IReadOnlyList<string>? parentPath = segmentIndex == 0 ? null : path.Take(segmentIndex - 1).ToList();
+            segmentIndex++;
             HopStep? step = times?.NextHop(segment);
             try
             {
@@ -331,7 +339,7 @@ internal sealed partial class GpeditDriver
                 }
 
                 ProbeUia.Expand(current, 4000, step?.Expand);
-                current = WaitChild(current, segment, where, step);
+                current = WaitChild(current, segment, where, step, parentPath);
                 where += "/" + segment;
                 hops?.Add(segment);
             }

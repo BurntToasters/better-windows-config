@@ -8,7 +8,64 @@ namespace Bwc.Oracle.Capture.Gpedit.Driver;
 // Result list, status bar, Extended and Standard tabs, header sort. Failure modes 2, 18, 19, 20 and 22 of the driver document.
 internal sealed partial class GpeditDriver
 {
-    private sealed record ListCandidate(AutomationElement List, IntPtr Hwnd, string Headers, bool SettingAndState, NativeRect Rect);
+    private sealed record ListCandidate(AutomationElement List, IntPtr Hwnd, string Headers, bool SettingAndState, NativeRect Rect, int Rows);
+
+    private static bool IsOnScreen(WinInfo w, NativeRect mainRect) =>
+        w.Rect.Width > 0 && w.Rect.Height > 0 && w.Rect.Left < mainRect.Right && w.Rect.Right > mainRect.Left
+        && w.Rect.Top < mainRect.Bottom && w.Rect.Bottom > mainRect.Top;
+
+    // The row count of a list view by LVM_GETITEMCOUNT, or -1 when it did not answer.
+    private static int ListRowCount(IntPtr hwnd)
+    {
+        try
+        {
+            return DriverNative.Send(hwnd, Msg.LVM_GETITEMCOUNT, IntPtr.Zero, IntPtr.Zero).ToInt32();
+        }
+        catch (DriverException)
+        {
+            return -1;
+        }
+    }
+
+    // The rows of the largest visible, on-screen result list, by Win32 messages only; 0 when there is none or nothing can be read. It decides
+    // between the old UI Automation search and the narrow lookups (failure mode 40).
+    private int VisibleListRows()
+    {
+        try
+        {
+            Win32.GetWindowRect(main, out NativeRect mainRect);
+            return UiaScope.LargestVisibleList(ProbeWindows.Children(main).Where(c => c.Class == "SysListView32").Select(w =>
+            {
+                bool onScreen = IsOnScreen(w, mainRect);
+                return new ListSize(w.Visible, onScreen, w.Visible && onScreen ? ListRowCount(w.Hwnd) : -1);
+            }));
+        }
+        catch (Exception ex) when (ex is DriverException or System.ComponentModel.Win32Exception)
+        {
+            return 0;
+        }
+    }
+
+    // The header items of a list. A list with LargeListRows rows or more asks for the Header children and then their HeaderItem children, because
+    // the search below the list walks every row; when that finds nothing the old search runs (failure mode 40).
+    private static List<AutomationElement> HeaderItems(AutomationElement list, int rows)
+    {
+        if (rows >= UiaScope.LargeListRows)
+        {
+            var narrow = new List<AutomationElement>();
+            foreach (AutomationElement header in ProbeUia.OfType(list, ControlType.Header, TreeScope.Children))
+            {
+                narrow.AddRange(ProbeUia.OfType(header, ControlType.HeaderItem, TreeScope.Children));
+            }
+
+            if (narrow.Count > 0)
+            {
+                return narrow;
+            }
+        }
+
+        return ProbeUia.OfType(list, ControlType.HeaderItem);
+    }
 
     // Visible list views only, found from the native child windows first (MMC keeps one per node it has shown, over a hundred after a
     // few navigations, and asking UI Automation about each is slow and returns stale ones). Setting and State headers rank first.
@@ -19,8 +76,7 @@ internal sealed partial class GpeditDriver
         hiddenCount = 0;
         foreach (WinInfo w in ProbeWindows.Children(main).Where(c => c.Class == "SysListView32"))
         {
-            bool onScreen = w.Rect.Width > 0 && w.Rect.Height > 0 && w.Rect.Left < mainRect.Right && w.Rect.Right > mainRect.Left
-                && w.Rect.Top < mainRect.Bottom && w.Rect.Bottom > mainRect.Top;
+            bool onScreen = IsOnScreen(w, mainRect);
             if (!w.Visible || !onScreen)
             {
                 hiddenCount++;
@@ -30,9 +86,10 @@ internal sealed partial class GpeditDriver
             try
             {
                 AutomationElement list = AutomationElement.FromHandle(w.Hwnd);
-                string headers = string.Join("|", ProbeUia.OfType(list, ControlType.HeaderItem).Select(h => ProbeUia.NameOf(h).Trim()));
+                int rows = ListRowCount(w.Hwnd);
+                string headers = string.Join("|", HeaderItems(list, rows).Select(h => ProbeUia.NameOf(h).Trim()));
                 bool settingAndState = headers.Contains("Setting", StringComparison.OrdinalIgnoreCase) && headers.Contains("State", StringComparison.OrdinalIgnoreCase);
-                found.Add(new ListCandidate(list, w.Hwnd, headers, settingAndState, w.Rect));
+                found.Add(new ListCandidate(list, w.Hwnd, headers, settingAndState, w.Rect, rows));
             }
             catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException)
             {
@@ -107,13 +164,45 @@ internal sealed partial class GpeditDriver
 
         var rows = new JsonArray();
         int total;
+
+        // A names-only read of a list with LargeListRows rows or more, asking for fewer rows than it has, takes the first rows with a walker that
+        // stops there, and the row count from the list view (failure mode 40). An empty walk falls back to the read below.
+        bool capped = namesOnly && list.Rows >= UiaScope.LargeListRows && list.Rows > maxRows;
+        if (capped)
+        {
+            rows = FirstRowNames(list.List, maxRows);
+            capped = rows.Count > 0;
+        }
+
+        total = capped ? list.Rows : ReadRowsCached(list.List, maxRows, namesOnly, settingAt, stateAt, commentAt, rows);
+
+        JsonObject status = ReadStatus();
+        return new JsonObject
+        {
+            ["listHwnd"] = "0x" + list.Hwnd.ToString("X"),
+            ["settingStateList"] = list.SettingAndState,
+            ["headers"] = new JsonArray(headers.Select(h => (JsonNode?)JsonValue.Create(h)).ToArray()),
+            ["sort"] = HeaderSort(list.Hwnd, headers.Length),
+            ["rowCount"] = total,
+            ["truncated"] = total > rows.Count,
+            ["rows"] = rows,
+            ["status"] = status,
+            ["filtered"] = status["filtered"]?.DeepClone(),
+            ["selectedNode"] = SelectedPath() is { } p ? string.Join("/", p.Skip(1)) : null,
+            ["activeTabGuess"] = ActiveTabGuess(list),
+        };
+    }
+
+    // All rows of the list from one cached request (the read of every list below LargeListRows rows, and of a list that is not capped). Adds at
+    // most maxRows rows to rows and returns the number of rows the list has.
+    private static int ReadRowsCached(AutomationElement list, int maxRows, bool namesOnly, int settingAt, int stateAt, int commentAt, JsonArray rows)
+    {
         var cache = new CacheRequest { TreeScope = namesOnly ? TreeScope.Element : TreeScope.Element | TreeScope.Children, AutomationElementMode = AutomationElementMode.Full };
         cache.Add(AutomationElement.NameProperty);
         cache.Add(AutomationElement.ControlTypeProperty);
         using (cache.Activate())
         {
-            AutomationElementCollection found = list.List.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem));
-            total = found.Count;
+            AutomationElementCollection found = list.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem));
             int index = 0;
             foreach (AutomationElement row in found)
             {
@@ -135,23 +224,31 @@ internal sealed partial class GpeditDriver
                 rows.Add(node);
                 index++;
             }
+
+            return found.Count;
+        }
+    }
+
+    // The first rows of a list by name, from a walker over the children of the list that stops after max list items (name and control type cached).
+    private static JsonArray FirstRowNames(AutomationElement list, int max)
+    {
+        var cache = new CacheRequest { TreeScope = TreeScope.Element, AutomationElementMode = AutomationElementMode.Full };
+        cache.Add(AutomationElement.NameProperty);
+        cache.Add(AutomationElement.ControlTypeProperty);
+        var rows = new JsonArray();
+        TreeWalker walker = TreeWalker.ControlViewWalker;
+        AutomationElement? child = walker.GetFirstChild(list, cache);
+        while (child is not null && rows.Count < max)
+        {
+            if (child.Cached.ControlType == ControlType.ListItem)
+            {
+                rows.Add(new JsonObject { ["index"] = rows.Count, ["name"] = child.Cached.Name });
+            }
+
+            child = walker.GetNextSibling(child, cache);
         }
 
-        JsonObject status = ReadStatus();
-        return new JsonObject
-        {
-            ["listHwnd"] = "0x" + list.Hwnd.ToString("X"),
-            ["settingStateList"] = list.SettingAndState,
-            ["headers"] = new JsonArray(headers.Select(h => (JsonNode?)JsonValue.Create(h)).ToArray()),
-            ["sort"] = HeaderSort(list.Hwnd, headers.Length),
-            ["rowCount"] = total,
-            ["truncated"] = total > rows.Count,
-            ["rows"] = rows,
-            ["status"] = status,
-            ["filtered"] = status["filtered"]?.DeepClone(),
-            ["selectedNode"] = SelectedPath() is { } p ? string.Join("/", p.Skip(1)) : null,
-            ["activeTabGuess"] = ActiveTabGuess(list),
-        };
+        return rows;
     }
 
     // The sort arrow of each column header as the header control reports it (none, up, down). Null when it cannot be read.
@@ -218,9 +315,10 @@ internal sealed partial class GpeditDriver
         }
 
         var uia = new JsonArray();
+        string route = UiaScope.Route(VisibleListRows());
         try
         {
-            foreach (AutomationElement bar in ProbeUia.OfType(Main(), ControlType.StatusBar))
+            foreach (AutomationElement bar in StatusBarElements(route))
             {
                 foreach (AutomationElement child in ProbeUia.Find(bar, TreeScope.Descendants, Condition.TrueCondition))
                 {
@@ -236,7 +334,7 @@ internal sealed partial class GpeditDriver
                 }
             }
         }
-        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException)
+        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or ArgumentException)
         {
             error ??= ex.Message;
         }
@@ -248,8 +346,36 @@ internal sealed partial class GpeditDriver
             ["uiaTexts"] = uia,
             ["filtered"] = text.StartsWith("Filtered", StringComparison.OrdinalIgnoreCase),
             ["error"] = error,
+            ["uiaRoute"] = route,
         };
     }
+
+    // The elements of the type given, taken from the window handle of their own control on the narrow route (failure mode 40), or by the old
+    // search over the main window on the other. A window that has no element any more is skipped.
+    private List<AutomationElement> ElementsOfWindows(string className, ControlType? mustBe)
+    {
+        var elements = new List<AutomationElement>();
+        foreach (WinInfo window in UiaScope.VisibleOfClass(ProbeWindows.Children(main), className))
+        {
+            try
+            {
+                AutomationElement element = AutomationElement.FromHandle(window.Hwnd);
+                if (mustBe is null || element.Current.ControlType == mustBe)
+                {
+                    elements.Add(element);
+                }
+            }
+            catch (Exception ex) when (ex is ElementNotAvailableException or ArgumentException or InvalidOperationException)
+            {
+                // The window went away between the enumeration and the lookup: it is not an element of this read.
+            }
+        }
+
+        return elements;
+    }
+
+    private List<AutomationElement> StatusBarElements(string route) =>
+        route == UiaScope.RouteNarrow ? ElementsOfWindows(UiaScope.StatusBarClass, null) : ProbeUia.OfType(Main(), ControlType.StatusBar);
 
     // The tabs are HTML elements of the view; they offer Invoke only and no selection state, so the active one is a guess from the
     // layout: Extended leaves room for the description pane between the tree and the list.
@@ -263,11 +389,18 @@ internal sealed partial class GpeditDriver
     private IntPtr FindTreeWindow() =>
         ProbeWindows.Children(main).FirstOrDefault(c => c.Class == "SysTreeView32" && c.Visible)?.Hwnd ?? main;
 
-    private List<AutomationElement> DistinctTabs()
+    private List<AutomationElement> DistinctTabs() => DistinctTabs(UiaScope.Route(VisibleListRows()));
+
+    // The tab items of the view. On the narrow route they come from the tab strip window (class AMCCustomTab) and not from a search of the
+    // whole main window; a missing strip gives no tab, so the caller fails at once (failure mode 40).
+    private List<AutomationElement> DistinctTabs(string route)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var tabs = new List<AutomationElement>();
-        foreach (AutomationElement tab in ProbeUia.OfType(Main(), ControlType.TabItem))
+        IEnumerable<AutomationElement> items = route == UiaScope.RouteNarrow
+            ? ElementsOfWindows(UiaScope.TabClass, null).SelectMany(strip => ProbeUia.OfType(strip, ControlType.TabItem))
+            : ProbeUia.OfType(Main(), ControlType.TabItem);
+        foreach (AutomationElement tab in items)
         {
             if (seen.Add(ProbeUia.NameOf(tab) + "|" + tab.Current.BoundingRectangle))
             {
@@ -278,22 +411,26 @@ internal sealed partial class GpeditDriver
         return tabs;
     }
 
-    internal JsonObject ReadTabs()
+    internal JsonObject ReadTabs() => ReadTabs(UiaScope.Route(VisibleListRows()));
+
+    private JsonObject ReadTabs(string route)
     {
-        List<AutomationElement> tabs = DistinctTabs();
+        List<AutomationElement> tabs = DistinctTabs(route);
         ListCandidate? list = VisibleList();
         return new JsonObject
         {
             ["tabs"] = new JsonArray(tabs.Select(t => (JsonNode?)ProbeUia.NameOf(t)).ToArray()),
             ["activeTabGuess"] = list is null ? null : ActiveTabGuess(list),
+            ["uiaRoute"] = route,
         };
     }
 
     // Invoke only (section 22 of the session document); a tab without Invoke is an error, never clicked.
     internal JsonObject SelectTab(string name)
     {
-        AutomationElement tab = DistinctTabs().FirstOrDefault(t => string.Equals(ProbeUia.NameOf(t).Replace("&", string.Empty, StringComparison.Ordinal).Trim(), name, StringComparison.OrdinalIgnoreCase))
-            ?? throw new DriverException($"no tab '{name}'. Tabs: " + string.Join(", ", DistinctTabs().Select(ProbeUia.NameOf)));
+        string route = UiaScope.Route(VisibleListRows());
+        AutomationElement tab = DistinctTabs(route).FirstOrDefault(t => string.Equals(ProbeUia.NameOf(t).Replace("&", string.Empty, StringComparison.Ordinal).Trim(), name, StringComparison.OrdinalIgnoreCase))
+            ?? throw new DriverException($"no tab '{name}'. Tabs: " + string.Join(", ", DistinctTabs(route).Select(ProbeUia.NameOf)));
         if (!ProbeUia.Invoke(tab))
         {
             throw new DriverException($"the tab '{name}' has no InvokePattern, so it was not clicked");
@@ -301,10 +438,131 @@ internal sealed partial class GpeditDriver
 
         Thread.Sleep(800);
         bool stable = WaitListStable(TimeSpan.FromSeconds(8));
-        JsonObject tabs = ReadTabs();
+        JsonObject tabs = ReadTabs(route);
         tabs["listStable"] = stable;
         tabs["selected"] = name;
         return tabs;
+    }
+
+    // Brings a column header into view when UI Automation gives it no clickable rectangle, by the first route that works: ScrollIntoView on the
+    // header item, the horizontal scroll of the list, then LVM_SCROLL by a computed distance. The rectangle is read again after each route. The
+    // window is never resized. Failure mode 41 in docs/failure-modes/oracle-gpedit-driver.md.
+    private JsonObject BringHeaderIntoView(ListCandidate list, AutomationElement item, int column)
+    {
+        var tried = new JsonArray();
+        string by = "none needed";
+        int steps = 0;
+
+        bool Clickable()
+        {
+            try
+            {
+                return HeaderScroll.Clickable(item.Current.BoundingRectangle, list.Rect);
+            }
+            catch (ElementNotAvailableException)
+            {
+                return false;
+            }
+        }
+
+        bool ok = Clickable();
+        if (!ok)
+        {
+            tried.Add("ScrollItem");
+            try
+            {
+                if (item.TryGetCurrentPattern(ScrollItemPattern.Pattern, out object? scrollItem))
+                {
+                    ((ScrollItemPattern)scrollItem).ScrollIntoView();
+                    Thread.Sleep(200);
+                    steps++;
+                    ok = Clickable();
+                    by = ok ? "ScrollItem" : by;
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ElementNotAvailableException or System.Runtime.InteropServices.COMException)
+            {
+                tried.Add("ScrollItem threw " + ex.GetType().Name);
+            }
+        }
+
+        if (!ok)
+        {
+            tried.Add("ScrollPattern");
+            try
+            {
+                if (list.List.TryGetCurrentPattern(ScrollPattern.Pattern, out object? scrollPattern) && ((ScrollPattern)scrollPattern).Current.HorizontallyScrollable)
+                {
+                    var pattern = (ScrollPattern)scrollPattern;
+                    for (int i = 0; i < 20 && !ok; i++)
+                    {
+                        pattern.Scroll(ScrollAmount.LargeIncrement, ScrollAmount.NoAmount);
+                        Thread.Sleep(150);
+                        steps++;
+                        ok = Clickable();
+                    }
+
+                    by = ok ? "ScrollPattern" : by;
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ElementNotAvailableException or System.Runtime.InteropServices.COMException)
+            {
+                tried.Add("ScrollPattern threw " + ex.GetType().Name);
+            }
+        }
+
+        if (!ok)
+        {
+            tried.Add("LVM_SCROLL");
+            try
+            {
+                int WidthOf(int index) => DriverNative.Send(list.Hwnd, Msg.LVM_GETCOLUMNWIDTH, new IntPtr(index), IntPtr.Zero).ToInt32();
+                int left = Enumerable.Range(0, column).Sum(WidthOf);
+                int width = WidthOf(column);
+                Win32.GetClientRect(list.Hwnd, out NativeRect client);
+                for (int i = 0; i < 8 && !ok; i++)
+                {
+                    int position = DriverNative.GetScrollPos(list.Hwnd, DriverNative.SbHorz);
+                    int distance = HeaderScroll.Distance(left, width, client.Width, position);
+                    if (distance == 0)
+                    {
+                        // The widths and the position disagree with what UI Automation shows: step by half a view instead of not moving.
+                        distance = Math.Max(1, client.Width / 2);
+                    }
+
+                    DriverNative.Send(list.Hwnd, DriverNative.LvmScroll, new IntPtr(distance), IntPtr.Zero);
+                    Thread.Sleep(150);
+                    steps++;
+                    ok = Clickable();
+                }
+
+                by = ok ? "LVM_SCROLL" : by;
+            }
+            catch (DriverException ex)
+            {
+                tried.Add("LVM_SCROLL threw " + ex.Message);
+            }
+        }
+
+        string rect;
+        try
+        {
+            rect = item.Current.BoundingRectangle.ToString();
+        }
+        catch (ElementNotAvailableException)
+        {
+            rect = "(no element)";
+        }
+
+        return new JsonObject
+        {
+            ["clickable"] = ok,
+            ["scrolledBy"] = by,
+            ["scrollSteps"] = steps,
+            ["tried"] = tried,
+            ["rectangle"] = rect,
+            ["listRectangle"] = $"{list.Rect.Left},{list.Rect.Top},{list.Rect.Right},{list.Rect.Bottom}",
+        };
     }
 
     // One click on a column header, by Invoke on the header item; a guarded click only when the item has no Invoke.
@@ -321,8 +579,16 @@ internal sealed partial class GpeditDriver
 
         JsonNode? before = HeaderSort(list.Hwnd, names.Count);
         string via = "Invoke";
+        var scroll = new JsonObject { ["scrolledBy"] = "none needed", ["scrollSteps"] = 0 };
         if (!ProbeUia.Invoke(items[at]))
         {
+            // A header that is scrolled out of the list has no rectangle to click: bring it into view first (failure mode 41).
+            scroll = BringHeaderIntoView(list, items[at], at);
+            if (scroll["clickable"]!.GetValue<bool>() == false)
+            {
+                throw new DriverException($"the column header '{column}' is not clickable after scrolling the list", evidence: scroll);
+            }
+
             ProbeUia.Click(items[at], doubleClick: false);
             via = "guarded click";
         }
@@ -334,6 +600,8 @@ internal sealed partial class GpeditDriver
         {
             ["column"] = column,
             ["via"] = via,
+            ["scrolledBy"] = scroll["scrolledBy"]?.DeepClone(),
+            ["scrollSteps"] = scroll["scrollSteps"]?.DeepClone(),
             ["sortBefore"] = before?.DeepClone(),
             ["sortAfter"] = after["sort"]?.DeepClone(),
             ["listStable"] = stable,

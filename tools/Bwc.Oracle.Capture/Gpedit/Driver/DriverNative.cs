@@ -20,6 +20,8 @@ internal static class DriverNative
     internal const uint HdiFormat = 0x0004;
     internal const uint HdfSortUp = 0x0400;
     internal const uint HdfSortDown = 0x0200;
+    internal const uint LvmScroll = 0x1000 + 20;
+    internal const int SbHorz = 0;
     internal const uint EsMultiline = 0x0004;
     internal const uint CbsMask = 0x0003;
     internal const uint CbsDropDown = 0x0002;
@@ -35,6 +37,9 @@ internal static class DriverNative
 
     [DllImport("user32.dll")]
     internal static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    internal static extern int GetScrollPos(IntPtr hWnd, int bar);
 
     [DllImport("user32.dll")]
     internal static extern bool IsChild(IntPtr parent, IntPtr child);

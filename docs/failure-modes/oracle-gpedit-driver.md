@@ -875,3 +875,232 @@ the box, so that box is classic behaviour. The `rows0` step (Show Contents refus
 classic saves is the one loaded when the policy dialog opened (1 row), so nothing changed. Classic's Cancel of Show Contents therefore puts the
 list back to its value from the file, not to the value of the last OK. The read before the sets stays as it is: it cancels before any edit,
 when the two values are the same. BWC may differ here on purpose; the audit decides.
+
+## 40. All Settings makes every UI Automation search over the main window take minutes
+
+The long capture showed one pattern in every F case that visits `All Settings` (about 3400 policies). The node itself is not slow: `selectNode`
+takes 11 to 12 s and `pressKey` on its list takes 11 s (`F/Keys_ListAllSettings`). The steps that ask UI Automation for one element of the
+whole main window take minutes. In `F/AllSettings_Computer` `readStatus` takes 422 s, `readList` 427 s and `readLayout` 439 s. In
+`F/Toolbar_States` the `readLayout` at All Settings takes 492 s and the case took 3123 s. In `F/Tabs_Extended_Standard` the `selectTab` at
+All Settings takes 905 s (two searches), and the next `selectTab` was killed by the case watchdog (`MatrixRunner.cs`, "taking too long,
+closing classic") after 651 s, so the case failed with `ElementNotAvailableException`. The same calls on a node of the fixture take 4 to 13 s.
+
+Cause. Three helpers search `TreeScope.Descendants` from the main window for one control type: `ReadStatus` (StatusBar, `GpeditDriver.List.cs`),
+`DistinctTabs` (TabItem, called twice by `SelectTab`, once more through `ReadTabs`) and `ReadLayout` (ToolBar, `GpeditDriver.Visual.cs`).
+`readList` reaches the first of them through `ReadStatus`. A search from the main window walks into the `SysListView32` and asks for every row
+and every cell, across the process boundary, so its cost grows with the row count. The searches that start at the list itself (the header
+lookups of `ListCandidates`, `SortColumn` and `ReadLayout`) are not the cause: `readList` minus `readStatus` is 5 s. The console tree lookups
+were already moved to window handles in section 34.
+
+An observation decides how far the change goes. The old search returns different things at different nodes. In `F/Toolbar_States` the
+`readLayout` at the placeholder node `Software Settings` takes 373 ms and finds the two toolbars (`uiaToolbars`). The same call at the root
+node, at Administrative Templates, at a category, with a row selected and at All Settings takes 9 to 13 s (492 s at All Settings) and finds
+none. The tracked goldens of the F cases hold that empty list. That is a property of the old search at a node with a visible list, and it
+cannot be told apart from classic without a run. So the old search stays exactly as it was wherever it is cheap.
+
+What the driver does now. Before each of the three helpers it counts the rows of the visible, on-screen `SysListView32` windows below the main
+window with `LVM_GETITEMCOUNT` (Win32 only, no UI Automation) and takes the largest. From 1000 rows it takes the narrow route. Below that, or
+when the count cannot be read, it runs the old search with the same calls and the same results as before. The narrow route is:
+
+- Status bar: the visible `msctls_statusbar32` windows below the main window, each taken with `AutomationElement.FromHandle`, then the same
+  descendants search below the bar as before (`uiaTexts`).
+- Tabs: the visible `AMCCustomTab` windows (the tab strip of the view, as the probe showed it), each taken with `FromHandle`, then the TabItem
+  descendants below it. `DistinctTabs` still removes repeated items by name and rectangle.
+- Toolbars: the visible `ToolbarWindow32` windows, each taken with `FromHandle` and kept when the element is a ToolBar. The button search
+  below a bar is unchanged.
+- Column headers of a list with 1000 rows or more: the Header children of the list, then the HeaderItem children of each. When that finds
+  nothing, the old search below the list runs.
+- `readList` of such a list with `namesOnly` and a `maxRows` below the row count reads the first `maxRows` rows with a tree walker that
+  stops when it has them (name and control type cached) and takes `rowCount` from `LVM_GETITEMCOUNT`. Until now it read all 3400 names and kept 60.
+  A list below 1000 rows, and a read with cells, are read as before.
+
+`result.json` says which route ran in `uiaRoute` (`hwnd` or `search`) on the status object, on the tab list and on the layout. The key is a
+diagnostic and is on the scrubber's drop list, like `closedBy`. No wait, timeout or sleep changes, and nothing is sent to classic. Every node
+below 1000 rows is read by the same calls as before.
+
+What can go wrong and the guard of each:
+
+- A narrow lookup finds nothing because a class name differs on another system. Tabs then come back empty and `selectTab` fails at once with
+  `no tab 'Standard'. Tabs: ` and an empty list, which is a cheap and visible failure and not a 15 minute wait. The status text does not depend
+  on it: the native status bar read comes first and is unchanged. Toolbars would be an empty list, as the old search gave.
+- A small list takes the narrow route, or a big one the slow route. The route follows the row count only, and `uiaRoute` records it. A row count
+  that cannot be read (the list does not answer within 5 s) takes the old search, which is exact but slow, and `uiaRoute` says `search`.
+- A golden changes. Only the layout of a node with 1000 rows or more can change: `uiaToolbars` may now hold the two toolbars where the old
+  search found none. The tracked F goldens that reach this are `F/Toolbar_States` (the operation at All Settings) and `F/AllSettings_Computer`
+  and `_User` (the optional `readLayout`). A rerun reports them as changed against the earlier golden, in that one key. Every other node, and every
+  other key of those layouts, is read by the same calls as before. The status, tab, header and row data of All Settings is untracked or dropped.
+- The walker of the capped read returns fewer rows than asked. `truncated` stays `rowCount > rows.Count`, so a short read would show as
+  `truncated: true` with fewer rows than `maxRows`, in the untracked result.
+
+The self test checks the route decision (the threshold, a hidden or off-screen list not counted, no list and an unreadable count taking the old
+search) and the choice of the windows of each lookup on made-up window lists.
+
+Unproved, for the next real run to confirm from `result.json`:
+
+- That `readStatus`, `readList` and `readLayout` at All Settings take seconds and not minutes, with `uiaRoute` `hwnd` on them and `search` on
+  every smaller node.
+- That `selectTab` finds `Extended` and `Standard` at All Settings (`F/Tabs_Extended_Standard` passes both All Settings operations).
+- What `uiaToolbars` holds at All Settings now.
+
+## 41. A column header scrolled out of the list cannot be clicked
+
+`F/Sort_Columns` clicked `Setting` and `State` three times each (by a guarded click, the headers have no Invoke) and then failed three times on `Comment` with
+`click refused: 'Comment' has no usable bounding rectangle`. The screenshot of operation 12 (`012-sortColumn.png`) shows classic at its
+small default size: the description pane takes the left half of the view, the result list is narrow, the `State` column is cut at the right edge
+and a horizontal scroll bar sits under the list. The `Comment` header is beyond the right edge, so UI Automation reports it with an empty
+rectangle, and the click guard (section 11) refuses a click it cannot place. The window must not be resized or maximized, because other F
+goldens record its layout.
+
+What the driver does now. Before a header click it reads the rectangle of the header item. The header is clickable when the rectangle is finite,
+at least 1 by 1, and its centre is inside the list window. When it is not, the driver brings the header into view by the first route that
+works, and reads the rectangle again after each route:
+
+1. `ScrollItemPattern.ScrollIntoView` on the header item, when the item offers it.
+2. `ScrollPattern` of the list, up to 20 large steps to the right, when the list scrolls horizontally.
+3. `LVM_SCROLL` with a distance computed from the column widths (`LVM_GETCOLUMNWIDTH`), the width of the list client area and the current position
+   (`GetScrollPos`): the smallest scroll that shows the column, or its left edge when the column is wider than the list. Up to 8 messages.
+
+The click is then the same as before: Invoke when the item has it, the guarded click otherwise. A header that is still not clickable after the
+last route fails the operation, with the rectangle and the routes tried as evidence. The result gets `scrolledBy` (`none needed`, `ScrollItem`,
+`ScrollPattern` or `LVM_SCROLL`) and `scrollSteps`. Both are diagnostics and are on the scrubber's drop list. A header that needs no scroll
+(`Setting`, `State`, and every list that fits) costs one rectangle read, so its click and the goldens do not change.
+
+What can go wrong and the guard of each:
+
+- A scroll moves the list for the later steps. Later reads take rows by name, not by position, and the sort order is read after each click as before.
+- A scroll shows the header only partly and the click lands next to it. The centre of the rectangle must be inside the list window, and the click
+  guard checks the window under the point.
+- A route scrolls the wrong way or by another step. Every route is followed by a new read of the rectangle, and the message route reads
+  `GetScrollPos` each time and does not rely on a remembered position.
+- The window is resized to make room. Nothing in this change touches the size or the layout of the window.
+
+The self test checks the scroll distance (a column left of the view, inside it, partly right of it, wider than the view, at the start) and the
+clickable test (empty, infinite, outside and inside rectangles).
+
+Unproved, for the next real run to confirm from `result.json`:
+
+- Which route brought `Comment` into view (`scrolledBy`), and that its three clicks give `sortAfter` up, down and up in the third column.
+
+## 42. A node that the filter hides is a result, not a failure
+
+`F/Filter_Options` operation 26 (`setFilter` with Managed set to No) worked, and every operation after it failed (44 optional failures). Classic's
+tree under `BWC Oracle` then shows only `Basics`, because the filter is on and every Sort cases policy is managed. Each later operation selects
+`Sort cases` first (`EnsureNode`), so `filterOn`, `readList`, `clearFilter` and the next `setFilter` all failed with
+`no tree node 'Sort cases' under ...BWC Oracle. Children: [Basics]`, and the filter, which stays on in classic, was never cleared. A node that
+disappears under a filter is classic behaviour, and recording it is the job of the oracle.
+
+What the driver does now. `WaitChild` attaches what it knew to its error: the segment that is missing, the path of the parent that was found
+(empty when the parent is the root configuration node) and the children that were there. A missing root configuration node carries none of it.
+The operations that name a node (`readList`, `setFilter`, `filterOn`, `clearFilter`) act on that detail when selecting the node fails with it:
+
+1. The driver reads whether Filter On is checked (the check mark of View > Filter On, read from the menu without activating it). When it is not
+   checked, or cannot be read, the original error stands: a missing node with no filter is a failure.
+2. `readList` returns, as its data, `nodeHidden: true`, `filterOn: true`, the missing `segment`, the `parentPath`, the `parentChildren` with
+   `parentChildCount`, and `selectedPath`, the node that is selected now. It reads no list and selects nothing.
+3. `setFilter`, `filterOn` and `clearFilter` select the nearest visible ancestor (the parent, then its parent, up to the root configuration node, with
+   the same selection every operation uses) and run from there as they always do. Their data gets the same description as `hiddenNode`, with
+   `selectedInstead`, the ancestor that was selected.
+
+The next operation that names `Sort cases` after the filter was cleared selects it as usual. The operations of the plan and `PlanVersion` (2) do not change.
+
+How it shows in a golden. The names are the fixture's (`BWC Oracle`, `Basics`, `Sort cases`) and are kept. Any other name would be a hash.
+No timing, route or handle is in the description. A node that is visible gives the data it gave before, with no new key.
+
+What can go wrong and the guard of each:
+
+- A mistyped path under a filter is recorded as hidden. The description holds the parent's children, so a typo shows as a name that is not among
+  them, and the paths of the matrix come from the fixture and are not typed.
+- The filter is on and the node is missing for another reason (classic did not fill it). The description is the same, and the screenshot of the next
+  operation shows the rest. A missing node with the filter off still fails as before.
+- The ancestor cannot be selected either. Each ancestor that is missing too moves one level up. When none can be selected, the error of the first
+  missing node is thrown.
+- Filter Options is grayed at the ancestor. `ActivateMenuItem` fails as it does for any grayed item, with the menu as evidence. The ancestor is
+  a node of Administrative Templates, where the item is enabled when the case selects `Sort cases`, which is its child.
+- The menu read that decides leaves a menu open. `DumpTopMenu` closes menus in its `finally` block, as every menu read does.
+- A hidden node changes a tracked golden of a visible node. It cannot: the new keys appear only when selecting the node failed.
+
+The self test checks the description (its fields, the ancestor order, no description for a missing root node, none when the filter is off) and that
+the scrubber keeps the fixture names and hashes the others.
+
+Unproved, for the next real run to confirm from `result.json`:
+
+- That `F/Filter_Options` operations 27 to 29 now return the hidden description (`readList`) or run from `BWC Oracle` (`filterOn`, `clearFilter`),
+  and that operation 30 selects `Sort cases` again after the clear.
+- That the same happens for the later variants that hide the node, and for none of the first four.
+
+## 43. The numeric edit of a number control never passes the focus check
+
+`E/Decimal_TypedAboveMax` and `E/Decimal_TypedLetters` (the cases that type into a number control) failed in operation 0 with
+`the control of 'Number from 10 to 500:' did not get the keyboard focus, so nothing was typed`. The evidence says the control is kind `spinner`,
+class `WindowsForms10.EDIT.app.0.297b065_r40_ad1`, enabled, text `10`. The screenshot `left-open-*.png` shows the dialog with Enabled selected and
+a text caret inside the edit of the number control. So the focus did land, and the check failed.
+
+Cause (`PolicyDialog.Options.cs`, `TypeInto` and `RequireTypingTarget`). Both compare the native window handle of
+`AutomationElement.FocusedElement` with the handle of the edit. A Windows Forms number control is a host window with an inner EDIT, and the inner
+edit has no UI Automation element in the control view (section 6), so UI Automation reports the focus on another element whose handle is not the
+edit. The comparison was made on the wrong layer. Typed keys go to the window that has the real keyboard focus, and that is what a person's
+typing needs.
+
+What the driver does now. The focus is accepted when one of these holds: UI Automation reports the handle of the control (as before); the window
+that has the keyboard focus in the thread of the dialog (`GetGUIThreadInfo`, `hwndFocus`) is the control; or that window is a child of the control
+(the edit inside a combo box). Nothing else is accepted. Focus on the host of the number control, on the dialog or on another control is still
+refused. Both places use it: before the first key, and after each typed Enter and at the end of a multi-line text. The keys are the same real key
+presses as before. The text of the error is unchanged and now adds the two readings (UI Automation handle and keyboard focus handle), so a
+refusal can be read from the result.
+
+What can go wrong and the guard of each:
+
+- A real loss of focus is accepted. The Win32 reading is the window that receives the keys, so it is stronger than the UI Automation reading, and the
+  test is the exact handle or a child of the control. For a control that must be cleared, select all and delete is still checked by reading the text.
+- A control that passed before now fails. The old condition is still one of the three, so nothing that passed can fail.
+- The thread of the dialog cannot be read. The Win32 reading then says nothing and the UI Automation reading decides, as before.
+- The typed text lands in the host and not in the inner edit. The text of the edit is read back after the typing and after the commit
+  (`immediate`, `observed`), so a text that did not arrive shows in the result.
+
+The self test checks the decision on made-up handles: the control, a child of it, the host of it, nothing, and the old condition alone.
+
+Unproved, for the next real run to confirm from `result.json`:
+
+- That `E/Decimal_TypedAboveMax` types `9999` and `E/Decimal_TypedLetters` types `12ab` (`typed: true`, `via: keys`), and what the edit holds
+  after the commit (`immediate`, `observed`, `clamped`). That is what classic does with typed letters and with a typed value above the maximum.
+- Whether the number control takes letters at all. It may drop them while typing, which would show as an `immediate` with no letters.
+
+## 44. OK that leaves the dialog open with no message box is an outcome
+
+`E/LongDecimal_Required_Empty` operation 4 (a required long decimal given `x`, then OK) failed with `the dialog stayed open 15 seconds after OK`.
+The screenshot `stuck-OK.png` shows the policy dialog open after OK with the letter in the field and no message box. Operation 2 of the same case
+(the empty text) showed a box and was recorded as a refusal. So classic refuses a bad value in two ways, with a box and without one, and the second is
+classic behaviour. `Press` treated it as a driver failure (`closes && !closed && boxes.Count == 0`) and threw before the file settle and before
+`presses` was filled, so the read of the open dialog and the Cancel at the end had no data to go with.
+
+What the driver does now. After the 15 s wait for OK, which is not shortened, when the dialog is still open and no message box came, the press
+records the outcome: `stayedOpen: true`, next to `closed: false` and `messageBoxes: []` that it already has, and the screenshot as before. The press
+goes on to the file settle that every press does. Then it decides on the settled files:
+
+- No file changed: the outcome stands. The operation continues as for a refusal with a box: the read of the open dialog (`dialogStillOpen`) and the
+  Cancel at the end (`cancelledAtEnd`).
+- A file changed while the dialog stayed open: classic wrote something and kept the dialog, which a refusal does not explain. The press throws
+  `the dialog stayed open after OK but files changed`, with the press as evidence.
+- The dialog is still open after the Cancel at the end: unchanged, a failure, as for any Cancel.
+
+Cancel still needs the dialog to close, and a press that is not OK is judged as before. `Apply` leaves the dialog open on purpose and never failed
+here, so it does not get the key. `stayedOpen` is classic behaviour (that it kept the dialog and wrote nothing) and reaches the golden next to `closed`
+and `messageBoxes`. The screenshot name is a diagnostic as before.
+
+What can go wrong and the guard of each:
+
+- A slow close is taken as a stay. The wait is the old 15 s. If the dialog closes later, the read of the open dialog is skipped (it only runs when
+  the dialog is open) and the Cancel at the end is not pressed, so a late close shows as a `stayedOpen: true` entry without `dialogStillOpen`. The
+  next run reads it.
+- A write that comes after the settle is missed. The settle of this press is the settle of every OK: the file grace of 1200 ms and then the live registry
+  wait, the same as for an OK that closes.
+- A stay with a changed file passes as an outcome. The decision uses `changed` of the settle and throws for it.
+- The Cancel at the end does not close the dialog. It throws as before, and the `finally` cleanup of the operation closes what is left.
+
+The self test checks the decision for each combination of button, closed, message boxes and changed files: closed, a box, stayed open with no
+change, stayed open with a change, and a Cancel that does not close.
+
+Unproved, for the next real run to confirm from `result.json`:
+
+- That operation 4 of `E/LongDecimal_Required_Empty` records `stayedOpen: true`, no file change, `dialogStillOpen` and a Cancel that closes the dialog.
+- Whether other Group E cases stay open without a box (a letter in the other number controls). This change records them the same way.

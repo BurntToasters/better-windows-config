@@ -382,6 +382,21 @@ internal static class OpsRunner
         entry["node"] = driver.Phases.Run("nodeSelection", () => driver.SelectNode(op.Root, op.Path));
     }
 
+    // The same as EnsureNode for the operations that must cope with a node the filter hides (failure mode 42). Null when the node is selected;
+    // the description of a hidden node otherwise.
+    private static JsonObject? EnsureNodeOrHidden(GpeditDriver driver, GpeditOp op, JsonObject entry, bool selectAncestor) =>
+        op.Root is null || op.Path is null ? null : driver.EnsureNodeOrHidden(op.Root, op.Path, entry, selectAncestor);
+
+    private static JsonObject WithHidden(JsonObject result, JsonObject? hidden)
+    {
+        if (hidden is not null)
+        {
+            result["hiddenNode"] = hidden;
+        }
+
+        return result;
+    }
+
     private static JsonNode? Execute(GpeditDriver driver, GpeditOp op, JsonObject entry)
     {
         switch (op.Kind)
@@ -393,7 +408,11 @@ internal static class OpsRunner
                 return driver.TreeChildren(op.Root!, op.Path!);
 
             case "readList":
-                EnsureNode(driver, op, entry);
+                if (EnsureNodeOrHidden(driver, op, entry, selectAncestor: false) is { } hiddenList)
+                {
+                    return hiddenList;
+                }
+
                 return driver.ReadList(op.MaxRows ?? 6000, op.NamesOnly ?? false);
 
             case "readStatus":
@@ -417,16 +436,16 @@ internal static class OpsRunner
                 return driver.DumpTopMenu(op.Menu!);
 
             case "setFilter":
-                EnsureNode(driver, op, entry);
-                return driver.SetFilter(op.Filter!, op.Press is { Count: > 0 } ? op.Press[0] : "OK", op.MessageBoxAnswer);
+                JsonObject? hiddenForSet = EnsureNodeOrHidden(driver, op, entry, selectAncestor: true);
+                return WithHidden(driver.SetFilter(op.Filter!, op.Press is { Count: > 0 } ? op.Press[0] : "OK", op.MessageBoxAnswer), hiddenForSet);
 
             case "filterOn":
-                EnsureNode(driver, op, entry);
-                return driver.SetFilterOn(op.FilterOn!.Value);
+                JsonObject? hiddenForOn = EnsureNodeOrHidden(driver, op, entry, selectAncestor: true);
+                return WithHidden(driver.SetFilterOn(op.FilterOn!.Value), hiddenForOn);
 
             case "clearFilter":
-                EnsureNode(driver, op, entry);
-                return driver.ClearFilter();
+                JsonObject? hiddenForClear = EnsureNodeOrHidden(driver, op, entry, selectAncestor: true);
+                return WithHidden(driver.ClearFilter(), hiddenForClear);
 
             case "sortColumn":
                 EnsureNode(driver, op, entry);

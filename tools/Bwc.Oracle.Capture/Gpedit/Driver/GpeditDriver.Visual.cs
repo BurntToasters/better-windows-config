@@ -82,9 +82,16 @@ internal sealed partial class GpeditDriver
 
         result["toolbars"] = toolbars;
         var uiaBars = new JsonArray();
+        string route = UiaScope.Route(VisibleListRows());
+        result["uiaRoute"] = route;
         try
         {
-            foreach (AutomationElement bar in ProbeUia.OfType(Main(), ControlType.ToolBar))
+            // The search over the main window walks every row of a big list (failure mode 40): from LargeListRows rows the toolbar windows are
+            // taken by their handles instead.
+            IEnumerable<AutomationElement> bars = route == UiaScope.RouteNarrow
+                ? ElementsOfWindows(UiaScope.ToolbarClass, ControlType.ToolBar)
+                : ProbeUia.OfType(Main(), ControlType.ToolBar);
+            foreach (AutomationElement bar in bars)
             {
                 var buttons = new JsonArray();
                 foreach (AutomationElement button in ProbeUia.OfType(bar, ControlType.Button))
@@ -110,7 +117,7 @@ internal sealed partial class GpeditDriver
         ListCandidate? list = VisibleList();
         if (list is not null)
         {
-            foreach (AutomationElement header in ProbeUia.OfType(list.List, ControlType.HeaderItem))
+            foreach (AutomationElement header in HeaderItems(list.List, list.Rows))
             {
                 JsonObject node = RectRelative(header.Current.BoundingRectangle, mainRect);
                 node["name"] = ProbeUia.NameOf(header).Trim();

@@ -500,10 +500,9 @@ internal sealed partial class PolicyDialog
         DriverInput.RequireForeground(Hwnd, driver.Pid);
         ProbeUia.Focus(AutomationElement.FromHandle(control));
         Thread.Sleep(200);
-        AutomationElement? focused = AutomationElement.FocusedElement;
-        if (focused is null || focused.Current.NativeWindowHandle != control.ToInt32())
+        if (!FocusOnControl(control, out string focusReadings))
         {
-            throw new DriverException($"{name} did not get the keyboard focus, so nothing was typed");
+            throw new DriverException($"{name} did not get the keyboard focus, so nothing was typed ({focusReadings})");
         }
 
         DriverInput.Chord(new[] { DriverInput.VkControl }, DriverInput.VkA);
@@ -552,11 +551,38 @@ internal sealed partial class PolicyDialog
                 $"focus stolen while {name} was typed: the foreground window is 0x{front:X} '{ProbeWindows.ClassOf(front)}' '{ProbeWindows.TitleOf(front)}', not a window of mmc.exe (pid {driver.Pid}). No more keys were sent.");
         }
 
-        AutomationElement? focused = AutomationElement.FocusedElement;
-        if (focused is null || focused.Current.NativeWindowHandle != control.ToInt32())
+        if (!FocusOnControl(control, out string focusReadings))
         {
-            throw new DriverException($"the keyboard focus left {name} while it was typed. No more keys were sent.");
+            throw new DriverException($"the keyboard focus left {name} while it was typed. No more keys were sent. ({focusReadings})");
         }
+    }
+
+    // Whether the keyboard focus is on the control, from two readings: the handle UI Automation gives the focused element, and the window that has
+    // the keyboard focus in the thread of the control (GetGUIThreadInfo). The inner edit of a Windows Forms number control has no UI Automation
+    // element, so only the second reading sees it (failure mode 43). The readings come back as text for the error.
+    private static bool FocusOnControl(IntPtr control, out string readings)
+    {
+        int uiaHandle = 0;
+        try
+        {
+            uiaHandle = AutomationElement.FocusedElement?.Current.NativeWindowHandle ?? 0;
+        }
+        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException)
+        {
+            uiaHandle = 0;
+        }
+
+        IntPtr focus = IntPtr.Zero;
+        uint thread = Win32.GetWindowThreadProcessId(control, out _);
+        var info = new GuiThreadInfo { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<GuiThreadInfo>() };
+        if (thread != 0 && Win32Ext.GetGUIThreadInfo(thread, ref info))
+        {
+            focus = info.hwndFocus;
+        }
+
+        bool child = focus != IntPtr.Zero && DriverNative.IsChild(control, focus);
+        readings = $"UI Automation focus 0x{uiaHandle:X}, keyboard focus 0x{focus:X} '{(focus == IntPtr.Zero ? string.Empty : ProbeWindows.ClassOf(focus))}', control 0x{control:X}";
+        return TypingFocus.IsOnControl(uiaHandle, focus, control, child);
     }
 
     private JsonObject SetCheck(OptionGroup group, bool wanted)

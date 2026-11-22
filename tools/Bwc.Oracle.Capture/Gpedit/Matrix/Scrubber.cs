@@ -38,6 +38,8 @@ internal sealed partial class Scrubber
         "gridRead", "clearPasses",
         // The route that closed the Show Contents dialog after a refused list (failure mode 38 of the driver document).
         "cancelClosedBy",
+        // Which lookup route read the status bar, the tabs or the layout, and how a column header was brought into view (failure modes 40 and 41).
+        "uiaRoute", "scrolledBy", "scrollSteps",
     };
 
     private readonly HashSet<string> allowed;

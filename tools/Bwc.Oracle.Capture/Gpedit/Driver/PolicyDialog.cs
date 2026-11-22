@@ -312,10 +312,20 @@ internal sealed partial class PolicyDialog
 
         result["messageBoxes"] = boxes;
         result["closed"] = closed;
-        if (closes && !closed && boxes.Count == 0)
+
+        // A Cancel that does not close is a failure. An OK that leaves the dialog open with no message box is classic refusing the value without a
+        // box, which is an outcome unless a file changed (failure mode 44); that is decided after the file settle below.
+        PressVerdict early = closes ? PressOutcome.Judge(button, closed, boxes.Count, filesChanged: false) : PressVerdict.NotJudged;
+        if (early == PressVerdict.Failed || early == PressVerdict.StayedOpen)
         {
             string shot = driver.Shot(Hwnd, "stuck-" + button);
-            throw new DriverException($"the dialog stayed open 15 seconds after {button}. Screenshot: {shot}");
+            if (early == PressVerdict.Failed)
+            {
+                throw new DriverException($"the dialog stayed open 15 seconds after {button}. Screenshot: {shot}");
+            }
+
+            result["stayedOpen"] = true;
+            result["screenshot"] = shot;
         }
 
         if (button is "Previous" or "Next")
@@ -337,6 +347,12 @@ internal sealed partial class PolicyDialog
         }
 
         result["files"] = settled;
+        if (early == PressVerdict.StayedOpen
+            && PressOutcome.Judge(button, closed, boxes.Count, settled["changed"]?.GetValue<bool>() == true) == PressVerdict.Failed)
+        {
+            throw new DriverException($"the dialog stayed open after {button} but files changed. Screenshot: {result["screenshot"]}", evidence: result);
+        }
+
         return result;
     }
 

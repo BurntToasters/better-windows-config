@@ -16,4 +16,7 @@ internal sealed class DriverException : Exception
     internal bool Fatal { get; }
 
     internal JsonNode? Evidence { get; }
+
+    // Set by the tree selection when a segment of the path was missing under a parent that was found (failure mode 42).
+    internal TreeGap? Gap { get; init; }
 }
