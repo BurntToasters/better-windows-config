@@ -1,0 +1,14 @@
+# Capture cases whose golden is stale and waits for a recapture (CAP-4: classic's dialog did not notice a number box edit).
+# One case id per line, group and folder separated by a slash. A listed case is not replayed: its row reports "awaiting
+# recapture". Remove a case here when its recaptured golden is committed. AwaitingRecaptureListIsEmpty fails while any is left.
+B/Pol_Both_WithElements.Computer
+B/Pol_Both_WithElements.User
+B/Pol_Decimal_MinMax
+B/Pol_Decimal_Soft
+B/Pol_Decimal_StoreAsText
+B/Pol_LongDecimal_Basic
+E/Decimal_EdgeValues
+E/Decimal_NotNumber
+E/Decimal_Soft_OutOfRange
+E/Decimal_StoreAsText_OutOfRange
+E/LongDecimal_AboveMax

@@ -311,3 +311,8 @@ Disabled or Not Configured of this policy, and is not in `OwnedRecords`.
 A policy whose key has a leading backslash, or whose value name starts with `**`, makes the document refuse the call
 (section 5). The exception is `ArgumentException`. The loader may accept such a template (it only limits length), so the
 engine must not turn it into a silent write of a wrong record.
+
+### 16. Saving
+
+The one save that applies an edit and its comment to the files, and the replay of the captures against it, are in
+`docs/failure-modes/policy-save.md`.
