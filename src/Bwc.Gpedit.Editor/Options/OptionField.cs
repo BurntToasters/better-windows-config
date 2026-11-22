@@ -129,7 +129,7 @@ internal abstract class OptionField
     /// <summary>The items of a drop-down or combo box in display order, or null.</summary>
     internal virtual IReadOnlyList<string>? Items => null;
 
-    /// <summary>Shows a stored value, or the default of the presentation when there is none.</summary>
+    /// <summary>Shows a value: the stored one, or the default of <see cref="PolicyDefaults.For"/>. Null shows none.</summary>
     internal abstract void Load(ElementValue? stored);
 
     /// <summary>The value of the control, or null for a static text.</summary>

@@ -10,14 +10,17 @@ namespace Bwc.Gpedit.Policy;
 /// <param name="Policy">The policy the store opens through.</param>
 /// <param name="Description">One line for the log.</param>
 /// <param name="Problem">Why a requested sandbox was refused, or null.</param>
-internal sealed record GpeditStoreChoice(IGpoStorePolicy Policy, string Description, string? Problem);
+/// <param name="Access">Why the policy object cannot be saved (read-only mode), or no reason when it can.</param>
+internal sealed record GpeditStoreChoice(IGpoStorePolicy Policy, string Description, string? Problem, GpoAccessResult Access);
 
 /// <summary>
 /// The single place that chooses the policy object and the template sources of the Local Group Policy Editor, as
 /// <c>RegeditWritePolicy</c> does for the registry. The ship flavor always uses the system policy and the system and
 /// import store folders and reads no environment variable. Under <c>BWC_E2E</c> the sandbox root, the template root and
 /// the import store come from variables that only the tests set (docs/failure-modes/gpedit-tree-list.md, sections 1
-/// and 2). This piece only reads: no save path exists yet.
+/// and 2). The same choice gives the access of the process: the ship flavor asks <see cref="GpoAccess.Check"/> (not
+/// elevated, no write access, or Home means read-only), a sandbox is writable unless the test asks for read-only, and a run
+/// with no sandbox cannot save at all (docs/failure-modes/gpedit-dialog.md, section 15).
 /// </summary>
 internal static class GpeditStorePolicy
 {
@@ -32,23 +35,28 @@ internal static class GpeditStorePolicy
             return new GpeditStoreChoice(
                 new DenyAllGpoStorePolicy(runRoot),
                 "DenyAllGpoStorePolicy (BWC_E2E_GPO_ROOT is not set)",
-                null);
+                null,
+                new GpoAccessResult([GpoReadOnlyReason.NoWriteAccess]));
         }
 
         try
         {
             var sandbox = new SandboxGpoStorePolicy(configured.Trim(), runRoot);
-            return new GpeditStoreChoice(sandbox, "SandboxGpoStorePolicy(" + sandbox.GpoRoot + ")", null);
+            bool readOnly = string.Equals(Environment.GetEnvironmentVariable("BWC_E2E_GPEDIT_READONLY"), "1", StringComparison.Ordinal);
+            GpoAccessResult access = new(readOnly ? [GpoReadOnlyReason.NoWriteAccess] : []);
+            return new GpeditStoreChoice(sandbox, "SandboxGpoStorePolicy(" + sandbox.GpoRoot + ")", null, access);
         }
         catch (Exception ex) when (ex is ArgumentException or GpoStoreException)
         {
             return new GpeditStoreChoice(
                 new DenyAllGpoStorePolicy(runRoot),
                 "DenyAllGpoStorePolicy (invalid BWC_E2E_GPO_ROOT)",
-                ex.Message);
+                ex.Message,
+                new GpoAccessResult([GpoReadOnlyReason.NoWriteAccess]));
         }
 #else
-        return new GpeditStoreChoice(new SystemGpoStorePolicy(), "SystemGpoStorePolicy", null);
+        var system = new SystemGpoStorePolicy();
+        return new GpeditStoreChoice(system, "SystemGpoStorePolicy", null, GpoAccess.Check(system));
 #endif
     }
 

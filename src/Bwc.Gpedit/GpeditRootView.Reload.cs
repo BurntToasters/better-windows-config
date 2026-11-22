@@ -189,6 +189,7 @@ public sealed partial class GpeditRootView
     private void ApplyInitialModel(GpeditModel model)
     {
         _model = model;
+        UpdateReadOnlyNotice(model);
         Log.Info(
             $"Local Group Policy Editor model loaded in {model.LoadTime.TotalMilliseconds:0} ms: " +
             $"{model.Templates.Files.Count} templates, {model.Templates.Categories.Count} categories, " +
@@ -222,6 +223,7 @@ public sealed partial class GpeditRootView
         _model = model;
         _source = source;
         _refreshes++;
+        UpdateReadOnlyNotice(model);
 
         TreeNode current;
         bool exact;
@@ -264,6 +266,29 @@ public sealed partial class GpeditRootView
 
         Shell.TreeContent.SelectNode(root);
         return root;
+    }
+
+    /// <summary>Shows the notice of a window that cannot save, with the first reason that applies, or hides it.</summary>
+    private void UpdateReadOnlyNotice(GpeditModel model)
+    {
+        if (!model.IsReadOnly)
+        {
+            ReadOnlyNotice.Visibility = Microsoft.UI.Xaml.Visibility.Collapsed;
+            return;
+        }
+
+        string key = model.Access.Reasons.Count == 0
+            ? "GpeditReadOnlyNoWriteAccess"
+            : model.Access.Reasons[0] switch
+            {
+                GpoReadOnlyReason.NotElevated => "GpeditReadOnlyNotElevated",
+                GpoReadOnlyReason.HomeEdition => "GpeditReadOnlyHomeEdition",
+                _ => "GpeditReadOnlyNoWriteAccess",
+            };
+        string text = GpeditStrings.Tree(key);
+        ReadOnlyNotice.Text = text;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ReadOnlyNotice, text);
+        ReadOnlyNotice.Visibility = Microsoft.UI.Xaml.Visibility.Visible;
     }
 
     // ---- what a reload keeps ------------------------------------------------------------------------

@@ -172,4 +172,16 @@
   <data name="GpeditPlaceholderPageName" xml:space="preserve">
     <value>Not available yet</value>
   </data>
+  <!-- BWC authored: the notice of a window that cannot save because the process is not elevated. -->
+  <data name="GpeditReadOnlyNotElevated" xml:space="preserve">
+    <value>This window is read-only. Start the editor as an administrator to change policy settings.</value>
+  </data>
+  <!-- BWC authored: the notice of a window that cannot save because this account cannot write the local policy folder. -->
+  <data name="GpeditReadOnlyNoWriteAccess" xml:space="preserve">
+    <value>This window is read-only. This account cannot write to the local policy folder.</value>
+  </data>
+  <!-- BWC authored: the notice of a window that cannot save because this edition of Windows has no Local Group Policy. -->
+  <data name="GpeditReadOnlyHomeEdition" xml:space="preserve">
+    <value>This window is read-only. This edition of Windows does not apply Local Group Policy.</value>
+  </data>
 </root>

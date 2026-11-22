@@ -15,7 +15,6 @@ internal sealed class DropField : OptionField
     private readonly ComboBox _combo;
     private readonly List<string> _items = [];
     private readonly List<int> _order = [];
-    private readonly int _default;
 
     internal DropField(OptionsContext context, PresentationControl control, EnumElement element)
         : base(context, control)
@@ -38,7 +37,6 @@ internal sealed class DropField : OptionField
         }
 
         _combo.ItemsSource = _items;
-        _default = control.DefaultItem is { } item && item < (ulong)element.Items.Count ? (int)item : 0;
         _combo.SelectionChanged += (_, _) => NotifyChanged();
         Parts = _label is null ? [_combo] : [_label, _combo];
     }
@@ -51,14 +49,14 @@ internal sealed class DropField : OptionField
 
     internal override void Load(ElementValue? stored)
     {
-        int index = stored is ChoiceValue choice ? choice.ItemIndex : _default;
-        _combo.SelectedIndex = _order.IndexOf(index);
+        // No stored choice and no default item: nothing is selected, as in classic, and OK is refused until one is chosen.
+        _combo.SelectedIndex = stored is ChoiceValue choice ? _order.IndexOf(choice.ItemIndex) : -1;
     }
 
     internal override ElementValue? Read()
     {
         int selected = _combo.SelectedIndex;
-        return new ChoiceValue(selected >= 0 && selected < _order.Count ? _order[selected] : _default);
+        return selected >= 0 && selected < _order.Count ? new ChoiceValue(_order[selected]) : null;
     }
 
     internal override void SetEnabled(bool enabled) => _combo.IsEnabled = enabled;

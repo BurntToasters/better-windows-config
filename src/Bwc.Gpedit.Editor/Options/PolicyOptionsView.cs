@@ -28,6 +28,7 @@ internal sealed class PolicyOptionsView
     private readonly Canvas _canvas;
     private readonly OptionsContext _context;
     private readonly List<OptionField> _fields = [];
+    private readonly IReadOnlyDictionary<string, ElementValue> _defaults;
     private PolicyStateSnapshot? _snapshot;
 
     internal PolicyOptionsView(PolicyDefinition policy, Canvas canvas, OptionsContext context)
@@ -35,6 +36,7 @@ internal sealed class PolicyOptionsView
         _policy = policy;
         _canvas = canvas;
         _context = context;
+        _defaults = PolicyDefaults.For(policy);
         canvas.Children.Clear();
         foreach (PresentationControl control in policy.Presentation?.Controls ?? [])
         {
@@ -82,7 +84,10 @@ internal sealed class PolicyOptionsView
         }
     }
 
-    /// <summary>Shows the stored values of the snapshot (only when its state is Enabled), or the defaults.</summary>
+    /// <summary>
+    /// Shows the stored values of the snapshot (only when its state is Enabled), or the defaults of
+    /// <see cref="PolicyDefaults.For"/>, which hold what classic shows before anything is typed.
+    /// </summary>
     internal void Load(PolicyStateSnapshot? snapshot)
     {
         _snapshot = snapshot;
@@ -104,12 +109,17 @@ internal sealed class PolicyOptionsView
 
     private ElementValue? StoredFor(OptionField field)
     {
-        if (_snapshot is not { State: PolicyState.Enabled } snapshot || field.Element is not { } element)
+        if (field.Element is not { } element)
         {
             return null;
         }
 
-        return snapshot.Elements.TryGetValue(element.Id, out ElementValue? value) ? value : null;
+        if (_snapshot is { State: PolicyState.Enabled } snapshot && snapshot.Elements.TryGetValue(element.Id, out ElementValue? stored))
+        {
+            return stored;
+        }
+
+        return _defaults.TryGetValue(element.Id, out ElementValue? fallback) ? fallback : null;
     }
 
     /// <summary>
@@ -255,9 +265,19 @@ internal sealed class PolicyOptionsView
     {
         var text = new StringBuilder();
         text.Append("Enabled=").Append(Enabled ? '1' : '0').Append(';');
-        foreach ((string id, ElementValue value) in ReadValues().OrderBy(p => p.Key, StringComparer.Ordinal))
+        IReadOnlyDictionary<string, ElementValue> values = ReadValues();
+        foreach ((string id, ElementValue value) in values.OrderBy(p => p.Key, StringComparer.Ordinal))
         {
             text.Append("V.").Append(id).Append('=').Append(Uri.EscapeDataString(OptionValueJson.Serialize(value))).Append(';');
+        }
+
+        // A drop-down with nothing selected has no value to apply; the readout shows it as item -1 so the control is listed.
+        foreach (OptionField field in _fields)
+        {
+            if (field.Element is { Kind: PolicyElementKind.Enum } element && !values.ContainsKey(element.Id))
+            {
+                text.Append("V.").Append(element.Id).Append('=').Append(Uri.EscapeDataString(OptionValueJson.Serialize(ElementValue.FromChoice(-1)))).Append(';');
+            }
         }
 
         foreach (OptionField field in _fields)

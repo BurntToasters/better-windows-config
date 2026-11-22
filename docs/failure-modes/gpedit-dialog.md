@@ -151,12 +151,12 @@ Failure mode: Apply or OK writes the policy file, the version file or the commen
 the machine changes in a test.
 
 - Handling: `Bwc.Gpedit.Editor` names no file API (the writer guard `scripts/check-policy-writer.js` scans it). The dialog calls one
-  interface, `IPolicyEditStore.Apply`, whose only implementation here (`InMemoryPolicyEditStore`) changes the models of the loaded
-  snapshot. Piece G4 replaces that one class to save. The harness hashes the real policy folder around every unelevated run
-  (`gpo.real-unchanged`).
-- E2E: `Gpedit_Dialog_OkWritesNothing` hashes the sandbox policy file, version file and comment file of both sides (SHA-256 of
-  the bytes, or "absent"), applies a state and a comment with Apply and OK, and checks all hashes are equal afterwards. The run
-  artifact holds `gpo.real-unchanged`.
+  interface, `IPolicyEditStore.Apply`. In G3a its only implementation changed the models of the loaded snapshot; from piece G4 on
+  it is `PolicySaveStore` (`src/Bwc.Gpedit/Save`), which saves through `PolicySave.Save` (section 15). The harness hashes the real
+  policy folder around every unelevated run (`gpo.real-unchanged`).
+- E2E: G3a hashed the sandbox files around an Apply and OK and required them equal. G4 changed the test and renamed it
+  `Gpedit_Dialog_OkSaves`: the hashes must differ afterwards, the list shows the saved state, and the saved bytes stay after the
+  editor exits. The run artifact holds `gpo.real-unchanged`.
 
 ## 9. Previous Setting and Next Setting
 
@@ -288,7 +288,34 @@ Cases that are not replayed through the window, and why: the cases of `awaiting-
 number box edit made without key presses, so their goldens are stale until a recapture); groups C, D, E and K stay engine
 replays (`tests/Bwc.Policy.Tests/Golden`), because the window adds no behavior to them beyond what groups A and B show.
 
-Tests written before G4 that the code piece must change, because they state the G3a behavior: `Gpedit_Options_List` (two checks,
-changed in this dispatch to classic's refusal of an empty list), `Gpedit_Dialog_OkWritesNothing` (section 8: OK and Apply now
-write), `Gpedit_Dialog_ReadOnly` (section 10: OK must not close silently) and `Gpedit_Options_Defaults` (`choiceNoDefault.first`
-expects the first item of an enum with no `defaultItem`; classic selects nothing, W12).
+Tests written before G4 that the code piece had to change, because they stated the G3a behavior: `Gpedit_Options_List` (two checks,
+changed in the tests dispatch to classic's refusal of an empty list), `Gpedit_Dialog_OkWritesNothing` (section 8, now
+`Gpedit_Dialog_OkSaves`: OK and Apply write), `Gpedit_Dialog_ReadOnly` (section 10: the dialog now shows `DialogReadOnlyNotice`, so
+OK closing without a save is not silent, and a check that OK writes no file was added) and `Gpedit_Options_Defaults`
+(`choiceNoDefault.first` expected the first item of an enum with no `defaultItem`; classic selects nothing, W12).
+
+### 15.1 What the code does (piece G4, dispatch C)
+
+- `PolicySaveStore` (`src/Bwc.Gpedit/Save/PolicySaveStore.cs`) implements `IPolicyEditStore`. `Apply` calls
+  `PolicySave.Save(store, target.Side, ...)`, so the side is the side of the node the policy was opened from. When files were
+  written it opens the store again, so `PolFor` and `CommentsFor` give what is on disk. The view keeps one `GpoStore` for the
+  window (it makes the backup of the session once) and, on `Applied`, replaces the loaded model with
+  `GpeditModel.WithSnapshot(store.Snapshot)` before it rebuilds the rows.
+- `InMemoryPolicyEditStore` was deleted. The guard rule `in-memory-store` (`scripts/check-policy-writer.js`, cases (a) to (f) of
+  `--self-test`) stops it from coming back into a ship file.
+- Access comes from the one place that chooses the policy object, `GpeditStorePolicy.Choose`. Ship: `GpoAccess.Check` (not
+  elevated, no write access, Home). E2E with a sandbox root: writable, or read-only with `BWC_E2E_GPEDIT_READONLY=1`. E2E with no
+  sandbox root or an invalid one: read-only, because the deny-all policy refuses every write. The window shows
+  `GpeditReadOnlyNotice` under the status bar with the first reason, and the dialog shows `DialogReadOnlyNotice` (or a notice that
+  its policy file could not be read) at the left of the buttons. In read-only mode Apply is disabled and OK only closes.
+- The save runs on the thread pool: the lock can take 15 seconds, and the window must not freeze. While it runs the dialog is
+  busy: OK, Cancel, Apply, Previous and Next are disabled, keys are swallowed, and a close from the caption is refused. OK closes the
+  dialog when the save succeeded. A `GpoStoreException` becomes one message box whose text has the id `DialogSaveError.<Kind>`
+  (`SaveErrorMessages`): `ReadOnlyFile`, `Malformed`, `LockTimeout` (also `LockUnavailable`), `InUse`, `Partial` (files written
+  before the failure, named in the text), `ReadOnlyMode` and `Failed`. A refresh failure after a write is `RefreshFailed`: a notice,
+  the dialog counts the change as saved.
+- `PolicyOptionsView.Load` takes the value of a field that has no stored value from `PolicyDefaults.For`. The fields keep no default
+  logic of their own any more. An enum with no `defaultItem` loads with nothing selected and reads no value, so the validator
+  refuses OK until an item is chosen; an Enabled list with no rows is refused by the same validator.
+- Declared difference: OK in a read-only dialog still closes, with the notice visible. Classic's own dialog in that case is not
+  captured.

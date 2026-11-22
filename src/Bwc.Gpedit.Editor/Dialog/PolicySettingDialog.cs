@@ -2,6 +2,7 @@ using System.Globalization;
 using Bwc.Gpo.Comments;
 using Bwc.Gpedit.Editor.Options;
 using Bwc.Gpo.Pol;
+using Bwc.Gpo.Store;
 using Bwc.Policy.Admx;
 using Bwc.Policy.Model;
 using Bwc.UI;
@@ -33,9 +34,9 @@ namespace Bwc.Gpedit.Editor.Dialog;
 /// is in docs/failure-modes/gpedit-dialog.md.
 /// </summary>
 /// <remarks>
-/// The dialog reads the state and the comment through <see cref="IPolicyEditStore"/> and applies
-/// through the same seam, which
-/// in G3a changes the in-memory models only. The dialog names no file.
+/// The dialog reads the state and the comment through <see cref="IPolicyEditStore"/> and applies through the same seam,
+/// which saves the edit and hands out the files as read back (piece G4). The save runs off the UI thread, because it can
+/// wait for the write lock; the dialog is busy meanwhile and ignores every command. The dialog names no file.
 /// </remarks>
 public sealed class PolicySettingDialog : ClassicDialog
 {
@@ -80,6 +81,7 @@ public sealed class PolicySettingDialog : ClassicDialog
     private readonly FrameworkElement _supportedOnLabel;
     private readonly FrameworkElement _optionsLabel;
     private readonly FrameworkElement _helpLabel;
+    private readonly TextBlock _readOnlyNotice;
     private readonly AutomationHost _icon;
     private readonly AutomationHost _optionsHost;
     private readonly Canvas _optionsPanel;
@@ -88,6 +90,8 @@ public sealed class PolicySettingDialog : ClassicDialog
     private int _index;
     private bool _loading;
     private bool _messageOpen;
+    private bool _busy;
+    private bool _closed;
     private bool _optionsDirty;
     private bool _externalDirty;
     private PolicyOptionsView? _options;
@@ -127,6 +131,9 @@ public sealed class PolicySettingDialog : ClassicDialog
         _supportedOnLabel = RequireControl<FrameworkElement>("labelSupportedOn");
         _optionsLabel = RequireControl<FrameworkElement>("label2");
         _helpLabel = RequireControl<FrameworkElement>("label1");
+        _readOnlyNotice = RequireControl<TextBlock>("DialogReadOnlyNotice");
+        _readOnlyNotice.Visibility = Visibility.Collapsed;
+        Closed += (_, _) => _closed = true;
 
         _title.TextTrimming = TextTrimming.CharacterEllipsis;
         _comment.MaxLength = CommentMaxLength;
@@ -254,6 +261,7 @@ public sealed class PolicySettingDialog : ClassicDialog
             LabelDef("labelSupportedOn", DialogStrings.Get("DialogSupportedOnLabel"), 129, 129, 82, 52),
             LabelDef("label2", DialogStrings.Get("DialogOptionsLabel"), 3, 190, 52, 15),
             LabelDef("label1", DialogStrings.Get("DialogHelpLabel"), 309, 190, 35, 15),
+            LabelDef("DialogReadOnlyNotice", string.Empty, 9, 567, 420, 25, literal: true),
         ];
         return new ClassicDialogDefinition(
             caption,
@@ -319,6 +327,10 @@ public sealed class PolicySettingDialog : ClassicDialog
         }
 
         bool locked = IsReadOnly;
+        string notice = _store.IsReadOnly ? DialogStrings.Get("DialogReadOnlyNotice") : DialogStrings.Get("DialogUnreadableNotice");
+        _readOnlyNotice.Text = locked ? notice : string.Empty;
+        AutomationProperties.SetName(_readOnlyNotice, _readOnlyNotice.Text);
+        _readOnlyNotice.Visibility = locked ? Visibility.Visible : Visibility.Collapsed;
         _notConfigured.IsEnabled = !locked;
         _enabled.IsEnabled = !locked;
         _disabled.IsEnabled = !locked;
@@ -415,10 +427,27 @@ public sealed class PolicySettingDialog : ClassicDialog
 
     private void UpdateButtons()
     {
-        _apply.IsEnabled = !IsReadOnly && IsDirty;
-        _previous.IsEnabled = _index > 0;
-        _next.IsEnabled = _index < _order.Count - 1;
-        EnsureFocusIsUsable();
+        if (_closed)
+        {
+            return;
+        }
+
+        _apply.IsEnabled = !IsReadOnly && IsDirty && !_busy;
+        _previous.IsEnabled = _index > 0 && !_busy;
+        _next.IsEnabled = _index < _order.Count - 1 && !_busy;
+        _ok.IsEnabled = !_busy;
+        _cancel.IsEnabled = !_busy;
+        try
+        {
+            EnsureFocusIsUsable();
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+            // A selection or text event of a control can arrive while the window closes; the closed window refuses its content.
+            _closed = true;
+            return;
+        }
+
         UpdateReadout();
     }
 
@@ -456,15 +485,20 @@ public sealed class PolicySettingDialog : ClassicDialog
         switch (id)
         {
             case PreviousId:
-                Move(-1);
+                _ = MoveAsync(-1);
                 break;
             case NextId:
-                Move(1);
+                _ = MoveAsync(1);
                 break;
             case ApplyId:
-                _ = TryApply();
+                _ = ApplyAsync();
                 break;
             default:
+                if (_busy)
+                {
+                    break;
+                }
+
                 if (_options?.TryRun(id) != true)
                 {
                     base.OnCommand(id, automationId);
@@ -474,13 +508,42 @@ public sealed class PolicySettingDialog : ClassicDialog
         }
     }
 
-    /// <summary>OK applies a pending change and closes; with nothing changed (or read-only) it only closes.</summary>
-    protected override bool TryAccept() => !IsDirty || IsReadOnly || TryApply();
+    /// <summary>
+    /// OK with nothing changed (or read-only) only closes. OK with a pending change starts the save and keeps the dialog
+    /// open; the dialog closes when the save succeeded, and stays open with a message when it did not.
+    /// </summary>
+    protected override bool TryAccept()
+    {
+        if (_busy)
+        {
+            return false;
+        }
 
-    private void Move(int delta)
+        if (!IsDirty || IsReadOnly)
+        {
+            return true;
+        }
+
+        _ = ApplyThenAcceptAsync();
+        return false;
+    }
+
+    /// <summary>A close from the caption or Alt+F4 is refused while a save is running.</summary>
+    protected override bool IsCloseAllowed() => !_busy;
+
+    private async Task ApplyThenAcceptAsync()
+    {
+        if (await ApplyAsync())
+        {
+            // Nothing is pending now, so the base closes the dialog.
+            Accept();
+        }
+    }
+
+    private async Task MoveAsync(int delta)
     {
         int target = _index + delta;
-        if (target < 0 || target >= _order.Count || !CommitPending())
+        if (_busy || target < 0 || target >= _order.Count || !await CommitPendingAsync())
         {
             return;
         }
@@ -490,11 +553,21 @@ public sealed class PolicySettingDialog : ClassicDialog
     }
 
     /// <summary>Applies a pending change before the dialog moves to another policy (docs gpedit-dialog.md, OQ-D1).</summary>
-    private bool CommitPending() => IsReadOnly || !IsDirty || TryApply();
+    private async Task<bool> CommitPendingAsync() => IsReadOnly || !IsDirty || await ApplyAsync();
 
-    private bool TryApply()
+    private void SetBusy(bool busy)
     {
-        if (IsReadOnly)
+        _busy = busy;
+        UpdateButtons();
+    }
+
+    /// <summary>
+    /// Saves the pending change. True when it is saved (also when the policy refresh failed after the write, which the dialog
+    /// reports); false when nothing was written because of a problem or a failure, with the message shown and the change kept.
+    /// </summary>
+    private async Task<bool> ApplyAsync()
+    {
+        if (IsReadOnly || _busy)
         {
             return false;
         }
@@ -516,17 +589,29 @@ public sealed class PolicySettingDialog : ClassicDialog
         }
 
         PolicyApplyOutcome outcome;
+        SetBusy(true);
         try
         {
-            outcome = _store.Apply(target, edit, comment);
+            // The save can wait for the write lock for seconds, so it never runs on the thread of the window.
+            outcome = await Task.Run(() => _store.Apply(target, edit, comment));
+        }
+        catch (GpoStoreException ex)
+        {
+            SetBusy(false);
+            UiDiagnostics.Warn?.Invoke($"The setting '{target.Policy.FullName}' was not saved ({ex.Reason}): {ex.Message}");
+            SaveErrorMessage message = SaveErrorMessages.For(ex);
+            ShowMessage(DialogStrings.Get("DialogMessageCaption"), message.Text, textId: message.AutomationId);
+            return false;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
+            SetBusy(false);
             UiDiagnostics.Warn?.Invoke($"The setting '{target.Policy.FullName}' could not be applied: {ex.Message}");
             ShowMessage(DialogStrings.Get("DialogMessageCaption"), DialogStrings.Get("DialogFailedText"));
             return false;
         }
 
+        SetBusy(false);
         if (!outcome.IsApplied)
         {
             ShowProblem(target.Policy, outcome.Problems[0]);
@@ -543,6 +628,14 @@ public sealed class PolicySettingDialog : ClassicDialog
         _applyCount++;
         UpdateButtons();
         Applied?.Invoke(this, target);
+        if (outcome.RefreshFailure is not null)
+        {
+            // The files are on disk and the change is applied; only the policy refresh failed. The message is a notice.
+            UiDiagnostics.Warn?.Invoke($"The policy refresh after saving '{target.Policy.FullName}' failed: {outcome.RefreshFailure.Message}");
+            SaveErrorMessage notice = SaveErrorMessages.ForRefresh();
+            await ShowMessageAndWaitAsync(DialogStrings.Get("DialogMessageCaption"), notice.Text, null, notice.AutomationId);
+        }
+
         return true;
     }
 
@@ -595,22 +688,33 @@ public sealed class PolicySettingDialog : ClassicDialog
         return string.IsNullOrWhiteSpace(label) ? elementId : label.Trim().TrimEnd(':').TrimEnd();
     }
 
-    private void ShowMessage(string caption, string text, Action? afterClose = null)
+    private void ShowMessage(string caption, string text, Action? afterClose = null, string? textId = null)
+    {
+        _ = ShowMessageAndWaitAsync(caption, text, afterClose, textId);
+    }
+
+    /// <summary>Shows a message box and completes when it has been closed. A message that is already open wins.</summary>
+    private Task ShowMessageAndWaitAsync(string caption, string text, Action? afterClose, string? textId)
     {
         if (_messageOpen)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         _messageOpen = true;
-        _ = ShowMessageAsync(caption, text, afterClose);
+        return ShowMessageAsync(caption, text, afterClose, textId);
     }
 
-    private async Task ShowMessageAsync(string caption, string text, Action? afterClose)
+    private async Task ShowMessageAsync(string caption, string text, Action? afterClose, string? textId)
     {
         try
         {
-            var box = new ClassicMessageBox(caption, text, ClassicMessageIcon.Warning, ClassicMessageButtons.Ok);
+            var box = new ClassicMessageBox(
+                caption,
+                text,
+                ClassicMessageIcon.Warning,
+                ClassicMessageButtons.Ok,
+                textAutomationId: textId ?? "DialogMessage");
             _ = await box.ShowAsync(WindowNative.GetWindowHandle(this));
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -717,6 +821,7 @@ public sealed class PolicySettingDialog : ClassicDialog
         Place(_help, helpLeft, splitTop + 37, panel2 - 2, paneHeight);
 
         double buttonTop = height - 37;
+        Place(_readOnlyNotice, 9, buttonTop, Math.Max(40, width - 246 - 9 - 8), 25);
         Place(_ok, width - 246, buttonTop, 75, 25);
         Place(_cancel, width - 165, buttonTop, 75, 25);
         Place(_apply, width - 84, buttonTop, 75, 25);
@@ -751,6 +856,13 @@ public sealed class PolicySettingDialog : ClassicDialog
     {
         if (Content is not FrameworkElement { XamlRoot: { } xamlRoot })
         {
+            return;
+        }
+
+        // While a save runs the dialog takes no key: Escape would close it under the save.
+        if (_busy)
+        {
+            e.Handled = true;
             return;
         }
 

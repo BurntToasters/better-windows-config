@@ -55,8 +55,12 @@ internal sealed class GpeditModel
         GpoSnapshot? snapshot,
         IReadOnlyList<GpeditProblem> problems,
         TimeSpan loadTime,
-        string storeDescription)
+        string storeDescription,
+        IGpoStorePolicy? storePolicy = null,
+        GpoAccessResult? access = null)
     {
+        StorePolicy = storePolicy;
+        Access = access ?? new GpoAccessResult([GpoReadOnlyReason.NoWriteAccess]);
         Templates = templates;
         Snapshot = snapshot;
         Problems = problems;
@@ -79,6 +83,25 @@ internal sealed class GpeditModel
     /// <summary>The policy choice, for the log.</summary>
     public string StoreDescription { get; }
 
+    /// <summary>The policy the store opened through, or null when none was chosen (a model that did not load).</summary>
+    public IGpoStorePolicy? StorePolicy { get; }
+
+    /// <summary>
+    /// Why the policy object cannot be saved. A model that did not load has a reason, so nothing is saved through it.
+    /// </summary>
+    public GpoAccessResult Access { get; }
+
+    /// <summary>True when OK and Apply must not write: the access check found a reason, or no policy was chosen.</summary>
+    public bool IsReadOnly => Access.IsReadOnly || StorePolicy is null;
+
+    /// <summary>
+    /// The same model over the files as a save left them. The templates, the problems of the load and the access stay; the
+    /// states and comments the list shows come from the new snapshot.
+    /// </summary>
+    /// <param name="snapshot">The policy object as read after the save.</param>
+    public GpeditModel WithSnapshot(GpoSnapshot snapshot) =>
+        new(Templates, snapshot, Problems, LoadTime, StoreDescription, StorePolicy, Access);
+
     /// <summary>An empty model with no problem, for a view that has not loaded yet.</summary>
     public static GpeditModel Empty { get; } = new(TemplateSet.Empty, null, [], TimeSpan.Zero, string.Empty);
 
@@ -90,10 +113,12 @@ internal sealed class GpeditModel
         var templates = TemplateSet.Empty;
         GpoSnapshot? snapshot = null;
         string description = string.Empty;
+        GpeditStoreChoice? chosen = null;
 
         try
         {
             GpeditStoreChoice choice = GpeditStorePolicy.Choose();
+            chosen = choice;
             description = choice.Description;
             Log.Info("Local Group Policy Editor policy object: " + description);
             if (choice.Problem is not null)
@@ -115,7 +140,7 @@ internal sealed class GpeditModel
         }
 
         clock.Stop();
-        return new GpeditModel(templates, snapshot, problems, clock.Elapsed, description);
+        return new GpeditModel(templates, snapshot, problems, clock.Elapsed, description, chosen?.Policy, chosen?.Access);
     }
 
     /// <summary>The policy file model of a side, or null when it could not be read (or nothing was opened).</summary>

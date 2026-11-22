@@ -22,6 +22,7 @@ internal sealed class ShowContentsDialog : ClassicDialog
     private const double ClientWidthDip = 494;
     private const double ClientHeightDip = 304;
 
+    private readonly string _fieldName;
     private readonly bool _explicit;
     private readonly StringComparer _comparer;
     private readonly ClassicEditableGrid _grid;
@@ -37,6 +38,7 @@ internal sealed class ShowContentsDialog : ClassicDialog
     internal ShowContentsDialog(string fieldName, bool explicitValue, IReadOnlyList<IReadOnlyList<string>> rows, StringComparer valueComparer)
         : base(BuildTemplate(fieldName, explicitValue))
     {
+        _fieldName = fieldName;
         _explicit = explicitValue;
         _comparer = valueComparer;
         _grid = RequireControl<ClassicEditableGrid>("dataGrid");
@@ -148,6 +150,13 @@ internal sealed class ShowContentsDialog : ClassicDialog
     protected override bool TryAccept()
     {
         string[][] rows = _grid.Rows.Select(r => r.ToArray()).ToArray();
+        if (rows.Length == 0)
+        {
+            // Classic refuses OK on a grid with no row (B/Pol_List_Plain, the Show Contents box of step 7) and keeps it open.
+            ShowMessage(OptionsStrings.Format("OptionsListRequiredCaption", _fieldName), OptionsStrings.Get("OptionsListRequiredText"), -1, 0);
+            return false;
+        }
+
         ContentsProblem? problem = Check(rows, _explicit, _comparer);
         if (problem is null)
         {
@@ -225,7 +234,7 @@ internal sealed class ShowContentsDialog : ClassicDialog
         finally
         {
             _messageOpen = false;
-            _ = _grid.CellAt(row, column).Focus(FocusState.Programmatic);
+            _ = (row < 0 ? (Control)_grid : _grid.CellAt(row, column)).Focus(FocusState.Programmatic);
         }
     }
 

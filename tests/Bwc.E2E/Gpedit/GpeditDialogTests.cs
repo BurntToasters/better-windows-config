@@ -401,17 +401,21 @@ public sealed class GpeditDialogTests
         checks.AssertAllPassed();
     }
 
-    // ---- 8: nothing is written to disk ---------------------------------------------------------
+    // ---- 8: OK and Apply save to disk ----------------------------------------------------------
 
+    // G4 changed this test: in G3a OK and Apply changed memory only and the test required that no file changed (it was
+    // called Gpedit_Dialog_OkWritesNothing). From G4 on they save the policy object, so the test requires that the files
+    // changed, that the list shows the saved state, and that the saved files stay as they are after the editor exits.
     [TestMethod]
     [TestCategory("Gpedit")]
     [TestCategory("E2EOnly")]
-    public void Gpedit_Dialog_OkWritesNothing()
+    public void Gpedit_Dialog_OkSaves()
     {
         E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
-        var checks = new GpeditChecks("dialog", "nowrite");
-        GpeditRun run = Start("gpedit-dialog-nowrite", out GpeditSandbox sandbox);
+        var checks = new GpeditChecks("dialog", "save");
+        GpeditRun run = Start("gpedit-dialog-save", out GpeditSandbox sandbox);
         SortedDictionary<string, string> before = sandbox.PolicyFileHashes();
+        SortedDictionary<string, string>? saved = null;
         try
         {
             checks.Record("seeded", before.Values.Any(v => v != "absent"), $"hashes before={Describe(before)}.");
@@ -443,23 +447,24 @@ public sealed class GpeditDialogTests
             string[] applied = CellsOf(run, MachineFlag);
             string[] both = CellsOf(run, BothFlag);
             checks.Record(
-                "appliedInMemory",
+                "appliedShown",
                 applied.ElementAtOrDefault(1) == "Disabled" && applied.ElementAtOrDefault(2) == "Yes" && both.ElementAtOrDefault(1) == "Not configured",
-                $"machine flag={string.Join("|", applied)}, both flag={string.Join("|", both)}: the changes are in the model.");
+                $"machine flag={string.Join("|", applied)}, both flag={string.Join("|", both)}: the list shows what was saved.");
 
             SortedDictionary<string, string> after = sandbox.PolicyFileHashes();
-            checks.Record("filesUnchanged", before.SequenceEqual(after), $"before={Describe(before)}; after={Describe(after)}.");
+            saved = after;
+            checks.Record("filesChanged", !before.SequenceEqual(after), $"before={Describe(before)}; after={Describe(after)}.");
             run.Measure("hashesBefore", before);
             run.Measure("hashesAfter", after);
-            run.WriteArtifacts("gpedit-dialog-nowrite.png");
+            run.WriteArtifacts("gpedit-dialog-save.png");
         }
         finally
         {
             run.Dispose();
         }
 
-        // The editor has exited: closing it must not save either.
-        checks.Record("filesUnchangedAfterExit", before.SequenceEqual(sandbox.PolicyFileHashes()), "the policy files are still the seeded bytes after the editor exited.");
+        // The editor has exited: closing it saves nothing more, and what OK saved is still on disk.
+        checks.Record("filesKeptAfterExit", saved is not null && saved.SequenceEqual(sandbox.PolicyFileHashes()), "the policy files are still the saved bytes after the editor exited.");
         checks.AssertAllPassed();
     }
 
@@ -558,7 +563,7 @@ public sealed class GpeditDialogTests
     {
         E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("dialog", "readonly");
-        using GpeditRun run = Start("gpedit-dialog-readonly", out _, readOnly: true);
+        using GpeditRun run = Start("gpedit-dialog-readonly", out GpeditSandbox sandbox, readOnly: true);
         run.GoTo(Root, Computer, Admin, Oracle, Basics);
 
         using GpeditDialog? dialog = GpeditDialog.Open(run, MachineFlag);
@@ -577,11 +582,17 @@ public sealed class GpeditDialogTests
         checks.Record("stateShown", dialog.IsSelected(GpeditDialog.Enabled), "the state is still shown.");
         checks.Record("commentReadOnly", dialog.IsReadOnly(GpeditDialog.Comment) && dialog.TextOf(GpeditDialog.Comment) == "machine note", "the Comment box is read-only and shows the comment.");
         checks.Record("applyDisabled", !dialog.IsEnabled(GpeditDialog.Apply), "Apply is disabled.");
+
+        // G4: the dialog says why it cannot change anything, so OK closing without a save is not silent.
+        string notice = dialog.Find("DialogReadOnlyNotice", 3) is null ? string.Empty : dialog.TextOf("DialogReadOnlyNotice");
+        checks.Record("notice", !string.IsNullOrWhiteSpace(notice), $"the dialog shows the read-only notice '{notice}'.");
         checks.Record("navigationWorks", dialog.IsEnabled(GpeditDialog.Previous) && dialog.IsEnabled(GpeditDialog.Next), "Previous and Next still move.");
         bool changed = dialog.Select(GpeditDialog.Disabled);
         checks.Record("noChange", !changed || dialog.IsSelected(GpeditDialog.Enabled), "a state cannot be selected.");
+        SortedDictionary<string, string> hashes = sandbox.PolicyFileHashes();
         _ = dialog.Invoke(GpeditDialog.Ok);
-        checks.Record("okCloses", dialog.WaitClosed(), "OK closes the dialog without applying.");
+        checks.Record("okCloses", dialog.WaitClosed(), "OK closes the dialog without applying (the notice says why).");
+        checks.Record("okWritesNothing", hashes.SequenceEqual(sandbox.PolicyFileHashes()), "OK in read-only mode wrote no file.");
         string[] cells = CellsOf(run, MachineFlag);
         checks.Record("listUnchanged", cells.ElementAtOrDefault(1) == "Enabled" && cells.ElementAtOrDefault(2) == "Yes", $"list cells={string.Join("|", cells)}.");
         run.WriteArtifacts("gpedit-dialog-readonly.png");

@@ -11,10 +11,10 @@
     "src/Bwc.UI/Console/**/*.cs (excluding bin and obj)"
   ],
   "counts": {
-    "equal": 102,
+    "equal": 104,
     "differs": 2,
     "template": 32,
-    "absent": 2048
+    "absent": 2046
   },
   "strings": [
     {
@@ -1815,7 +1815,7 @@
     },
     {
       "id": "gpedit.dll:228",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll:229",
@@ -2859,7 +2859,7 @@
     },
     {
       "id": "gpedit.dll.mui:228",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll.mui:229",

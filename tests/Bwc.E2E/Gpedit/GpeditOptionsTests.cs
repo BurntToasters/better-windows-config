@@ -252,7 +252,9 @@ public sealed class GpeditOptionsTests
             checks.Record("choiceNoDefault.opens", dialog is not null, "the decimal choice policy opens.");
             if (dialog is not null)
             {
-                checks.Record("choiceNoDefault.first", Choice(dialog, "DecimalChoice") == 0, $"selected item={Choice(dialog, "DecimalChoice")}, expected the first item of the template (0).");
+                // G4 changed this check: it expected the first item (0). Classic selects nothing when the presentation has no
+                // defaultItem (F7, B/Pol_Enum_StringItems), so OK is refused until one is chosen (PolicyDefaults.For).
+                checks.Record("choiceNoDefault.first", Choice(dialog, "DecimalChoice") == -1, $"selected item={Choice(dialog, "DecimalChoice")}, expected nothing selected (-1).");
                 Close(dialog);
             }
         }
@@ -490,7 +492,8 @@ public sealed class GpeditOptionsTests
         RoundTrip(
             run, checks, "choice", "Choice with decimal items setting",
             d => d.Choose(DecimalDrop, "Two"),
-            d => Choice(d, "DecimalChoice") == 2);
+            d => Choice(d, "DecimalChoice") == 2,
+            noDefaultItem: true);
 
         run.GoTo(Root, Computer, Admin, Oracle, "Elements", "Booleans");
         RoundTrip(
@@ -502,7 +505,7 @@ public sealed class GpeditOptionsTests
         checks.AssertAllPassed();
     }
 
-    private static void RoundTrip(GpeditRun run, GpeditChecks checks, string name, string row, Action<GpeditDialog> edit, Func<GpeditDialog, bool> verify)
+    private static void RoundTrip(GpeditRun run, GpeditChecks checks, string name, string row, Action<GpeditDialog> edit, Func<GpeditDialog, bool> verify, bool noDefaultItem = false)
     {
         using (GpeditDialog? dialog = GpeditDialog.Open(run, row))
         {
@@ -515,7 +518,22 @@ public sealed class GpeditOptionsTests
             checks.Record($"{name}.cleanAtOpen", !dialog.IsEnabled(GpeditDialog.Apply), "Apply is disabled at open.");
             _ = dialog.Select(GpeditDialog.Enabled);
             _ = dialog.Invoke(GpeditDialog.Apply);
-            checks.Record($"{name}.baseline", ShellRun.WaitUntil(() => !dialog.IsEnabled(GpeditDialog.Apply), TimeSpan.FromSeconds(3)), "Apply with the default values succeeds and Apply goes disabled.");
+            if (noDefaultItem)
+            {
+                // G4 changed this step for a drop-down with no defaultItem: nothing is selected, so Apply is refused with a message
+                // box, as in classic (B/Pol_Enum_StringItems operation 0), and the choice made next is what gets applied.
+                (string Caption, string Text)? refused = dialog.WaitMessage();
+                checks.Record($"{name}.baseline", refused is not null && dialog.IsEnabled(GpeditDialog.Apply), $"Apply with no item selected is refused with a message and Apply stays enabled: {refused?.Text}.");
+                if (refused is not null)
+                {
+                    _ = dialog.DismissMessage();
+                }
+            }
+            else
+            {
+                checks.Record($"{name}.baseline", ShellRun.WaitUntil(() => !dialog.IsEnabled(GpeditDialog.Apply), TimeSpan.FromSeconds(3)), "Apply with the default values succeeds and Apply goes disabled.");
+            }
+
             edit(dialog);
             checks.Record($"{name}.optionEnablesApply", ShellRun.WaitUntil(() => dialog.IsEnabled(GpeditDialog.Apply), TimeSpan.FromSeconds(3)), "one change of the option control enables Apply.");
             checks.Record($"{name}.dirtyReadout", dialog.Read("Dirty") == "1", $"readout Dirty={dialog.Read("Dirty")}.");
@@ -774,6 +792,10 @@ public sealed class GpeditOptionsTests
             // into the pane. The dialog keeps its own access keys (Alt+E selects Enabled).
             _ = dialog.Select(GpeditDialog.NotConfigured);
             _ = dialog.Select(GpeditDialog.Enabled);
+
+            // G4 added this choice: the drop-down has no default item, so Alt+N (Next Setting) would be refused for the
+            // missing choice, as in classic, and the message box would take the keys that follow.
+            _ = dialog.Choose(AmpDrop, "Tom & Jerry");
             foreach (char letter in "NSRP")
             {
                 _ = ClassicDialogTestsBridge.EnsureForeground(dialog.Hwnd);

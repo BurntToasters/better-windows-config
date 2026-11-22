@@ -234,6 +234,14 @@ const countedWriteAllowlist = new Map([
     },
   ],
   [
+    "src/Bwc.Gpedit/Save/PolicySaveStore.cs",
+    {
+      allowances: [{ label: ".Save over a path", max: 1 }],
+      reason:
+        "PolicySave.Save is the one policy save: it validates the edit and calls GpoStore.Save, which writes through GpoFileWriter under the write lock after the write policy has checked every path. This file opens no file itself and names no policy folder.",
+    },
+  ],
+  [
     "src/Bwc.Gpo/Store/WriteLock.cs",
     {
       allowances: [
@@ -818,6 +826,53 @@ function scanNativeMethods(relative, source, violations) {
   });
 }
 
+// The in-memory store changes memory only, so a ship build that wired it would lose every edit. A file may name it only in
+// the part of a file that is compiled in the E2E flavor alone (#if BWC_E2E, or the #else part of #if !BWC_E2E) or in a file
+// under tests/. Comments and string contents are already blanked in code.
+const inMemoryStoreName = /\bInMemoryPolicyEditStore\b/g;
+
+function scanInMemoryStore(relative, source, code, violations) {
+  if (relative.startsWith("tests/") || !code.includes("InMemoryPolicyEditStore")) {
+    return;
+  }
+
+  // One frame for each open #if: whether the branch now being read is compiled in the E2E flavor alone.
+  const stack = [];
+  const lines = code.split("\n");
+  lines.forEach((line, index) => {
+    const directive = /^\s*#\s*(if|elif|else|endif)\b\s*(.*)$/.exec(line);
+    if (directive !== null) {
+      const [, word, rest] = directive;
+      const condition = rest.trim();
+      if (word === "if") {
+        stack.push({ condition, only: condition === "BWC_E2E" });
+      } else if (word === "elif") {
+        const frame = stack[stack.length - 1];
+        if (frame !== undefined) {
+          frame.only = condition === "BWC_E2E";
+        }
+      } else if (word === "else") {
+        const frame = stack[stack.length - 1];
+        if (frame !== undefined) {
+          frame.only = frame.condition === "!BWC_E2E";
+        }
+      } else {
+        stack.pop();
+      }
+
+      return;
+    }
+
+    if (stack.some((frame) => frame.only)) {
+      return;
+    }
+
+    for (const match of line.matchAll(inMemoryStoreName)) {
+      addViolation(violations, relative, index + 1, "in-memory-store", match[0]);
+    }
+  });
+}
+
 function scanSource(relative, source, violations) {
   const { code, literals } = tokenize(source);
   const isWriter = relative === gpoWriterFile || relative === templateWriterFile;
@@ -871,6 +926,7 @@ function scanSource(relative, source, violations) {
   }
 
   scanRefreshNames(relative, source, code, literals, violations);
+  scanInMemoryStore(relative, source, code, violations);
 
   if (hasProcess && !relative.startsWith(launchAllowedPrefix) && allowlistReason(launchAllowlist, relative) === null) {
     for (const literal of literals) {

@@ -125,4 +125,44 @@
   <data name="DialogFailedText" xml:space="preserve">
     <value>The setting could not be applied. The policy template holds a value that cannot be stored.</value>
   </data>
+  <!-- BWC text for the notice of a setting dialog over a policy object that cannot be changed. -->
+  <data name="DialogReadOnlyNotice" xml:space="preserve">
+    <value>This setting cannot be changed because the policy object is read-only.</value>
+  </data>
+  <!-- BWC text for the notice of a setting dialog whose policy file could not be read. -->
+  <data name="DialogUnreadableNotice" xml:space="preserve">
+    <value>This setting cannot be changed because its policy file could not be read.</value>
+  </data>
+  <!-- BWC text of the save error for a policy file with the read-only attribute. {0} is the file. -->
+  <data name="DialogSaveReadOnlyFile" xml:space="preserve">
+    <value>The setting was not saved because a policy file is read-only: {0}. Clear the read-only attribute of the file and try again.</value>
+  </data>
+  <!-- BWC text of the save error for a policy file that is not valid. {0} is the file. -->
+  <data name="DialogSaveMalformed" xml:space="preserve">
+    <value>The setting was not saved because a policy file is not valid: {0}. The file was left as it is.</value>
+  </data>
+  <!-- BWC text of the save error for a write lock that another program holds. -->
+  <data name="DialogSaveLockTimeout" xml:space="preserve">
+    <value>The setting was not saved because another program is saving policy settings. Wait a moment and try again.</value>
+  </data>
+  <!-- BWC text of the save error for a policy file that another program has open. {0} is the file. -->
+  <data name="DialogSaveInUse" xml:space="preserve">
+    <value>The setting was not saved because another program is using a policy file: {0}. Wait a moment and try again.</value>
+  </data>
+  <!-- BWC text of the save error for a save that wrote some files before it failed. {0} lists the files written. -->
+  <data name="DialogSavePartial" xml:space="preserve">
+    <value>The setting was only partly saved. These files were written before the error: {0}. The other files were not changed. Check the setting before you try again.</value>
+  </data>
+  <!-- BWC text of the notice for a save whose policy refresh failed. -->
+  <data name="DialogSaveRefreshFailed" xml:space="preserve">
+    <value>The setting was saved, but Windows could not apply policy now. It takes effect the next time policy is refreshed.</value>
+  </data>
+  <!-- BWC text of the save error for a store that is read-only. -->
+  <data name="DialogSaveReadOnlyMode" xml:space="preserve">
+    <value>The setting was not saved because policy cannot be changed in this window.</value>
+  </data>
+  <!-- BWC text of the save error for every other failure. {0} is the file. -->
+  <data name="DialogSaveFailed" xml:space="preserve">
+    <value>The setting was not saved because a policy file could not be written: {0}.</value>
+  </data>
 </root>

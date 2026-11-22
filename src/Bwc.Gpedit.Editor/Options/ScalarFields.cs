@@ -47,7 +47,6 @@ internal sealed class CheckField : OptionField
 {
     private readonly CheckBox _box;
     private readonly TextBlock? _text;
-    private readonly bool _default;
 
     internal CheckField(OptionsContext context, PresentationControl control)
         : base(context, control)
@@ -61,7 +60,6 @@ internal sealed class CheckField : OptionField
             _text.TextTrimming = TextTrimming.None;
         }
 
-        _default = control.DefaultChecked == true;
         _box.Checked += OnToggled;
         _box.Unchecked += OnToggled;
         Parts = [_box];
@@ -72,7 +70,7 @@ internal sealed class CheckField : OptionField
     internal override (FrameworkElement Owner, FrameworkElement Target)? TabStop => (_box, _box);
 
     internal override void Load(ElementValue? stored) =>
-        _box.IsChecked = stored is BooleanValue boolean ? boolean.Checked : _default;
+        _box.IsChecked = stored is BooleanValue { Checked: true };
 
     internal override ElementValue? Read() => new BooleanValue(_box.IsChecked == true);
 
@@ -110,7 +108,6 @@ internal sealed class NumberField : OptionField
     private readonly TextBox _box;
     private readonly ulong _min;
     private readonly ulong _max;
-    private readonly ulong _default;
     private ulong _last;
 
     internal NumberField(OptionsContext context, PresentationControl control, DecimalElement element)
@@ -119,10 +116,7 @@ internal sealed class NumberField : OptionField
         ulong ceiling = element.Kind == PolicyElementKind.Decimal ? uint.MaxValue : ulong.MaxValue;
         _min = element.MinValue ?? 0;
         _max = Math.Max(_min, Math.Min(element.MaxValue ?? ceiling, ceiling));
-        _default = ulong.TryParse(control.DefaultValue, NumberStyles.None, CultureInfo.InvariantCulture, out ulong parsed)
-            ? Math.Clamp(parsed, _min, _max)
-            : _min;
-        _last = _default;
+        _last = _min;
 
         _label = MakeLabel();
         if (control.Spin != false)
@@ -171,7 +165,7 @@ internal sealed class NumberField : OptionField
 
     internal override void Load(ElementValue? stored)
     {
-        ulong value = stored is NumberValue number ? number.Number : _default;
+        ulong value = stored is NumberValue number ? number.Number : _min;
         _last = value;
         _box.Text = value.ToString(CultureInfo.InvariantCulture);
     }
@@ -217,7 +211,6 @@ internal sealed class TextBoxField : OptionField
 {
     private readonly TextBlock? _label;
     private readonly TextBox _box;
-    private readonly string _default;
 
     internal TextBoxField(OptionsContext context, PresentationControl control, TextElement element)
         : base(context, control)
@@ -227,7 +220,6 @@ internal sealed class TextBoxField : OptionField
         _box.IsTabStop = true;
         _box.MaxLength = (int)Math.Clamp(element.MaxLength ?? OptionsMetrics.DefaultTextMaxLength, 1UL, (ulong)int.MaxValue);
         _box.TextChanged += (_, _) => NotifyChanged();
-        _default = control.DefaultValue ?? string.Empty;
         Parts = _label is null ? [_box] : [_label, _box];
     }
 
@@ -235,7 +227,7 @@ internal sealed class TextBoxField : OptionField
 
     internal override (FrameworkElement Owner, FrameworkElement Target)? TabStop => (_box, _box);
 
-    internal override void Load(ElementValue? stored) => _box.Text = stored is TextValue text ? text.Text : _default;
+    internal override void Load(ElementValue? stored) => _box.Text = stored is TextValue text ? text.Text : string.Empty;
 
     internal override ElementValue? Read() => new TextValue(_box.Text ?? string.Empty);
 
@@ -251,7 +243,6 @@ internal sealed class ComboField : OptionField
     private readonly TextBlock? _label;
     private readonly ComboBox _combo;
     private readonly List<string> _items;
-    private readonly string _default;
     private TextBox? _inner;
     private string _text = string.Empty;
 
@@ -266,7 +257,6 @@ internal sealed class ComboField : OptionField
             ? [.. control.Suggestions]
             : [.. control.Suggestions.OrderBy(s => s, StringComparer.Create(CultureInfo.CurrentCulture, ignoreCase: true))];
         _combo.ItemsSource = _items;
-        _default = control.DefaultValue ?? string.Empty;
         _ = element;
         _combo.Loaded += OnLoaded;
         _combo.TextSubmitted += (_, args) =>
@@ -296,7 +286,7 @@ internal sealed class ComboField : OptionField
 
     internal override void Load(ElementValue? stored)
     {
-        _text = stored is TextValue text ? text.Text : _default;
+        _text = stored is TextValue text ? text.Text : string.Empty;
         _combo.Text = _text;
         if (_inner is not null)
         {

@@ -4,6 +4,7 @@ using Bwc.Core;
 using Bwc.Gpedit.Editor.Dialog;
 using Bwc.Gpedit.List;
 using Bwc.Gpedit.Policy;
+using Bwc.Gpedit.Save;
 using Bwc.Gpedit.Tree;
 using Bwc.Gpo.Store;
 using Bwc.Policy.Admx;
@@ -58,6 +59,7 @@ public sealed partial class GpeditRootView
     private string _lastEdit = string.Empty;
     private int _linkInvocations;
     private PolicySettingDialog? _policyDialog;
+    private GpoStore? _gpoStore;
 
     /// <summary>
     /// Raised when the user asks to edit a policy: the Edit policy setting link, Enter or a double click on a policy row.
@@ -318,8 +320,9 @@ public sealed partial class GpeditRootView
 
     /// <summary>
     /// Opens the setting dialog for a policy (docs/failure-modes/gpedit-dialog.md). One dialog at a time. Previous Setting and
-    /// Next Setting move through the policy rows of the shown list in display order. Apply changes the in-memory policy object
-    /// only (the seam <see cref="IPolicyEditStore"/>; piece G4 replaces it), and the State and Comment cells are rebuilt.
+    /// Next Setting move through the policy rows of the shown list in display order. Apply and OK save the edit into the policy
+    /// object through the seam <see cref="IPolicyEditStore"/> (<see cref="PolicySaveStore"/>), the model is replaced by what
+    /// was saved, and the State and Comment cells are rebuilt.
     /// </summary>
     private void OpenPolicyDialog(PolicyDefinition policy, GpoSide side)
     {
@@ -351,7 +354,7 @@ public sealed partial class GpeditRootView
             index = 0;
         }
 
-        var store = new InMemoryPolicyEditStore(model.PolFor, model.CommentsFor, StoreIsReadOnly());
+        var store = new PolicySaveStore(SaveStoreOf(model), model.Snapshot, model.IsReadOnly);
         PolicySettingDialog dialog;
         try
         {
@@ -363,7 +366,7 @@ public sealed partial class GpeditRootView
             return;
         }
 
-        dialog.Applied += (_, _) => RefreshPolicyRows();
+        dialog.Applied += (_, _) => OnPolicySaved(store);
         _policyDialog = dialog;
         _ = RunPolicyDialogAsync(dialog, Win32Interop.GetWindowFromWindowId(environment.AppWindowId));
     }
@@ -392,6 +395,39 @@ public sealed partial class GpeditRootView
                 Log.Warn("The window could not be updated after the setting dialog closed: " + ex.Message);
             }
         }
+    }
+
+    /// <summary>
+    /// The one store of the window, made when the first dialog opens. It keeps the backup of the session, so the first save
+    /// of a window makes one backup folder and the later saves make none. Null when the model chose no policy object.
+    /// </summary>
+    private GpoStore? SaveStoreOf(GpeditModel model)
+    {
+        if (model.StorePolicy is not { } policy)
+        {
+            return null;
+        }
+
+        if (_gpoStore is null || !string.Equals(_gpoStore.Policy.GpoRoot, policy.GpoRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            _gpoStore = new GpoStore(policy, new GpoStoreOptions { Access = model.Access });
+        }
+
+        return _gpoStore;
+    }
+
+    /// <summary>
+    /// A save wrote files: the loaded model becomes the files as read back after the write, so the list shows the saved state
+    /// and every later dialog opens on it.
+    /// </summary>
+    private void OnPolicySaved(PolicySaveStore store)
+    {
+        if (store.Snapshot is { } snapshot && _model is { } model && !ReferenceEquals(model.Snapshot, snapshot))
+        {
+            _model = model.WithSnapshot(snapshot);
+        }
+
+        RefreshPolicyRows();
     }
 
     /// <summary>
@@ -432,15 +468,6 @@ public sealed partial class GpeditRootView
                 return;
             }
         }
-    }
-
-    private static bool StoreIsReadOnly()
-    {
-#if BWC_E2E
-        return string.Equals(Environment.GetEnvironmentVariable("BWC_E2E_GPEDIT_READONLY"), "1", StringComparison.Ordinal);
-#else
-        return false;
-#endif
     }
 
     // ---- persistence --------------------------------------------------------------------------------
@@ -619,6 +646,7 @@ public sealed partial class GpeditRootView
 
         Add("Mode", "gpedit");
         Add("Loaded", model is null ? 0 : 1);
+        Add("ReadOnly", model is { IsReadOnly: true } ? 1 : 0);
         if (model is not null)
         {
             Add("LoadMs", (int)model.LoadTime.TotalMilliseconds);
