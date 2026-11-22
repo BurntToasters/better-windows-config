@@ -244,6 +244,40 @@ internal sealed class GpeditSandbox
         TemplateRoot = target;
     }
 
+    /// <summary>
+    /// Adds the files of a broken case to the template copy that <see cref="UseTemplatesWithBadCases"/> made, while an editor
+    /// may be running on it. The copy must exist.
+    /// </summary>
+    internal void AddBadTemplateCase(string name)
+    {
+        string target = Path.Combine(DataRoot, "templates");
+        string bad = Path.Combine(FixtureRoot, "bad", name);
+        foreach (string file in Directory.GetFiles(bad, "*.admx"))
+        {
+            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), overwrite: true);
+        }
+
+        string language = Path.Combine(bad, "en-US");
+        if (Directory.Exists(language))
+        {
+            foreach (string file in Directory.GetFiles(language, "*.adml"))
+            {
+                File.Copy(file, Path.Combine(target, "en-US", Path.GetFileName(file)), overwrite: true);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Removes one template (the template file and its language file, by the shared base name) from the copy that
+    /// <see cref="UseTemplatesWithBadCases"/> made, while an editor may be running on it.
+    /// </summary>
+    internal void RemoveTemplate(string baseName)
+    {
+        string target = Path.Combine(DataRoot, "templates");
+        File.Delete(Path.Combine(target, baseName + ".admx"));
+        File.Delete(Path.Combine(target, "en-US", baseName + ".adml"));
+    }
+
     /// <summary>The settings file of the editor in the data root, or null when none was written.</summary>
     internal string? SettingsFilePath() =>
         Directory.Exists(DataRoot) ? Directory.GetFiles(DataRoot, "settings.json", SearchOption.AllDirectories).FirstOrDefault() : null;

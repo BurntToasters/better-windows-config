@@ -1,0 +1,210 @@
+# Local Group Policy Editor commands failure modes
+
+Scope: piece G2 of release 0.2.0. In `src/Bwc.Gpedit` and `src/Bwc.Gpedit.App`: the Action menu, the context menus of the
+console tree and the result list, the toolbar commands (Properties, Refresh, Help and the history buttons), the keys (F5, F1,
+Alt+Enter, Enter, Delete, Backspace, Alt+Left, Alt+Right, Alt+Up), Refresh that reloads the model, the placement of the
+window before its first show, and the findings G2-1, GPE-4, GPE-2, GPE-5, EVT-1 and DOC-2 of the plan. Filter, Filter
+Options, Add/Remove Templates and Export List are other pieces (G5, G6, U3a) and have no test here.
+
+This file was written before the code (tests first). Each section lists the ways a command can fail, the design choice that
+prevents it and the E2E check that catches it. The tests are in `tests/Bwc.E2E/Gpedit/Commands/`. Every test writes
+`artifacts/e2e/visual/gpedit/gpedit-<test>.json` and a picture of the client area, and its checks (`gpedit.<group>.<name>.<id>`)
+to the E2E result artifact.
+
+## Specification sources
+
+The classic captures are the specification of what exists in classic: `docs/parity/oracle/gpedit/goldens/F/Menus_Computer`,
+`F/Menus_User`, `F/Toolbar_States`, `F/Keys_List`, `F/Keys_Tree`, `F/Keys_ListAllSettings`, and the rows MENU, CTX, TOOL, ACC
+and BEH of `docs/parity/gpedit-inventory.md`. Menu entries are compared with the captures by command role, never by Microsoft
+text: the labels are BWC's own and live in the piece's own `.resw`. What the captures show, by role:
+
+| Role | Classic (captures) | BWC at G2 |
+| --- | --- | --- |
+| Edit (policy setting dialog) | Action menu and list context menu with a policy row selected only, first entry, enabled (MENU-010, MENU-012, CTX-007) | the same |
+| Help (plain entry) | last entry of the Action menu and of every list context menu, enabled (MENU-018, CTX-001) | the same, in both context menus and the tree menu |
+| Help Topics | Help menu, enabled (MENU-033); F1 is the accelerator of the help command (ACC-002) | the same |
+| Refresh | no entry in any dump; F5 opens no window and no menu (ACC-004, ACC-027, ACC-044) | BWC addition (BEH-022): Action menu and all three context menus, enabled at every node kind |
+| Export List | every node kind but a policy row (MENU-017) | not in G2: no handler exists; owned by U3a |
+| Properties button | hidden in the classic toolbar (TOOL-009) | shown (the console frame has it); enabled only while a policy row is selected, because its command is Edit |
+| Refresh button | hidden in the classic toolbar (TOOL-009) | shown, enabled at every node kind |
+| Back, Forward, Up, Show/Hide tree, Help buttons | Back enabled with history, Forward disabled until Back, Up enabled at every non-root node, tree toggle and Help enabled (TOOL-004 to TOOL-014, TOOL-016) | the same |
+
+Not captured, so decided here and listed in the audit (CTX-009): the context menu of the console tree holds Refresh and Help
+only. Selection by a right click on a tree node is not asserted.
+
+## The E2E seam
+
+Compiled only under `BWC_E2E`. The readout is the UIA help text of `GpeditRoot` (`Key=Value;`, see
+`gpedit-tree-list.md`, section 13). G2 adds four keys to the existing ones (`Node`, `Rows`, `Edits`, `LastEdit`, `Loaded`,
+`Problems`, `Failures`, `ProblemList`, `Page`, `Status`):
+
+| Key | Meaning |
+| --- | --- |
+| `Refreshes` | the number of reloads that finished and were applied (0 after the first load) |
+| `Reloading` | 1 while a reload is in flight, otherwise 0 |
+| `HelpRequests` | the number of times the Help command ran; in the E2E flavor it opens nothing and only counts |
+| `LastCommand` | the role of the last command that ran: `Edit`, `Refresh`, `Help`, `Back`, `Forward`, `Up` |
+
+Command ids (the same id in the menu bar, where the automation id is `MenuCommand_<id>`, and in the context menus, where it is
+`ContextMenuCommand_<id>`, so that one command is one id; CTX-011): Edit 2001, Refresh 2002, Help 2003. Help Topics keeps the
+frame id 12804. The Action popup is the frame id 59002.
+
+## 1. The Action menu is empty or has the wrong entries (G2-1)
+
+The Action popup is empty today. The entries depend on the node and on the selected row, and classic builds them again every
+time the popup opens.
+
+- At a node with no row selected: no Edit, Refresh enabled, Help enabled and last.
+- With a policy row selected: Edit first and enabled, Refresh, Help last.
+- With a folder row selected, or after the node changed and the selection was cleared: no Edit. A menu that is built once
+  and kept shows Edit at a folder (stale selection).
+- Computer Configuration and User Configuration give identical menus at every node kind (CTX-008).
+- A disabled entry that looks usable, or an enabled entry that does nothing. Every enabled entry runs its command.
+
+Handling: the popup is rebuilt from the current node and the selected row each time it opens (the menu bar's opening event),
+and an entry is enabled only when its command can run. Checks: `Gpedit_Menu_Action_NodeKinds`, `Gpedit_Menu_Action_PolicyRow`
+(`nodes`, `edit`, `folderRow`, `staleSelection`), `Gpedit_Menu_Action_Commands`, `Gpedit_Menu_Help_Topics`.
+
+## 2. A command acts on the wrong item
+
+- The Action or toolbar Edit opens the dialog of the row that was selected before, not the current one.
+- A right click on a row that is not selected edits the selected row instead of the clicked one (the list selects the row on
+  a right click, as every list view does).
+- After the node changed, Edit still names the policy of the previous node.
+- Alt+Enter, Delete or Enter with the keyboard focus in the console tree acts on the row selected in the list.
+- The tasks of a context menu run the command of the Action popup with another target.
+
+Handling: one command object per role reads its target (selected policy row, current node) when it runs, never when it was
+built. A key command checks which pane holds the focus. Checks: `Gpedit_ContextMenu_List_PolicyRow` (`clickedRowEdited`),
+`Gpedit_Keys_WrongPane`, `Gpedit_Menu_Action_PolicyRow` (`staleSelection`), `Gpedit_Menu_Action_Commands`.
+
+## 3. The context menus (G2-1: requests are dropped)
+
+`OnContextMenuRequested` drops every request today. Classic opens the menu on a right click, on the context-menu key and on
+Shift+F10, and a dismissed menu leaves the focus where it was (CTX-011).
+
+- The list menu with a policy row: Edit first, Refresh, Help last. Without a row, or with a folder row: no Edit.
+- The key opens the menu for the focused row, a right click for the clicked row, with no row for the empty area (CTX-008).
+- The tree menu: Refresh and Help, no Edit; Shift+F10 and the right click give the same menu.
+- Escape closes the menu and the focus stays in the pane it was in; the command of an entry does not run.
+- A second request while a menu is open opens a second menu, or throws.
+
+Checks: `Gpedit_ContextMenu_List_PolicyRow` (`menu`, `key`, `shiftF10`, `dismiss`), `Gpedit_ContextMenu_List_NoRow`,
+`Gpedit_ContextMenu_Tree`.
+
+## 4. The toolbar states and commands (G2-1: Properties and Refresh do nothing)
+
+Today Properties and Refresh are enabled and do nothing, and Help is disabled.
+
+- Back is enabled with history and disabled at the start; Forward is enabled only after Back and ends when a new node is
+  selected. Up is disabled at the root and enabled at every other node (TOOL-004 to TOOL-007).
+- Show/Hide Console Tree and Help are enabled at every node kind (TOOL-008, TOOL-013); Help runs the Help command.
+- Properties is enabled only while a policy row is selected, and runs Edit. At every other selection it is disabled: an
+  enabled button that does nothing is the failure.
+- Refresh is enabled at every node kind and with a row selected, and reloads (section 5).
+- A state that is set once at the first selection and never again (a node kind that changes it, a row selection).
+
+Handling: `UpdateToolbarStates` runs after a node change, a row selection change, a reload and the end of a dialog. Checks:
+`Gpedit_Toolbar_States` (one check per button and node kind), `Gpedit_Toolbar_History`, `Gpedit_Toolbar_Commands`.
+
+## 5. Refresh does not reload, or reloads wrongly (G2-1, GPE-4)
+
+`_loadCancel` is a one-shot token source that is never disposed, so the model cannot load a second time.
+
+- F5, the toolbar button and the menu entry do nothing, or reload only the first time. A second F5 fails.
+- The reload reads only the policy files and not the template set (BEH-022 reads both).
+- The reload writes a policy file, a comment file or the version file. Refresh is read only.
+- The selection is lost: the tree goes back to the root, the list loses its selected row, the expanded nodes collapse, the
+  status text and the Extended pane are blank until the next click.
+- The selected node is gone in the new template set: the window keeps a node of the old model. The nearest surviving
+  ancestor is selected.
+- A burst of Refresh requests starts several loads that race, the older one finishes last and its model wins, or the load
+  count grows without end. A request while a load is in flight is merged: the last request wins, `Reloading` returns to 0.
+- A load leaks: the token source or the task of the replaced load is not cancelled and disposed.
+- A reload fails (an unreadable policy file, a broken template): the window shows the new problems, keeps working, and the
+  next Refresh after the file is fixed recovers. The failure of a reload never throws into a task that nobody observes
+  (the `finally` of `RunPolicyDialogAsync` has the same fault).
+- The disk is changed and the window shows the new state before any Refresh: classic reads on request only.
+- A reload while the setting dialog is open: the dialog stays on the model it was opened with and stays open; the
+  main window does not swap its store under the dialog. The reload is refused or deferred until the dialog closes, and
+  Refresh works after it closes.
+- Event handlers of the replaced model stay subscribed, so one Enter raises two edit requests after two reloads.
+
+Handling: one reload gate with a per-load token source that is cancelled and disposed when the next load starts or the view
+unloads; the new model replaces the old in one step on the UI thread; the selection is kept by node path and row tag.
+Checks: `Gpedit_Refresh_Reloads` (`unchangedBeforeRefresh`, `firstRefresh`, `secondRefresh`, `filesUntouched`, `backForward`),
+`Gpedit_Refresh_Templates`, `Gpedit_Refresh_KeepsSelection`, `Gpedit_Refresh_VanishedNode`, `Gpedit_Refresh_Burst`,
+`Gpedit_Refresh_Failure`, `Gpedit_Refresh_WhileDialogOpen`, `Gpedit_Keys_F5`.
+
+## 6. History keeps nodes of a replaced model (GPE-5)
+
+`_history` has no limit and holds `TreeNode` objects of the model that a reload replaced.
+
+- After a reload Back selects a node that is no longer in the tree: nothing is shown, or the list of the old model is shown.
+- Back after a reload shows the state of the old model (the nodes carry the model).
+- The history grows without bound while a user navigates.
+- Back and Forward after a reload walk to a node whose category no longer exists.
+
+Handling: the history stores node paths, not nodes; a path that does not resolve in the new model is dropped; the list is
+capped (the check only requires that Back walks to existing nodes). Checks: `Gpedit_Refresh_Reloads` (`backForward`),
+`Gpedit_Refresh_VanishedNode` (`historyExists`), `Gpedit_Toolbar_History`.
+
+## 7. Keys reach the wrong pane or do the wrong thing (G2-1)
+
+F5, F1, Alt+Enter, Delete and Alt+Up have no handler today. The captures show:
+
+- F5 opens no window and no menu and keeps the selection, in the list and in the tree (ACC-027, ACC-044). In BWC it
+  reloads (section 5).
+- Enter on a policy row opens the dialog (ACC-048); Enter on a folder row opens the folder. Alt+Enter on a policy row opens
+  the same dialog; on a folder row or in the tree it does nothing.
+- F1 is the help command (ACC-002): it runs the Help command in any pane. The E2E check asserts only that the command fired
+  once, through `HelpRequests`; no key opens two help requests.
+- Delete: classic has no Delete entry in any menu and no capture shows a window or a write; Delete does nothing in the list
+  and in the tree. A Delete that edits, clears a setting or writes a policy file is the failure.
+- Backspace in the tree selects the parent node (ACC-024), it is not a history key. Alt+Left and Alt+Right walk the history
+  (the console frame already raises Back and Forward for them). In the captures Alt+Left, Alt+Right and Alt+Up pressed with the
+  focus on the result side change nothing (ACC-030 to ACC-032); Alt+Up with the focus in the result pane changes nothing.
+- A key press that is handled in one pane but also reaches the other (Enter edits and also opens a folder).
+- A key handled while a menu or the dialog is open.
+
+Checks: `Gpedit_Keys_F5`, `Gpedit_Keys_Edit`, `Gpedit_Keys_WrongPane`, `Gpedit_Keys_F1`, `Gpedit_Keys_Delete`,
+`Gpedit_Keys_History`.
+
+## 8. The window placement jumps after the first show (GPE-2)
+
+The editor shows its window at the default place and moves it to the saved place in a low priority dispatch after `Loaded`, so
+the user sees the window jump. The Registry Editor applies `Bwc.UI` `WindowPlacement` before the first show.
+
+- The first visible rectangle of the window is not the saved rectangle; a second rectangle follows.
+- The saved rectangle is applied twice with two results, or never (the final rectangle is the default).
+- A saved rectangle that is off every display is shown off screen (the existing `Gpedit_Persistence_BadSettingsFile` covers it).
+- The placement code is a copy of the shared one and drifts from it (DOC-2: the comments say the placement is a later piece).
+
+Handling: the head reads the settings and calls the shared placement before `Activate`; the view no longer moves the window.
+Check: `Gpedit_Window_PlacementBeforeShow` samples every visible top-level window of the process from before its start and
+requires the first visible rectangle to be the saved one and no other rectangle afterwards.
+
+## 9. Event handlers are never unsubscribed (EVT-1)
+
+`BwcTheme.Changed` is a static event and the view subscribes a lambda that nothing removes; `AppWindow.Closing` and `Changed`
+are never removed either. A view that is replaced or closed stays alive and its handlers keep running. A reload that
+re-subscribes its handlers without removing the old ones doubles every command.
+
+Handling: named handlers, removed in `Unloaded` and when a model is replaced. Checks: one Enter raises exactly one edit and one
+tree move adds exactly one history step after repeated reloads (`Gpedit_Refresh_Burst`, `noDuplicateEdit`,
+`noDuplicateHistory`); the placement and close paths are covered by the persistence tests.
+
+## 10. Stale comments and wording (DOC-2)
+
+The comments of `MainWindow.xaml.cs` and `GpeditRootView.xaml.cs` still say the commands and the window state are later
+pieces, and the fixture help text says Disabled writes 0 while the captures show a delete record. They are corrected in the
+code dispatch; there is no E2E check. The fixture wording is not a check here: the existing dialog tests read it.
+
+## Safety and repeatability
+
+The tests run on the E2E flavor only, with the sandbox policy object, the F1 fixture templates (or a copy of them under the run
+data root) and the run data root of the scope; nothing writes the real policy folder, the real registry or `%ProgramData%`. The
+tests never elevate and never prompt. A test that changes a policy file on disk uses `GpeditSandbox` (the guard
+`scripts/check-policy-writer.js` allows no write API next to a policy file name in a test class). Every test records its
+checks and measurements as `artifacts/e2e/visual/gpedit/gpedit-<test>.json` and `artifacts/e2e/result-<rid>-<flavor>.json`, which
+is the repeatable artifact of AGENTS.md.
