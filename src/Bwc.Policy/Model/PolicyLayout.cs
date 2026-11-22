@@ -67,6 +67,13 @@ internal static class PolicyLayout
         policy.DisabledValue
         ?? (policy.EnabledValue is null && PolicyRules.PlainValueNameDisabledWritesZero ? PolicyRules.DefaultDisabledValue : null);
 
+    /// <summary>
+    /// The value that reads as Enabled at the policy value, or null when none does. A policy that declares a disabledValue and
+    /// no enabledValue writes DWORD 1 when Enabled but reads it back as Not Configured: capture B/Pol_Value_DisabledOnly (D7).
+    /// </summary>
+    public static PolicyValue? EnabledReadLiteral(PolicyDefinition policy) =>
+        policy.EnabledValue ?? (policy.DisabledValue is null ? PolicyRules.DefaultEnabledValue : null);
+
     /// <summary>The value that reads as Disabled at the policy value, or null when none does.</summary>
     public static PolicyValue? DisabledReadLiteral(PolicyDefinition policy) =>
         policy.DisabledValue
@@ -142,6 +149,59 @@ internal static class PolicyLayout
         return slots;
     }
 
+    /// <summary>
+    /// The slots Disabled and Not Configured remove for one element: its value name and the value lists of its default
+    /// side, which is the false list of a boolean and the first item of an enum. The other lists stay:
+    /// B/Pol_Bool_TrueFalseLists step 5 keeps the true list, and B/Pol_Enum_ItemValueList steps 5 and 6 keep the list of
+    /// the third item and clear the first.
+    /// </summary>
+    public static IReadOnlyList<Slot> ElementClearSlots(PolicyElement element)
+    {
+        var slots = new List<Slot>();
+        if (element.Kind != PolicyElementKind.List && element.ValueName is not null)
+        {
+            slots.Add(new Slot(element.EffectiveKey, element.ValueName));
+        }
+
+        switch (element)
+        {
+            case BooleanElement boolean:
+                slots.AddRange(ListSlots(boolean.FalseList));
+                break;
+            case EnumElement { Items.Count: > 0 } choice:
+                slots.AddRange(ListSlots(choice.Items[0].ValueList));
+                break;
+        }
+
+        return slots;
+    }
+
+    /// <summary>
+    /// The slots Not Configured removes for the policy value and its lists. With a value name the enabled list stays, as in
+    /// B/Pol_Value_BothLists step 3 (the disabled list and the value name leave, the enabled items stay).
+    /// </summary>
+    public static IReadOnlyList<Slot> NotConfiguredSlots(PolicyDefinition policy)
+    {
+        var slots = new List<Slot>();
+        if (policy.ValueName is not null)
+        {
+            slots.Add(new Slot(policy.Key, policy.ValueName));
+        }
+        else
+        {
+            slots.AddRange(ListSlots(policy.EnabledList));
+        }
+
+        slots.AddRange(ListSlots(policy.DisabledList));
+        foreach (var element in policy.Elements)
+        {
+            slots.AddRange(ElementClearSlots(element));
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        return slots.Where(s => seen.Add(s.Id)).ToArray();
+    }
+
     /// <summary>The check box side of a boolean: the values that make it true or false.</summary>
     public static IReadOnlyList<ValueWrite> BooleanSide(BooleanElement element, bool isTrue)
     {
@@ -151,19 +211,33 @@ internal static class PolicyLayout
         if (element.ValueName is not null)
         {
             var slot = new Slot(element.EffectiveKey, element.ValueName);
-            var noValues = element.TrueValue is null && element.FalseValue is null && element.TrueList is null && element.FalseList is null;
             if (literal is not null)
             {
                 writes.Add(new ValueWrite(slot, literal));
             }
-            else if (noValues && PolicyRules.BooleanDefaultsToOneAndZero)
+            else if (isTrue && PolicyRules.BooleanDefaultsToOneAndZero)
             {
-                writes.Add(new ValueWrite(slot, isTrue ? PolicyRules.DefaultEnabledValue : PolicyRules.DefaultDisabledValue));
+                // Checked with no true value writes DWORD 1: B/Pol_Amp_LabelSingle (no values at all) and B/Pol_Bool_TrueFalseLists
+                // step 2 (lists only). Unchecked with no false value writes nothing here: classic deletes the value with an
+                // instruction (B/Pol_Amp_LabelSingle step 3, B/Pol_Bool_NoFalseValue, B/Pol_Bool_TrueFalseLists step 1).
+                writes.Add(new ValueWrite(slot, PolicyRules.DefaultEnabledValue));
             }
         }
 
         writes.AddRange(ListWrites(list));
         return writes;
+    }
+
+    /// <summary>Tells whether one side of a boolean writes something at the boolean value name.</summary>
+    public static bool HasLiteralFor(BooleanElement element, bool isTrue)
+    {
+        if (element.ValueName is null)
+        {
+            return false;
+        }
+
+        var slot = new Slot(element.EffectiveKey, element.ValueName);
+        return BooleanSide(element, isTrue).Any(w => string.Equals(w.Slot.Id, slot.Id, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Every slot the policy can write, in a stable order, without duplicates.</summary>

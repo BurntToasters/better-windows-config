@@ -10,7 +10,22 @@ namespace Bwc.Policy.Tests;
 [TestClass]
 public sealed class PolicyStateFlowTests
 {
-    private sealed record Sample(string Policy, PolicyEdit Edit, bool EnabledReadable = true, bool DisabledReadable = true);
+    /// <summary>
+    /// One policy shape. The flags carry what group B settled: a policy with an enabledValue or an enabled list reads Not
+    /// Configured over its delete instructions and keeps them on Not Configured (B/Pol_Value_EnabledOnly,
+    /// B/Pol_Value_EnabledListOnly); a policy with only a disabledValue reads Not Configured over DWORD 1
+    /// (B/Pol_Value_DisabledOnly); Not Configured leaves the enabled list of a policy with a value name
+    /// (B/Pol_Value_BothLists) and the true list of a boolean (B/Pol_Bool_TrueFalseLists). A soft number stays through
+    /// Disabled and Not Configured and counts as a value, so the policy keeps reading Enabled
+    /// (B/Pol_LongDecimal_RequiredSoftText, "before Enabled" at every press after the first).
+    /// </summary>
+    private sealed record Sample(
+        string Policy,
+        PolicyEdit Edit,
+        bool EnabledReadable = true,
+        bool DisabledReadable = true,
+        bool NotConfiguredEmpties = true,
+        bool SoftStays = false);
 
     private static ElementValue B(bool value) => ElementValue.FromBoolean(value);
 
@@ -28,29 +43,32 @@ public sealed class PolicyStateFlowTests
         foreach (var name in new[]
                  {
                      "Pol_Top_DirectUnderRoot", "Pol_Class_Machine", "Pol_Class_User", "Pol_Class_Both", "Pol_Value_Decimal",
-                     "Pol_Value_String", "Pol_Value_EnabledOnly", "Pol_Value_DisabledOnly", "Pol_Value_EnabledListOnly",
-                     "Pol_Value_BothLists", "Pol_Outside_KeyOutsideRoots", "Pol_Shared_Zeta", "Pol_Shared_Alpha", "Pol_Shared_Mid",
+                     "Pol_Value_String", "Pol_Outside_KeyOutsideRoots", "Pol_Shared_Zeta", "Pol_Shared_Alpha", "Pol_Shared_Mid",
                      "Pol_Sort_Zulu", "Pol_Amp_DisplayName", "Pol_Explain_MultiParagraph", "Pol_Nested_MachineTop",
                  })
         {
             yield return new Sample(name, plain);
         }
 
+        yield return new Sample("Pol_Value_EnabledOnly", plain, DisabledReadable: false, NotConfiguredEmpties: false);
+        yield return new Sample("Pol_Value_DisabledOnly", plain, EnabledReadable: false);
+        yield return new Sample("Pol_Value_EnabledListOnly", plain, DisabledReadable: false, NotConfiguredEmpties: false);
+        yield return new Sample("Pol_Value_BothLists", plain, NotConfiguredEmpties: false);
         yield return new Sample("Pol_Value_DisabledListOnly", plain, EnabledReadable: false);
         yield return new Sample("Pol_Value_NoValueName_ElementsOnly", PolicyEdit.Enabled(("OnlyText", T("t")), ("OnlyNumber", N(3))));
         yield return new Sample("Pol_Element_KeyOverride", PolicyEdit.Enabled(("OverrideText", T("v"))));
         yield return new Sample("Pol_Both_WithElements", PolicyEdit.Enabled(("BothNumber", N(5))));
         yield return new Sample("Pol_Bool_TrueFalseValues", PolicyEdit.Enabled(("TrueFalseCheck", B(true))));
-        yield return new Sample("Pol_Bool_StringValues", PolicyEdit.Enabled(("StringCheck", B(false))));
-        yield return new Sample("Pol_Bool_TrueFalseLists", PolicyEdit.Enabled(("ListCheck", B(true))));
+        yield return new Sample("Pol_Bool_StringValues", PolicyEdit.Enabled(("StringCheck", B(false))), EnabledReadable: false);
+        yield return new Sample("Pol_Bool_TrueFalseLists", PolicyEdit.Enabled(("ListCheck", B(true))), NotConfiguredEmpties: false);
         yield return new Sample("Pol_Bool_NoFalseValue", PolicyEdit.Enabled(("NoFalseCheck", B(true))));
         yield return new Sample("Pol_Bool_TwoChecksReverseOrder", PolicyEdit.Enabled(("ZetaCheck", B(true)), ("AlphaCheck", B(false))));
         yield return new Sample("Pol_Decimal_MinMax", PolicyEdit.Enabled(("MinMaxNumber", N(100))));
         yield return new Sample("Pol_Decimal_Required", PolicyEdit.Enabled(("RequiredNumber", N(1))));
-        yield return new Sample("Pol_Decimal_Soft", PolicyEdit.Enabled(("SoftNumber", N(5))));
+        yield return new Sample("Pol_Decimal_Soft", PolicyEdit.Enabled(("SoftNumber", N(5))), NotConfiguredEmpties: false, SoftStays: true);
         yield return new Sample("Pol_Decimal_StoreAsText", PolicyEdit.Enabled(("TextNumber", N(1))));
         yield return new Sample("Pol_LongDecimal_Basic", PolicyEdit.Enabled(("LongNumber", N(1))));
-        yield return new Sample("Pol_LongDecimal_RequiredSoftText", PolicyEdit.Enabled(("LongTextNumber", N(1))));
+        yield return new Sample("Pol_LongDecimal_RequiredSoftText", PolicyEdit.Enabled(("LongTextNumber", N(1))), NotConfiguredEmpties: false, SoftStays: true);
         yield return new Sample("Pol_Text_Plain", PolicyEdit.Enabled(("PlainText", T("a"))));
         yield return new Sample("Pol_Text_Expandable", PolicyEdit.Enabled(("ExpandText", T("b"))));
         yield return new Sample("Pol_Text_MaxLength", PolicyEdit.Enabled(("ShortText", T("c"))));
@@ -113,20 +131,28 @@ public sealed class PolicyStateFlowTests
             var disabledAgain = Apply(sample.Policy, disabledDocument, PolicyEdit.Disabled);
             Assert.IsFalse(disabledAgain.Changed, sample.Policy + " disabled twice");
             var disabled = Read(sample.Policy, document);
-            Assert.AreEqual(
-                sample.DisabledReadable ? PolicyState.Disabled : PolicyState.NotConfigured,
-                disabled.State,
-                sample.Policy + " disabled");
-            Assert.AreEqual(0, disabled.Elements.Count, sample.Policy + " disabled elements");
+            var expectedDisabled = sample.SoftStays ? PolicyState.Enabled : sample.DisabledReadable ? PolicyState.Disabled : PolicyState.NotConfigured;
+            Assert.AreEqual(expectedDisabled, disabled.State, sample.Policy + " disabled");
+            if (!sample.SoftStays)
+            {
+                Assert.AreEqual(0, disabled.Elements.Count, sample.Policy + " disabled elements");
+            }
 
             Apply(sample.Policy, document, PolicyEdit.NotConfigured);
-            Assert.IsTrue(document.IsEmpty, sample.Policy + " not configured after disabled");
-            Assert.AreEqual(PolicyState.NotConfigured, Read(sample.Policy, document).State, sample.Policy);
+            if (sample.NotConfiguredEmpties)
+            {
+                Assert.IsTrue(document.IsEmpty, sample.Policy + " not configured after disabled");
+            }
+
+            Assert.AreEqual(sample.SoftStays ? PolicyState.Enabled : PolicyState.NotConfigured, Read(sample.Policy, document).State, sample.Policy);
 
             var direct = ApplyTwice(sample.Policy, sample.Edit);
             Apply(sample.Policy, direct, PolicyEdit.NotConfigured);
-            Assert.IsTrue(direct.IsEmpty, sample.Policy + " not configured after enabled");
-            Assert.AreEqual(0, Read(sample.Policy, direct).OwnedRecords.Count, sample.Policy);
+            if (sample.NotConfiguredEmpties)
+            {
+                Assert.IsTrue(direct.IsEmpty, sample.Policy + " not configured after enabled");
+                Assert.AreEqual(0, Read(sample.Policy, direct).OwnedRecords.Count, sample.Policy);
+            }
         }
     }
 
@@ -145,15 +171,17 @@ public sealed class PolicyStateFlowTests
     }
 
     [TestMethod]
-    public void Enabled_WhenNoRecordIsWritten_ReadsNotConfigured()
+    public void Enabled_WithTheOnlyBoxUnchecked_WritesItsDeleteInstructionAndReadsDisabled()
     {
         var document = NewDocument();
 
         var result = Apply("Pol_Bool_NoFalseValue", document, PolicyEdit.Enabled(("NoFalseCheck", B(false))));
 
+        // B/Pol_Bool_NoFalseValue step 1: the unchecked box writes its delete instruction, and the dialog then shows Disabled.
         Assert.IsTrue(result.IsValid);
-        Assert.IsFalse(result.Changed);
-        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Bool_NoFalseValue", document).State);
+        Assert.IsTrue(result.Changed);
+        AssertBytes(document, Del(Bool, "NoFalseCheck"));
+        Assert.AreEqual(PolicyState.Disabled, Read("Pol_Bool_NoFalseValue", document).State);
     }
 
     [TestMethod]

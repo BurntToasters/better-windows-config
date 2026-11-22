@@ -76,6 +76,14 @@ A `Registry.pol` file is a header followed by zero or more records. Everything i
 - Disabled on a policy with a value name and no `disabledValue` removes the value record and appends
   `**del.<valueName>` at the end of the key (probe, 2026-11-18).
 - Not Configured removes the value record and writes no delete instruction (probe, 2026-11-18).
+- Rules settled by groups B and C (E6b), each in `docs/failure-modes/policy-state.md` with its case: D6 (a `resources`
+  element gets `minRequiredRevision="1.0"`, `C/Cmtx_FirstSave_*`), D7 (a lone `**del.` or the DWORD 1 of a disabledValue-only
+  policy reads Not Configured, `B/Pol_Value_EnabledOnly`, `B/Pol_Value_DisabledOnly`), D8 (an empty list and an unselected
+  enum are refused, `B/Pol_List_Plain`, `C/SharedList_EmptyList`), a version half at 65535 goes to 1
+  (`C/Version_FromHighMachine`), records of one key keep their order when a value changes in place
+  (`C/Booleans_ReverseOrder`), a CR in a comment is written raw (`C/Comment_MultiLine`), the registry pair leaves the
+  extension line and foreign groups stay (`C/GptIni_PairRemoval`), and `B/Pol_Value_BothLists` keeps the enabled items on
+  Disabled.
 - An OK or Apply that changes nothing writes no file and does not bump `gpt.ini` (probe, 2026-11-18).
 - Save writes keys in registry-sorted order and, inside a key, values in creation order.
 - Records the model does not understand, and unknown `**` instructions, are kept and written back

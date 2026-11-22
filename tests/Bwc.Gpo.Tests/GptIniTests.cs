@@ -52,9 +52,11 @@ public sealed class GptIniTests
     {
         var ini = GptIni.Parse(GptIniProbe.Bytes((3u << 16) | 0xFFFF));
         ini.BumpVersion(GpoSide.Machine);
-        Assert.AreEqual(3u << 16, ini.Version);
+
+        // C/Version_FromHighMachine step 2: a half at 65535 goes to 1, not 0, and does not carry into the other half.
+        Assert.AreEqual((3u << 16) | 1u, ini.Version);
         Assert.AreEqual((ushort)3, ini.UserVersion);
-        Assert.AreEqual((ushort)0, ini.MachineVersion);
+        Assert.AreEqual((ushort)1, ini.MachineVersion);
     }
 
     [TestMethod]
@@ -62,7 +64,9 @@ public sealed class GptIniTests
     {
         var ini = GptIni.Parse(GptIniProbe.Bytes(0xFFFF0005u));
         ini.BumpVersion(GpoSide.User);
-        Assert.AreEqual(5u, ini.Version);
+
+        // C/Version_FromHighUser step 2: the high half at 65535 goes to 1 (the file reads 65536 there), the machine half stays.
+        Assert.AreEqual((1u << 16) | 5u, ini.Version);
     }
 
     [TestMethod]

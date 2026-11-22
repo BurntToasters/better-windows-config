@@ -99,14 +99,17 @@ public sealed class PolicyListInstructionTests
     }
 
     [TestMethod]
-    public void NonAdditive_EnabledWithNoEntries_RemovesValuesAndDelvalsAndWritesNeither()
+    public void NonAdditive_EnabledWithNoEntries_IsRefusedAndWritesNothing()
     {
         var document = Parse(Delvals(Plain), RecSz(Plain, "a", "a"));
+        var before = document.ToBytes();
 
-        Apply("Pol_List_Plain", document, PolicyEdit.Enabled(("PlainList", ElementValue.FromList())));
+        // D8: classic refuses a list with no row (C/SharedList_EmptyList, and the Show Contents box of B/Pol_List_Plain step 7).
+        var result = Apply("Pol_List_Plain", document, PolicyEdit.Enabled(("PlainList", ElementValue.FromList())));
 
-        Assert.AreEqual(PolicyRules.EnabledEmptyListWritesDelvals, !document.IsEmpty);
-        Assert.AreEqual(PolicyRules.EnabledEmptyListWritesDelvals ? PolicyState.Disabled : PolicyState.NotConfigured, Read("Pol_List_Plain", document).State);
+        Assert.IsFalse(result.IsValid);
+        Assert.AreEqual(PolicyProblemKind.Required, result.Problems.Single().Kind);
+        CollectionAssert.AreEqual(before, document.ToBytes());
     }
 
     [TestMethod]
@@ -182,13 +185,17 @@ public sealed class PolicyListInstructionTests
     }
 
     [TestMethod]
-    public void Additive_EnabledWithNoEntries_RemovesTheRemovedEntriesAndKeepsTheRest()
+    public void Additive_EnabledWithNoEntries_IsRefusedAndWritesNothing()
     {
         var document = Parse(RecSz(Additive, "keep", "keep"), RecSz(Additive, "a", "a"));
+        var before = document.ToBytes();
 
-        Apply("Pol_List_Additive", document, AdditiveEdit([], ListEntry.Of("a")));
+        // D8 again: the dialog cannot hold a list with no row, so a removal that empties the list never reaches the engine.
+        var result = Apply("Pol_List_Additive", document, AdditiveEdit([], ListEntry.Of("a")));
 
-        AssertBytes(document, RecSz(Additive, "keep", "keep"));
+        Assert.IsFalse(result.IsValid);
+        Assert.AreEqual(PolicyProblemKind.Required, result.Problems.Single().Kind);
+        CollectionAssert.AreEqual(before, document.ToBytes());
     }
 
     [TestMethod]

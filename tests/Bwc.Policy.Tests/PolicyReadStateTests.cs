@@ -73,7 +73,10 @@ public sealed class PolicyReadStateTests
         var expected = PolicyRules.DeleteInstructionOnlyIsDisabled ? PolicyState.Disabled : PolicyState.NotConfigured;
 
         Assert.AreEqual(expected, Read("Pol_Shared_Alpha", Parse(Del(Shared, "Alpha"))).State);
-        Assert.AreEqual(expected, Read("Pol_Value_EnabledOnly", Parse(Del(Basics, "EnabledOnly"))).State);
+
+        // D7: a policy that declares an enabledValue reads a lone delete instruction as Not Configured (B/Pol_Value_EnabledOnly,
+        // the dialog of step 3 shows Not Configured over a file that holds only the instruction).
+        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Value_EnabledOnly", Parse(Del(Basics, "EnabledOnly"))).State);
     }
 
     [TestMethod]

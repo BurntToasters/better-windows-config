@@ -68,48 +68,70 @@ public static class PolicySave
             }
         }
 
-        IReadOnlyList<PolicyEditProblem>? lateProblems = null;
-        var result = store.Save(
-            side,
-            session =>
+        try
+        {
+            var result = store.Save(
+                side,
+                session => ApplyWithPolicyWriter(session, policy, edit, comment),
+                cancellationToken);
+            return new PolicySaveOutcome([], result.Wrote, result);
+        }
+        catch (EditRefusedException refused)
+        {
+            // The writer found problems after the models were read under the lock. The throw leaves the store before its first
+            // write, so no file changes (S17).
+            return new PolicySaveOutcome(refused.Problems, false, null);
+        }
+    }
+
+    private static void ApplyWithPolicyWriter(GpoEditSession session, PolicyDefinition policy, PolicyEdit? edit, string comment)
+    {
+        // The policy file is always read, so a malformed one refuses a comment-only save too.
+        var pol = session.Pol;
+        var dirty = false;
+        if (edit is not null)
+        {
+            // Classic saves when the state the dialog shows changes, even if no record is written: capture
+            // K/KeyLeadingBackslash_Enable. The state it shows is read before the edit.
+            var shown = PolicyStateReader.Read(policy, pol).State;
+            var storedComment = session.Comments.GetComment(policy.Namespace, policy.Name) ?? string.Empty;
+            var commentChanged = !SameComment(storedComment, comment);
+            var applied = PolicyStateWriter.Apply(policy, pol, edit, commentChanged);
+            if (!applied.IsValid)
             {
-                // The policy file is always read, so a malformed one refuses a comment-only save too.
-                var pol = session.Pol;
-                var dirty = false;
-                if (edit is not null)
-                {
-                    // Classic saves when the state the dialog shows changes, even if no record is written: capture
-                    // K/KeyLeadingBackslash_Enable. The state it shows is read before the edit.
-                    var shown = PolicyStateReader.Read(policy, pol).State;
-                    var applied = PolicyStateWriter.Apply(policy, pol, edit);
-                    if (!applied.IsValid)
-                    {
-                        lateProblems = applied.Problems;
-                        return;
-                    }
+                throw new EditRefusedException(applied.Problems);
+            }
 
-                    dirty = applied.Changed || shown != edit.State;
-                }
+            dirty = applied.Changed || shown != edit.State;
+        }
 
-                var comments = session.Comments;
-                var stored = comments.GetComment(policy.Namespace, policy.Name) ?? string.Empty;
-                if (!string.Equals(stored, comment, StringComparison.Ordinal))
-                {
-                    comments.SetComment(policy.Namespace, policy.Name, comment.Length == 0 ? null : comment);
-                    dirty = true;
-                }
+        var comments = session.Comments;
+        var stored = comments.GetComment(policy.Namespace, policy.Name) ?? string.Empty;
+        if (!SameComment(stored, comment))
+        {
+            comments.SetComment(policy.Namespace, policy.Name, comment.Length == 0 ? null : comment);
+            dirty = true;
+        }
 
-                // Classic rewrites the namespace list on a save that changes something (captures A/Machine_Enabled and
-                // A/User_Enabled: one using line, no comment); a save that changes nothing writes nothing
-                // (A/Machine_NotConfigured).
-                if (dirty)
-                {
-                    comments.RestrictNamespacesTo(policy.Namespace);
-                }
-            },
-            cancellationToken);
-        return lateProblems is not null
-            ? new PolicySaveOutcome(lateProblems, false, null)
-            : new PolicySaveOutcome([], result.Wrote, result);
+        // Classic rewrites the namespace list on a save that changes something (captures A/Machine_Enabled and
+        // A/User_Enabled: one using line, no comment); a save that changes nothing writes nothing
+        // (A/Machine_NotConfigured).
+        if (dirty)
+        {
+            comments.RestrictNamespacesTo(policy.Namespace);
+        }
+    }
+
+    // The file holds a carriage return as it is (C/Comment_MultiLine) and an XML reader hands it back as a line feed, so a
+    // comment typed with CR LF and the same comment read from the file are the same comment.
+    private static bool SameComment(string stored, string typed) =>
+        string.Equals(NormalizeLineEnds(stored), NormalizeLineEnds(typed), StringComparison.Ordinal);
+
+    private static string NormalizeLineEnds(string text) =>
+        text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+
+    private sealed class EditRefusedException(IReadOnlyList<PolicyEditProblem> problems) : Exception("The policy writer refused the edit.")
+    {
+        public IReadOnlyList<PolicyEditProblem> Problems { get; } = problems;
     }
 }

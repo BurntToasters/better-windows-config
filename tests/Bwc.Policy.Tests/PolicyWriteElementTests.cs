@@ -20,7 +20,9 @@ public sealed class PolicyWriteElementTests
 
         Apply("Pol_Bool_TrueFalseValues", on, PolicyEdit.Enabled(("TrueFalseCheck", ElementValue.FromBoolean(false))));
         AssertBytes(on, RecDw(Bool, "TrueFalseCheck", 20));
-        Assert.AreEqual(new BooleanValue(false), Value(Read("Pol_Bool_TrueFalseValues", on), "TrueFalseCheck"));
+
+        // B/Pol_Bool_TrueFalseValues step 3: a policy whose only box is unchecked shows Disabled, so no element is read back.
+        Assert.AreEqual(PolicyState.Disabled, Read("Pol_Bool_TrueFalseValues", on).State);
     }
 
     [TestMethod]
@@ -42,8 +44,10 @@ public sealed class PolicyWriteElementTests
         var result = Apply("Pol_Bool_NoFalseValue", document, PolicyEdit.Enabled(("NoFalseCheck", ElementValue.FromBoolean(false))));
 
         Assert.IsTrue(result.Changed);
-        Assert.IsTrue(document.IsEmpty);
-        Assert.AreEqual(PolicyRules.FalseBooleanWithoutFalseValueWritesDeleteInstruction, document.GetValue(Bool, "**del.NoFalseCheck") is not null);
+
+        // B/Pol_Bool_NoFalseValue step 3: the value goes and the delete instruction takes its place.
+        AssertBytes(document, Del(Bool, "NoFalseCheck"));
+        Assert.IsTrue(PolicyRules.FalseBooleanWithoutFalseValueWritesDeleteInstruction);
     }
 
     [TestMethod]
@@ -52,13 +56,16 @@ public sealed class PolicyWriteElementTests
         var amp = K + @"\Amp";
         var document = Parse(RecDw(amp, "AmpName", 1));
 
-        Apply("Pol_Amp_LabelSingle", document, PolicyEdit.Enabled(("AmpNumber", ElementValue.FromNumber(3))));
+        // The enum needs an item: B/Pol_Amp_LabelSingle step 0 is refused until one is chosen (D8 for enums).
+        Apply("Pol_Amp_LabelSingle", document, PolicyEdit.Enabled(("AmpNumber", ElementValue.FromNumber(3)), ("AmpChoice", ElementValue.FromChoice(0))));
         var snapshot = Read("Pol_Amp_LabelSingle", document);
 
-        AssertBytes(document, RecDw(amp, "AmpName", 1), RecDw(amp, "AmpNumber", 3));
+        AssertBytes(document, RecDw(amp, "AmpName", 1), RecDw(amp, "AmpNumber", 3), RecDw(amp, "AmpChoice", 1));
         Assert.AreEqual(PolicyState.Enabled, snapshot.State);
         Assert.AreEqual(new NumberValue(3), Value(snapshot, "AmpNumber"));
-        CollectionAssert.AreEqual(new[] { new PolicyOwnedRecord(amp, "AmpNumber") }, snapshot.OwnedRecords.ToArray());
+        CollectionAssert.AreEqual(
+            new[] { new PolicyOwnedRecord(amp, "AmpNumber"), new PolicyOwnedRecord(amp, "AmpChoice") },
+            snapshot.OwnedRecords.ToArray());
     }
 
     [TestMethod]
@@ -68,13 +75,16 @@ public sealed class PolicyWriteElementTests
         var t2 = Bool + @"\TrueListOtherKey";
         var f = Bool + @"\FalseListKey";
         var document = ApplyTwice("Pol_Bool_TrueFalseLists", PolicyEdit.Enabled(("ListCheck", ElementValue.FromBoolean(true))));
-        AssertBytes(document, RecDw(t1, "TrueListOne", 1), RecSz(t2, "TrueListTwo", "t2"));
+
+        // B/Pol_Bool_TrueFalseLists step 2: checked writes DWORD 1 at the value name and the true list.
+        AssertBytes(document, RecDw(Bool, "ListCheck", 1), RecDw(t1, "TrueListOne", 1), RecSz(t2, "TrueListTwo", "t2"));
         Assert.AreEqual(new BooleanValue(true), Value(Read("Pol_Bool_TrueFalseLists", document), "ListCheck"));
 
         Apply("Pol_Bool_TrueFalseLists", document, PolicyEdit.Enabled(("ListCheck", ElementValue.FromBoolean(false))));
 
-        AssertBytes(document, RecDw(f, "FalseListOne", 0), RecSz(f, "FalseListTwo", "f2"));
-        Assert.AreEqual(new BooleanValue(false), Value(Read("Pol_Bool_TrueFalseLists", document), "ListCheck"));
+        // Step 3: unchecked deletes the value name with an instruction, writes the false list and leaves the true list.
+        AssertBytes(document, Del(Bool, "ListCheck"), RecDw(f, "FalseListOne", 0), RecSz(f, "FalseListTwo", "f2"), RecDw(t1, "TrueListOne", 1), RecSz(t2, "TrueListTwo", "t2"));
+        Assert.AreEqual(PolicyState.Disabled, Read("Pol_Bool_TrueFalseLists", document).State);
     }
 
     [TestMethod]
@@ -91,19 +101,23 @@ public sealed class PolicyWriteElementTests
             document,
             PolicyEdit.Enabled(("AlphaCheck", ElementValue.FromBoolean(true)), ("ZetaCheck", ElementValue.FromBoolean(false))));
 
-        AssertBytes(document, RecDw(key, "AlphaCheck", 1), RecDw(key, "ZetaCheck", 0));
+
+        // C/Booleans_ReverseOrder step 2: the changed value keeps its place, Zeta stays first.
+        AssertBytes(document, RecDw(key, "ZetaCheck", 0), RecDw(key, "AlphaCheck", 1));
     }
 
     [TestMethod]
     public void Boolean_WithNoValuesAtAll_DefaultsToOneAndZero()
     {
         var amp = K + @"\Amp";
-        var document = ApplyTwice("Pol_Amp_LabelSingle", PolicyEdit.Enabled(("AmpCheck", ElementValue.FromBoolean(true))));
-        AssertBytes(document, RecDw(amp, "AmpCheck", 1));
+        var choice = ("AmpChoice", ElementValue.FromChoice(0));
+        var document = ApplyTwice("Pol_Amp_LabelSingle", PolicyEdit.Enabled(("AmpCheck", ElementValue.FromBoolean(true)), choice));
+        AssertBytes(document, RecDw(amp, "AmpCheck", 1), RecDw(amp, "AmpChoice", 1));
 
-        Apply("Pol_Amp_LabelSingle", document, PolicyEdit.Enabled(("AmpCheck", ElementValue.FromBoolean(false))));
+        Apply("Pol_Amp_LabelSingle", document, PolicyEdit.Enabled(("AmpCheck", ElementValue.FromBoolean(false)), choice));
 
-        AssertBytes(document, RecDw(amp, "AmpCheck", 0));
+        // B/Pol_Amp_LabelSingle step 3: unchecked writes no DWORD 0, the delete instruction takes the place of the value.
+        AssertBytes(document, Del(amp, "AmpCheck"), RecDw(amp, "AmpChoice", 1));
         Assert.AreEqual(new BooleanValue(false), Value(Read("Pol_Amp_LabelSingle", document), "AmpCheck"));
     }
 
@@ -132,7 +146,9 @@ public sealed class PolicyWriteElementTests
         var soft = ApplyTwice("Pol_Decimal_Soft", PolicyEdit.Enabled(("SoftNumber", ElementValue.FromNumber(50))));
 
         AssertBytes(required, RecDw(Number, "RequiredNumber", 7));
-        AssertBytes(soft, RecDw(Number, "SoftNumber", 50));
+
+        // B/Pol_Decimal_Soft step 1: a soft number is stored under the soft name, with the typed data of the number.
+        AssertBytes(soft, RecDw(Number, "**soft.SoftNumber", 50));
     }
 
     [TestMethod]
@@ -149,7 +165,10 @@ public sealed class PolicyWriteElementTests
     {
         var document = ApplyTwice("Pol_LongDecimal_RequiredSoftText", PolicyEdit.Enabled(("LongTextNumber", ElementValue.FromNumber(18_000_000_000_000_000_000))));
 
-        AssertBytes(document, RecSz(Number, "LongTextNumber", "18000000000000000000"));
+
+        // B/Pol_LongDecimal_RequiredSoftText steps 1 and 2: the soft number of a text-stored element is a string under the
+        // soft name.
+        AssertBytes(document, RecSz(Number, "**soft.LongTextNumber", "18000000000000000000"));
         Assert.AreEqual(
             new NumberValue(18_000_000_000_000_000_000),
             Value(Read("Pol_LongDecimal_RequiredSoftText", document), "LongTextNumber"));
@@ -176,7 +195,7 @@ public sealed class PolicyWriteElementTests
     }
 
     [TestMethod]
-    public void Text_EmptyOptional_RemovesTheValue()
+    public void Text_EmptyOptional_IsSavedAsAnEmptyString()
     {
         var document = ApplyTwice("Pol_Text_Plain", PolicyEdit.Enabled(("PlainText", ElementValue.FromText("x"))));
 
@@ -184,7 +203,10 @@ public sealed class PolicyWriteElementTests
 
         Assert.IsTrue(result.IsValid);
         Assert.IsTrue(result.Changed);
-        Assert.IsTrue(document.IsEmpty);
+
+        // B/Pol_Amp_LabelDouble, B/Pol_Text_MaxLength and B/Pol_Shared_ElementsReverseOrder step 1: an optional text left empty
+        // is written as an empty REG_SZ.
+        AssertBytes(document, RecSz(Text, "PlainText", string.Empty));
     }
 
     [TestMethod]
@@ -241,7 +263,7 @@ public sealed class PolicyWriteElementTests
     }
 
     [TestMethod]
-    public void Enum_ItemValueList_SwitchingTheItemRemovesTheOldListValues()
+    public void Enum_ItemValueList_SwitchingTheItemKeepsTheOldListValues()
     {
         var a = Choice + @"\ProfileA";
         var aOther = Choice + @"\ProfileAOther";
@@ -249,11 +271,12 @@ public sealed class PolicyWriteElementTests
         AssertBytes(document, RecDw(Choice, "ProfileChoice", 1), RecDw(a, "ProfileAFirst", 100), RecSz(aOther, "ProfileASecond", "second"));
         Assert.AreEqual(new ChoiceValue(0), Value(Read("Pol_Enum_ItemValueList", document), "ProfileChoice"));
 
+        // B/Pol_Enum_ItemValueList steps 3 and 4: the list of the first item stays when another item is chosen.
         Apply("Pol_Enum_ItemValueList", document, PolicyEdit.Enabled(("ProfileChoice", ElementValue.FromChoice(2))));
-        AssertBytes(document, RecDw(Choice, "ProfileChoice", 3), RecDw(Choice, "ProfileCOnly", 300));
+        AssertBytes(document, RecDw(Choice, "ProfileChoice", 3), RecDw(Choice, "ProfileCOnly", 300), RecDw(a, "ProfileAFirst", 100), RecSz(aOther, "ProfileASecond", "second"));
 
         Apply("Pol_Enum_ItemValueList", document, PolicyEdit.Enabled(("ProfileChoice", ElementValue.FromChoice(1))));
-        AssertBytes(document, RecDw(Choice, "ProfileChoice", 2));
+        AssertBytes(document, RecDw(Choice, "ProfileChoice", 2), RecDw(Choice, "ProfileCOnly", 300), RecDw(a, "ProfileAFirst", 100), RecSz(aOther, "ProfileASecond", "second"));
     }
 
     [TestMethod]
@@ -284,11 +307,11 @@ public sealed class PolicyWriteElementTests
     }
 
     [TestMethod]
-    public void List_EmptyPrefix_NameIsTheData()
+    public void List_EmptyPrefix_NameIsThePosition()
     {
         var document = ApplyTwice("Pol_List_EmptyPrefix", PolicyEdit.Enabled(("EmptyPrefixList", ElementValue.FromList(ListEntry.Of("x")))));
 
-        AssertBytes(document, Rec(Lists + @"\EmptyPrefix", "**delvals.", 1, [0x20, 0x00, 0x00, 0x00]), RecSz(Lists + @"\EmptyPrefix", "x", "x"));
+        AssertBytes(document, Rec(Lists + @"\EmptyPrefix", "**delvals.", 1, [0x20, 0x00, 0x00, 0x00]), RecSz(Lists + @"\EmptyPrefix", "1", "x"));
     }
 
     [TestMethod]
@@ -361,14 +384,16 @@ public sealed class PolicyWriteElementTests
     }
 
     [TestMethod]
-    public void List_EnabledWithNoEntries_ClearsTheKey()
+    public void List_EnabledWithNoEntries_IsRefusedAndKeepsTheKey()
     {
         var key = Lists + @"\Switched";
         var document = Parse(RecDw(Lists, "ListSwitch", 1), RecSz(key, "z", "z"));
 
-        Apply("Pol_List_PolicyValueName", document, PolicyEdit.Enabled(("SwitchedList", ElementValue.FromList())));
+        // D8: B/Pol_List_PolicyValueName step 0 and C/SharedList_EmptyList, a list with no row is refused.
+        var result = Apply("Pol_List_PolicyValueName", document, PolicyEdit.Enabled(("SwitchedList", ElementValue.FromList())));
 
-        AssertBytes(document, RecDw(Lists, "ListSwitch", 1));
+        Assert.IsFalse(result.IsValid);
+        AssertBytes(document, RecDw(Lists, "ListSwitch", 1), RecSz(key, "z", "z"));
     }
 
     [TestMethod]
@@ -400,11 +425,15 @@ public sealed class PolicyWriteElementTests
         if (PolicyRules.DisabledClearsElementsWithDelete)
         {
             AssertBytes(document, Del(def, "ListItemOne"), Del(def, "ListItemThree"), Del(over, "ListItemTwo"));
-            Assert.AreEqual(PolicyState.Disabled, Read("Pol_Value_EnabledListOnly", document).State);
+
+            // D7, B/Pol_Value_EnabledListOnly step 2: a policy that declares an enabled list reads its delete instructions as
+            // Not Configured, and Not Configured over that state (step 3) writes nothing.
+            Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Value_EnabledListOnly", document).State);
         }
 
-        Apply("Pol_Value_EnabledListOnly", document, PolicyEdit.NotConfigured);
-        Assert.IsTrue(document.IsEmpty);
+        var result = Apply("Pol_Value_EnabledListOnly", document, PolicyEdit.NotConfigured);
+        Assert.IsFalse(result.Changed);
+        AssertBytes(document, Del(def, "ListItemOne"), Del(def, "ListItemThree"), Del(over, "ListItemTwo"));
     }
 
     [TestMethod]
@@ -433,7 +462,9 @@ public sealed class PolicyWriteElementTests
         var disabled = Read("Pol_Value_BothLists", document);
         Assert.AreEqual(PolicyState.Disabled, disabled.State);
         Assert.IsNotNull(document.GetValue(Basics, "BothListOff"));
-        Assert.IsNull(document.GetValue(Basics, "BothListOn"));
+
+        // B/Pol_Value_BothLists step 2: the enabled items stay when the policy is Disabled.
+        Assert.IsNotNull(document.GetValue(Basics, "BothListOn"));
         // Capture A/Machine_Disabled: the switch is deleted with an instruction, not set to DWORD 0.
         Assert.IsNull(document.GetValue(Basics, "ListMaster"));
         Assert.IsNotNull(document.GetValue(Basics, "**del.ListMaster"));

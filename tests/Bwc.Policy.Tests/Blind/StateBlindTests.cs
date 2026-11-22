@@ -152,7 +152,8 @@ public sealed class StateBlindTests
         Assert.IsNotNull(del);
         CollectionAssert.AreEqual(new byte[] { 0x20, 0, 0, 0 }, del.Data.ToArray());
         Assert.AreEqual((uint)PolValueType.String, del.Type);
-        Assert.AreEqual(PolicyState.Disabled, Read("Pol_Value_EnabledOnly", d).State);
+        // D7, B/Pol_Value_EnabledOnly step 1: the lone instruction reads Not Configured for a policy with an enabledValue.
+        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Value_EnabledOnly", d).State);
         Assert.AreEqual("**del.EnabledOnly", d.GetRecords(Basics).Last().ValueName);
     }
 
@@ -162,7 +163,9 @@ public sealed class StateBlindTests
         var d = PolDocument.Create();
         Apply("Pol_Value_DisabledOnly", d, PolicyEdit.Enabled());
         Assert.AreEqual(1u, Dw(d, Basics, "DisabledOnly"));
-        Assert.AreEqual(PolicyState.Enabled, Read("Pol_Value_DisabledOnly", d).State);
+
+        // D7, B/Pol_Value_DisabledOnly step 1: DWORD 1 is written but the dialog reads Not Configured.
+        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Value_DisabledOnly", d).State);
         Apply("Pol_Value_DisabledOnly", d, PolicyEdit.Disabled);
         Assert.AreEqual(3u, Dw(d, Basics, "DisabledOnly"));
         Assert.AreEqual(PolicyState.Disabled, Read("Pol_Value_DisabledOnly", d).State);
@@ -182,16 +185,18 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec01_NotConfiguredClearsDeleteAndSoftInstructions_SoItCannotReadBackAsDisabled()
+    public void Sec01_NotConfiguredClearsTheDeleteInstruction_AndKeepsTheSoftRecord()
     {
         var d = PolDocument.Create();
-        Apply("Pol_Value_EnabledOnly", d, PolicyEdit.Disabled);
-        d.AddSoftInstruction(Basics, "EnabledOnly");
-        Apply("Pol_Value_EnabledOnly", d, PolicyEdit.NotConfigured);
-        Assert.IsNull(d.GetValue(Basics, "**del.EnabledOnly"));
-        Assert.IsNull(d.GetValue(Basics, "**soft.EnabledOnly"));
-        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Value_EnabledOnly", d).State);
-        Assert.IsTrue(d.IsEmpty);
+        Apply("Pol_Shared_Alpha", d, PolicyEdit.Disabled);
+        d.AddSoftInstruction(K + @"\Shared", "Alpha");
+        Apply("Pol_Shared_Alpha", d, PolicyEdit.NotConfigured);
+
+        // B/Pol_LongDecimal_RequiredSoftText step 4: Not Configured over Disabled removes the delete instruction and the soft
+        // record stays.
+        Assert.IsNull(d.GetValue(K + @"\Shared", "**del.Alpha"));
+        Assert.IsNotNull(d.GetValue(K + @"\Shared", "**soft.Alpha"));
+        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Shared_Alpha", d).State);
     }
 
     [TestMethod]
@@ -393,8 +398,10 @@ public sealed class StateBlindTests
         Assert.IsNull(d.GetValue(Basics, "ListMaster"));
         Assert.IsNotNull(d.GetValue(Basics, "**del.ListMaster"));
         Assert.AreEqual(0u, Dw(d, Basics, "BothListOff"));
-        Assert.IsNull(d.GetValue(Basics, "BothListOn"));
-        Assert.IsNull(d.GetValue(Basics + @"\BothListKey", "BothListOnOther"));
+
+        // B/Pol_Value_BothLists step 2: the enabled items stay when the policy is Disabled.
+        Assert.AreEqual(1u, Dw(d, Basics, "BothListOn"));
+        Assert.AreEqual(11u, Dw(d, Basics + @"\BothListKey", "BothListOnOther"));
         Assert.AreEqual(PolicyState.Disabled, Read("Pol_Value_BothLists", d).State);
     }
 
@@ -467,8 +474,11 @@ public sealed class StateBlindTests
             valueName: null);
         var d = PolDocument.Create();
         var result = PolicyStateWriter.Apply(policy, d, PolicyEdit.Enabled(("B", ElementValue.FromBoolean(false))));
-        AssertNoChange(result, d);
-        Assert.AreEqual(PolicyState.NotConfigured, PolicyStateReader.Read(policy, d).State);
+
+        // B/Pol_Bool_NoFalseValue step 1: the unchecked box writes its delete instruction and the dialog then shows Disabled.
+        Assert.IsTrue(result.Changed);
+        Assert.IsNotNull(d.GetValue(policy.Key, "**del.B"));
+        Assert.AreEqual(PolicyState.Disabled, PolicyStateReader.Read(policy, d).State);
     }
 
     // ---------------------------------------------------------------- 3. Element kinds
@@ -508,7 +518,9 @@ public sealed class StateBlindTests
         Assert.AreEqual(true, ((BooleanValue)ValueOf(Read("Pol_Bool_TrueFalseValues", d), "TrueFalseCheck")).Checked);
         Apply("Pol_Bool_TrueFalseValues", d, PolicyEdit.Enabled(("TrueFalseCheck", ElementValue.FromBoolean(false))));
         Assert.AreEqual(20u, Dw(d, key, "TrueFalseCheck"));
-        Assert.AreEqual(false, ((BooleanValue)ValueOf(Read("Pol_Bool_TrueFalseValues", d), "TrueFalseCheck")).Checked);
+
+        // B/Pol_Bool_TrueFalseValues step 3: with the only box unchecked the dialog shows Disabled.
+        Assert.AreEqual(PolicyState.Disabled, Read("Pol_Bool_TrueFalseValues", d).State);
     }
 
     [TestMethod]
@@ -523,7 +535,7 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec03_1_BooleanWithoutFalseValue_FalseRemovesTheValue_WithoutAnInstruction()
+    public void Sec03_1_BooleanWithoutFalseValue_FalseRemovesTheValue_AndWritesAnInstruction()
     {
         var d = PolDocument.Create();
         var key = K + @"\Elements\Bool";
@@ -531,13 +543,10 @@ public sealed class StateBlindTests
         Assert.AreEqual(1u, Dw(d, key, "NoFalseCheck"));
         Apply("Pol_Bool_NoFalseValue", d, PolicyEdit.Enabled(("NoFalseCheck", ElementValue.FromBoolean(false))));
         Assert.IsNull(d.GetValue(key, "NoFalseCheck"));
-        Assert.IsNull(d.GetValue(key, "**del.NoFalseCheck"));
-        // Reads: no record means false.
-        var snap = Read("Pol_Bool_NoFalseValue", d);
-        if (snap.Elements.TryGetValue("NoFalseCheck", out var v))
-        {
-            Assert.AreEqual(false, ((BooleanValue)v).Checked);
-        }
+
+        // B/Pol_Bool_NoFalseValue step 3: the delete instruction takes the place of the value, and the dialog shows Disabled.
+        Assert.IsNotNull(d.GetValue(key, "**del.NoFalseCheck"));
+        Assert.AreEqual(PolicyState.Disabled, Read("Pol_Bool_NoFalseValue", d).State);
     }
 
     [TestMethod]
@@ -549,14 +558,18 @@ public sealed class StateBlindTests
         Assert.AreEqual(1u, Dw(d, bool_ + @"\TrueListKey", "TrueListOne"));
         Assert.AreEqual("t2", Sz(d, bool_ + @"\TrueListOtherKey", "TrueListTwo"));
         Assert.IsNull(d.GetValue(bool_ + @"\FalseListKey", "FalseListOne"));
+        Assert.AreEqual(1u, Dw(d, bool_, "ListCheck"));
         Assert.AreEqual(true, ((BooleanValue)ValueOf(Read("Pol_Bool_TrueFalseLists", d), "ListCheck")).Checked);
 
         Apply("Pol_Bool_TrueFalseLists", d, PolicyEdit.Enabled(("ListCheck", ElementValue.FromBoolean(false))));
         Assert.AreEqual(0u, Dw(d, bool_ + @"\FalseListKey", "FalseListOne"));
         Assert.AreEqual("f2", Sz(d, bool_ + @"\FalseListKey", "FalseListTwo"));
-        Assert.IsNull(d.GetValue(bool_ + @"\TrueListKey", "TrueListOne"), "true items are removed");
-        Assert.IsNull(d.GetValue(bool_ + @"\TrueListOtherKey", "TrueListTwo"));
-        Assert.AreEqual(false, ((BooleanValue)ValueOf(Read("Pol_Bool_TrueFalseLists", d), "ListCheck")).Checked);
+
+        // B/Pol_Bool_TrueFalseLists step 3: the true items stay, the value name becomes an instruction, the dialog shows Disabled.
+        Assert.AreEqual(1u, Dw(d, bool_ + @"\TrueListKey", "TrueListOne"), "true items stay");
+        Assert.AreEqual("t2", Sz(d, bool_ + @"\TrueListOtherKey", "TrueListTwo"));
+        Assert.IsNotNull(d.GetValue(bool_, "**del.ListCheck"));
+        Assert.AreEqual(PolicyState.Disabled, Read("Pol_Bool_TrueFalseLists", d).State);
 
         Apply("Pol_Bool_TrueFalseLists", d, PolicyEdit.Enabled());
         Assert.IsNull(d.GetValue(bool_ + @"\FalseListKey", "FalseListOne"), "empty removes the values of both sides");
@@ -568,10 +581,14 @@ public sealed class StateBlindTests
     {
         var d = PolDocument.Create();
         var key = K + @"\Amp";
-        Apply("Pol_Amp_LabelSingle", d, PolicyEdit.Enabled(("AmpCheck", ElementValue.FromBoolean(true))));
+        var choice = ("AmpChoice", ElementValue.FromChoice(0));
+        Apply("Pol_Amp_LabelSingle", d, PolicyEdit.Enabled(("AmpCheck", ElementValue.FromBoolean(true)), choice));
         Assert.AreEqual(1u, Dw(d, key, "AmpCheck"));
-        Apply("Pol_Amp_LabelSingle", d, PolicyEdit.Enabled(("AmpCheck", ElementValue.FromBoolean(false))));
-        Assert.AreEqual(0u, Dw(d, key, "AmpCheck"));
+        Apply("Pol_Amp_LabelSingle", d, PolicyEdit.Enabled(("AmpCheck", ElementValue.FromBoolean(false)), choice));
+
+        // B/Pol_Amp_LabelSingle step 3: unchecked writes the delete instruction, never DWORD 0.
+        Assert.IsNull(d.GetValue(key, "AmpCheck"));
+        Assert.IsNotNull(d.GetValue(key, "**del.AmpCheck"));
         Assert.AreEqual(false, ((BooleanValue)ValueOf(Read("Pol_Amp_LabelSingle", d), "AmpCheck")).Checked);
     }
 
@@ -615,7 +632,9 @@ public sealed class StateBlindTests
         var e = PolDocument.Create();
         var edit = PolicyEdit.Enabled(("LongTextNumber", ElementValue.FromNumber(ulong.MaxValue)));
         Assert.IsTrue(Apply("Pol_LongDecimal_RequiredSoftText", e, edit).IsValid);
-        Assert.AreEqual("18446744073709551615", Sz(e, K + @"\Elements\Number", "LongTextNumber"));
+
+        // B/Pol_LongDecimal_RequiredSoftText: the soft number lives under the soft name.
+        Assert.AreEqual("18446744073709551615", Sz(e, K + @"\Elements\Number", "**soft.LongTextNumber"));
     }
 
     [TestMethod]
@@ -703,14 +722,16 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec03_3_EmptyTextIsEmpty_RequiredEmptyIsAProblem_OptionalEmptyRemovesTheValue()
+    public void Sec03_3_EmptyTextIsEmpty_RequiredEmptyIsAProblem_OptionalEmptyIsSavedAsAnEmptyString()
     {
         var d = PolDocument.Create();
         var req = Apply("Pol_Text_Required", d, PolicyEdit.Enabled(("RequiredText", ElementValue.FromText(""))));
         Assert.AreEqual(PolicyProblemKind.Required, req.Problems.Single().Kind);
         Apply("Pol_Text_Plain", d, PolicyEdit.Enabled(("PlainText", ElementValue.FromText("x"))));
         Apply("Pol_Text_Plain", d, PolicyEdit.Enabled(("PlainText", ElementValue.FromText(""))));
-        Assert.IsNull(d.GetValue(K + @"\Elements\Text", "PlainText"));
+
+        // B/Pol_Amp_LabelDouble step 1: an optional text left empty is an empty REG_SZ.
+        Assert.AreEqual(string.Empty, Sz(d, K + @"\Elements\Text", "PlainText"));
     }
 
     [TestMethod]
@@ -738,12 +759,16 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec03_4_MultiText_NoLinesIsEmpty_RemovesTheValue()
+    public void Sec03_4_MultiText_NoLinesIsEmpty_IsSavedAsASingleNul()
     {
         var d = PolDocument.Create();
         Apply("Pol_MultiText_Basic", d, PolicyEdit.Enabled(("MultiLines", ElementValue.FromLines("a"))));
         Apply("Pol_MultiText_Basic", d, PolicyEdit.Enabled(("MultiLines", ElementValue.FromLines("", ""))));
-        Assert.IsNull(d.GetValue(K + @"\Elements\Text", "MultiLines"));
+
+        // B/Pol_MultiText_Basic step 1: no line is a REG_MULTI_SZ of one NUL character, two bytes.
+        var record = d.GetValue(K + @"\Elements\Text", "MultiLines");
+        Assert.IsNotNull(record);
+        CollectionAssert.AreEqual(new byte[] { 0, 0 }, record.Data.ToArray());
     }
 
     [TestMethod]
@@ -810,7 +835,7 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec03_5_EnumValueLists_WrittenForTheChosenItem_AndTheOthersRemoved()
+    public void Sec03_5_EnumValueLists_WrittenForTheChosenItem_AndTheOthersStay()
     {
         var d = PolDocument.Create();
         var choice = K + @"\Elements\Choice";
@@ -822,12 +847,14 @@ public sealed class StateBlindTests
         Apply("Pol_Enum_ItemValueList", d, PolicyEdit.Enabled(("ProfileChoice", ElementValue.FromChoice(2))));
         Assert.AreEqual(3u, Dw(d, choice, "ProfileChoice"));
         Assert.AreEqual(300u, Dw(d, choice, "ProfileCOnly"));
-        Assert.IsNull(d.GetValue(choice + @"\ProfileA", "ProfileAFirst"), "no stale list stays");
-        Assert.IsNull(d.GetValue(choice + @"\ProfileAOther", "ProfileASecond"));
+
+        // B/Pol_Enum_ItemValueList steps 3 and 4: the lists of the other items stay when an item is chosen.
+        Assert.AreEqual(100u, Dw(d, choice + @"\ProfileA", "ProfileAFirst"));
+        Assert.AreEqual("second", Sz(d, choice + @"\ProfileAOther", "ProfileASecond"));
 
         Apply("Pol_Enum_ItemValueList", d, PolicyEdit.Enabled(("ProfileChoice", ElementValue.FromChoice(1))));
         Assert.AreEqual(2u, Dw(d, choice, "ProfileChoice"));
-        Assert.IsNull(d.GetValue(choice, "ProfileCOnly"));
+        Assert.AreEqual(300u, Dw(d, choice, "ProfileCOnly"));
         Assert.AreEqual(1, ((ChoiceValue)ValueOf(Read("Pol_Enum_ItemValueList", d), "ProfileChoice")).ItemIndex);
     }
 
@@ -865,11 +892,13 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec03_6_EmptyPrefixListNamesByData_PrefixedListNamesPrefixOneBased()
+    public void Sec03_6_EmptyPrefixListNamesByPosition_PrefixedListNamesPrefixOneBased()
     {
         var d = PolDocument.Create();
         Apply("Pol_List_EmptyPrefix", d, EnableList("EmptyPrefixList", "p", "q"));
-        CollectionAssert.AreEqual(new[] { "**delvals.", "p", "q" }, Names(d, K + @"\Lists\EmptyPrefix"));
+
+        // B/Pol_List_EmptyPrefix step 2: an empty valuePrefix names the entries by position, "1" and "2".
+        CollectionAssert.AreEqual(new[] { "**delvals.", "1", "2" }, Names(d, K + @"\Lists\EmptyPrefix"));
         Apply("Pol_List_ValuePrefix", d, EnableList("PrefixList", "x", "y"));
         var key = K + @"\Lists\Prefix";
         Assert.AreEqual("x", Sz(d, key, "Item1"));
@@ -930,14 +959,17 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec03_6_EmptyListRemovesEveryValueOfTheKey_RequiredEmptyIsAProblem()
+    public void Sec03_6_EmptyListIsRefused_RequiredEmptyIsAProblem()
     {
         var d = PolDocument.Create();
         var key = K + @"\Lists\Plain";
         Apply("Pol_List_Plain", d, EnableList("PlainList", "a", "b"));
         SetSz(d, key, "foreign", "x");
-        Apply("Pol_List_Plain", d, PolicyEdit.Enabled(("PlainList", ElementValue.FromList())));
-        Assert.AreEqual(0, d.GetRecords(key).Count(r => !r.IsInstruction), "every value of the key is removed");
+        var refused = Apply("Pol_List_Plain", d, PolicyEdit.Enabled(("PlainList", ElementValue.FromList())));
+
+        // D8: a list with no row is refused (C/SharedList_EmptyList), so the key is left as it was.
+        Assert.AreEqual(PolicyProblemKind.Required, refused.Problems.Single().Kind);
+        Assert.AreEqual(3, d.GetRecords(key).Count(r => !r.IsInstruction), "the key is untouched");
 
         var required = Tmp("Pol", "<elements><list id=\"L\" key=\"Software\\Policies\\BlindT\\L\" required=\"true\" /></elements>", valueName: null);
         var result = PolicyStateWriter.Apply(required, PolDocument.Create(), PolicyEdit.Enabled(("L", ElementValue.FromList())));
@@ -1393,15 +1425,18 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec07_1_AdditiveEmpty_RemovesOnlyTheRemovedEntriesAndDelvals_NothingElse()
+    public void Sec07_1_AdditiveEmpty_IsRefused_NothingChanges()
     {
         var d = PolDocument.Create();
         SetSz(d, AdditiveKey, "foreign", "x");
         SetSz(d, AdditiveKey, "gone", "gone");
         d.AddDeleteValuesInstruction(AdditiveKey);
         var edit = PolicyEdit.Enabled(("AdditiveList", ElementValue.FromListWithRemoved([], [ListEntry.Of("gone")])));
-        Apply("Pol_List_Additive", d, edit);
-        CollectionAssert.AreEqual(new[] { "foreign" }, Names(d, AdditiveKey));
+        var result = Apply("Pol_List_Additive", d, edit);
+
+        // D8: the dialog cannot hold a list with no row (B/Pol_List_Additive step 7), so the edit is refused.
+        Assert.AreEqual(PolicyProblemKind.Required, result.Problems.Single().Kind);
+        CollectionAssert.AreEqual(new[] { "**delvals.", "foreign", "gone" }, Names(d, AdditiveKey));
     }
 
     [TestMethod]
@@ -1473,12 +1508,15 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec07_1_EmptyEnabledNonAdditiveList_RemovesValuesAndDelvals_AndWritesNothing()
+    public void Sec07_1_EmptyEnabledNonAdditiveList_IsRefused_NothingChanges()
     {
         var d = PolDocument.Create();
         Apply("Pol_List_Plain", d, EnableList("PlainList", "a"));
-        Apply("Pol_List_Plain", d, PolicyEdit.Enabled(("PlainList", ElementValue.FromList())));
-        Assert.AreEqual(0, d.GetRecords(PlainKey).Count);
+        var result = Apply("Pol_List_Plain", d, PolicyEdit.Enabled(("PlainList", ElementValue.FromList())));
+
+        // D8: C/SharedList_EmptyList and B/Pol_List_Plain step 7.
+        Assert.AreEqual(PolicyProblemKind.Required, result.Problems.Single().Kind);
+        Assert.AreEqual(2, d.GetRecords(PlainKey).Count);
     }
 
     // ---------------------------------------------------------------- Extra adversarial cases
@@ -1526,12 +1564,17 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec01_2_SoftIsNeverWrittenByThePolicyEngine()
+    public void Sec01_2_SoftNumbersAreWrittenUnderTheSoftName()
     {
         var d = PolDocument.Create();
         Apply("Pol_Decimal_Soft", d, PolicyEdit.Enabled(("SoftNumber", ElementValue.FromNumber(50))));
         Apply("Pol_LongDecimal_RequiredSoftText", d, PolicyEdit.Enabled(("LongTextNumber", ElementValue.FromNumber(5))));
-        Assert.IsFalse(d.EnumerateRecords().Any(r => r.ValueName.StartsWith("**soft.", StringComparison.OrdinalIgnoreCase)));
+
+        // B/Pol_Decimal_Soft step 1 and B/Pol_LongDecimal_RequiredSoftText steps 1 and 2: the number is the data of the
+        // soft record.
+        Assert.AreEqual(50u, Dw(d, K + @"\Elements\Number", "**soft.SoftNumber"));
+        Assert.AreEqual("5", Sz(d, K + @"\Elements\Number", "**soft.LongTextNumber"));
+        Assert.IsNull(d.GetValue(K + @"\Elements\Number", "SoftNumber"));
     }
 
     [TestMethod]

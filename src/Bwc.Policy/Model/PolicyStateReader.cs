@@ -26,7 +26,7 @@ public static class PolicyStateReader
         }
 
         var found = ReadElements(policy, document);
-        var state = ReadState(policy, document, found.Count);
+        var state = ReadState(policy, document, found);
         var elements = new Dictionary<string, ElementValue>(StringComparer.OrdinalIgnoreCase);
         if (state == PolicyState.Enabled)
         {
@@ -37,7 +37,7 @@ public static class PolicyStateReader
 
             foreach (var boolean in policy.Elements.OfType<BooleanElement>())
             {
-                if (!elements.ContainsKey(boolean.Id) && PolicyLayout.BooleanSide(boolean, isTrue: false).Count == 0
+                if (!elements.ContainsKey(boolean.Id) && boolean.ValueName is not null && !PolicyLayout.HasLiteralFor(boolean, isTrue: false)
                     && PolicyLayout.BooleanSide(boolean, isTrue: true).Count > 0)
                 {
                     elements[boolean.Id] = new BooleanValue(false);
@@ -48,8 +48,13 @@ public static class PolicyStateReader
         return new PolicyStateSnapshot(state, elements, OwnedRecords(policy, document));
     }
 
-    private static PolicyState ReadState(PolicyDefinition policy, PolDocument document, int elementsWithValue)
+    private static PolicyState ReadState(PolicyDefinition policy, PolDocument document, Dictionary<string, ElementValue> found)
     {
+        // An unchecked box is no evidence of Enabled: with every check box of an elements-only policy unchecked, classic shows
+        // Disabled (B/Pol_Bool_TrueFalseValues, B/Pol_Bool_StringValues and B/Pol_Bool_TwoChecksReverseOrder, "before Disabled"
+        // after the unchecked save).
+        var elementsWithValue = found.Values.Count(v => v is not BooleanValue { Checked: false });
+        var onlyUncheckedBoxes = found.Count > 0 && elementsWithValue == 0;
         if (policy.ValueName is not null)
         {
             return ReadValueNameState(policy, document);
@@ -61,12 +66,12 @@ public static class PolicyStateReader
             return PolicyState.Enabled;
         }
 
-        if (PolicyEncoding.AllMatch(document, PolicyLayout.ListWrites(policy.DisabledList)))
+        if (PolicyEncoding.AllMatch(document, PolicyLayout.ListWrites(policy.DisabledList)) || onlyUncheckedBoxes)
         {
             return PolicyState.Disabled;
         }
 
-        if (PolicyRules.DeleteInstructionOnlyIsDisabled && PolicyLayout.EnabledSideSlots(policy).Any(s => PolicyEncoding.HasDelete(document, s)))
+        if (PolicyRules.LoneDeleteReadsAsDisabled(policy) && PolicyLayout.EnabledSideSlots(policy).Any(s => PolicyEncoding.HasDelete(document, s)))
         {
             return PolicyState.Disabled;
         }
@@ -83,7 +88,7 @@ public static class PolicyStateReader
     private static PolicyState ReadValueNameState(PolicyDefinition policy, PolDocument document)
     {
         var slot = new Slot(policy.Key, policy.ValueName!);
-        if (PolicyEncoding.Matches(document, new ValueWrite(slot, PolicyLayout.EnabledLiteral(policy))))
+        if (PolicyLayout.EnabledReadLiteral(policy) is { } enabled && PolicyEncoding.Matches(document, new ValueWrite(slot, enabled)))
         {
             return PolicyState.Enabled;
         }
@@ -99,7 +104,14 @@ public static class PolicyStateReader
             return PolicyRules.UnmatchedValueState;
         }
 
-        return PolicyRules.DeleteInstructionOnlyIsDisabled && PolicyEncoding.HasDelete(document, slot)
+        // The disabled list shows Disabled when the value itself says nothing: B/Pol_Value_BothLists step 2 holds a delete
+        // instruction and the disabled item, and classic shows Disabled for it although it declares an enabled list.
+        if (PolicyEncoding.AllMatch(document, PolicyLayout.ListWrites(policy.DisabledList)))
+        {
+            return PolicyState.Disabled;
+        }
+
+        return PolicyRules.LoneDeleteReadsAsDisabled(policy) && PolicyEncoding.HasDelete(document, slot)
             ? PolicyState.Disabled
             : PolicyState.NotConfigured;
     }
@@ -138,7 +150,9 @@ public static class PolicyStateReader
             return null;
         }
 
-        var record = document.GetValue(element.EffectiveKey, element.ValueName);
+        // A soft number lives under the soft name (B/Pol_LongDecimal_RequiredSoftText).
+        var name = element is DecimalElement { Soft: true } ? PolicyEncoding.SoftPrefix + element.ValueName : element.ValueName;
+        var record = document.GetValue(element.EffectiveKey, name);
         return record is not null && PolicyRules.StoredTypeMatches((uint)type, record.Type) ? record : null;
     }
 
@@ -147,6 +161,14 @@ public static class PolicyStateReader
         if (PolicyEncoding.AllMatch(document, PolicyLayout.BooleanSide(element, isTrue: true)))
         {
             return new BooleanValue(true);
+        }
+
+        // An unchecked box with no false literal leaves only a delete instruction (and perhaps the false list entries), and
+        // classic reads that policy as Disabled: B/Pol_Bool_TrueFalseLists step 4 shows "Disabled" with the false list in the
+        // file. Only a false literal at the value name counts as evidence of an unchecked box.
+        if (!PolicyLayout.HasLiteralFor(element, isTrue: false))
+        {
+            return null;
         }
 
         return PolicyEncoding.AllMatch(document, PolicyLayout.BooleanSide(element, isTrue: false)) ? new BooleanValue(false) : null;
@@ -192,7 +214,9 @@ public static class PolicyStateReader
         }
 
         var lines = text.TrimEnd('\0').Split('\0', StringSplitOptions.None).Where(l => l.Length > 0).ToArray();
-        return lines.Length == 0 ? null : new MultiTextValue(lines);
+        // A record with no line is the empty multi-text that the dialog saves by default (B/Pol_MultiText_Basic step 1) and
+        // it shows Enabled, so it is a value.
+        return new MultiTextValue(lines);
     }
 
     private static ElementValue? ReadEnum(EnumElement element, PolDocument document)

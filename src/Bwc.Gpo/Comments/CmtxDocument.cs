@@ -338,7 +338,7 @@ public sealed class CmtxDocument
         return FindString(table, id)?.Value;
     }
 
-    /// <summary>Verify against oracle (group C): the shape of one comment entry.</summary>
+    /// <summary>The shape of one comment entry (C/Comment_Enabled_AddEditRemove, C/Comment_TwoPolicies).</summary>
     private static XElement WriteComment(string prefix, string policyName, string id) =>
         new(
             CmtxFormat.Comment,
@@ -411,6 +411,13 @@ public sealed class CmtxDocument
         {
             resources = new XElement(CmtxFormat.Resources, new XAttribute("minRequiredRevision", "1.0"));
             comments.AddAfterSelf(resources);
+        }
+
+        // Classic adds the minimum revision when it saves a file whose resources element lacks it (D6): captures
+        // C/Cmtx_FirstSave_ThenUser and C/Cmtx_FirstSave_ForeignNamespaces.
+        if (resources.Attribute("minRequiredRevision") is null)
+        {
+            resources.SetAttributeValue("minRequiredRevision", "1.0");
         }
 
         if (resources.Element(CmtxFormat.StringTable) is null)

@@ -29,7 +29,7 @@ public sealed record CmtxComment(string Namespace, string PolicyName, string Tex
 /// <summary>
 /// Names, namespaces and layout of comment.cmtx. The classic layout comes from the 2026-11-18 probe: UTF-8 with a
 /// byte order mark, CRLF, two-space indent, a single-quoted declaration, empty elements as open and close tags, no
-/// final line ending. The shape of a comment entry is *verify against oracle* (group C) and lives in
+/// final line ending. The shape of a comment entry is settled by group C (C/Comment_*) and lives in
 /// <see cref="CmtxDocument"/> next to the names below.
 /// </summary>
 internal static class CmtxFormat
@@ -50,7 +50,7 @@ internal static class CmtxFormat
     internal const string NewLine = "\r\n";
     internal const string Indent = "  ";
 
-    /// <summary>The classic skeleton of a file with no comments and no namespaces. Verify against oracle (group C).</summary>
+    /// <summary>The classic skeleton of a file with no comments and no namespaces (C/Cmtx_NoStartFile).</summary>
     internal static readonly string EmptyDocument =
         Declaration + NewLine +
         "<policyComments xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" " +
@@ -161,11 +161,12 @@ internal static class CmtxFormat
         return string.IsNullOrEmpty(prefix) ? name.LocalName : prefix + ":" + name.LocalName;
     }
 
+    // Classic writes a carriage return in a comment as it is: capture C/Comment_MultiLine holds the raw CR LF pair inside the
+    // string element and no character reference.
     private static string EscapeText(string value) =>
         value.Replace("&", "&amp;", StringComparison.Ordinal)
             .Replace("<", "&lt;", StringComparison.Ordinal)
-            .Replace(">", "&gt;", StringComparison.Ordinal)
-            .Replace("\r", "&#xD;", StringComparison.Ordinal);
+            .Replace(">", "&gt;", StringComparison.Ordinal);
 
     private static string EscapeAttribute(string value) =>
         value.Replace("&", "&amp;", StringComparison.Ordinal)

@@ -179,7 +179,7 @@ public sealed class GoldenOptionsTests
     }
 
     [TestMethod]
-    public void O12_AListThatIsNotCleared_AddsToTheRowsShown_AndAClearedListStartsEmpty()
+    public void O12_AListThatIsNotCleared_AddsToTheRowsShown_AndAClearedEmptyListKeepsTheRowsShown()
     {
         var policy = P("Pol_List_Plain");
         var stored = Stored("PlainList", ElementValue.FromList(ListEntry.Of("old-1"), ListEntry.Of("old-2")));
@@ -188,10 +188,15 @@ public sealed class GoldenOptionsTests
         var replaced = Map(policy, """[{"expectKind":"list","rows":[["new"]],"clearRows":true,"elementId":"PlainList"}]""", stored);
         var cleared = Map(policy, """[{"expectKind":"list","clearRows":true,"elementId":"PlainList"}]""", stored);
         var fresh = Map(policy, """[{"expectKind":"list","rows":[["a"],["b"]],"clearRows":true,"elementId":"PlainList"}]""");
+        var clearedFresh = Map(policy, """[{"expectKind":"list","clearRows":true,"elementId":"PlainList"}]""");
 
         CollectionAssert.AreEqual(new[] { "old-1", "old-2", "new" }, ((ListValue)added.Values["PlainList"]).Entries.Select(e => e.Data).ToArray());
         CollectionAssert.AreEqual(new[] { "new" }, ((ListValue)replaced.Values["PlainList"]).Entries.Select(e => e.Data).ToArray());
-        Assert.AreEqual(0, ((ListValue)cleared.Values["PlainList"]).Entries.Count);
+
+        // The Show Contents box refuses an empty list and the driver cancels it, so the rows shown stay (B/Pol_List_Plain step 7,
+        // observed "refused":true,"cancelled":true). With nothing stored the list stays empty.
+        CollectionAssert.AreEqual(new[] { "old-1", "old-2" }, ((ListValue)cleared.Values["PlainList"]).Entries.Select(e => e.Data).ToArray());
+        Assert.AreEqual(0, ((ListValue)clearedFresh.Values["PlainList"]).Entries.Count);
         CollectionAssert.AreEqual(new[] { "a", "b" }, ((ListValue)fresh.Values["PlainList"]).Entries.Select(e => e.Data).ToArray());
     }
 

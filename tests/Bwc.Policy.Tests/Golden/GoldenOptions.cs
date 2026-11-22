@@ -224,6 +224,14 @@ internal static class GoldenOptions
             rows.Add(list.ExplicitValue ? new ListEntry(cells[0], cells[1]) : ListEntry.Of(cells[0]));
         }
 
+        // The Show Contents box refuses OK when it holds no row and the driver cancels it, so the list keeps the rows it had
+        // before: observed "refused":true,"cancelled":true in B/Pol_List_Plain operation 6 (and the same operation of the other
+        // B list cases) and in C/SharedList_EmptyList operation 0, where the dialog then refuses the empty list on OK.
+        if (rows.Count == 0)
+        {
+            return ElementValue.FromListWithRemoved(storedEntries.Select(e => list.ExplicitValue ? e : ListEntry.Of(e.Data)).ToArray(), []);
+        }
+
         var removed = storedEntries
             .Where(old => !rows.Any(r => list.ExplicitValue
                 ? string.Equals(r.Name, old.Name, StringComparison.OrdinalIgnoreCase)

@@ -36,7 +36,7 @@ The contract of `PolicySave.Save(store, side, policy, edit, comment)`:
 | S14 | The cancellation token is checked after the first write. | Cancelled before the first write: `OperationCanceledException`, nothing written. | store tests |
 | S15 | A malformed `Registry.pol` is overwritten, or a comment-only save skips reading it and bumps the version on top of it. | The save throws a malformed-file failure and writes nothing (D9). | `K/KeyLeadingBackslash_ReadAsWritten` (refused start), `PolicySaveContractTests.S15_...` |
 | S16 | Read-only mode, lock timeout or a write failure are hidden in the outcome. | `GpoStoreException` reaches the caller unchanged. | `tests/Bwc.Gpo.Tests` (store tests) |
-| S17 | `PolicyStateWriter.Apply` returns problems inside the store edit (the template changed between the dialog and the lock) and the edit returns with a model that is partly changed, or after the comment was set. | `PolicySave.Save` returns the problems and `Changed` false, the comment is not set, the store writes nothing and does not refresh (S2). | `PolicySaveContractTests.S17_...` |
+| S17 | `PolicyStateWriter.Apply` returns problems inside the store edit (the template changed between the dialog and the lock) and the edit returns with a model that is partly changed, or after the comment was set. | `PolicySave.Save` returns the problems and `Changed` false, the comment is not set, the store writes nothing and does not refresh (S2). The code throws a private `EditRefusedException` inside the edit, so `GpoStore.Save` discards the models and writes nothing, and the catch maps it to the problems outcome. | `PolicySaveContractTests.S17_...` |
 
 Not decided and not tested here: a policy of class Machine saved with side User (the UI never offers it).
 

@@ -75,9 +75,12 @@ public sealed class PolicyStateValidationTests
     {
         Assert.AreEqual(0, Validate("Pol_Text_Plain").Count);
         Assert.AreEqual(0, Validate("Pol_Decimal_MinMax").Count);
-        Assert.AreEqual(0, Validate("Pol_Enum_DecimalItems").Count);
-        Assert.AreEqual(0, Validate("Pol_List_Plain").Count);
         Assert.AreEqual(0, Validate("Pol_Bool_TrueFalseValues").Count);
+
+        // An enum with no item selected and a list with no row are refused whether the element is required or not: the first
+        // press of B/Pol_Enum_DecimalItems and of B/Pol_List_Plain shows a message box and saves nothing.
+        AssertSingle(Validate("Pol_Enum_DecimalItems"), "DecimalChoice", PolicyProblemKind.Required);
+        AssertSingle(Validate("Pol_List_Plain"), "PlainList", PolicyProblemKind.Required);
     }
 
     [TestMethod]

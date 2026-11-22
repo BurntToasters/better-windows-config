@@ -51,6 +51,17 @@ internal static class PolicyRules
     public static readonly bool DeleteInstructionOnlyIsDisabled = true;
 
     /// <summary>
+    /// Tells how a lone <c>**del.</c> record (no value record) reads for this policy shape. Classic shows Disabled when the
+    /// template declares neither an enabledValue nor an enabledList (plain value-name policies, elements-only policies:
+    /// A/Machine_Disabled, B/Pol_Value_NoValueName_ElementsOnly) and Not Configured when it declares one
+    /// (B/Pol_Value_EnabledOnly, B/Pol_Value_EnabledListOnly). Group B settles it for these four shapes (D7).
+    /// </summary>
+    /// <param name="policy">The policy definition.</param>
+    /// <returns>True when the lone delete reads as Disabled.</returns>
+    public static bool LoneDeleteReadsAsDisabled(PolicyDefinition policy) =>
+        DeleteInstructionOnlyIsDisabled && policy.EnabledValue is null && policy.EnabledList is null;
+
+    /// <summary>
     /// Disabled on a policy with elements or an enabled list removes those values and writes a <c>**del.</c> for each. False
     /// removes them without an instruction.
     /// </summary>
@@ -62,8 +73,11 @@ internal static class PolicyRules
     /// <summary>An optional element left empty writes a <c>**del.</c> instead of only removing its value.</summary>
     public static readonly bool EmptyOptionalElementWritesDeleteInstruction = false;
 
-    /// <summary>An unchecked boolean that has no false side writes a <c>**del.</c> for its true side value.</summary>
-    public static readonly bool FalseBooleanWithoutFalseValueWritesDeleteInstruction = false;
+    /// <summary>
+    /// An unchecked boolean with nothing to write at its value name removes the value and writes a <c>**del.</c> for it.
+    /// Settled by B/Pol_Bool_NoFalseValue, B/Pol_Bool_TrueFalseLists and B/Pol_Amp_LabelSingle.
+    /// </summary>
+    public static readonly bool FalseBooleanWithoutFalseValueWritesDeleteInstruction = true;
 
     /// <summary>A boolean with a value name and no true or false value or list writes DWORD 1 and 0.</summary>
     public static readonly bool BooleanDefaultsToOneAndZero = true;
@@ -77,13 +91,16 @@ internal static class PolicyRules
     /// <summary>The soft attribute does not change range checking (true). False skips the check for a soft number.</summary>
     public static readonly bool SoftIgnoredByValidation = true;
 
-    /// <summary>Choosing an enum item removes the values of the value lists of the other items.</summary>
-    public static readonly bool EnumClearsOtherItemLists = true;
+    /// <summary>
+    /// Choosing an enum item removes the values of the value lists of the other items. Classic does not:
+    /// B/Pol_Enum_ItemValueList steps 3 and 4 keep the list of the first item while the second and third items are chosen.
+    /// </summary>
+    public static readonly bool EnumClearsOtherItemLists = false;
 
     /// <summary>
     /// Enabling a non-additive list (ADMX default) writes <c>**delvals.</c> at the front of its key and then the entries, which
-    /// is how Group Policy expresses "replace the values of the key". Verify against oracle: the exact bytes and position
-    /// (capture group B lists, group C OQ-04). False writes the entries alone.
+    /// is how Group Policy expresses "replace the values of the key". Settled by B/Pol_List_Plain, B/Pol_List_ValuePrefix,
+    /// B/Pol_SharedList_One and C/SharedList_OneThenTwo: replaying them with this false fails the byte comparison.
     /// </summary>
     public static readonly bool ListReplaceWritesDelvals = true;
 
@@ -159,8 +176,9 @@ internal static class PolicyRules
         lines.Count == 0 ? 0UL : (ulong)lines.Sum(l => l.Length) + (ulong)(lines.Count - 1);
 
     /// <summary>
-    /// The value name of a list entry. explicitValue: the name of the entry. A prefix that is not empty: the prefix and
-    /// the one-based position. Otherwise (no attribute or an empty prefix) the data itself (OQ-06).
+    /// The value name of a list entry. explicitValue: the name of the entry. A valuePrefix attribute, empty or not: the prefix
+    /// and the one-based position (B/Pol_List_EmptyPrefix writes the names 1 and 2, B/Pol_List_ValuePrefix a prefix and the
+    /// position). No attribute: the data itself (B/Pol_List_Plain, OQ-06).
     /// </summary>
     /// <param name="list">The list element.</param>
     /// <param name="index">The zero-based position of the entry.</param>
@@ -173,7 +191,7 @@ internal static class PolicyRules
             return entry.Name ?? string.Empty;
         }
 
-        if (!string.IsNullOrEmpty(list.ValuePrefix))
+        if (list.ValuePrefix is not null)
         {
             return list.ValuePrefix + (index + 1).ToString(CultureInfo.InvariantCulture);
         }

@@ -202,8 +202,12 @@ public sealed class CmtxTests
         const string value = "a < b & \"c\" > d\r\nline2\tend";
         doc.SetComment(Uri, "P", value);
         var text = Text(doc.ToBytes());
-        StringAssert.Contains(text, "a &lt; b &amp; \"c\" &gt; d&#xD;\nline2");
-        Assert.AreEqual(value, CmtxDocument.Parse(doc.ToBytes()).GetComment(Uri, "P"));
+
+        // C/Comment_MultiLine step 1: classic writes the carriage return as it is, not as a character reference.
+        StringAssert.Contains(text, "a &lt; b &amp; \"c\" &gt; d\r\nline2");
+
+        // An XML reader hands a CR LF pair back as a line feed.
+        Assert.AreEqual(value.Replace("\r\n", "\n"), CmtxDocument.Parse(doc.ToBytes()).GetComment(Uri, "P"));
     }
 
     [TestMethod]

@@ -101,6 +101,19 @@ Record: `[` key NUL `;` name NUL `;` type(4) `;` size(4) `;` data(size) `]`, del
 one at the end of the key's records. Probe: Zeta=1, then Alpha=1, then Zeta=0 gave `[Alpha=1, Zeta=0]`. The new record
 reuses the stored spelling of the key and name (assumed, not probed). Rule `PolOrderRules.ReplaceByAppend`.
 
+### 2.1c In-place sets, in-place delete instruction and the soft record (groups B and C)
+
+The policy writer needs three more edits, each settled by a capture:
+
+- `SetValueInPlace(key, name, type, data)` keeps the record where it is and changes its data. A record that does not exist
+  is appended. Element values are set this way: `C/Booleans_ReverseOrder` step 2 and `C/TwoInKey_ChangeFirstAgain` keep the
+  changed value in its place, while the value of the policy itself is still removed and appended (`SetValue`).
+- `AddDeleteInstructionInPlace(key, name)` replaces the value `name` by `**del.name` at the same position. Only the
+  unchecked boolean uses it (`B/Pol_Bool_NoFalseValue` step 3, `B/Pol_Amp_LabelSingle` step 3). Every other delete is
+  remove the value, remove an existing `**del.`, append the new one (`C/Shared_DeleteRecordsOrder`).
+- `SetSoftValue(key, name, type, data)` stores the data under `**soft.<name>`, in place when the record exists
+  (`B/Pol_LongDecimal_RequiredSoftText` steps 1 and 2). The record survives Disabled and Not Configured.
+
 ### 2.1a Set to identical data changes nothing
 `SetValue` with the same type and the same data bytes returns the existing record, keeps its bytes and its position,
 and does not count as a change (probe: an OK that changes nothing writes no file). `AddDeleteInstruction` follows the

@@ -51,8 +51,9 @@ public static class GptIniRules
     public static string Tool(GpoSide side) => side == GpoSide.Machine ? MachineTool : UserTool;
 
     /// <summary>
-    /// Verify against oracle (probe: +1 for machine; overflow not observable): the version after one save of a side. The
-    /// other half never changes. A half at 65535 wraps to 0 without a carry into the other half.
+    /// The version after one save of a side. The other half never changes. A half at 65535 goes to 1, not 0, and does not
+    /// carry into the other half: captures C/Version_FromHighMachine (65535 becomes 1) and C/Version_FromHighUser (the high
+    /// half 65535 becomes 1, so the file reads 65536).
     /// </summary>
     /// <param name="version">The current 32-bit version.</param>
     /// <param name="side">The saved side.</param>
@@ -61,13 +62,13 @@ public static class GptIniRules
     {
         if (side == GpoSide.Machine)
         {
-            var low = unchecked((ushort)((version & 0xFFFF) + 1));
-            return (version & 0xFFFF0000u) | low;
+            return (version & 0xFFFF0000u) | NextHalf(version & 0xFFFFu);
         }
 
-        var high = unchecked((ushort)((version >> 16) + 1));
-        return ((uint)high << 16) | (version & 0xFFFFu);
+        return (NextHalf(version >> 16) << 16) | (version & 0xFFFFu);
     }
+
+    private static uint NextHalf(uint half) => half >= 0xFFFFu ? 1u : half + 1u;
 
     /// <summary>
     /// Where a missing key goes inside the General section: after the last non-blank line of the section, whatever the other
@@ -90,7 +91,34 @@ public static class GptIniRules
     }
 
     /// <summary>
-    /// Verify against oracle (group C): adds the pair for a side to the parsed extension groups. Each group is the
+    /// Takes the snap-in GUID of a side out of the registry group of the parsed extension groups, and the group with it when
+    /// no tool is left. Other groups and tools stay in place. Settled by C/GptIni_ForeignExtensions step 4 and
+    /// C/GptIni_PairRemoval.
+    /// </summary>
+    /// <param name="groups">The groups; the first entry of each is the extension GUID.</param>
+    /// <param name="side">The side.</param>
+    /// <returns>True when the groups changed.</returns>
+    public static bool RemovePair(List<List<string>> groups, GpoSide side)
+    {
+        var tool = Tool(side);
+        var changed = false;
+        foreach (var group in groups.Where(g => string.Equals(g[0], RegistryExtension, StringComparison.OrdinalIgnoreCase)).ToList())
+        {
+            if (group.RemoveAll(g => string.Equals(g, tool, StringComparison.OrdinalIgnoreCase)) > 0)
+            {
+                changed = true;
+                if (group.Count == 1)
+                {
+                    groups.Remove(group);
+                }
+            }
+        }
+
+        return changed;
+    }
+
+    /// <summary>
+    /// Adds the pair for a side to the parsed extension groups (C/GptIni_ForeignExtensions). Each group is the
     /// extension GUID followed by tool GUIDs. A tool joins an existing registry group in ordinal order; a new group is
     /// inserted before the first group whose GUID is greater, else appended. Existing groups are never reordered.
     /// </summary>

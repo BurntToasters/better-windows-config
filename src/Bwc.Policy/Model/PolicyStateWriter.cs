@@ -22,7 +22,15 @@ public static class PolicyStateWriter
     /// The template holds a key or value name that the document refuses. That is a template fault, and the apply may then be
     /// partial.
     /// </exception>
-    public static PolicyApplyResult Apply(PolicyDefinition policy, PolDocument document, PolicyEdit edit)
+    public static PolicyApplyResult Apply(PolicyDefinition policy, PolDocument document, PolicyEdit edit) =>
+        Apply(policy, document, edit, commentChanged: false);
+
+    /// <summary>
+    /// <see cref="Apply(PolicyDefinition, PolDocument, PolicyEdit)"/> for a save that also changes the comment. A policy with
+    /// a value name and no elements that stays Enabled writes its value again then, which moves it to the end of its key:
+    /// capture C/Cmtx_FirstSave_ForeignNamespaces step 4.
+    /// </summary>
+    internal static PolicyApplyResult Apply(PolicyDefinition policy, PolDocument document, PolicyEdit edit, bool commentChanged)
     {
         ArgumentNullException.ThrowIfNull(policy);
         ArgumentNullException.ThrowIfNull(document);
@@ -35,13 +43,24 @@ public static class PolicyStateWriter
         }
 
         var before = document.ToBytes();
+        var current = PolicyStateReader.Read(policy, document).State;
+
+        // Disabled over a policy that already shows Disabled saves nothing: B/Pol_Bool_TrueFalseValues, B/Pol_Bool_StringValues,
+        // B/Pol_Bool_TwoChecksReverseOrder, B/Pol_Bool_TrueFalseLists (the unchecked box reads Disabled, a second Disabled
+        // writes no file) and C/Booleans_ReverseOrder.
+        if (edit.State == PolicyState.Disabled && current == PolicyState.Disabled)
+        {
+            return new PolicyApplyResult(problems, false);
+        }
+
+        var rewrite = commentChanged && edit.State == PolicyState.Enabled && current == PolicyState.Enabled && policy.Elements.Count == 0;
         if (PolKeySpelling.HasTrailingBackslash(document))
         {
             // Classic spells every key without the trailing backslash once a save changes something, and a save that changes
             // nothing leaves the file alone (capture K/KeyTrailingBackslash_ReadAsWritten). A copy tells which one this is.
             var probe = PolKeySpelling.TrimmedCopy(document);
             var trimmedBefore = probe.ToBytes();
-            ApplyPlan(policy, probe, edit);
+            ApplyPlan(policy, probe, edit, current, rewrite);
             if (probe.ToBytes().AsSpan().SequenceEqual(trimmedBefore))
             {
                 return new PolicyApplyResult(problems, false);
@@ -50,34 +69,35 @@ public static class PolicyStateWriter
             document.TrimTrailingKeyBackslashes();
         }
 
-        ApplyPlan(policy, document, edit);
+        ApplyPlan(policy, document, edit, current, rewrite);
         return new PolicyApplyResult(problems, !document.ToBytes().AsSpan().SequenceEqual(before));
     }
 
-    private static void ApplyPlan(PolicyDefinition policy, PolDocument document, PolicyEdit edit)
+    private static void ApplyPlan(PolicyDefinition policy, PolDocument document, PolicyEdit edit, PolicyState current, bool rewrite)
     {
         var plan = new WritePlan();
         switch (edit.State)
         {
             case PolicyState.Enabled:
-                PlanEnabled(plan, policy, document, edit);
+                PlanEnabled(plan, policy, document, edit, rewrite);
                 break;
             case PolicyState.Disabled:
                 PlanDisabled(plan, policy);
                 break;
             default:
-                PlanNotConfigured(plan, policy);
+                PlanNotConfigured(plan, policy, current);
                 break;
         }
 
         plan.Execute(document);
     }
 
-    private static void PlanEnabled(WritePlan plan, PolicyDefinition policy, PolDocument document, PolicyEdit edit)
+    private static void PlanEnabled(WritePlan plan, PolicyDefinition policy, PolDocument document, PolicyEdit edit, bool rewrite)
     {
         foreach (var write in PolicyLayout.EnabledWrites(policy))
         {
-            plan.AddWrite(write);
+            var isPolicyValue = policy.ValueName is not null && write.Slot.Name == policy.ValueName && write.Slot.Key == policy.Key;
+            plan.AddWrite(write, move: rewrite && isPolicyValue);
         }
 
         foreach (var slot in PolicyLayout.ListSlots(policy.DisabledList))
@@ -89,25 +109,35 @@ public static class PolicyStateWriter
         {
             edit.Elements.TryGetValue(element.Id, out var value);
             var keepsRemoved = value is ListValue { Removed.Count: > 0 };
-            PlanElement(plan, element, PolicyEditValidator.IsEmpty(value) && !keepsRemoved ? null : value, document);
+
+            // An optional text or multi-text left empty is saved as an empty value: B/Pol_Amp_LabelDouble, B/Pol_Text_MaxLength,
+            // B/Pol_Element_KeyOverride and B/Pol_Shared_ElementsReverseOrder (an empty string), B/Pol_MultiText_Basic (one NUL).
+            var savedWhenEmpty = value is TextValue or MultiTextValue;
+            PlanElement(plan, element, PolicyEditValidator.IsEmpty(value) && !keepsRemoved && !savedWhenEmpty ? null : value, document);
         }
     }
 
     private static void PlanDisabled(WritePlan plan, PolicyDefinition policy)
     {
-        foreach (var write in PolicyLayout.DisabledWrites(policy))
-        {
-            plan.AddWrite(write);
-        }
-
+        // The delete instruction of the policy value goes in before the disabled list: B/Pol_Value_BothLists step 2.
         if (policy.ValueName is not null && PolicyLayout.DisabledLiteral(policy) is null)
         {
             plan.Delete(new Slot(policy.Key, policy.ValueName));
         }
 
-        foreach (var slot in PolicyLayout.ListSlots(policy.EnabledList))
+        foreach (var write in PolicyLayout.DisabledWrites(policy))
         {
-            plan.Remove(slot, PolicyRules.DisabledClearsElementsWithDelete);
+            plan.AddWrite(write);
+        }
+
+        // The enabled list gets its delete instructions only when the policy has no value name to carry the state:
+        // B/Pol_Value_EnabledListOnly step 2 against B/Pol_Value_BothLists step 2, where the enabled items stay.
+        if (policy.ValueName is null)
+        {
+            foreach (var slot in PolicyLayout.ListSlots(policy.EnabledList))
+            {
+                plan.Remove(slot, PolicyRules.DisabledClearsElementsWithDelete);
+            }
         }
 
         foreach (var element in policy.Elements)
@@ -123,18 +153,22 @@ public static class PolicyStateWriter
                 continue;
             }
 
-            foreach (var slot in PolicyLayout.ElementSlots(element))
+            foreach (var slot in PolicyLayout.ElementClearSlots(element))
             {
                 plan.Remove(slot, PolicyRules.DisabledClearsElementsWithDelete);
             }
         }
     }
 
-    private static void PlanNotConfigured(WritePlan plan, PolicyDefinition policy)
+    private static void PlanNotConfigured(WritePlan plan, PolicyDefinition policy, PolicyState current)
     {
-        foreach (var slot in PolicyLayout.AllSlots(policy))
+        // A policy that shows Not Configured keeps its delete instructions: B/Pol_Value_EnabledOnly and
+        // B/Pol_Value_EnabledListOnly step 3 (the lone instruction reads Not Configured and a second Not Configured writes
+        // nothing). A policy that shows Disabled loses them (every other group B step 'not-configured').
+        var removeInstructions = PolicyRules.NotConfiguredClearsInstructions && current != PolicyState.NotConfigured;
+        foreach (var slot in PolicyLayout.NotConfiguredSlots(policy))
         {
-            plan.Clear(slot, PolicyRules.NotConfiguredClearsInstructions);
+            plan.Clear(slot, removeInstructions);
         }
 
         if (PolicyRules.NotConfiguredClearsWholeListKey)
@@ -188,17 +222,23 @@ public static class PolicyStateWriter
         }
 
         var written = PolicyLayout.BooleanSide(element, value.Checked);
-        var other = PolicyLayout.BooleanSide(element, !value.Checked);
         foreach (var write in written)
         {
-            plan.AddWrite(write);
+            plan.AddWrite(write, inPlace: true);
         }
 
-        var deleteOther = !value.Checked && written.Count == 0 && PolicyRules.FalseBooleanWithoutFalseValueWritesDeleteInstruction;
-        foreach (var write in other)
+        if (element.ValueName is null || PolicyLayout.HasLiteralFor(element, value.Checked))
         {
-            plan.Remove(write.Slot, deleteOther);
+            return;
         }
+
+        // The side has nothing to write at the value name. Unchecked deletes it with an instruction, also when the false side
+        // is a list: B/Pol_Bool_NoFalseValue steps 1 and 3, B/Pol_Bool_TrueFalseLists steps 1 and 3 and B/Pol_Amp_LabelSingle
+        // step 3. The value lists of the other side stay: B/Pol_Bool_TrueFalseLists step 3 keeps the true list entries.
+        plan.Remove(
+            new Slot(element.EffectiveKey, element.ValueName),
+            !value.Checked && PolicyRules.FalseBooleanWithoutFalseValueWritesDeleteInstruction,
+            inPlace: true);
     }
 
     private static void PlanNumber(WritePlan plan, DecimalElement element, NumberValue? value)
@@ -215,17 +255,18 @@ public static class PolicyStateWriter
         }
 
         var slot = new Slot(element.EffectiveKey, element.ValueName);
+        var soft = element.Soft;
         if (element.StoreAsText)
         {
-            plan.Set(slot, PolValueType.String, PolData.FromString(PolicyEncoding.Digits(value.Number)));
+            plan.Set(slot, PolValueType.String, PolData.FromString(PolicyEncoding.Digits(value.Number)), inPlace: true, soft: soft);
         }
         else if (element.Kind == PolicyElementKind.LongDecimal)
         {
-            plan.Set(slot, PolValueType.QWord, PolData.FromQWord(value.Number));
+            plan.Set(slot, PolValueType.QWord, PolData.FromQWord(value.Number), inPlace: true, soft: soft);
         }
         else
         {
-            plan.Set(slot, PolValueType.DWord, PolData.FromDWord((uint)value.Number));
+            plan.Set(slot, PolValueType.DWord, PolData.FromDWord((uint)value.Number), inPlace: true, soft: soft);
         }
     }
 
@@ -242,7 +283,8 @@ public static class PolicyStateWriter
             plan.Set(
                 new Slot(element.EffectiveKey, element.ValueName),
                 element.Expandable ? PolValueType.ExpandString : PolValueType.String,
-                PolData.FromString(value.Text));
+                PolData.FromString(value.Text),
+                inPlace: true);
         }
     }
 
@@ -257,10 +299,12 @@ public static class PolicyStateWriter
         if (element.ValueName is not null)
         {
             var lines = PolicyRules.NormalizeMultiTextLines(value.Lines);
+
+            // No lines is a single NUL character (B/Pol_MultiText_Basic step 1, 2 bytes); lines end with one more NUL.
             plan.Set(
                 new Slot(element.EffectiveKey, element.ValueName),
                 PolValueType.MultiString,
-                PolData.FromString(string.Join('\0', lines) + "\0"));
+                PolData.FromString(lines.Count == 0 ? string.Empty : string.Join('\0', lines) + "\0"));
         }
     }
 
@@ -278,7 +322,7 @@ public static class PolicyStateWriter
             var slot = new Slot(element.EffectiveKey, element.ValueName);
             if (selected.Value is not null)
             {
-                plan.AddWrite(new ValueWrite(slot, selected.Value));
+                plan.AddWrite(new ValueWrite(slot, selected.Value), inPlace: true);
             }
             else
             {
@@ -392,7 +436,7 @@ public static class PolicyStateWriter
         private readonly List<string> deleteValuesWrites = [];
         private readonly List<(string Key, string Name, PolValueType Type, string Data)> listRemovals = [];
         private readonly List<(Slot Slot, bool RemoveInstructions)> clears = [];
-        private readonly List<(Slot Slot, bool IsDelete, PolValueType Type, byte[] Data)> writes = [];
+        private readonly List<(Slot Slot, bool IsDelete, PolValueType Type, byte[] Data, bool InPlace, bool Soft, bool Move)> writes = [];
         private readonly HashSet<string> claimed = new(StringComparer.OrdinalIgnoreCase);
 
         public void ClearListValues(string key, bool includeDeleteValues) => listClears.Add((key, includeDeleteValues));
@@ -405,25 +449,25 @@ public static class PolicyStateWriter
 
         public void Clear(Slot slot, bool removeInstructions) => clears.Add((slot, removeInstructions));
 
-        public void Set(Slot slot, PolValueType type, byte[] data)
+        public void Set(Slot slot, PolValueType type, byte[] data, bool inPlace = false, bool soft = false, bool move = false)
         {
             claimed.Add(slot.Id);
-            writes.Add((slot, false, type, data));
+            writes.Add((slot, false, type, data, inPlace, soft, move));
         }
 
-        public void Delete(Slot slot)
+        public void Delete(Slot slot, bool inPlace = false)
         {
             if (claimed.Add(slot.Id))
             {
-                writes.Add((slot, true, PolValueType.String, []));
+                writes.Add((slot, true, PolValueType.String, [], inPlace, false, false));
             }
         }
 
-        public void Remove(Slot slot, bool withDeleteInstruction)
+        public void Remove(Slot slot, bool withDeleteInstruction, bool inPlace = false)
         {
             if (withDeleteInstruction)
             {
-                Delete(slot);
+                Delete(slot, inPlace);
             }
             else
             {
@@ -431,12 +475,12 @@ public static class PolicyStateWriter
             }
         }
 
-        public void AddWrite(ValueWrite write)
+        public void AddWrite(ValueWrite write, bool inPlace = false, bool move = false)
         {
             if (write.Value.Kind != PolicyValueKind.Delete)
             {
                 var (type, data) = PolicyEncoding.Encode(write.Value);
-                Set(write.Slot, type, data);
+                Set(write.Slot, type, data, inPlace, move: move);
             }
             else if (PolicyRules.DeleteLiteralWritesDeleteInstruction)
             {
@@ -483,7 +527,9 @@ public static class PolicyStateWriter
                 document.RemoveValue(slot.Key, slot.Name);
                 if (removeInstructions)
                 {
-                    document.RemoveInstructions(slot.Key, slot.Name);
+                    // Only the delete instruction goes. A soft value stays through Disabled and Not Configured:
+                    // B/Pol_LongDecimal_RequiredSoftText steps 3 and 4.
+                    document.RemoveValue(slot.Key, PolicyEncoding.DeletePrefix + slot.Name);
                 }
             }
 
@@ -494,17 +540,43 @@ public static class PolicyStateWriter
 
             // A key with a leading backslash is never written: classic saves such a policy and adds no record (capture
             // K/KeyLeadingBackslash_Enable).
-            foreach (var (slot, isDelete, type, data) in writes.Where(w => !PolKeySpelling.HasLeadingBackslash(w.Slot.Key)))
+            foreach (var (slot, isDelete, type, data, inPlace, soft, move) in writes.Where(w => !PolKeySpelling.HasLeadingBackslash(w.Slot.Key)))
             {
-                if (isDelete)
+                if (isDelete && inPlace)
                 {
+                    document.AddDeleteInstructionInPlace(slot.Key, slot.Name);
+                }
+                else if (isDelete)
+                {
+                    // The value and any older instruction leave and the new instruction goes to the end of the key:
+                    // B/Pol_Amp_LabelSingle step 4 (every record becomes an instruction in element order, the instruction that
+                    // was there before included) and B/Pol_Enum_ItemValueList step 5 (the instruction lands after a record that
+                    // stays).
                     document.RemoveValue(slot.Key, slot.Name);
+                    document.RemoveValue(slot.Key, PolicyEncoding.DeletePrefix + slot.Name);
                     document.AddDeleteInstruction(slot.Key, slot.Name);
+                }
+                else if (soft)
+                {
+                    document.RemoveValue(slot.Key, PolicyEncoding.DeletePrefix + slot.Name);
+                    document.SetSoftValue(slot.Key, slot.Name, type, data);
                 }
                 else
                 {
                     document.RemoveInstructions(slot.Key, slot.Name);
-                    document.SetValue(slot.Key, slot.Name, type, data);
+                    if (move)
+                    {
+                        document.RemoveValue(slot.Key, slot.Name);
+                    }
+
+                    if (inPlace)
+                    {
+                        document.SetValueInPlace(slot.Key, slot.Name, type, data);
+                    }
+                    else
+                    {
+                        document.SetValue(slot.Key, slot.Name, type, data);
+                    }
                 }
             }
         }

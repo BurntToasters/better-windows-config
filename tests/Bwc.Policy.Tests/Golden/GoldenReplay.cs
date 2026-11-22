@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json.Nodes;
 using Bwc.Gpo.Store;
 using Bwc.Policy.Admx;
@@ -82,6 +83,15 @@ internal static class GoldenReplay
         foreach (var name in golden.StartFiles.Keys)
         {
             sandbox.SeedFrom(name, Path.Combine(golden.StartFolder, name));
+        }
+
+        // Classic creates a policy version file with an empty General section when it opens a GPO that has none. The start
+        // snapshot of A/Machine_Cancel and A/Machine_NotConfigured holds exactly that, and B/Pol_Enum_Required,
+        // B/Pol_Text_Required and B/Pol_MultiText_Limits still hold it after a refused first press. The engine only saves,
+        // so the replay does the open.
+        if (!golden.StartFiles.ContainsKey(GpoFileNames.GptIniFile))
+        {
+            sandbox.Seed(sandbox.PathOf(GpoFileNames.GptIniFile), Encoding.ASCII.GetBytes("[General]\r\n"));
         }
     }
 

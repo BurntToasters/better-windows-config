@@ -36,7 +36,9 @@ public sealed class PolicyWriteProbeTests
 
         Apply("Pol_Value_EnabledOnly", document, PolicyEdit.Disabled);
         AssertBytes(document, RecDw(Basics, "ModeNumber", 5), Del(Basics, "EnabledOnly"));
-        Assert.AreEqual(PolicyState.Disabled, Read("Pol_Value_EnabledOnly", document).State);
+
+        // D7, B/Pol_Value_EnabledOnly step 1: the policy then reads Not Configured.
+        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Value_EnabledOnly", document).State);
     }
 
     [TestMethod]
@@ -69,13 +71,16 @@ public sealed class PolicyWriteProbeTests
     }
 
     [TestMethod]
-    public void NotConfigured_ClearsTheDeleteInstructionToo_SoThePolicyCannotReadAsDisabled()
+    public void NotConfigured_OverALoneDeleteInstructionOfAnEnabledValuePolicy_WritesNothing()
     {
         var document = Parse(Del(Basics, "EnabledOnly"));
 
-        Apply("Pol_Value_EnabledOnly", document, PolicyEdit.NotConfigured);
+        // B/Pol_Value_EnabledOnly step 3: the dialog shows Not Configured over the lone instruction, and Not Configured
+        // changes no file. The instruction stays.
+        var result = Apply("Pol_Value_EnabledOnly", document, PolicyEdit.NotConfigured);
 
-        Assert.IsTrue(document.IsEmpty);
+        Assert.IsFalse(result.Changed);
+        AssertBytes(document, Del(Basics, "EnabledOnly"));
         Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Value_EnabledOnly", document).State);
     }
 

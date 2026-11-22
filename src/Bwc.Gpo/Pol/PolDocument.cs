@@ -139,6 +139,46 @@ public sealed class PolDocument
         return Upsert(key, name, (uint)type, data);
     }
 
+    /// <summary>
+    /// Sets a value of an element. A new value goes to the end of its key like <see cref="SetValue"/>. An existing value keeps
+    /// its place and takes the new type and data, which is how classic rewrites the values of the elements of a policy
+    /// (captures C/Booleans_ReverseOrder step 2 and C/Elements_ReverseOrder step 3: the changed value stays where it was),
+    /// while the value of the policy itself is removed and appended (C/TwoInKey_ChangeFirstAgain step 5, see
+    /// <see cref="SetValue"/>). The stored key and name spelling stay.
+    /// </summary>
+    /// <param name="key">A key path without leading, trailing or doubled backslashes.</param>
+    /// <param name="name">A value name that does not start with <c>**</c>.</param>
+    /// <param name="type">The value type.</param>
+    /// <param name="data">The data bytes; copied. Shape must match the type.</param>
+    /// <returns>The stored record.</returns>
+    /// <exception cref="ArgumentException">The key, name, type or data shape is invalid.</exception>
+    public PolRecord SetValueInPlace(string key, string name, PolValueType type, ReadOnlySpan<byte> data)
+    {
+        ValidateKey(key);
+        ValidateName(name);
+        if (name.StartsWith(PolFormat.InstructionPrefix, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("A value name starting with ** is an instruction and cannot be set as a value.", nameof(name));
+        }
+
+        ValidateData(type, data);
+        if (_keys.TryGetValue(key, out var bucket) && bucket.ByName.TryGetValue(name, out var existing))
+        {
+            var old = existing.Value;
+            if (PolOrderRules.IsSameContent(old, (uint)type, data))
+            {
+                return old;
+            }
+
+            var replacement = PolRecord.Create(old.Key, old.ValueName, (uint)type, data);
+            existing.Value = replacement;
+            Version++;
+            return replacement;
+        }
+
+        return Upsert(key, name, (uint)type, data);
+    }
+
     /// <summary>Removes one value record (Not Configured). Instruction records for the value stay.</summary>
     /// <param name="key">The key path.</param>
     /// <param name="name">The value name.</param>
@@ -175,6 +215,81 @@ public sealed class PolDocument
         ValidateKey(key);
         ValidateName(name);
         return Upsert(key, PolFormat.DeletePrefix + name, (uint)PolValueType.String, PolFormat.DeleteInstructionData);
+    }
+
+    /// <summary>
+    /// Sets the soft value of an element: a record named <c>**soft.&lt;name&gt;</c> that carries the typed data of the value
+    /// (capture B/Pol_LongDecimal_RequiredSoftText and B/Pol_Decimal_Soft: the number of a soft element is stored under the
+    /// soft name and not under its own name). Place and spelling follow <see cref="SetValueInPlace"/>.
+    /// </summary>
+    /// <param name="key">A key path without leading, trailing or doubled backslashes.</param>
+    /// <param name="name">The value name without the <c>**soft.</c> prefix.</param>
+    /// <param name="type">The value type.</param>
+    /// <param name="data">The data bytes; copied. Shape must match the type.</param>
+    /// <returns>The stored record.</returns>
+    /// <exception cref="ArgumentException">The key, name, type or data shape is invalid.</exception>
+    public PolRecord SetSoftValue(string key, string name, PolValueType type, ReadOnlySpan<byte> data)
+    {
+        ValidateKey(key);
+        ValidateName(name);
+        if (name.StartsWith(PolFormat.InstructionPrefix, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("A value name starting with ** cannot take the soft prefix.", nameof(name));
+        }
+
+        ValidateData(type, data);
+        var softName = PolFormat.SoftPrefix + name;
+        if (_keys.TryGetValue(key, out var bucket) && bucket.ByName.TryGetValue(softName, out var existing))
+        {
+            var old = existing.Value;
+            if (PolOrderRules.IsSameContent(old, (uint)type, data))
+            {
+                return old;
+            }
+
+            var replacement = PolRecord.Create(old.Key, old.ValueName, (uint)type, data);
+            existing.Value = replacement;
+            Version++;
+            return replacement;
+        }
+
+        return Upsert(key, softName, (uint)type, data);
+    }
+
+    /// <summary>
+    /// Replaces the value record of an element by its delete instruction where it stands: the instruction takes the place of
+    /// the value in the key (capture B/Pol_Bool_NoFalseValue and B/Pol_Amp_LabelSingle step 3, where the unchecked box sits
+    /// between two other records). With no value record it is <see cref="AddDeleteInstruction"/>.
+    /// </summary>
+    /// <param name="key">A key path without leading, trailing or doubled backslashes.</param>
+    /// <param name="name">The name of the value to delete when the policy is applied.</param>
+    /// <returns>The stored instruction.</returns>
+    /// <exception cref="ArgumentException">The key or name is invalid.</exception>
+    public PolRecord AddDeleteInstructionInPlace(string key, string name)
+    {
+        ValidateKey(key);
+        ValidateName(name);
+        if (!_keys.TryGetValue(key, out var bucket) || !bucket.ByName.TryGetValue(name, out var valueNode))
+        {
+            return AddDeleteInstruction(key, name);
+        }
+
+        var instructionName = PolFormat.DeletePrefix + name;
+        if (bucket.ByName.TryGetValue(instructionName, out var oldInstruction))
+        {
+            bucket.Records.Remove(oldInstruction);
+            bucket.ByName.Remove(instructionName);
+            _recordCount--;
+        }
+
+        var value = valueNode.Value;
+        var instruction = PolRecord.Create(value.Key, instructionName, (uint)PolValueType.String, PolFormat.DeleteInstructionData);
+        var node = bucket.Records.AddAfter(valueNode, instruction);
+        bucket.Records.Remove(valueNode);
+        bucket.ByName.Remove(name);
+        bucket.ByName[instructionName] = node;
+        Version++;
+        return instruction;
     }
 
     /// <summary>

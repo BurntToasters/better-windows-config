@@ -61,7 +61,11 @@ public static class PolicyEditValidator
 
         if (IsEmpty(value))
         {
-            if (element.Required && element.Kind != PolicyElementKind.Boolean)
+            // Classic refuses OK with a message box for an Enabled list with no rows (D8: every B/Pol_List_* default press,
+            // C/SharedList_EmptyList, and the Show Contents box of B/Pol_List_Plain step 7) and for an enum with no item
+            // selected (B/Pol_Enum_StringItems, B/Pol_Enum_DecimalItems, B/Pol_Enum_ItemValueList), required or not.
+            var alwaysRequired = element.Kind is PolicyElementKind.List or PolicyElementKind.Enum;
+            if (alwaysRequired || (element.Required && element.Kind != PolicyElementKind.Boolean))
             {
                 problems.Add(new PolicyEditProblem(element.Id, PolicyProblemKind.Required));
             }

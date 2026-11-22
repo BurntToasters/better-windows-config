@@ -29,8 +29,8 @@ Rules for the whole piece:
 |---|---|---|---|
 | value name, no enabledValue and no disabledValue | value = DWORD 1 (*probe-confirmed*) | remove the value record, append `**del.<name>` (`[Rule: PlainValueNameDisabledWritesZero]`, false; captures `A/Machine_Disabled`, `A/User_Disabled`, settled; the earlier guess of DWORD 0 was wrong) | record equal to 1: Enabled; `**del.` only: Disabled (captures `A/Machine_Disabled`, `A/User_Disabled`); a DWORD 0 still reads as Disabled (`[Rule: PlainValueNameZeroReadsAsDisabled]`, *verify against oracle*, group D) |
 | enabledValue and disabledValue | enabledValue | disabledValue (*probe-confirmed* for DWORD) | equal to either |
-| enabledValue only | enabledValue | remove the value record, append `**del.<name>` (*probe-confirmed*) | equal to enabledValue: Enabled; `**del.` only: Disabled |
-| disabledValue only | DWORD 1 (default) | disabledValue | equal to either |
+| enabledValue only | enabledValue | remove the value record, append `**del.<name>` (*probe-confirmed*) | equal to enabledValue: Enabled; a lone `**del.` reads as Not Configured (D7, `B/Pol_Value_EnabledOnly` step 1) |
+| disabledValue only | DWORD 1 (default) | disabledValue | equal to disabledValue: Disabled; the DWORD 1 written by Enabled reads as Not Configured (D7, `B/Pol_Value_DisabledOnly` step 1) |
 | decimal values | DWORD (QWORD above 32 bits) | same | type and data must equal |
 | string values | REG_SZ | REG_SZ | type and data must equal |
 | delete literal as enabled or disabled value | remove the record, append `**del.<name>` (*verify against oracle*, `[Rule: DeleteLiteralWritesDeleteInstruction]`) | same | `**del.` with no record matches |
@@ -39,9 +39,11 @@ Rules for the whole piece:
 Defaults 1 and 0 are `[Rule: DefaultEnabledValue]` and `[Rule: DefaultDisabledValue]` (*verify against oracle*; the
 enabled default is *probe-confirmed*).
 
-Not Configured removes the value record and writes no instruction (*probe-confirmed*). It also removes `**del.<name>` and
-`**soft.<name>` for the value, so the state cannot read back as Disabled (*verify against oracle*,
-`[Rule: NotConfiguredClearsInstructions]`).
+Not Configured removes the value record and writes no instruction (*probe-confirmed*). Over Disabled it also removes the
+`**del.<name>` instructions, but not over Not Configured: Not Configured over a lone `**del.` writes nothing and leaves it
+(`B/Pol_Value_EnabledOnly` step 3, `B/Pol_Value_EnabledListOnly` step 3). `**soft.<name>` stays through Disabled and Not
+Configured (`B/Pol_LongDecimal_RequiredSoftText` steps 3 and 4). Disabled over Disabled saves nothing
+(`B/Pol_Value_EnabledOnly`, `B/Pol_Class_Machine`).
 
 ### 1.1 Value in the file that does not match
 
@@ -53,11 +55,15 @@ Not Configured removes the value record and writes no instruction (*probe-confir
 
 ### 1.2 Delete instructions
 
-- Only `**del.Alpha` in the key: Disabled (*verify against oracle*, `[Rule: DeleteInstructionOnlyIsDisabled]`). Open
-  lead: classic may show Not Configured, because choosing Not Configured on that state wrote nothing (probe lead). The
-  two rules disagree on what OK writes, so the oracle settles them together; flipping the one member flips both.
-- `**soft.<name>` is never written by the policy engine (the model has the API, no template shape needs it yet). It is
-  kept when the document is read and written back (E1), and removed with the value it belongs to by Not Configured.
+- A lone `**del.<name>` reads as Disabled when the policy declares no enabledValue and no enabledList (`B/Pol_Class_Machine`,
+  `B/Pol_Value_DisabledOnly`), and as Not Configured otherwise (D7, `B/Pol_Value_EnabledOnly`,
+  `B/Pol_Value_EnabledListOnly`). The rule is `PolicyRules.LoneDeleteReadsAsDisabled`. An unchecked boolean box that wrote
+  `**del.<name>` reads as Disabled (`B/Pol_Bool_NoFalseValue` step 3); a policy whose only boxes are unchecked reads as
+  Disabled (`B/Pol_Bool_TrueFalseValues` step 3).
+- A decimal element with `soft="true"` is stored under `**soft.<name>` with the typed data of the number (DWORD, QWORD or
+  REG_SZ digits), not under its own name (`B/Pol_LongDecimal_RequiredSoftText` steps 1 and 2). The soft record counts as
+  a value, so the policy keeps reading Enabled after Disabled and Not Configured. `B/Pol_Decimal_Soft` is on the awaiting
+  recapture list (CAP-4), so only the long decimal case settles it.
   `**delvals.` is written for lists only, see section 7.
 - Enabled removes `**del.<name>` for every name it writes.
 - An instruction that is not owned by the policy (another policy's name, an unknown `**` name) is never touched.
@@ -68,7 +74,7 @@ Not Configured removes the value record and writes no instruction (*probe-confir
 |---|---|---|---|
 | enabledList only | every item at its key (item key, else list default key, else policy key) | removes every item and writes `**del.<item>` in the item's key (product today), or writes nothing (the earlier reading); *verify against oracle*, matrix B Pol_Value_EnabledListOnly Disabled; no value record can say Disabled | Enabled when every item record matches; else Not Configured |
 | disabledList only | nothing | every item | Disabled when every item matches; else Not Configured |
-| both lists | enabledList items; disabledList items are removed | disabledList items; enabledList items removed and `**del.` written | the list that matches in full |
+| both lists | enabledList items; disabledList items are removed | disabledList items; the enabledList items stay (`B/Pol_Value_BothLists` step 2) | the list that matches in full |
 | elements only | each element's value | each element's value removed and `**del.<valueName>` written (*verify against oracle*, `[Rule: DisabledClearsElementsWithDelete]`) | Enabled when any element has a value (*verify against oracle*, `[Rule: IsEnabledByElementEvidence]`); Disabled when a `**del.` for an element name exists and nothing is Enabled |
 | nothing at all | nothing | nothing | Not Configured |
 
@@ -82,12 +88,19 @@ Not Configured removes the value record and writes no instruction (*probe-confir
   reports `Changed` false for it. Classic may write something the model does not know (*verify against oracle*).
 - Enabled removes the values of the disabledList that it does not write, without a delete instruction (*verify against
   oracle*, `[Rule: EnabledClearsDisabledListWithDelete]`, false).
+- Disabled writes `**del.` for the enabledList items only when the policy has no value name. Not Configured removes the
+  disabledList and, with no value name, the enabledList; with a value name it keeps the enabledList
+  (`B/Pol_Value_BothLists` steps 2 to 4, `B/Pol_Value_EnabledListOnly`). The enabledList rule is fitted to those two cases
+  alone and stays uncertain.
 
 ## 3. Element kinds
 
 For every element: an absent value (not in the edit) is "empty". A required element that is empty is a `Required`
-problem. An optional empty element removes its value and writes no instruction (*verify against oracle*,
-`[Rule: EmptyOptionalElementWritesDeleteInstruction]`, false). On read, no record means no value in the snapshot (a
+problem. An optional empty text writes an empty REG_SZ and an optional empty multi text writes one NUL (`B/Pol_Amp_LabelDouble`
+step 1, `B/Pol_MultiText_Basic` step 1); an optional empty element of another kind removes its value and writes no
+instruction (*verify against oracle*, `[Rule: EmptyOptionalElementWritesDeleteInstruction]`, false). An enum with no item
+and a list with no row are refused as `Required` whether the element is required or not (D8, `B/Pol_Enum_DecimalItems`,
+`B/Pol_List_Plain` step 7, `C/SharedList_EmptyList`). On read, no record means no value in the snapshot (a
 partial set of element values is normal). An element only reads and writes when the policy is Enabled. Disabled and Not
 Configured ignore the edit's element values.
 
@@ -96,15 +109,15 @@ Configured ignore the edit's element values.
 | Shape | Check on | Check off | Reads |
 |---|---|---|---|
 | trueValue and falseValue | trueValue | falseValue | true or false by equality; no match: absent |
-| trueValue, no falseValue | trueValue | remove the value; no instruction (*verify against oracle*, `[Rule: FalseBooleanWithoutFalseValueWritesDeleteInstruction]`, false) | equal: true; no record: false |
-| trueList and falseList | every true item | every false item; true items removed | all true items match: true; all false items match: false |
+| trueValue, no falseValue | trueValue | remove the value and write `**del.<name>` in its place (`[Rule: FalseBooleanWithoutFalseValueWritesDeleteInstruction]`, true; `B/Pol_Bool_NoFalseValue` step 3, `B/Pol_Amp_LabelSingle` step 3) | equal: true; no record: false |
+| trueList and falseList | DWORD 1 at the value name, then every true item | `**del.<name>` in place of the value, then every false item; the true items stay (`B/Pol_Bool_TrueFalseLists` steps 2 and 3) | all true items match: true; all false items match: false |
 | trueList only | true items | true items removed | match: true; else false |
-| no values at all and a value name | DWORD 1 | DWORD 0 (*verify against oracle*, `[Rule: BooleanDefaultsToOneAndZero]`) | equal to 1: true; 0: false |
+| no values at all and a value name | DWORD 1 | `**del.<name>` in place of the value, no DWORD 0 (`B/Pol_Amp_LabelSingle` step 3) | equal to 1: true; no record: false |
 | no value name | nothing | nothing | absent |
 | string values | REG_SZ | REG_SZ | exact |
 
-Items of a list can sit in different keys. A false that writes nothing removes the values the true side wrote. Empty
-(absent in the edit) removes the values of both sides.
+Items of a list can sit in different keys. The unchecked delete instruction takes the place of the value, so the record
+keeps its position (`C/Booleans_ReverseOrder` step 2 keeps Zeta before Alpha). Lists of the other side stay.
 
 ### 3.2 decimal (DWORD) and longDecimal (QWORD)
 
@@ -136,8 +149,8 @@ Items of a list can sit in different keys. A false that writes nothing removes t
 
 - The edit holds an item index. An index outside the items is `InvalidChoice`.
 - Writes the item's value at the element's value name (decimal as DWORD, string as REG_SZ), then the item's value list.
-  Values of the other items' value lists are removed, so no stale list stays (*verify against oracle* for the removal,
-  `[Rule: EnumClearsOtherItemLists]`).
+  Values of the other items' value lists stay: choosing another item keeps the earlier lists
+  (`[Rule: EnumClearsOtherItemLists]`, false; `B/Pol_Enum_ItemValueList` steps 3 and 4).
 - Reads the first item whose value equals the record. No record, or no match (a foreign value): absent. The value list is
   not used to choose the item.
 - An item with no value writes only its value list. An element with no value name writes only the value list.
@@ -147,16 +160,18 @@ Items of a list can sit in different keys. A false that writes nothing removes t
 - The list owns its whole key. Entries are string values (REG_SZ; REG_EXPAND_SZ when `expandable`).
 - Names (*verify against oracle*, OQ-06, `[Rule: ListEntryName]`):
   - `explicitValue`: the entry's name and value as given; a missing name is `EntryNameMissing`.
-  - `valuePrefix` that is not empty: `Prefix1`, `Prefix2` and so on, one-based, in entry order.
-  - otherwise (no attribute, or an empty prefix): the name is the data (value name = data).
+  - `valuePrefix` present, even empty: `Prefix1`, `Prefix2` and so on, one-based, in entry order. An empty prefix gives
+    `1`, `2` (`B/Pol_List_EmptyPrefix` step 2).
+  - no attribute: the name is the data (value name = data).
 - Empty entry data is `EntryEmpty`. Two entries with the same name (case-insensitive) are `DuplicateEntry`. A name that
   starts with `**` or holds NUL is `InvalidCharacter`.
 - Non-additive (default): the key holds `**delvals.` and then exactly the new entries, in order, after the write
-  (`[Rule: ListReplaceWritesDelvals]`, true, *verify against oracle*; section 7). When the existing values already equal
+  (`[Rule: ListReplaceWritesDelvals]`, true, settled by `B/Pol_List_Plain` and `C/SharedList_OneThenTwo`; section 7). When the existing values already equal
   the new entries (name, type, data, order) they are not rewritten.
 - Additive: the key keeps the values the policy does not own and gets the entries; section 7
   (`[Rule: AdditiveListKeepsOtherValues]`, true, *verify against oracle*).
-- An empty list removes every value of the key. Required and empty is `Required`.
+- An empty list is refused as `Required` and writes nothing, required or not (D8: `B/Pol_List_Plain` step 7,
+  `C/SharedList_EmptyList`). The Show Contents box refuses an empty list, so the list a dialog shows keeps its stored rows.
 - Reads: every non-instruction record of the key whose type matches, in model order, as (name, data). Records of another
   type are foreign and ignored. A list-only policy is Enabled when the key has an entry.
 - Disabled removes every value of the list key and writes `**delvals.` (`[Rule: DisabledListWritesDelvals]`, section 7).

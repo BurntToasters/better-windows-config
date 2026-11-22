@@ -1,8 +1,8 @@
 namespace Bwc.Gpo.Pol;
 
 /// <summary>
-/// Every record-order and file-shape rule of the model, in one place. Each rule here is *verify against oracle*
-/// (docs/contracts/policy-engine.md, "Ordered model"); a correction from the classic probe results changes this file.
+/// Every record-order and file-shape rule of the model, in one place. A rule that names a B or C capture case is settled;
+/// one marked "verify against oracle" is still a guess (docs/contracts/policy-engine.md, "Ordered model").
 /// </summary>
 internal static class PolOrderRules
 {
@@ -50,10 +50,9 @@ internal static class PolOrderRules
         recordsOfKey.AddLast(record);
 
     /// <summary>
-    /// Verify against oracle: <c>**delvals.</c> goes to the front of its key, before every other record. A record in front of
-    /// it would be deleted when the file is applied, so the front keeps every existing record meaningful. A record that
-    /// already exists is moved to the front too (the old node is removed first). Classic may place it right before the first
-    /// list entry instead.
+    /// <c>**delvals.</c> goes to the front of its key, before every other record (B/Pol_List_Plain, B/Pol_SharedList_Two,
+    /// C/SharedList_TwoThenOne). A record in front of it would be deleted when the file is applied, so the front keeps every
+    /// existing record meaningful. A record that already exists is moved to the front too (the old node is removed first).
     /// </summary>
     public static LinkedListNode<PolRecord> PlaceDeleteValues(
         LinkedList<PolRecord> recordsOfKey,
