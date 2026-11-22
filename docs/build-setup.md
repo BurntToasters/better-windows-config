@@ -63,16 +63,29 @@ A minimal self-contained WinUI app published this way is about 280 MB (x64) and 
 `node scripts/test-all.js` runs the gate steps in order and stops at the first failure.
 `--rid win-x64|win-arm64|all` picks the target (default from `process.arch`).
 
-The shared steps are `sync-version`, `registry-writer`, `no-em-dash`, `changelog-version`, and
-`comment-lint`, then `build-arm64`, `build-x64`, and four test projects: `test-core`
-(`Bwc.Core.Tests`), `test-registry-e2e` (`Bwc.Registry.Tests`), `test-registry-shipping`
-(`Bwc.Registry.Shipping.Tests`), and `test-update` (`Bwc.Update.Tests`).
+The shared steps run once, in this order:
 
-`--quick` runs the shared steps only. Without it, each RID then runs `publish-ship`,
-`verify-flavor-ship`, `e2e-ship`, `publish-e2e`, `verify-flavor-e2e`, and `e2e-flavor`.
+- Static checks: `sync-version`, `registry-writer`, `registry-writer-selftest`, `policy-writer`,
+  `policy-writer-selftest`, `no-em-dash`, `no-em-dash-selftest`, `regedit-strings`,
+  `tracked-paths-selftest`, `tracked-paths`, `oracle-json-selftest`, `oracle-json`,
+  `e2e-timing-selftest`, `changelog-version`, and `comment-lint`.
+- Release tooling self-tests: `release-selftest`, `release-flow-selftest`, `release-assets-selftest`,
+  `embed-key-selftest`, and `signing-selftest`.
+- Builds: `build-arm64` and `build-x64`.
+- Test projects: `test-core` (`Bwc.Core.Tests`), `test-gpo` (`Bwc.Gpo.Tests`), `test-policy`
+  (`Bwc.Policy.Tests`), `test-registry-e2e` (`Bwc.Registry.Tests`), `test-registry-shipping`
+  (`Bwc.Registry.Shipping.Tests`), `test-update` (`Bwc.Update.Tests`), and `test-update-e2e`
+  (`Bwc.Update.Tests` compiled in the E2E flavor). The normal steps skip tests tagged `Elevated` or
+  `ReleaseGate`.
+- `test-policy-release-gate`, only in a full gate (no `--quick`). It runs the tests tagged `ReleaseGate`
+  in `Bwc.Policy.Tests`, and fails while a capture case still awaits a recapture.
+
+`--quick` runs the shared steps except `test-policy-release-gate`. Without it, each RID then runs
+`publish-ship`, `verify-flavor-ship`, `e2e-ship`, `publish-e2e`, `verify-flavor-e2e`, and `e2e-flavor`.
 `--rid all` runs the shared steps once and the publish, flavor, and E2E steps once for each RID.
+A release needs one full `--rid all` gate that passed on a clean HEAD (see `docs/RELEASE.md`).
 
-The four test projects always build and run for the host architecture (`process.arch`:
+The test projects always build and run for the host architecture (`process.arch`:
 ARM64 or x64), whatever `--rid` is. `--rid` only picks the app RID for the publish and E2E
 steps. On an ARM64 machine, `--rid win-x64` therefore runs the tests as ARM64 against the
 x64 app, which runs under emulation. The x64 app is self-contained, so no x64 .NET runtime
@@ -87,7 +100,7 @@ Each run removes the previous run's outputs first, then writes:
 
 Schema 2 fields of `result.json`:
 
-- `schema`, `startedUtc`, `durationMs`, `rid` (requested: `win-x64`, `win-arm64`, or `all`), `testPlatform` (the host architecture the four test projects ran as: `ARM64` or `x64`), `quick`, `pass`
+- `schema`, `startedUtc`, `durationMs`, `rid` (requested: `win-x64`, `win-arm64`, or `all`), `testPlatform` (the host architecture the test projects ran as: `ARM64` or `x64`), `quick`, `pass`
 - `git`: `commit` (full SHA), `branch`, `dirty`, `dirtyPaths` (from `git status --porcelain -z`; a rename reads `new (from old)`), `error`
 - `environment`: `node` (version), `dotnet` (`version`, `error` from `dotnet --version`), `os` (`type`, `version`, `release`), `arch` (`process.arch`)
 - `rids`: one entry per requested RID with `platform`, `status` (`pass`, `fail`, `not-run` after an earlier failure, or `skipped` in quick mode), and its step names
@@ -224,8 +237,9 @@ missing a size or older than its source. Run the normalize command again, then c
 | `npm run build:win:e2e` | `scripts/dotnet-build.js` for arm64 in the E2E flavor |
 | `npm run test:all`, `npm run gate` | `scripts/test-all.js` (the full gate) |
 | `npm run test:e2e` | `scripts/test-e2e.js` |
+| `npm run test:installer-e2e` | `scripts/test-installer-e2e.js` (real NSIS installers, unelevated) |
 | `npm run installer:x64`, `installer:arm64` | `scripts/build-installer.js` (needs NSIS 3.10 or newer) |
-| `npm run run:hub`, `run:regedit` | `scripts/run-app.js` (starts the app with RunAsInvoker) |
+| `npm run run:hub`, `run:regedit`, `run:gpedit` | `scripts/run-app.js` (starts the app with RunAsInvoker) |
 | `npm run oracle` | `scripts/oracle.js` (regenerates the classic regedit captures) |
 | `npm run sync-version` | `scripts/sync-version.js` |
 | `npm run icons:normalize`, `-- --check` | `scripts/normalize-icons.js` (regenerates or verifies the app `.ico` files) |

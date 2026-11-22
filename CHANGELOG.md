@@ -19,7 +19,7 @@ Better Windows Config! Faithful, modern re-implementations of the classic Window
 
 ## Changes in `v0.2.0:`
 
-- **Local Group Policy Editor:** New tool, a faithful clone of the classic Local Group Policy Editor. (In progress.)
+- **Local Group Policy Editor:** New tool, a faithful clone of the classic Local Group Policy Editor.
 
 ## Changes in `v0.1.5:`
 

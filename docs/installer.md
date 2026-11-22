@@ -236,7 +236,7 @@ starts the Hub through the helper. The updater does not start the Hub.
 The uninstaller closes running BWC processes with the `BwcUpdate.exe` in the install folder, with the
 same exit-code rules. If that copy is missing, the uninstall stops and changes nothing.
 
-It deletes the installed files listed at build time, the two all-users shortcuts, `LICENSE`,
+It deletes the installed files listed at build time, the three all-users shortcuts (the Hub, the Registry Editor, and the Local Group Policy Editor), `LICENSE`,
 `THIRD-PARTY-NOTICES.txt`, `installed-files.txt`, `upgrade-cleanup-pending`, and `Uninstall.exe`. It removes folders only when they are empty. It removes the
 protected folder of the elevated updater, `<install folder>.upd`: only the `<32 hex>` folders in it, never
 through a link or junction, then the folder itself when it is empty. It no longer removes `%TEMP%\BWC-Update`

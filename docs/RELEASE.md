@@ -3,7 +3,7 @@
 This document covers the release tooling: the minisign signer, the manifest validator, the
 offline dry run, the release session and preflight, the GitHub draft, verify, and publish
 commands, and the Windows release VM flow (`npm run release:win`) that builds, signs, and uploads
-the stable release. The first release is `0.1.0` on the stable channel, with no beta.
+the stable release. Releases go out on the stable channel, with no beta. The release ships three apps (the Hub, the Registry Editor, and the Local Group Policy Editor) in one setup EXE per architecture.
 
 The update format is fixed by [contracts/update-manifest.md](contracts/update-manifest.md).
 The release failure cases are in [failure-modes/release.md](failure-modes/release.md).
@@ -56,7 +56,7 @@ git switch main
 git pull --ff-only origin main
 ```
 
-`package.json`, `Directory.Build.props`, and the `CHANGELOG.md` section for `0.1.0` must agree.
+`package.json`, `Directory.Build.props`, and the `CHANGELOG.md` section for the version being released must agree.
 The preflight checks this, and a dirty tree is refused.
 
 ### 3. Build, gate, sign, and upload the draft
@@ -80,7 +80,21 @@ This runs, in order:
    [failure-modes/release.md](failure-modes/release.md).
 3. The full quality gate: one `node scripts/test-all.js --rid all` run (no `--quick`) that passed on a clean
    HEAD for both `win-arm64` and `win-x64`, including their GUI E2E steps. Run it on a machine with a GUI
-   session. A quick gate, a one-rid gate, and a gate with a skipped, NOT RUN, or failed step are refused.
+   session. A quick gate, a one-rid gate, and a gate with a skipped, NOT RUN, or failed step are refused
+   (`qualityGateProof` and `GATE_REQUIRED_RIDS` in `scripts/lib/release-policy.js`). The gate stops at the first
+   failure and writes `artifacts/gate/result.json`. Its steps run in this order:
+   - Shared steps, run once: `sync-version`, `registry-writer`, `registry-writer-selftest`, `policy-writer`,
+     `policy-writer-selftest`, `no-em-dash`, `no-em-dash-selftest`, `regedit-strings`, `tracked-paths-selftest`,
+     `tracked-paths`, `oracle-json-selftest`, `oracle-json`, `e2e-timing-selftest`, `changelog-version`,
+     `comment-lint`, `release-selftest`, `release-flow-selftest`, `release-assets-selftest`, `embed-key-selftest`,
+     and `signing-selftest`.
+   - Builds and test projects, run once: `build-arm64`, `build-x64`, `test-core`, `test-gpo`, `test-policy`,
+     `test-registry-e2e`, `test-registry-shipping`, `test-update`, and `test-update-e2e`.
+   - `test-policy-release-gate`, which runs only in a full gate. It runs the tests tagged `ReleaseGate` in
+     `tests/Bwc.Policy.Tests` and fails while a capture case still awaits a recapture.
+   - For each rid (`win-arm64`, then `win-x64`): `publish-ship`, `verify-flavor-ship`, `e2e-ship`, `publish-e2e`,
+     `verify-flavor-e2e`, and `e2e-flavor`. The two E2E steps must each have a passing
+     `artifacts/e2e/result-<rid>-<flavor>.json`.
 4. A release session that records the gate with `mode: "full"`, both rids, and E2E `passed`.
 5. A clean `artifacts/release/<version>/` folder, then `npm run release:win:continue`.
 
@@ -141,9 +155,9 @@ Run it only after a successful publish, on this disposable release VM. Git-ignor
 
 - The release tooling (D4 to D7) and the Windows release VM flow are implemented as scripts. Nothing
   is published until the VM runbook above runs with `--apply` (`release:publish`).
-- The built-in update key is still the placeholder in
-  `src/Bwc.Update/Signing/TrustedKeys.cs`. Preflight, draft, verify, and publish all refuse it, so
-  the real public key must be embedded first (user step 2 below).
+- The real update key is embedded in `src/Bwc.Update/Signing/TrustedKeys.cs` (`IsPlaceholder = false`),
+  and the 0.1.x releases shipped with it. Preflight, draft, verify, and publish still refuse a
+  placeholder key, so a checkout that carries the placeholder cannot release.
 - The dry-run harness uses an ephemeral test key and a `.dry-run.json` installer stand-in
   when NSIS has not produced a real setup EXE. `--apply` refuses both.
 - On the release VM, `build-installer.js` runs NSIS and `gpg-sign.js` runs GnuPG. A dry run calls
@@ -160,7 +174,7 @@ Run it only after a successful publish, on this disposable release VM. Git-ignor
 | NSIS 3.10+ | A real setup EXE. The dry run does not need it. |
 | GnuPG 2.4+ | Detached signatures of the release folder (`scripts/gpg-sign.js`). Used on the release VM only. |
 | GitHub CLI, authenticated | Only `--apply` for draft, verify, and publish. Dry runs never start `gh`. |
-| A real minisign release key | Created and protected by the user. |
+| The real minisign release key | Already created and embedded. Its private half is in the release VM's `.env`. |
 
 Refresh PATH in PowerShell before a build or release command:
 
@@ -171,17 +185,18 @@ $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Env
 ## User-owned steps
 
 The release VM runbook above covers the day-to-day flow. These are the one-time duties the
-scripts do not do for you.
+scripts do not do for you. Steps 1 and 2 are done for the current key; they stay here for a rotation or a
+new VM.
 
-1. Create the real minisign release key. Keep the secret key off the repository and off the
+1. Create a minisign release key (done for the current key). Keep the secret key off the repository and off the
    release VM image history, and encrypt it with a password you keep in a password manager
    (`minisign -G`, or `tauri signer generate`, which writes the same format). The keygen in
    `scripts/sign-update-manifest.js` writes test keys only; never use one for a release. Check the
    encrypted-key path once with a key that minisign made (see 2a). Put the key in `.env` as
    `TAURI_SIGNING_PRIVATE_KEY` (base64 of the key file, the form `tauri signer generate` prints) and
    its password in `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
-2. Put the real public key in `src/Bwc.Update/Signing/TrustedKeys.cs`, in the `Embedded` list, and
-   set `IsPlaceholder = false`. The release tooling trusts exactly the keys in that list, matched by
+2. Put the public key in `src/Bwc.Update/Signing/TrustedKeys.cs`, in the `Embedded` list, and
+   set `IsPlaceholder = false` (done for the current key). The release tooling trusts exactly the keys in that list, matched by
    key id and key bytes. Rotation lists the old and new key during the overlap.
 3. Hosting is GitHub Releases, the same as Zinnia. The repository is
    `BurntToasters/better-windows-config` unless `.env` sets `GH_REPO_OWNER` and `GH_REPO_NAME`.
@@ -192,8 +207,8 @@ scripts do not do for you.
    dry-run artifact contains a stand-in, not an installer, and a release never uses one.
 5. Authenticode-sign the BWC binaries and the setup EXE with Azure Artifact Signing (see "Windows code
    signing" below). SmartScreen warns on an unsigned download.
-6. The first release is `0.1.0`, stable, with no beta. Build it from `main` on the release VM (see the
-   runbook above). That is the first run that may use `--apply`.
+6. Releases are stable, with no beta. Build each one from `main` on the release VM (see the
+   runbook above).
 
 ## Secrets (`.env`)
 
@@ -727,11 +742,4 @@ Verify one file by hand: `powershell.exe -NoProfile -ExecutionPolicy Bypass -Fil
 
 ## What remains
 
-- The real release key: the placeholder in `TrustedKeys.cs` must be replaced with the public key. Until
-  then `npm run release:win` refuses before its first step. Nothing above can run a real release.
-- The first `0.1.0` stable run on the release VM (runbook above), with a real `gh` login and the real key.
-- The stable manifest URL in `src/Bwc.Hub/Updates/UpdateSources.cs` points at the GitHub latest-release
-  asset `bwc-stable-v2.json`. The beta URL is empty. Until the real key replaces the placeholder, the
-  Hub reports "not configured" and never fetches the manifest.
-- The real key must replace the placeholder in `TrustedKeys.cs`; until then every updater
-  check fails closed.
+- The `0.2.0` stable run on the release VM (runbook above), with a real `gh` login.

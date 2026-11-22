@@ -147,7 +147,7 @@ The E2E tests (`tests/Bwc.E2E`) are run by `run.js` through `test-e2e.js --filte
   task has, and never prompts). They need `--prepare` (above). Failure modes: `docs/failure-modes/installer-e2e.md`,
   43 to 81. Each test uses its own run id and writes only the names below; `finally` removes them.
   - `InstallerMachine_FreshInstallOfB`: installs B. Checks the files, the HKLM key (64-bit view, nothing under
-    WOW6432Node), the `_?=` uninstall strings, the two all-users shortcuts and their AppUserModelIDs, and that the
+    WOW6432Node), the `_?=` uninstall strings, the three all-users shortcuts and their AppUserModelIDs, and that the
     folder inherits from Program Files with no write access for Users.
   - `InstallerMachine_RawDirNamingAnotherFolderIsIgnored`: B is installed per machine with `/D=` naming a folder the
     test owns inside its run folder. B goes to Program Files and that folder is unchanged.
