@@ -25,7 +25,7 @@ internal sealed partial class Scrubber
     private static readonly HashSet<string> DroppedKeys = new(StringComparer.Ordinal)
     {
         "ms", "settleMs", "waitMs", "waitedMs", "startedUtc", "finishedUtc", "atUtc", "lastWriteUtc", "lastWriteUtcOfChanged", "firstSeenMs", "history",
-        "snapshot", "hex", "screenshot", "screenshotDialog", "notes", "evidence", "exception", "hwnd", "listHwnd", "tree", "uiaTexts", "uiaButtons",
+        "snapshot", "hex", "screenshot", "screenshotDialog", "notes", "evidence", "exception", "hwnd", "hmenu", "listHwnd", "tree", "uiaTexts", "uiaButtons",
         "beforeHashes", "afterHashes", "diff", "via", "selectedVia", "hops", "opened", "pid", "plan", "dpiAwareness", "className", "node",
         "gapPixels", "closedBy", "attributes", "epilogue", "epilogueError", "epilogueEvidence", "fileCheckError", "parts",
         // Timings and refusal evidence live beside the data in the untracked result; if one ever ends up inside data it is still dropped.

@@ -70,6 +70,15 @@ internal static partial class SelfTest
             Expect(text.Contains("Comment", StringComparison.Ordinal) && text.Contains("Standard", StringComparison.Ordinal), "a kept value was lost: " + text);
         });
 
+        Case("scrubber: a menu handle never reaches a golden (failure mode 46)", () =>
+        {
+            var scrub = new Scrubber(MatrixPlan.Build(repo).Fixture.AllowedStrings, Array.Empty<string>(), false);
+            var data = new JsonObject { ["hmenu"] = "0x39C30511", ["items"] = new JsonArray(new JsonObject { ["index"] = 0 }) };
+            string text = scrub.Clean(data)!.ToJsonString();
+            Expect(!text.Contains("hmenu", StringComparison.Ordinal) && !text.Contains("39C30511", StringComparison.Ordinal), "the menu handle reached the golden data: " + text);
+            Expect(text.Contains("items", StringComparison.Ordinal), "the menu items were lost: " + text);
+        });
+
         Case("header scroll: the distance shows the column and is zero when it is shown", () =>
         {
             Expect(HeaderScroll.Distance(columnLeft: 700, columnWidth: 200, viewWidth: 600, position: 0) == 300, "a column right of the view needs the right edge in view");

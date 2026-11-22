@@ -1139,3 +1139,18 @@ What can go wrong and the guard of each:
 
 Unproved, for the next real run to confirm from `result.json`: that `E/Decimal_TypedAboveMax` records the box in `boxesBeforePress`, that OK
 is then pressed, and what classic writes (500 is expected).
+
+Result of the next run: the box is in `boxesBeforePress` (title and text hashed), OK is pressed and closes the dialog, and Registry.pol holds
+500.
+
+## 46. A menu handle in a golden changes on every run
+
+Evidence: the rerun of `F/Toolbar_States` after section 40 reported "CHANGED against the earlier golden". One of the changes was `hmenu` in
+the `dumpMenu` data, the handle of the context menu, which is a new number each time the menu opens. It was also in `F/Menus_Computer` and
+`F/Menus_User`. A handle says nothing about classic behaviour, and with it no rerun of these cases can ever match its golden.
+
+What the driver does now: the scrubber drops `hmenu` like `hwnd` and `pid`, and the three tracked goldens lose the key. The result file keeps
+it. The self test checks that the handle is dropped and the menu items are kept.
+
+The other changes of that rerun are expected (section 40): at All Settings the old route returned no toolbars and the main window at a
+different place than at every other node. The new route gives the same toolbars and the same window place as the other nodes.
