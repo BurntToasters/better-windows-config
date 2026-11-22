@@ -6,7 +6,7 @@ verified installer and asks for elevation, and the two process commands (`--clos
 that the installer calls. Since 0.1.2 (per-machine install) the elevated half, `--apply-elevated`, `--launch-hub`,
 and the other-session check of `--close-running` are in `docs/failure-modes/update-elevation.md`; this file's
 rows HT4, HT5, HT7, HL9, HL14, NE8, N1, N10, Q5, S8 and S18 changed with that hand-off. The minisign layer is the verifier proven in
-`spikes/S5-minisign/FAILURE-MODES.md`; this file covers what the update flow adds on top of it.
+`docs/failure-modes/minisign.md`; this file covers what the update flow adds on top of it.
 
 Written before the tests and before the code, per AGENTS.md ("FIRST write all the ways it could
 fail, THEN write the code"). This revision adds sections L to R and changes rows MS14, NE4, IN15,
@@ -36,7 +36,7 @@ Terms:
 | MS9 | Legacy `Ed` algorithm on the manifest signature | WA: legacy signs raw bytes and is not prehashed | Reject (`allowLegacy` is false in production) | `Manifest_LegacyEd_Rejected` |
 | MS10 | Unknown algorithm bytes (not `ED` or `Ed`) | WA if treated as legacy | Reject | `Manifest_UnknownAlgorithm_Rejected` |
 | MS11 | Signature as raw minisign text, or as the base64 envelope | WR if one form is refused | Accept both | `Manifest_RawAndEnvelope_Both_Accepted` |
-| MS12 | Signature with a BOM, stray CR, extra whitespace, wrong line count | WA if trimmed silently | Reject (spike rules B11 to B17) | `Manifest_Signature_Format_Rejected` |
+| MS12 | Signature with a BOM, stray CR, extra whitespace, wrong line count | WA if trimmed silently | Reject (minisign rules B11 to B17) | `Manifest_Signature_Format_Rejected` |
 | MS13 | Trusted key list is empty | WA if "no keys" means "accept" | Reject, fail closed (`TrustedKeysInvalid`) | `Empty_Key_List_Rejected` |
 | MS14 | Shipped placeholder public key (no real key yet) | WA if the placeholder verifies anything | Every manifest is refused, `TrustedKeysNotConfigured` (see R1) | `Placeholder_Key_Fails_Closed` |
 | MS15 | Key rotation: the second trusted key signed | WR | Accept, return the trusted comment | `Rotation_Second_Key_Accepted` |

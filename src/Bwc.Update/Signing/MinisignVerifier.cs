@@ -10,8 +10,8 @@ namespace Bwc.Update;
 public sealed record VerificationResult(bool Ok, string? TrustedComment, string Failure);
 
 /// <summary>
-/// Verify-only minisign for the update envelope. Ported from spikes/S5-minisign (see its
-/// FAILURE-MODES.md). Signatures are prehashed ("ED": Ed25519 over BLAKE2b-512 of the data).
+/// Verify-only minisign for the update envelope. Its failure modes are in
+/// docs/failure-modes/minisign.md. Signatures are prehashed ("ED": Ed25519 over BLAKE2b-512 of the data).
 /// Legacy "Ed" signatures are refused unless allowLegacy is true. Bad signature text, keys, or
 /// data never throw: they return Ok = false with a reason. Null arguments throw.
 /// </summary>

@@ -5,8 +5,13 @@
 //
 // Each failure prints the file and the parser message. The message never carries file content: the excerpt that the
 // JSON parser puts into some messages is removed.
+//
+// Second rule: every folder below docs/parity/oracle/gpedit/goldens that holds a complete.json on disk must have its
+// complete.json and case.json tracked by git and not matched by an ignore rule. A broad ignore rule (*.user matched
+// capture folders named *.User) once kept finished captures out of the repository with no warning. Only the goldens
+// folder is walked. A failing folder prints as its path alone.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +20,8 @@ const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
 
 const ORACLE_ROOT = "docs/parity/";
+const GOLDENS_ROOT = "docs/parity/oracle/gpedit/goldens";
+const CAPTURE_FILES = ["complete.json", "case.json"];
 const MAX_BUFFER = 256 * 1024 * 1024;
 const BYTE_ORDER_MARK = "﻿";
 
@@ -25,10 +32,15 @@ A leading byte order mark is ignored. A tracked file that is missing in the work
 skipped. A repository with no tracked JSON file under docs/parity fails, because the check would prove nothing.
 Each failure prints as path: parser message, without file content.
 
+Also walks docs/parity/oracle/gpedit/goldens and requires that every folder holding a complete.json on disk has its
+complete.json and case.json tracked by git and not ignored. A folder that is untracked or ignored fails and prints as
+its path alone. A folder with no complete.json is not required to be tracked.
+
 Options:
   --root <repo>   Repository root (default: the script's parent folder)
-  --self-test     In a temporary folder that the script creates and removes, require that valid files pass and
-                  that each kind of invalid file fails without printing its content.
+  --self-test     In temporary folders that the script creates and removes, require that valid files pass, that
+                  each kind of invalid file fails without printing its content, and that complete capture folders
+                  pass only when tracked and not ignored.
   --help          Show this help
 
 Exit codes: 0 every file parses, 1 a parse failure or a failed self-test, 2 usage error.
@@ -107,6 +119,161 @@ function trackedOracleJson(root) {
   return String(result.stdout).split("\0").filter((entry) => entry.length > 0 && isOracleJson(entry));
 }
 
+function runGit(root, args, input) {
+  const result = spawnSync("git", args, {
+    cwd: root,
+    encoding: "utf8",
+    input,
+    shell: false,
+    windowsHide: true,
+    maxBuffer: MAX_BUFFER,
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  return result;
+}
+
+// Returns the folders (relative, forward slashes) below the goldens root that hold a complete.json on disk.
+// Only the goldens folder is walked.
+function completeCaptureFolders(root) {
+  const start = path.join(root, ...GOLDENS_ROOT.split("/"));
+  const found = [];
+  if (!existsSync(start)) {
+    return found;
+  }
+  const walk = (directory, relative) => {
+    const entries = readdirSync(directory, { withFileTypes: true });
+    if (entries.some((entry) => entry.isFile() && entry.name === "complete.json")) {
+      found.push(relative);
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        walk(path.join(directory, entry.name), `${relative}/${entry.name}`);
+      }
+    }
+  };
+  walk(start, GOLDENS_ROOT);
+  return found.sort();
+}
+
+// Returns { folders, failing }: every complete capture folder, and those whose complete.json or case.json is not
+// tracked or that git ignores. The ignore check passes --no-index, so a rule that matches a tracked file also fails:
+// it would hide the next capture.
+function untrackedCaptureFolders(root) {
+  const folders = completeCaptureFolders(root);
+  if (folders.length === 0) {
+    return { folders, failing: [] };
+  }
+  const listed = runGit(root, ["ls-files", "-z", "--", GOLDENS_ROOT]);
+  if (listed.status !== 0) {
+    throw new Error(`git ls-files exited with ${listed.status}: ${String(listed.stderr).trim()}`);
+  }
+  const tracked = new Set(String(listed.stdout).split("\0").filter((entry) => entry.length > 0));
+  const candidates = folders.flatMap((folder) => [folder, ...CAPTURE_FILES.map((name) => `${folder}/${name}`)]);
+  const ignoredRun = runGit(root, ["check-ignore", "--no-index", "-z", "--stdin"], `${candidates.join("\0")}\0`);
+  if (ignoredRun.status !== 0 && ignoredRun.status !== 1) {
+    throw new Error(`git check-ignore exited with ${ignoredRun.status}: ${String(ignoredRun.stderr).trim()}`);
+  }
+  const ignored = new Set(String(ignoredRun.stdout).split("\0").filter((entry) => entry.length > 0));
+  const failing = folders.filter(
+    (folder) =>
+      ignored.has(folder) ||
+      CAPTURE_FILES.some((name) => !tracked.has(`${folder}/${name}`) || ignored.has(`${folder}/${name}`)),
+  );
+  return { folders, failing };
+}
+
+// A failing capture folder prints as its path alone.
+function captureFailureLines(failing) {
+  return failing.map((folder) => folder);
+}
+
+// Builds a git repository under the temporary root and requires the capture tracking rule to pass or fail each case.
+// Returns the number of cases. A broken expectation is appended to problems.
+function runCaptureSelfTest(temporaryRoot, problems) {
+  const repository = path.join(temporaryRoot, "capture-repo");
+  mkdirSync(repository, { recursive: true });
+  const git = (args) => {
+    const result = runGit(repository, args);
+    if (result.status !== 0) {
+      throw new Error(`git ${args.join(" ")} exited with ${result.status}: ${String(result.stderr).trim()}`);
+    }
+  };
+  git(["init", "--quiet"]);
+  git(["config", "core.ignorecase", "true"]);
+  const write = (relative, content) => {
+    const filePath = path.join(repository, ...relative.split("/"));
+    mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFileSync(filePath, content, "utf8");
+  };
+  write(".gitignore", "*.user\n");
+
+  const complete = (folder) => {
+    write(`${GOLDENS_ROOT}/${folder}/complete.json`, "{}");
+    write(`${GOLDENS_ROOT}/${folder}/case.json`, "{}");
+  };
+
+  // Each entry: the folder below the goldens root, whether the check must fail for it, and why.
+  const cases = [
+    { folder: "A/Tracked_Complete", fails: false, why: "a tracked complete folder" },
+    { folder: "A/Untracked_Complete", fails: true, why: "an untracked complete folder" },
+    { folder: "B/Pol_Ignored.User", fails: true, why: "an ignored complete folder (name ends in .User, rule *.user)" },
+    { folder: "A/Case_Json_Untracked", fails: true, why: "a folder whose complete.json is tracked and case.json is not" },
+    { folder: "B/Forced.User", fails: true, why: "a complete folder tracked with add -f under an ignore rule" },
+    { folder: "A/No_Complete", fails: false, why: "an untracked folder with no complete.json" },
+    { folder: "A/Tracked_Complete/step-01", fails: false, why: "an untracked step folder with no complete.json" },
+  ];
+  for (const entry of cases) {
+    if (entry.folder === "A/No_Complete" || entry.folder === "A/Tracked_Complete/step-01") {
+      write(`${GOLDENS_ROOT}/${entry.folder}/case.json`, "{}");
+      write(`${GOLDENS_ROOT}/${entry.folder}/notes.txt`, "x");
+    } else {
+      complete(entry.folder);
+    }
+  }
+  // Outside the goldens root: an untracked complete.json there is not this rule's business and is not walked.
+  write("docs/parity/oracle/other/Outside_Untracked/complete.json", "{}");
+
+  git(["add", "--", `${GOLDENS_ROOT}/A/Tracked_Complete/complete.json`, `${GOLDENS_ROOT}/A/Tracked_Complete/case.json`]);
+  git(["add", "--", `${GOLDENS_ROOT}/A/Case_Json_Untracked/complete.json`]);
+  git(["add", "-f", "--", `${GOLDENS_ROOT}/B/Forced.User/complete.json`, `${GOLDENS_ROOT}/B/Forced.User/case.json`]);
+
+  const { folders, failing } = untrackedCaptureFolders(repository);
+  const expectedFolders = cases.filter((entry) => !entry.folder.endsWith("No_Complete") && !entry.folder.endsWith("step-01"));
+  if (folders.length !== expectedFolders.length) {
+    problems.push(`capture walk: expected ${expectedFolders.length} complete folders, got ${folders.length}`);
+  }
+  const failed = new Set(failing);
+  for (const entry of cases) {
+    const full = `${GOLDENS_ROOT}/${entry.folder}`;
+    if (entry.fails && !failed.has(full)) {
+      problems.push(`capture: expected a failure for ${entry.why}, got a pass`);
+    }
+    if (!entry.fails && failed.has(full)) {
+      problems.push(`capture: expected a pass for ${entry.why}, got a failure`);
+    }
+  }
+  if (failed.has("docs/parity/oracle/other/Outside_Untracked") || folders.some((folder) => folder.includes("/other/"))) {
+    problems.push("capture: a folder outside the goldens root was walked");
+  }
+
+  // The printed text for a failure is the path alone.
+  const lines = captureFailureLines(failing);
+  if (lines.some((line) => line.includes(" ") || line.includes(":"))) {
+    problems.push("capture: a failure line carries more than a path");
+  }
+
+  // Once the failing folders are tracked and the ignore rule is gone, every folder passes.
+  writeFileSync(path.join(repository, ".gitignore"), "", "utf8");
+  git(["add", "--", GOLDENS_ROOT]);
+  const after = untrackedCaptureFolders(repository);
+  if (after.failing.length !== 0) {
+    problems.push(`capture: expected no failure after tracking every folder, got ${after.failing.length}`);
+  }
+  return cases.length + 3;
+}
+
 function runSelfTest() {
   const temporaryRoot = mkdtempSync(path.join(tmpdir(), "bwc-oracle-json-"));
   try {
@@ -175,6 +342,8 @@ function runSelfTest() {
       }
     }
 
+    const captureCases = runCaptureSelfTest(temporaryRoot, problems);
+
     if (problems.length > 0) {
       for (const problem of problems) {
         console.error(`check-oracle-json self-test: ${problem}`);
@@ -183,7 +352,7 @@ function runSelfTest() {
     }
 
     console.log(
-      `check-oracle-json self-test: ${Object.keys(failing).length} invalid files failed without file content; ${Object.keys(passing).length} valid files (one with a byte order mark), a deleted file, a file outside docs/parity and a non-JSON file passed.`,
+      `check-oracle-json self-test: ${Object.keys(failing).length} invalid files failed without file content; ${Object.keys(passing).length} valid files (one with a byte order mark), a deleted file, a file outside docs/parity and a non-JSON file passed; ${captureCases} capture folder cases behaved as required.`,
     );
     return 0;
   } finally {
@@ -216,6 +385,7 @@ function main() {
   }
 
   let result;
+  let capture;
   try {
     const relatives = trackedOracleJson(options.root);
     if (relatives.length === 0) {
@@ -223,20 +393,36 @@ function main() {
       return 1;
     }
     result = checkFiles(options.root, relatives);
+    capture = untrackedCaptureFolders(options.root);
   } catch (error) {
     console.error(`check-oracle-json: ${error.message}`);
     return 1;
   }
 
+  let failed = false;
   if (result.failures.length > 0) {
     for (const failure of result.failures) {
       console.error(`${failure.file}: ${failure.message}`);
     }
     console.error(`check-oracle-json: ${result.failures.length} tracked oracle JSON file(s) do not parse.`);
+    failed = true;
+  }
+  if (capture.failing.length > 0) {
+    for (const line of captureFailureLines(capture.failing)) {
+      console.error(line);
+    }
+    console.error(
+      `check-oracle-json: ${capture.failing.length} complete capture folder(s) under ${GOLDENS_ROOT} are untracked or ignored.`,
+    );
+    failed = true;
+  }
+  if (failed) {
     return 1;
   }
 
-  console.log(`check-oracle-json: ok (${result.checked} tracked JSON file(s) under docs/parity parse).`);
+  console.log(
+    `check-oracle-json: ok (${result.checked} tracked JSON file(s) under docs/parity parse; ${capture.folders.length} complete capture folder(s) are tracked).`,
+  );
   return 0;
 }
 

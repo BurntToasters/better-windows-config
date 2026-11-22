@@ -1,0 +1,3 @@
+# Oracle goldens and fixtures are byte-exact captures; line-ending conversion would break the byte comparison.
+docs/parity/oracle/gpedit/goldens/** -text
+docs/parity/oracle/gpedit/fixture/** -text

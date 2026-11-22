@@ -25,7 +25,7 @@
     "test:all": "node scripts/test-all.js",
     "oracle": "node scripts/oracle.js",
     "gate": "node scripts/test-all.js",
-    "validate": "node scripts/validate-no-em-dash.js && node scripts/validate-changelog-version.js && node scripts/lint-comments.mjs && node scripts/check-regedit-strings.js && node scripts/check-tracked-paths.js && node scripts/check-oracle-json.js && node scripts/e2e-timing-report.js --self-test",
+    "validate": "node scripts/validate-no-em-dash.js && node scripts/validate-changelog-version.js && node scripts/lint-comments.mjs && node scripts/check-regedit-strings.js && node scripts/check-tracked-paths.js && node scripts/check-oracle-json.js && node scripts/e2e-timing-report.js --self-test && node scripts/check-registry-writer.js && node scripts/check-policy-writer.js && node scripts/sync-version.js --check",
     "release:dry-run": "node --env-file-if-exists=.env scripts/release-dry-run.js",
     "release:assemble": "node --env-file-if-exists=.env scripts/assemble-bundle.js",
     "release:sign": "node --env-file-if-exists=.env scripts/sign-update-manifest.js",

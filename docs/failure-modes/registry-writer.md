@@ -302,7 +302,7 @@ assumption is wrong. Items marked as measured were checked on this Windows build
 ## E. Static guard (`scripts/check-registry-writer.js`)
 
 The checker scans every `.cs` file and every `NativeMethods.txt` under `src/` and `tests/`, skipping
-`bin/` and `obj/`. `tools/` and `spikes/` are not scanned; `tools/Bwc.Oracle.Capture` writes with
+`bin/` and `obj/`. `tools/` is not scanned; `tools/Bwc.Oracle.Capture` writes with
 `NtSetValueKey` by design and is a separate review. The writer files `RegistryWriter*.cs` in
 `src/Bwc.Registry` are exempt. `NativeMethods.txt` in `src/Bwc.Registry` is exempt because it lists
 the writer's own native surface.
@@ -344,7 +344,7 @@ Exemptions are explicit and recorded in the checker with a reason:
 
 Known gaps: reflection, names built at run time, native libraries, generated code outside `obj/`,
 and managed writes through a `RegistryKey` that arrives without a registry-type reference in the
-same file. `tools/` and `spikes/` are not scanned.
+same file. `tools/` is not scanned.
 
 `--self-test` writes a temporary tree with violating files for each rule family (native names with
 `W`, `Ex`, `Nt`, and `SH` forms, a DllImport entry point literal, a NativeMethods entry, managed

@@ -6,6 +6,9 @@ obj/
 .vs/
 TestResults/
 
+# Oracle capture folders are tracked evidence. Some are named *.User, which the *.user rule above would ignore (git runs with core.ignorecase).
+!docs/parity/oracle/gpedit/goldens/**
+
 # Publish, installer, and release output
 publish/
 dist/
