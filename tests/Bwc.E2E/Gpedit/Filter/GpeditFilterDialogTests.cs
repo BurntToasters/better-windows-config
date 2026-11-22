@@ -54,8 +54,6 @@ public sealed class GpeditFilterDialogTests
         checks.Record("managedItems", dialog.ComboItems(FilterIds.Managed).SequenceEqual(tri), $"Managed items: {string.Join("|", dialog.ComboItems(FilterIds.Managed))}.");
         checks.Record("configuredItems", dialog.ComboItems(FilterIds.Configured).SequenceEqual(tri), $"Configured items: {string.Join("|", dialog.ComboItems(FilterIds.Configured))}.");
         checks.Record("commentedItems", dialog.ComboItems(FilterIds.Commented).SequenceEqual(tri), $"Commented items: {string.Join("|", dialog.ComboItems(FilterIds.Commented))}.");
-        checks.Record("matchItems", dialog.ComboItems(FilterIds.KeywordMatch).SequenceEqual(["Any", "All", "Exact"]), $"Match items: {string.Join("|", dialog.ComboItems(FilterIds.KeywordMatch))}.");
-        checks.Record("platformMatchItems", dialog.ComboItems(FilterIds.PlatformMatch).SequenceEqual(["Any", "All"]), $"Requirement match items: {string.Join("|", dialog.ComboItems(FilterIds.PlatformMatch))}.");
 
         // F/Filter_Options, the dialog read before each OK: the keyword and requirement details are disabled until their
         // check box is ticked, the three combo boxes and the two check boxes are always enabled.
@@ -70,6 +68,9 @@ public sealed class GpeditFilterDialogTests
         _ = dialog.SetChecked(FilterIds.KeywordsEnabled, false);
         checks.Record("keywordDetailsOffAgain", keywordDetails.All(id => !dialog.IsEnabled(id)), "unticking the keyword filter disables its details again.");
         _ = dialog.SetChecked(FilterIds.KeywordsEnabled, true);
+        // The two match boxes are disabled until their check boxes are ticked, and a disabled box cannot be opened.
+        checks.Record("matchItems", dialog.ComboItems(FilterIds.KeywordMatch).SequenceEqual(["Any", "All", "Exact"]), $"Match items: {string.Join("|", dialog.ComboItems(FilterIds.KeywordMatch))}.");
+        checks.Record("platformMatchItems", dialog.ComboItems(FilterIds.PlatformMatch).SequenceEqual(["Any", "All"]), $"Requirement match items: {string.Join("|", dialog.ComboItems(FilterIds.PlatformMatch))}.");
 
         // The platform list holds the four supported-on definitions of the fixture, none ticked.
         List<(string Name, bool Ticked)> platforms = dialog.Platforms();

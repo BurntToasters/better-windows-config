@@ -91,6 +91,16 @@ public sealed partial class ConsoleToolbar : UserControl
     /// </summary>
     public void AddExtensionButton(int id, string name, string glyph, string? toolTip = null)
     {
+        AddExtensionButton(id, name, glyph, toolTip, idText: null, toggle: false);
+    }
+
+    /// <summary>
+    /// As the overload without the extra parameters. <paramref name="idText"/> is the end of the automation id
+    /// (<c>ConsoleToolbar_</c> plus it; the default is <c>Ext</c> plus the id). A <paramref name="toggle"/> button can show
+    /// itself pressed (<see cref="SetButtonChecked"/>) and has the Toggle pattern as well as Invoke.
+    /// </summary>
+    public void AddExtensionButton(int id, string name, string glyph, string? toolTip, string? idText, bool toggle)
+    {
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentException.ThrowIfNullOrEmpty(glyph);
         if (id < ConsoleToolbarIds.FirstExtension)
@@ -108,9 +118,21 @@ public sealed partial class ConsoleToolbar : UserControl
             AddSeparator();
         }
 
-        AddButton(id, name, "Ext" + id, glyph, toolTip ?? name, initiallyEnabled: true);
+        AddButton(id, name, string.IsNullOrEmpty(idText) ? "Ext" + id : idText, glyph, toolTip ?? name, initiallyEnabled: true, toggle);
         RefreshImages();
     }
+
+    /// <summary>Draws a toggle button pressed or released. A button that is not a toggle button ignores it.</summary>
+    public void SetButtonChecked(int id, bool isChecked)
+    {
+        if (ButtonFor(id) is ConsoleToolbarToggleButton toggle)
+        {
+            toggle.IsToggled = isChecked;
+        }
+    }
+
+    /// <summary>True while a toggle button is drawn pressed.</summary>
+    public bool IsButtonChecked(int id) => _buttons.TryGetValue(id, out Button? button) && button is ConsoleToolbarToggleButton { IsToggled: true };
 
     /// <summary>Reads the images again at the pixel size of the current scale (a DPI change); reapplies brushes.</summary>
     public void RefreshImages()
@@ -133,14 +155,12 @@ public sealed partial class ConsoleToolbar : UserControl
         AddButton(id, name, idText, glyph, name, initiallyEnabled);
     }
 
-    private void AddButton(int id, string name, string idText, string glyph, string toolTip, bool initiallyEnabled)
+    private void AddButton(int id, string name, string idText, string glyph, string toolTip, bool initiallyEnabled, bool toggle = false)
     {
-        var button = new Button
-        {
-            Style = (Style)Resources["ConsoleToolbarButtonStyle"],
-            IsEnabled = initiallyEnabled,
-            Tag = id,
-        };
+        Button button = toggle ? new ConsoleToolbarToggleButton() : new Button();
+        button.Style = (Style)Resources["ConsoleToolbarButtonStyle"];
+        button.IsEnabled = initiallyEnabled;
+        button.Tag = id;
         AutomationProperties.SetName(button, name);
         AutomationProperties.SetAutomationId(button, "ConsoleToolbar_" + idText);
         ToolTipService.SetToolTip(button, toolTip);

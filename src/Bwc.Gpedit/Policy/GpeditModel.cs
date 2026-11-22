@@ -5,6 +5,7 @@ using Bwc.Gpo.Comments;
 using Bwc.Gpo.Pol;
 using Bwc.Gpo.Store;
 using Bwc.Policy.Admx;
+using Bwc.Policy.Filter;
 using Bwc.Policy.Model;
 using Bwc.Policy.Store;
 
@@ -231,12 +232,45 @@ internal sealed class GpeditModel
         return source.Where(visible.Contains).OrderBy(c => c, CategoryOrder.Instance).ToList();
     }
 
-    /// <summary>The policies of a category that apply to a side, in display order.</summary>
+    /// <summary>
+    /// The policies of a category that apply to a side, in the default order of the list: the policy ids, compared ordinally
+    /// (F/Sort_Columns op 5 and 17, F/Nodes_Computer; docs/failure-modes/gpedit-filter.md, section 18).
+    /// </summary>
     public IReadOnlyList<PolicyDefinition> PoliciesOf(PolicyCategory category, GpoSide side) =>
         category.Policies
             .Where(p => side == GpoSide.Machine ? p.AppliesToMachine : p.AppliesToUser)
-            .OrderBy(p => p, PolicyOrder.Instance)
+            .OrderBy(p => p, IdOrder.Instance)
             .ToList();
+
+    /// <summary>
+    /// A policy as the filter engine sees it: the definition, its state in the side's policy file (null when that file is
+    /// unknown or the state cannot be read) and its comment on the side (null when it has none or cannot be read).
+    /// </summary>
+    public FilterSubject SubjectOf(PolicyDefinition policy, GpoSide side)
+    {
+        PolicyStateSnapshot? state = null;
+        try
+        {
+            PolDocument? document = PolFor(side);
+            state = document is null ? null : PolicyStateReader.Read(policy, document);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Log.Warn($"The state of '{policy.FullName}' could not be read for the filter: {ex.Message}");
+        }
+
+        string? comment = null;
+        try
+        {
+            comment = CommentsFor(side)?.GetComment(policy.Namespace, policy.Name);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Log.Warn($"The comment of '{policy.FullName}' could not be read for the filter: {ex.Message}");
+        }
+
+        return new FilterSubject(policy, state, comment);
+    }
 
     /// <summary>Every policy of a side (All Settings), in display order.</summary>
     public IReadOnlyList<PolicyDefinition> AllPolicies(GpoSide side) =>
@@ -323,6 +357,27 @@ internal sealed class GpeditModel
         {
             int byName = string.Compare(x!.DisplayName, y!.DisplayName, CultureInfo.CurrentCulture, CompareOptions.IgnoreCase);
             return byName != 0 ? byName : x.SourceOrder.CompareTo(y.SourceOrder);
+        }
+    }
+
+    /// <summary>
+    /// The default order of the policies of a category: the policy id (the name attribute) compared ordinally, then the
+    /// namespace, then the source order. 'L' is below '_' in an ordinal compare, which the captures settle.
+    /// </summary>
+    private sealed class IdOrder : IComparer<PolicyDefinition>
+    {
+        public static IdOrder Instance { get; } = new();
+
+        public int Compare(PolicyDefinition? x, PolicyDefinition? y)
+        {
+            int byId = string.CompareOrdinal(x!.Name, y!.Name);
+            if (byId != 0)
+            {
+                return byId;
+            }
+
+            int byNamespace = string.CompareOrdinal(x.Namespace, y.Namespace);
+            return byNamespace != 0 ? byNamespace : x.SourceOrder.CompareTo(y.SourceOrder);
         }
     }
 

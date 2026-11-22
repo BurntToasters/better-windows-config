@@ -256,7 +256,7 @@ public sealed class GpeditFilterResultsTests
         // The same filter works at another node and on the other side: the options are one set for the whole editor.
         run.GoTo(Root, User, Admin, Oracle, BasicsName);
         checks.Record("user.rows", run.WaitRowsAsSet(FilterNames.Rows("Class user flag", BothFlagName)).Length == 2, $"user rows with Configured Yes: {string.Join("|", run.RowNames())}.");
-        checks.Record("user.status", run.WaitStatusNumbers(2, 6), $"user status [{string.Join(",", run.StatusNumbers())}].");
+        checks.Record("user.status", run.WaitStatusNumbers(2, 4), $"user status [{string.Join(",", run.StatusNumbers())}].");
 
         // Filter off grays Re-Apply again.
         checks.Record("off", run.ToggleFilterByMenu() && run.WaitFilterOn(false), $"FilterOn={run.Str("FilterOn")}.");
@@ -331,7 +331,7 @@ public sealed class GpeditFilterResultsTests
         // every other policy the any definition.
         checks.Record("older", run.ApplyFilter(new FilterValues { Requirements = true, Platforms = [FilterIds.PlatformOlder] }) && run.WaitRowsAsSet(FilterNames.Rows(BothFlagName)).Length == 1, $"older rows {string.Join("|", run.RowNames())}.");
         checks.Record("anyOfTwo", run.ApplyFilter(new FilterValues { Requirements = true, Platforms = [FilterIds.PlatformOlder, FilterIds.PlatformLocal] }) && run.WaitRowsAsSet(FilterNames.Rows(BothFlagName, "Class both with an element")).Length == 2, $"Any of two rows {string.Join("|", run.RowNames())}.");
-        checks.Record("allOfTwo", run.ApplyFilter(new FilterValues { Requirements = true, PlatformMatch = "All", Platforms = [FilterIds.PlatformOlder, FilterIds.PlatformLocal] }) && ShellRun.WaitUntil(() => run.NodePath().SequenceEqual(OraclePath)), $"All of two: node={run.Str("Node")}; no policy has two supported-on definitions, so Basics is hidden.");
+        checks.Record("allOfTwo", run.ApplyFilter(new FilterValues { Requirements = true, PlatformMatch = "All", Platforms = [FilterIds.PlatformOlder, FilterIds.PlatformLocal] }) && ShellRun.WaitUntil(() => run.NodePath().SequenceEqual([Root, Computer, Admin])), $"All of two: node={run.Str("Node")}; no policy has two supported-on definitions, so no folder has a match, BWC Oracle is hidden too and the selection moves up to Administrative Templates.");
         checks.Record("selectAll", run.ApplyFilter(new FilterValues { Requirements = true, SelectAllPlatforms = true }), "Select All then OK.");
         run.GoTo(BasicsPath);
         checks.Record("selectAll.rows", run.WaitRowsAsSet(run.RowNames()).Length == 12 && run.WaitStatusNumbers(12, 12), $"Select All shows every Basics policy: status [{string.Join(",", run.StatusNumbers())}].");

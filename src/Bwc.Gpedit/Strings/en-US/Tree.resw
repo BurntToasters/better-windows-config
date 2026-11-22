@@ -128,6 +128,18 @@
   <data name="GpeditStatusSettingCount" xml:space="preserve">
     <value>{0} setting(s)</value>
   </data>
+  <!-- The fourth column of the All Settings list: where the setting is found. -->
+  <data name="GpeditColumnPath" xml:space="preserve">
+    <value>Path</value>
+  </data>
+  <!-- The status text of a list while Filter On is on: shown and total. -->
+  <data name="GpeditStatusFilteredCount" xml:space="preserve">
+    <value>{0} of {1} setting(s)</value>
+  </data>
+  <!-- The flag at the right end of the status bar while Filter On is on. -->
+  <data name="GpeditStatusFilterFlag" xml:space="preserve">
+    <value>Filter On</value>
+  </data>
   <!-- The UIA name of a policy row: the display name followed by the word setting ({0} is the display name) (classic probe, step result-list). -->
   <data name="GpeditPolicyRowName" xml:space="preserve">
     <value>{0} setting</value>

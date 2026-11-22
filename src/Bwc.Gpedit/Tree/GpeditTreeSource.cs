@@ -1,4 +1,5 @@
 using System.Text;
+using Bwc.Gpedit.Filter;
 using Bwc.Gpedit.Policy;
 using Bwc.Gpo.Store;
 using Bwc.Policy.Admx;
@@ -37,10 +38,17 @@ internal sealed class GpeditTreeSource
     ];
 
     private readonly Task<GpeditModel> _modelTask;
+    private readonly GpeditFilterState? _filter;
 
-    internal GpeditTreeSource(Task<GpeditModel> modelTask)
+    /// <param name="modelTask">The model, when it has loaded.</param>
+    /// <param name="filter">
+    /// The filter of the window, or null. While its Filter On is on, a category with no matching policy in itself or below
+    /// is left out of the tree. The nodes are made once, so a change of the filter needs a new source.
+    /// </param>
+    internal GpeditTreeSource(Task<GpeditModel> modelTask, GpeditFilterState? filter = null)
     {
         _modelTask = modelTask;
+        _filter = filter;
         Root = BuildSkeleton();
     }
 
@@ -129,7 +137,7 @@ internal sealed class GpeditTreeSource
         switch (info.Kind)
         {
             case GpeditNodeKind.AdministrativeTemplates:
-                foreach (PolicyCategory category in model.ChildCategories(null, side))
+                foreach (PolicyCategory category in ChildCategories(model, null, side))
                 {
                     _ = node.AddChild(CreateCategoryNode(category, side, model));
                 }
@@ -137,7 +145,7 @@ internal sealed class GpeditTreeSource
                 _ = node.AddChild(CreateNode("GpeditNodeAllSettings", new GpeditNodeInfo(GpeditNodeKind.AllSettings, side), IconKind.ClosedFolder));
                 break;
             case GpeditNodeKind.Category when info.Category is { } parent:
-                foreach (PolicyCategory category in model.ChildCategories(parent, side))
+                foreach (PolicyCategory category in ChildCategories(model, parent, side))
                 {
                     _ = node.AddChild(CreateCategoryNode(category, side, model));
                 }
@@ -168,9 +176,16 @@ internal sealed class GpeditTreeSource
         }
     }
 
+    /// <summary>The child categories of a category, less the ones the filter hides.</summary>
+    private IReadOnlyList<PolicyCategory> ChildCategories(GpeditModel model, PolicyCategory? parent, GpoSide side)
+    {
+        IReadOnlyList<PolicyCategory> all = model.ChildCategories(parent, side);
+        return _filter is not { IsOn: true } ? all : all.Where(category => _filter.Shows(category, side)).ToList();
+    }
+
     private TreeNode CreateCategoryNode(PolicyCategory category, GpoSide side, GpeditModel model)
     {
-        bool hasChildren = model.ChildCategories(category, side).Count > 0;
+        bool hasChildren = ChildCategories(model, category, side).Count > 0;
         var node = new TreeNode(category.DisplayName, null, hasChildren, LoadChildrenAsync)
         {
             Icon = IconKind.ClosedFolder,

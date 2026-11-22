@@ -35,6 +35,11 @@ public enum ConsoleListSortDirection
     Descending,
 }
 
+/// <summary>One key of a cumulative sort: a column and the direction it was last sorted in.</summary>
+/// <param name="ColumnId">The column id.</param>
+/// <param name="Direction">Ascending or descending.</param>
+public readonly record struct ConsoleListSortKey(string ColumnId, ConsoleListSortDirection Direction);
+
 /// <summary>Horizontal alignment of a column's header and cells.</summary>
 public enum ConsoleListAlignment
 {

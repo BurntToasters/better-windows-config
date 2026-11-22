@@ -119,21 +119,7 @@ public sealed partial class GpeditRootView
     }
 #endif
 
-    // ---- Action menu --------------------------------------------------------------------------------
-
-    private List<ClassicCommandItem> BuildActionItems(bool includeEdit)
-    {
-        var items = new List<ClassicCommandItem>();
-        if (includeEdit)
-        {
-            items.Add(ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandEdit"), EditCommand, true, invoke: RunEdit));
-        }
-
-        items.Add(ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandRefresh"), RefreshCommand, true, invoke: RunRefresh));
-        items.Add(ClassicCommandItem.Separator);
-        items.Add(ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandHelp"), HelpCommand, true, invoke: RunHelp));
-        return items;
-    }
+    // ---- the Action popup follows the selection -----------------------------------------------------
 
     /// <summary>
     /// Brings the Action popup in line with the selection: Edit is shown while a policy row is selected and hidden otherwise.
@@ -160,6 +146,7 @@ public sealed partial class GpeditRootView
     {
         UpdateToolbarStates();
         UpdateActionMenu();
+        UpdateFilterUi();
     }
 
     private void ApplyPopupWidth(IList<MenuFlyoutItemBase> items)
@@ -204,20 +191,33 @@ public sealed partial class GpeditRootView
             && e.Row is { Tag: GpeditRowTag { Kind: GpeditRowKind.Policy } }
             && selected.Count == 1
             && ReferenceEquals(selected[0], e.Row);
+        bool folderRow = e.Area == ConsoleListContextArea.Item && !policyRow;
+        bool hasFilter = !_placeholderShown && NodeHasFilter(Shell.TreeContent.SelectedNode);
         FrameworkElement target = _placeholderShown ? Shell.ResultHostElement : _list;
         Point point = _placeholderShown || e.Position is null ? new Point(KeyboardMenuOffset, KeyboardMenuOffset) : e.Position.Value;
-        ShowContextMenu(BuildActionItems(policyRow), target, point);
+
+        // A policy row has the menu of the Action popup. A folder row has the base entries. The empty area has a View
+        // submenu that holds the filter entries.
+        List<ClassicCommandItem> items = policyRow
+            ? BuildActionItems(includeEdit: true, includeFilter: hasFilter)
+            : folderRow
+                ? BuildActionItems(includeEdit: false, includeFilter: false)
+                : BuildEmptyAreaItems(hasFilter);
+        ShowContextMenu(items, target, point);
     }
 
     private void ShowTreeContextMenu(ConsoleContextMenuEventArgs e)
     {
+        // The filter entries are flat in the tree menu, at the nodes that have the filter.
+        bool hasFilter = NodeHasFilter(e.Node ?? Shell.TreeContent.SelectedNode);
+        List<ClassicCommandItem> items = BuildTreeMenuItems(hasFilter);
         if (e.Position is { } position)
         {
-            ShowContextMenu(BuildActionItems(includeEdit: false), Shell, position);
+            ShowContextMenu(items, Shell, position);
         }
         else
         {
-            ShowContextMenu(BuildActionItems(includeEdit: false), Shell.TreeContent, new Point(KeyboardMenuOffset, KeyboardMenuOffset));
+            ShowContextMenu(items, Shell.TreeContent, new Point(KeyboardMenuOffset, KeyboardMenuOffset));
         }
     }
 
@@ -235,6 +235,8 @@ public sealed partial class GpeditRootView
             flyout.Items.Add(ClassicMenuBuilder.BuildFlyoutItem(item, ContextPrefix));
         }
 
+        FinishItems(flyout.Items);
+        SetFilterChecks(flyout.Items, _filter.IsOn);
         ApplyPopupWidth(flyout.Items);
         flyout.Closed += (_, _) =>
         {

@@ -34,6 +34,7 @@ public sealed partial class GpeditRootView
     private const double SettingColumnWidth = 350;
     private const double StateColumnWidth = 100;
     private const double CommentColumnWidth = 139;
+    private const double PathColumnWidth = 250;
     private const double NameColumnWidth = 180;
     private const double MinSavedColumnWidth = ConsoleList.MinColumnWidth;
     private const double MaxSavedColumnWidth = ConsoleList.MaxColumnWidth;
@@ -90,6 +91,7 @@ public sealed partial class GpeditRootView
             }
         }
 
+        LoadSortStacks();
         ConfigureEditorResultPane();
         StartModelLoad();
         PolicyEditRequested += OnPolicyEditRequested;
@@ -108,6 +110,9 @@ public sealed partial class GpeditRootView
     {
         // The classic list names a row by its text plus a word for a policy; the list control adds nothing itself.
         _list.ItemNameFormatter = GpeditListBuilder.RowName;
+        // A click on a header sorts the order shown now, so the list keeps the clicks of each node (gpedit-filter.md).
+        _list.CumulativeSort = true;
+        _list.SortChanged += OnListSortChanged;
         _list.ItemActivated += OnEditorItemActivated;
         _list.ContextMenuRequested += OnEditorListContext;
         _list.ViewModeChanged += (_, _) =>
@@ -151,7 +156,7 @@ public sealed partial class GpeditRootView
     {
         try
         {
-            GpeditListContent content = GpeditListBuilder.Build(node, _model, _source);
+            GpeditListContent content = GpeditListBuilder.Build(node, _model, _source, _filter);
             ApplyContent(content, node);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -172,11 +177,13 @@ public sealed partial class GpeditRootView
         {
             ShowList();
             ApplyLayout(content.Layout);
+            ApplySortOf(node);
             _list.SetRows(content.Rows);
         }
 
         _extended.Description = content.Description;
         Shell.StatusText = content.StatusText;
+        NoteContent(content);
         StateChanged();
     }
 
@@ -222,14 +229,23 @@ public sealed partial class GpeditRootView
         }
 
         _layout = layout;
-        _list.SetColumns(layout == GpeditListLayout.Navigation
-            ? [Column("name", "GpeditColumnName", NameColumnWidth)]
-            :
+        _list.SetColumns(layout switch
+        {
+            GpeditListLayout.Navigation => [Column("name", "GpeditColumnName", NameColumnWidth)],
+            GpeditListLayout.AllSettings =>
             [
                 Column("setting", "GpeditColumnSetting", SettingColumnWidth),
                 Column("state", "GpeditColumnState", StateColumnWidth),
                 Column("comment", "GpeditColumnComment", CommentColumnWidth),
-            ]);
+                Column("path", "GpeditColumnPath", PathColumnWidth),
+            ],
+            _ =>
+            [
+                Column("setting", "GpeditColumnSetting", SettingColumnWidth),
+                Column("state", "GpeditColumnState", StateColumnWidth),
+                Column("comment", "GpeditColumnComment", CommentColumnWidth),
+            ],
+        });
     }
 
     private ConsoleListColumn Column(string id, string headerKey, double defaultWidth) =>
@@ -443,10 +459,11 @@ public sealed partial class GpeditRootView
 
         try
         {
-            GpeditListContent content = GpeditListBuilder.Build(node, _model, _source);
+            GpeditListContent content = GpeditListBuilder.Build(node, _model, _source, _filter);
             if (!content.IsPlaceholder)
             {
                 _list.SetRows(content.Rows, keepSelectionByTag: true);
+                NoteContent(content);
             }
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -523,6 +540,11 @@ public sealed partial class GpeditRootView
         foreach (KeyValuePair<string, double> pair in _columnWidths)
         {
             snapshot.ColumnWidths[pair.Key] = pair.Value;
+        }
+
+        foreach (KeyValuePair<string, List<ConsoleListSortKey>> pair in _sortStacks)
+        {
+            snapshot.Sorts[pair.Key] = pair.Value.Select(key => $"{key.ColumnId}:{key.Direction}").ToList();
         }
 
         if (_appWindow is { } window)
@@ -668,6 +690,9 @@ public sealed partial class GpeditRootView
         Add("ShownFolders", _list.Rows.Count(r => r.Tag is GpeditRowTag { Kind: GpeditRowKind.Folder }));
         Add("ShownPolicies", _list.Rows.Count(r => r.Tag is GpeditRowTag { Kind: GpeditRowKind.Policy }));
         Add("Status", Shell.StatusText);
+        Add("FilterOn", _filter.IsOn ? 1 : 0);
+        Add("FilterShown", _filter.IsOn ? _list.Rows.Count(r => r.Tag is GpeditRowTag { Kind: GpeditRowKind.Policy }) : _filterTotal);
+        Add("FilterTotal", _filterTotal);
         Add("Links", _linkInvocations);
         Add("Edits", _editRequests);
         Add("LastEdit", _lastEdit);

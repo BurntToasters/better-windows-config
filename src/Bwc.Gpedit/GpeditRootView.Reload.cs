@@ -35,7 +35,7 @@ public sealed partial class GpeditRootView
 
     private void StartModelLoad()
     {
-        _source = new GpeditTreeSource(BeginLoad(initial: true));
+        _source = new GpeditTreeSource(BeginLoad(initial: true), _filter);
     }
 
     private Task<GpeditModel> BeginLoad(bool initial)
@@ -186,6 +186,8 @@ public sealed partial class GpeditRootView
         }
     }
 
+    private void ApplyReloadedModel(GpeditModel model) => ReplaceTree(model, reloaded: true);
+
     private void ApplyInitialModel(GpeditModel model)
     {
         _model = model;
@@ -205,25 +207,41 @@ public sealed partial class GpeditRootView
     /// <summary>
     /// Replaces the model, the tree and the list in one step. The expanded nodes, the selected node (or its nearest ancestor
     /// that the new templates still have) and the selected row are found again by name; the history keeps the entries that
-    /// still exist.
+    /// still exist. A change of the filter (Filter On, the options, Re-Apply Filter) uses it with the model it has, since the
+    /// tree is made once: folders the filter hides are not in it, and a hidden selected node gives way to its nearest visible
+    /// ancestor. A reload applies the filter again to the files it read.
     /// </summary>
-    private void ApplyReloadedModel(GpeditModel model)
+    private void ReplaceTree(GpeditModel model, bool reloaded)
     {
         TreeNode? selected = Shell.TreeContent.SelectedNode;
         List<string> selectedNames = GpeditTreeSource.NamesOf(selected);
         HashSet<string> expanded = [];
         CollectExpanded(Shell.TreeContent.Roots, expanded);
+        if (!reloaded && selected is not null)
+        {
+            // A new filter rebuilds the tree and opens the node that is current, so its matching children show.
+            _ = expanded.Add(KeyOf(selectedNames));
+        }
+
         RowKey? row = CaptureSelectedRow();
         bool listFocused = Shell.FocusedPane == ConsolePane.Result;
         List<List<string>> historyNames = _history.Select(GpeditTreeSource.NamesOf).ToList();
         int oldIndex = _historyIndex;
 
-        var source = new GpeditTreeSource(Task.FromResult(model));
+        if (reloaded)
+        {
+            _filter.Rebase(model);
+        }
+
+        var source = new GpeditTreeSource(Task.FromResult(model), _filter);
         RestoreExpansion(source, model, expanded);
         _model = model;
         _source = source;
-        _refreshes++;
-        UpdateReadOnlyNotice(model);
+        if (reloaded)
+        {
+            _refreshes++;
+            UpdateReadOnlyNotice(model);
+        }
 
         TreeNode current;
         bool exact;
@@ -246,9 +264,13 @@ public sealed partial class GpeditRootView
             SelectRow(key, listFocused);
         }
 
-        Log.Info(
-            $"Local Group Policy Editor model reloaded in {model.LoadTime.TotalMilliseconds:0} ms: " +
-            $"{model.Templates.Policies.Count} policies, {model.Problems.Count} problems.");
+        if (reloaded)
+        {
+            Log.Info(
+                $"Local Group Policy Editor model reloaded in {model.LoadTime.TotalMilliseconds:0} ms: " +
+                $"{model.Templates.Policies.Count} policies, {model.Problems.Count} problems.");
+        }
+
         StateChanged();
     }
 

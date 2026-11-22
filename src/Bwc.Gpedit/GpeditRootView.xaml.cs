@@ -72,7 +72,16 @@ public sealed partial class GpeditRootView : UserControl
         Shell.SetMenuExtensions(CreateMenuExtensions());
         if (IsEditorHost)
         {
+            PrepareFilterMenus();
             ClassicMenuBuilder.SetCommandVisible(Shell.MenuBar, EditCommand, false);
+            Shell.Toolbar.AddExtensionButton(
+                FilterToolbarId,
+                GpeditStrings.Commands("GpeditToolbarFilter"),
+                FilterToolbarGlyph,
+                null,
+                idText: "Filter",
+                toggle: true);
+            Shell.Toolbar.SetButtonVisible(FilterToolbarId, false);
         }
 
         Shell.ToolbarCommandInvoked += OnToolbarCommand;
@@ -160,6 +169,11 @@ public sealed partial class GpeditRootView : UserControl
             ClassicMenuBuilder.Command("&List", ViewListCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.List), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
             ClassicMenuBuilder.Command("&Detail", ViewDetailCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.Detail), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
         };
+        if (IsEditorHost)
+        {
+            // The filter entries sit between the view modes and Customize View (the frame adds that one after these).
+            view.AddRange(FilterItems());
+        }
 #if BWC_E2E
         // E2E only: save and restore the list state through the host, to exercise GetState and ApplyState.
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BWC_E2E_CONSOLE_STATE_MENU")))
@@ -179,7 +193,7 @@ public sealed partial class GpeditRootView : UserControl
         return new ConsoleMenuExtensions
         {
             FileEntries = file,
-            ActionEntries = IsEditorHost ? BuildActionItems(includeEdit: true) : [],
+            ActionEntries = IsEditorHost ? BuildActionBarItems() : [],
             ViewEntries = view,
             Exit = RequestClose,
             HelpTopics = IsEditorHost ? RunHelp : null,
@@ -280,6 +294,9 @@ public sealed partial class GpeditRootView : UserControl
                     break;
                 case ConsoleToolbarIds.Help:
                     RunHelp();
+                    break;
+                case FilterToolbarId:
+                    RunToggleFilter();
                     break;
             }
 

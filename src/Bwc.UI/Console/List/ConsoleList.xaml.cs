@@ -56,6 +56,7 @@ public sealed partial class ConsoleList : UserControl
     private ConsoleListRow? _focusRow;
     private ConsoleListRow? _anchorRow;
     private ConsoleListViewMode _mode = ConsoleListViewMode.Detail;
+    private readonly List<ConsoleListSortKey> _sortStack = [];
     private string? _sortColumnId;
     private ConsoleListSortDirection _sortDirection = ConsoleListSortDirection.None;
     private double _labelItemWidth = 120;
@@ -172,6 +173,19 @@ public sealed partial class ConsoleList : UserControl
     /// <summary>The direction of the sort.</summary>
     public ConsoleListSortDirection SortDirection => _sortDirection;
 
+    /// <summary>
+    /// False (the default): a sort is by one column, stable against the caller's order. True: a sort sorts the order shown
+    /// now, so a tie keeps the order the earlier sorts made (<see cref="SortStack"/>). The Local Group Policy Editor sets it.
+    /// </summary>
+    public bool CumulativeSort { get; set; }
+
+    /// <summary>
+    /// The columns sorted so far, oldest first, one entry per column with its last direction. Empty unless
+    /// <see cref="CumulativeSort"/> is set. The last entry is the sort mark. Replaying the entries in order over the caller's
+    /// order gives the order shown, so the stack is all a caller needs to keep or restore.
+    /// </summary>
+    public IReadOnlyList<ConsoleListSortKey> SortStack => _sortStack.ToArray();
+
     /// <summary>The view mode. A change keeps the selection and the focus and reveals the focused row.</summary>
     public ConsoleListViewMode ViewMode
     {
@@ -229,7 +243,13 @@ public sealed partial class ConsoleList : UserControl
         _all.Clear();
         _all.AddRange(list);
         RebuildVisible();
-        if (_sortColumnId is not null && !seen.Contains(_sortColumnId))
+        if (CumulativeSort && _sortStack.RemoveAll(key => !seen.Contains(key.ColumnId)) > 0)
+        {
+            SyncSortFromStack();
+            ApplySort();
+            Rebind(preserveScroll: true);
+        }
+        else if (!CumulativeSort && _sortColumnId is not null && !seen.Contains(_sortColumnId))
         {
             _sortColumnId = null;
             _sortDirection = ConsoleListSortDirection.None;
@@ -422,12 +442,76 @@ public sealed partial class ConsoleList : UserControl
 
         _sortColumnId = columnId;
         _sortDirection = direction;
+        if (CumulativeSort)
+        {
+            PushSortKey(columnId, direction);
+        }
+
         ApplySort();
         Rebind(preserveScroll: false);
         Header.RefreshSort();
         ScrollToFocusOrStart();
         SortChanged?.Invoke(this, EventArgs.Empty);
         UpdateHelpText();
+    }
+
+    /// <summary>
+    /// Replaces the sort stack of a cumulative list (see <see cref="SortStack"/>). A key of a column that is not shown, a
+    /// direction of None and a column that repeats (the last entry wins) are dropped. Raises no event: the caller made the
+    /// change. The rows are shown in the new order at once.
+    /// </summary>
+    public void SetSortStack(IEnumerable<ConsoleListSortKey> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        var wanted = new List<ConsoleListSortKey>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (ConsoleListSortKey key in keys.Reverse())
+        {
+            if (key.Direction != ConsoleListSortDirection.None && FindColumn(key.ColumnId) is { Visible: true } && seen.Add(key.ColumnId))
+            {
+                wanted.Add(key);
+            }
+        }
+
+        wanted.Reverse();
+        if (wanted.SequenceEqual(_sortStack))
+        {
+            return;
+        }
+
+        _sortStack.Clear();
+        _sortStack.AddRange(wanted);
+        SyncSortFromStack();
+        ApplySort();
+        Rebind(preserveScroll: true);
+        UpdateHelpText();
+    }
+
+    private void PushSortKey(string? columnId, ConsoleListSortDirection direction)
+    {
+        if (columnId is null || direction == ConsoleListSortDirection.None)
+        {
+            _sortStack.Clear();
+            return;
+        }
+
+        _ = _sortStack.RemoveAll(key => key.ColumnId == columnId);
+        _sortStack.Add(new ConsoleListSortKey(columnId, direction));
+    }
+
+    /// <summary>Makes the sort mark the newest entry of the stack, or none when the stack is empty.</summary>
+    private void SyncSortFromStack()
+    {
+        if (_sortStack.Count == 0)
+        {
+            _sortColumnId = null;
+            _sortDirection = ConsoleListSortDirection.None;
+        }
+        else
+        {
+            _sortColumnId = _sortStack[^1].ColumnId;
+            _sortDirection = _sortStack[^1].Direction;
+        }
     }
 
     /// <summary>The state a caller persists: the columns in display order, the sort and the view mode.</summary>
@@ -472,6 +556,15 @@ public sealed partial class ConsoleList : UserControl
         {
             _sortColumnId = null;
             _sortDirection = ConsoleListSortDirection.None;
+        }
+
+        if (CumulativeSort)
+        {
+            _sortStack.Clear();
+            if (_sortColumnId is not null)
+            {
+                _sortStack.Add(new ConsoleListSortKey(_sortColumnId, _sortDirection));
+            }
         }
 
         bool sortChanged = previousSort != SortColumnId || previousDirection != _sortDirection;
@@ -693,6 +786,7 @@ public sealed partial class ConsoleList : UserControl
         {
             _sortColumnId = null;
             _sortDirection = ConsoleListSortDirection.None;
+            _sortStack.Clear();
             ApplySort();
             return true;
         }
@@ -820,9 +914,32 @@ public sealed partial class ConsoleList : UserControl
             IComparer<ConsoleListRow> comparer = column.Comparer ?? DefaultComparer(column.Index);
             try
             {
-                _rows = (_sortDirection == ConsoleListSortDirection.Ascending
-                    ? _source.OrderBy(row => row, comparer)
-                    : _source.OrderByDescending(row => row, comparer)).ToList();
+                // A cumulative list replays every key of the stack, oldest first, each a stable sort of the order the earlier
+                // ones made; the newest key decides, and a tie keeps the order before it.
+                IEnumerable<ConsoleListRow> ordered = _source;
+                if (CumulativeSort && _sortStack.Count > 0)
+                {
+                    foreach (ConsoleListSortKey key in _sortStack)
+                    {
+                        if (FindColumn(key.ColumnId) is not { } keyColumn || key.Direction == ConsoleListSortDirection.None)
+                        {
+                            continue;
+                        }
+
+                        IComparer<ConsoleListRow> keyComparer = keyColumn.Comparer ?? DefaultComparer(keyColumn.Index);
+                        ordered = key.Direction == ConsoleListSortDirection.Ascending
+                            ? ordered.OrderBy(row => row, keyComparer)
+                            : ordered.OrderByDescending(row => row, keyComparer);
+                    }
+                }
+                else
+                {
+                    ordered = _sortDirection == ConsoleListSortDirection.Ascending
+                        ? _source.OrderBy(row => row, comparer)
+                        : _source.OrderByDescending(row => row, comparer);
+                }
+
+                _rows = ordered.ToList();
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
@@ -830,6 +947,7 @@ public sealed partial class ConsoleList : UserControl
                 _rows = new List<ConsoleListRow>(_source);
                 _sortColumnId = null;
                 _sortDirection = ConsoleListSortDirection.None;
+                _sortStack.Clear();
             }
         }
 

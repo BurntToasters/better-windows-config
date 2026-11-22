@@ -390,6 +390,18 @@ The plan rule: a capture is the specification, and a difference from classic nee
 - **BWC definitions the captures cannot give:** Re-Apply Filter is enabled only while Filter On is on (every dump has the filter
   off); the status bar shows two numbers (shown, total) and a flag pane while the filter is on; Select All of the requirements
   filter selects the supported-on definitions of the loaded templates, so op 66 shows every row (FC11).
+- **Filter On is a custom menu item.** The shared check menu item has no UI Automation Toggle pattern, and the tests read and
+  set the state through it. The editor swaps each Filter On entry for `FilterToggleMenuItem` (a plain menu item that shows the
+  check mark as its icon and has the Toggle pattern). The command id, text, access key and automation id stay the same. The
+  toolbar button is a toggle button of the console frame with the same Toggle pattern.
+- **Tab in the platform list.** The dialog's own tab order does not see focus inside a list item as the list, so Tab there
+  would start over at the first control. The platform list answers Tab and Shift+Tab itself: Select All follows the list, the
+  platform match box precedes it, which is the template order.
+- **The current node opens after a filter change.** A new filter rebuilds the tree, and the node that is current is expanded
+  again, so its matching children show (the folder tests read Basics in the tree with BWC Oracle selected). Not captured.
+- **Engine rule `FilterRules.EmptyCategoryStaysVisible`.** It says a category with no match stays in the tree. That contradicts
+  the captures, and the editor hides empty folders (section 7). The rule and its Bwc.Policy test are left as they are; the
+  engine fix belongs to the audit.
 
 ## Safety and repeatability
 

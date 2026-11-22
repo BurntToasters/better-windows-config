@@ -36,6 +36,13 @@ public sealed class GpeditSettings
 
     /// <summary>The selected tab by name (Extended or Standard), or null for the default.</summary>
     public string? ExtendedTab { get; set; }
+
+    /// <summary>
+    /// The sort of each list by node: the names of the node from the root joined with " > ", then the columns sorted so far,
+    /// oldest first, each as "column id:Ascending" or "column id:Descending". A click sorts the order shown now, so the
+    /// whole list of clicks is what restores an order (docs/failure-modes/gpedit-filter.md, section 15).
+    /// </summary>
+    public Dictionary<string, List<string>> Sorts { get; set; } = new(StringComparer.Ordinal);
 }
 
 [JsonSourceGenerationOptions(WriteIndented = true)]

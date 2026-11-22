@@ -174,6 +174,10 @@ const unnamedCallAllowlist = new Map([
     "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
   ],
   [
+    "tests/Bwc.E2E/Gpedit/Filter/GpeditFilterSupport.cs",
+    "Calls PolDocument.SetValue inside a save of the E2E sandbox store. No registry API is reached.",
+  ],
+  [
     "tests/Bwc.Policy.Tests/Blind/FilterStoreBlindTests.cs",
     "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
   ],

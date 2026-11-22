@@ -2,7 +2,7 @@ using Microsoft.Windows.ApplicationModel.Resources;
 
 namespace Bwc.Gpedit;
 
-/// <summary>Strings from Bwc.Gpedit/Strings/en-US/Resources.resw, Tree.resw and Commands.resw.</summary>
+/// <summary>Strings from Bwc.Gpedit/Strings/en-US/Resources.resw, Tree.resw, Commands.resw and Filter.resw.</summary>
 public static class GpeditStrings
 {
     // The default loader only sees the head's own map, so the library map must be named explicitly.
@@ -11,6 +11,7 @@ public static class GpeditStrings
     // Each resw file of a library is a map of its own, named after the file (as Bwc.UI/Console is Console.resw).
     internal const string TreeResourceMap = "Bwc.Gpedit/Tree";
     internal const string CommandsResourceMap = "Bwc.Gpedit/Commands";
+    internal const string FilterResourceMap = "Bwc.Gpedit/Filter";
 
     public static string Get(string key)
     {
@@ -20,6 +21,9 @@ public static class GpeditStrings
 
     /// <summary>A string of Commands.resw (menu entries, the About box). A missing entry gives the key name.</summary>
     internal static string Commands(string key) => Lookup(CommandsResourceMap, key);
+
+    /// <summary>A string of Filter.resw (the Filter Options dialog). A missing entry gives the key name.</summary>
+    internal static string Filter(string key) => Lookup(FilterResourceMap, key);
 
     /// <summary>
     /// A string of Tree.resw (the tree, list, status and placeholder texts). A missing or empty entry gives the key

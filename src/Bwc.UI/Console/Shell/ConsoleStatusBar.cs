@@ -8,7 +8,9 @@ namespace Bwc.UI.Console.Shell;
 
 /// <summary>
 /// The status bar: one line of text on the face color, 23 DIP high as in the probed classic window. The text is long
-/// text safe: one line, trimmed with an ellipsis, and the full string is the accessible name of the pane.
+/// text safe: one line, trimmed with an ellipsis, and the full string is the accessible name of the pane. A second, narrow
+/// pane at the right end holds a flag text a host sets (the filter flag of the Local Group Policy Editor); it exists only
+/// while the text is not empty.
 /// </summary>
 public sealed class ConsoleStatusBar : UserControl
 {
@@ -17,7 +19,10 @@ public sealed class ConsoleStatusBar : UserControl
 
     private readonly Border _frame = new();
     private readonly TextBlock _pane = new();
+    private readonly Border _flagFrame = new();
+    private readonly TextBlock _flag = new();
     private string _text = string.Empty;
+    private string _flagText = string.Empty;
 
     public ConsoleStatusBar()
     {
@@ -34,8 +39,25 @@ public sealed class ConsoleStatusBar : UserControl
         AutomationProperties.SetAutomationId(_pane, "StatusBar.Pane0");
         AutomationProperties.SetName(_pane, string.Empty);
 
+        _flag.TextWrapping = TextWrapping.NoWrap;
+        _flag.VerticalAlignment = VerticalAlignment.Center;
+        _flag.Margin = new Thickness(6, 0, 6, 0);
+        _flag.IsTextSelectionEnabled = false;
+        AutomationProperties.SetAutomationId(_flag, "StatusBar.Pane1");
+        AutomationProperties.SetName(_flag, string.Empty);
+        _flagFrame.BorderThickness = new Thickness(1, 0, 0, 0);
+        _flagFrame.Child = _flag;
+        _flagFrame.Visibility = Visibility.Collapsed;
+
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.Children.Add(_pane);
+        Grid.SetColumn(_flagFrame, 1);
+        row.Children.Add(_flagFrame);
+
         _frame.BorderThickness = new Thickness(0, 1, 0, 0);
-        _frame.Child = _pane;
+        _frame.Child = row;
         Content = _frame;
         ApplyBrushes();
     }
@@ -52,12 +74,30 @@ public sealed class ConsoleStatusBar : UserControl
         }
     }
 
+    /// <summary>
+    /// The text of the flag pane at the right end. The pane is hidden (and so absent for UI Automation) while the text is
+    /// empty.
+    /// </summary>
+    public string FlagText
+    {
+        get => _flagText;
+        set
+        {
+            _flagText = value ?? string.Empty;
+            _flag.Text = _flagText;
+            AutomationProperties.SetName(_flag, _flagText);
+            _flagFrame.Visibility = _flagText.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        }
+    }
+
     /// <summary>Takes the colors from the current palette.</summary>
     public void ApplyBrushes()
     {
         _frame.Background = BwcBrushes.Face;
         _frame.BorderBrush = BwcBrushes.Highlight3D;
         _pane.Foreground = BwcBrushes.WindowText;
+        _flag.Foreground = BwcBrushes.WindowText;
+        _flagFrame.BorderBrush = BwcBrushes.Shadow;
     }
 
     /// <summary>Takes the font from the dense metrics.</summary>
@@ -65,6 +105,8 @@ public sealed class ConsoleStatusBar : UserControl
     {
         _pane.FontSize = DenseMetrics.FontSize;
         _pane.FontFamily = DenseMetrics.FontFamily;
+        _flag.FontSize = DenseMetrics.FontSize;
+        _flag.FontFamily = DenseMetrics.FontFamily;
     }
 
     protected override AutomationPeer OnCreateAutomationPeer() => new ConsoleStatusBarPeer(this);

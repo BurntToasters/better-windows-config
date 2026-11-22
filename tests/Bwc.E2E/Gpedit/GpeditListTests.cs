@@ -274,7 +274,7 @@ public sealed class GpeditListTests
         // The user file is fine, so its states are still read.
         run.GoTo(Root, User, Admin, Oracle, "Basics");
         string[] userStates = run.Rows().Select(r => r.Cells.ElementAtOrDefault(1) ?? "?").ToArray();
-        checks.Record("userSideRead", userStates.SequenceEqual(["Disabled", "Not configured", "Enabled", "Not configured"]), $"user states={string.Join("|", userStates)}.");
+        checks.Record("userSideRead", userStates.SequenceEqual(["Not configured", "Disabled", "Enabled", "Not configured"]), $"user states={string.Join("|", userStates)}.");
 
         run.Measure("problems", run.Str("ProblemList"));
         run.Measure("computerStates", states);

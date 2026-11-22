@@ -1,4 +1,5 @@
 using System.Globalization;
+using Bwc.Gpedit.Filter;
 using Bwc.Gpedit.Policy;
 using Bwc.Gpedit.Tree;
 using Bwc.Gpo.Store;
@@ -18,8 +19,11 @@ internal enum GpeditListLayout
     /// <summary>One Name column (the root, the configuration nodes, Windows Settings).</summary>
     Navigation,
 
-    /// <summary>Setting, State and Comment (a category and All Settings).</summary>
+    /// <summary>Setting, State and Comment (a category).</summary>
     Settings,
+
+    /// <summary>Setting, State, Comment and Path (All Settings).</summary>
+    AllSettings,
 }
 
 /// <summary>What a result row stands for.</summary>
@@ -57,6 +61,12 @@ internal sealed class GpeditListContent
     /// <summary>The number of policy rows.</summary>
     public int PolicyCount { get; init; }
 
+    /// <summary>The number of policy rows the node would show with no filter.</summary>
+    public int TotalPolicyCount { get; init; }
+
+    /// <summary>True when Filter On is on and the node lists policies, so the status text holds two numbers.</summary>
+    public bool Filtered { get; init; }
+
     /// <summary>The status bar text of the node.</summary>
     public string StatusText { get; init; } = string.Empty;
 
@@ -78,7 +88,7 @@ internal static class GpeditListBuilder
             : row.Text;
 
     /// <summary>Builds the content of a node. <paramref name="model"/> is null while the templates are still loading.</summary>
-    internal static GpeditListContent Build(TreeNode node, GpeditModel? model, GpeditTreeSource source)
+    internal static GpeditListContent Build(TreeNode node, GpeditModel? model, GpeditTreeSource source, GpeditFilterState? filter = null)
     {
         GpeditNodeInfo? info = GpeditTreeSource.InfoOf(node);
         if (info is null)
@@ -105,7 +115,7 @@ internal static class GpeditListBuilder
             case GpeditNodeKind.AdministrativeTemplates:
             case GpeditNodeKind.Category:
             case GpeditNodeKind.AllSettings:
-                return model is null ? Loading(node, info) : Settings(node, info, side, model, source);
+                return model is null ? Loading(node, info) : Settings(node, info, side, model, source, filter);
             default:
                 return Empty(node);
         }
@@ -162,13 +172,16 @@ internal static class GpeditListBuilder
             Description = NodeDescription(node, info),
         };
 
-    private static GpeditListContent Settings(TreeNode node, GpeditNodeInfo info, GpoSide side, GpeditModel model, GpeditTreeSource source)
+    private static GpeditListContent Settings(TreeNode node, GpeditNodeInfo info, GpoSide side, GpeditModel model, GpeditTreeSource source, GpeditFilterState? filter)
     {
         var rows = new List<ConsoleListRow>();
         int folders = 0;
         int policies = 0;
+        int total = 0;
+        GpeditListLayout layout = info.Kind == GpeditNodeKind.AllSettings ? GpeditListLayout.AllSettings : GpeditListLayout.Settings;
         if (info.Kind != GpeditNodeKind.AllSettings)
         {
+            // The children of the node are the tree's: a folder with no matching policy is not among them while Filter On is on.
             foreach (TreeNode child in source.EnsureChildren(node, model))
             {
                 rows.Add(FolderRow(child, side, GpeditListLayout.Settings));
@@ -184,20 +197,32 @@ internal static class GpeditListBuilder
         };
         foreach (PolicyDefinition policy in list)
         {
-            rows.Add(PolicyRow(policy, side, model));
+            total++;
+            if (filter is not null && !filter.Shows(policy, side))
+            {
+                continue;
+            }
+
+            rows.Add(PolicyRow(policy, side, model, layout));
             policies++;
         }
 
-        // Classic shows a count only where policies are listed: a category or All Settings.
-        string status = info.ListsPolicies
-            ? string.Format(CultureInfo.CurrentCulture, GpeditStrings.Tree("GpeditStatusSettingCount"), policies)
-            : string.Empty;
+        // Classic shows a count only where policies are listed: a category or All Settings. While Filter On is on it holds
+        // the shown and the total number.
+        bool filtered = filter is { IsOn: true } && info.ListsPolicies;
+        string status = !info.ListsPolicies
+            ? string.Empty
+            : filtered
+                ? string.Format(CultureInfo.CurrentCulture, GpeditStrings.Tree("GpeditStatusFilteredCount"), policies, total)
+                : string.Format(CultureInfo.CurrentCulture, GpeditStrings.Tree("GpeditStatusSettingCount"), policies);
         return new GpeditListContent
         {
-            Layout = GpeditListLayout.Settings,
+            Layout = layout,
             Rows = rows,
             FolderCount = folders,
             PolicyCount = policies,
+            TotalPolicyCount = total,
+            Filtered = filtered,
             StatusText = status,
             Description = NodeDescription(node, info),
         };
@@ -209,10 +234,12 @@ internal static class GpeditListBuilder
         var tag = new GpeditRowTag(GpeditRowKind.Folder, side, null, child);
         return layout == GpeditListLayout.Navigation
             ? new ConsoleListRow(child.Name) { SmallIcon = icon, LargeIcon = icon, Tag = tag }
-            : new ConsoleListRow(child.Name, string.Empty, string.Empty) { SmallIcon = icon, LargeIcon = icon, Tag = tag };
+            : layout == GpeditListLayout.AllSettings
+                ? new ConsoleListRow(child.Name, string.Empty, string.Empty, string.Empty) { SmallIcon = icon, LargeIcon = icon, Tag = tag }
+                : new ConsoleListRow(child.Name, string.Empty, string.Empty) { SmallIcon = icon, LargeIcon = icon, Tag = tag };
     }
 
-    private static ConsoleListRow PolicyRow(PolicyDefinition policy, GpoSide side, GpeditModel model)
+    private static ConsoleListRow PolicyRow(PolicyDefinition policy, GpoSide side, GpeditModel model, GpeditListLayout layout)
     {
         PolicyState? state = model.StateOf(policy, side);
         string stateText = state switch
@@ -226,12 +253,32 @@ internal static class GpeditListBuilder
 
         // Classic draws a policy setting with a page icon from admtmpl.dll; the glyph stands in when the module is absent.
         IconReference icon = IconReference.FromModule(ModuleIcon.ById("admtmpl.dll", 4), IconKind.StringValue);
-        return new ConsoleListRow(policy.DisplayName, stateText, comment)
+        IEnumerable<string> cells = layout == GpeditListLayout.AllSettings
+            ? [policy.DisplayName, stateText, comment, PathOf(policy)]
+            : [policy.DisplayName, stateText, comment];
+        return new ConsoleListRow(cells)
         {
             SmallIcon = icon,
             LargeIcon = icon,
             Tag = new GpeditRowTag(GpeditRowKind.Policy, side, policy, null),
         };
+    }
+
+    /// <summary>
+    /// Where a policy is found, for the Path column of All Settings: the Administrative Templates node and the categories
+    /// down to the policy, separated by backslashes. Never empty: a policy with no category is at Administrative Templates.
+    /// </summary>
+    internal static string PathOf(PolicyDefinition policy)
+    {
+        var names = new List<string>();
+        for (PolicyCategory? at = policy.Category; at is not null; at = at.Parent)
+        {
+            names.Add(at.DisplayName);
+        }
+
+        names.Add(GpeditStrings.Tree("GpeditNodeAdministrativeTemplates"));
+        names.Reverse();
+        return string.Join("\\", names);
     }
 
     private static ConsoleDescriptionModel NodeDescription(TreeNode node, GpeditNodeInfo info)

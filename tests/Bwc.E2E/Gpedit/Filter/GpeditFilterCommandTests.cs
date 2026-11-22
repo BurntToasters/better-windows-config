@@ -216,8 +216,9 @@ public sealed class GpeditFilterCommandTests
         foreach ((string[] path, string id, bool filter) in Kinds.Where(k => k.Path.Length >= 2 && k.Path[1] == Computer))
         {
             run.GoTo(path);
-            Rectangle? list = run.Rect(GpeditRun.ListId);
-            checks.Record(id + ".listFound", list is not null, "the result list has a rectangle.");
+            // A placeholder page has no list (the tree tests pin that), so its empty area is the page itself.
+            Rectangle? list = run.Rect(GpeditRun.ListId) ?? run.Rect("GpeditPlaceholderPage");
+            checks.Record(id + ".listFound", list is not null, "the result list or the placeholder page has a rectangle.");
             if (list is { } area)
             {
                 _ = context.RightClick(area.Left + (area.Width / 2), area.Bottom - 8);

@@ -50,6 +50,28 @@
   <data name="GpeditCommandHelp" xml:space="preserve">
     <value>&amp;Help	F1</value>
   </data>
+  <!-- Filter entries of the Action and View menus, the policy row menu and the tree menu (docs/failure-modes/gpedit-filter.md). -->
+  <data name="GpeditCommandFilterOn" xml:space="preserve">
+    <value>&amp;Filter On</value>
+  </data>
+  <data name="GpeditCommandFilterOptions" xml:space="preserve">
+    <value>Filter &amp;Options...</value>
+  </data>
+  <data name="GpeditCommandReApplyFilter" xml:space="preserve">
+    <value>Re-&amp;Apply Filter</value>
+  </data>
+  <!-- The submenu that repeats the policy and filter entries in the Action menu and in the policy row menu. -->
+  <data name="GpeditCommandTasks" xml:space="preserve">
+    <value>&amp;Tasks</value>
+  </data>
+  <!-- The View submenu of the list menu with no row selected. -->
+  <data name="GpeditCommandViewSubmenu" xml:space="preserve">
+    <value>&amp;View</value>
+  </data>
+  <!-- The name of the Filter button of the toolbar. -->
+  <data name="GpeditToolbarFilter" xml:space="preserve">
+    <value>Filter</value>
+  </data>
   <data name="GpeditAboutVersion" xml:space="preserve">
     <value>Version {0}</value>
   </data>

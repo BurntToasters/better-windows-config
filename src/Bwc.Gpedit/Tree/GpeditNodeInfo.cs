@@ -61,4 +61,7 @@ internal sealed class GpeditNodeInfo
 
     /// <summary>True for a node whose result list shows policy rows (a category or All Settings).</summary>
     public bool ListsPolicies => Kind is GpeditNodeKind.Category or GpeditNodeKind.AllSettings;
+
+    /// <summary>True for a node that has the filter: Administrative Templates, a category and All Settings.</summary>
+    public bool HasFilter => Kind is GpeditNodeKind.AdministrativeTemplates or GpeditNodeKind.Category or GpeditNodeKind.AllSettings;
 }
