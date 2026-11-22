@@ -1,0 +1,10 @@
+{
+  "case": "E/Decimal_TypedAboveMax",
+  "planHash": "fd3b2566d44f0e6e511f9e8833e39dbcdb02023a6564cca367e9c8265e155305",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini"
+  ]
+}

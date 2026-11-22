@@ -1,0 +1,10 @@
+{
+  "case": "F/Filter_Options",
+  "planHash": "965229b58012e17dc368efb4fa83bc4fbccc0d8c829570524b7522bf6d5793e4",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini"
+  ]
+}
