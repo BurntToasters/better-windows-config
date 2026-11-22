@@ -155,9 +155,10 @@ public sealed class LargeValueSortTests
         // The keys go to the list only when it has focus. Selecting the first row gives the list focus.
         ControlTestSupport.Select(RowAt(session, 0));
         _ = ControlTestSupport.WaitUntil(() => ControlTestSupport.IsSelected(RowAt(session, 0)), TimeSpan.FromSeconds(5));
+        List<(int Index, string Name)> snapshot = WaitForRows(session, rows => true);
         for (var step = 0; step < WalkSteps; step += 1)
         {
-            foreach ((int index, string name) in RealizedRows(session))
+            foreach ((int index, string name) in snapshot)
             {
                 if (index < 0 || index >= expected.Length)
                 {
@@ -172,14 +173,14 @@ public sealed class LargeValueSortTests
                 }
             }
 
+            int lastBefore = snapshot.Count > 0 ? snapshot[^1].Index : -1;
             ControlTestSupport.SendKeys(session, Enumerable.Repeat("NEXT", PagesPerStep).ToArray());
-            _ = WaitForFilledRows(session);
+            snapshot = WaitForRows(session, rows => rows[^1].Index != lastBefore);
         }
 
         ControlTestSupport.SendKeys(session, "END");
-        _ = ControlTestSupport.WaitUntil(() => RealizedRows(session).Any(row => row.Index == expected.Length - 1), TimeSpan.FromSeconds(5));
-        _ = WaitForFilledRows(session);
-        (int lastIndex, string lastName) = RealizedRows(session).LastOrDefault();
+        snapshot = WaitForRows(session, rows => rows[^1].Index == expected.Length - 1);
+        (int lastIndex, string lastName) = snapshot.LastOrDefault();
         bool lastMatches = lastIndex == expected.Length - 1 && lastName == expected[^1];
 
         E2EResults.Record(
@@ -208,16 +209,24 @@ public sealed class LargeValueSortTests
         return rows.OrderBy(row => row.Index).ToList();
     }
 
-    // A row recycled by a scroll reads blank until the list fills it. Wait until at least one row is realized and
-    // none is blank, so the walk never reads a recycled row. Polls UIA; there is no fixed sleep.
-    private static bool WaitForFilledRows(AppSession session) =>
-        ControlTestSupport.WaitUntil(
+    // A row recycled by a scroll reads blank until the list fills it, and right after the keys the old rows still
+    // look filled. Wait, with a bound, until the realized rows satisfy the caller's condition (the viewport moved)
+    // and none is blank, and return the one snapshot that was accepted. At the timeout the last snapshot is
+    // returned as it is, so a blank or wrong row is still judged and fails. Polls UIA; there is no fixed sleep.
+    private static List<(int Index, string Name)> WaitForRows(
+        AppSession session,
+        Func<List<(int Index, string Name)>, bool> moved)
+    {
+        List<(int Index, string Name)> last = [];
+        _ = ControlTestSupport.WaitUntil(
             () =>
             {
-                List<(int Index, string Name)> rows = RealizedRows(session);
-                return rows.Count > 0 && rows.All(row => row.Name.Length > 0);
+                last = RealizedRows(session);
+                return last.Count > 0 && last.All(row => row.Name.Length > 0) && moved(last);
             },
-            TimeSpan.FromSeconds(5));
+            TimeSpan.FromSeconds(10));
+        return last;
+    }
 
     private static AutomationElement? RowAt(AppSession session, int index)
     {

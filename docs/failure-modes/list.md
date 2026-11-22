@@ -272,10 +272,22 @@ Failure modes:
   version.
 - **Sort order between two literal names that differ only by case.** Registry names are unique without
   regard to case, so this cannot happen in one key.
+- **The walk reads rows while the list is still scrolling.** A recycled row element is detached from its
+  row, so its UIA name is empty until the repeater fills it again, and the element keeps its old row id
+  meanwhile. The walk of the large-list test sent the PageDown keys and then waited for "no blank row"
+  before it read the rows a second time. Right after the keys that wait is already true for the rows of
+  the previous page, so it returned before the list processed the scroll, and the second read caught
+  recycled rows with empty names (rows 7390 to 7399 in the two failed full runs, none in the runs of the
+  test alone, with no wait timeout in the run's timings). The product has no blank row after the sort: the
+  rows are blank only while a scroll is being applied. Intended: the test judges the one snapshot that
+  its wait accepted, and that wait first sees the viewport move (the last realized row index changes) and
+  then sees every realized row named, within a bounded time. A snapshot that stays blank or wrong at the
+  timeout is judged as it is and fails, so a missing or wrong name still fails.
 
 E2E: `List_TenThousandValuesSortInBackground` (in `tests/Bwc.E2E/List/LargeValueSortTests.cs`) seeds
 10,001 values in one key, checks that the first row is `(Default)`, and walks the realized rows with
-Home, PageDown, and End. It checks each row against the native collation order computed in the test.
+Home, PageDown, and End. It checks each row against the native collation order computed in the test, on a
+snapshot taken after the viewport moved and every realized row has a name.
 
 ## 10. Key identity of the value list (0.1.2)
 
