@@ -1,0 +1,675 @@
+{
+  "case": "F/Tabs_Extended_Standard",
+  "description": "Extended and Standard tabs on a node and on All Settings",
+  "planVersion": 2,
+  "planHash": "4d85ff98536db75c7ab044a374198c5bb331bb163d89753ac92d22e37e575e73",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "selectTab",
+      "label": null,
+      "plan": "selectTab Standard",
+      "op": {
+        "kind": "selectTab",
+        "tab": "Standard"
+      },
+      "optional": true
+    },
+    {
+      "index": 2,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "readList",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "basics-standard"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "selectTab",
+      "label": null,
+      "plan": "selectTab Extended",
+      "op": {
+        "kind": "selectTab",
+        "tab": "Extended"
+      },
+      "optional": true
+    },
+    {
+      "index": 5,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "readList",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "basics-extended"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates/All Settings",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "All Settings"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "selectTab",
+      "label": null,
+      "plan": "selectTab Standard",
+      "op": {
+        "kind": "selectTab",
+        "tab": "Standard"
+      },
+      "optional": true
+    },
+    {
+      "index": 9,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "all-settings-standard"
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "selectTab",
+      "label": null,
+      "plan": "selectTab Extended",
+      "op": {
+        "kind": "selectTab",
+        "tab": "Extended"
+      },
+      "optional": true
+    },
+    {
+      "index": 11,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "all-settings-extended"
+      },
+      "optional": null
+    },
+    {
+      "index": 12,
+      "kind": "snapshot",
+      "label": "step final",
+      "plan": "snapshot  [step final]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step final"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "final",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 1,
+      "kind": "selectTab",
+      "ok": true,
+      "data": {
+        "tabs": [
+          "Extended",
+          "Standard"
+        ],
+        "activeTabGuess": {
+          "guess": "Standard"
+        },
+        "listStable": true,
+        "selected": "Standard"
+      }
+    },
+    {
+      "index": 2,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 12,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Class both with an element",
+            "cells": [
+              "Class both with an element",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Class both with an element",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 1,
+            "name": "Class both flag",
+            "cells": [
+              "Class both flag",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Class both flag",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 2,
+            "name": "Class machine flag",
+            "cells": [
+              "Class machine flag",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Class machine flag",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 3,
+            "name": "Element key differs from policy key",
+            "cells": [
+              "Element key differs from policy key",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Element key differs from policy key",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 4,
+            "name": "Key outside the policy roots",
+            "cells": [
+              "Key outside the policy roots",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Key outside the policy roots",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 5,
+            "name": "Enabled list and disabled list with value name",
+            "cells": [
+              "Enabled list and disabled list with value name",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Enabled list and disabled list with value name",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 6,
+            "name": "Decimal enabled and disabled values",
+            "cells": [
+              "Decimal enabled and disabled values",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Decimal enabled and disabled values",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 7,
+            "name": "Disabled list only",
+            "cells": [
+              "Disabled list only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Disabled list only",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 8,
+            "name": "Disabled value only",
+            "cells": [
+              "Disabled value only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Disabled value only",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 9,
+            "name": "Enabled list only",
+            "cells": [
+              "Enabled list only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Enabled list only",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 10,
+            "name": "Enabled value only",
+            "cells": [
+              "Enabled value only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Enabled value only",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 11,
+            "name": "No value name, elements only",
+            "cells": [
+              "No value name, elements only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "No value name, elements only",
+            "state": "Not configured",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#db03ccd74d36",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#d60995aea828",
+        "activeTabGuess": {
+          "guess": "Standard"
+        },
+        "statusNumbers": [
+          12
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 4,
+      "kind": "selectTab",
+      "ok": true,
+      "data": {
+        "tabs": [
+          "Extended",
+          "Standard"
+        ],
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "listStable": true,
+        "selected": "Extended"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 12,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Class both with an element",
+            "cells": [
+              "Class both with an element",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Class both with an element",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 1,
+            "name": "Class both flag",
+            "cells": [
+              "Class both flag",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Class both flag",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 2,
+            "name": "Class machine flag",
+            "cells": [
+              "Class machine flag",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Class machine flag",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 3,
+            "name": "Element key differs from policy key",
+            "cells": [
+              "Element key differs from policy key",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Element key differs from policy key",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 4,
+            "name": "Key outside the policy roots",
+            "cells": [
+              "Key outside the policy roots",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Key outside the policy roots",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 5,
+            "name": "Enabled list and disabled list with value name",
+            "cells": [
+              "Enabled list and disabled list with value name",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Enabled list and disabled list with value name",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 6,
+            "name": "Decimal enabled and disabled values",
+            "cells": [
+              "Decimal enabled and disabled values",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Decimal enabled and disabled values",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 7,
+            "name": "Disabled list only",
+            "cells": [
+              "Disabled list only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Disabled list only",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 8,
+            "name": "Disabled value only",
+            "cells": [
+              "Disabled value only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Disabled value only",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 9,
+            "name": "Enabled list only",
+            "cells": [
+              "Enabled list only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Enabled list only",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 10,
+            "name": "Enabled value only",
+            "cells": [
+              "Enabled value only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Enabled value only",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 11,
+            "name": "No value name, elements only",
+            "cells": [
+              "No value name, elements only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "No value name, elements only",
+            "state": "Not configured",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#db03ccd74d36",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#d60995aea828",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": [
+          12
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 7,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "untracked": "depends on the machine's own templates"
+      }
+    },
+    {
+      "index": 8,
+      "kind": "selectTab",
+      "ok": true,
+      "data": {
+        "tabs": [
+          "Extended",
+          "Standard"
+        ],
+        "activeTabGuess": {
+          "guess": "Standard"
+        },
+        "listStable": true,
+        "selected": "Standard"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 10,
+      "kind": "selectTab",
+      "ok": true,
+      "data": {
+        "tabs": [
+          "Extended",
+          "Standard"
+        ],
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "listStable": true,
+        "selected": "Extended"
+      }
+    },
+    {
+      "index": 11,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 12,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    }
+  ]
+}

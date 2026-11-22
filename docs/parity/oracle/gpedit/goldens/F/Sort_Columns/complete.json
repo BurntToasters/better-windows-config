@@ -1,0 +1,10 @@
+{
+  "case": "F/Sort_Columns",
+  "planHash": "92fb4ab3ed66222db7896a11d2cb65aa4e41b192c3b6304537d93ed2afb9a6e6",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini"
+  ]
+}

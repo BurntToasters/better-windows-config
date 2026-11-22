@@ -1,0 +1,19 @@
+{
+  "case": "E/LongDecimal_Required_Empty",
+  "planHash": "ddc0e9c7f37b652904429c28655a0436212a675ad9074e596b71f8676c1060c5",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-defaults/User.Registry.pol",
+    "step-01-defaults/User.comment.cmtx",
+    "step-01-defaults/gpt.ini",
+    "step-02-empty/User.Registry.pol",
+    "step-02-empty/User.comment.cmtx",
+    "step-02-empty/gpt.ini",
+    "step-03-letter/User.Registry.pol",
+    "step-03-letter/User.comment.cmtx",
+    "step-03-letter/gpt.ini"
+  ]
+}
