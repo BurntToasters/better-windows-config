@@ -1785,7 +1785,6 @@
       "kind": "dumpMenu",
       "ok": true,
       "data": {
-        "hmenu": "0x347502D1",
         "items": [
           {
             "index": 0,
@@ -2895,24 +2894,98 @@
             "count": 7
           }
         ],
-        "uiaToolbars": [],
+        "uiaToolbars": [
+          {
+            "class": "#18bb811937a9",
+            "buttons": [
+              {
+                "x": 20,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#76900f1bfd16",
+                "enabled": true
+              },
+              {
+                "x": 43,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#f1c65e14817e",
+                "enabled": false
+              },
+              {
+                "x": 74,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#1c9e6e9f7e24",
+                "enabled": true
+              },
+              {
+                "x": 97,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#ee8852e02ba0",
+                "enabled": true
+              },
+              {
+                "x": 128,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#aa277f9e2621",
+                "enabled": true
+              },
+              {
+                "x": 159,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "Help",
+                "enabled": true
+              },
+              {
+                "x": 182,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#37cb84b5d051",
+                "enabled": true
+              },
+              {
+                "x": 213,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#638e249f4a15",
+                "enabled": true
+              }
+            ]
+          },
+          {
+            "class": "#18bb811937a9",
+            "buttons": []
+          }
+        ],
         "list": {
-          "x": 898,
-          "y": 288,
+          "x": 762,
+          "y": 220,
           "width": 754,
           "height": 750
         },
         "headers": [
           {
-            "x": 898,
-            "y": 288,
+            "x": 762,
+            "y": 220,
             "width": 700,
             "height": 48,
             "name": "Setting"
           },
           {
-            "x": 1598,
-            "y": 288,
+            "x": 1462,
+            "y": 220,
             "width": 20,
             "height": 48,
             "name": "State"
@@ -2933,14 +3006,14 @@
           }
         ],
         "treeWindow": {
-          "x": 152,
-          "y": 234,
+          "x": 16,
+          "y": 166,
           "width": 312,
           "height": 846
         },
         "statusBar": {
-          "x": 152,
-          "y": 1080,
+          "x": 16,
+          "y": 1012,
           "width": 1504,
           "height": 46
         },

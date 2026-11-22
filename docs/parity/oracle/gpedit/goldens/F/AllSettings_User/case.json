@@ -504,7 +504,81 @@
             "count": 7
           }
         ],
-        "uiaToolbars": [],
+        "uiaToolbars": [
+          {
+            "class": "#18bb811937a9",
+            "buttons": [
+              {
+                "x": 20,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#76900f1bfd16",
+                "enabled": true
+              },
+              {
+                "x": 43,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#f1c65e14817e",
+                "enabled": false
+              },
+              {
+                "x": 74,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#1c9e6e9f7e24",
+                "enabled": true
+              },
+              {
+                "x": 97,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#ee8852e02ba0",
+                "enabled": true
+              },
+              {
+                "x": 128,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#aa277f9e2621",
+                "enabled": true
+              },
+              {
+                "x": 159,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "Help",
+                "enabled": true
+              },
+              {
+                "x": 182,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#37cb84b5d051",
+                "enabled": true
+              },
+              {
+                "x": 213,
+                "y": 110,
+                "width": 23,
+                "height": 22,
+                "name": "#638e249f4a15",
+                "enabled": true
+              }
+            ]
+          },
+          {
+            "class": "#18bb811937a9",
+            "buttons": []
+          }
+        ],
         "list": {
           "x": 762,
           "y": 220,
