@@ -1,0 +1,22 @@
+{
+  "case": "C/ReApply_SameValues",
+  "planHash": "a3eda9b9be5b34c9ce5e1c9877a63e8a97ef30a66e4965c2d79ec50f5bab83f0",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled/Machine.Registry.pol",
+    "step-01-enabled/Machine.comment.cmtx",
+    "step-01-enabled/gpt.ini",
+    "step-02-enabled-again/Machine.Registry.pol",
+    "step-02-enabled-again/Machine.comment.cmtx",
+    "step-02-enabled-again/gpt.ini",
+    "step-03-apply-ok-no-change/Machine.Registry.pol",
+    "step-03-apply-ok-no-change/Machine.comment.cmtx",
+    "step-03-apply-ok-no-change/gpt.ini",
+    "step-04-apply-cancel-no-change/Machine.Registry.pol",
+    "step-04-apply-cancel-no-change/Machine.comment.cmtx",
+    "step-04-apply-cancel-no-change/gpt.ini"
+  ]
+}

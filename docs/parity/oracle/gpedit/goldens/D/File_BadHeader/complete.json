@@ -1,0 +1,10 @@
+{
+  "case": "D/File_BadHeader",
+  "planHash": "1bfe71ef3f87a39d58f09f15f3957eb28209a48f36753baac43d87b81e568b67",
+  "files": [
+    "Machine.Registry.pol",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.Registry.pol"
+  ]
+}

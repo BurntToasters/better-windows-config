@@ -1,0 +1,1920 @@
+{
+  "case": "C/SharedList_DisableAndShrink",
+  "description": "shared list: One Enabled with three rows, Two with one row, One shrunk to one row, One Disabled, Two Disabled",
+  "planVersion": 2,
+  "planHash": "9f034ec599bdfd276532a76895b9b0b3651a07aabb4eba6142ac18ea37fdd8cf",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Shared list, first policy' state Enabled options [First shared entries: = 3 rows] press [OK] at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared list, first policy",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "First shared entries:",
+            "expectKind": "list",
+            "rows": [
+              [
+                "a-1"
+              ],
+              [
+                "a-2"
+              ],
+              [
+                "a-3"
+              ]
+            ],
+            "clearRows": true,
+            "elementId": "SharedListOne"
+          }
+        ],
+        "policyId": "Pol_SharedList_One",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step one-three",
+      "plan": "snapshot  [step one-three]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step one-three"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Shared list, second policy' state Enabled options [Second shared entries: = 1 rows] press [OK] at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared list, second policy",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Second shared entries:",
+            "expectKind": "list",
+            "rows": [
+              [
+                "b-1"
+              ]
+            ],
+            "clearRows": true,
+            "elementId": "SharedListTwo"
+          }
+        ],
+        "policyId": "Pol_SharedList_Two",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step two-one",
+      "plan": "snapshot  [step two-one]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step two-one"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Shared list, first policy' state Enabled options [First shared entries: = 1 rows] press [OK] at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared list, first policy",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "First shared entries:",
+            "expectKind": "list",
+            "rows": [
+              [
+                "a-1"
+              ]
+            ],
+            "clearRows": true,
+            "elementId": "SharedListOne"
+          }
+        ],
+        "policyId": "Pol_SharedList_One",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step one-shrunk",
+      "plan": "snapshot  [step one-shrunk]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step one-shrunk"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Shared list, first policy' state Disabled press [OK] at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared list, first policy",
+        "state": "Disabled",
+        "policyId": "Pol_SharedList_One",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step one-disabled",
+      "plan": "snapshot  [step one-disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step one-disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Shared list, second policy' state Disabled press [OK] at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared list, second policy",
+        "state": "Disabled",
+        "policyId": "Pol_SharedList_Two",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step two-disabled",
+      "plan": "snapshot  [step two-disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step two-disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Shared list, first policy' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared list, first policy",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_SharedList_One",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "label": "step one-not-configured",
+      "plan": "snapshot  [step one-not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step one-not-configured"
+      },
+      "optional": null
+    },
+    {
+      "index": 12,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Shared list, second policy' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared list, second policy",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_SharedList_Two",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 13,
+      "kind": "snapshot",
+      "label": "step two-not-configured",
+      "plan": "snapshot  [step two-not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step two-not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "one-three",
+      "folder": "step-01-one-three",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 538,
+          "sha256": "7f5fe1cf432d3ec9591f0a750d654f90b812f809c88cd2e57a881d31cb385c38"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 538
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "two-one",
+      "folder": "step-02-two-one",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 278,
+          "sha256": "327ed3c4207c5cba9c51f12dca4e5157ae9b25d4257299f91f8eca28c4fe9a50"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 278
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "one-shrunk",
+      "folder": "step-03-one-shrunk",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 278,
+          "sha256": "1859108e9836b7b069e27f5b0045fe504b622dbad97ac366a6b22e4283af4c2f"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 278
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "one-disabled",
+      "folder": "step-04-one-disabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "96f4491b25bff1628f50ad5d9b1d779bcd3a46539c564749c2c204b8beca7df9"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 148
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "two-disabled",
+      "folder": "step-05-two-disabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "96f4491b25bff1628f50ad5d9b1d779bcd3a46539c564749c2c204b8beca7df9"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 148
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "label": "one-not-configured",
+      "folder": "step-06-one-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "add17e86ef8a5c6ca59ccc21acb39d786700609e1a42954b2d189b9d3511c19c"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "label": "two-not-configured",
+      "folder": "step-07-two-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "add17e86ef8a5c6ca59ccc21acb39d786700609e1a42954b2d189b9d3511c19c"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Shared list, first policy",
+        "before": {
+          "title": "Shared list, first policy",
+          "windowTitle": "Shared list, first policy",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into a key shared with the second shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "First shared entries:",
+              "panelId": "#0b7938284914",
+              "controlId": "#6fa45f0d2704",
+              "rect": [
+                440,
+                1004,
+                360,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11",
+              "contents": "#5a077ccfda20"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "before": {
+              "title": "Show Contents",
+              "label": "First shared entries:",
+              "rowCount": 0,
+              "filledRows": 0,
+              "rows": []
+            },
+            "cells": [
+              {
+                "row": 0,
+                "column": 0,
+                "requested": "a-1",
+                "read": "a-1"
+              },
+              {
+                "row": 1,
+                "column": 0,
+                "requested": "a-2",
+                "read": "a-2"
+              },
+              {
+                "row": 2,
+                "column": 0,
+                "requested": "a-3",
+                "read": "a-3"
+              }
+            ],
+            "afterEdit": {
+              "title": "Show Contents",
+              "label": "First shared entries:",
+              "rowCount": 3,
+              "filledRows": 3,
+              "rows": [
+                [
+                  "a-1"
+                ],
+                [
+                  "a-2"
+                ],
+                [
+                  "a-3"
+                ]
+              ]
+            },
+            "close": {
+              "button": "OK",
+              "closed": true
+            },
+            "set": "#a11a75e0feee",
+            "label": "First shared entries:",
+            "labelMatch": "exact",
+            "kind": "#a330395cc0a5",
+            "controlId": "#6fa45f0d2704"
+          }
+        ],
+        "afterSet": {
+          "title": "Shared list, first policy",
+          "windowTitle": "Shared list, first policy",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into a key shared with the second shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "First shared entries:",
+              "panelId": "#0b7938284914",
+              "controlId": "#6fa45f0d2704",
+              "rect": [
+                440,
+                1004,
+                360,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Shared list, first policy",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Shared list, first policy"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 538,
+          "sha256": "7f5fe1cf432d3ec9591f0a750d654f90b812f809c88cd2e57a881d31cb385c38"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Shared list, second policy",
+        "before": {
+          "title": "Shared list, second policy",
+          "windowTitle": "Shared list, second policy",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into the same key as the first shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Second shared entries:",
+              "panelId": "#e80d1cbcd377",
+              "controlId": "#0858f5e0ebb6",
+              "rect": [
+                544,
+                1108,
+                394,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11",
+              "contents": {
+                "title": "Show Contents",
+                "label": "Second shared entries:",
+                "rowCount": 3,
+                "filledRows": 3,
+                "rows": [
+                  [
+                    "a-1"
+                  ],
+                  [
+                    "a-2"
+                  ],
+                  [
+                    "a-3"
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "before": {
+              "title": "Show Contents",
+              "label": "Second shared entries:",
+              "rowCount": 3,
+              "filledRows": 3,
+              "rows": [
+                [
+                  "a-1"
+                ],
+                [
+                  "a-2"
+                ],
+                [
+                  "a-3"
+                ]
+              ]
+            },
+            "cells": [
+              {
+                "row": 0,
+                "column": 0,
+                "requested": "b-1",
+                "read": "b-1"
+              }
+            ],
+            "afterEdit": {
+              "title": "Show Contents",
+              "label": "Second shared entries:",
+              "rowCount": 1,
+              "filledRows": 1,
+              "rows": [
+                [
+                  "b-1"
+                ]
+              ]
+            },
+            "close": {
+              "button": "OK",
+              "closed": true
+            },
+            "set": "#a11a75e0feee",
+            "label": "Second shared entries:",
+            "labelMatch": "exact",
+            "kind": "#a330395cc0a5",
+            "controlId": "#0858f5e0ebb6"
+          }
+        ],
+        "afterSet": {
+          "title": "Shared list, second policy",
+          "windowTitle": "Shared list, second policy",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into the same key as the first shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Second shared entries:",
+              "panelId": "#e80d1cbcd377",
+              "controlId": "#0858f5e0ebb6",
+              "rect": [
+                544,
+                1108,
+                394,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Shared list, second policy",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Shared list, second policy"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 278,
+          "sha256": "327ed3c4207c5cba9c51f12dca4e5157ae9b25d4257299f91f8eca28c4fe9a50"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 2,
+      "gptVersionAfter": 3,
+      "data": {
+        "policy": "Shared list, first policy",
+        "before": {
+          "title": "Shared list, first policy",
+          "windowTitle": "Shared list, first policy",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into a key shared with the second shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "First shared entries:",
+              "panelId": "#0b7938284914",
+              "controlId": "#6fa45f0d2704",
+              "rect": [
+                180,
+                744,
+                360,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11",
+              "contents": {
+                "title": "Show Contents",
+                "label": "First shared entries:",
+                "rowCount": 1,
+                "filledRows": 1,
+                "rows": [
+                  [
+                    "b-1"
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "before": {
+              "title": "Show Contents",
+              "label": "First shared entries:",
+              "rowCount": 1,
+              "filledRows": 1,
+              "rows": [
+                [
+                  "b-1"
+                ]
+              ]
+            },
+            "cells": [
+              {
+                "row": 0,
+                "column": 0,
+                "requested": "a-1",
+                "read": "a-1"
+              }
+            ],
+            "afterEdit": {
+              "title": "Show Contents",
+              "label": "First shared entries:",
+              "rowCount": 1,
+              "filledRows": 1,
+              "rows": [
+                [
+                  "a-1"
+                ]
+              ]
+            },
+            "close": {
+              "button": "OK",
+              "closed": true
+            },
+            "set": "#a11a75e0feee",
+            "label": "First shared entries:",
+            "labelMatch": "exact",
+            "kind": "#a330395cc0a5",
+            "controlId": "#6fa45f0d2704"
+          }
+        ],
+        "afterSet": {
+          "title": "Shared list, first policy",
+          "windowTitle": "Shared list, first policy",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into a key shared with the second shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "First shared entries:",
+              "panelId": "#0b7938284914",
+              "controlId": "#6fa45f0d2704",
+              "rect": [
+                180,
+                744,
+                360,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Shared list, first policy",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Shared list, first policy"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 278,
+          "sha256": "1859108e9836b7b069e27f5b0045fe504b622dbad97ac366a6b22e4283af4c2f"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 3,
+      "gptVersionAfter": 4,
+      "data": {
+        "policy": "Shared list, first policy",
+        "before": {
+          "title": "Shared list, first policy",
+          "windowTitle": "Shared list, first policy",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into a key shared with the second shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "First shared entries:",
+              "panelId": "#0b7938284914",
+              "controlId": "#6fa45f0d2704",
+              "rect": [
+                336,
+                900,
+                360,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11",
+              "contents": {
+                "title": "Show Contents",
+                "label": "First shared entries:",
+                "rowCount": 1,
+                "filledRows": 1,
+                "rows": [
+                  [
+                    "a-1"
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Shared list, first policy",
+          "windowTitle": "Shared list, first policy",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into a key shared with the second shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "First shared entries:",
+              "panelId": "#0b7938284914",
+              "controlId": "#6fa45f0d2704",
+              "rect": [
+                336,
+                900,
+                360,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Shared list, first policy",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Shared list, first policy"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "96f4491b25bff1628f50ad5d9b1d779bcd3a46539c564749c2c204b8beca7df9"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Shared list, second policy",
+        "before": {
+          "title": "Shared list, second policy",
+          "windowTitle": "Shared list, second policy",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into the same key as the first shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Second shared entries:",
+              "panelId": "#e80d1cbcd377",
+              "controlId": "#0858f5e0ebb6",
+              "rect": [
+                440,
+                1004,
+                394,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11",
+              "contents": "#5a077ccfda20"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Disabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Shared list, second policy",
+          "windowTitle": "Shared list, second policy",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into the same key as the first shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Second shared entries:",
+              "panelId": "#e80d1cbcd377",
+              "controlId": "#0858f5e0ebb6",
+              "rect": [
+                440,
+                1004,
+                394,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Shared list, second policy",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Shared list, second policy"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "96f4491b25bff1628f50ad5d9b1d779bcd3a46539c564749c2c204b8beca7df9"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      }
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 4,
+      "gptVersionAfter": 5,
+      "data": {
+        "policy": "Shared list, first policy",
+        "before": {
+          "title": "Shared list, first policy",
+          "windowTitle": "Shared list, first policy",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into a key shared with the second shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "First shared entries:",
+              "panelId": "#0b7938284914",
+              "controlId": "#6fa45f0d2704",
+              "rect": [
+                492,
+                1056,
+                360,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11",
+              "contents": "#5a077ccfda20"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Shared list, first policy",
+          "windowTitle": "Shared list, first policy",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into a key shared with the second shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "First shared entries:",
+              "panelId": "#0b7938284914",
+              "controlId": "#6fa45f0d2704",
+              "rect": [
+                492,
+                1056,
+                360,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Shared list, first policy",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 5,
+                "machine": 5,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Shared list, first policy"
+      }
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "add17e86ef8a5c6ca59ccc21acb39d786700609e1a42954b2d189b9d3511c19c"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      }
+    },
+    {
+      "index": 12,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Shared list, second policy",
+        "before": {
+          "title": "Shared list, second policy",
+          "windowTitle": "Shared list, second policy",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into the same key as the first shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Second shared entries:",
+              "panelId": "#e80d1cbcd377",
+              "controlId": "#0858f5e0ebb6",
+              "rect": [
+                544,
+                1108,
+                394,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11",
+              "contents": "#5a077ccfda20"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Not Configured",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Shared list, second policy",
+          "windowTitle": "Shared list, second policy",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that writes into the same key as the first shared list policy.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Second shared entries:",
+              "panelId": "#e80d1cbcd377",
+              "controlId": "#0858f5e0ebb6",
+              "rect": [
+                544,
+                1108,
+                394,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Shared list, second policy",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": {
+                "raw": 5,
+                "machine": 5,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Shared list, second policy"
+      }
+    },
+    {
+      "index": 13,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "add17e86ef8a5c6ca59ccc21acb39d786700609e1a42954b2d189b9d3511c19c"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      }
+    }
+  ]
+}

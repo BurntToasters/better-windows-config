@@ -1,0 +1,8 @@
+{
+  "case": "H/BoolAttributeMixed",
+  "planHash": "622a4141c2bfd43d96fc48ceb596fc3f56243b817a8f0a8ee2a451c5691bd169",
+  "files": [
+    "case.json",
+    "gpt.ini"
+  ]
+}

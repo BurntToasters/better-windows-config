@@ -1,0 +1,8 @@
+{
+  "case": "H/MalformedXml",
+  "planHash": "f2628d0f366b75b0e05af8b9cc867604893352bc7e2a418830b4820b4652da67",
+  "files": [
+    "case.json",
+    "gpt.ini"
+  ]
+}

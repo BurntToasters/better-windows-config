@@ -1,0 +1,16 @@
+{
+  "case": "E/Decimal_StoreAsText_OutOfRange",
+  "planHash": "67b95ea9ac326de2d1b0a0026643c4a211844a1f957e70265a72c4d900cc6e6e",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-above/Machine.Registry.pol",
+    "step-01-above/Machine.comment.cmtx",
+    "step-01-above/gpt.ini",
+    "step-02-negative/Machine.Registry.pol",
+    "step-02-negative/Machine.comment.cmtx",
+    "step-02-negative/gpt.ini"
+  ]
+}

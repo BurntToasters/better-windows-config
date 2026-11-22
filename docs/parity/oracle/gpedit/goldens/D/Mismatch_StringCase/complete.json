@@ -1,0 +1,19 @@
+{
+  "case": "D/Mismatch_StringCase",
+  "planHash": "85149cec5be919d4f0ee49c54d76f23d53138935f5a2ec5c4cdc793fd2138512",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/User.Registry.pol",
+    "step-01-start/User.Registry.pol",
+    "step-01-start/gpt.ini",
+    "step-02-unrelated-save/User.Registry.pol",
+    "step-02-unrelated-save/User.comment.cmtx",
+    "step-02-unrelated-save/gpt.ini",
+    "step-03-unrelated-cleared/User.Registry.pol",
+    "step-03-unrelated-cleared/User.comment.cmtx",
+    "step-03-unrelated-cleared/gpt.ini"
+  ]
+}

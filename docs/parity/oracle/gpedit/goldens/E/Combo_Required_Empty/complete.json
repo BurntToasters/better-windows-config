@@ -1,0 +1,10 @@
+{
+  "case": "E/Combo_Required_Empty",
+  "planHash": "175e650a1aa9e097cfbf891f9df130c8f3d1caf523db1dc8ba9e90d8abe59d5f",
+  "files": [
+    "case.json",
+    "gpt.ini",
+    "step-01-defaults/gpt.ini",
+    "step-02-empty/gpt.ini"
+  ]
+}

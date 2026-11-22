@@ -1,0 +1,32 @@
+{
+  "case": "C/GptIni_ForeignExtensions",
+  "planHash": "a43a2ddb25d310f87b097dc51f32f55b1f92bc5b55b1b153f7a04d42b7262022",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-machine/Machine.Registry.pol",
+    "step-02-machine/Machine.comment.cmtx",
+    "step-02-machine/gpt.ini",
+    "step-03-user/Machine.Registry.pol",
+    "step-03-user/Machine.comment.cmtx",
+    "step-03-user/User.Registry.pol",
+    "step-03-user/User.comment.cmtx",
+    "step-03-user/gpt.ini",
+    "step-04-machine-cleared/Machine.Registry.pol",
+    "step-04-machine-cleared/Machine.comment.cmtx",
+    "step-04-machine-cleared/User.Registry.pol",
+    "step-04-machine-cleared/User.comment.cmtx",
+    "step-04-machine-cleared/gpt.ini",
+    "step-05-user-cleared/Machine.Registry.pol",
+    "step-05-user-cleared/Machine.comment.cmtx",
+    "step-05-user-cleared/User.Registry.pol",
+    "step-05-user-cleared/User.comment.cmtx",
+    "step-05-user-cleared/gpt.ini"
+  ]
+}

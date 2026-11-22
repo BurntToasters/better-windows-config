@@ -1,0 +1,19 @@
+{
+  "case": "C/Comment_NotConfigured_AddEditRemove",
+  "planHash": "5b9bb51b360592d263728330033231ac99cb9518142a45c0b9f7f648319800d4",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-add/Machine.Registry.pol",
+    "step-01-add/Machine.comment.cmtx",
+    "step-01-add/gpt.ini",
+    "step-02-edit/Machine.Registry.pol",
+    "step-02-edit/Machine.comment.cmtx",
+    "step-02-edit/gpt.ini",
+    "step-03-remove/Machine.Registry.pol",
+    "step-03-remove/Machine.comment.cmtx",
+    "step-03-remove/gpt.ini"
+  ]
+}

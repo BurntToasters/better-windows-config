@@ -1,0 +1,15 @@
+{
+  "case": "C/Version_FromHighUser",
+  "planHash": "7e84d3f54613619d8822231af195bc635536b71184b41f3cc043ef2c7dded014",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-user/User.Registry.pol",
+    "step-02-user/User.comment.cmtx",
+    "step-02-user/gpt.ini"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "case": "E/Text_Required_Empty",
+  "planHash": "f9467135c04258be206eb29f75f3cd72e3e81819a27cb0cfd62d39594a05a003",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-defaults/gpt.ini",
+    "step-02-empty/gpt.ini",
+    "step-03-spaces/Machine.Registry.pol",
+    "step-03-spaces/Machine.comment.cmtx",
+    "step-03-spaces/gpt.ini"
+  ]
+}

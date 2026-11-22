@@ -1,0 +1,19 @@
+{
+  "case": "C/Clear_LastSetting_WithComment",
+  "planHash": "7b3b6f399068ccc64407640cde86bba99cd20ab9e484bca2379b3d6572473d6e",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-with-comment/Machine.Registry.pol",
+    "step-01-enabled-with-comment/Machine.comment.cmtx",
+    "step-01-enabled-with-comment/gpt.ini",
+    "step-02-not-configured-comment-kept/Machine.Registry.pol",
+    "step-02-not-configured-comment-kept/Machine.comment.cmtx",
+    "step-02-not-configured-comment-kept/gpt.ini",
+    "step-03-comment-removed/Machine.Registry.pol",
+    "step-03-comment-removed/Machine.comment.cmtx",
+    "step-03-comment-removed/gpt.ini"
+  ]
+}

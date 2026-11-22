@@ -1,0 +1,10 @@
+{
+  "case": "E/Text_TooLong_SetText",
+  "planHash": "bb749eee3a291ac0c7ef822e79890d0d51d019777512d6403c0d8acd17dd32e7",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini"
+  ]
+}

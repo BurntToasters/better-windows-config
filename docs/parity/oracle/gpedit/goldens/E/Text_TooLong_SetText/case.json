@@ -1,0 +1,282 @@
+{
+  "case": "E/Text_TooLong_SetText",
+  "description": "text with maxLength 12 set with 20 characters without typing",
+  "planVersion": 2,
+  "planHash": "bb749eee3a291ac0c7ef822e79890d0d51d019777512d6403c0d8acd17dd32e7",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text with a length limit' state Enabled options [Short text: = text 'abcdefghijklmnopqrst'] press [OK] at User/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text with a length limit",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Short text:",
+            "expectKind": "textBox",
+            "text": "abcdefghijklmnopqrst",
+            "elementId": "ShortText"
+          }
+        ],
+        "policyId": "Pol_Text_MaxLength",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step set",
+      "plan": "snapshot  [step set]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step set"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "set",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 176,
+          "sha256": "49d193cc5ce5b1b2a471f2cdff4d1ef0574996d214fc0a4a18c793e075273ca3"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 128
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 176
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol",
+        "User\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 65536,
+      "data": {
+        "policy": "Text with a length limit",
+        "before": {
+          "title": "Text with a length limit",
+          "windowTitle": "Text with a length limit",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text box that accepts at most 12 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Short text:",
+              "panelId": "#93b094fed799",
+              "controlId": "#c662bacbef5b",
+              "rect": [
+                284,
+                848,
+                584,
+                58
+              ],
+              "enabled": false,
+              "text": ""
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "abcdefghijklmnopqrst",
+            "before": "",
+            "immediate": "abcdefghijklmnopqrst",
+            "observed": "abcdefghijklmnopqrst",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Short text:",
+            "labelMatch": "exact",
+            "kind": "#68e85187d390",
+            "controlId": "#c662bacbef5b"
+          }
+        ],
+        "afterSet": {
+          "title": "Text with a length limit",
+          "windowTitle": "Text with a length limit",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text box that accepts at most 12 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Short text:",
+              "panelId": "#93b094fed799",
+              "controlId": "#c662bacbef5b",
+              "rect": [
+                284,
+                848,
+                584,
+                58
+              ],
+              "enabled": true,
+              "text": "abcdefghijklmnopqrst"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text with a length limit",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol",
+                "User\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1,
+                "User\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              }
+            }
+          }
+        ],
+        "finalTitle": "Text with a length limit"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 176,
+          "sha256": "49d193cc5ce5b1b2a471f2cdff4d1ef0574996d214fc0a4a18c793e075273ca3"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      }
+    }
+  ]
+}

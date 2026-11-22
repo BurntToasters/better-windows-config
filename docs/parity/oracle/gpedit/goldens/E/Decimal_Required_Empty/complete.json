@@ -1,0 +1,16 @@
+{
+  "case": "E/Decimal_Required_Empty",
+  "planHash": "d481929bf4a63735fdcd4760477fa81cbd2f9a10e155a8b054271b682a48f0e5",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-defaults/User.Registry.pol",
+    "step-01-defaults/User.comment.cmtx",
+    "step-01-defaults/gpt.ini",
+    "step-02-empty/User.Registry.pol",
+    "step-02-empty/User.comment.cmtx",
+    "step-02-empty/gpt.ini"
+  ]
+}

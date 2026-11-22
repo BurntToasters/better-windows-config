@@ -1,0 +1,16 @@
+{
+  "case": "G/Both_Computer_Ok",
+  "planHash": "355d0d9fdc9c7d7603e267665a79a90e5d2518e5fbacf1fa8349affbd6f1b197",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled/Machine.Registry.pol",
+    "step-01-enabled/Machine.comment.cmtx",
+    "step-01-enabled/gpt.ini",
+    "step-02-enabled-again/Machine.Registry.pol",
+    "step-02-enabled-again/Machine.comment.cmtx",
+    "step-02-enabled-again/gpt.ini"
+  ]
+}

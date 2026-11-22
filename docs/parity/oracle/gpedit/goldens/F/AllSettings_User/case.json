@@ -1,0 +1,684 @@
+{
+  "case": "F/AllSettings_User",
+  "description": "the All Settings node under User Configuration: status bar, headers, first rows (counts stay untracked)",
+  "planVersion": 2,
+  "planHash": "23aa8ecf3ab6d7ce8e43c3fad39323b5a91f1441adda340093cda9a9dffa0cf0",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at User/Administrative Templates/All Settings",
+      "op": {
+        "kind": "selectNode",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "All Settings"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at User/Administrative Templates/All Settings",
+      "op": {
+        "kind": "readStatus",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "All Settings"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at User/Administrative Templates/All Settings",
+      "op": {
+        "kind": "readList",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "All Settings"
+        ],
+        "maxRows": 60,
+        "namesOnly": true
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "readLayout",
+      "label": "layout at All Settings",
+      "plan": "readLayout  [layout at All Settings]",
+      "op": {
+        "kind": "readLayout",
+        "label": "layout at All Settings"
+      },
+      "optional": true
+    },
+    {
+      "index": 4,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "all-settings"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step final",
+      "plan": "snapshot  [step final]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step final"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "final",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "untracked": "depends on the machine's own templates"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "untracked": "depends on the machine's own templates"
+      }
+    },
+    {
+      "index": 2,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "untracked": "depends on the machine's own templates"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "readLayout",
+      "ok": true,
+      "data": {
+        "window": {
+          "width": 1536,
+          "height": 1074
+        },
+        "perMonitorV2": true,
+        "toolbars": [
+          {
+            "visible": true,
+            "rect": {
+              "x": 20,
+              "y": 110,
+              "width": 1500,
+              "height": 44
+            },
+            "buttons": [
+              {
+                "index": 0,
+                "command": 1,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 0,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 1,
+                "command": 2,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 23,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 2,
+                "command": 3,
+                "separator": true,
+                "enabled": false,
+                "checked": false,
+                "hidden": false,
+                "style": 1,
+                "x": 46,
+                "y": 0,
+                "width": 8,
+                "height": 22
+              },
+              {
+                "index": 3,
+                "command": 4,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 54,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 4,
+                "command": 5,
+                "separator": false,
+                "enabled": true,
+                "checked": true,
+                "hidden": false,
+                "style": 0,
+                "x": 77,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 5,
+                "command": 6,
+                "separator": true,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 1
+              },
+              {
+                "index": 6,
+                "command": 7,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 7,
+                "command": 8,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 8,
+                "command": 9,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 9,
+                "command": 10,
+                "separator": true,
+                "enabled": false,
+                "checked": false,
+                "hidden": false,
+                "style": 1,
+                "x": 100,
+                "y": 0,
+                "width": 8,
+                "height": 22
+              },
+              {
+                "index": 10,
+                "command": 11,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 11,
+                "command": 12,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 12,
+                "command": 13,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 13,
+                "command": 14,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 14,
+                "command": 15,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 108,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 15,
+                "command": 16,
+                "separator": true,
+                "enabled": false,
+                "checked": false,
+                "hidden": false,
+                "style": 1,
+                "x": 131,
+                "y": 0,
+                "width": 8,
+                "height": 22
+              },
+              {
+                "index": 16,
+                "command": 17,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 139,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 17,
+                "command": 18,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 162,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 18,
+                "command": 19,
+                "separator": true,
+                "enabled": false,
+                "checked": false,
+                "hidden": false,
+                "style": 1,
+                "x": 185,
+                "y": 0,
+                "width": 8,
+                "height": 22
+              },
+              {
+                "index": 19,
+                "command": 20,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 193,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              }
+            ],
+            "count": 20
+          },
+          {
+            "visible": true,
+            "rect": {
+              "x": 20,
+              "y": 62,
+              "width": 1500,
+              "height": 44
+            },
+            "buttons": [
+              {
+                "index": 0,
+                "command": 21508,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": true,
+                "style": 8,
+                "text": "#6725e7bbcd28"
+              },
+              {
+                "index": 1,
+                "command": 21513,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 24,
+                "x": 0,
+                "y": 0,
+                "width": 34,
+                "height": 22,
+                "text": "#a222a02aa749"
+              },
+              {
+                "index": 2,
+                "command": 21509,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 24,
+                "x": 34,
+                "y": 0,
+                "width": 49,
+                "height": 22,
+                "text": "#556cc6ef2021"
+              },
+              {
+                "index": 3,
+                "command": 21510,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 24,
+                "x": 83,
+                "y": 0,
+                "width": 40,
+                "height": 22,
+                "text": "#d8042eb735a9"
+              },
+              {
+                "index": 4,
+                "command": 21511,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": true,
+                "style": 24,
+                "text": "#f310d505fd02"
+              },
+              {
+                "index": 5,
+                "command": 21512,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": true,
+                "style": 24,
+                "text": "#ad08e7848be7"
+              },
+              {
+                "index": 6,
+                "command": 21514,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 24,
+                "x": 123,
+                "y": 0,
+                "width": 40,
+                "height": 22,
+                "text": "#5a3cadef7959"
+              }
+            ],
+            "count": 7
+          }
+        ],
+        "uiaToolbars": [],
+        "list": {
+          "x": 762,
+          "y": 220,
+          "width": 754,
+          "height": 750
+        },
+        "headers": [
+          {
+            "x": 762,
+            "y": 220,
+            "width": 700,
+            "height": 48,
+            "name": "Setting"
+          },
+          {
+            "x": 1462,
+            "y": 220,
+            "width": 20,
+            "height": 48,
+            "name": "State"
+          },
+          {
+            "x": null,
+            "y": null,
+            "width": null,
+            "height": null,
+            "name": "Comment"
+          },
+          {
+            "x": null,
+            "y": null,
+            "width": null,
+            "height": null,
+            "name": "#62fa5a5b0d3c"
+          }
+        ],
+        "treeWindow": {
+          "x": 16,
+          "y": 166,
+          "width": 312,
+          "height": 846
+        },
+        "statusBar": {
+          "x": 16,
+          "y": 1012,
+          "width": 1504,
+          "height": 46
+        },
+        "tree": {
+          "nodes": [
+            {
+              "depth": 0,
+              "name": "Local Computer Policy",
+              "image": 25,
+              "selectedImage": 25,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": false
+            },
+            {
+              "depth": 1,
+              "name": "Computer Configuration",
+              "image": 27,
+              "selectedImage": 27,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": false
+            },
+            {
+              "depth": 2,
+              "name": "Software Settings",
+              "image": 23,
+              "selectedImage": 24,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 2,
+              "name": "Windows Settings",
+              "image": 23,
+              "selectedImage": 24,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 2,
+              "name": "Administrative Templates",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 1,
+              "name": "User Configuration",
+              "image": 28,
+              "selectedImage": 28,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": false
+            },
+            {
+              "depth": 2,
+              "name": "Software Settings",
+              "image": 23,
+              "selectedImage": 24,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 2,
+              "name": "Windows Settings",
+              "image": 23,
+              "selectedImage": 24,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 2,
+              "name": "Administrative Templates",
+              "image": 70,
+              "selectedImage": 71,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": false
+            },
+            {
+              "depth": 3,
+              "name": "BWC Oracle",
+              "image": 70,
+              "selectedImage": 71,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 3,
+              "name": "All Settings",
+              "image": 78,
+              "selectedImage": 78,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": true
+            }
+          ],
+          "otherNodes": "present, untracked"
+        }
+      }
+    },
+    {
+      "index": 4,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    }
+  ]
+}

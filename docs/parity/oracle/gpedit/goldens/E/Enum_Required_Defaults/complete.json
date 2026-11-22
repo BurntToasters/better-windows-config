@@ -1,0 +1,8 @@
+{
+  "case": "E/Enum_Required_Defaults",
+  "planHash": "6187ef65b8947a1644dd18142064cb68862bcdf9431a7ed2acd12af5e207dbb6",
+  "files": [
+    "case.json",
+    "gpt.ini"
+  ]
+}

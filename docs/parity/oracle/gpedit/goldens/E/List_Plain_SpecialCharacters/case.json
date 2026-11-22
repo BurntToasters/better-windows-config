@@ -1,0 +1,335 @@
+{
+  "case": "E/List_Plain_SpecialCharacters",
+  "description": "plain list with quotes, commas and an ampersand",
+  "planVersion": 2,
+  "planHash": "06d6875458f2cfe09ee717f536ed09a7710c3196098d69957bb3283bdf0d7216",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'List with default naming' state Enabled options [Plain entries: = 3 rows] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Lists",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Lists"
+        ],
+        "policy": "List with default naming",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Plain entries:",
+            "expectKind": "list",
+            "rows": [
+              [
+                "a,b"
+              ],
+              [
+                "say \"hi\""
+              ],
+              [
+                "x & y"
+              ]
+            ],
+            "clearRows": true,
+            "elementId": "PlainList"
+          }
+        ],
+        "policyId": "Pol_List_Plain",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step special",
+      "plan": "snapshot  [step special]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step special"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "special",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 518,
+          "sha256": "fc062eeb18a6ea34230513ce6b1f2c14bd257fcc6cb7f1c3ddae53cd10347507"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 518
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "List with default naming",
+        "before": {
+          "title": "List with default naming",
+          "windowTitle": "List with default naming",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that sets no value prefix and no other attributes.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Plain entries:",
+              "panelId": "#32a9dde1789c",
+              "controlId": "#ec3626fee56b",
+              "rect": [
+                388,
+                952,
+                286,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11",
+              "contents": "#5a077ccfda20"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "before": {
+              "title": "Show Contents",
+              "label": "Plain entries:",
+              "rowCount": 0,
+              "filledRows": 0,
+              "rows": []
+            },
+            "cells": [
+              {
+                "row": 0,
+                "column": 0,
+                "requested": "a,b",
+                "read": "a,b"
+              },
+              {
+                "row": 1,
+                "column": 0,
+                "requested": "say \"hi\"",
+                "read": "say \"hi\""
+              },
+              {
+                "row": 2,
+                "column": 0,
+                "requested": "x & y",
+                "read": "x & y"
+              }
+            ],
+            "afterEdit": {
+              "title": "Show Contents",
+              "label": "Plain entries:",
+              "rowCount": 3,
+              "filledRows": 3,
+              "rows": [
+                [
+                  "a,b"
+                ],
+                [
+                  "say \"hi\""
+                ],
+                [
+                  "x & y"
+                ]
+              ]
+            },
+            "close": {
+              "button": "OK",
+              "closed": true
+            },
+            "set": "#a11a75e0feee",
+            "label": "Plain entries:",
+            "labelMatch": "exact",
+            "kind": "#a330395cc0a5",
+            "controlId": "#ec3626fee56b"
+          }
+        ],
+        "afterSet": {
+          "title": "List with default naming",
+          "windowTitle": "List with default naming",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A list that sets no value prefix and no other attributes.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Plain entries:",
+              "panelId": "#32a9dde1789c",
+              "controlId": "#ec3626fee56b",
+              "rect": [
+                388,
+                952,
+                286,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "List with default naming",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "List with default naming"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 518,
+          "sha256": "fc062eeb18a6ea34230513ce6b1f2c14bd257fcc6cb7f1c3ddae53cd10347507"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    }
+  ]
+}

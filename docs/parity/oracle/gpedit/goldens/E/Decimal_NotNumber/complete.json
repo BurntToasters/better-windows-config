@@ -1,0 +1,16 @@
+{
+  "case": "E/Decimal_NotNumber",
+  "planHash": "87fe95109c682f652cb40a49923307a35b91f89c73941654acf8c5aaf88cef6d",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-letters/Machine.Registry.pol",
+    "step-01-letters/Machine.comment.cmtx",
+    "step-01-letters/gpt.ini",
+    "step-02-negative/Machine.Registry.pol",
+    "step-02-negative/Machine.comment.cmtx",
+    "step-02-negative/gpt.ini"
+  ]
+}

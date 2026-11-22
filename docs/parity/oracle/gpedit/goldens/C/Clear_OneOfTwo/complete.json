@@ -1,0 +1,22 @@
+{
+  "case": "C/Clear_OneOfTwo",
+  "planHash": "fa6a092209e7aa4e231a36f651baa1c2b795d1613a56825e9089771fd859ac2b",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-first/Machine.Registry.pol",
+    "step-01-first/Machine.comment.cmtx",
+    "step-01-first/gpt.ini",
+    "step-02-second/Machine.Registry.pol",
+    "step-02-second/Machine.comment.cmtx",
+    "step-02-second/gpt.ini",
+    "step-03-first-cleared/Machine.Registry.pol",
+    "step-03-first-cleared/Machine.comment.cmtx",
+    "step-03-first-cleared/gpt.ini",
+    "step-04-second-cleared/Machine.Registry.pol",
+    "step-04-second-cleared/Machine.comment.cmtx",
+    "step-04-second-cleared/gpt.ini"
+  ]
+}

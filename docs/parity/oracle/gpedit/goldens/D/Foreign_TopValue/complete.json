@@ -1,0 +1,19 @@
+{
+  "case": "D/Foreign_TopValue",
+  "planHash": "c5c4c63f1aec73951ab2b6a8d3e46b6464a35edf4b1184dbdeb7b08a842cf383",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/User.Registry.pol",
+    "step-01-start/User.Registry.pol",
+    "step-01-start/gpt.ini",
+    "step-02-unrelated-save/User.Registry.pol",
+    "step-02-unrelated-save/User.comment.cmtx",
+    "step-02-unrelated-save/gpt.ini",
+    "step-03-unrelated-cleared/User.Registry.pol",
+    "step-03-unrelated-cleared/User.comment.cmtx",
+    "step-03-unrelated-cleared/gpt.ini"
+  ]
+}

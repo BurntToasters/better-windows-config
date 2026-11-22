@@ -1,0 +1,10 @@
+{
+  "case": "G/Both_Computer_Apply",
+  "planHash": "0391152440d7eb25c099574ff9df42f38f196b1397aa7c8ad64c1e0529667392",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini"
+  ]
+}

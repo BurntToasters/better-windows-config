@@ -1,0 +1,8 @@
+{
+  "case": "E/List_Explicit_EmptyName",
+  "planHash": "7e813723271c09fead482e8022a140e0a906b77351f4d0ef6bbcdea9f40bffd2",
+  "files": [
+    "case.json",
+    "gpt.ini"
+  ]
+}

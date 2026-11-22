@@ -1,0 +1,25 @@
+{
+  "case": "C/Comment_Enabled_AddEditRemove",
+  "planHash": "d4f9e2c0b75a913279ead6d153021815b691e1eed01b74c5926082011cfb87d4",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled/Machine.Registry.pol",
+    "step-01-enabled/Machine.comment.cmtx",
+    "step-01-enabled/gpt.ini",
+    "step-02-add/Machine.Registry.pol",
+    "step-02-add/Machine.comment.cmtx",
+    "step-02-add/gpt.ini",
+    "step-03-edit/Machine.Registry.pol",
+    "step-03-edit/Machine.comment.cmtx",
+    "step-03-edit/gpt.ini",
+    "step-04-remove/Machine.Registry.pol",
+    "step-04-remove/Machine.comment.cmtx",
+    "step-04-remove/gpt.ini",
+    "step-05-not-configured/Machine.Registry.pol",
+    "step-05-not-configured/Machine.comment.cmtx",
+    "step-05-not-configured/gpt.ini"
+  ]
+}

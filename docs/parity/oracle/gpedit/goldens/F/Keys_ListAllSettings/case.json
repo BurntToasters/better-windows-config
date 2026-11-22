@@ -1,0 +1,122 @@
+{
+  "case": "F/Keys_ListAllSettings",
+  "description": "keys in the result list on the All Settings node",
+  "planVersion": 2,
+  "planHash": "f41363dfc39f56270a6646f58682ff10f38c3fea45a71e31a80f6e114b134573",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates/All Settings",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "All Settings"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "pressKey",
+      "label": "list keys",
+      "plan": "pressKey [Down, Down, Up, End, Home, PageDown] in list at Computer/Administrative Templates/All Settings  [list keys]",
+      "op": {
+        "kind": "pressKey",
+        "label": "list keys",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "All Settings"
+        ],
+        "name": "list",
+        "keys": [
+          "Down",
+          "Down",
+          "Up",
+          "End",
+          "Home",
+          "PageDown"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 2,
+      "kind": "snapshot",
+      "label": "step final",
+      "plan": "snapshot  [step final]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step final"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "final",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "untracked": "depends on the machine's own templates"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "pressKey",
+      "ok": true,
+      "data": {
+        "untracked": "depends on the machine's own templates"
+      }
+    },
+    {
+      "index": 2,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "case": "E/MultiText_Limits",
+  "planHash": "ea599ec3ee7a885f5fe6330a7d49225047bb1d99de8724b7a1da5fd090f78300",
+  "files": [
+    "case.json",
+    "gpt.ini",
+    "step-01-four-lines/gpt.ini",
+    "step-02-long-line/gpt.ini",
+    "step-03-empty/gpt.ini"
+  ]
+}

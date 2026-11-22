@@ -1,0 +1,16 @@
+{
+  "case": "C/Clear_LastSetting_Disabled",
+  "planHash": "c7ee9aa42107d4d6d42f9fbcf4e2e3ed31fb2a229d39db84f3abca78669f642f",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-disabled/Machine.Registry.pol",
+    "step-01-disabled/Machine.comment.cmtx",
+    "step-01-disabled/gpt.ini",
+    "step-02-not-configured/Machine.Registry.pol",
+    "step-02-not-configured/Machine.comment.cmtx",
+    "step-02-not-configured/gpt.ini"
+  ]
+}

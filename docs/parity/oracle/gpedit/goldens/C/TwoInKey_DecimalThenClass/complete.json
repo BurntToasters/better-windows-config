@@ -1,0 +1,16 @@
+{
+  "case": "C/TwoInKey_DecimalThenClass",
+  "planHash": "ac651401a2ed31442725cb62038390a9b73044bb0cfcd90048918197ced35534",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-first/Machine.Registry.pol",
+    "step-01-first/Machine.comment.cmtx",
+    "step-01-first/gpt.ini",
+    "step-02-second/Machine.Registry.pol",
+    "step-02-second/Machine.comment.cmtx",
+    "step-02-second/gpt.ini"
+  ]
+}

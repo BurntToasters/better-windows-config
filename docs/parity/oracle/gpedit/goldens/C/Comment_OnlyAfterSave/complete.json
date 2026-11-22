@@ -1,0 +1,23 @@
+{
+  "case": "C/Comment_OnlyAfterSave",
+  "planHash": "9e2d92cba74733b70adc20ce67b346dd8dd319b761c5cb5041c53057f87b2419",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled/Machine.Registry.pol",
+    "step-01-enabled/Machine.comment.cmtx",
+    "step-01-enabled/gpt.ini",
+    "step-02-comment-only/Machine.Registry.pol",
+    "step-02-comment-only/Machine.comment.cmtx",
+    "step-02-comment-only/gpt.ini",
+    "step-03-comment-only-user/Machine.Registry.pol",
+    "step-03-comment-only-user/Machine.comment.cmtx",
+    "step-03-comment-only-user/User.Registry.pol",
+    "step-03-comment-only-user/User.comment.cmtx",
+    "step-03-comment-only-user/gpt.ini"
+  ]
+}

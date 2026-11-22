@@ -1,0 +1,16 @@
+{
+  "case": "E/LongDecimal_AboveMax",
+  "planHash": "eb19108b89f21de39e78bbeff9a9d22b7771e9758b72db9d83de259e7d46e177",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-above/Machine.Registry.pol",
+    "step-01-above/Machine.comment.cmtx",
+    "step-01-above/gpt.ini",
+    "step-02-huge/Machine.Registry.pol",
+    "step-02-huge/Machine.comment.cmtx",
+    "step-02-huge/gpt.ini"
+  ]
+}

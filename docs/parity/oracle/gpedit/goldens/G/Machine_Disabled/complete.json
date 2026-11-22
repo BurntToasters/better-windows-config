@@ -1,0 +1,16 @@
+{
+  "case": "G/Machine_Disabled",
+  "planHash": "70c48799cbbe33ff0792a4ba4a5c40eaee439b0b69e1f49e7a9b3dbbf49c8c67",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled/Machine.Registry.pol",
+    "step-01-enabled/Machine.comment.cmtx",
+    "step-01-enabled/gpt.ini",
+    "step-02-disabled/Machine.Registry.pol",
+    "step-02-disabled/Machine.comment.cmtx",
+    "step-02-disabled/gpt.ini"
+  ]
+}

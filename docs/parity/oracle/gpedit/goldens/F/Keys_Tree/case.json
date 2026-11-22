@@ -1,0 +1,388 @@
+{
+  "case": "F/Keys_Tree",
+  "description": "keys in the console tree on the sort cases node",
+  "planVersion": 2,
+  "planHash": "438af8a8d9fabe8a36f344249600cced501627ed68f61c9e82f281556dd828e9",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates/BWC Oracle/Sort cases",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "pressKey",
+      "label": "tree keys",
+      "plan": "pressKey [Left, Right, Down, Up, Home, End, PageDown, PageUp, Plus, Minus, Asterisk, Backspace, Tab, Shift+Tab, F5, F6, Esc, Alt+Left, Alt+Right, Alt+Up, Apps] in tree at Computer/Administrative Templates/BWC Oracle/Sort cases  [tree keys]",
+      "op": {
+        "kind": "pressKey",
+        "label": "tree keys",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ],
+        "name": "tree",
+        "keys": [
+          "Left",
+          "Right",
+          "Down",
+          "Up",
+          "Home",
+          "End",
+          "PageDown",
+          "PageUp",
+          "Plus",
+          "Minus",
+          "Asterisk",
+          "Backspace",
+          "Tab",
+          "Shift+Tab",
+          "F5",
+          "F6",
+          "Esc",
+          "Alt+Left",
+          "Alt+Right",
+          "Alt+Up",
+          "Apps"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 2,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "after-tree-keys"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step final",
+      "plan": "snapshot  [step final]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step final"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "final",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 1,
+      "kind": "pressKey",
+      "ok": true,
+      "data": {
+        "target": "tree",
+        "steps": [
+          {
+            "key": "#58eb9032e3bb",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#203ae593805b",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "BWC Oracle",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#883361d5d682",
+            "selectedBefore": "#203ae593805b",
+            "selectedAfter": "#66e77517b689",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Basics",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#b86d11af7918",
+            "selectedBefore": "#66e77517b689",
+            "selectedAfter": "#f06699abe20c",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Elements",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#55490a4bf3a8",
+            "selectedBefore": "#f06699abe20c",
+            "selectedAfter": "#66e77517b689",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Basics",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#3a78695388b3",
+            "selectedBefore": "#66e77517b689",
+            "selectedAfter": "Local Computer Policy",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Local Computer Policy",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#f4db1e48476f",
+            "selectedBefore": "Local Computer Policy",
+            "selectedAfter": "#ec6c52f62265",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Administrative Templates",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#cb5a196c2528",
+            "selectedBefore": "#ec6c52f62265",
+            "selectedAfter": "#ec6c52f62265",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Administrative Templates",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#0ffcb4d7f662",
+            "selectedBefore": "#ec6c52f62265",
+            "selectedAfter": "#2563f489fe85",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Administrative Templates",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#8a7843789f8d",
+            "selectedBefore": "#2563f489fe85",
+            "selectedAfter": "#2563f489fe85",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Administrative Templates",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#9befa3c63239",
+            "selectedBefore": "#2563f489fe85",
+            "selectedAfter": "#2563f489fe85",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Administrative Templates",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#8c7bb1707737",
+            "selectedBefore": "#2563f489fe85",
+            "selectedAfter": "#2563f489fe85",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Administrative Templates",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#292fffe328d0",
+            "selectedBefore": "#2563f489fe85",
+            "selectedAfter": "#50ce4683cc51",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Computer Configuration",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#90ddf1963abb",
+            "selectedBefore": "#50ce4683cc51",
+            "selectedAfter": "#50ce4683cc51",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "#dcd1d5223f73",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#4408064d9bba",
+            "selectedBefore": "#50ce4683cc51",
+            "selectedAfter": "#50ce4683cc51",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Computer Configuration",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#6cd28ed32abf",
+            "selectedBefore": "#50ce4683cc51",
+            "selectedAfter": "#50ce4683cc51",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Computer Configuration",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#1c003eb26aa0",
+            "selectedBefore": "#50ce4683cc51",
+            "selectedAfter": "#50ce4683cc51",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "#dcd1d5223f73",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#52f878edb34f",
+            "selectedBefore": "#50ce4683cc51",
+            "selectedAfter": "#50ce4683cc51",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "#dcd1d5223f73",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#523f7eba58e1",
+            "selectedBefore": "#50ce4683cc51",
+            "selectedAfter": "#50ce4683cc51",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "#dcd1d5223f73",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#d5a7cec62478",
+            "selectedBefore": "#50ce4683cc51",
+            "selectedAfter": "#50ce4683cc51",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "#dcd1d5223f73",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#2a36f20a301f",
+            "selectedBefore": "#50ce4683cc51",
+            "selectedAfter": "#50ce4683cc51",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "#dcd1d5223f73",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#89dd748442c1",
+            "selectedBefore": "#50ce4683cc51",
+            "selectedAfter": "#50ce4683cc51",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "#dcd1d5223f73",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          }
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    }
+  ]
+}

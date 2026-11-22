@@ -1,0 +1,10 @@
+{
+  "case": "D/File_MissingCloseBracket",
+  "planHash": "9cec5f78799222367251dfd4aa1427e8e1f44cc284cc8a020c7bf40ad16b0b59",
+  "files": [
+    "Machine.Registry.pol",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.Registry.pol"
+  ]
+}

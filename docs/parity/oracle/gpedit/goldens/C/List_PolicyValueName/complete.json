@@ -1,0 +1,22 @@
+{
+  "case": "C/List_PolicyValueName",
+  "planHash": "86ae8c3f91d9480c0a87176c657c5354fcbaef4267803b5a72bf7f3393a25d38",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-two/Machine.Registry.pol",
+    "step-01-enabled-two/Machine.comment.cmtx",
+    "step-01-enabled-two/gpt.ini",
+    "step-02-enabled-one/Machine.Registry.pol",
+    "step-02-enabled-one/Machine.comment.cmtx",
+    "step-02-enabled-one/gpt.ini",
+    "step-03-disabled/Machine.Registry.pol",
+    "step-03-disabled/Machine.comment.cmtx",
+    "step-03-disabled/gpt.ini",
+    "step-04-not-configured/Machine.Registry.pol",
+    "step-04-not-configured/Machine.comment.cmtx",
+    "step-04-not-configured/gpt.ini"
+  ]
+}

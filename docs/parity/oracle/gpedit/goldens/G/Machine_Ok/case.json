@@ -1,0 +1,774 @@
+{
+  "case": "G/Machine_Ok",
+  "description": "Pol_Class_Machine under Computer: Enabled with OK, then OK again with no change",
+  "planVersion": 2,
+  "planHash": "8b1e022f81d8c7e5939f461e6409c15ec701fd54e7dea060ec65876edd000101",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "label": "registry at start",
+      "plan": "snapshot  [registry at start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "registry at start"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Class machine flag' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class machine flag",
+        "state": "Enabled",
+        "policyId": "Pol_Class_Machine",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "snapshot",
+      "label": "step enabled",
+      "plan": "snapshot  [step enabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "wait",
+      "label": "wait 4 s",
+      "plan": "wait 4000 ms  [wait 4 s]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "snapshot",
+      "label": "enabled: registry 4 s later",
+      "plan": "snapshot  [enabled: registry 4 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "enabled: registry 4 s later"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "wait",
+      "label": "wait 4 s more",
+      "plan": "wait 4000 ms  [wait 4 s more]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s more",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "snapshot",
+      "label": "enabled: registry 8 s later",
+      "plan": "snapshot  [enabled: registry 8 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "enabled: registry 8 s later"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Class machine flag' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class machine flag",
+        "state": "Enabled",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Class_Machine",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "snapshot",
+      "label": "step enabled-again",
+      "plan": "snapshot  [step enabled-again]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-again"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "wait",
+      "label": "wait 4 s",
+      "plan": "wait 4000 ms  [wait 4 s]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "snapshot",
+      "label": "enabled-again: registry 4 s later",
+      "plan": "snapshot  [enabled-again: registry 4 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "enabled-again: registry 4 s later"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "wait",
+      "label": "wait 4 s more",
+      "plan": "wait 4000 ms  [wait 4 s more]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s more",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 12,
+      "kind": "snapshot",
+      "label": "enabled-again: registry 8 s later",
+      "plan": "snapshot  [enabled-again: registry 8 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "enabled-again: registry 8 s later"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled",
+      "folder": "step-01-enabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 128,
+          "sha256": "a3a3f87e7236cf755fe2380633710ca7382bb1bb0f08e810fdee7996b02a84bb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 128
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-again",
+      "folder": "step-02-enabled-again",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 128,
+          "sha256": "a3a3f87e7236cf755fe2380633710ca7382bb1bb0f08e810fdee7996b02a84bb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 128
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 1,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Class machine flag",
+        "before": {
+          "title": "Class machine flag",
+          "windowTitle": "Class machine flag",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A machine policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Class machine flag",
+          "windowTitle": "Class machine flag",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A machine policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Class machine flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "liveRegistry": {
+                "after": {
+                  "HKLM\\Software\\Policies\\BWC-Oracle": {},
+                  "HKLM\\Software\\Policies\\BWC-Oracle\\Basics": {
+                    "MachineFlag": {
+                      "type": "DWord",
+                      "data": 1
+                    }
+                  },
+                  "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+                  "HKCU\\Software\\Policies\\BWC-Oracle": null,
+                  "HKCU\\Software\\BWC-Oracle-Gpedit": null
+                },
+                "changed": true,
+                "waited": true,
+                "timedOut": false
+              }
+            }
+          }
+        ],
+        "finalTitle": "Class machine flag"
+      }
+    },
+    {
+      "index": 2,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 128,
+          "sha256": "a3a3f87e7236cf755fe2380633710ca7382bb1bb0f08e810fdee7996b02a84bb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Basics": {
+          "MachineFlag": {
+            "type": "DWord",
+            "data": 1
+          }
+        },
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 3,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 4,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 128,
+          "sha256": "a3a3f87e7236cf755fe2380633710ca7382bb1bb0f08e810fdee7996b02a84bb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Basics": {
+          "MachineFlag": {
+            "type": "DWord",
+            "data": 1
+          }
+        },
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 5,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 6,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 128,
+          "sha256": "a3a3f87e7236cf755fe2380633710ca7382bb1bb0f08e810fdee7996b02a84bb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Basics": {
+          "MachineFlag": {
+            "type": "DWord",
+            "data": 1
+          }
+        },
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 7,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Class machine flag",
+        "before": {
+          "title": "Class machine flag",
+          "windowTitle": "Class machine flag",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A machine policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Class machine flag",
+          "windowTitle": "Class machine flag",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A machine policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Class machine flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "liveRegistry": {
+                "after": {
+                  "HKLM\\Software\\Policies\\BWC-Oracle": {},
+                  "HKLM\\Software\\Policies\\BWC-Oracle\\Basics": {
+                    "MachineFlag": {
+                      "type": "DWord",
+                      "data": 1
+                    }
+                  },
+                  "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+                  "HKCU\\Software\\Policies\\BWC-Oracle": null,
+                  "HKCU\\Software\\BWC-Oracle-Gpedit": null
+                },
+                "changed": false,
+                "waited": false
+              }
+            }
+          }
+        ],
+        "finalTitle": "Class machine flag"
+      }
+    },
+    {
+      "index": 8,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 128,
+          "sha256": "a3a3f87e7236cf755fe2380633710ca7382bb1bb0f08e810fdee7996b02a84bb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Basics": {
+          "MachineFlag": {
+            "type": "DWord",
+            "data": 1
+          }
+        },
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 9,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 10,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 128,
+          "sha256": "a3a3f87e7236cf755fe2380633710ca7382bb1bb0f08e810fdee7996b02a84bb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Basics": {
+          "MachineFlag": {
+            "type": "DWord",
+            "data": 1
+          }
+        },
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 11,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 12,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 128,
+          "sha256": "a3a3f87e7236cf755fe2380633710ca7382bb1bb0f08e810fdee7996b02a84bb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Basics": {
+          "MachineFlag": {
+            "type": "DWord",
+            "data": 1
+          }
+        },
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    }
+  ]
+}

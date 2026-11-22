@@ -1,0 +1,1377 @@
+{
+  "case": "F/Nodes_User",
+  "description": "result list and status bar of every fixture node under User Configuration, nothing configured",
+  "planVersion": 2,
+  "planHash": "26e0e83a34677f4fdcd0c1cfa9408ceb23846d10aaff40321151cc6fa0524b9e",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at User/Administrative Templates/BWC Oracle",
+      "op": {
+        "kind": "selectNode",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at User/Administrative Templates/BWC Oracle",
+      "op": {
+        "kind": "readList",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at User/Administrative Templates/BWC Oracle",
+      "op": {
+        "kind": "readStatus",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "selectNode",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "readList",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "readStatus",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at User/Administrative Templates/BWC Oracle/Elements",
+      "op": {
+        "kind": "selectNode",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at User/Administrative Templates/BWC Oracle/Elements",
+      "op": {
+        "kind": "readList",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at User/Administrative Templates/BWC Oracle/Elements",
+      "op": {
+        "kind": "readStatus",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at User/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "selectNode",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at User/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "readList",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at User/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "readStatus",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 12,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at User/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "selectNode",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 13,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at User/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "readList",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 14,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at User/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "readStatus",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 15,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at User/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "selectNode",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 16,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at User/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "readList",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 17,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at User/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "readStatus",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 18,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at User/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "selectNode",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 19,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at User/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "readList",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 20,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at User/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "readStatus",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 21,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at User/Administrative Templates/BWC Oracle/Elements/Lists",
+      "op": {
+        "kind": "selectNode",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Lists"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 22,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at User/Administrative Templates/BWC Oracle/Elements/Lists",
+      "op": {
+        "kind": "readList",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Lists"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 23,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at User/Administrative Templates/BWC Oracle/Elements/Lists",
+      "op": {
+        "kind": "readStatus",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Lists"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 24,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at User/Administrative Templates/BWC Oracle/User only",
+      "op": {
+        "kind": "selectNode",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "User only"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 25,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at User/Administrative Templates/BWC Oracle/User only",
+      "op": {
+        "kind": "readList",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "User only"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 26,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at User/Administrative Templates/BWC Oracle/User only",
+      "op": {
+        "kind": "readStatus",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "User only"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 27,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at User/Administrative Templates/BWC Oracle/User only/User nested",
+      "op": {
+        "kind": "selectNode",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "User only",
+          "User nested"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 28,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at User/Administrative Templates/BWC Oracle/User only/User nested",
+      "op": {
+        "kind": "readList",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "User only",
+          "User nested"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 29,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at User/Administrative Templates/BWC Oracle/User only/User nested",
+      "op": {
+        "kind": "readStatus",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "User only",
+          "User nested"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 30,
+      "kind": "snapshot",
+      "label": "step final",
+      "plan": "snapshot  [step final]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step final"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "final",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 1,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 4,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Basics",
+            "cells": [
+              "Basics",
+              "",
+              ""
+            ],
+            "setting": "Basics",
+            "state": "",
+            "comment": ""
+          },
+          {
+            "index": 1,
+            "name": "Elements",
+            "cells": [
+              "Elements",
+              "",
+              ""
+            ],
+            "setting": "Elements",
+            "state": "",
+            "comment": ""
+          },
+          {
+            "index": 2,
+            "name": "User only",
+            "cells": [
+              "User only",
+              "",
+              ""
+            ],
+            "setting": "User only",
+            "state": "",
+            "comment": ""
+          },
+          {
+            "index": 3,
+            "name": "Top level user flag",
+            "cells": [
+              "Top level user flag",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Top level user flag",
+            "state": "Not configured",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#6f24603bb55b",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#5b707b89b5ce",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": [
+          1
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "text": "#6f24603bb55b",
+        "filtered": false,
+        "error": null,
+        "statusNumbers": [
+          1
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 4,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 4,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Class both with an element",
+            "cells": [
+              "Class both with an element",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Class both with an element",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 1,
+            "name": "Class both flag",
+            "cells": [
+              "Class both flag",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Class both flag",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 2,
+            "name": "Class user flag",
+            "cells": [
+              "Class user flag",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Class user flag",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 3,
+            "name": "String enabled and disabled values",
+            "cells": [
+              "String enabled and disabled values",
+              "Not configured",
+              "No"
+            ],
+            "setting": "String enabled and disabled values",
+            "state": "Not configured",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#b55ba33485a5",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#86175c2a8042",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": [
+          4
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "text": "#b55ba33485a5",
+        "filtered": false,
+        "error": null,
+        "statusNumbers": [
+          4
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 7,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 5,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Booleans",
+            "cells": [
+              "Booleans",
+              "",
+              ""
+            ],
+            "setting": "Booleans",
+            "state": "",
+            "comment": ""
+          },
+          {
+            "index": 1,
+            "name": "Choices",
+            "cells": [
+              "Choices",
+              "",
+              ""
+            ],
+            "setting": "Choices",
+            "state": "",
+            "comment": ""
+          },
+          {
+            "index": 2,
+            "name": "Lists",
+            "cells": [
+              "Lists",
+              "",
+              ""
+            ],
+            "setting": "Lists",
+            "state": "",
+            "comment": ""
+          },
+          {
+            "index": 3,
+            "name": "Numbers",
+            "cells": [
+              "Numbers",
+              "",
+              ""
+            ],
+            "setting": "Numbers",
+            "state": "",
+            "comment": ""
+          },
+          {
+            "index": 4,
+            "name": "Texts",
+            "cells": [
+              "Texts",
+              "",
+              ""
+            ],
+            "setting": "Texts",
+            "state": "",
+            "comment": ""
+          }
+        ],
+        "status": {
+          "text": "",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#6319914eba7c",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": []
+      }
+    },
+    {
+      "index": 8,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "text": "",
+        "filtered": false,
+        "error": null,
+        "statusNumbers": []
+      }
+    },
+    {
+      "index": 9,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 10,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 1,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Boolean with string values",
+            "cells": [
+              "Boolean with string values",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Boolean with string values",
+            "state": "Not configured",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#6f24603bb55b",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#dab6a20d69c6",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": [
+          1
+        ]
+      }
+    },
+    {
+      "index": 11,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "text": "#6f24603bb55b",
+        "filtered": false,
+        "error": null,
+        "statusNumbers": [
+          1
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 13,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 2,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Decimal that is required",
+            "cells": [
+              "Decimal that is required",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Decimal that is required",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 1,
+            "name": "Long decimal required, soft, stored as text",
+            "cells": [
+              "Long decimal required, soft, stored as text",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Long decimal required, soft, stored as text",
+            "state": "Not configured",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#0d389e08d8a0",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#a8ce91d6a380",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": [
+          2
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "text": "#0d389e08d8a0",
+        "filtered": false,
+        "error": null,
+        "statusNumbers": [
+          2
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 16,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 2,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Multiple text lines with limits",
+            "cells": [
+              "Multiple text lines with limits",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Multiple text lines with limits",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 1,
+            "name": "Text with a length limit",
+            "cells": [
+              "Text with a length limit",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Text with a length limit",
+            "state": "Not configured",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#0d389e08d8a0",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#999ccd6080ca",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": [
+          2
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "text": "#0d389e08d8a0",
+        "filtered": false,
+        "error": null,
+        "statusNumbers": [
+          2
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 19,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 1,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Choice with string items",
+            "cells": [
+              "Choice with string items",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Choice with string items",
+            "state": "Not configured",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#6f24603bb55b",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#236c05f77f7a",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": [
+          1
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "text": "#6f24603bb55b",
+        "filtered": false,
+        "error": null,
+        "statusNumbers": [
+          1
+        ]
+      }
+    },
+    {
+      "index": 21,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 22,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 1,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "List with a value prefix",
+            "cells": [
+              "List with a value prefix",
+              "Not configured",
+              "No"
+            ],
+            "setting": "List with a value prefix",
+            "state": "Not configured",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#6f24603bb55b",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#5096218d316b",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": [
+          1
+        ]
+      }
+    },
+    {
+      "index": 23,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "text": "#6f24603bb55b",
+        "filtered": false,
+        "error": null,
+        "statusNumbers": [
+          1
+        ]
+      }
+    },
+    {
+      "index": 24,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 25,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 1,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "User nested",
+            "cells": [
+              "User nested",
+              "",
+              ""
+            ],
+            "setting": "User nested",
+            "state": "",
+            "comment": ""
+          }
+        ],
+        "status": {
+          "text": "",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#f700b3d15de7",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": []
+      }
+    },
+    {
+      "index": 26,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "text": "",
+        "filtered": false,
+        "error": null,
+        "statusNumbers": []
+      }
+    },
+    {
+      "index": 27,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 28,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 1,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Nested user policy, deep level",
+            "cells": [
+              "Nested user policy, deep level",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Nested user policy, deep level",
+            "state": "Not configured",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#6f24603bb55b",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#6a9fcc4a8cfd",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": [
+          1
+        ]
+      }
+    },
+    {
+      "index": 29,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "text": "#6f24603bb55b",
+        "filtered": false,
+        "error": null,
+        "statusNumbers": [
+          1
+        ]
+      }
+    },
+    {
+      "index": 30,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    }
+  ]
+}

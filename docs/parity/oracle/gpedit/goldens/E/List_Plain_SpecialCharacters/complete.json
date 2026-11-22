@@ -1,0 +1,10 @@
+{
+  "case": "E/List_Plain_SpecialCharacters",
+  "planHash": "06d6875458f2cfe09ee717f536ed09a7710c3196098d69957bb3283bdf0d7216",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini"
+  ]
+}

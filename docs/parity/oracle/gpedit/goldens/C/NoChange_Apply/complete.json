@@ -1,0 +1,11 @@
+{
+  "case": "C/NoChange_Apply",
+  "planHash": "d6469e57e5c525b3643517265607186f0acb37f8af29e5075e85f0256f37fd03",
+  "files": [
+    "case.json",
+    "gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-apply-no-change/gpt.ini",
+    "step-03-ok-no-change/gpt.ini"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "case": "C/Clear_LastSetting_Machine",
+  "planHash": "66ea9cb737715d784e3e3a04b4cfae2324b8dd7ee382a31bbdada605807126ec",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled/Machine.Registry.pol",
+    "step-01-enabled/Machine.comment.cmtx",
+    "step-01-enabled/gpt.ini",
+    "step-02-not-configured/Machine.Registry.pol",
+    "step-02-not-configured/Machine.comment.cmtx",
+    "step-02-not-configured/gpt.ini"
+  ]
+}

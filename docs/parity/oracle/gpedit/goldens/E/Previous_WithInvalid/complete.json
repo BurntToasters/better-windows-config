@@ -1,0 +1,8 @@
+{
+  "case": "E/Previous_WithInvalid",
+  "planHash": "cf3961c1062f8dfedd1a720c768292d22b0591aa43a4b9b603b504efc89d6ef1",
+  "files": [
+    "case.json",
+    "gpt.ini"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "case": "C/SharedList_TwoThenOne",
+  "planHash": "64746c1a1b794ff0866781e3273cdc51fd84895b9e77dc87ddb99fc0e6bd3aed",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-two/Machine.Registry.pol",
+    "step-01-two/Machine.comment.cmtx",
+    "step-01-two/gpt.ini",
+    "step-02-one/Machine.Registry.pol",
+    "step-02-one/Machine.comment.cmtx",
+    "step-02-one/gpt.ini",
+    "step-03-two-not-configured/Machine.Registry.pol",
+    "step-03-two-not-configured/Machine.comment.cmtx",
+    "step-03-two-not-configured/gpt.ini",
+    "step-04-one-not-configured/Machine.Registry.pol",
+    "step-04-one-not-configured/Machine.comment.cmtx",
+    "step-04-one-not-configured/gpt.ini"
+  ]
+}

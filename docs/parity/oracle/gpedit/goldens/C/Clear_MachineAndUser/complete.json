@@ -1,0 +1,30 @@
+{
+  "case": "C/Clear_MachineAndUser",
+  "planHash": "2faafb555f768788841eeaccd4e2e6660b0b31466886d4755384b210e79bc5e1",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-machine/Machine.Registry.pol",
+    "step-01-machine/Machine.comment.cmtx",
+    "step-01-machine/gpt.ini",
+    "step-02-user/Machine.Registry.pol",
+    "step-02-user/Machine.comment.cmtx",
+    "step-02-user/User.Registry.pol",
+    "step-02-user/User.comment.cmtx",
+    "step-02-user/gpt.ini",
+    "step-03-machine-cleared/Machine.Registry.pol",
+    "step-03-machine-cleared/Machine.comment.cmtx",
+    "step-03-machine-cleared/User.Registry.pol",
+    "step-03-machine-cleared/User.comment.cmtx",
+    "step-03-machine-cleared/gpt.ini",
+    "step-04-user-cleared/Machine.Registry.pol",
+    "step-04-user-cleared/Machine.comment.cmtx",
+    "step-04-user-cleared/User.Registry.pol",
+    "step-04-user-cleared/User.comment.cmtx",
+    "step-04-user-cleared/gpt.ini"
+  ]
+}

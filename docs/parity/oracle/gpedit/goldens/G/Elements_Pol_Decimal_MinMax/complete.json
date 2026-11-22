@@ -1,0 +1,16 @@
+{
+  "case": "G/Elements_Pol_Decimal_MinMax",
+  "planHash": "d39cdc61ece3621517ccce9449308919ffd439de491d1cb0e61ed8f097316925",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled/Machine.Registry.pol",
+    "step-01-enabled/Machine.comment.cmtx",
+    "step-01-enabled/gpt.ini",
+    "step-02-not-configured/Machine.Registry.pol",
+    "step-02-not-configured/Machine.comment.cmtx",
+    "step-02-not-configured/gpt.ini"
+  ]
+}

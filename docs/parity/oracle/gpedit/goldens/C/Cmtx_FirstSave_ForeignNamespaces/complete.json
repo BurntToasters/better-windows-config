@@ -1,0 +1,22 @@
+{
+  "case": "C/Cmtx_FirstSave_ForeignNamespaces",
+  "planHash": "4ff0d98a0f1b18dcee7aed3b593328d0343a8df705fbe5c6fcfd4b09caf97f74",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.comment.cmtx",
+    "step-01-start/Machine.comment.cmtx",
+    "step-01-start/gpt.ini",
+    "step-02-first-save/Machine.Registry.pol",
+    "step-02-first-save/Machine.comment.cmtx",
+    "step-02-first-save/gpt.ini",
+    "step-03-second-save/Machine.Registry.pol",
+    "step-03-second-save/Machine.comment.cmtx",
+    "step-03-second-save/gpt.ini",
+    "step-04-comment/Machine.Registry.pol",
+    "step-04-comment/Machine.comment.cmtx",
+    "step-04-comment/gpt.ini"
+  ]
+}

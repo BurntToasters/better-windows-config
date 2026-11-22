@@ -1,0 +1,8 @@
+{
+  "case": "E/List_Plain_DuplicateEntries",
+  "planHash": "6623fc05fd6b0cbb6909d0287893c74c5e8470c19430123c3fb658aee672a2ba",
+  "files": [
+    "case.json",
+    "gpt.ini"
+  ]
+}
