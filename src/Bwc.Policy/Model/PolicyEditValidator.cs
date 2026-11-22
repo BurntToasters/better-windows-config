@@ -137,11 +137,9 @@ public static class PolicyEditValidator
             return;
         }
 
-        var limit = element.MaxLength ?? PolicyRules.DefaultTextMaxLength;
-        if ((ulong)text.Length > limit)
-        {
-            problems.Add(new PolicyEditProblem(element.Id, PolicyProblemKind.TooLong, limit));
-        }
+        // No length check: classic saves a text longer than maxLength that was set and not typed (E/Text_TooLong_SetText: 20
+        // characters in a box limited to 12). The box cuts typed text at the limit (E/Text_TooLong_Typed), which is the UI's
+        // job (the text box sets its MaxLength), so no person reaches a longer text.
     }
 
     private static void ValidateMultiText(MultiTextElement element, IReadOnlyList<string> raw, List<PolicyEditProblem> problems)
@@ -176,7 +174,10 @@ public static class PolicyEditValidator
                 continue;
             }
 
-            if (entry.Data.Length == 0)
+            // An explicit list takes an entry with no value (E/List_Explicit_EmptyValue, E/List_Explicit_NameOnly: classic saved
+            // name1 with an empty value); a plain list refuses an empty entry because the entry is its name
+            // (E/List_Plain_EmptyEntry).
+            if (entry.Data.Length == 0 && !element.ExplicitValue)
             {
                 problems.Add(new PolicyEditProblem(element.Id, PolicyProblemKind.EntryEmpty, EntryIndex: i));
                 continue;

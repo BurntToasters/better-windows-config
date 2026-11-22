@@ -1,28 +1,31 @@
 namespace Bwc.Gpo.Pol;
 
 /// <summary>
-/// Every record-order and file-shape rule of the model, in one place. A rule that names a B or C capture case is settled;
-/// one marked "verify against oracle" is still a guess (docs/contracts/policy-engine.md, "Ordered model").
+/// Every record-order and file-shape rule of the model, in one place. A rule that names a capture case is settled by it;
+/// one that points at a row of the Gaps section of docs/parity/gpedit-audit.md has no capture yet
+/// (docs/contracts/policy-engine.md, "Ordered model").
 /// </summary>
 internal static class PolOrderRules
 {
     /// <summary>
-    /// Verify against oracle: the order keys are written in. A tree walk: key paths split on backslash, each segment
-    /// compared ordinally by uppercase, a key before its descendants. Ties between distinct spellings that compare equal
-    /// are broken ordinally so the output is deterministic. The regedit display comparer (NLS, user locale) is not used
-    /// because saved bytes must not depend on the locale.
+    /// The order keys are written in, settled by D/Order_KeysDescending, D/Order_KeysInterleaved and D/Order_ParentAfterChild
+    /// (the saved file puts keys in this order whatever the order they were in). A tree walk: key paths split on backslash,
+    /// each segment compared ordinally by uppercase, a key before its descendants. Ties between distinct spellings that
+    /// compare equal are broken ordinally so the output is deterministic. The regedit display comparer (NLS, user
+    /// locale) is not used because saved bytes must not depend on the locale.
     /// </summary>
     public static IComparer<string> KeyComparer { get; } = new RegistryKeyComparer();
 
     /// <summary>
-    /// Verify against oracle: value-name prefixes of the instructions that belong to one value and are removed with it
-    /// by <see cref="PolDocument.RemoveInstructions"/>.
+    /// Value-name prefixes of the instructions that belong to one value and are removed with it by
+    /// <see cref="PolDocument.RemoveInstructions"/>. No capture removes a value that has a soft or delete instruction beside
+    /// it and then saves again: gap GAP-01 in docs/parity/gpedit-audit.md.
     /// </summary>
     public static readonly string[] PerValueInstructionPrefixes = [PolFormat.DeletePrefix, PolFormat.SoftPrefix];
 
     /// <summary>
-    /// Verify against oracle: the bytes written for a document with no records. The choice is the bare header; classic
-    /// might write nothing or delete the file instead.
+    /// The bytes written for a document with no records: the bare 8-byte header. Settled by B/Pol_List_Additive step 6, where
+    /// the last Not Configured leaves a Registry.pol of 8 bytes.
     /// </summary>
     public static byte[] EmptyDocumentBytes() => PolFormat.Header.ToArray();
 

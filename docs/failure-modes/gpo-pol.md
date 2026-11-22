@@ -14,7 +14,8 @@ any other exception type for any byte sequence. Edit calls on a model throw `Arg
 
 ### 1.1 Empty file
 Zero bytes: `PolFormatException`, reason `Empty`, offset 0. The caller (the store piece) decides whether a missing or
-empty file means "no policy yet". Classic's treatment is *verify against oracle* (matrix D).
+empty file means "no policy yet". Classic refuses a zero-byte Registry.pol as malformed (`D/File_Empty`), so the store
+reports a failure for the side and never overwrites the file.
 
 ### 1.2 Header
 - Fewer than 8 bytes (but not zero): `HeaderTruncated`, offset 0.
@@ -66,23 +67,15 @@ Record: `[` key NUL `;` name NUL `;` type(4) `;` size(4) `;` data(size) `]`, del
 ### 1.5 Value names and duplicates
 - Value names compare case-insensitively within a key. The empty name is the key's default value and is valid.
 - Two records for the same key and name (any case): load replays in file order with the same rule as `SetValue`
-  (section 2.1). A later record with the same type and data changes nothing (the first record and its position stay);
-  a later record with different data removes the earlier record and appends the later one at the end of the key. The
-  file therefore does not round-trip byte for byte when it holds duplicates; the result is the normalized form.
-  Classic's result for a file with duplicates is *verify against oracle* (matrix D).
+  (section 2.1) except that a later record with different data keeps the place of the first record and takes the later
+  data (`D/Dup_DifferentLastWins`, `D/Dup_NonAdjacent`, `D/Dup_Identical`). The first spelling of the name stays. The file
+  therefore does not round-trip byte for byte when it holds duplicates; the result is the normalized form.
 - Two records of one key that are not adjacent in the file (`A`, `B`, `A`) are grouped under one key on write. Same
   caveat: a file not already in classic order may be normalized.
-- Duplicates with an instruction between them (GPO-4, open oracle question). `ReplayLoaded` keeps one record per key and
-  name, and an instruction record is an ordinary record that is never interpreted (1.6). A file with `X=1`, `**del.X`,
-  `X=1` (or `**delvals.` in place of `**del.X`) loads as `X=1`, `**del.X`: the later identical record changes nothing,
-  so it is dropped. A reader that applies records in order sees `X` set, deleted, then set again (X present) in the
-  file, but set and then deleted (X absent) after the next save. With different data the later record is appended after
-  the instruction instead, which keeps the order but drops the first value. Which result classic gives for such a file,
-  and whether classic itself ever writes one, is unknown. Nothing in the codec changes until the oracle capture
-  (matrix D) answers it; the open question lives in `PolDocument.ReplayLoaded` and `PolOrderRules.ReplaceByAppend`.
-  The capture cases are `D/Dup_DelBetween` (`X=1`, `**del.X`, `X=1`), `D/Dup_DelBetweenDifferent` (`X=1`, `**del.X`,
-  `X=0`) and `D/Dup_DelvalsBetween` (`X=1`, `**delvals.`, `X=0`). Each records the state classic shows and the file
-  after one unrelated save. They are in the plan and not yet captured.
+- Duplicates with an instruction between them (GPO-4, settled). An instruction record is an ordinary record that is never
+  interpreted (1.6). A file with `X=1`, `**del.X`, `X=0` (or `**delvals.` in place of `**del.X`) loads as `X=0`, `**del.X`:
+  the value keeps the first place and takes the later data, the instruction stays after it, as classic saves it after an
+  unrelated save (`D/Dup_DelBetweenDifferent`, `D/Dup_DelvalsBetween`, `D/Dup_DelBetween`).
 
 ### 1.6 Instructions (`**` value names)
 - `**del.<name>`, `**delvals.`, `**DeleteValues`, `**DeleteKeys`, `**SecureKey`, `**soft.<name>` and every other name
@@ -109,8 +102,9 @@ gpo-store.md, L). These that look malformed or odd were opened:
   the reader).
 - `D/Instruction_*`, `D/Soft_*`, `D/Delvals*`: instructions in any place; kept.
 
-Ways this can fail: a zero-byte file reads as "no policy yet" and a save overwrites it (it is `Empty` and refused); a stray
-tail refuses the file where classic opened it (above); a long value name is refused; the unrelated save changes the
+Ways this can fail: a zero-byte file reads as "no policy yet" and a save overwrites it (it is `Empty` and refused, as in
+classic: `D/File_Empty`); a stray tail refuses the file where classic opened it (above; one stray character after the last
+record is ignored and dropped on the next save, `D/File_TrailingBytes`; other tails stay refused, gap GAP-05); a long value name is refused; the unrelated save changes the
 bytes of the records it did not touch.
 
 ## 2. Editing
@@ -234,8 +228,8 @@ The key sorted before `Software\Policies\Microsoft\Windows\CloudContent`. Whethe
 methods in this combination is its own decision; this piece only guarantees the record order they produce.
 
 ### 2.8 Empty document
-Writing a document with no records writes the 8-byte header. What classic writes for an emptied file (header only,
-zero bytes, or deleting the file) is unknown and *verify against oracle*; the choice is the one method
+Writing a document with no records writes the 8-byte header. Classic leaves a header-only file for an emptied
+side (`B/Pol_List_Additive` step 6, `C/Clear_LastSetting_Machine`); the choice is the one method
 `PolOrderRules.EmptyDocumentBytes` (callers that must treat "empty" differently test `IsEmpty` first).
 
 ## 3. Writing and round trip

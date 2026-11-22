@@ -203,10 +203,13 @@ public sealed class FilterBlindTests
     }
 
     [TestMethod]
-    public void A11_All_EveryWordMustBeFound_PossiblyInDifferentTexts()
+    public void A11_All_EveryWordMustBeFound_InOneText()
     {
-        Assert.IsTrue(Hit(Kw("alpha beta", KeywordMatchMode.All), title: "alpha", help: "beta"));
-        Assert.IsTrue(Hit(Kw("alpha beta", KeywordMatchMode.All), title: "alpha", help: "x", comment: "beta"));
+        // Changed from "possibly in different texts": capture F/Filter_Options op 54 (words "policy sort", title and help ticked)
+        // shows classic listing no policy when the two words are in different texts.
+        Assert.IsFalse(Hit(Kw("alpha beta", KeywordMatchMode.All), title: "alpha", help: "beta"));
+        Assert.IsFalse(Hit(Kw("alpha beta", KeywordMatchMode.All), title: "alpha", help: "x", comment: "beta"));
+        Assert.IsTrue(Hit(Kw("alpha beta", KeywordMatchMode.All), title: "beta alpha", help: "x"));
         Assert.IsFalse(Hit(Kw("alpha beta", KeywordMatchMode.All), title: "alpha", help: "x", comment: "y"));
     }
 

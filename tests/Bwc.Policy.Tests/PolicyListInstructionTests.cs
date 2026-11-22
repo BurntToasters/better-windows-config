@@ -252,13 +252,14 @@ public sealed class PolicyListInstructionTests
     [TestMethod]
     public void Reader_DelvalsBehindTheEntries_IsEnabledAndTheInstructionIsNotAnEntry()
     {
-        var document = Parse(RecSz(Plain, "a", "one"), Delvals(Plain), RecSz(Plain, "b", "two"));
+        // The names equal the data (capture D/List_WithDelvals: other names are no entries, delvals alone is Disabled).
+        var document = Parse(RecSz(Plain, "one", "one"), Delvals(Plain), RecSz(Plain, "two", "two"));
 
         var read = Read("Pol_List_Plain", document);
 
         Assert.AreEqual(PolicyState.Enabled, read.State);
         CollectionAssert.AreEqual(new[] { "one", "two" }, Entries(read, "PlainList"));
-        CollectionAssert.AreEquivalent(new[] { "a", "**delvals.", "b" }, read.OwnedRecords.Select(r => r.ValueName).ToArray());
+        CollectionAssert.AreEquivalent(new[] { "one", "**delvals.", "two" }, read.OwnedRecords.Select(r => r.ValueName).ToArray());
     }
 
     [TestMethod]

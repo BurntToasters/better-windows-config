@@ -43,9 +43,10 @@ public sealed class PolRoundTripTests
     [TestMethod]
     public void DuplicateRecords_AreCollapsedOnceAndThenStable()
     {
+        // The first place and the last data: captures D/Dup_DifferentLastWins and D/Dup_NonAdjacent.
         var bytes = File(DwordRecord("K", "A", 1), DwordRecord("K", "B", 2), DwordRecord("K", "A", 3));
         var once = PolDocument.Parse(bytes).ToBytes();
-        CollectionAssert.AreEqual(File(DwordRecord("K", "B", 2), DwordRecord("K", "A", 3)), once);
+        CollectionAssert.AreEqual(File(DwordRecord("K", "A", 3), DwordRecord("K", "B", 2)), once);
         CollectionAssert.AreEqual(once, PolDocument.Parse(once).ToBytes());
     }
 

@@ -578,17 +578,19 @@ internal static class AdmxParser
             return Text(element, "displayName") ?? fallback;
         }
 
+        // The class is read in the letter case of the schema: classic refuses the whole template for class="machine"
+        // (H/ClassLowerCase).
         private static bool TryReadClass(string text, out PolicyClass policyClass)
         {
-            switch (text.Trim().ToLowerInvariant())
+            switch (text.Trim())
             {
-                case "machine":
+                case "Machine":
                     policyClass = PolicyClass.Machine;
                     return true;
-                case "user":
+                case "User":
                     policyClass = PolicyClass.User;
                     return true;
-                case "both":
+                case "Both":
                     policyClass = PolicyClass.Both;
                     return true;
                 default:

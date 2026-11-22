@@ -15,7 +15,10 @@ public enum PolFormatReason
     /// <summary>The signature is right and the version is not 1.</summary>
     BadVersion,
 
-    /// <summary>Bytes after a record, or after the header, do not start a record with <c>[</c>.</summary>
+    /// <summary>
+    /// Bytes after a record, or after the header, do not start a record with <c>[</c>. One stray character after the last
+    /// record is ignored instead (D/File_TrailingBytes).
+    /// </summary>
     ExpectedRecordStart,
 
     /// <summary>The input ends inside a record.</summary>

@@ -211,12 +211,13 @@ public sealed class StateBlindTests
     // ---------------------------------------------------------------- 1.1 Value that does not match
 
     [TestMethod]
-    public void Sec01_1_ADwordThatMatchesNeitherLiteral_ReadsNotConfigured_AndEnablingMovesItToTheEnd()
+    public void Sec01_1_ADwordOfAnotherNumber_ReadsEnabled_AndEnablingMovesItToTheEnd()
     {
+        // Changed from "reads Not Configured": capture D/Mismatch_FlagValue2 shows classic reading a flag that holds 2 as Enabled.
         var d = PolDocument.Create();
         Set1(d, Basics, "MachineFlag", 2);
         Set1(d, Basics, "UserFlag", 1);
-        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Class_Machine", d).State);
+        Assert.AreEqual(PolicyState.Enabled, Read("Pol_Class_Machine", d).State);
         Apply("Pol_Class_Machine", d, PolicyEdit.Enabled());
         CollectionAssert.AreEqual(new[] { "UserFlag", "MachineFlag" }, Names(d, Basics));
         Assert.AreEqual(1u, Dw(d, Basics, "MachineFlag"));
@@ -226,8 +227,10 @@ public sealed class StateBlindTests
     public void Sec01_1_TypeComparisonIsExact()
     {
         var d = PolDocument.Create();
+        // Changed for the flag: capture D/WrongType_FlagAsString shows classic reading a REG_SZ "1" at a flag as Enabled, because
+        // the flag is read as a number from its data (D/WrongType_FlagAsBinary and D/WrongType_FlagShortSize read Enabled too).
         SetSz(d, Basics, "MachineFlag", "1");
-        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Class_Machine", d).State, "REG_SZ digits are not a DWORD");
+        Assert.AreEqual(PolicyState.Enabled, Read("Pol_Class_Machine", d).State, "REG_SZ data is read as a number at a plain flag");
 
         var e = PolDocument.Create();
         SetSz(e, Basics, "ModeText", "on", PolValueType.ExpandString);
@@ -593,12 +596,14 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec03_1_BooleanValueOfAnotherNumber_ReadsAsAbsent()
+    public void Sec03_1_BooleanValueOfAnotherNumber_ReadsAsChecked()
     {
+        // Changed from "reads as absent": capture D/Partial_BoolValues shows a third value (30) next to the values 10 and 20
+        // reading as a checked box and Enabled.
         var d = PolDocument.Create();
         Set1(d, K + @"\Elements\Bool", "TrueFalseCheck", 99);
         var snap = Read("Pol_Bool_TrueFalseValues", d);
-        Assert.IsFalse(snap.Elements.ContainsKey("TrueFalseCheck"));
+        Assert.AreEqual(true, ((BooleanValue)snap.Elements["TrueFalseCheck"]).Checked);
     }
 
     // 3.2 numbers
@@ -667,13 +672,15 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec03_2_ReadingAWrongTypeOrBadDigits_IsAbsent()
+    public void Sec03_2_ReadingAWrongTypeOrBadDigits()
     {
+        // Changed for the storeAsText number: capture D/WrongType_StoreAsTextAsDword shows a record that is no number reading as
+        // Enabled with 0 in the box. The decimal read from a string of eight bytes stays absent (D/WrongType_DecimalAsString).
         var d = PolDocument.Create();
         SetSz(d, K + @"\Elements\Number", "MinMaxNumber", "20");
         SetSz(d, K + @"\Elements\Number", "TextNumber", "not a number");
         Assert.IsFalse(Read("Pol_Decimal_MinMax", d).Elements.ContainsKey("MinMaxNumber"));
-        Assert.IsFalse(Read("Pol_Decimal_StoreAsText", d).Elements.ContainsKey("TextNumber"));
+        Assert.AreEqual(0UL, ((NumberValue)Read("Pol_Decimal_StoreAsText", d).Elements["TextNumber"]).Number);
     }
 
     // 3.3 text
@@ -693,14 +700,16 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec03_3_ReadRequiresTheExactType()
+    public void Sec03_3_ReadTakesEitherStringType()
     {
+        // Changed from "requires the exact type": capture D/WrongType_ExpandableAsPlain shows Enabled with the text for an
+        // expandable box that holds a REG_SZ and for a plain box that holds a REG_EXPAND_SZ.
         var d = PolDocument.Create();
         var key = K + @"\Elements\Text";
         SetSz(d, key, "ExpandText", "x", PolValueType.String);
         SetSz(d, key, "PlainText", "y", PolValueType.ExpandString);
-        Assert.IsFalse(Read("Pol_Text_Expandable", d).Elements.ContainsKey("ExpandText"));
-        Assert.IsFalse(Read("Pol_Text_Plain", d).Elements.ContainsKey("PlainText"));
+        Assert.AreEqual("x", ((TextValue)Read("Pol_Text_Expandable", d).Elements["ExpandText"]).Text);
+        Assert.AreEqual("y", ((TextValue)Read("Pol_Text_Plain", d).Elements["PlainText"]).Text);
     }
 
     [TestMethod]
@@ -708,17 +717,15 @@ public sealed class StateBlindTests
     {
         var d = PolDocument.Create();
         Assert.IsTrue(Apply("Pol_Text_MaxLength", d, PolicyEdit.Enabled(("ShortText", ElementValue.FromText("123456789012")))).IsValid);
-        var long13 = Apply("Pol_Text_MaxLength", d, PolicyEdit.Enabled(("ShortText", ElementValue.FromText("1234567890123"))));
-        Assert.AreEqual(PolicyProblemKind.TooLong, long13.Problems.Single().Kind);
-        Assert.AreEqual(12UL, long13.Problems.Single().Limit);
+        // Changed from TooLong: capture E/Text_TooLong_SetText shows classic saving a set text of 20 characters in a box limited
+        // to 12. The box cuts typed text (E/Text_TooLong_Typed), so the validator has no length rule for a text.
+        Assert.IsTrue(Apply("Pol_Text_MaxLength", d, PolicyEdit.Enabled(("ShortText", ElementValue.FromText("1234567890123")))).IsValid);
 
         var nul = Apply("Pol_Text_Plain", d, PolicyEdit.Enabled(("PlainText", ElementValue.FromText("a\0b"))));
         Assert.AreEqual(PolicyProblemKind.InvalidCharacter, nul.Problems.Single().Kind);
 
         Assert.IsTrue(Apply("Pol_Text_Plain", d, PolicyEdit.Enabled(("PlainText", ElementValue.FromText(new string('x', 1023))))).IsValid);
-        var over = Apply("Pol_Text_Plain", d, PolicyEdit.Enabled(("PlainText", ElementValue.FromText(new string('x', 1024)))));
-        Assert.AreEqual(PolicyProblemKind.TooLong, over.Problems.Single().Kind);
-        Assert.AreEqual(1023UL, over.Problems.Single().Limit);
+        Assert.IsTrue(Apply("Pol_Text_Plain", d, PolicyEdit.Enabled(("PlainText", ElementValue.FromText(new string('x', 1024))))).IsValid);
     }
 
     [TestMethod]
@@ -789,11 +796,13 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec03_4_MultiText_ReadsOnlyRegMultiSz()
+    public void Sec03_4_MultiText_GivesLinesOnlyForRegMultiSz()
     {
+        // Changed from "is absent": capture D/WrongType_MultiAsString shows a REG_SZ at a multi-line element reading as Enabled
+        // with an empty box.
         var d = PolDocument.Create();
         SetSz(d, K + @"\Elements\Text", "MultiLines", "a");
-        Assert.IsFalse(Read("Pol_MultiText_Basic", d).Elements.ContainsKey("MultiLines"));
+        Assert.AreEqual(0, ((MultiTextValue)Read("Pol_MultiText_Basic", d).Elements["MultiLines"]).Lines.Count);
     }
 
     // 3.5 enum
@@ -1592,16 +1601,19 @@ public sealed class StateBlindTests
     }
 
     [TestMethod]
-    public void Sec03_2_NumbersAreReadFromTheirOwnType_Only()
+    public void Sec03_2_NumbersAreReadWhenTheirDataFits()
     {
+        // Changed for the long decimal and the storeAsText number: capture D/WrongType_LongAsDword shows a DWORD at a long decimal
+        // reading as Enabled with the number; D/WrongType_StoreAsTextAsDword shows Enabled with 0 for data that is no number.
+        // A QWORD at a decimal does not fit four bytes and stays absent (D/WrongType_FlagAsQword for the flag).
         var d = PolDocument.Create();
         var key = K + @"\Elements\Number";
         d.SetValue(key, "MinMaxNumber", PolValueType.QWord, PolData.FromQWord(20));
         d.SetValue(key, "LongNumber", PolValueType.DWord, PolData.FromDWord(20));
         SetSz(d, key, "TextNumber", "-1");
         Assert.IsFalse(Read("Pol_Decimal_MinMax", d).Elements.ContainsKey("MinMaxNumber"), "a QWORD is not a decimal");
-        Assert.IsFalse(Read("Pol_LongDecimal_Basic", d).Elements.ContainsKey("LongNumber"), "a DWORD is not a longDecimal");
-        Assert.IsFalse(Read("Pol_Decimal_StoreAsText", d).Elements.ContainsKey("TextNumber"), "digits only");
+        Assert.AreEqual(20UL, ((NumberValue)Read("Pol_LongDecimal_Basic", d).Elements["LongNumber"]).Number, "a DWORD is read as a longDecimal");
+        Assert.AreEqual(0UL, ((NumberValue)Read("Pol_Decimal_StoreAsText", d).Elements["TextNumber"]).Number, "text that is no number is 0");
     }
 
     [TestMethod]

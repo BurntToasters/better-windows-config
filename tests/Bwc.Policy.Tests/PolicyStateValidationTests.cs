@@ -84,15 +84,12 @@ public sealed class PolicyStateValidationTests
     }
 
     [TestMethod]
-    public void Text_TooLong_UsesMaxLength_OrTheDefault()
+    public void Text_OverMaxLength_IsAccepted_BecauseTheBoxCutsTypedText()
     {
-        AssertSingle(Validate("Pol_Text_MaxLength", ("ShortText", ElementValue.FromText("1234567890123"))), "ShortText", PolicyProblemKind.TooLong, 12);
+        // Changed from TooLong: capture E/Text_TooLong_SetText shows classic saving a set text longer than maxLength.
+        Assert.AreEqual(0, Validate("Pol_Text_MaxLength", ("ShortText", ElementValue.FromText("1234567890123"))).Count);
         Assert.AreEqual(0, Validate("Pol_Text_MaxLength", ("ShortText", ElementValue.FromText("123456789012"))).Count);
-        AssertSingle(
-            Validate("Pol_Text_Plain", ("PlainText", ElementValue.FromText(new string('x', (int)PolicyRules.DefaultTextMaxLength + 1)))),
-            "PlainText",
-            PolicyProblemKind.TooLong,
-            PolicyRules.DefaultTextMaxLength);
+        Assert.AreEqual(0, Validate("Pol_Text_Plain", ("PlainText", ElementValue.FromText(new string('x', (int)PolicyRules.DefaultTextMaxLength + 1)))).Count);
     }
 
     [TestMethod]

@@ -292,17 +292,19 @@ public sealed class PolReaderTests
     }
 
     [TestMethod]
-    public void DuplicateRecordWithDifferentData_MovesToTheEndOfTheKey()
+    public void DuplicateRecordWithDifferentData_KeepsTheFirstPlaceAndTakesTheLastData()
     {
+        // Changed from "moves to the end of the key": captures D/Dup_DifferentLastWins and D/Dup_NonAdjacent show classic
+        // keeping the first position of a duplicate name with the data of the last record.
         var doc = PolDocument.Parse(File(
             DwordRecord("K", "A", 1),
             DwordRecord("K", "B", 2),
             DwordRecord("K", "a", 3)));
         var records = doc.GetRecords("K");
         Assert.AreEqual(2, records.Count);
-        Assert.AreEqual("B", records[0].ValueName);
-        Assert.AreEqual("a", records[1].ValueName);
-        Assert.AreEqual(3u, PolData.TryGetDWord(records[1].Data.Span));
+        Assert.AreEqual("A", records[0].ValueName);
+        Assert.AreEqual("B", records[1].ValueName);
+        Assert.AreEqual(3u, PolData.TryGetDWord(records[0].Data.Span));
     }
 
     [TestMethod]

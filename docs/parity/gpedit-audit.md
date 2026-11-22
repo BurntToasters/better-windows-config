@@ -35,7 +35,19 @@ When a piece closes a gap, it changes the row here and in the inventory to `pass
 
 ## Gaps
 
-No row is judged yet, so no gap is recorded. The audit lists each gap here with its row id, what is missing and the piece that closes it. Known sources of gaps, to be judged by the audit and not yet verdicts:
+Engine rules that no capture settles are listed first (E6c). Each has a pointer comment in the source. After them come the known sources of gaps for the audit rows, to be judged by the audit and not yet verdicts.
+
+| ID | Rule | What is missing | Where |
+| --- | --- | --- | --- |
+| GAP-01 | The value-name prefixes (`**del.`, `**soft.`) removed with their value when a value is replaced or cleared. | No capture sets or clears a value that has a soft or delete record next to it and then saves. | `PolOrderRules.PerValueInstructionPrefixes` |
+| GAP-02 | The flag of the refresh call after a save. | The editor does not show which call it makes. | `UserenvPolicyRefresher` |
+| GAP-03 | An additive list keeps the foreign values of its key. | B/Pol_List_Additive starts empty; no start has a foreign value at an additive key. | `PolicyRules.AdditiveListKeepsOtherValues` |
+| GAP-04 | Enabling an additive list removes a delete-values record of its key. | No start has a delete-values record at an additive key. | `PolicyRules.AdditiveListRemovesDelvals` |
+| GAP-05 | A tail after the last record that is not one stray character (odd length, several characters, a lone NUL) is refused. | D/File_TrailingBytes has one stray character only. | `PolReader.IsStrayTail` |
+| GAP-06 | A key that a new record joins takes the spelling of its ancestors; on load two spellings of one key merge under the first. | D/Case_KeyDiffers and D/Case_KeyTwoSpellings show one level; deeper trees and ties between several first spellings are not captured. | `PolDocument.SpellNewKey` |
+| GAP-07 | The namespaces that stay in comment.cmtx after the first save of a session. | Only the one-namespace case is captured (A/Machine_Enabled, A/User_Enabled). | `CmtxDocument.RestrictNamespacesTo` |
+
+Sources of gaps for the audit rows:
 
 - Static dialogs that no dumped menu opens (DLG layout rows with piece A1).
 - Menu entries not yet decided (the Help web site entry) and menus not captured (the console tree context menu, the column header and description pane menus).

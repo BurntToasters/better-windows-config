@@ -88,6 +88,16 @@ public static class PolicyStateReader
     private static PolicyState ReadValueNameState(PolicyDefinition policy, PolDocument document)
     {
         var slot = new Slot(policy.Key, policy.ValueName!);
+        if (PolicyRules.IsPlainFlag(policy) && document.GetValue(slot.Key, slot.Name) is { } flag
+            && PolicyRules.LooseNumber(flag, maxBytes: 4) is { } flagNumber)
+        {
+            // A policy with no values, lists or elements reads the data as a number whatever its type: a nonzero number is
+            // Enabled and zero is Disabled (D/Mismatch_FlagValue2, D/Mismatch_FlagZero, D/WrongType_FlagAsBinary,
+            // D/WrongType_FlagAsString, D/WrongType_FlagShortSize). More than four bytes is no number
+            // (D/WrongType_FlagAsQword, D/WrongType_FlagEightBytes) and falls through to the unmatched rule.
+            return flagNumber != 0 ? PolicyState.Enabled : PolicyState.Disabled;
+        }
+
         if (PolicyLayout.EnabledReadLiteral(policy) is { } enabled && PolicyEncoding.Matches(document, new ValueWrite(slot, enabled)))
         {
             return PolicyState.Enabled;
@@ -104,9 +114,10 @@ public static class PolicyStateReader
             return PolicyRules.UnmatchedValueState;
         }
 
-        // The disabled list shows Disabled when the value itself says nothing: B/Pol_Value_BothLists step 2 holds a delete
-        // instruction and the disabled item, and classic shows Disabled for it although it declares an enabled list.
-        if (PolicyEncoding.AllMatch(document, PolicyLayout.ListWrites(policy.DisabledList)))
+        // The disabled list shows Disabled when the value itself says nothing, but only with the delete instruction of the
+        // policy value: B/Pol_Value_BothLists step 2 holds the instruction and the disabled item and classic shows Disabled for
+        // it; D/BothLists_Disabled holds the disabled item alone and classic shows Not Configured.
+        if (PolicyEncoding.HasDelete(document, slot) && PolicyEncoding.AllMatch(document, PolicyLayout.ListWrites(policy.DisabledList)))
         {
             return PolicyState.Disabled;
         }
@@ -143,7 +154,7 @@ public static class PolicyStateReader
             _ => null,
         };
 
-    private static PolRecord? Record(PolicyElement element, PolDocument document, PolValueType type)
+    private static PolRecord? Record(PolicyElement element, PolDocument document)
     {
         if (element.ValueName is null)
         {
@@ -152,12 +163,16 @@ public static class PolicyStateReader
 
         // A soft number lives under the soft name (B/Pol_LongDecimal_RequiredSoftText).
         var name = element is DecimalElement { Soft: true } ? PolicyEncoding.SoftPrefix + element.ValueName : element.ValueName;
-        var record = document.GetValue(element.EffectiveKey, name);
-        return record is not null && PolicyRules.StoredTypeMatches((uint)type, record.Type) ? record : null;
+        return document.GetValue(element.EffectiveKey, name);
     }
 
     private static ElementValue? ReadBoolean(BooleanElement element, PolDocument document)
     {
+        if (element.ValueName is not null && element.TrueList is not { Items.Count: > 0 } && element.FalseList is not { Items.Count: > 0 })
+        {
+            return ReadPlainBoolean(element, document);
+        }
+
         if (PolicyEncoding.AllMatch(document, PolicyLayout.BooleanSide(element, isTrue: true)))
         {
             return new BooleanValue(true);
@@ -174,43 +189,77 @@ public static class PolicyStateReader
         return PolicyEncoding.AllMatch(document, PolicyLayout.BooleanSide(element, isTrue: false)) ? new BooleanValue(false) : null;
     }
 
-    private static ElementValue? ReadNumber(DecimalElement element, PolDocument document)
+    // A boolean with a value name and no lists. The record is read whatever its type: it is unchecked when it equals the false
+    // value, or zero when the template has none, and checked otherwise (D/Partial_BoolNoFalse reads 0 as unchecked and 2 as
+    // checked, D/Partial_BoolValues reads 30 as checked next to 10 and 20, D/Partial_BoolStrings reads YES as checked).
+    private static ElementValue? ReadPlainBoolean(BooleanElement element, PolDocument document)
     {
-        if (element.StoreAsText)
+        var record = document.GetValue(element.EffectiveKey, element.ValueName!);
+        if (record is null)
         {
-            var text = Record(element, document, PolValueType.String);
-            var digits = text is null ? null : PolData.TryGetString(text.Data.Span);
-            return digits is not null && ulong.TryParse(digits, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
-                ? new NumberValue(parsed)
+            return null;
+        }
+
+        var falseValue = element.FalseValue ?? (element.TrueValue is { Kind: PolicyValueKind.String } ? null : PolicyRules.DefaultDisabledValue);
+        if (falseValue is null)
+        {
+            return PolicyEncoding.Matches(document, new ValueWrite(new Slot(element.EffectiveKey, element.ValueName!), element.TrueValue!))
+                ? new BooleanValue(true)
                 : null;
         }
 
-        if (element.Kind == PolicyElementKind.LongDecimal)
+        if (falseValue.Kind == PolicyValueKind.String)
         {
-            var record = Record(element, document, PolValueType.QWord);
-            var number = record is null ? null : PolData.TryGetQWord(record.Data.Span);
-            return number is null ? null : new NumberValue(number.Value);
+            return new BooleanValue(!string.Equals(PolicyRules.LooseText(record), falseValue.Text, StringComparison.OrdinalIgnoreCase));
         }
 
-        var dword = Record(element, document, PolValueType.DWord);
-        var small = dword is null ? null : PolData.TryGetDWord(dword.Data.Span);
-        return small is null ? null : new NumberValue(small.Value);
+        return PolicyRules.LooseNumber(record, maxBytes: 4) is { } number ? new BooleanValue(number != falseValue.Number) : null;
     }
 
-    private static ElementValue? ReadText(TextElement element, PolDocument document)
+    // A number element is present when a record has its name and fits its size, whatever the type: a decimal needs at
+    // most four bytes, a long decimal at most eight (D/WrongType_DecimalAsString: a string of eight bytes is not read;
+    // D/WrongType_LongAsDword: a DWORD is read as a long number). A storeAsText number reads the data as text and takes 0
+    // when the text is no number (D/WrongType_StoreAsTextAsDword: Enabled, 0 shown).
+    private static ElementValue? ReadNumber(DecimalElement element, PolDocument document)
     {
-        var record = Record(element, document, element.Expandable ? PolValueType.ExpandString : PolValueType.String);
-        var text = record is null ? null : PolData.TryGetString(record.Data.Span);
-        return text is null ? null : new TextValue(text);
-    }
-
-    private static ElementValue? ReadMultiText(MultiTextElement element, PolDocument document)
-    {
-        var record = Record(element, document, PolValueType.MultiString);
-        var text = record is null ? null : PolData.TryGetString(record.Data.Span);
-        if (text is null)
+        var record = Record(element, document);
+        if (record is null)
         {
             return null;
+        }
+
+        if (element.StoreAsText)
+        {
+            var digits = PolicyRules.LooseText(record);
+            return new NumberValue(ulong.TryParse(digits, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : 0);
+        }
+
+        return PolicyRules.LooseNumber(record, element.Kind == PolicyElementKind.LongDecimal ? 8 : 4) is { } number ? new NumberValue(number) : null;
+    }
+
+    // A text element is present when a record has its name, whatever its type, and shows the data read as text:
+    // D/WrongType_DecimalAsString (a DWORD 7 shows the character U+0007), D/WrongType_ExpandableAsPlain (a REG_SZ in an
+    // expandable box and the reverse).
+    private static ElementValue? ReadText(TextElement element, PolDocument document)
+    {
+        var record = Record(element, document);
+        return record is null ? null : new TextValue(PolicyRules.LooseText(record));
+    }
+
+    // A multi-line element is present when a record has its name; only a REG_MULTI_SZ gives lines (D/WrongType_MultiAsString:
+    // a REG_SZ is Enabled and shows no text).
+    private static ElementValue? ReadMultiText(MultiTextElement element, PolDocument document)
+    {
+        var record = Record(element, document);
+        if (record is null)
+        {
+            return null;
+        }
+
+        var text = (uint)PolValueType.MultiString == record.Type ? PolData.TryGetString(record.Data.Span) : string.Empty;
+        if (text is null)
+        {
+            return new MultiTextValue([]);
         }
 
         var lines = text.TrimEnd('\0').Split('\0', StringSplitOptions.None).Where(l => l.Length > 0).ToArray();
@@ -226,17 +275,28 @@ public static class PolicyStateReader
             return null;
         }
 
+        // The item is the first whose value matches and whose value list is all there. When a value matches an item and no item
+        // has its list complete, the element is still there and the box shows the first item: D/EnumValueList_ItemC (value 3, the
+        // list of item C missing) and D/EnumValueList_ItemAPartial (value 1, one of two list values) show Profile A.
         var slot = new Slot(element.EffectiveKey, element.ValueName);
+        var valueMatched = false;
         for (var i = 0; i < element.Items.Count; i++)
         {
             var literal = element.Items[i].Value;
-            if (literal is not null && PolicyEncoding.Matches(document, new ValueWrite(slot, literal)))
+            if (literal is null || !PolicyEncoding.Matches(document, new ValueWrite(slot, literal)))
+            {
+                continue;
+            }
+
+            valueMatched = true;
+            var list = PolicyLayout.ListWrites(element.Items[i].ValueList);
+            if (list.Count == 0 || PolicyEncoding.AllMatch(document, list))
             {
                 return new ChoiceValue(i);
             }
         }
 
-        return null;
+        return valueMatched ? new ChoiceValue(0) : null;
     }
 
     private static ElementValue? ReadList(ListElement element, PolDocument document)
@@ -251,7 +311,7 @@ public static class PolicyStateReader
             }
 
             var data = PolData.TryGetString(record.Data.Span);
-            if (data is not null)
+            if (data is not null && PolicyRules.IsListEntryOf(element, record.ValueName, data))
             {
                 entries.Add(new ListEntry(record.ValueName, data));
             }

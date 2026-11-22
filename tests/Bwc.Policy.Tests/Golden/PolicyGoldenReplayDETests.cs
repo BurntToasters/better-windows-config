@@ -88,7 +88,8 @@ public sealed class PolicyGoldenReplayDETests
     /// <summary>
     /// The foreign cases of group D read the children of a tree node (an observation of the console, with no engine
     /// counterpart: inventory row BEH-014 says no Extra Registry Settings node exists). The harness replays no such
-    /// operation, so the rows leave them out.
+    /// operation, so the rows leave them out. E6c keeps them out: which nodes the tree lists is a fact of the window, and the
+    /// engine has no tree of records to compare it with (the filter and the tree builder work from templates only).
     /// </summary>
     private static void DropTreeObservations(GoldenCase golden)
     {

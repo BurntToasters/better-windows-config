@@ -47,11 +47,17 @@ Configured (`B/Pol_LongDecimal_RequiredSoftText` steps 3 and 4). Disabled over D
 
 ### 1.1 Value in the file that does not match
 
-- A record whose type or data equals neither literal (a DWORD 2 where 1 and 0 are expected, a REG_SZ where a DWORD is
-  expected) reads as Not Configured (*verify against oracle*, `[Rule: UnmatchedValueState]`). Enabling then
-  replaces it and moves it to the end of its key.
-- Type comparison is exact: REG_SZ never matches REG_EXPAND_SZ and a DWORD never matches a REG_SZ of digits
-  (*verify against oracle*, `[Rule: StoredTypeMatches]`).
+- A plain flag (a value name, no enabled or disabled value or list) reads its data as a number of at most 4 bytes, any
+  type: nonzero is Enabled, zero is Disabled (`D/Mismatch_FlagValue2`, `D/Mismatch_FlagZero`, `D/WrongType_FlagAsString`,
+  `D/WrongType_FlagAsBinary`, `D/WrongType_FlagShortSize`). Data of more than 4 bytes is not a flag (`D/WrongType_FlagAsQword`).
+- A policy that declares values or lists compares the record to its literals; no match is Not Configured
+  (`[Rule: UnmatchedValueState]`, `D/Mismatch_*`). A string literal compares ignoring case (`D/Case_*`).
+  Enabling over a record that matches nothing replaces it and moves it to the end of its key.
+- A duplicate name reads as its last data at its first place (`D/Dup_*`, gpo-pol.md section 1.5). A lone `**del.` reads
+  Disabled only when the policy declares no enabled or disabled value or list (`D/Del_DisabledValuePolicy`). A disabled list
+  reads Disabled only together with the `**del.` of the policy value.
+- A key under an ancestor spelled in another letter case merges with it under the first spelling (`D/Case_KeyDiffers`,
+  `D/Case_KeyTwoSpellings`; only one level is captured, gap GAP-06).
 
 ### 1.2 Delete instructions
 
@@ -126,16 +132,19 @@ keeps its position (`C/Booleans_ReverseOrder` step 2 keeps Zeta before Alpha). L
 - Range: `minValue` default 0, `maxValue` default 4294967295 for decimal and 18446744073709551615 for longDecimal. Below the
   minimum is `BelowMinimum`, above the maximum is `AboveMaximum`; both carry the limit. `soft` does not change the
   range check (*verify against oracle*, `[Rule: SoftIgnoredByValidation]`).
-- Reads: DWORD (or QWORD) data; REG_SZ digits for `storeAsText`. Any other type or digits that do not parse: absent.
+- Reads: data of at most 4 bytes (decimal) or 8 bytes (longDecimal), whatever the type (`D/WrongType_LongAsDword`,
+  `D/WrongType_DecimalAsString`); with `storeAsText` the data is read as text and digits that do not parse give 0
+  (`D/WrongType_StoreAsTextAsDword`). Longer data: absent.
 - A value above the 32-bit range in a template literal is written as QWORD (an edge the schema allows).
 
 ### 3.3 text
 
 - REG_SZ; REG_EXPAND_SZ when `expandable`. The string is stored with one terminator.
 - Empty text is empty (see above). A NUL character is `InvalidCharacter`.
-- Length over `maxLength` is `TooLong` with the limit. Without `maxLength` the limit is 1023 (*verify against oracle*,
-  `[Rule: DefaultTextMaxLength]`).
-- Reads: the type must match `expandable` exactly.
+- No length rule in the validator: classic saves a set text longer than `maxLength` (`E/Text_TooLong_SetText`) and the box
+  cuts typed text at `maxLength`, 1023 when none is declared (`E/Text_TooLong_Typed`, `[Rule: DefaultTextMaxLength]`).
+- Reads: REG_SZ and REG_EXPAND_SZ both give the text, up to the first NUL, whatever `expandable` says
+  (`D/WrongType_ExpandableAsPlain`).
 
 ### 3.4 multiText (REG_MULTI_SZ)
 
@@ -143,7 +152,8 @@ keeps its position (`C/Booleans_ReverseOrder` step 2 keeps Zeta before Alpha). L
   `[Rule: NormalizeMultiTextLines]`). No lines left is empty.
 - `maxStrings` counts non-empty lines (`TooManyLines`). `maxLength` counts all characters of the lines plus one
   separator between lines (`TooLong`, *verify against oracle*, `[Rule: MultiTextLength]`).
-- Reads: REG_MULTI_SZ only; lines split on NUL, the final terminator dropped.
+- Reads: lines split on NUL, the final terminator dropped, for REG_MULTI_SZ only; any other type reads as an empty box
+  (`D/WrongType_MultiAsString`).
 
 ### 3.5 enum
 
@@ -151,14 +161,15 @@ keeps its position (`C/Booleans_ReverseOrder` step 2 keeps Zeta before Alpha). L
 - Writes the item's value at the element's value name (decimal as DWORD, string as REG_SZ), then the item's value list.
   Values of the other items' value lists stay: choosing another item keeps the earlier lists
   (`[Rule: EnumClearsOtherItemLists]`, false; `B/Pol_Enum_ItemValueList` steps 3 and 4).
-- Reads the first item whose value equals the record. No record, or no match (a foreign value): absent. The value list is
-  not used to choose the item.
+- Reads the first item whose value equals the record and whose value list is complete. When the value matches an item and
+  no item has its list complete, the first item shows (`D/EnumValueList_ItemC`, `D/EnumValueList_ItemAPartial`). No
+  record, or no match (a foreign value): absent (`D/Mismatch_EnumUnknownItem`, `D/EnumValueList_ValuesWithoutChoice`).
 - An item with no value writes only its value list. An element with no value name writes only the value list.
 
 ### 3.6 list
 
 - The list owns its whole key. Entries are string values (REG_SZ; REG_EXPAND_SZ when `expandable`).
-- Names (*verify against oracle*, OQ-06, `[Rule: ListEntryName]`):
+- Names (settled, OQ-06, `[Rule: ListEntryName]`; `B/Pol_List_*`):
   - `explicitValue`: the entry's name and value as given; a missing name is `EntryNameMissing`.
   - `valuePrefix` present, even empty: `Prefix1`, `Prefix2` and so on, one-based, in entry order. An empty prefix gives
     `1`, `2` (`B/Pol_List_EmptyPrefix` step 2).
@@ -169,16 +180,17 @@ keeps its position (`C/Booleans_ReverseOrder` step 2 keeps Zeta before Alpha). L
   (`[Rule: ListReplaceWritesDelvals]`, true, settled by `B/Pol_List_Plain` and `C/SharedList_OneThenTwo`; section 7). When the existing values already equal
   the new entries (name, type, data, order) they are not rewritten.
 - Additive: the key keeps the values the policy does not own and gets the entries; section 7
-  (`[Rule: AdditiveListKeepsOtherValues]`, true, *verify against oracle*).
+  (`[Rule: AdditiveListKeepsOtherValues]`, true; no capture has a foreign value there, gap GAP-03).
 - An empty list is refused as `Required` and writes nothing, required or not (D8: `B/Pol_List_Plain` step 7,
   `C/SharedList_EmptyList`). The Show Contents box refuses an empty list, so the list a dialog shows keeps its stored rows.
-- Reads: every non-instruction record of the key whose type matches, in model order, as (name, data). Records of another
-  type are foreign and ignored. A list-only policy is Enabled when the key has an entry.
+- Reads: every non-instruction record of the key, in model order, as (name, data). A plain list takes only records whose
+  name equals the data (`D/List_PlainValues`, `D/List_PlainOtherNames`, `D/List_AdditiveValues`); prefix, explicit and
+  policy-value-name lists take any name. A list-only policy is Enabled when the key has an entry.
 - Disabled removes every value of the list key and writes `**delvals.` (`[Rule: DisabledListWritesDelvals]`, section 7).
-  A `**delvals.` record in the list key reads as Disabled when no entry is there (*verify against oracle*,
-  `[Rule: ListDelvalsOnlyIsDisabled]`).
+  A `**delvals.` record in the list key reads as Disabled when no entry is there
+  (`[Rule: ListDelvalsOnlyIsDisabled]`, `D/List_WithDelvals`).
 - Two policies that share a list key read the same entries. Not Configured on one removes every value of the key and
-  its `**delvals.` (*verify against oracle*, `[Rule: NotConfiguredClearsWholeListKey]`).
+  its `**delvals.` (`[Rule: NotConfiguredClearsWholeListKey]`, `C/SharedList_DisableAndShrink` step 6).
 
 ## 4. Order of records (*verify against oracle*, `[Rule: WriteOrder]`)
 

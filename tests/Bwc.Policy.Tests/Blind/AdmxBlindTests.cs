@@ -756,14 +756,21 @@ public sealed class AdmxBlindTests
     }
 
     [TestMethod]
+    [DataRow("machine")]
+    [DataRow("USER")]
+    [DataRow("bOtH")]
+    public void Sec18_ClassInAnotherLetterCase_IsRefused(string written) =>
+        // Capture H/ClassLowerCase: classic refuses class="machine" with a message box.
+        AssertInvalid("class", P("Pol", cls: written));
+
+    [TestMethod]
     public void Sec18_BadClass() => AssertInvalid("class", P("Pol", cls: "Sometimes"));
 
     [TestMethod]
     [DataRow("Machine", PolicyClass.Machine)]
-    [DataRow("machine", PolicyClass.Machine)]
-    [DataRow("USER", PolicyClass.User)]
-    [DataRow("bOtH", PolicyClass.Both)]
-    public void Sec18_ClassIgnoresCase(string written, PolicyClass expected)
+    [DataRow("User", PolicyClass.User)]
+    [DataRow("Both", PolicyClass.Both)]
+    public void Sec18_ClassFollowsTheSchemaLetterCase(string written, PolicyClass expected)
     {
         using var t = new TempTemplates();
         Std(t, "a", "Blind.A", P("Pol", cls: written), ["Pol"]);

@@ -5,8 +5,8 @@ G1 to G6, G0 and A2 must follow it. A change to this file is a manager decision.
 
 The governing rule: **behave like classic Local Group Policy Editor (`gpedit.msc`), byte for
 byte on disk.** Where this contract and classic disagree, classic wins and this file is
-corrected. Where classic's behavior is unknown, the item is marked *verify against oracle* and the
-owning package records the observed behavior as a golden before implementing it. Goldens are
+corrected. Where classic's behavior is not captured, the rule is a row of the Gaps section of
+`docs/parity/gpedit-audit.md` and the owning package records the observed behavior as a golden before changing it. Goldens are
 captured from classic by the oracle (`docs/parity/oracle/gpedit/`) using BWC-authored fixture
 templates only.
 
@@ -58,11 +58,11 @@ A `Registry.pol` file is a header followed by zero or more records. Everything i
 - A delete record has the value name `**del.<name>`, type `REG_SZ` (1), size 4, and data
   `20 00 00 00`. It removes the named value when the policy is applied.
 - Unknown value names that start with `**` are instructions. The engine keeps every record it
-  does not model, including unknown instructions, byte for byte, in its original position. Which
-  `**` instructions classic keeps and which it shows is *verify against oracle*.
+  does not model, including unknown instructions, byte for byte, in its original position. Classic keeps
+  every instruction in place and shows none (`D/Instruction_KeyLevel`, `D/Instruction_Unknown`, `D/Instruction_UnknownAlone`).
 - A file that is empty or has a bad header is reported to the caller as a typed failure with a
-  reason. Classic's treatment of each malformed shape is part of the state matrix and is *verify
-  against oracle*.
+  reason. Classic refuses a zero-byte file, a bad header, a cut record and a missing
+  closing bracket (`D/File_*`); one stray character after the last record is ignored.
 
 ### Ordered model
 
@@ -89,33 +89,27 @@ A `Registry.pol` file is a header followed by zero or more records. Everything i
 - Records the model does not understand, and unknown `**` instructions, are kept and written back
   byte for byte.
 - Read then write of a file with no edit produces the same bytes whenever the input is already in
-  the order classic writes. What classic normalizes in a file that is not in that order is *verify
-  against oracle* (matrix D, then one save).
+  the order classic writes. What classic normalizes in a file that is not in that order: keys go in tree order
+  (`D/Order_KeysDescending`, `D/Order_ParentAfterChild`), a duplicate name keeps its first place with its last data
+  (`D/Dup_DifferentLastWins`), a key spelled two ways takes the first spelling (`D/Case_KeyTwoSpellings`) and one stray
+  character after the last record is dropped (`D/File_TrailingBytes`).
 
-The following rules are not guessed. Each is *verify against oracle* and the owning package
-records the golden before the engine is frozen:
+The questions that were open are closed by captures (`docs/parity/gpedit-inventory.md`, section 4, OQ-01 to OQ-09):
 
-- *verify against oracle*: record order inside a key when one policy writes several values at once
-  (the probe settled the one-value case above).
-- *verify against oracle*: how a boolean that is false is stored when the template has no
-  `falseValue`.
-- *verify against oracle*: how the state of a policy is inferred from a partial or foreign file.
-  Probe lead (2026-11-18): with only `**del.Alpha` in the key, choosing Not Configured for Probe_Alpha
-  and pressing OK wrote nothing, so classic may already show that policy as Not Configured rather than
-  Disabled. Matrix D settles it.
-- *verify against oracle*: what Not Configured removes from a key shared by several policies or by a
-  list.
-- Settled by capture A and K: a first save creates the empty 8-byte `Registry.pol` even when it
-  adds no record (`A/Machine_CommentOnly`, `K/KeyLeadingBackslash_Enable`). *verify against oracle*:
-  what is written when a file that had records ends up with none (group C).
-- *verify against oracle*: how list values are named (the value name pattern for lists that use
-  `valuePrefix`, `additive`, or `explicitValue`).
-- Settled by capture A and K: a comment-only change bumps the version (`A/Machine_CommentOnly`),
-  and a side that holds no setting keeps its extension line with one space as its value
-  (`K/KeyTrailingBackslash_Enable` step 2). Pairs of other extensions are still *verify against
-  oracle* (group C, piece E6c).
-- *verify against oracle*: which `**` instructions classic keeps or shows.
-- *verify against oracle*: the contents of the "Extra Registry Settings" node.
+- Record order inside a key: a changed value moves to the end of its key (`C/TwoInKey_ChangeFirstAgain`); keys are in tree order.
+- A false boolean without `falseValue` is a `**del.<name>` record in place of the value (`B/Pol_Bool_NoFalseValue` step 3).
+- The state of a policy from a partial or foreign file: `docs/failure-modes/policy-state.md`, section 1 (`D/*`). A plain flag
+  reads its data as a number, a lone `**del.` reads Disabled only when the policy has no enabled or disabled value or list.
+- Not Configured on a shared key removes every value and the delete-values record of the key (`C/SharedList_DisableAndShrink`).
+- A first save creates the empty 8-byte `Registry.pol` (`A/Machine_CommentOnly`, `K/KeyLeadingBackslash_Enable`), and a
+  side that ends up with no records keeps the 8-byte file (`B/Pol_List_Additive` step 6, `C/Clear_LastSetting_Machine`).
+- List values: explicit names and values as given, `valuePrefix` names are the prefix and a number from 1, the others are named
+  like their data (`B/Pol_List_*`).
+- A comment-only change bumps the version (`A/Machine_CommentOnly`, `C/Comment_OnlyAfterSave`); the registry pair leaves the
+  extension list of a side with no setting left and foreign pairs stay (`C/GptIni_PairRemoval`, `C/GptIni_ForeignExtensions`).
+- Instructions are kept in place and not shown (`D/Instruction_*`), and there is no Extra Registry Settings node (BEH-014).
+
+The rules that no capture reaches are the rows GAP-01 to GAP-06 of the Gaps section of `docs/parity/gpedit-audit.md`.
 
 ## `Bwc.Gpo`: gpt.ini
 
@@ -132,8 +126,7 @@ records the golden before the engine is frozen:
   (captures `A/User_Enabled`, `A/Machine_Then_User`, `A/User_Then_Machine`): a missing line goes at the
   end of the General section. When a side holds no setting the line stays with one space as its
   value (`K/KeyTrailingBackslash_Enable` step 2), and a missing line is not added when `Registry.pol`
-  holds no record (`A/Machine_CommentOnly`). Foreign extension groups are *verify against oracle*
-  (group C).
+  holds no record (`A/Machine_CommentOnly`). Foreign extension groups stay (`C/GptIni_ForeignExtensions`).
 
 ## `Bwc.Gpo`: comment.cmtx
 
@@ -184,7 +177,7 @@ Rules for the whole sequence:
   its `policyNamespaces` list changed to hold only the namespace of the edited policy. Later saves in
   the same session left it alone. For a first save with no comment the list holds one `using` line
   (`A/Machine_Enabled`, `A/User_Enabled`); `PolicySave.Save` calls `RestrictNamespacesTo` when a save
-  changed something. The rule for which namespaces stay beyond that is *verify against oracle* (group C).
+  changed something. Which namespaces stay beyond that is not captured beyond the one-namespace case (gap GAP-07 of the audit).
 
 ## `Bwc.Gpo`: write policy and E2E seams
 

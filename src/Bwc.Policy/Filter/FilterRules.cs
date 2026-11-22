@@ -3,9 +3,9 @@ using System.Text;
 namespace Bwc.Policy.Filter;
 
 /// <summary>
-/// The filter rules that the classic resources do not settle. Each member is one decision, *verify against oracle*
-/// (capture group F, filter results), so a golden corrects it in one place. docs/failure-modes/policy-filter.md has the
-/// reasoning for each. Rules that only restate what the resources say are not here.
+/// The filter rules that the classic resources do not settle. Each member is one decision; the capture case of group F
+/// that settles it is named in its comment, and a member with no case points at a row of the Gaps section of
+/// docs/parity/gpedit-audit.md. docs/failure-modes/policy-filter.md has the reasoning for each.
 /// </summary>
 public static class FilterRules
 {
@@ -18,8 +18,12 @@ public static class FilterRules
     /// <summary>[Rule: KeywordMatchesSubstring] A word matches inside a longer word.</summary>
     public static readonly bool KeywordMatchesSubstring = true;
 
-    /// <summary>[Rule: KeywordAllMayUseDifferentTexts] With All, the words may be found in different ticked texts.</summary>
-    public static readonly bool KeywordAllMayUseDifferentTexts = true;
+    /// <summary>
+    /// [Rule: KeywordAllMayUseDifferentTexts] With All, the words may not be found in different ticked texts: every word
+    /// must be in one text. F/Filter_Options op 54 (words "policy sort" in title and help of the Sort cases) hid every
+    /// policy, so a word of the title plus a word of the help does not match.
+    /// </summary>
+    public static readonly bool KeywordAllMayUseDifferentTexts = false;
 
     /// <summary>[Rule: KeywordExactCollapsesWhiteSpace] With Exact, runs of white space count as one space.</summary>
     public static readonly bool KeywordExactCollapsesWhiteSpace = true;

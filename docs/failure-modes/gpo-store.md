@@ -21,7 +21,7 @@ one named place so the correction touches one spot:
 | Shape of a comment entry | `CmtxFormat.WriteComment` | `<comment policyRef="ns0:Name" commentText="$(resource.ns0_Name)"></comment>` under `admTemplate`, and `<string id="ns0_Name">text</string>` in `stringTable`. |
 | The first-save rewrite of the namespace list | `CmtxDocument.RestrictNamespacesTo` | The store does not call it. `PolicySave.Save` calls it inside its edit when something changed, so the first save writes one `using` line (capture `A/Machine_Enabled`, `A/User_Enabled`, settled, D5). |
 | Refresh call and flags | `PolicyRefresh.cs`, `UserenvPolicyRefresher` | `RefreshPolicyEx(machine, RP_FORCE)` after every save that wrote `Registry.pol`, for the saved side only (group G). |
-| Zero-byte `Registry.pol` | `GpoStore` load | Read as an empty document (no policy yet); a bad header is a failure, never overwritten (matrix D). |
+| Zero-byte `Registry.pol` | `GpoStore` load | A failure for the side, as classic refuses it as malformed (`D/File_Empty`); a bad header is a failure too; neither is overwritten. |
 | Home detection | `GpoAccess.IsHomeEdition` | `EditionID` starts with `Core` (Core, CoreN, CoreSingleLanguage, CoreCountrySpecific). |
 
 ## Named files
@@ -50,7 +50,7 @@ one named place so the correction touches one spot:
 | A8 | Temp and target on different volumes | Cannot happen: the temp file is created next to the target, in the same folder. Replace is never a cross-volume copy. A reparse point that moves the folder to another volume is refused by C-group checks (G3). |
 | A9 | The target does not exist yet | The temp file is moved into place with no overwrite. If a file appeared in between (another process), the move fails and is reported as `Io` with the path; nothing is replaced. |
 | A10 | The folder (`Machine`, `User`, or the GPO root itself) does not exist | The writer creates it (through the write policy, inside the root only). A new folder inherits the parent ACL. Opening a store with these folders missing is normal (empty documents). |
-| A11 | Empty content | Written as zero bytes if the caller asks. The store never asks for it: `Registry.pol` always has at least the header. |
+| A11 | Empty content | Written as zero bytes if the caller asks, which classic refuses to open (`D/File_Empty`). The store never asks for it: `Registry.pol` always has at least the header. |
 | A12 | A path that is a directory, or a file path with an alternate data stream (`:name`) | Refused by the path check (`PolicyDenied`). |
 | A13 | The caller cancels | A write already started finishes. The token is checked before the first write of a save and between loads, never between two files of the same save, because the contract wants each file complete or untouched and the sequence to run to the end once started. |
 | A14 | Two threads in one process write the same path | The store serializes saves with the write lock file; the writer itself is not thread safe and documents that. The recorder append takes a lock. |

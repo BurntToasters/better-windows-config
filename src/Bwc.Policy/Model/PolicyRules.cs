@@ -4,9 +4,10 @@ using Bwc.Policy.Admx;
 namespace Bwc.Policy.Model;
 
 /// <summary>
-/// Every state and write rule of the policy model that classic has not confirmed, in one place. Each member is *verify
-/// against oracle* (docs/failure-modes/policy-state.md, docs/contracts/policy-engine.md) unless its comment says
-/// probe-confirmed. A capture golden that disagrees changes a member here and nothing else.
+/// Every state and write rule of the policy model, in one place (docs/failure-modes/policy-state.md,
+/// docs/contracts/policy-engine.md). A comment names the capture case that settles a member; a member that points at a row
+/// of the Gaps section of docs/parity/gpedit-audit.md has no capture yet. A capture golden that disagrees changes a member
+/// here and nothing else.
 /// </summary>
 internal static class PolicyRules
 {
@@ -24,8 +25,8 @@ internal static class PolicyRules
     public static readonly bool PlainValueNameDisabledWritesZero = false;
 
     /// <summary>
-    /// A DWORD 0 at the value of a plain value-name policy reads as Disabled, as the earlier version of this engine wrote it.
-    /// No capture of a crafted file settles it yet; verify against oracle (group D).
+    /// A DWORD 0 at the value of a plain value-name policy reads as Disabled. Settled by D/Mismatch_FlagZero (classic shows
+    /// Disabled for a flag that holds 0).
     /// </summary>
     public static readonly bool PlainValueNameZeroReadsAsDisabled = true;
 
@@ -54,12 +55,15 @@ internal static class PolicyRules
     /// Tells how a lone <c>**del.</c> record (no value record) reads for this policy shape. Classic shows Disabled when the
     /// template declares neither an enabledValue nor an enabledList (plain value-name policies, elements-only policies:
     /// A/Machine_Disabled, B/Pol_Value_NoValueName_ElementsOnly) and Not Configured when it declares one
-    /// (B/Pol_Value_EnabledOnly, B/Pol_Value_EnabledListOnly). Group B settles it for these four shapes (D7).
+    /// (B/Pol_Value_EnabledOnly, B/Pol_Value_EnabledListOnly). Group B settles it for these four shapes (D7). A policy that
+    /// declares a disabled value or list writes that and not a delete when Disabled, so a lone delete is Not Configured for
+    /// it (D/Del_DisabledValuePolicy, Pol_Value_DisabledOnly).
     /// </summary>
     /// <param name="policy">The policy definition.</param>
     /// <returns>True when the lone delete reads as Disabled.</returns>
     public static bool LoneDeleteReadsAsDisabled(PolicyDefinition policy) =>
-        DeleteInstructionOnlyIsDisabled && policy.EnabledValue is null && policy.EnabledList is null;
+        DeleteInstructionOnlyIsDisabled && policy.EnabledValue is null && policy.EnabledList is null
+        && policy.DisabledValue is null && policy.DisabledList is null;
 
     /// <summary>
     /// Disabled on a policy with elements or an enabled list removes those values and writes a <c>**del.</c> for each. False
@@ -107,28 +111,29 @@ internal static class PolicyRules
     /// <summary>
     /// An additive list (additive="true") adds its entries and keeps the values of its key that it does not own. Only the
     /// entries in <see cref="ListValue.Removed"/> (the rows the dialog removed) leave the file. False makes the list behave
-    /// like a non-additive one: the key ends up with exactly the new entries. Verify against oracle.
+    /// like a non-additive one: the key ends up with exactly the new entries. B/Pol_List_Additive shows the entries only (no
+    /// <c>**delvals.</c> at the key). No capture starts with a foreign value at an additive key: gap GAP-03.
     /// </summary>
     public static readonly bool AdditiveListKeepsOtherValues = true;
 
     /// <summary>
     /// Enabling an additive list removes a <c>**delvals.</c> from its key, so the key no longer says "replace". False leaves
-    /// the record where it is. Verify against oracle.
+    /// the record where it is. No capture starts with a delete-values record at an additive key: gap GAP-04.
     /// </summary>
     public static readonly bool AdditiveListRemovesDelvals = true;
 
     /// <summary>
     /// Disabled on a list policy removes the values of every list key and writes <c>**delvals.</c> there, so a list-only
     /// policy reads back as Disabled through <see cref="ListDelvalsOnlyIsDisabled"/>. False writes nothing for the list and
-    /// a list-only policy then reads as Not Configured. Applies to additive and non-additive lists alike. Verify against
-    /// oracle (matrix B for the write, group D for the read).
+    /// a list-only policy then reads as Not Configured. Applies to additive and non-additive lists alike. Settled by
+    /// B/Pol_List_Additive step 5 and B/Pol_List_Plain step 5 (Disabled leaves one <c>**delvals.</c> at the key).
     /// </summary>
     public static readonly bool DisabledListWritesDelvals = true;
 
     /// <summary>
     /// Enabled with an empty list writes <c>**delvals.</c> and no entries. False (default) removes the values and the
-    /// <c>**delvals.</c> and writes nothing, because delvals alone reads as Disabled for a list-only policy. Verify against
-    /// oracle.
+    /// <c>**delvals.</c> and writes nothing, because delvals alone reads as Disabled for a list-only policy. Settled by
+    /// B/Pol_List_Plain step 4 and C/SharedList_EmptyList: OK on an empty list changes no file.
     /// </summary>
     public static readonly bool EnabledEmptyListWritesDelvals = false;
 
@@ -148,6 +153,78 @@ internal static class PolicyRules
     /// <param name="total">The elements of the policy.</param>
     /// <returns>True when that is evidence of Enabled.</returns>
     public static bool IsEnabledByElementEvidence(int present, int total) => total > 0 && present > 0;
+
+    /// <summary>
+    /// A policy with a value name and no values, lists or elements: a plain flag. Its record is read as a number
+    /// (D/Mismatch_FlagValue2 and the WrongType_Flag cases).
+    /// </summary>
+    /// <param name="policy">The policy definition.</param>
+    /// <returns>True for a plain flag.</returns>
+    public static bool IsPlainFlag(PolicyDefinition policy) =>
+        policy.ValueName is not null && policy.EnabledValue is null && policy.DisabledValue is null
+        && policy.EnabledList is null && policy.DisabledList is null && policy.Elements.Count == 0;
+
+    /// <summary>
+    /// The data of a record as a number, whatever its type: little-endian, nothing when it is longer than the size the reader
+    /// has room for (D/WrongType_FlagAsQword, D/WrongType_FlagEightBytes, D/WrongType_DecimalAsString).
+    /// </summary>
+    /// <param name="record">The record.</param>
+    /// <param name="maxBytes">The room: 4 for a DWORD, 8 for a QWORD.</param>
+    /// <returns>The number, or null when the data does not fit.</returns>
+    public static ulong? LooseNumber(Bwc.Gpo.Pol.PolRecord record, int maxBytes)
+    {
+        var data = record.Data.Span;
+        if (data.Length > maxBytes)
+        {
+            return null;
+        }
+
+        ulong number = 0;
+        for (var i = data.Length - 1; i >= 0; i--)
+        {
+            number = (number << 8) | data[i];
+        }
+
+        return number;
+    }
+
+    /// <summary>
+    /// The data of a record as text, whatever its type: whole UTF-16 characters up to the first NUL
+    /// (D/WrongType_DecimalAsString shows the character U+0007 for a DWORD 7).
+    /// </summary>
+    /// <param name="record">The record.</param>
+    /// <returns>The text.</returns>
+    public static string LooseText(Bwc.Gpo.Pol.PolRecord record)
+    {
+        var data = record.Data.Span;
+        var text = new System.Text.StringBuilder();
+        for (var i = 0; i + 1 < data.Length; i += 2)
+        {
+            var c = (char)(data[i] | (data[i + 1] << 8));
+            if (c == '\0')
+            {
+                break;
+            }
+
+            text.Append(c);
+        }
+
+        return text.ToString();
+    }
+
+    /// <summary>
+    /// Tells whether a record of a list key is an entry of the list. A plain list (no explicit value, no prefix) keeps the
+    /// entry as its own name, so a record with other data in its name is none of its entries: D/List_PlainValues,
+    /// D/List_PlainGapNames, D/List_PlainOtherNames, D/List_AdditiveValues, D/List_SharedKey and D/Order_ParentAfterChild
+    /// read Not Configured, B/Pol_List_Plain reads Enabled for names equal to the data. A prefix or explicit list takes any
+    /// name (B/Pol_List_EmptyPrefix, D/List_ExplicitValues).
+    /// </summary>
+    /// <param name="list">The list element.</param>
+    /// <param name="name">The value name of the record.</param>
+    /// <param name="data">The text of the record.</param>
+    /// <returns>True when the record is an entry.</returns>
+    public static bool IsListEntryOf(Bwc.Policy.Admx.ListElement list, string name, string data) =>
+        list.ExplicitValue || list.ValuePrefix is not null || string.Equals(name, data, StringComparison.Ordinal);
 
     /// <summary>
     /// Tells whether a stored record has the type that the template expects. Exact: a REG_SZ never stands for a

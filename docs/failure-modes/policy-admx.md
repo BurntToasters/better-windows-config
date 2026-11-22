@@ -506,14 +506,14 @@ The parser class comment said that a text or reference fault is recorded and the
 file when any failure was recorded while it was read (section 35), so the item does not stay. The comment now says the
 failure is recorded and the file is rejected by the loader. Documentation only.
 
-### 50. Letter case of `class` and boolean attributes (ADMX-4, open oracle question)
+### 50. Letter case of `class` and boolean attributes (ADMX-4, settled by H/ClassLowerCase, H/BoolAttributeUpper, H/BoolAttributeMixed)
 
-`class` (Machine, User, Both) and the boolean attributes (`required`, `soft`, `storeAsText`, `expandable`, `additive`,
-`explicitValue`) are accepted in any letter case, and boolean values also with surrounding blanks. What classic accepts
-is not captured: it may refuse `class="machine"` or `required="True"`. Until a capture exists the parser stays lenient.
-No code change. The capture cases are `H/ClassLowerCase` (one policy with `class="machine"`) and `H/BoolAttributeUpper` (one
-`decimal` element with `required="TRUE"`) and `H/BoolAttributeMixed` (one `decimal` element with `soft="True"`); they are in
-the plan and not yet captured.
+`class` is read as `Machine`, `User` or `Both` and the boolean attributes (`required`, `soft`, `storeAsText`, `expandable`,
+`additive`, `explicitValue`) as `true`, `false`, `1` or `0`, all in exactly that letter case; surrounding blanks are
+still allowed. Classic refuses the whole template for `class="machine"` (`H/ClassLowerCase`), `required="TRUE"`
+(`H/BoolAttributeUpper`) and `soft="True"` (`H/BoolAttributeMixed`). The loader records `InvalidAttributeValue` and rejects
+that one file, so the other templates still load (the declared difference: one bad template does not hide the rest).
+The code is `AdmxParser.TryReadClass` and `ParseContext.OptionalBool`.
 
 ## Group H captures (E6c)
 
@@ -527,7 +527,7 @@ there with its seven categories. Tests: `PolicyTemplateGoldenTests` in `tests/Bw
 | Case | Classic | Expected in the loader |
 |---|---|---|
 | `H/MalformedXml`, `H/DtdEntity`, `H/MissingAdml`, `H/DuplicatePolicy`, `H/UndefinedString`, `H/ListItemNoKey`, `H/BooleanNoValueName` | One message box at start; the category of the bad template is not in the tree; selecting it, listing it and opening its policy fail. | At least one `TemplateFailure` whose file is in the bad fixture; no file, category, policy or supported-on definition of its namespace in the set. |
-| `H/ClassLowerCase`, `H/BoolAttributeUpper`, `H/BoolAttributeMixed` | The same: one message box and nothing of the template shown. This answers section 50: classic refuses `class="machine"`, `required="TRUE"` and `soft="True"`. | As above. The parser is lenient today (section 50), so these three rows fail until the C dispatch makes the letter case strict and rewrites section 50. |
+| `H/ClassLowerCase`, `H/BoolAttributeUpper`, `H/BoolAttributeMixed` | The same: one message box and nothing of the template shown. This answers section 50: classic refuses `class="machine"`, `required="TRUE"` and `soft="True"`. | As above. The parser is strict (section 50). |
 | `H/UndefinedUsing` | No message box; the category `Bad fixture UndefinedUsing` is in the tree and its policy opens with its text and supported-on text. | No file is rejected; the category and the policy are in the set (section 35, link-level failures keep the file). |
 
 How the loader can fail against them:

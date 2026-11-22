@@ -36,8 +36,18 @@ internal static class PolReader
         }
 
         var pos = PolFormat.HeaderLength;
+        var records = 0;
         while (pos < bytes.Length)
         {
+            // Classic stops at a stray character after the last record and the next save leaves it out (D/File_TrailingBytes:
+            // one stray character, two bytes). Only that shape is accepted: whole characters, the first not NUL and not the
+            // bracket. A record that starts with the bracket and is cut short stays refused (D/File_TruncatedLastRecord,
+            // D/File_MissingCloseBracket); an odd or zero tail has no capture and stays refused (gap GAP-05).
+            if (records > 0 && IsStrayTail(bytes, pos))
+            {
+                break;
+            }
+
             var failure = ReadRecord(bytes, ref pos, out var record);
             if (failure is not null)
             {
@@ -45,6 +55,7 @@ internal static class PolReader
             }
 
             document.ReplayLoaded(record!);
+            records++;
         }
 
         return null;
@@ -222,6 +233,17 @@ internal static class PolReader
         value = BinaryPrimitives.ReadUInt32LittleEndian(b[pos..]);
         pos += 4;
         return null;
+    }
+
+    private static bool IsStrayTail(ReadOnlySpan<byte> bytes, int pos)
+    {
+        if ((bytes.Length - pos) % 2 != 0)
+        {
+            return false;
+        }
+
+        var first = ReadChar(bytes, pos);
+        return first != PolFormat.RecordStart && first != '\0';
     }
 
     private static char ReadChar(ReadOnlySpan<byte> b, int pos) => (char)(b[pos] | (b[pos + 1] << 8));

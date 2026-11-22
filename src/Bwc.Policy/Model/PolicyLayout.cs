@@ -48,7 +48,15 @@ internal static class PolicyEncoding
         }
 
         var (type, data) = Encode(write.Value);
-        return PolicyRules.StoredTypeMatches((uint)type, record.Type) && record.Data.Span.SequenceEqual(data);
+        if (!PolicyRules.StoredTypeMatches((uint)type, record.Type))
+        {
+            return false;
+        }
+
+        // A string value is compared without regard to case: D/Mismatch_StringCase reads ON as the value on.
+        return write.Value.Kind == PolicyValueKind.String
+            ? string.Equals(PolData.TryGetString(record.Data.Span), write.Value.Text ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+            : record.Data.Span.SequenceEqual(data);
     }
 
     public static bool AllMatch(PolDocument document, IReadOnlyList<ValueWrite> writes) =>

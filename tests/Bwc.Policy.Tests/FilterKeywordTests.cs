@@ -68,11 +68,13 @@ public sealed class FilterKeywordTests
     }
 
     [TestMethod]
-    public void All_EveryWordMustBeFoundPossiblyInDifferentTexts()
+    public void All_EveryWordMustBeFoundInOneText()
     {
-        Assert.IsTrue(Hit(Words("alpha network", KeywordMatchMode.All)), "title and help text");
+        // Changed from "possibly in different texts": capture F/Filter_Options op 54 shows classic matching no policy when the
+        // words are split between the title and the help text.
+        Assert.IsFalse(Hit(Words("alpha network", KeywordMatchMode.All)), "title and help text");
         Assert.IsFalse(Hit(Words("alpha zzz", KeywordMatchMode.All)));
-        Assert.IsTrue(Hit(Words("alpha zebra", KeywordMatchMode.All), comment: "zebra"));
+        Assert.IsFalse(Hit(Words("alpha zebra", KeywordMatchMode.All), comment: "zebra"));
         Assert.IsFalse(Hit(Words("alpha zebra", KeywordMatchMode.All, comment: false), comment: "zebra"));
     }
 

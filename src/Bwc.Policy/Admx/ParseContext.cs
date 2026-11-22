@@ -122,7 +122,10 @@ internal sealed class ParseContext(string path, FailureSink sink, Func<string, s
     /// </summary>
     internal static string? KeyAttr(XElement element, string name) => Attr(element, name)?.TrimEnd('\\');
 
-    /// <summary>Reads an optional boolean attribute. A value that is not true, false, 1 or 0 is recorded and ignored.</summary>
+    /// <summary>
+    /// Reads an optional boolean attribute. A value that is not true, false, 1 or 0 in lower case is recorded and ignored:
+    /// classic refuses the whole template for required="TRUE" and soft="True" (H/BoolAttributeUpper, H/BoolAttributeMixed).
+    /// </summary>
     internal bool? OptionalBool(XElement element, string name)
     {
         var text = Attr(element, name);
@@ -131,7 +134,7 @@ internal sealed class ParseContext(string path, FailureSink sink, Func<string, s
             return null;
         }
 
-        switch (text.Trim().ToLowerInvariant())
+        switch (text.Trim())
         {
             case "true" or "1":
                 return true;

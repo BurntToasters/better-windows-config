@@ -61,8 +61,10 @@ public sealed class PolicyReadStateTests
     {
         var expected = PolicyRules.UnmatchedValueState;
 
-        Assert.AreEqual(expected, Read("Pol_Shared_Alpha", Parse(RecDw(Shared, "Alpha", 2))).State);
-        Assert.AreEqual(expected, Read("Pol_Shared_Alpha", Parse(RecSz(Shared, "Alpha", "1"))).State);
+        // Changed for the plain flag: captures D/Mismatch_FlagValue2 and D/WrongType_FlagAsString show classic reading 2 and a
+        // REG_SZ "1" at a flag as Enabled, so only the policies that declare a value follow the unmatched rule.
+        Assert.AreEqual(PolicyState.Enabled, Read("Pol_Shared_Alpha", Parse(RecDw(Shared, "Alpha", 2))).State);
+        Assert.AreEqual(PolicyState.Enabled, Read("Pol_Shared_Alpha", Parse(RecSz(Shared, "Alpha", "1"))).State);
         Assert.AreEqual(expected, Read("Pol_Value_EnabledOnly", Parse(RecDw(Basics, "EnabledOnly", 1))).State);
         Assert.AreEqual(expected, Read("Pol_Value_Decimal", Parse(Rec(Basics, "ModeNumber", 11, Qw(5)))).State);
     }
@@ -168,31 +170,37 @@ public sealed class PolicyReadStateTests
     }
 
     [TestMethod]
-    public void Elements_OfTheWrongRegistryType_AreNotValues()
+    public void Elements_OfAnotherRegistryType_AreReadFromTheirData()
     {
+        // Changed from "are not values": captures D/WrongType_DecimalAsString (a text box reads a DWORD), D/WrongType_LongAsDword
+        // and D/WrongType_ExpandableAsPlain show classic reading an element whatever the type of its record.
         var document = Parse(RecDw(Shared, "Gate", 1), RecDw(Shared, "ZetaElement", 1), RecSz(Shared, "AlphaElement", "2"));
 
         var snapshot = Read("Pol_Shared_ElementsReverseOrder", document);
 
         Assert.AreEqual(PolicyState.Enabled, snapshot.State);
-        Assert.AreEqual(0, snapshot.Elements.Count);
+        Assert.AreEqual(2, snapshot.Elements.Count);
     }
 
     [TestMethod]
-    public void Text_ExpandableAndPlain_MustMatchTheirType()
+    public void Text_ExpandableAndPlain_ReadEitherStringType()
     {
-        Assert.AreEqual(0, Read("Pol_Text_Expandable", Parse(RecSz(Text, "ExpandText", "x"))).Elements.Count);
-        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Text_Plain", Parse(Rec(Text, "PlainText", 2, Sz("x")))).State);
+        // Changed from "must match their type": capture D/WrongType_ExpandableAsPlain shows Enabled for both mismatches.
+        Assert.AreEqual(1, Read("Pol_Text_Expandable", Parse(RecSz(Text, "ExpandText", "x"))).Elements.Count);
+        Assert.AreEqual(PolicyState.Enabled, Read("Pol_Text_Plain", Parse(Rec(Text, "PlainText", 2, Sz("x")))).State);
         Assert.AreEqual(PolicyState.Enabled, Read("Pol_Text_Expandable", Parse(Rec(Text, "ExpandText", 2, Sz("x")))).State);
     }
 
     [TestMethod]
-    public void NoValueNameElementsAndWrongTypes_ReadNotConfigured()
+    public void NoValueNameElementsAndWrongTypes_ReadFromTheirData()
     {
-        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Decimal_StoreAsText", Parse(RecDw(Number, "TextNumber", 5))).State);
-        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Decimal_StoreAsText", Parse(RecSz(Number, "TextNumber", "abc"))).State);
-        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_LongDecimal_Basic", Parse(RecDw(Number, "LongNumber", 5))).State);
-        Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_MultiText_Basic", Parse(RecSz(Text, "MultiLines", "a"))).State);
+        // Changed from "read Not Configured": D/WrongType_StoreAsTextAsDword, D/WrongType_LongAsDword and
+        // D/WrongType_MultiAsString show classic reading Enabled for these records. Enum values stay exact
+        // (D/Mismatch_EnumUnknownItem).
+        Assert.AreEqual(PolicyState.Enabled, Read("Pol_Decimal_StoreAsText", Parse(RecDw(Number, "TextNumber", 5))).State);
+        Assert.AreEqual(PolicyState.Enabled, Read("Pol_Decimal_StoreAsText", Parse(RecSz(Number, "TextNumber", "abc"))).State);
+        Assert.AreEqual(PolicyState.Enabled, Read("Pol_LongDecimal_Basic", Parse(RecDw(Number, "LongNumber", 5))).State);
+        Assert.AreEqual(PolicyState.Enabled, Read("Pol_MultiText_Basic", Parse(RecSz(Text, "MultiLines", "a"))).State);
         Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Enum_DecimalItems", Parse(RecDw(Choice, "DecimalChoice", 99))).State);
         Assert.AreEqual(PolicyState.NotConfigured, Read("Pol_Enum_StringItems", Parse(RecSz(Choice, "StringChoice", "purple"))).State);
     }
@@ -210,12 +218,14 @@ public sealed class PolicyReadStateTests
     public void List_ReadsStringValuesOnly_AndKeepsForeignTypesOut()
     {
         var key = Lists + @"\Plain";
-        var document = Parse(RecSz(key, "a", "one"), RecDw(key, "n", 4), Rec(key, "**delvals.", 1, DeleteData), RecSz(key, "b", "two"));
+        // The names equal the data: capture D/List_PlainValues shows a plain list whose names differ from its data reading Not
+        // Configured, B/Pol_List_Plain shows names equal to the data reading Enabled.
+        var document = Parse(RecSz(key, "one", "one"), RecDw(key, "n", 4), Rec(key, "**delvals.", 1, DeleteData), RecSz(key, "two", "two"));
 
         var list = (ListValue)Read("Pol_List_Plain", document).Elements["PlainList"];
 
         CollectionAssert.AreEqual(new[] { "one", "two" }, list.Entries.Select(e => e.Data).ToArray());
-        CollectionAssert.AreEqual(new[] { "a", "b" }, list.Entries.Select(e => e.Name).ToArray());
+        CollectionAssert.AreEqual(new[] { "one", "two" }, list.Entries.Select(e => e.Name).ToArray());
     }
 
     [TestMethod]

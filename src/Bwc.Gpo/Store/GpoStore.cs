@@ -263,8 +263,8 @@ public sealed class GpoStore
         {
             try
             {
-                // A zero-byte file is "no policy yet" (verify against oracle, matrix D).
-                var document = stream.Length == 0 ? PolDocument.Create() : PolDocument.Parse(stream);
+                // A zero-byte file is not a policy file: classic refuses to open it (D/File_Empty), so the reader reports Empty.
+                var document = PolDocument.Parse(stream);
                 return new Loaded<PolDocument>(document, null, true);
             }
             catch (PolFormatException e)

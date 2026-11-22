@@ -342,13 +342,26 @@ public sealed class AdmxParserTests
     }
 
     [TestMethod]
-    public void Parser_ClassIsCaseInsensitive()
+    public void Parser_ClassFollowsTheLetterCaseOfTheSchema()
+    {
+        // Changed from "is case insensitive": capture H/ClassLowerCase shows classic refusing class="machine" with a message box.
+        using var bad = new TempTemplates();
+        bad.AddSimple(
+            "Case",
+            "T.Case",
+            """<policy name="P" class="both" displayName="$(string.P)" key="K"><parentCategory ref="Root" /></policy>""",
+            """<string id="P">P</string>""");
+        FailureAssert.Single(bad.Load(), TemplateFailureCode.InvalidAttributeValue);
+        Parser_ClassBoth_IsRead();
+    }
+
+    private static void Parser_ClassBoth_IsRead()
     {
         using var temp = new TempTemplates();
         temp.AddSimple(
             "Case",
             "T.Case",
-            """<policy name="P" class="both" displayName="$(string.P)" key="K"><parentCategory ref="Root" /></policy>""",
+            """<policy name="P" class="Both" displayName="$(string.P)" key="K"><parentCategory ref="Root" /></policy>""",
             """<string id="P">P</string>""");
         var set = temp.Load();
         FailureAssert.None(set);

@@ -1,8 +1,8 @@
 namespace Bwc.Gpo.Store;
 
 /// <summary>
-/// The classic gpt.ini choices that the 2026-11-18 probe did not settle, in one place so the oracle capture (groups A
-/// and C) corrects them in one spot. Every member marked "verify against oracle" is an assumption.
+/// The classic gpt.ini choices, in one place. The captures of groups A and C settle them (the gpt.ini of every A and C
+/// golden step); a member that names no capture case restates the 2026-11-18 probe.
 /// </summary>
 public static class GptIniRules
 {

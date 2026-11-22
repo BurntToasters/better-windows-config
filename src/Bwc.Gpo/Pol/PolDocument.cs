@@ -307,7 +307,7 @@ public sealed class PolDocument
         ValidateKey(key);
         if (!_keys.TryGetValue(key, out var bucket))
         {
-            bucket = new Bucket(key);
+            bucket = new Bucket(SpellNewKey(key));
             _keys.Add(key, bucket);
         }
 
@@ -439,11 +439,20 @@ public sealed class PolDocument
             _keys.Add(record.Key, bucket);
         }
 
+        // Two spellings of one key are one key, written with the first spelling (D/Case_KeyTwoSpellings).
+        if (!string.Equals(record.Key, bucket.Spelling, StringComparison.Ordinal))
+        {
+            record = PolRecord.Create(bucket.Spelling, record.ValueName, record.Type, record.Data.Span);
+        }
+
         if (bucket.ByName.TryGetValue(record.ValueName, out var existing))
         {
-            if (!PolOrderRules.IsSameContent(existing.Value, record.Type, record.Data.Span))
+            // A name that occurs again takes the later data and keeps the place of its first occurrence
+            // (D/Dup_DelBetweenDifferent, D/Dup_DelvalsBetween, D/Dup_DifferentLastWins).
+            var old = existing.Value;
+            if (!PolOrderRules.IsSameContent(old, record.Type, record.Data.Span))
             {
-                bucket.ByName[record.ValueName] = PolOrderRules.ReplaceByAppend(bucket.Records, existing, record);
+                existing.Value = PolRecord.Create(old.Key, old.ValueName, record.Type, record.Data.Span);
             }
         }
         else
@@ -453,11 +462,39 @@ public sealed class PolDocument
         }
     }
 
+    // A key that is new to the file is spelled the way classic's key tree spells it: a segment that an existing key already
+    // has at the same depth keeps that key's spelling and only the segments below are the template's (D/Case_KeyDiffers).
+    private string SpellNewKey(string key)
+    {
+        var known = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var existing in _keys.Values)
+        {
+            var path = string.Empty;
+            foreach (var segment in existing.Spelling.Split('\\'))
+            {
+                path = path.Length == 0 ? segment : path + "\\" + segment;
+                known.TryAdd(path, segment);
+            }
+        }
+
+        var spelled = new List<string>();
+        var given = string.Empty;
+        var matching = true;
+        foreach (var segment in key.Split('\\'))
+        {
+            given = given.Length == 0 ? segment : given + "\\" + segment;
+            matching = matching && known.ContainsKey(given);
+            spelled.Add(matching ? known[given] : segment);
+        }
+
+        return string.Join('\\', spelled);
+    }
+
     private PolRecord Upsert(string key, string name, uint type, ReadOnlySpan<byte> data)
     {
         if (!_keys.TryGetValue(key, out var bucket))
         {
-            bucket = new Bucket(key);
+            bucket = new Bucket(SpellNewKey(key));
             _keys.Add(key, bucket);
         }
 

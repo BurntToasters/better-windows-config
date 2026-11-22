@@ -630,14 +630,15 @@ Two user decisions of 2026-11-22 are recorded as removed rows, not as difference
 
 ## 4. Open questions
 
-The oracle must settle these before the engine is frozen. They are the same list as the policy engine contract and are not guessed.
+Each question is closed by the capture case named with it (E6c). Nothing is left open; the rules that no capture reaches are
+rows of the Gaps section of `docs/parity/gpedit-audit.md`.
 
-- OQ-01. Record order inside a key when a policy writes several values.
-- OQ-02. How a boolean that is false is stored when the template has no `falseValue`.
-- OQ-03. How policy state is inferred from a partial or foreign Registry.pol.
-- OQ-04. What Not Configured removes from a key shared by policies or lists.
-- OQ-05. What is written when the file ends up with no records.
-- OQ-06. How list values are named.
-- OQ-07. When gpt.ini extension pairs are removed, and whether a comment-only change bumps the version.
-- OQ-08. Which `**` instructions classic keeps or shows.
-- OQ-09. The contents of the Extra Registry Settings node.
+- OQ-01. Record order inside a key when a policy writes several values. Closed: a value set to new data moves to the end of its key, the same data changes nothing, and keys are written in tree order whatever the order they were in (POL-031; C/TwoInKey_ChangeFirstAgain, C/Shared_MidAlphaZeta, D/Order_KeysDescending, D/Order_ParentAfterChild, D/Order_ValuesAscending).
+- OQ-02. How a boolean that is false is stored when the template has no `falseValue`. Closed: a `**del.` record of the value name, no value (B/Pol_Bool_NoFalseValue step 3). A checked box writes the DWORD 1 (step 2).
+- OQ-03. How policy state is inferred from a partial or foreign Registry.pol. Closed: the rules of `docs/failure-modes/policy-state.md` section 1, derived from all D cases of each kind (D/Partial_*, D/Mismatch_*, D/WrongType_*, D/Del_*, D/Foreign_*, D/List_*). Records that match no policy change nothing (D/Foreign_ValueInPolicyKey).
+- OQ-04. What Not Configured removes from a key shared by policies or lists. Closed: every value and the delete-values record of the key, also when the other policy that shares the key is still Disabled (C/SharedList_DisableAndShrink step 6, C/SharedList_OneThenTwo).
+- OQ-05. What is written when the file ends up with no records. Closed: a Registry.pol of the 8-byte header and the extension line of gpt.ini with one space (B/Pol_List_Additive step 6, C/Clear_LastSetting_Machine, POL-033).
+- OQ-06. How list values are named. Closed: a plain list takes its entry as the name and the data, a prefix list the prefix and a number from 1 (Item1, Item2), an explicit list the name cell with the value cell as data, a policy-value-name list names its entries like a plain list and writes the policy value as the DWORD 1 (B/Pol_List_Plain, B/Pol_List_ValuePrefix, B/Pol_List_ExplicitValue, B/Pol_List_PolicyValueName). Reading a plain list takes only entries whose name equals the data (D/List_AdditiveValues, D/List_PlainValues).
+- OQ-07. When gpt.ini extension pairs are removed, and whether a comment-only change bumps the version. Closed: the pair leaves a side when the side has no setting left, foreign pairs stay (POL-041; C/GptIni_PairRemoval, C/GptIni_ForeignExtensions); a comment-only change writes comment.cmtx and gpt.ini and raises the version (POL-038; C/Comment_OnlyAfterSave).
+- OQ-08. Which `**` instructions classic keeps or shows. Closed: it keeps every one in place and shows none (D/Instruction_KeyLevel, D/Instruction_Unknown, D/Instruction_UnknownAlone; BEH-014). The lone delete record that reads Disabled is in D/Del_Only.
+- OQ-09. The contents of the Extra Registry Settings node. Closed: there is no node; records that match no policy stay invisible and are kept untouched (BEH-014, TREE-020; D/Foreign_*).

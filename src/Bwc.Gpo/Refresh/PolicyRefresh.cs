@@ -13,11 +13,11 @@ public interface IPolicyRefresher
 }
 
 /// <summary>
-/// The real refresher: <c>RefreshPolicyEx(machine, RP_FORCE)</c> from <c>userenv.dll</c>. Verify against oracle (group
-/// G): the flag choice. <c>RP_FORCE</c> (1) refreshes even when no version changed; BWC bumps the version anyway, so
-/// the flag only guards against a missed bump. The user call refreshes the calling user's policy: for an elevated
-/// split-token administrator that is the same user. This is the only file that names the API (the static guard
-/// enforces it). Tests never call this class.
+/// The real refresher: <c>RefreshPolicyEx(machine, RP_FORCE)</c> from <c>userenv.dll</c>. The flag choice has no capture
+/// (the editor does not show which refresh call it makes): gap GAP-02 in docs/parity/gpedit-audit.md. <c>RP_FORCE</c> (1)
+/// refreshes even when no version changed; BWC bumps the version anyway, so the flag only guards against a missed bump.
+/// The user call refreshes the calling user's policy: for an elevated split-token administrator that is the same user.
+/// This is the only file that names the API (the static guard enforces it). Tests never call this class.
 /// </summary>
 public sealed partial class UserenvPolicyRefresher : IPolicyRefresher
 {
