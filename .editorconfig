@@ -1,0 +1,5 @@
+root = true
+
+# Hardening: every P/Invoke in the shipped source must name a DLL search path (CA5392).
+[src/**.cs]
+dotnet_diagnostic.CA5392.severity = warning
