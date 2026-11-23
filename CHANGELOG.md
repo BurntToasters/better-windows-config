@@ -20,6 +20,28 @@ Better Windows Config! Faithful, modern re-implementations of the classic Window
 ## Changes in `v0.2.0:`
 
 - **Local Group Policy Editor:** New tool, a faithful clone of the classic Local Group Policy Editor.
+  - Browse the Administrative Templates of Computer Configuration and User Configuration.
+  - The policy setting dialog shows the policy's options and comment, with Previous and Next to move through the policies in order.
+  - Saving writes the local policy files (`Registry.pol`, `gpt.ini`, and `comment.cmtx`) through one locked writer. Before the first write of a session, BWC keeps a backup of the three files, the last 10. After a save, the policy is refreshed.
+  - Without administrator rights, on Windows Home, or without write access to the policy folder, the editor opens read-only and shows a notice.
+  - Filter Options, Filter On, and Re-Apply filter the tree. All Settings lists every policy with a Path column.
+  - Columns can be sorted, and the sort is kept for each node.
+  - Add/Remove Templates imports ADMX templates and removes them. Classic `.adm` files are not accepted.
+  - Templates that fail to load are listed in a load-error list. One bad template does not hide the rest.
+  - View > Add/Remove Columns, Customize View, and Export List.
+  - File > Options, and the Help menu with the web site entry, About, and the snap-in About.
+  - Refresh (Action menu, context menus, toolbar, and F5) reloads the templates and the policy files.
+- **Hub and installer:** The Hub and the installer now list three tools. An update from 0.1.x adds the Local Group Policy Editor.
+- **Hardening:** DLL loading searches System32 only, the Hub opens release notes links only when they are plain https addresses, and app manifests carry the product version.
+- **Known differences from the classic editor:**
+  - Template load errors are shown in a list and a status bar notice, not in a start-up message box. Each problem has a sentence of its own.
+  - BWC uses its own icons.
+  - There is no Favorites menu, no Extra Registry Settings node, and no action pane.
+  - The editor opens read-only when it is not elevated or on Windows Home, instead of refusing to open.
+  - Saving keeps changes made outside BWC by reading and changing the files under a lock, instead of rewriting them from an older copy.
+  - The Extended view pane is native, not an HTML page.
+  - Ctrl+P, Ctrl+F10, Ctrl+F5, and Ctrl+Alt+Shift+F7 are not bound.
+- Writing policies on Windows Home and on non-English Windows was simulated only. It has not been verified on real machines.
 
 ## Changes in `v0.1.5:`
 

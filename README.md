@@ -64,8 +64,9 @@ from the original, that's a bug.
       the setting dialog for a policy, and saves it to the local policy (<code>Registry.pol</code>,
       <code>gpt.ini</code>, and <code>comment.cmtx</code>) when it runs as an administrator. Without
       elevation, on Windows Home, or without write access to the policy folder, it is read-only and
-      shows a notice. Some classic features are still being built, so it does not match classic
-      <code>gpedit.msc</code> yet.
+      shows a notice. It also has the filter, sorting, All Settings, Add/Remove Templates for ADMX
+      files and the classic View, File and Help menus. The changelog lists where it differs from
+      classic <code>gpedit.msc</code> on purpose.
     </td>
   </tr>
 </table>
@@ -101,8 +102,12 @@ those with [my public key](https://tuxedo.rosie.run/GPG/BurntToasters_0xF2FBC20F
 
 - Open **Better Windows Config** from the Start menu to get the Hub, or open
   **Registry Editor (BWC)** or **Local Group Policy Editor (BWC)** directly.
-- To change a policy, start the Local Group Policy Editor as an administrator. Otherwise it only
-  shows the current state.
+- The Hub lists the Local Group Policy Editor next to the Registry Editor. Choose it there, or open
+  **Local Group Policy Editor (BWC)** from the Start menu.
+- To change a policy, start the Local Group Policy Editor as an administrator. Saving needs
+  administrator rights, and the policy files are written only then.
+- Without administrator rights, or on Windows Home, the editor opens read-only. It shows the current
+  policy and a notice, so you can browse settings but not save them.
 - The Registry Editor also works from the command line the way classic regedit does:
 
   ```powershell
