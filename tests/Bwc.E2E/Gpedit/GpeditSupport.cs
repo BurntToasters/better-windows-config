@@ -69,7 +69,7 @@ internal sealed class GpeditSandbox
     internal GpoStore Store => new(new SandboxGpoStorePolicy(GpoRoot, DataRoot, null, new RecordingRefresher()));
 
     /// <summary>The environment of the editor process for this sandbox.</summary>
-    internal Dictionary<string, string> Environment(bool shape = false)
+    internal Dictionary<string, string> Environment(bool shape = false, bool icons = false)
     {
         var environment = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -87,6 +87,11 @@ internal sealed class GpeditSandbox
         if (shape)
         {
             environment["BWC_E2E_GPEDIT_SHAPE"] = "1";
+        }
+
+        if (icons)
+        {
+            environment["BWC_E2E_GPEDIT_ICONS"] = "1";
         }
 
         return environment;
@@ -329,9 +334,9 @@ internal sealed class GpeditRun : IDisposable
     /// Starts the editor on a sandbox and waits until the templates are loaded. <paramref name="name"/> becomes the data
     /// root scope (prefixed with console-); a second Open with the same name sees the same settings file.
     /// </summary>
-    internal static GpeditRun Open(string name, GpeditSandbox sandbox, bool shape = false, bool placeWindow = true, TimeSpan? loadTimeout = null)
+    internal static GpeditRun Open(string name, GpeditSandbox sandbox, bool shape = false, bool placeWindow = true, TimeSpan? loadTimeout = null, bool icons = false)
     {
-        ShellRun shell = ShellRun.Open(name, sandbox.Environment(shape));
+        ShellRun shell = ShellRun.Open(name, sandbox.Environment(shape, icons));
         var run = new GpeditRun(shell, sandbox);
         try
         {
@@ -386,6 +391,19 @@ internal sealed class GpeditRun : IDisposable
 
     /// <summary>The whole tree as indented text (the run must have been opened with <c>shape: true</c>).</summary>
     internal string Shape()
+    {
+        try
+        {
+            return Shell.Find(RootId)?.Properties.FullDescription.ValueOrDefault ?? string.Empty;
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
+
+    /// <summary>The tree with the icon of each node (opened with <c>icons: true</c>): name, tab, icon kind.</summary>
+    internal string Icons()
     {
         try
         {

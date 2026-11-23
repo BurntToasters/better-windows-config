@@ -256,32 +256,32 @@
 | ACC-014 | Tree pane, Right (step 2): the selection moves to the first child. | F/Keys_Tree | G2 | pass |
 | ACC-015 | Tree pane, Down (step 3): the selection moves to the next node. | F/Keys_Tree | G2 | pass |
 | ACC-016 | Tree pane, Up (step 4): the selection moves to the previous node. | F/Keys_Tree | G2 | pass |
-| ACC-017 | Tree pane, Home (step 5): the selection moves to the root, Local Computer Policy. | F/Keys_Tree | G2 | gap |
-| ACC-018 | Tree pane, End (step 6): the selection moves to the last visible node. | F/Keys_Tree | G2 | gap |
-| ACC-019 | Tree pane, PageDown (step 7): from the last visible node the selection does not change. | F/Keys_Tree | G2 | gap |
+| ACC-017 | Tree pane, Home (step 5): the selection moves to the root, Local Computer Policy. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeWalk) |
+| ACC-018 | Tree pane, End (step 6): the selection moves to the last visible node. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeWalk) |
+| ACC-019 | Tree pane, PageDown (step 7): from the last visible node the selection does not change. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeWalk) |
 | ACC-020 | Tree pane, PageUp (step 8): the selection moves up by a page. | F/Keys_Tree | G2 | gap |
-| ACC-021 | Tree pane, Plus (step 9): no selection change; opens no window and no menu. | F/Keys_Tree | G2 | gap |
-| ACC-022 | Tree pane, Minus (step 10): no selection change; opens no window and no menu. | F/Keys_Tree | G2 | gap |
-| ACC-023 | Tree pane, Asterisk (step 11): no selection change; opens no window and no menu. | F/Keys_Tree | G2 | gap |
+| ACC-021 | Tree pane, Plus (step 9): no selection change; opens no window and no menu. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeExpand) |
+| ACC-022 | Tree pane, Minus (step 10): no selection change; opens no window and no menu. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeExpand) |
+| ACC-023 | Tree pane, Asterisk (step 11): no selection change; opens no window and no menu. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeExpand) |
 | ACC-024 | Tree pane, Backspace (step 12): the selection moves to the parent node. | F/Keys_Tree | G2 | pass |
 | ACC-025 | Tree pane, Tab (step 13): focus moves out of the tree to the result side; the selection stays. | F/Keys_Tree | G2 | pass |
 | ACC-026 | Tree pane, Shift+Tab (step 14): focus returns to the tree; the selection stays. | F/Keys_Tree | G2 | pass |
 | ACC-027 | Tree pane, F5 (step 15): opens no window and no menu; selection stays. | F/Keys_Tree | G2 | pass |
 | ACC-028 | Tree pane, F6 (step 16): focus moves to the result side. | F/Keys_Tree | G2 | pass |
-| ACC-029 | Tree pane, Esc (step 17): no effect on selection or focus; no window. | F/Keys_Tree | G2 | gap |
+| ACC-029 | Tree pane, Esc (step 17): no effect on selection or focus; no window. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeExpand) |
 | ACC-030 | Tree pane, Alt+Left (step 18): no change to selection or focus in this capture (history keys; the capture's focus is on the result side). | F/Keys_Tree | G2 | gap |
 | ACC-031 | Tree pane, Alt+Right (step 19): no change in this capture. | F/Keys_Tree | G2 | gap |
 | ACC-032 | Tree pane, Alt+Up (step 20): no change in this capture. | F/Keys_Tree | G2 | pass |
 | ACC-033 | Tree pane, Apps (step 21): no popup menu opens in this capture (focus is on the result side). | F/Keys_Tree | G2 | pass |
-| ACC-034 | Result list, Down (F/Keys_List step 1): the focus stays on the last row (the start row is the last). | F/Keys_List | G2 | gap |
-| ACC-035 | Result list, Up (step 2): the focus moves to the previous row. | F/Keys_List | G2 | gap |
-| ACC-036 | Result list, Home (step 3): the focus moves to the first row. | F/Keys_List | G2 | gap |
-| ACC-037 | Result list, End (step 4): the focus moves to the last row. | F/Keys_List | G2 | gap |
-| ACC-038 | Result list, PageDown (step 5): the focus stays on the last row. | F/Keys_List | G2 | gap |
-| ACC-039 | Result list, PageUp (step 6): the focus moves to the first row. | F/Keys_List | G2 | gap |
-| ACC-040 | Result list, Space (step 7): no window, no menu; focus stays. | F/Keys_List | G2 | gap |
-| ACC-041 | Result list, Right (step 8): no window, no menu; focus stays. | F/Keys_List | G2 | gap |
-| ACC-042 | Result list, Left (step 9): no window, no menu; focus stays. | F/Keys_List | G2 | gap |
+| ACC-034 | Result list, Down (F/Keys_List step 1): the focus stays on the last row (the start row is the last). | F/Keys_List | G2 | pass (Gpedit_Keys_ListWalk) |
+| ACC-035 | Result list, Up (step 2): the focus moves to the previous row. | F/Keys_List | G2 | pass (Gpedit_Keys_ListWalk) |
+| ACC-036 | Result list, Home (step 3): the focus moves to the first row. | F/Keys_List | G2 | pass (Gpedit_Keys_ListWalk) |
+| ACC-037 | Result list, End (step 4): the focus moves to the last row. | F/Keys_List | G2 | pass (Gpedit_Keys_ListWalk) |
+| ACC-038 | Result list, PageDown (step 5): the focus stays on the last row. | F/Keys_List | G2 | pass (Gpedit_Keys_ListWalk) |
+| ACC-039 | Result list, PageUp (step 6): the focus moves to the first row. | F/Keys_List | G2 | pass (Gpedit_Keys_ListWalk) |
+| ACC-040 | Result list, Space (step 7): no window, no menu; focus stays. | F/Keys_List | G2 | pass (Gpedit_Keys_ListInert) |
+| ACC-041 | Result list, Right (step 8): no window, no menu; focus stays. | F/Keys_List | G2 | pass (Gpedit_Keys_ListInert) |
+| ACC-042 | Result list, Left (step 9): no window, no menu; focus stays. | F/Keys_List | G2 | pass (Gpedit_Keys_ListInert) |
 | ACC-043 | Result list, Ctrl+A (step 10): no window, no menu; focus stays on the same row. | F/Keys_List | G2 | gap |
 | ACC-044 | Result list, F5 (step 11): no window, no menu; focus stays. | F/Keys_List | G2 | pass |
 | ACC-045 | Result list, Tab (step 12): the focus leaves the list for the next pane. | F/Keys_List | G2 | pass |
@@ -459,7 +459,7 @@
 | TREE-016 | A policy placed directly under the top category shows in that category's list, next to the subcategory folder rows. | F/Tree_User, F/Nodes_User | G1 | pass |
 | TREE-017 | Category node icons: folder style, same as placeholder nodes except Administrative Templates and its descendants. | F/Tree_Computer, F/Tree_User | G1, U2a | gap |
 | TREE-018 | Selecting a node updates the result list at once; selecting a placeholder node shows an empty or children-only list. | F/Placeholders_Computer, F/Placeholders_User | G1 | pass |
-| TREE-019 | Expand and collapse keys on the tree (Right, Left, Plus, Minus, Asterisk, Backspace). | F/Keys_Tree | G2 | gap |
+| TREE-019 | Expand and collapse keys on the tree (Right, Left, Plus, Minus, Asterisk, Backspace). | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeWalk, Gpedit_Keys_TreeExpand) |
 | TREE-020 | Removed 2026-11-22 by user decision: an Extra Registry Settings node. Classic shows none; records that match no policy stay invisible (see BEH-014). BWC builds none. | F/Tree_Computer, F/Tree_User; D/Foreign_* | none | removed |
 
 ### 2.9 BEH: behavior not in the resources

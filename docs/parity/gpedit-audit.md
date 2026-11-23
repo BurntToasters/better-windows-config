@@ -26,10 +26,10 @@ State after A1 (2026-11-22, HEAD 5ccff10): every row has a verdict. E2E evidence
 | CTX | 9 | 2 | 0 | 0 | 0 |
 | TOOL | 16 | 1 | 0 | 0 | 0 |
 | DLG | 35 | 88 | 0 | 0 | 0 |
-| ACC | 24 | 6 | 20 | 0 | 0 |
+| ACC | 40 | 6 | 4 | 0 | 0 |
 | MSG | 3 | 73 | 17 | 0 | 0 |
 | VIEW | 28 | 14 | 1 | 0 | 0 |
-| TREE | 16 | 0 | 3 | 1 | 0 |
+| TREE | 17 | 0 | 2 | 1 | 0 |
 | BEH | 23 | 4 | 1 | 1 | 0 |
 | POL | 63 | 0 | 5 | 0 | 7 |
 | ADMX | 32 | 0 | 0 | 0 | 0 |
@@ -49,30 +49,14 @@ Engine rules that no capture settles are listed first (E6c). Each has a pointer 
 | GAP-06 | A key that a new record joins takes the spelling of its ancestors; on load two spellings of one key merge under the first. | D/Case_KeyDiffers and D/Case_KeyTwoSpellings show one level; deeper trees and ties between several first spellings are not captured. | `PolDocument.SpellNewKey` |
 | GAP-07 | The namespaces that stay in comment.cmtx after the first save of a session. | Only the one-namespace case is captured (A/Machine_Enabled, A/User_Enabled). | `CmtxDocument.RestrictNamespacesTo` |
 
-Gap rows of the audit (A1). Each line names the row, what is missing and the piece that closes it: A3 for a fix or a test after this audit, A2 for the elevated run (a real save with refresh). Gap rows by section: ACC 20, MSG 17, VIEW 1, TREE 3, BEH 1, POL 5, ADMX 1.
+Gap rows of the audit (A1). Each line names the row, what is missing and the piece that closes it: A3 for a fix or a test after this audit, A2 for the elevated run (a real save with refresh). Gap rows by section: ACC 4, MSG 17, VIEW 1, TREE 2, BEH 1, POL 5, ADMX 1.
 
 | Row | What is missing | Piece |
 | --- | --- | --- |
-| ACC-017 | Tree Home: no test. | A3 |
-| ACC-018 | Tree End: no test. | A3 |
-| ACC-019 | Tree PageDown: no test. | A3 |
-| ACC-020 | Tree PageUp: no test. | A3 |
-| ACC-021 | Tree Plus: no test. | A3 |
-| ACC-022 | Tree Minus: no test. | A3 |
-| ACC-023 | Tree Asterisk: no test. | A3 |
-| ACC-029 | Tree Esc with no menu open: no test. | A3 |
-| ACC-030 | Alt+Left with the focus on the result side (the capture shows no change): no test. | A3 |
-| ACC-031 | Alt+Right with the focus on the result side (the capture shows no change): no test. | A3 |
-| ACC-034 | List Down at the last row: no test in the editor. | A3 |
-| ACC-035 | List Up: no test in the editor. | A3 |
-| ACC-036 | List Home: no test in the editor. | A3 |
-| ACC-037 | List End: no test in the editor. | A3 |
-| ACC-038 | List PageDown: no test in the editor. | A3 |
-| ACC-039 | List PageUp: no test in the editor. | A3 |
-| ACC-040 | List Space: no test in the editor. | A3 |
-| ACC-041 | List Right: no test in the editor. | A3 |
-| ACC-042 | List Left: no test in the editor. | A3 |
-| ACC-043 | List Ctrl+A: no test in the editor (classic keeps the focus on the same row). | A3 |
+| ACC-020 | Tree PageUp: Gpedit_Keys_TreeWalk asserts the direction only; the page length depends on the tree viewport and the capture's is not reproduced. | A3 |
+| ACC-030 | Alt+Left with the focus on the result side: BWC walks the history (the console frame handles it in every pane); the capture shows no change. | A3 |
+| ACC-031 | Alt+Right with the focus on the result side: the same frame difference as ACC-030. | A3 |
+| ACC-043 | List Ctrl+A: BWC selects all rows and shows the folder; classic keeps the focus on the same row. Shared list (Bwc.UI/Console/List). | A3 |
 | MSG-001 | gpedit.dll id 9 (the window title form) differs (STR-1). | A3 |
 | MSG-023 | The Add/Remove Templates menu label is not found by the string check (access key and ellipsis form). | A3 |
 | MSG-024 | The Show Contents refusal messages have BWC wording that the check does not find. | A3 |
@@ -90,10 +74,9 @@ Gap rows of the audit (A1). Each line names the row, what is missing and the pie
 | MSG-091 | Setting dialog form texts are outside the string check; only button and radio names are asserted. | A3 |
 | MSG-092 | Show Contents form texts are outside the string check and untested. | A3 |
 | MSG-093 | Setting dialog resource texts are outside the string check and untested. | A3 |
-| VIEW-023 | No test asserts the tree icons by node kind. | A3 |
-| TREE-010 | No test asserts the Administrative Templates icons per side. | A3 |
-| TREE-017 | No test asserts the category and placeholder icons. | A3 |
-| TREE-019 | Plus, Minus and Asterisk on the tree are not asserted. | A3 |
+| VIEW-023 | Tree icons by kind: Gpedit_Tree_Icons_Placeholders asserts the root and the placeholder kinds; the Computer and User Configuration, Administrative Templates and All Settings kinds differ from the classic images. | A3 |
+| TREE-010 | Administrative Templates icons per side: BWC uses ClosedFolder on both sides; classic images 60 and 70. | A3 |
+| TREE-017 | Category and placeholder icons: placeholders are ClosedFolder (asserted); categories under Administrative Templates differ from the classic images. | A3 |
 | BEH-027 | The refresh timing of group G needs a real elevated save with refresh. | A2 |
 | POL-068 | The live registry after OK (group G), elevated only. | A2 |
 | POL-069 | The live registry after Apply then Cancel (group G), elevated only. | A2 |
@@ -103,7 +86,7 @@ Gap rows of the audit (A1). Each line names the row, what is missing and the pie
 
 | Piece | Rows |
 | --- | --- |
-| A3 | ACC-017, ACC-018, ACC-019, ACC-020, ACC-021, ACC-022, ACC-023, ACC-029, ACC-030, ACC-031, ACC-034, ACC-035, ACC-036, ACC-037, ACC-038, ACC-039, ACC-040, ACC-041, ACC-042, ACC-043, MSG-001, MSG-023, MSG-024, MSG-028, MSG-029, MSG-031, MSG-032, MSG-033, MSG-037, MSG-038, MSG-050, MSG-059, MSG-062, MSG-064, MSG-091, MSG-092, MSG-093, VIEW-023, TREE-010, TREE-017, TREE-019 |
+| A3 | ACC-020, ACC-030, ACC-031, ACC-043, MSG-001, MSG-023, MSG-024, MSG-028, MSG-029, MSG-031, MSG-032, MSG-033, MSG-037, MSG-038, MSG-050, MSG-059, MSG-062, MSG-064, MSG-091, MSG-092, MSG-093, VIEW-023, TREE-010, TREE-017 |
 | A2 | BEH-027, POL-068, POL-069, POL-070, POL-071, POL-072 |
 
 Notes for the fix pieces:
@@ -381,33 +364,33 @@ Not differences: the default list order and the policy id ordering follow classi
 | ACC-014 | pass | Gpedit_TreeBlind_ExpandCollapseAndKeys. | G2 |
 | ACC-015 | pass | Gpedit_TreeBlind_ExpandCollapseAndKeys and Gpedit_TreeBlind_PlaceholderPages. | G2 |
 | ACC-016 | pass | Gpedit_TreeBlind_ExpandCollapseAndKeys and Gpedit_TreeBlind_PlaceholderPages. | G2 |
-| ACC-017 | gap | Home in the tree is not asserted by any test. | A3 |
-| ACC-018 | gap | End in the tree is not asserted by any test. | A3 |
-| ACC-019 | gap | PageDown in the tree is not asserted by any test. | A3 |
-| ACC-020 | gap | PageUp in the tree is not asserted by any test. | A3 |
-| ACC-021 | gap | Plus in the tree is not asserted by any test. | A3 |
-| ACC-022 | gap | Minus in the tree is not asserted by any test. | A3 |
-| ACC-023 | gap | Asterisk in the tree is not asserted by any test. | A3 |
+| ACC-017 | pass | Gpedit_Keys_TreeWalk: Home selects the root, Local Computer Policy. | G2 |
+| ACC-018 | pass | Gpedit_Keys_TreeWalk: End selects the last visible node, User Configuration > Administrative Templates. | G2 |
+| ACC-019 | pass | Gpedit_Keys_TreeWalk: PageDown on the last visible node changes nothing. | G2 |
+| ACC-020 | gap | Gpedit_Keys_TreeWalk asserts that PageUp leaves User Configuration > Administrative Templates only. The landing node depends on the number of rows the tree shows, and the capture's page length is not reproduced; BWC reached the root at the test window size. Not proven. | A3 |
+| ACC-021 | pass | Gpedit_Keys_TreeExpand: Plus changes no node and opens no window or menu. | G2 |
+| ACC-022 | pass | Gpedit_Keys_TreeExpand: Minus changes no node and opens no window or menu. | G2 |
+| ACC-023 | pass | Gpedit_Keys_TreeExpand: Asterisk changes no node and opens no window or menu. | G2 |
 | ACC-024 | pass | Gpedit_Keys_History (Backspace selects the parent). | G2 |
 | ACC-025 | pass | Console_Shell_FocusCycle. | G2 |
 | ACC-026 | pass | Console_Shell_FocusCycle. | G2 |
 | ACC-027 | pass | Gpedit_Keys_F5: no window and no menu, selection kept. The reload is the DIFF-007 addition. | G2 |
 | ACC-028 | pass | Console_Shell_FocusCycle. | G2 |
-| ACC-029 | gap | Esc in the tree with no menu open is not asserted by any test. | A3 |
-| ACC-030 | gap | The capture shows no change with the focus on the result side; Gpedit_Keys_History asserts Alt+Left from the tree only. The result-side case is not asserted. | A3 |
-| ACC-031 | gap | Same as ACC-030 for Alt+Right. | A3 |
+| ACC-029 | pass | Gpedit_Keys_TreeExpand: Esc changes neither the node nor the focus and opens no window. | G2 |
+| ACC-030 | gap | The capture shows no change with the focus on the result side. BWC's console frame raises Back for Alt+Left in every pane, so with the focus on the result list the history is walked (Gpedit_Keys_TreeHistoryResult notes it). Difference in the shared console frame (Bwc.UI/Console/Shell), not a small fix. | A3 |
+| ACC-031 | gap | Same as ACC-030 for Alt+Right: the console frame raises Forward in every pane. Not asserted. | A3 |
 | ACC-032 | pass | Gpedit_Keys_History (Alt+Up in the result pane changes nothing). | G2 |
 | ACC-033 | pass | Gpedit_ContextMenu_Tree and Console_Shell_ContextMenuKey. The capture's focus was on the result side; the tree menu itself is CTX-009. | G2 |
-| ACC-034 | gap | The list keys of F/Keys_List (Down at the last row) are not asserted in the editor. | A3 |
-| ACC-035 | gap | Up in the result list is not asserted in the editor. | A3 |
-| ACC-036 | gap | Home in the result list is not asserted in the editor. | A3 |
-| ACC-037 | gap | End in the result list is not asserted in the editor. | A3 |
-| ACC-038 | gap | PageDown in the result list is not asserted in the editor. | A3 |
-| ACC-039 | gap | PageUp in the result list is not asserted in the editor. | A3 |
-| ACC-040 | gap | Space in the result list is not asserted in the editor. | A3 |
-| ACC-041 | gap | Right in the result list is not asserted in the editor. | A3 |
-| ACC-042 | gap | Left in the result list is not asserted in the editor. | A3 |
-| ACC-043 | gap | Ctrl+A in the result list is not asserted in the editor (Console_List_MultiSelect runs on the frame host only). | A3 |
+| ACC-034 | pass | Gpedit_Keys_ListWalk: Down on the last row keeps it. | G2 |
+| ACC-035 | pass | Gpedit_Keys_ListWalk: Up moves to the row before. | G2 |
+| ACC-036 | pass | Gpedit_Keys_ListWalk: Home moves to the first row. | G2 |
+| ACC-037 | pass | Gpedit_Keys_ListWalk: End moves to the last row. | G2 |
+| ACC-038 | pass | Gpedit_Keys_ListWalk: PageDown on the last row keeps it. | G2 |
+| ACC-039 | pass | Gpedit_Keys_ListWalk: PageUp moves to the first row. | G2 |
+| ACC-040 | pass | Gpedit_Keys_ListInert: Space opens no window or menu and keeps the row. | G2 |
+| ACC-041 | pass | Gpedit_Keys_ListInert: Right opens no window or menu and keeps the row. | G2 |
+| ACC-042 | pass | Gpedit_Keys_ListInert: Left opens no window or menu and keeps the row. | G2 |
+| ACC-043 | gap | Ctrl+A selects every row of the list, so the description shows the folder and not the row; the capture keeps the focus on the same row. The list is shared (Bwc.UI/Console/List). Not a small fix. | A3 |
 | ACC-044 | pass | Gpedit_Keys_F5. The reload is the DIFF-007 addition. | G2 |
 | ACC-045 | pass | Console_Shell_FocusCycle. | G2 |
 | ACC-046 | pass | Console_Shell_FocusCycle. | G2 |
@@ -540,7 +523,7 @@ Not differences: the default list order and the policy id ordering follow classi
 | VIEW-020 | pass | Gpedit_Filter_CaptureReplay and Gpedit_Filter_OnOffAndStaysOn (flag and narrowed count). The status words are BWC's own (gpedit-filter.md). | G5 |
 | VIEW-021 | pass | Gpedit_TreeBlind_PlaceholderPages. Software Settings shows the BWC placeholder page of BEH-003. | G1 |
 | VIEW-022 | pass | Gpedit_TreeBlind_PlaceholderPages. | G1 |
-| VIEW-023 | gap | No test asserts the tree icons by node kind (root, configuration nodes, folders, Administrative Templates per side, All Settings). | A3 |
+| VIEW-023 | gap | Gpedit_Tree_Icons_Placeholders asserts the root icon (Computer) and the folder kind of the placeholders. BWC's icon set is the classic regedit set (Computer, ClosedFolder): Computer Configuration and User Configuration show Computer and ClosedFolder, Administrative Templates and All Settings show ClosedFolder; the capture has images 27, 28, 60, 61, 70, 71 and 68. Not proven. | A3 |
 | VIEW-024 | pass | Gpedit_TreeBlind_ShapeAndInitialState. | G1 |
 | VIEW-025 | pass | Gpedit_ListBlind_LiteralAmpersand. | G1 |
 | VIEW-026 | pass | Gpedit_Dialog_Frame and Gpedit_Dialog_Resize (client 684 x 604 DIP). | G3a |
@@ -575,16 +558,16 @@ Not differences: the default list order and the policy id ordering follow classi
 | TREE-007 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_TreeBlind_PlaceholderPages. | G1 |
 | TREE-008 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_TreeBlind_PlaceholderPages. | G1 |
 | TREE-009 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_Tree_Shape. The icon part is VIEW-023. | G1 |
-| TREE-010 | gap | No test asserts the Administrative Templates icons per side (see VIEW-023). | A3 |
+| TREE-010 | gap | Gpedit_Tree_Icons_Placeholders records the Administrative Templates kind per side (ClosedFolder). The capture has image 60 (selected 61) under Computer and 70 (selected 71) under User. Difference, no small fix. | A3 |
 | TREE-011 | pass | Gpedit_TreeBlind_ShapeAndInitialState and TemplateSetTests. | G1 |
 | TREE-012 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_Tree_Shape. | G1 |
 | TREE-013 | pass | Gpedit_TreeBlind_ShapeAndInitialState. | G1 |
 | TREE-014 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_ListBlind_States. | G1 |
 | TREE-015 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_Tree_Shape. | G1 |
 | TREE-016 | pass | Gpedit_ListBlind_CategoryRows. | G1 |
-| TREE-017 | gap | No test asserts the category and placeholder icons (see VIEW-023). | A3 |
+| TREE-017 | gap | Gpedit_Tree_Icons_Placeholders asserts the placeholder kind (ClosedFolder). The category nodes under Administrative Templates and their descendants use ClosedFolder in BWC, while the capture gives them the Administrative Templates images. Not proven. | A3 |
 | TREE-018 | pass | Gpedit_TreeBlind_PlaceholderPages and Gpedit_TreeBlind_ExpandCollapseAndKeys. | G1 |
-| TREE-019 | gap | Right, Left (Gpedit_TreeBlind_ExpandCollapseAndKeys) and Backspace (Gpedit_Keys_History) pass; Plus, Minus and Asterisk are not asserted (ACC-021 to ACC-023). | A3 |
+| TREE-019 | pass | Gpedit_Keys_TreeWalk (Left, Right, Down, Up) and Gpedit_Keys_TreeExpand (Plus, Minus, Asterisk, Backspace); Gpedit_TreeBlind_ExpandCollapseAndKeys. | G2 |
 | TREE-020 | removed | Removed by the user decision of 2026-11-22. Classic shows no Extra Registry Settings node; records that match no policy stay invisible (BEH-014). | none |
 
 ### BEH

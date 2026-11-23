@@ -167,6 +167,32 @@ internal sealed class GpeditTreeSource
         return text.ToString().TrimEnd('\n');
     }
 
+    /// <summary>
+    /// The whole tree with the icon of each node, one node per line: two spaces per level, the name, a tab, then the classic
+    /// icon kind or the module icon with its id. E2E only, like <see cref="DescribeShape"/>.
+    /// </summary>
+    internal string DescribeIcons(GpeditModel model)
+    {
+        var text = new StringBuilder();
+        DescribeIcon(Root, 0, model, text);
+        return text.ToString().TrimEnd('\n');
+    }
+
+    private void DescribeIcon(TreeNode node, int depth, GpeditModel model, StringBuilder text)
+    {
+        IconReference? icon = node.Icon;
+        string kind = icon?.Kind is { } classic
+            ? classic.ToString()
+            : icon?.Module is { } module
+                ? "module:" + module.Module + "#" + module.Value
+                : "none";
+        _ = text.Append(' ', depth * 2).Append(node.Name).Append('\t').Append(kind).Append('\n');
+        foreach (TreeNode child in EnsureChildren(node, model))
+        {
+            DescribeIcon(child, depth + 1, model, text);
+        }
+    }
+
     private void Describe(TreeNode node, int depth, GpeditModel model, StringBuilder text)
     {
         _ = text.Append(' ', depth * 2).Append(node.Name).Append('\n');

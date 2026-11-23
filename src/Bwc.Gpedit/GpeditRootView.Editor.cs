@@ -727,6 +727,11 @@ public sealed partial class GpeditRootView
         {
             AutomationProperties.SetFullDescription(this, _source.DescribeShape(model));
         }
+
+        if (model is not null && Environment.GetEnvironmentVariable("BWC_E2E_GPEDIT_ICONS") == "1")
+        {
+            AutomationProperties.SetFullDescription(this, _source.DescribeIcons(model));
+        }
 #endif
     }
 }
