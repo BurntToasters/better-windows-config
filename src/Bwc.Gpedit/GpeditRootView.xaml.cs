@@ -23,9 +23,6 @@ public sealed partial class GpeditRootView : UserControl
 {
     // Menu ids of the view's own entries, outside the frame's ids (ConsoleCommandIds). The editor commands are in
     // GpeditRootView.Commands.cs.
-    private const int ViewConsoleTreeCommand = 1001;
-    private const int ViewToolbarCommand = 1002;
-    private const int ViewStatusBarCommand = 1003;
     private const int ViewLargeIconsCommand = 1004;
     private const int ViewSmallIconsCommand = 1005;
     private const int ViewListCommand = 1006;
@@ -159,44 +156,53 @@ public sealed partial class GpeditRootView : UserControl
         }
 #endif
 
-        // The view toggles stand in for Customize View, which the frame does not implement yet.
+        // The four view modes. Add/Remove Columns and Customize View are the frame's.
         var view = new List<ClassicCommandItem>
         {
-            ClassicMenuBuilder.Command("&Console Tree", ViewConsoleTreeCommand, true, invoke: () => Shell.IsTreeVisible = !Shell.IsTreeVisible, kind: ClassicCommandKind.Check),
-            ClassicMenuBuilder.Command("&Toolbar", ViewToolbarCommand, true, invoke: () => Shell.IsToolbarVisible = !Shell.IsToolbarVisible, kind: ClassicCommandKind.Check),
-            ClassicMenuBuilder.Command("Stat&us Bar", ViewStatusBarCommand, true, invoke: () => Shell.IsStatusBarVisible = !Shell.IsStatusBarVisible, kind: ClassicCommandKind.Check),
             ClassicMenuBuilder.Command("Lar&ge Icons", ViewLargeIconsCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.LargeIcons), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
             ClassicMenuBuilder.Command("S&mall Icons", ViewSmallIconsCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.SmallIcons), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
             ClassicMenuBuilder.Command("&List", ViewListCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.List), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
             ClassicMenuBuilder.Command("&Detail", ViewDetailCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.Detail), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
         };
+
+        // After the modes and the frame's separator, right before Customize View.
+        var viewTail = new List<ClassicCommandItem>();
         if (IsEditorHost)
         {
-            // The filter entries sit between the view modes and Customize View (the frame adds that one after these).
-            view.AddRange(FilterItems());
+            // The filter entries and a separator that hides with them sit between the view modes and Customize View.
+            viewTail.AddRange(FilterItems());
+            viewTail.Add(ClassicCommandItem.Separator);
         }
 #if BWC_E2E
         // E2E only: save and restore the list state through the host, to exercise GetState and ApplyState.
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BWC_E2E_CONSOLE_STATE_MENU")))
         {
-            view.Add(ClassicMenuBuilder.Command("E2E Sa&ve State", SaveStateCommand, true, invoke: SaveListState));
-            view.Add(ClassicMenuBuilder.Command("E2E &Restore State", RestoreStateCommand, true, invoke: RestoreListState));
+            viewTail.Add(ClassicMenuBuilder.Command("E2E Sa&ve State", SaveStateCommand, true, invoke: SaveListState));
+            viewTail.Add(ClassicMenuBuilder.Command("E2E &Restore State", RestoreStateCommand, true, invoke: RestoreListState));
         }
 
         // E2E only: drops every reference to the menu item wrappers and collects them, to prove the menu keyboard does not
         // depend on a wrapper staying alive.
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BWC_E2E_MENU_GC")))
         {
-            view.Add(ClassicMenuBuilder.Command("E2E Wra&pper GC", WrapperGcCommand, true, invoke: CollectMenuWrappers));
+            viewTail.Add(ClassicMenuBuilder.Command("E2E Wra&pper GC", WrapperGcCommand, true, invoke: CollectMenuWrappers));
         }
 #endif
 
+        // The Action popup: the editor's entries, the frame's Export List, then the separator and Help.
+        List<ClassicCommandItem> action = IsEditorHost ? BuildActionBarItems() : [];
+        int tailStart = Math.Max(0, action.Count - 2);
         return new ConsoleMenuExtensions
         {
             FileEntries = file,
-            ActionEntries = IsEditorHost ? BuildActionBarItems() : [],
+            ActionEntries = action.GetRange(0, tailStart),
+            ActionTailEntries = action.GetRange(tailStart, action.Count - tailStart),
             ViewEntries = view,
+            ViewTailEntries = viewTail,
             Exit = RequestClose,
+            AddRemoveColumns = RunColumns,
+            CustomizeView = RunCustomize,
+            ExportList = RunExport,
             HelpTopics = IsEditorHost ? RunHelp : null,
         };
     }
@@ -209,9 +215,6 @@ public sealed partial class GpeditRootView : UserControl
 
     private void SyncViewChecks()
     {
-        ClassicMenuBuilder.SetChecked(Shell.MenuBar, ViewConsoleTreeCommand, Shell.IsTreeVisible);
-        ClassicMenuBuilder.SetChecked(Shell.MenuBar, ViewToolbarCommand, Shell.IsToolbarVisible);
-        ClassicMenuBuilder.SetChecked(Shell.MenuBar, ViewStatusBarCommand, Shell.IsStatusBarVisible);
         int modeCommand = _list.ViewMode switch
         {
             ConsoleListViewMode.LargeIcons => ViewLargeIconsCommand,
@@ -274,6 +277,12 @@ public sealed partial class GpeditRootView : UserControl
 
     private void OnToolbarCommand(object? sender, ConsoleToolbarEventArgs e)
     {
+        if (e.Id == ConsoleToolbarIds.ExportList)
+        {
+            RunExport();
+            return;
+        }
+
         if (IsEditorHost)
         {
             switch (e.Id)

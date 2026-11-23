@@ -122,7 +122,8 @@ public sealed partial class GpeditRootView
     // ---- the Action popup follows the selection -----------------------------------------------------
 
     /// <summary>
-    /// Brings the Action popup in line with the selection: Edit is shown while a policy row is selected and hidden otherwise.
+    /// Brings the Action popup in line with the selection: Edit is shown while a policy row is selected and hidden otherwise,
+    /// and Export List the other way round.
     /// It runs after every change of the node, the selection and the model, so the popup is never older than the state it
     /// shows. The entries are built once (a removed entry stays in the popup's visual tree until the popup is rebuilt).
     /// </summary>
@@ -137,6 +138,9 @@ public sealed partial class GpeditRootView
         if (includeEdit != _actionMenuHasEdit)
         {
             ClassicMenuBuilder.SetCommandVisible(Shell.MenuBar, EditCommand, includeEdit);
+
+            // Classic has no Export List with a policy row selected (MENU-017); the toolbar button stays enabled (TOOL-016).
+            ClassicMenuBuilder.SetCommandVisible(Shell.MenuBar, ConsoleCommandIds.ExportList, !includeEdit);
             _actionMenuHasEdit = includeEdit;
         }
     }

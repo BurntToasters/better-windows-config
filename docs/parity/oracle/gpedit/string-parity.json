@@ -11,10 +11,10 @@
     "src/Bwc.UI/Console/**/*.cs (excluding bin and obj)"
   ],
   "counts": {
-    "equal": 134,
+    "equal": 140,
     "differs": 2,
     "template": 32,
-    "absent": 2016
+    "absent": 2010
   },
   "strings": [
     {
@@ -3211,7 +3211,7 @@
     },
     {
       "id": "mmc.exe:209",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmc.exe:210",
@@ -3251,7 +3251,7 @@
     },
     {
       "id": "mmc.exe.mui:209",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmc.exe.mui:210",
@@ -4471,7 +4471,7 @@
     },
     {
       "id": "mmcbase.dll:14111",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14112",
@@ -6203,7 +6203,7 @@
     },
     {
       "id": "mmcbase.dll.mui:14111",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14112",
@@ -7675,7 +7675,7 @@
     },
     {
       "id": "mmcndmgr.dll:30252",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcndmgr.dll:30253",
@@ -8691,7 +8691,7 @@
     },
     {
       "id": "mmcndmgr.dll.mui:30252",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcndmgr.dll.mui:30253",

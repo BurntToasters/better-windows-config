@@ -43,6 +43,7 @@ public sealed partial class ConsoleShell : UserControl
     private bool _splitterDragging;
     private bool _treeVisible = true;
     private bool _toolbarVisible = true;
+    private bool _snapInToolbarsVisible = true;
     private bool _statusBarVisible = true;
     private ClassicMenuKeyboard? _menuKeyboard;
     private nint _topHwnd;
@@ -80,6 +81,7 @@ public sealed partial class ConsoleShell : UserControl
         ResultPaneBorder.RightTapped += OnResultRightTapped;
         MainGrid.SizeChanged += (_, _) => ApplyTreeWidth();
         ToolbarControl.Invoked += OnToolbarInvoked;
+        ToolbarControl.VisibleButtonsChanged += (_, _) => UpdateToolbarBand();
 
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -103,7 +105,7 @@ public sealed partial class ConsoleShell : UserControl
     /// </summary>
     public event EventHandler<ConsoleContextMenuEventArgs>? ContextMenuRequested;
 
-    /// <summary>Raised after the tree, the toolbar or the status bar is shown or hidden.</summary>
+    /// <summary>Raised after the tree, a toolbar group or the status bar is shown or hidden.</summary>
     public event EventHandler? ViewChanged;
 
     /// <summary>Raised after the preferred tree width changed (a drag, or a set). The host persists it.</summary>
@@ -192,7 +194,10 @@ public sealed partial class ConsoleShell : UserControl
         }
     }
 
-    /// <summary>Shows or hides the standard toolbar.</summary>
+    /// <summary>
+    /// Shows or hides the standard toolbar, the eight standard buttons (the Standard toolbar switch of Customize View). The
+    /// band that holds the toolbar is gone while no button of either group shows.
+    /// </summary>
     public bool IsToolbarVisible
     {
         get => _toolbarVisible;
@@ -204,7 +209,27 @@ public sealed partial class ConsoleShell : UserControl
             }
 
             _toolbarVisible = value;
-            ToolbarBand.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+            ToolbarControl.StandardGroupVisible = value;
+            ViewChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
+    /// Shows or hides the toolbars of the snap-in, the host's extension buttons (the Snap-in toolbars switch of Customize
+    /// View). A button the host hides for a node stays hidden when the switch is on.
+    /// </summary>
+    public bool AreSnapInToolbarsVisible
+    {
+        get => _snapInToolbarsVisible;
+        set
+        {
+            if (_snapInToolbarsVisible == value)
+            {
+                return;
+            }
+
+            _snapInToolbarsVisible = value;
+            ToolbarControl.ExtensionGroupVisible = value;
             ViewChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -697,6 +722,9 @@ public sealed partial class ConsoleShell : UserControl
             this,
             new ConsoleContextMenuEventArgs(ConsolePane.Result, null, e.GetPosition(this), fromKeyboard: false));
     }
+
+    private void UpdateToolbarBand() =>
+        ToolbarBand.Visibility = ToolbarControl.HasVisibleButtons ? Visibility.Visible : Visibility.Collapsed;
 
     private void OnToolbarInvoked(object? sender, ConsoleToolbarEventArgs e)
     {

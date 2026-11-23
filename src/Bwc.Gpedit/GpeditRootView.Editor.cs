@@ -9,6 +9,7 @@ using Bwc.Gpedit.Tree;
 using Bwc.Gpo.Store;
 using Bwc.Policy.Admx;
 using Bwc.UI.Console.Extended;
+using Bwc.UI.Console.Frame;
 using Bwc.UI.Console.List;
 using Bwc.UI.Tree;
 using Microsoft.UI;
@@ -92,6 +93,7 @@ public sealed partial class GpeditRootView
         }
 
         LoadSortStacks();
+        _columnChoice = ConsoleColumnChoice.From(_settings.ColumnOrder, _settings.HiddenColumns);
         ConfigureEditorResultPane();
         StartModelLoad();
         PolicyEditRequested += OnPolicyEditRequested;
@@ -99,8 +101,10 @@ public sealed partial class GpeditRootView
         Shell.TreeContent.SetRoots([_source.Root]);
         Shell.TreeContent.SelectionChanged += OnTreeSelectionChanged;
         ApplySavedView();
+        ApplySavedSwitches();
         Shell.TreeContent.SelectNode(_source.Root);
         SyncViewChecks();
+        Shell.ViewChanged += (_, _) => ScheduleSettingsSave();
 
         Loaded += OnEditorLoaded;
         Unloaded += OnEditorUnloaded;
@@ -246,6 +250,9 @@ public sealed partial class GpeditRootView
                 Column("comment", "GpeditColumnComment", CommentColumnWidth),
             ],
         });
+
+        // The column choice is one for the list: every layout applies it (Add/Remove Columns).
+        ApplyColumnChoice();
     }
 
     private ConsoleListColumn Column(string id, string headerKey, double defaultWidth) =>
@@ -536,6 +543,13 @@ public sealed partial class GpeditRootView
             WindowWidth = _settings.WindowWidth,
             WindowHeight = _settings.WindowHeight,
             WindowMaximized = _settings.WindowMaximized,
+            ColumnOrder = [.. _columnChoice.Order],
+            HiddenColumns = [.. _columnChoice.Hidden],
+            ViewConsoleTree = Shell.IsTreeVisible,
+            ViewStandardToolbar = Shell.IsToolbarVisible,
+            ViewSnapInToolbars = Shell.AreSnapInToolbarsVisible,
+            ViewStatusBar = Shell.IsStatusBarVisible,
+            ViewDescriptionBar = _extended.IsDescriptionBarShown,
         };
         foreach (KeyValuePair<string, double> pair in _columnWidths)
         {

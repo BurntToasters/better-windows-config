@@ -45,6 +45,12 @@ public static class ConsoleCommandIds
     public const int Exit = 57665;
     public const int CustomizeView = 13231;
     public const int HelpTopics = 12804;
+
+    /// <summary>View > Add/Remove Columns. The id is BWC's (the capture names the command by its role).</summary>
+    public const int AddRemoveColumns = 1000;
+
+    /// <summary>Action > Export List, the string id that names its help line (mmcbase.dll 13436).</summary>
+    public const int ExportList = 13436;
 }
 
 /// <summary>The pane that held the keyboard focus, or was hit, when a context menu was requested.</summary>

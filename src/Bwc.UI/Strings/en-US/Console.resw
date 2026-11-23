@@ -179,4 +179,128 @@
   <data name="ConsoleDescriptionNoSelectionHint" xml:space="preserve">
     <value>Select an item to view its description.</value>
   </data>
+  <!-- BWC wording: View menu entry that opens the column chooser (command 1000). -->
+  <data name="ConsoleMenuViewColumns" xml:space="preserve">
+    <value>Add/Remove &amp;Columns...</value>
+  </data>
+  <!-- BWC wording: Action menu entry that saves the shown list as text (command 13436). -->
+  <data name="ConsoleMenuActionExportList" xml:space="preserve">
+    <value>E&amp;xport List...</value>
+  </data>
+  <!-- BWC wording: Caption of the column chooser. -->
+  <data name="ConsoleColumnsCaption" xml:space="preserve">
+    <value>Add/Remove Columns</value>
+  </data>
+  <!-- BWC wording: Label of the list of the columns that are not shown. -->
+  <data name="ConsoleColumnsLabelAvailable" xml:space="preserve">
+    <value>&amp;Available columns:</value>
+  </data>
+  <!-- BWC wording: Label of the list of the columns that are shown. -->
+  <data name="ConsoleColumnsLabelDisplayed" xml:space="preserve">
+    <value>Display&amp;ed columns:</value>
+  </data>
+  <!-- BWC wording: Accessible name of the list of the columns that are not shown. -->
+  <data name="ConsoleColumnsNameAvailable" xml:space="preserve">
+    <value>Available columns</value>
+  </data>
+  <!-- BWC wording: Accessible name of the list of the columns that are shown. -->
+  <data name="ConsoleColumnsNameDisplayed" xml:space="preserve">
+    <value>Displayed columns</value>
+  </data>
+  <!-- BWC wording: Button that moves the selected available column to the displayed columns. -->
+  <data name="ConsoleColumnsAdd" xml:space="preserve">
+    <value>A&amp;dd &gt;</value>
+  </data>
+  <!-- BWC wording: Button that moves the selected displayed column to the available columns. -->
+  <data name="ConsoleColumnsRemove" xml:space="preserve">
+    <value>&lt; &amp;Remove</value>
+  </data>
+  <!-- BWC wording: Button that moves the selected displayed column one place up. -->
+  <data name="ConsoleColumnsMoveUp" xml:space="preserve">
+    <value>M&amp;ove Up</value>
+  </data>
+  <!-- BWC wording: Button that moves the selected displayed column one place down. -->
+  <data name="ConsoleColumnsMoveDown" xml:space="preserve">
+    <value>Mo&amp;ve Down</value>
+  </data>
+  <!-- BWC wording: Button that restores the default columns and order in the dialog. -->
+  <data name="ConsoleColumnsRestore" xml:space="preserve">
+    <value>Re&amp;store Defaults</value>
+  </data>
+  <!-- BWC wording: OK button of the frame dialogs. -->
+  <data name="ConsoleDialogOk" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <!-- BWC wording: Cancel button of the frame dialogs. -->
+  <data name="ConsoleDialogCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <!-- BWC wording: Caption of the Customize View dialog. -->
+  <data name="ConsoleCustomizeCaption" xml:space="preserve">
+    <value>Customize View</value>
+  </data>
+  <!-- BWC wording: Text at the top of the Customize View dialog. -->
+  <data name="ConsoleCustomizeIntro" xml:space="preserve">
+    <value>Select the parts of the window to show.</value>
+  </data>
+  <!-- BWC wording: Group caption of the console switches of Customize View. -->
+  <data name="ConsoleCustomizeGroupConsole" xml:space="preserve">
+    <value>Console</value>
+  </data>
+  <!-- BWC wording: Group caption of the snap-in switches of Customize View. -->
+  <data name="ConsoleCustomizeGroupSnapIn" xml:space="preserve">
+    <value>Snap-in</value>
+  </data>
+  <!-- BWC wording: Customize View: the console tree and its splitter. -->
+  <data name="ConsoleCustomizeConsoleTree" xml:space="preserve">
+    <value>&amp;Console tree</value>
+  </data>
+  <!-- BWC wording: Customize View: the standard menus (shown disabled, BWC has no such switch). -->
+  <data name="ConsoleCustomizeStandardMenus" xml:space="preserve">
+    <value>Standard m&amp;enus</value>
+  </data>
+  <!-- BWC wording: Customize View: the eight standard toolbar buttons. -->
+  <data name="ConsoleCustomizeStandardToolbar" xml:space="preserve">
+    <value>Standard tool&amp;bar</value>
+  </data>
+  <!-- BWC wording: Customize View: the status bar. -->
+  <data name="ConsoleCustomizeStatusBar" xml:space="preserve">
+    <value>&amp;Status bar</value>
+  </data>
+  <!-- BWC wording: Customize View: the description pane of the Extended tab. -->
+  <data name="ConsoleCustomizeDescriptionBar" xml:space="preserve">
+    <value>&amp;Description bar</value>
+  </data>
+  <!-- BWC wording: Customize View: taskpad navigation tabs (shown disabled, BWC has no taskpads). -->
+  <data name="ConsoleCustomizeTaskpadTabs" xml:space="preserve">
+    <value>Taskpad &amp;navigation tabs</value>
+  </data>
+  <!-- BWC wording: Customize View: the action pane (shown disabled, BWC has none). -->
+  <data name="ConsoleCustomizeActionPane" xml:space="preserve">
+    <value>&amp;Action pane</value>
+  </data>
+  <!-- BWC wording: Customize View: the menus of the snap-in (shown disabled, BWC has no such switch). -->
+  <data name="ConsoleCustomizeSnapInMenus" xml:space="preserve">
+    <value>Snap-in &amp;menus</value>
+  </data>
+  <!-- BWC wording: Customize View: the toolbars of the snap-in, the extension buttons of the host. -->
+  <data name="ConsoleCustomizeSnapInToolbars" xml:space="preserve">
+    <value>Snap-in &amp;toolbars</value>
+  </data>
+  <!-- BWC wording: Caption of the message boxes of Export List. -->
+  <data name="ConsoleExportCaption" xml:space="preserve">
+    <value>Export List</value>
+  </data>
+  <!-- BWC wording: Export List: the file cannot be created. -->
+  <data name="ConsoleExportErrorCreate" xml:space="preserve">
+    <value>The file could not be created.</value>
+  </data>
+  <!-- BWC wording: Export List: the file cannot be written. -->
+  <data name="ConsoleExportErrorWrite" xml:space="preserve">
+    <value>The file could not be written.</value>
+  </data>
+  <!-- BWC wording: Export List: the chosen file is read-only. -->
+  <data name="ConsoleExportErrorReadOnly" xml:space="preserve">
+    <value>The file is read-only.</value>
+  </data>
 </root>

@@ -11,7 +11,8 @@ namespace Bwc.UI.Console.Shell;
 /// The standard console toolbar: Back, Forward, Up One Level, Show/Hide Console Tree, Properties, Refresh, Export
 /// List and Help, then the host's extension buttons. The toolbar only shows state and raises
 /// <see cref="Invoked"/>; the host decides what a command does and when it is enabled. A standard button is disabled
-/// until the host enables it, except Show/Hide Console Tree, which the shell runs itself.
+/// until the host enables it, except Show/Hide Console Tree, which the shell runs itself, and Export List, which is
+/// enabled in every state of the classic console (TOOL-011).
 /// </summary>
 public sealed partial class ConsoleToolbar : UserControl
 {
@@ -24,6 +25,8 @@ public sealed partial class ConsoleToolbar : UserControl
     private readonly List<int> _order = [];
     private readonly HashSet<int> _hidden = [];
     private int _imagePixels = 16;
+    private bool _standardVisible = true;
+    private bool _extensionVisible = true;
 
     public ConsoleToolbar()
     {
@@ -38,7 +41,7 @@ public sealed partial class ConsoleToolbar : UserControl
         AddSeparator();
         AddStandard(ConsoleToolbarIds.Properties, "ConsoleToolbarProperties", "Properties", "", initiallyEnabled: false);
         AddStandard(ConsoleToolbarIds.Refresh, "ConsoleToolbarRefresh", "Refresh", "", initiallyEnabled: false);
-        AddStandard(ConsoleToolbarIds.ExportList, "ConsoleToolbarExportList", "ExportList", "", initiallyEnabled: false);
+        AddStandard(ConsoleToolbarIds.ExportList, "ConsoleToolbarExportList", "ExportList", "", initiallyEnabled: true);
         AddSeparator();
         AddStandard(ConsoleToolbarIds.Help, "ConsoleToolbarHelp", "Help", "", initiallyEnabled: false);
 
@@ -47,6 +50,46 @@ public sealed partial class ConsoleToolbar : UserControl
 
     /// <summary>Raised for a click on an enabled button. The shell raises it again for the keys that stand for one.</summary>
     public event EventHandler<ConsoleToolbarEventArgs>? Invoked;
+
+    /// <summary>Raised after the set of visible buttons changed (a button or a group was shown or hidden).</summary>
+    public event EventHandler? VisibleButtonsChanged;
+
+    /// <summary>
+    /// Shows or hides the eight standard buttons as one group (the Standard toolbar switch of Customize View). A button
+    /// that the host hid with <see cref="SetButtonVisible"/> stays hidden when the group shows.
+    /// </summary>
+    public bool StandardGroupVisible
+    {
+        get => _standardVisible;
+        set
+        {
+            if (_standardVisible != value)
+            {
+                _standardVisible = value;
+                ApplyVisibility();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Shows or hides the host's extension buttons as one group (the Snap-in toolbars switch of Customize View). A button
+    /// that the host hid with <see cref="SetButtonVisible"/> stays hidden when the group shows.
+    /// </summary>
+    public bool ExtensionGroupVisible
+    {
+        get => _extensionVisible;
+        set
+        {
+            if (_extensionVisible != value)
+            {
+                _extensionVisible = value;
+                ApplyVisibility();
+            }
+        }
+    }
+
+    /// <summary>True while at least one button shows. The shell hides the band that holds the toolbar when none does.</summary>
+    public bool HasVisibleButtons => _buttons.Values.Any(button => button.Visibility == Visibility.Visible);
 
     /// <summary>Where the images came from: the module and resource, or "fallback" for the font glyphs.</summary>
     public string IconSource => ConsoleToolbarIcons.Source;
@@ -67,21 +110,23 @@ public sealed partial class ConsoleToolbar : UserControl
         ApplyImage(id, button);
     }
 
-    /// <summary>Shows or hides a button. A separator shows only between two visible buttons.</summary>
+    /// <summary>
+    /// Shows or hides a button for the host (a node that has no filter has no Filter button). A separator shows only between
+    /// two visible buttons. A button whose group is hidden stays hidden whatever the host says.
+    /// </summary>
     public void SetButtonVisible(int id, bool visible)
     {
-        Button button = ButtonFor(id);
-        button.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        _ = ButtonFor(id);
         if (visible)
         {
-            _hidden.Remove(id);
+            _ = _hidden.Remove(id);
         }
         else
         {
-            _hidden.Add(id);
+            _ = _hidden.Add(id);
         }
 
-        UpdateSeparators();
+        ApplyVisibility();
     }
 
     /// <summary>
@@ -119,6 +164,7 @@ public sealed partial class ConsoleToolbar : UserControl
         }
 
         AddButton(id, name, string.IsNullOrEmpty(idText) ? "Ext" + id : idText, glyph, toolTip ?? name, initiallyEnabled: true, toggle);
+        ApplyVisibility();
         RefreshImages();
     }
 
@@ -204,6 +250,19 @@ public sealed partial class ConsoleToolbar : UserControl
         _buttons.TryGetValue(id, out Button? button)
             ? button
             : throw new ArgumentException($"No toolbar button has id {id}.", nameof(id));
+
+    /// <summary>Shows each button that its group and the host allow, then the separators between the visible ones.</summary>
+    private void ApplyVisibility()
+    {
+        foreach ((int id, Button button) in _buttons)
+        {
+            bool group = id >= ConsoleToolbarIds.FirstExtension ? _extensionVisible : _standardVisible;
+            button.Visibility = group && !_hidden.Contains(id) ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        UpdateSeparators();
+        VisibleButtonsChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <summary>A separator is visible when a visible button comes before it and another after it.</summary>
     private void UpdateSeparators()

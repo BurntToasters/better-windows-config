@@ -33,6 +33,7 @@ public sealed class ConsoleExtendedView : UserControl
     private readonly ContentControl _contentHost = new();
     private readonly ConsoleDescriptionPane _pane = new();
     private readonly ConsoleTabStrip _tabs = new();
+    private bool _descriptionBarShown = true;
 
     public ConsoleExtendedView()
     {
@@ -109,8 +110,27 @@ public sealed class ConsoleExtendedView : UserControl
         }
     }
 
-    /// <summary>True while the description pane shows (Extended is selected).</summary>
-    public bool IsDescriptionVisible => _tabs.SelectedTab == ConsoleViewTab.Extended;
+    /// <summary>
+    /// The Description bar switch of Customize View: false hides the description pane on the Extended tab too, and the content
+    /// takes its room. The Standard tab shows no pane either way. Default true.
+    /// </summary>
+    public bool IsDescriptionBarShown
+    {
+        get => _descriptionBarShown;
+        set
+        {
+            if (_descriptionBarShown == value)
+            {
+                return;
+            }
+
+            _descriptionBarShown = value;
+            ApplyPaneVisibility();
+        }
+    }
+
+    /// <summary>True while the description pane shows (Extended is selected and the Description bar switch is on).</summary>
+    public bool IsDescriptionVisible => _tabs.SelectedTab == ConsoleViewTab.Extended && _descriptionBarShown;
 
     /// <summary>The width of the description pane in DIPs; zero while Standard is selected.</summary>
     public double DescriptionPaneWidth => IsDescriptionVisible ? _paneColumn.Width.Value : 0;
@@ -163,17 +183,25 @@ public sealed class ConsoleExtendedView : UserControl
 
     private void OnSelectedTabChanged(object? sender, EventArgs e)
     {
-        // Collapsing the pane while the focus is inside it would leave the focus on nothing: the content takes it first.
-        bool standard = _tabs.SelectedTab == ConsoleViewTab.Standard;
-        if (standard && XamlRoot is not null && FocusManager.GetFocusedElement(XamlRoot) is DependencyObject focused && IsWithin(focused, _pane))
+        ApplyPaneVisibility();
+        SelectedTabChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Shows or hides the pane by the selected tab and the Description bar switch. Collapsing the pane while the focus is
+    /// inside it would leave the focus on nothing: the content takes it first.
+    /// </summary>
+    private void ApplyPaneVisibility()
+    {
+        bool hide = !IsDescriptionVisible;
+        if (hide && XamlRoot is not null && FocusManager.GetFocusedElement(XamlRoot) is DependencyObject focused && IsWithin(focused, _pane))
         {
             _ = ContentFocusTarget?.Focus(FocusState.Programmatic);
         }
 
-        _pane.Visibility = standard ? Visibility.Collapsed : Visibility.Visible;
+        _pane.Visibility = hide ? Visibility.Collapsed : Visibility.Visible;
         ApplyPaneWidth();
         UpdateHelpText();
-        SelectedTabChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void ApplyPaneWidth()

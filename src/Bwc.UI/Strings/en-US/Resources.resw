@@ -288,4 +288,24 @@ Should the value be truncated in order to continue?</value>
   <data name="ResourceShared" xml:space="preserve">
     <value>Shared</value>
   </data>
+  <!-- BWC wording: Title of the Export List save dialog. -->
+  <data name="FileDialogExportListTitle" xml:space="preserve">
+    <value>Export List</value>
+  </data>
+  <!-- BWC wording: Export List file type 1: plain text, tab separated. -->
+  <data name="FileDialogExportListAnsiTab" xml:space="preserve">
+    <value>Text (tab delimited) (*.txt)</value>
+  </data>
+  <!-- BWC wording: Export List file type 2: plain text, comma separated. -->
+  <data name="FileDialogExportListAnsiComma" xml:space="preserve">
+    <value>Text (comma delimited) (*.csv)</value>
+  </data>
+  <!-- BWC wording: Export List file type 3: Unicode text, tab separated. -->
+  <data name="FileDialogExportListUnicodeTab" xml:space="preserve">
+    <value>Unicode text (tab delimited) (*.txt)</value>
+  </data>
+  <!-- BWC wording: Export List file type 4: Unicode text, comma separated. -->
+  <data name="FileDialogExportListUnicodeComma" xml:space="preserve">
+    <value>Unicode text (comma delimited) (*.csv)</value>
+  </data>
 </root>

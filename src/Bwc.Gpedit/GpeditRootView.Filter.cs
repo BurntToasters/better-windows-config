@@ -31,6 +31,9 @@ public sealed partial class GpeditRootView
     /// <summary>The tag of the separator after the filter entries of the Action popup, so it hides with them.</summary>
     private const int FilterSeparatorTag = 2102;
 
+    /// <summary>The tag of the separator after the filter entries of the View popup, so it hides with them.</summary>
+    private const int FilterViewSeparatorTag = 2103;
+
     private const int FilterToolbarId = ConsoleToolbarIds.FirstExtension;
     private const string FilterToolbarGlyph = "";
     private const string TasksPrefix = "TasksCommand_";
@@ -294,18 +297,22 @@ public sealed partial class GpeditRootView
             FinishItems(top.Items);
             if (top.Tag is ConsoleCommandIds.ActionMenu)
             {
-                TagFilterSeparator(top.Items);
+                TagFilterSeparator(top.Items, FilterSeparatorTag);
+            }
+            else if (top.Tag is ConsoleCommandIds.ViewMenu)
+            {
+                TagFilterSeparator(top.Items, FilterViewSeparatorTag);
             }
         }
     }
 
-    private static void TagFilterSeparator(IList<MenuFlyoutItemBase> items)
+    private static void TagFilterSeparator(IList<MenuFlyoutItemBase> items, int tag)
     {
         for (int i = 0; i + 1 < items.Count; i++)
         {
             if (items[i].Tag is int id && id == FilterReApplyCommand && items[i + 1] is MenuFlyoutSeparator separator)
             {
-                separator.Tag = FilterSeparatorTag;
+                separator.Tag = tag;
                 return;
             }
         }
@@ -350,7 +357,7 @@ public sealed partial class GpeditRootView
 
         _filterUiState = (hasFilter, ready, on, hasTemplates);
         MenuBar bar = Shell.MenuBar;
-        foreach (int id in new[] { FilterToggleCommand, FilterOptionsCommand, FilterReApplyCommand, TasksSubmenuCommand, FilterSeparatorTag })
+        foreach (int id in new[] { FilterToggleCommand, FilterOptionsCommand, FilterReApplyCommand, TasksSubmenuCommand, FilterSeparatorTag, FilterViewSeparatorTag })
         {
             ClassicMenuBuilder.SetCommandVisible(bar, id, hasFilter);
         }

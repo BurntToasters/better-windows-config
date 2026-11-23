@@ -57,6 +57,25 @@ public sealed record ExportFileDialogResult(
     ExportFileRange Range,
     string BranchText = "");
 
+/// <summary>The file type chosen in the Export List save dialog: encoding and separator of the exported text.</summary>
+public enum ExportListFileFormat
+{
+    /// <summary>Text in the system ANSI code page, cells joined with a tab.</summary>
+    AnsiTab,
+
+    /// <summary>Text in the system ANSI code page, cells joined with a comma.</summary>
+    AnsiComma,
+
+    /// <summary>UTF-16LE text with a byte order mark, cells joined with a tab.</summary>
+    UnicodeTab,
+
+    /// <summary>UTF-16LE text with a byte order mark, cells joined with a comma.</summary>
+    UnicodeComma,
+}
+
+/// <summary>The path and file type approved in the Export List save dialog.</summary>
+public sealed record ExportListDialogResult(string FilePath, ExportListFileFormat Format);
+
 /// <summary>
 /// The rules the Export dialog applies to its branch path edit (classic control 1282, DLG-001, BEH-021).
 /// </summary>
@@ -114,6 +133,15 @@ public static unsafe class CommonFileDialogs
         (BwcStrings.Get("FileDialogAllFiles"), "*.*"),
     ];
 
+    /// <summary>The Export List filters, in order: ANSI tab, ANSI comma, Unicode tab, Unicode comma.</summary>
+    private static (string Name, string Spec)[] ExportListFilters() =>
+    [
+        (BwcStrings.Get("FileDialogExportListAnsiTab"), "*.txt"),
+        (BwcStrings.Get("FileDialogExportListAnsiComma"), "*.csv"),
+        (BwcStrings.Get("FileDialogExportListUnicodeTab"), "*.txt"),
+        (BwcStrings.Get("FileDialogExportListUnicodeComma"), "*.csv"),
+    ];
+
     /// <summary>The Load Hive filter: one entry, All Files (oracle string 180).</summary>
     private static (string Name, string Spec)[] LoadHiveFilters() =>
     [
@@ -144,6 +172,60 @@ public static unsafe class CommonFileDialogs
         return new ImportFileDialogResult(
             path,
             filterIndex == 2 ? ImportFileFormat.Hive : ImportFileFormat.Registration);
+    }
+
+    /// <summary>
+    /// Shows a common item open dialog owned by <paramref name="ownerHwnd"/> with a title and a list of filters (a name and a
+    /// pattern each; the first is the default). The file must exist and the dialog does not change the working directory.
+    /// Returns the chosen path, or null when the user cancelled.
+    /// </summary>
+    public static string? ShowOpen(nint ownerHwnd, string title, IReadOnlyList<(string Name, string Spec)> filters)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(title);
+        ArgumentNullException.ThrowIfNull(filters);
+
+        var dialog = (IFileOpenDialog)new FileOpenDialog();
+        return ShowCore(
+            dialog,
+            ownerHwnd,
+            defaultFileName: null,
+            save: false,
+            [.. filters],
+            defaultExtension: null,
+            title: title,
+            extraOptions: FILEOPENDIALOGOPTIONS.FOS_NOCHANGEDIR);
+    }
+
+    /// <summary>
+    /// Shows the Export List save dialog owned by <paramref name="ownerHwnd"/>: four file types, plain text with tabs (the
+    /// default), plain text with commas, Unicode text with tabs and Unicode text with commas. Returns the chosen path and
+    /// type, or null when the user cancelled. Nothing is written.
+    /// </summary>
+    public static ExportListDialogResult? ShowExportListSave(nint ownerHwnd, string? defaultFileName = null)
+    {
+        var dialog = (IFileSaveDialog)new FileSaveDialog();
+        string? path = ShowCore(
+            dialog,
+            ownerHwnd,
+            defaultFileName,
+            save: true,
+            ExportListFilters(),
+            defaultExtension: "txt",
+            title: BwcStrings.Get("FileDialogExportListTitle"));
+        if (path is null)
+        {
+            return null;
+        }
+
+        dialog.GetFileTypeIndex(out uint filterIndex);
+        ExportListFileFormat format = filterIndex switch
+        {
+            2 => ExportListFileFormat.AnsiComma,
+            3 => ExportListFileFormat.UnicodeTab,
+            4 => ExportListFileFormat.UnicodeComma,
+            _ => ExportListFileFormat.AnsiTab,
+        };
+        return new ExportListDialogResult(path, format);
     }
 
     /// <summary>
@@ -214,7 +296,8 @@ public static unsafe class CommonFileDialogs
         bool save,
         (string Name, string Spec)[] filters,
         string? defaultExtension,
-        string? title = null)
+        string? title = null,
+        FILEOPENDIALOGOPTIONS extraOptions = 0)
     {
         if (!string.IsNullOrEmpty(title))
         {
@@ -233,7 +316,8 @@ public static unsafe class CommonFileDialogs
             FILEOPENDIALOGOPTIONS.FOS_PATHMUSTEXIST |
             (save
                 ? FILEOPENDIALOGOPTIONS.FOS_OVERWRITEPROMPT
-                : FILEOPENDIALOGOPTIONS.FOS_FILEMUSTEXIST);
+                : FILEOPENDIALOGOPTIONS.FOS_FILEMUSTEXIST) |
+            extraOptions;
         dialog.SetOptions(options);
 
         if (!string.IsNullOrWhiteSpace(defaultFileName))
