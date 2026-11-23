@@ -60,6 +60,10 @@
   <data name="GpeditCommandReApplyFilter" xml:space="preserve">
     <value>Re-&amp;Apply Filter</value>
   </data>
+  <!-- Add/Remove Templates, first entry of the Action menu at the Administrative Templates node (docs/failure-modes/gpedit-templates.md). -->
+  <data name="GpeditCommandAddRemoveTemplates" xml:space="preserve">
+    <value>A&amp;dd/Remove Templates...</value>
+  </data>
   <!-- The submenu that repeats the policy and filter entries in the Action menu and in the policy row menu. -->
   <data name="GpeditCommandTasks" xml:space="preserve">
     <value>&amp;Tasks</value>

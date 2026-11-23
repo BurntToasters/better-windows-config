@@ -96,6 +96,15 @@ public sealed partial class GpeditRootView
         }
 
         RecordCommand(CommandRefresh);
+        RequestReload();
+    }
+
+    /// <summary>
+    /// Starts a reload, or merges the request into the load in flight (the last request wins). Refresh and the close of the
+    /// Add/Remove Templates dialog after a change both come here.
+    /// </summary>
+    private void RequestReload()
+    {
         if (_loadInFlight)
         {
             // The last request wins: the load in flight is cancelled (a reload only) and one more load follows it.
@@ -172,6 +181,7 @@ public sealed partial class GpeditRootView
 
         if (model is null || (!initial && _policyDialog is not null))
         {
+            _reloadFromTemplates = false;
             StateChanged();
             return;
         }
@@ -192,6 +202,7 @@ public sealed partial class GpeditRootView
     {
         _model = model;
         UpdateReadOnlyNotice(model);
+        UpdateTemplateNotice(model);
         Log.Info(
             $"Local Group Policy Editor model loaded in {model.LoadTime.TotalMilliseconds:0} ms: " +
             $"{model.Templates.Files.Count} templates, {model.Templates.Categories.Count} categories, " +
@@ -239,8 +250,18 @@ public sealed partial class GpeditRootView
         _source = source;
         if (reloaded)
         {
-            _refreshes++;
+            // A reload that closing the Add/Remove Templates dialog started is counted as that, not as a Refresh.
+            if (_reloadFromTemplates)
+            {
+                _reloadFromTemplates = false;
+            }
+            else
+            {
+                _refreshes++;
+            }
+
             UpdateReadOnlyNotice(model);
+            UpdateTemplateNotice(model);
         }
 
         TreeNode current;

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- The Add/Remove Templates dialog, its details box and the load-error notice (docs/failure-modes/gpedit-templates.md). -->
+  <data name="TemplatesCaption" xml:space="preserve">
+    <value>Add/Remove Templates</value>
+  </data>
+  <data name="TemplatesLabelList" xml:space="preserve">
+    <value>Imported &amp;templates:</value>
+  </data>
+  <data name="TemplatesNameList" xml:space="preserve">
+    <value>Imported templates</value>
+  </data>
+  <data name="TemplatesAdd" xml:space="preserve">
+    <value>&amp;Add...</value>
+  </data>
+  <data name="TemplatesRemove" xml:space="preserve">
+    <value>&amp;Remove</value>
+  </data>
+  <data name="TemplatesClose" xml:space="preserve">
+    <value>&amp;Close</value>
+  </data>
+  <data name="TemplatesLabelProblems" xml:space="preserve">
+    <value>&amp;Problems:</value>
+  </data>
+  <data name="TemplatesNameProblems" xml:space="preserve">
+    <value>Template problems</value>
+  </data>
+  <data name="TemplatesStatusLoaded" xml:space="preserve">
+    <value>Loaded</value>
+  </data>
+  <data name="TemplatesStatusShadowed" xml:space="preserve">
+    <value>Shadowed</value>
+  </data>
+  <data name="TemplatesStatusNotLoaded" xml:space="preserve">
+    <value>Not loaded</value>
+  </data>
+  <data name="TemplatesDetailsCaption" xml:space="preserve">
+    <value>Template details</value>
+  </data>
+  <data name="TemplatesDetailsClose" xml:space="preserve">
+    <value>&amp;Close</value>
+  </data>
+  <data name="TemplatesDetailsName" xml:space="preserve">
+    <value>Details</value>
+  </data>
+  <data name="TemplatesPickerTitle" xml:space="preserve">
+    <value>Add Template</value>
+  </data>
+  <data name="TemplatesPickerFilterAdmx" xml:space="preserve">
+    <value>Template files (*.admx)</value>
+  </data>
+  <data name="TemplatesPickerFilterAll" xml:space="preserve">
+    <value>All files (*.*)</value>
+  </data>
+  <data name="TemplatesNotice" xml:space="preserve">
+    <value>Template problems: {0}</value>
+  </data>
+</root>

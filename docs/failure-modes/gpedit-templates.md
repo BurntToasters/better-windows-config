@@ -105,8 +105,8 @@ policy row has it; the list and tree context menus never have it.
   longer last.
 - The label is not BWC's words (it starts with `Add/Remove Templates`).
 
-Handling: the Action popup is rebuilt each time it opens (as G2 and G5 do); the entry is added for the node kind
-`AdministrativeTemplates` only, first, before Filter On. Check: `Gpedit_Import_Menu_Placement` (`<kind>.present`, `<kind>.first`,
+Handling: the Action popup is built once and the entry is shown and hidden with the node (as G2 and G5 do); it is shown for
+the node kind `AdministrativeTemplates` only, first, before Filter On. Check: `Gpedit_Import_Menu_Placement` (`<kind>.present`, `<kind>.first`,
 `<kind>.enabled`, `<kind>.label`, `<kind>.filter.*`, `<kind>.beforeFilter`, `<kind>.tasks`, `<kind>.tasksAbsent`, `<kind>.helpLast`,
 `policyRow.absent`, `listMenu.absent`, `treeMenu.absent`).
 

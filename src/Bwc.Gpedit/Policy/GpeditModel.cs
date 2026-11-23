@@ -36,11 +36,15 @@ internal enum GpeditProblemKind
     LoadException,
 }
 
-/// <summary>One recorded read problem. G6 shows the list; this piece only records and counts it.</summary>
+/// <summary>
+/// One recorded read problem. The template ones are counted in the status bar and listed in the Add/Remove Templates
+/// dialog.
+/// </summary>
 /// <param name="Kind">The kind.</param>
 /// <param name="Path">The file or folder, or an empty string.</param>
 /// <param name="Detail">The reason code or message, without user-facing wording.</param>
-internal sealed record GpeditProblem(GpeditProblemKind Kind, string Path, string Detail);
+/// <param name="Message">The engine's own detail of a template failure (a namespace, a name, an HRESULT), or empty.</param>
+internal sealed record GpeditProblem(GpeditProblemKind Kind, string Path, string Detail, string Message = "");
 
 /// <summary>
 /// Everything the tree and the list read: the linked templates, one snapshot of the policy object and the problems found
@@ -290,7 +294,7 @@ internal sealed class GpeditModel
 
             foreach (TemplateFailure failure in result.Set.Failures)
             {
-                problems.Add(new GpeditProblem(GpeditProblemKind.TemplateFailure, failure.FilePath, failure.Code.ToString()));
+                problems.Add(new GpeditProblem(GpeditProblemKind.TemplateFailure, failure.FilePath, failure.Code.ToString(), failure.Detail));
             }
 
             return result.Set;

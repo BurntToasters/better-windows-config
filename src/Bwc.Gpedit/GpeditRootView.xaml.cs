@@ -74,6 +74,7 @@ public sealed partial class GpeditRootView : UserControl
         {
             PrepareFilterMenus();
             ClassicMenuBuilder.SetCommandVisible(Shell.MenuBar, EditCommand, false);
+            ClassicMenuBuilder.SetCommandVisible(Shell.MenuBar, AddRemoveTemplatesCommand, false);
             Shell.Toolbar.AddExtensionButton(
                 FilterToolbarId,
                 GpeditStrings.Commands("GpeditToolbarFilter"),

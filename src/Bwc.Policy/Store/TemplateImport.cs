@@ -14,22 +14,27 @@ public sealed class TemplateImport
 {
     private const string FallbackCulture = "en-US";
 
+    /// <summary>The most ADMX files the folder of a chosen file may hold, itself included (template-store.md, I6).</summary>
+    public const int MaxSourceFolderAdmxFiles = 1000;
+
     private readonly TemplateSources sources;
+    private readonly Action<TemplateImportStage>? observer;
 
     /// <summary>Creates an importer over the two sources.</summary>
     public TemplateImport(TemplateSources sources)
+        : this(sources, null)
     {
-        ArgumentNullException.ThrowIfNull(sources);
-        this.sources = sources;
     }
 
     /// <summary>
     /// Test seam (docs/failure-modes/template-store.md, I8). The observer gets AdmxRead right after the chosen
-    /// ADMX was read and Loaded right after the templates loaded. Stub: written by the G6 tests-first pass.
+    /// ADMX was read and Loaded right after the templates loaded, once each per check. It changes no behavior.
     /// </summary>
-    internal TemplateImport(TemplateSources sources, Action<TemplateImportStage> observer)
+    internal TemplateImport(TemplateSources sources, Action<TemplateImportStage>? observer)
     {
-        throw new NotImplementedException("G6 C: the import stage observer (failure mode I8).");
+        ArgumentNullException.ThrowIfNull(sources);
+        this.sources = sources;
+        this.observer = observer;
     }
 
     /// <summary>Checks a template without writing anything.</summary>
@@ -47,6 +52,13 @@ public sealed class TemplateImport
 
         var name = Path.GetFileName(full);
         var admxName = Path.GetFileNameWithoutExtension(name) + TemplateFileNames.AdmxExtension;
+        var tooLarge = CheckFolderCap(Path.GetDirectoryName(full)!);
+        if (tooLarge is not null)
+        {
+            problems.Add(tooLarge);
+            return new TemplateImportCheck(problems);
+        }
+
         var admx = ReadBounded(full, problems);
         var (status, detail) = sources.InspectStore();
         if (status is not (TemplateStoreStatus.Missing or TemplateStoreStatus.Ready))
@@ -59,6 +71,7 @@ public sealed class TemplateImport
             return new TemplateImportCheck(problems);
         }
 
+        observer?.Invoke(TemplateImportStage.AdmxRead);
         return CheckLoaded(full, admxName, admx, uiCulture, status == TemplateStoreStatus.Ready, problems, cancellationToken);
     }
 
@@ -180,7 +193,13 @@ public sealed class TemplateImport
             ? new[] { sources.SystemFolder, sources.StoreFolder, sourceFolder }
             : [sources.SystemFolder, sourceFolder];
         var sourceIndex = folders.Length - 1;
+
+        // The pair is read once more right before the load and again after it, and every read must be equal. The
+        // bytes that are written are these bytes (template-store.md, I1 and I2).
+        var beforeAdmx = TryRead(full);
+        var (beforeAdmlPath, beforeAdml) = ReadPredictedAdml(sourceFolder, Path.GetFileNameWithoutExtension(full), uiCulture);
         var set = TemplateLoader.Load(folders, uiCulture, cancellationToken);
+        observer?.Invoke(TemplateImportStage.Loaded);
         var candidate = set.Files.FirstOrDefault(f => f.SourceIndex == sourceIndex && TemplateStoreChecks.IsSame(f.AdmxPath, full));
         var stem = Path.GetFileNameWithoutExtension(full);
         foreach (var failure in set.Failures.Where(f => IsRelevant(f, full, sourceFolder, stem, uiCulture)))
@@ -215,9 +234,17 @@ public sealed class TemplateImport
 
         var adml = problems.Count == 0 ? ReadBounded(candidate.AdmlPath, problems) : null;
         var again = problems.Count == 0 ? ReadBounded(full, problems) : null;
-        if (problems.Count == 0 && !admx.AsSpan().SequenceEqual(again))
+        if (problems.Count == 0)
         {
-            problems.Add(new TemplateImportProblem(TemplateImportProblemCode.SourceChanged, full));
+            if (beforeAdmx is null || !admx.AsSpan().SequenceEqual(beforeAdmx) || !admx.AsSpan().SequenceEqual(again))
+            {
+                problems.Add(new TemplateImportProblem(TemplateImportProblemCode.SourceChanged, full));
+            }
+            else if (beforeAdml is null || beforeAdmlPath is null
+                || !TemplateStoreChecks.IsSame(beforeAdmlPath, candidate.AdmlPath) || !beforeAdml.AsSpan().SequenceEqual(adml))
+            {
+                problems.Add(new TemplateImportProblem(TemplateImportProblemCode.SourceChanged, candidate.AdmlPath));
+            }
         }
 
         return new TemplateImportCheck(problems)
@@ -228,6 +255,67 @@ public sealed class TemplateImport
             Admx = again,
             Adml = adml,
         };
+    }
+
+    private static TemplateImportProblem? CheckFolderCap(string folder)
+    {
+        if (!Directory.Exists(folder))
+        {
+            return null;
+        }
+
+        try
+        {
+            var count = 0;
+            foreach (var path in Directory.EnumerateFiles(folder))
+            {
+                if (path.EndsWith(TemplateFileNames.AdmxExtension, StringComparison.OrdinalIgnoreCase)
+                    && ++count > MaxSourceFolderAdmxFiles)
+                {
+                    return new TemplateImportProblem(
+                        TemplateImportProblemCode.SourceFolderTooLarge, folder, MaxSourceFolderAdmxFiles.ToString(CultureInfo.InvariantCulture));
+                }
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return new TemplateImportProblem(
+                TemplateImportProblemCode.SourceUnreadable, folder, "0x" + e.HResult.ToString("X8", CultureInfo.InvariantCulture));
+        }
+
+        return null;
+    }
+
+    /// <summary>Reads a file the way the check does, without a problem list. Null when it cannot be read.</summary>
+    private static byte[]? TryRead(string path) => ReadBounded(path, []);
+
+    /// <summary>The ADML the loader picks for the chosen ADMX (the culture folder, else en-US) and its bytes.</summary>
+    private static (string? Path, byte[]? Bytes) ReadPredictedAdml(string sourceFolder, string stem, string? uiCulture)
+    {
+        var culture = uiCulture?.Trim();
+        if (string.IsNullOrEmpty(culture) || culture is "." or ".." || culture.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            culture = FallbackCulture;
+        }
+
+        foreach (var language in new[] { culture, FallbackCulture })
+        {
+            try
+            {
+                var folder = Path.Combine(sourceFolder, language);
+                var path = Path.Combine(folder, stem + TemplateFileNames.AdmlExtension);
+                if (Directory.Exists(folder) && !TemplateStoreChecks.IsReparsePoint(folder) && File.Exists(path))
+                {
+                    return (path, TryRead(path));
+                }
+            }
+            catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+        }
+
+        return (null, null);
     }
 
     private TemplateImportProblem? Verify(

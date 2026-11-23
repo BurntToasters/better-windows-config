@@ -42,7 +42,7 @@ public sealed partial class GpeditRootView
     private readonly GpeditFilterState _filter = new();
     private readonly Dictionary<string, List<ConsoleListSortKey>> _sortStacks = new(StringComparer.Ordinal);
     private GpeditFilterOptionsDialog? _filterDialog;
-    private (bool HasFilter, bool Ready, bool On)? _filterUiState;
+    private (bool HasFilter, bool Ready, bool On, bool HasTemplates)? _filterUiState;
     private string? _sortNodeKey;
     private int _filterTotal;
 
@@ -51,7 +51,7 @@ public sealed partial class GpeditRootView
     /// <summary>True for the nodes that have the filter: Administrative Templates, a category and All Settings.</summary>
     private static bool NodeHasFilter(TreeNode? node) => GpeditTreeSource.InfoOf(node) is { HasFilter: true };
 
-    private bool FilterCommandsAllowed => _model is not null && _policyDialog is null && _filterDialog is null && !_closed;
+    private bool FilterCommandsAllowed => _model is not null && _policyDialog is null && _filterDialog is null && _templatesDialog is null && !_closed;
 
     /// <summary>Filter On: switches the filter on with the options kept, or off.</summary>
     private void RunToggleFilter()
@@ -181,19 +181,24 @@ public sealed partial class GpeditRootView
     /// that repeats them, Refresh and Help. The ones that belong to a node or a selection are shown and hidden as it changes
     /// (<see cref="UpdateFilterUi"/> and <see cref="UpdateActionMenu"/>).
     /// </summary>
-    private List<ClassicCommandItem> BuildActionBarItems() => BuildActionItems(includeEdit: true, includeFilter: true);
+    private List<ClassicCommandItem> BuildActionBarItems() => BuildActionItems(includeEdit: true, includeFilter: true, includeTemplates: true);
 
     /// <summary>
     /// The entries of a context menu or of the Action popup: Edit for a policy row; at the nodes that have the filter the
     /// three filter entries, a separator and the tasks submenu with the same entries (and Edit for a policy row); then
     /// Refresh and Help.
     /// </summary>
-    private List<ClassicCommandItem> BuildActionItems(bool includeEdit, bool includeFilter)
+    private List<ClassicCommandItem> BuildActionItems(bool includeEdit, bool includeFilter, bool includeTemplates = false)
     {
         var items = new List<ClassicCommandItem>();
         if (includeEdit)
         {
             items.Add(ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandEdit"), EditCommand, true, invoke: RunEdit));
+        }
+
+        if (includeTemplates)
+        {
+            items.AddRange(TemplateItems());
         }
 
         if (includeFilter)
@@ -204,6 +209,11 @@ public sealed partial class GpeditRootView
             if (includeEdit)
             {
                 tasks.Add(ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandEdit"), EditCommand, true, invoke: RunEdit));
+            }
+
+            if (includeTemplates)
+            {
+                tasks.AddRange(TemplateItems());
             }
 
             tasks.AddRange(FilterItems());
@@ -332,18 +342,23 @@ public sealed partial class GpeditRootView
         bool hasFilter = NodeHasFilter(Shell.TreeContent.SelectedNode);
         bool ready = _model is not null;
         bool on = _filter.IsOn;
-        if (_filterUiState is { } known && known == (hasFilter, ready, on))
+        bool hasTemplates = NodeHasTemplates(Shell.TreeContent.SelectedNode);
+        if (_filterUiState is { } known && known == (hasFilter, ready, on, hasTemplates))
         {
             return;
         }
 
-        _filterUiState = (hasFilter, ready, on);
+        _filterUiState = (hasFilter, ready, on, hasTemplates);
         MenuBar bar = Shell.MenuBar;
         foreach (int id in new[] { FilterToggleCommand, FilterOptionsCommand, FilterReApplyCommand, TasksSubmenuCommand, FilterSeparatorTag })
         {
             ClassicMenuBuilder.SetCommandVisible(bar, id, hasFilter);
         }
 
+        // Add/Remove Templates is at the Administrative Templates node only, and is not a policy write: it stays enabled in every
+        // access state while the model is loaded.
+        ClassicMenuBuilder.SetCommandVisible(bar, AddRemoveTemplatesCommand, hasTemplates);
+        ClassicMenuBuilder.SetCommandEnabled(bar, AddRemoveTemplatesCommand, ready);
         ClassicMenuBuilder.SetCommandEnabled(bar, FilterToggleCommand, ready);
         ClassicMenuBuilder.SetCommandEnabled(bar, FilterOptionsCommand, ready);
         ClassicMenuBuilder.SetCommandEnabled(bar, FilterReApplyCommand, ready && on);

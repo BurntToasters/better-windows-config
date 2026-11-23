@@ -62,7 +62,7 @@ public enum TemplateImportProblemCode
     /// <summary>Another imported template uses the namespace. The detail is the dependent file.</summary>
     UsedByTemplate,
 
-    /// <summary>The source folder holds more ADMX files than the cap (template-store.md, I6). Not raised yet.</summary>
+    /// <summary>The source folder holds more ADMX files than the cap (template-store.md, I6). The detail is the cap.</summary>
     SourceFolderTooLarge,
 }
 

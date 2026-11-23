@@ -697,6 +697,7 @@ public sealed partial class GpeditRootView
         Add("Edits", _editRequests);
         Add("LastEdit", _lastEdit);
         Add("Refreshes", _refreshes);
+        Add("TemplateReloads", _templateReloads);
         Add("Reloading", _loadInFlight && !_loadIsInitial ? 1 : 0);
         Add("HelpRequests", _helpRequests);
         Add("LastCommand", _lastCommand);
