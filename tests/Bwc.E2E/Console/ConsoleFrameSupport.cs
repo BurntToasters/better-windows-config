@@ -116,6 +116,19 @@ internal sealed class FrameDialog : IDisposable
         return dialog;
     }
 
+    /// <summary>Waits for a dialog that something else opened (a key chord, for example). Null when it did not open.</summary>
+    internal static FrameDialog? Attach(ShellRun run, string rootId)
+    {
+        var dialog = new FrameDialog(new EditingDriver(run.Session), rootId);
+        if (dialog._driver.WaitForElement(rootId, TimeSpan.FromSeconds(10)) is null)
+        {
+            dialog.Dispose();
+            return null;
+        }
+
+        return dialog;
+    }
+
     public void Dispose() => _driver.Dispose();
 
     internal AutomationElement? Root => _driver.WaitForElement(RootId, TimeSpan.FromSeconds(3));
