@@ -33,6 +33,11 @@ public sealed class GpeditDialogTests
     private const string DecimalValues = "Decimal enabled and disabled values setting";
     private const string LastBasics = "No value name, elements only setting";
 
+    // The default order of the policy rows is the order of the policy ids (F/Sort_Columns op 17), so Previous and Next walk
+    // Class both with an element, Class both flag, Class machine flag, Element key differs from policy key, and so on.
+    private const string NextAfterMachine = "Element key differs from policy key setting";
+    private const string NextAfterMachineTitle = "Element key differs from policy key";
+
     private const string MachineHelp = "A machine policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.";
     private const string AnySystem = "BWC oracle fixture: any system";
 
@@ -492,9 +497,9 @@ public sealed class GpeditDialogTests
             checks.Record("position", dialog.Read("Index") == "2" && dialog.Read("Count") == "12", $"index={dialog.Read("Index")}, count={dialog.Read("Count")}.");
 
             _ = dialog.Invoke(GpeditDialog.Next);
-            checks.Record("nextTitle", ShellRun.WaitUntil(() => dialog.Caption() == "Decimal enabled and disabled values", TimeSpan.FromSeconds(3)), $"caption='{dialog.Caption()}'.");
-            checks.Record("nextTitleLabel", dialog.TextOf(GpeditDialog.Title) == "Decimal enabled and disabled values", $"title label='{dialog.TextOf(GpeditDialog.Title)}'.");
-            checks.Record("nextState", dialog.IsSelected(GpeditDialog.Disabled) && dialog.TextOf(GpeditDialog.Comment).Length == 0, "the next policy shows its own state and comment.");
+            checks.Record("nextTitle", ShellRun.WaitUntil(() => dialog.Caption() == NextAfterMachineTitle, TimeSpan.FromSeconds(3)), $"caption='{dialog.Caption()}'.");
+            checks.Record("nextTitleLabel", dialog.TextOf(GpeditDialog.Title) == NextAfterMachineTitle, $"title label='{dialog.TextOf(GpeditDialog.Title)}'.");
+            checks.Record("nextState", dialog.IsSelected(GpeditDialog.NotConfigured) && dialog.TextOf(GpeditDialog.Comment).Length == 0, "the next policy shows its own state and comment.");
             checks.Record("nextClean", !dialog.IsEnabled(GpeditDialog.Apply), "Apply is disabled after a move.");
             checks.Record("nextPosition", dialog.Read("Index") == "3", $"index={dialog.Read("Index")}.");
             checks.Record("nextTexts", dialog.TextOf(GpeditDialog.Help) != MachineHelp && dialog.TextOf(GpeditDialog.Help).Length > 0, "the help text changed with the policy.");
@@ -504,13 +509,13 @@ public sealed class GpeditDialogTests
             _ = dialog.Invoke(GpeditDialog.Previous);
             checks.Record("previousTitle", ShellRun.WaitUntil(() => dialog.Caption() == "Class machine flag", TimeSpan.FromSeconds(3)), $"caption='{dialog.Caption()}'.");
             checks.Record("previousState", dialog.IsSelected(GpeditDialog.Enabled) && dialog.TextOf(GpeditDialog.Comment) == "machine note", "the previous policy shows its own state and comment.");
-            string[] decimalCells = CellsOf(run, DecimalValues);
-            checks.Record("commentKeptOnMove", decimalCells.ElementAtOrDefault(2) == "Yes", $"decimal row cells={string.Join("|", decimalCells)}.");
+            string[] nextCells = CellsOf(run, NextAfterMachine);
+            checks.Record("commentKeptOnMove", nextCells.ElementAtOrDefault(2) == "Yes", $"next row cells={string.Join("|", nextCells)}.");
 
             // A pending state change is applied by the move too.
             _ = dialog.Select(GpeditDialog.Disabled);
             _ = dialog.Invoke(GpeditDialog.Next);
-            _ = ShellRun.WaitUntil(() => dialog.Caption() == "Decimal enabled and disabled values", TimeSpan.FromSeconds(3));
+            _ = ShellRun.WaitUntil(() => dialog.Caption() == NextAfterMachineTitle, TimeSpan.FromSeconds(3));
             checks.Record("commentRestored", dialog.TextOf(GpeditDialog.Comment) == "decimal note", $"comment='{dialog.TextOf(GpeditDialog.Comment)}'.");
             string[] machineCells = CellsOf(run, MachineFlag);
             checks.Record("stateAppliedOnMove", machineCells.ElementAtOrDefault(1) == "Disabled", $"machine flag cells={string.Join("|", machineCells)}.");
@@ -520,11 +525,11 @@ public sealed class GpeditDialogTests
         }
 
         // After closing the list selects the last policy shown and holds the focus.
-        checks.Record("selectionFollows", ShellRun.WaitUntil(() => run.DescriptionTitle == "Decimal enabled and disabled values", TimeSpan.FromSeconds(5)), $"description title='{run.DescriptionTitle}'.");
+        checks.Record("selectionFollows", ShellRun.WaitUntil(() => run.DescriptionTitle == NextAfterMachineTitle, TimeSpan.FromSeconds(5)), $"description title='{run.DescriptionTitle}'.");
         checks.Record("focusFollows", ShellRun.WaitUntil(() => run.Shell.FocusedPane() == "result", TimeSpan.FromSeconds(5)), $"focused pane={run.Shell.FocusedPane()}.");
 
         // The ends of the list.
-        using (GpeditDialog? first = GpeditDialog.Open(run, BothFlag))
+        using (GpeditDialog? first = GpeditDialog.Open(run, BothElement))
         {
             checks.Record("firstEnds", first is not null && !first.IsEnabled(GpeditDialog.Previous) && first.IsEnabled(GpeditDialog.Next), "Previous is disabled on the first policy and Next is enabled.");
             first?.Press(VirtualKeyShort.ESCAPE);

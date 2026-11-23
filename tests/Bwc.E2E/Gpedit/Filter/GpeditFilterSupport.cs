@@ -604,7 +604,11 @@ internal sealed class GpeditFilterDialog : IDisposable
         for (int i = 0; i < count; i++)
         {
             string before = _run.Shell.FocusedId();
-            _run.Shell.Tap(VkTab);
+
+            // The keys go to the dialog window, so the dialog is the input target (the main window is not foreground).
+            _ = ClassicDialogTestsBridge.EnsureForeground(DialogHandle());
+            Bwc.E2E.List.RawKeyboard.Tap(VkTab);
+            Thread.Sleep(150);
             _ = ShellRun.WaitUntil(() => _run.Shell.FocusedId() != before, TimeSpan.FromSeconds(1));
             ids.Add(PartOf(_run.Shell.FocusedId()));
         }
@@ -641,8 +645,12 @@ internal sealed class GpeditFilterDialog : IDisposable
     /// <summary>Closes the message box with Enter and waits until it is gone.</summary>
     internal bool DismissMessage()
     {
-        _ = ClassicDialogTestsBridge.EnsureForeground(DialogHandle());
-        _run.Press(GpeditKeys.Enter);
+        // The message box is its own window over the dialog: it is the input target, not the dialog and not the main window.
+        AutomationElement? message = Find(FilterIds.Message, 2);
+        IntPtr target = message is null ? DialogHandle() : ClassicDialogTestsBridge.HandleOf(message);
+        _ = ClassicDialogTestsBridge.EnsureForeground(target);
+        Bwc.E2E.List.RawKeyboard.Tap(GpeditKeys.Enter);
+        Thread.Sleep(300);
         return ShellRun.WaitUntil(() => Find(FilterIds.Message, 0.3) is null, TimeSpan.FromSeconds(8));
     }
 
