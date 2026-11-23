@@ -74,16 +74,16 @@
 
 | ID | Feature | Oracle source | Package | Status |
 | --- | --- | --- | --- | --- |
-| CTX-001 | Context menu opened with the menu key on the result list at the two configuration nodes and at the Windows Settings placeholder: export list, separator, View submenu, separator, icon arrangement submenu, icon line-up entry, separator, Help. Ids as dumped at the configuration node: 1013, View 1016 to 1025, 1028, 1029, 1031. | F/Menus_Computer, F/Menus_User (dumpMenu Context) | G2 | gap |
-| CTX-002 | View submenu of that menu: columns command, separator, four list view modes (Detail checked), separator, Customize View. | F/Menus_Computer, F/Menus_User | G2, U3a | gap |
-| CTX-003 | icon arrangement submenu holds one entry, automatic arrangement entry (gpedit.dll RT_MENU 1234 id 32797); icon line-up entry (id 32794) follows the submenu. | gpedit.dll RT_MENU 1234, ids 32794, 32797; F/Menus_Computer, F/Menus_User | G2 | gap |
-| CTX-004 | Context menu at the Software Settings placeholder: View submenu, separator, icon arrangement submenu, icon line-up entry, separator, Help. No export list. Ids as dumped: 1015 to 1030. | F/Menus_Computer, F/Menus_User | G2 | gap |
-| CTX-005 | Context menu at the Administrative Templates node: export list, separator, View submenu with the filter entries (toggle, Filter Options, filter re-apply entry grayed) between the view modes and Customize View, separator, icon arrangement submenu, icon line-up entry, separator, Help. Ids as dumped: 1013, 1016 to 1028, 1031, 1032, 1034. No Add/Remove Templates in this menu. | F/Menus_Computer, F/Menus_User | G2, G5 | gap |
-| CTX-006 | Context menu at a category node and at All Settings: the same layout as at the Administrative Templates node. | F/Menus_Computer, F/Menus_User | G2, G5 | gap |
+| CTX-001 | Context menu opened with the menu key on the result list at the two configuration nodes and at the Windows Settings placeholder: export list, separator, View submenu, separator, icon arrangement submenu, icon line-up entry, separator, Help. Ids as dumped at the configuration node: 1013, View 1016 to 1025, 1028, 1029, 1031. | F/Menus_Computer, F/Menus_User (dumpMenu Context) | G2 | pass |
+| CTX-002 | View submenu of that menu: columns command, separator, four list view modes (Detail checked), separator, Customize View. | F/Menus_Computer, F/Menus_User | G2, U3a | pass |
+| CTX-003 | icon arrangement submenu holds one entry, automatic arrangement entry (gpedit.dll RT_MENU 1234 id 32797); icon line-up entry (id 32794) follows the submenu. | gpedit.dll RT_MENU 1234, ids 32794, 32797; F/Menus_Computer, F/Menus_User | G2 | pass |
+| CTX-004 | Context menu at the Software Settings placeholder: View submenu, separator, icon arrangement submenu, icon line-up entry, separator, Help. No export list. Ids as dumped: 1015 to 1030. | F/Menus_Computer, F/Menus_User | G2 | pass |
+| CTX-005 | Context menu at the Administrative Templates node: export list, separator, View submenu with the filter entries (toggle, Filter Options, filter re-apply entry grayed) between the view modes and Customize View, separator, icon arrangement submenu, icon line-up entry, separator, Help. Ids as dumped: 1013, 1016 to 1028, 1031, 1032, 1034. No Add/Remove Templates in this menu. | F/Menus_Computer, F/Menus_User | G2, G5 | pass |
+| CTX-006 | Context menu at a category node and at All Settings: the same layout as at the Administrative Templates node. | F/Menus_Computer, F/Menus_User | G2, G5 | pass |
 | CTX-007 | Context menu with a policy row selected: Edit, filter toggle, Filter Options, filter re-apply entry (grayed), separator, tasks submenu with the same four entries, separator, Help. Ids as dumped: 1012, 1014, 1016, 1018; submenu 1013, 1015, 1017, 1019; 1021. Identical to the Action popup with a policy row selected. | F/Menus_Computer, F/Menus_User | G2, G3a, G5 | pass |
 | CTX-008 | The menu key on the result list opens the context menu with no row selected; with a row selected the menu is the policy row menu. Computer and User Configuration give identical menus at every node kind. | F/Menus_Computer, F/Menus_User | G2 | pass |
 | CTX-009 | Not captured: a context menu on the console tree (the capture presses the menu key on the result list only). The audit sets the tree menu. | gap in the captures | G2, A1 | declared-difference |
-| CTX-010 | Not captured: a context menu on a list column header and on the empty area of the Extended description pane. | gap in the captures | A1 | gap |
+| CTX-010 | Not captured: a context menu on a list column header and on the empty area of the Extended description pane. | gap in the captures | A1 | declared-difference |
 | CTX-011 | Each command of a context menu does what the same command of the Action or View popup does, and a dismissed menu leaves focus where it was. | F/Menus_Computer, F/Menus_User | G2 | pass |
 
 ### 2.3 TOOL: toolbar
@@ -98,12 +98,12 @@
 | TOOL-006 | Separator after Forward (command 3): visible. | F/Toolbar_States | U3 | pass |
 | TOOL-007 | Up One Level (command 4): visible, enabled in every dump (every dumped node has a parent). | F/Toolbar_States | G2 | pass |
 | TOOL-008 | console tree toggle (command 5): visible, enabled, checked in every dump. | F/Toolbar_States | U3a | pass |
-| TOOL-009 | Hidden entries 6 to 9 and 11 to 14 (a separator and seven buttons): present in the band and hidden in every dump; entry 12 is enabled but hidden. Their positions leave no gap. | F/Toolbar_States | U3 | gap |
+| TOOL-009 | Hidden entries 6 to 9 and 11 to 14 (a separator and seven buttons): present in the band and hidden in every dump; entry 12 is enabled but hidden. Their positions leave no gap. | F/Toolbar_States | U3 | pass |
 | TOOL-010 | Separator before Export List (command 10): visible. | F/Toolbar_States | U3 | pass |
 | TOOL-011 | Export List (command 15; mmcbase.dll string 13436 names it): visible, enabled in every dump. | F/Toolbar_States; mmcbase.dll str 13436 | U3a | pass |
 | TOOL-012 | Separator after Export List (command 16): visible. | F/Toolbar_States | U3 | pass |
 | TOOL-013 | Help (command 17): visible, enabled in every dump (its UIA name is the short word Help). | F/Toolbar_States | U3b | pass |
-| TOOL-014 | action pane toggle (command 18): visible, enabled in every dump. | F/Toolbar_States | U3a | gap |
+| TOOL-014 | action pane toggle (command 18): visible, enabled in every dump. | F/Toolbar_States | U3a | declared-difference |
 | TOOL-015 | Filter button (command 20, preceded by a separator, command 19): present only at the Administrative Templates node, at category nodes, at All Settings and with a policy row selected. Absent at the two configuration nodes and at placeholder nodes. Enabled, not checked while no filter is on. | F/Toolbar_States | G5 | pass |
 | TOOL-016 | Toolbar states do not change with the selected node kind except for the filter button, and do not change with a policy row selected. | F/Toolbar_States | G2 | pass |
 | TOOL-017 | The toolbar and the console tree can be hidden and shown from the Customize View dialog. | mmcndmgr.dll RT_DIALOG 1086 | U3a | pass |
@@ -240,14 +240,14 @@
 
 | ID | Feature | Oracle source | Package | Status |
 | --- | --- | --- | --- | --- |
-| ACC-001 | Table 128, entry 1: Ctrl+P, command 13210. | mmc.exe RT_ACCELERATOR 128 | G2, A1 | gap |
+| ACC-001 | Table 128, entry 1: Ctrl+P, command 13210. | mmc.exe RT_ACCELERATOR 128 | G2, A1 | declared-difference |
 | ACC-002 | Table 128, entry 2: F1, command 13215. | mmc.exe RT_ACCELERATOR 128 | G2, U3b | pass |
-| ACC-003 | Table 128, entry 3: Ctrl+F10, command 13211. | mmc.exe RT_ACCELERATOR 128 | A1 | gap |
+| ACC-003 | Table 128, entry 3: Ctrl+F10, command 13211. | mmc.exe RT_ACCELERATOR 128 | A1 | declared-difference |
 | ACC-004 | Table 128, entry 4: F5, command 13209 (refresh). In F/Keys_List and F/Keys_Tree the press opens no window and no menu. | mmc.exe RT_ACCELERATOR 128; F/Keys_List, F/Keys_Tree | G2 | pass |
-| ACC-005 | Table 128, entry 5: Ctrl+F5, command 13212. | mmc.exe RT_ACCELERATOR 128 | A1 | gap |
+| ACC-005 | Table 128, entry 5: Ctrl+F5, command 13212. | mmc.exe RT_ACCELERATOR 128 | A1 | declared-difference |
 | ACC-006 | Table 128, entry 6: F6, command 13213 (next pane). In F/Keys_Tree step 16 the focus is on the result side. | mmc.exe RT_ACCELERATOR 128; F/Keys_Tree | G2 | pass |
 | ACC-007 | Table 128, entry 7: Shift+F6, command 13214 (previous pane). | mmc.exe RT_ACCELERATOR 128 | G2 | pass |
-| ACC-008 | Table 128, entry 8: Ctrl+Alt+Shift+F7, command 13235. | mmc.exe RT_ACCELERATOR 128 | A1 | gap |
+| ACC-008 | Table 128, entry 8: Ctrl+Alt+Shift+F7, command 13235. | mmc.exe RT_ACCELERATOR 128 | A1 | declared-difference |
 | ACC-009 | Table 128, entry 9: Tab, command 13213 (next pane). F/Keys_Tree step 13 moves the focus from the tree to the result side; F/Keys_List step 12 moves it from the list. | mmc.exe RT_ACCELERATOR 128; F/Keys_Tree, F/Keys_List | G2 | pass |
 | ACC-010 | Table 128, entry 10: Shift+Tab, command 13214 (previous pane). F/Keys_Tree step 14 returns the focus to the tree. | mmc.exe RT_ACCELERATOR 128; F/Keys_Tree | G2 | pass |
 | ACC-011 | Table 129 (author mode, 5 entries: Ctrl+N 57600, Ctrl+O 57601, Ctrl+M 13201, Ctrl+S 57603, Ctrl+W 57648). The matching commands are not on any dumped menu, so the table is not reached. | mmc.exe RT_ACCELERATOR 129; F/Menus_* | A1 | declared-difference |

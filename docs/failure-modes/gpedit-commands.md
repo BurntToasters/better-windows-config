@@ -25,12 +25,12 @@ text: the labels are BWC's own and live in the piece's own `.resw`. What the cap
 | Help Topics | Help menu, enabled (MENU-033); F1 is the accelerator of the help command (ACC-002) | the same |
 | Refresh | no entry in any dump; F5 opens no window and no menu (ACC-004, ACC-027, ACC-044) | BWC addition (BEH-022): Action menu and all three context menus, enabled at every node kind |
 | Export List | every node kind but a policy row (MENU-017) | not in G2: no handler exists; owned by U3a |
-| Properties button | hidden in the classic toolbar (TOOL-009) | shown (the console frame has it); enabled only while a policy row is selected, because its command is Edit |
+| Properties button | hidden in the classic toolbar (TOOL-009) | hidden (A3a-1, section 11.12); Edit stays in the Action menu, the policy row menu and Alt+Enter |
 | Refresh button | hidden in the classic toolbar (TOOL-009) | shown, enabled at every node kind |
 | Back, Forward, Up, Show/Hide tree, Help buttons | Back enabled with history, Forward disabled until Back, Up enabled at every non-root node, tree toggle and Help enabled (TOOL-004 to TOOL-014, TOOL-016) | the same |
 
 Not captured, so decided here and listed in the audit (CTX-009): the context menu of the console tree holds Refresh and Help
-only. Selection by a right click on a tree node is not asserted.
+only (A3a-1 left it as it is). Selection by a right click on a tree node is not asserted.
 
 ## The E2E seam
 
@@ -99,8 +99,8 @@ Today Properties and Refresh are enabled and do nothing, and Help is disabled.
 - Back is enabled with history and disabled at the start; Forward is enabled only after Back and ends when a new node is
   selected. Up is disabled at the root and enabled at every other node (TOOL-004 to TOOL-007).
 - Show/Hide Console Tree and Help are enabled at every node kind (TOOL-008, TOOL-013); Help runs the Help command.
-- Properties is enabled only while a policy row is selected, and runs Edit. At every other selection it is disabled: an
-  enabled button that does nothing is the failure.
+- Properties is hidden, as in classic (TOOL-009, section 11.12); it was enabled only while a policy row was selected. Edit
+  runs from the Action menu, the policy row menu and Alt+Enter.
 - Refresh is enabled at every node kind and with a row selected, and reloads (section 5).
 - A state that is set once at the first selection and never again (a node kind that changes it, a row selection).
 
@@ -199,6 +199,81 @@ tree move adds exactly one history step after repeated reloads (`Gpedit_Refresh_
 The comments of `MainWindow.xaml.cs` and `GpeditRootView.xaml.cs` still say the commands and the window state are later
 pieces, and the fixture help text says Disabled writes 0 while the captures show a delete record. They are corrected in the
 code dispatch; there is no E2E check. The fixture wording is not a check here: the existing dialog tests read it.
+
+## 11. The context menu of the result pane is not the classic menu (A3a-1: CTX-001 to CTX-006, TOOL-009)
+
+Before A3a-1 the menu of the result list with no policy row builds Refresh, a View submenu that holds the filter entries (at the
+nodes that have the filter) and Help. The captures (F/Menus_Computer, F/Menus_User, the menu key with no row selected) give
+more: an Export List entry, a View submenu with the columns command, the four view modes (the current one checked), the filter
+entries between the modes and Customize View, an icon arrangement submenu, a line-up entry and Help, with separators between
+the groups. The tree menu (CTX-009, a BWC definition), the folder row menu and the policy row menu (CTX-007) are not part of
+this section and keep their entries.
+
+Layout by node kind, from the captures (a separator between the groups; the Refresh entry is the DIFF-007 addition, placed
+after the line-up entry, in the group of the arrangement entries):
+
+| Node | Top level | View submenu |
+| --- | --- | --- |
+| Computer or User Configuration, Windows Settings | Export List, View, Arrange Icons, Line Up Icons, Refresh, Help | columns, four modes, Customize View |
+| Administrative Templates, a category, All Settings | the same | columns, four modes, the three filter entries, Customize View |
+| Software Settings (a placeholder page) | View, Arrange Icons, Line Up Icons, Refresh, Help (no Export List) | columns, four modes, Customize View |
+
+Ways it fails, with the design choice that prevents each and the check that catches it. Tests: `Gpedit_ContextMenu_Layout_NodeKinds`,
+`Gpedit_ContextMenu_Layout_Commands`, `Gpedit_Toolbar_PropertiesHidden`, in `tests/Bwc.E2E/Gpedit/Commands/GpeditContextMenuLayoutTests.cs`.
+Check ids are `gpedit.contextlayout.nodes.<side>.<kind>.<id>` and `gpedit.contextlayout.commands.<id>`.
+
+11.1 The empty area menu lacks the entries of the capture (Export List, the View content, the arrangement entries). One builder
+makes the menu for every node kind from a per-kind description, so a kind cannot keep an old list. Checks: `top.ids`, `view.ids`,
+`arrange.ids` at each kind.
+
+11.2 The entries are in the wrong order, or Help is not last. The order is the capture's, with Refresh after the line-up entry.
+Checks: `top.ids` (exact id sequence), `top.helpLast`.
+
+11.3 The separators are missing, doubled or in the wrong place (the filter group and its separator show at a node without the
+filter, or a separator stays behind with no group). The groups are compared with the groups of the capture, read from the golden
+file by the test. Checks: `top.groups`, `view.groups`, `arrange.groups`.
+
+11.4 Export List shows at Software Settings (the capture has none there) or is missing at the other nodes. Checks: `top.ids`.
+
+11.5 The filter entries show in the View submenu at a node without the filter, or are missing at a node with it, or Re-Apply
+Filter is not grayed while the filter is off. Checks: `view.ids`, `view.grayed`.
+
+11.6 The state of the entries is the state when the menu was built long ago: the checked view mode is the mode of the list now
+(the menu is built for each request), and the arrangement toggle shows its state. Checks: `view.checked` against the capture
+(Detail checked), `afterMode.checked` (the new mode is checked after a mode change from this menu), `autoArrange.checked`.
+
+11.7 An entry has no command behind it, or a command that differs from the one of the menu bar: a view mode from the menu
+sets the list mode (the list readout `Mode`), Add/Remove Columns and Customize View open their dialogs, Export List opens the
+save dialog, Line Up Icons counts (`LineUps` in the readout) and changes neither the mode, the selection nor the rows, Auto
+Arrange toggles (`AutoArrange`). The menu closes after a command. Checks: `mode.runs`, `columns.opens`, `customize.opens`,
+`export.opens`, `lineUp.runs`, `lineUp.keepsMode`, `autoArrange.runs`, `menuCloses`.
+
+11.8 An entry shows the resource key instead of a label (a missing string) or has no label. Checks: `labels` (no label equals
+its key and the BWC words are present).
+
+11.9 The Computer and the User side differ, or only one side is built. The test runs both sides, with the same expectations.
+Checks: every check above, with `user` in the kind.
+
+11.10 The menu key (no row) and the right click give different menus. Check: `key.ids`.
+
+11.11 BWC has no icon arrangement: the list lays its items out in item order in a grid, with no free placement and no drag. The
+arrangement entries run over the existing view modes: Line Up Icons lays the grid out again (the list keeps its mode, scroll
+position and selection) and Auto Arrange is a check item that lays the grid out again when it is checked. This is recorded in the audit (CTX-003) and is the one place where an entry has no visible effect beyond the layout
+pass. Checks: `lineUp.runs`, `lineUp.keepsMode`, `autoArrange.runs`.
+
+11.12 The Properties toolbar button shows although classic hides it (TOOL-009, F/Toolbar_States: entries 6 to 9 and 11 to 14
+are hidden in every dump). The editor hides the button for good; the Edit command stays in the Action menu, the policy row
+menu and Alt+Enter. The visible standard buttons are those of the capture, in the capture's order, plus Refresh
+(DIFF-007) and without the action pane toggle (TOOL-014, declared). Checks: `Gpedit_Toolbar_PropertiesHidden` (`absent` at
+each node kind and with a policy row selected, `visible` is the exact list), `Gpedit_Toolbar_Commands` (`editViaMenu`).
+
+11.13 The hidden button is hidden only until the first selection change (the visibility is reset by the next update of the button
+states). Check: `Gpedit_Toolbar_PropertiesHidden` selects a node, a policy row and a folder row and looks each time.
+
+Declared with no code (the manager, user to confirm): CTX-010 (no menu on a column header or on the description pane: not
+captured, and BWC has no commands for them), TOOL-014 (no action pane toggle: BWC has no action pane), ACC-001, ACC-003,
+ACC-005 and ACC-008 (Ctrl+P, Ctrl+F10, Ctrl+F5 and Ctrl+Alt+Shift+F7 are not bound: not captured, and the multiple-window console
+keys have no meaning in BWC's single-window frame).
 
 ## Decisions of the code dispatch
 

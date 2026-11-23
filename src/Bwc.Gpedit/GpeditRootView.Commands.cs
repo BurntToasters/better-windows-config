@@ -1,10 +1,12 @@
 using Bwc.Core;
 using Bwc.Gpedit.List;
+using Bwc.Gpedit.Tree;
 using Bwc.Gpo.Store;
 using Bwc.Policy.Admx;
 using Bwc.UI.Console.List;
 using Bwc.UI.Console.Shell;
 using Bwc.UI.Menu;
+using Bwc.UI.Tree;
 using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
@@ -201,15 +203,17 @@ public sealed partial class GpeditRootView
         FrameworkElement target = _placeholderShown ? Shell.ResultHostElement : _list;
         Point point = _placeholderShown || e.Position is null ? new Point(KeyboardMenuOffset, KeyboardMenuOffset) : e.Position.Value;
 
-        // A policy row has the menu of the Action popup. A folder row has the base entries. The empty area has a View
-        // submenu that holds the filter entries.
+        // A policy row has the menu of the Action popup. A folder row has the base entries. The empty area has the menu of
+        // the captures (CTX-001 to CTX-006); Software Settings, a placeholder page, has no Export List there.
         List<ClassicCommandItem> items = policyRow
             ? BuildActionItems(includeEdit: true, includeFilter: hasFilter)
             : folderRow
                 ? BuildActionItems(includeEdit: false, includeFilter: false)
-                : BuildEmptyAreaItems(hasFilter);
+                : BuildEmptyAreaItems(hasFilter, includeExport: !IsSoftwareSettings(Shell.TreeContent.SelectedNode));
         ShowContextMenu(items, target, point);
     }
+
+    private static bool IsSoftwareSettings(TreeNode? node) => GpeditTreeSource.InfoOf(node) is { Kind: GpeditNodeKind.SoftwareSettings };
 
     private void ShowTreeContextMenu(ConsoleContextMenuEventArgs e)
     {
@@ -242,6 +246,7 @@ public sealed partial class GpeditRootView
 
         FinishItems(flyout.Items);
         SetFilterChecks(flyout.Items, _filter.IsOn);
+        SetContextStates(flyout.Items);
         ApplyPopupWidth(flyout.Items);
         flyout.Closed += (_, _) =>
         {

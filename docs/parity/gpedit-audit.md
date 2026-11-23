@@ -23,17 +23,17 @@ State after A1 (2026-11-22, HEAD 5ccff10): every row has a verdict. E2E evidence
 | Section | pass | declared-difference | gap | removed | open |
 | --- | --- | --- | --- | --- | --- |
 | MENU | 36 | 4 | 0 | 1 | 0 |
-| CTX | 3 | 1 | 7 | 0 | 0 |
-| TOOL | 15 | 0 | 2 | 0 | 0 |
+| CTX | 9 | 2 | 0 | 0 | 0 |
+| TOOL | 16 | 1 | 0 | 0 | 0 |
 | DLG | 35 | 88 | 0 | 0 | 0 |
-| ACC | 24 | 2 | 24 | 0 | 0 |
+| ACC | 24 | 6 | 20 | 0 | 0 |
 | MSG | 3 | 73 | 17 | 0 | 0 |
 | VIEW | 28 | 14 | 1 | 0 | 0 |
 | TREE | 16 | 0 | 3 | 1 | 0 |
 | BEH | 23 | 4 | 1 | 1 | 0 |
 | POL | 63 | 0 | 5 | 0 | 7 |
 | ADMX | 32 | 0 | 0 | 0 | 0 |
-| All (534) | 277 | 186 | 61 | 3 | 7 |
+| All (534) | 284 | 192 | 48 | 3 | 7 |
 
 ## Gaps
 
@@ -49,23 +49,10 @@ Engine rules that no capture settles are listed first (E6c). Each has a pointer 
 | GAP-06 | A key that a new record joins takes the spelling of its ancestors; on load two spellings of one key merge under the first. | D/Case_KeyDiffers and D/Case_KeyTwoSpellings show one level; deeper trees and ties between several first spellings are not captured. | `PolDocument.SpellNewKey` |
 | GAP-07 | The namespaces that stay in comment.cmtx after the first save of a session. | Only the one-namespace case is captured (A/Machine_Enabled, A/User_Enabled). | `CmtxDocument.RestrictNamespacesTo` |
 
-Gap rows of the audit (A1). Each line names the row, what is missing and the piece that closes it: A3 for a fix or a test after this audit, A2 for the elevated run (a real save with refresh). Gap rows by section: CTX 7, TOOL 2, ACC 24, MSG 17, VIEW 1, TREE 3, BEH 1, POL 5, ADMX 1.
+Gap rows of the audit (A1). Each line names the row, what is missing and the piece that closes it: A3 for a fix or a test after this audit, A2 for the elevated run (a real save with refresh). Gap rows by section: ACC 20, MSG 17, VIEW 1, TREE 3, BEH 1, POL 5, ADMX 1.
 
 | Row | What is missing | Piece |
 | --- | --- | --- |
-| CTX-001 | The empty area menu has no export list, no view modes in its View submenu, no icon arrangement submenu and no line-up entry. | A3 |
-| CTX-002 | The View submenu of the empty area menu lacks the columns command, the four view modes and Customize View. | A3 |
-| CTX-003 | No icon arrangement submenu and no line-up entry in any context menu. | A3 |
-| CTX-004 | The Software Settings menu lacks the View submenu content and the icon arrangement entries. | A3 |
-| CTX-005 | The Administrative Templates menu lacks the export list, view modes, Customize View and icon arrangement entries. | A3 |
-| CTX-006 | Category and All Settings menus: the same entries as CTX-005 are missing. | A3 |
-| CTX-010 | No menu on a column header or the description pane; not captured, so capture classic or declare with the user. | A3 |
-| TOOL-009 | The Properties button shows although classic hides it; hide it or have the user declare it (Refresh is DIFF-007). | A3 |
-| TOOL-014 | No action pane toggle button (no action pane); build it, or have the user declare it. | A3 |
-| ACC-001 | Ctrl+P is not captured and not bound; capture classic, then build or declare. | A3 |
-| ACC-003 | Ctrl+F10 is not captured and not bound; capture classic, then build or declare. | A3 |
-| ACC-005 | Ctrl+F5 is not captured and not bound; capture classic, then build or declare. | A3 |
-| ACC-008 | Ctrl+Alt+Shift+F7 is not captured and not bound; capture classic, then build or declare. | A3 |
 | ACC-017 | Tree Home: no test. | A3 |
 | ACC-018 | Tree End: no test. | A3 |
 | ACC-019 | Tree PageDown: no test. | A3 |
@@ -116,12 +103,12 @@ Gap rows of the audit (A1). Each line names the row, what is missing and the pie
 
 | Piece | Rows |
 | --- | --- |
-| A3 | CTX-001, CTX-002, CTX-003, CTX-004, CTX-005, CTX-006, CTX-010, TOOL-009, TOOL-014, ACC-001, ACC-003, ACC-005, ACC-008, ACC-017, ACC-018, ACC-019, ACC-020, ACC-021, ACC-022, ACC-023, ACC-029, ACC-030, ACC-031, ACC-034, ACC-035, ACC-036, ACC-037, ACC-038, ACC-039, ACC-040, ACC-041, ACC-042, ACC-043, MSG-001, MSG-023, MSG-024, MSG-028, MSG-029, MSG-031, MSG-032, MSG-033, MSG-037, MSG-038, MSG-050, MSG-059, MSG-062, MSG-064, MSG-091, MSG-092, MSG-093, VIEW-023, TREE-010, TREE-017, TREE-019 |
+| A3 | ACC-017, ACC-018, ACC-019, ACC-020, ACC-021, ACC-022, ACC-023, ACC-029, ACC-030, ACC-031, ACC-034, ACC-035, ACC-036, ACC-037, ACC-038, ACC-039, ACC-040, ACC-041, ACC-042, ACC-043, MSG-001, MSG-023, MSG-024, MSG-028, MSG-029, MSG-031, MSG-032, MSG-033, MSG-037, MSG-038, MSG-050, MSG-059, MSG-062, MSG-064, MSG-091, MSG-092, MSG-093, VIEW-023, TREE-010, TREE-017, TREE-019 |
 | A2 | BEH-027, POL-068, POL-069, POL-070, POL-071, POL-072 |
 
 Notes for the fix pieces:
 
-- The context menu rows (CTX-001 to CTX-006) share one cause: `BuildEmptyAreaItems` and `BuildTreeMenuItems` build Refresh, the filter entries and Help only.
+- The context menu rows (CTX-001 to CTX-006) and TOOL-009 were closed by A3a-1; CTX-010, TOOL-014, ACC-001, ACC-003, ACC-005 and ACC-008 were declared by it (user to confirm).
 - The MSG gaps are mostly forms the string check cannot match (access keys, ellipses, a help line or tooltip after the text) and wording BWC chose itself. A3 either aligns the text or extends the check, then writes `string-parity.json` again.
 - The latest full E2E run fails one check only, the category guard: `Gpedit_ReadOnly_Notice` has no E2EOnly category and is not on the allowlist. The test itself passes. A3 adds the category.
 
@@ -153,6 +140,10 @@ The differences decided during the overnight run, with the rows that carry them 
 | The Options page fixes or disables the console-authoring parts and has OK and Cancel. | DLG-119 | `docs/failure-modes/console-options.md` |
 | The setting dialog has no maximize box, and each radio button is a tab stop. | DLG-089, DLG-095, VIEW-027 to VIEW-037 | `docs/failure-modes/gpedit-dialog.md` |
 | The tree context menu is a BWC definition (not captured). | CTX-009 | `docs/failure-modes/gpedit-commands.md` |
+| No menu on a column header or the description pane (not captured, no commands there). | CTX-010 | `docs/failure-modes/gpedit-commands.md`, section 11; declared by the manager, user to confirm |
+| No action pane toggle button (BWC has no action pane). | TOOL-014 | `docs/failure-modes/gpedit-commands.md`, section 11; declared by the manager, user to confirm |
+| Ctrl+P, Ctrl+F10, Ctrl+F5 and Ctrl+Alt+Shift+F7 are not bound (not captured; the multiple-window console keys have no meaning in the single-window frame). | ACC-001, ACC-003, ACC-005, ACC-008 | `docs/failure-modes/gpedit-commands.md`, section 11; declared by the manager, user to confirm |
+| The icon arrangement entries run over the view modes: BWC has no free icon placement, so Line Up Icons lays the grid out again and Auto Arrange toggles. | CTX-003 | `docs/failure-modes/gpedit-commands.md`, section 11.11 |
 
 Not differences: the default list order and the policy id ordering follow classic (VIEW-013, pass). The Export List format and encodings (`docs/failure-modes/console-frame.md`, declared difference 5) are a BWC definition, but no inventory row states classic's format, so no row carries them. The Help web site entry (MENU-034) exists as in classic and opens the project page; it is `pass`, for the user to confirm. Resources classic never shows in the local editor (static menus, wizard pages, Favorites dialogs, the author mode and MDI tables) are `declared-difference` "not reachable in the local editor, not built".
 
@@ -208,16 +199,16 @@ Not differences: the default list order and the policy id ordering follow classi
 
 | ID | Verdict | Evidence or reason | Piece |
 | --- | --- | --- | --- |
-| CTX-001 | gap | Gpedit_ContextMenu_List_NoRow checks the menu opens and Help runs, but the BWC empty area menu holds Refresh, the View submenu and Help only: no export list, no view modes in the View submenu, no icon arrangement submenu and no line-up entry. | A3 |
-| CTX-002 | gap | The View submenu of the empty area menu holds the filter entries only (BuildEmptyAreaItems); the columns command, the four view modes and Customize View are missing. | A3 |
-| CTX-003 | gap | No icon arrangement submenu and no line-up entry in any BWC context menu. | A3 |
-| CTX-004 | gap | The Software Settings menu lacks the View submenu content and the icon arrangement entries (same cause as CTX-001). | A3 |
-| CTX-005 | gap | Gpedit_Filter_ContextMenu_List proves the filter entries in the View submenu and no Add/Remove Templates; the export list, view modes, Customize View and icon arrangement entries are missing. | A3 |
-| CTX-006 | gap | Same as CTX-005 at category nodes and All Settings (Gpedit_Filter_ContextMenu_List). | A3 |
+| CTX-001 | pass | Gpedit_ContextMenu_Layout_NodeKinds and Gpedit_ContextMenu_Layout_Commands: the empty area menu has the export list, View, the arrangement submenu, the line-up entry and Help in the captured groups (Refresh is the DIFF-007 addition, after the line-up entry). | A3a-1 |
+| CTX-002 | pass | Gpedit_ContextMenu_Layout_NodeKinds and Gpedit_ContextMenu_Layout_Commands: the View submenu is columns, the four modes (the current one checked), Customize View, and the filter entries between them at the filter nodes; groups and grayed states equal the capture. | A3a-1 |
+| CTX-003 | pass | Gpedit_ContextMenu_Layout_NodeKinds and Gpedit_ContextMenu_Layout_Commands: the arrangement submenu holds one entry (Auto Arrange, a check item) and the line-up entry follows it. BWC has no free icon placement, so Line Up Icons lays the grid out again and Auto Arrange toggles and lays it out (docs/failure-modes/gpedit-commands.md, 11.11). | A3a-1 |
+| CTX-004 | pass | Gpedit_ContextMenu_Layout_NodeKinds at Software Settings: no export list, View, the arrangement entries, Help. A right click on the placeholder page opens the menu. | A3a-1 |
+| CTX-005 | pass | Gpedit_ContextMenu_Layout_NodeKinds at Administrative Templates (both sides): export list, View with the filter entries between the modes and Customize View, the arrangement entries, Help; no Add/Remove Templates. | A3a-1 |
+| CTX-006 | pass | Gpedit_ContextMenu_Layout_NodeKinds at a category, a category with policies and All Settings (both sides). | A3a-1 |
 | CTX-007 | pass | Gpedit_Filter_ContextMenu_List and Gpedit_ContextMenu_List_PolicyRow. The Refresh entry is the DIFF-007 addition. | G2, G3a, G5 |
 | CTX-008 | pass | Gpedit_ContextMenu_List_NoRow and Gpedit_Menu_Action_NodeKinds. | G2 |
 | CTX-009 | declared-difference | Not captured. BWC definition (gpedit-commands.md, gpedit-filter.md): the tree menu holds the filter entries flat where the node has the filter, then Refresh and Help. Gpedit_ContextMenu_Tree and Gpedit_Filter_ContextMenu_Tree. | G2, A1 |
-| CTX-010 | gap | Not captured. BWC shows no menu on a column header (OnEditorListContext returns) or on the description pane; capture classic or declare the absence with the user. | A3 |
+| CTX-010 | declared-difference | Not captured, and BWC has no commands for a column header or the description pane, so no menu opens there. Declared by the manager (A3a-1), user to confirm. | A3a-1 |
 | CTX-011 | pass | Gpedit_ContextMenu_List_PolicyRow (a command runs and the menu closes; Escape leaves the focus in the list) and Gpedit_ContextMenu_Tree. | G2 |
 
 ### TOOL
@@ -232,12 +223,12 @@ Not differences: the default list order and the policy id ordering follow classi
 | TOOL-006 | pass | Console_Shell_Layout (standard order with its separators). | U3 |
 | TOOL-007 | pass | Gpedit_Toolbar_States and Gpedit_Toolbar_Commands. | G2 |
 | TOOL-008 | pass | Gpedit_Toolbar_Commands and Console_Customize_Switches_ActAtOnce. | U3a |
-| TOOL-009 | gap | BWC shows the Properties and Refresh buttons that classic keeps hidden (gpedit-commands.md, G2). Refresh is DIFF-007; Properties is not a decided difference: hide it or have the user declare it. | A3 |
+| TOOL-009 | pass | Gpedit_Toolbar_PropertiesHidden: the Properties button is not shown at any node kind or with a row selected, and the visible standard buttons are the 7 of F/Toolbar_States (Refresh in place of the action pane toggle, DIFF-007 and TOOL-014). Edit stays in the Action menu (Gpedit_Toolbar_Commands). | A3a-1 |
 | TOOL-010 | pass | Console_Shell_Layout (standard order with its separators). | U3 |
 | TOOL-011 | pass | Console_Export_Menu_NodeKinds and Console_Export_Dialog_Types. | U3a |
 | TOOL-012 | pass | Console_Shell_Layout (standard order with its separators). | U3 |
 | TOOL-013 | pass | Gpedit_Toolbar_States and Gpedit_Toolbar_Commands. | U3b |
-| TOOL-014 | gap | BWC has no action pane and no action pane toggle button (the standard buttons end with Help, Console_Shell_Layout); not a decided difference. | A3 |
+| TOOL-014 | declared-difference | BWC has no action pane, so there is nothing for the toggle button to show or hide. Declared by the manager (A3a-1), user to confirm. | A3a-1 |
 | TOOL-015 | pass | Gpedit_Filter_Toolbar_Button and Console_Customize_SnapInToolbars_Editor. | G5 |
 | TOOL-016 | pass | Gpedit_Toolbar_States and Gpedit_Filter_Toolbar_Button. | G2 |
 | TOOL-017 | pass | Console_Customize_Switches_ActAtOnce and Console_Shell_ShowHide. | U3a |
@@ -374,14 +365,14 @@ Not differences: the default list order and the policy id ordering follow classi
 
 | ID | Verdict | Evidence or reason | Piece |
 | --- | --- | --- | --- |
-| ACC-001 | gap | Ctrl+P (table 128) is not captured and BWC binds nothing to it; capture classic's effect, then build or declare. | A3 |
+| ACC-001 | declared-difference | Ctrl+P is not captured and the multiple-window console keys have no meaning in BWC's single-window frame; not bound. Declared by the manager (A3a-1), user to confirm. | A3a-1 |
 | ACC-002 | pass | Gpedit_Keys_F1. | G2, U3b |
-| ACC-003 | gap | Ctrl+F10 (table 128) is not captured and BWC binds nothing to it; capture classic's effect, then build or declare. | A3 |
+| ACC-003 | declared-difference | Ctrl+F10 is not captured and the multiple-window console keys have no meaning in BWC's single-window frame; not bound. Declared by the manager (A3a-1), user to confirm. | A3a-1 |
 | ACC-004 | pass | Gpedit_Keys_F5: no window and no menu. The reload is the DIFF-007 addition. | G2 |
-| ACC-005 | gap | Ctrl+F5 (table 128) is not captured and BWC binds nothing to it; capture classic's effect, then build or declare. | A3 |
+| ACC-005 | declared-difference | Ctrl+F5 is not captured and the multiple-window console keys have no meaning in BWC's single-window frame; not bound. Declared by the manager (A3a-1), user to confirm. | A3a-1 |
 | ACC-006 | pass | Console_Shell_FocusCycle. | G2 |
 | ACC-007 | pass | Console_Shell_FocusCycle. | G2 |
-| ACC-008 | gap | Ctrl+Alt+Shift+F7 (table 128) is not captured and BWC binds nothing to it; capture classic's effect, then build or declare. | A3 |
+| ACC-008 | declared-difference | Ctrl+Alt+Shift+F7 is not captured and the multiple-window console keys have no meaning in BWC's single-window frame; not bound. Declared by the manager (A3a-1), user to confirm. | A3a-1 |
 | ACC-009 | pass | Console_Shell_FocusCycle. | G2 |
 | ACC-010 | pass | Console_Shell_FocusCycle. | G2 |
 | ACC-011 | declared-difference | Table not reached in the local editor (no matching menu command), not built. | none |

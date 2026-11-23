@@ -8,7 +8,7 @@ namespace Bwc.E2E.Gpedit.Commands;
 
 /// <summary>
 /// Toolbar tests of the Local Group Policy Editor: the enabled state of Back, Forward, Up One Level,
-/// Show/Hide Console Tree, Properties, Refresh and Help per node kind and with a row selected
+/// Show/Hide Console Tree, Refresh and Help per node kind and with a row selected
 /// (F/Toolbar_States, TOOL-004 to TOOL-016), the history buttons, and what each command does. The
 /// failure modes are in docs/failure-modes/gpedit-commands.md, section 4. Every test writes
 /// artifacts/e2e/visual/gpedit/gpedit-&lt;name&gt;.json and a picture, and its checks to the E2E result
@@ -36,8 +36,8 @@ public sealed class GpeditToolbarTests
         using GpeditRun run = GpeditRun.Open("gpedit-toolbar-states", sandbox);
 
         // Classic: Up is enabled at every node that has a parent, the tree toggle and Help at every node, and the states do
-        // not depend on the node kind. Properties and Refresh are BWC buttons: Refresh is always enabled, Properties only
-        // while a policy row is selected, because its command is Edit.
+        // not depend on the node kind. Refresh is a BWC button (DIFF-007) and is always enabled. The Properties button is
+        // hidden as in classic (TOOL-009); Gpedit_Toolbar_PropertiesHidden checks that.
         (string[] Path, string Id, bool Up)[] kinds =
         [
             ([Root], "root", false),
@@ -58,20 +58,18 @@ public sealed class GpeditToolbarTests
             {
                 ["UpOneLevel"] = up,
                 ["ShowHideConsoleTree"] = true,
-                ["Properties"] = false,
                 ["Refresh"] = true,
                 ["Help"] = true,
             });
         }
 
-        // A policy row selected: Properties is enabled and the other states are unchanged (TOOL-016).
+        // A policy row selected: the other states are unchanged (TOOL-016).
         run.GoTo(BasicsPath);
         run.SelectRow(MachineFlag);
         CheckStates(run, checks, "policyRow", new Dictionary<string, bool>
         {
             ["UpOneLevel"] = true,
             ["ShowHideConsoleTree"] = true,
-            ["Properties"] = true,
             ["Refresh"] = true,
             ["Help"] = true,
         });
@@ -80,9 +78,9 @@ public sealed class GpeditToolbarTests
         // A folder row is not a policy, and a node change clears the row selection.
         _ = run.InvokeButton("UpOneLevel");
         _ = run.WaitNode(OraclePath);
-        CheckStates(run, checks, "afterUp", new Dictionary<string, bool> { ["Properties"] = false, ["Refresh"] = true, ["Help"] = true });
+        CheckStates(run, checks, "afterUp", new Dictionary<string, bool> { ["Refresh"] = true, ["Help"] = true });
         run.SelectRow(BasicsName);
-        CheckStates(run, checks, "folderRow", new Dictionary<string, bool> { ["Properties"] = false, ["Refresh"] = true, ["Help"] = true });
+        CheckStates(run, checks, "folderRow", new Dictionary<string, bool> { ["Refresh"] = true, ["Help"] = true });
 
         run.WriteArtifacts("gpedit-toolbar-states.png");
         checks.AssertAllPassed();
@@ -136,17 +134,17 @@ public sealed class GpeditToolbarTests
         sandbox.SeedStandard();
         using GpeditRun run = GpeditRun.Open("gpedit-toolbar-commands", sandbox);
 
-        // Properties edits the selected row.
+        // The Properties button is hidden (TOOL-009), so Edit runs from the Action menu on the selected row.
         run.GoTo(BasicsPath);
         run.SelectRow(BothFlag);
         run.SelectRow(MachineFlag);
         int edits = Math.Max(0, run.Count("Edits"));
-        bool invoked = run.InvokeButton("Properties");
+        bool invoked = run.InvokeMenuEntry(GpeditCommandIds.ActionMenu, GpeditCommandIds.Edit);
         checks.Record(
-            "propertiesEdits",
+            "editViaMenu",
             invoked && ShellRun.WaitUntil(() => run.Count("Edits") == edits + 1 && run.Str("LastEdit") == MachineFlagFull),
             $"invoked={invoked}, Edits={run.Count("Edits")}, LastEdit='{run.Str("LastEdit")}'; expected {MachineFlagFull}.");
-        checks.Record("propertiesLastCommand", run.Str("LastCommand") == "Edit", $"LastCommand='{run.Str("LastCommand")}'.");
+        checks.Record("editLastCommand", run.Str("LastCommand") == "Edit", $"LastCommand='{run.Str("LastCommand")}'.");
 
         // Refresh reloads and keeps the node.
         int refreshes = Math.Max(0, run.Count("Refreshes"));

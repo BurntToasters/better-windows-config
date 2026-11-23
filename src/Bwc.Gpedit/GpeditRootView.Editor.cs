@@ -719,6 +719,8 @@ public sealed partial class GpeditRootView
         Add("WebSiteRequests", _webSiteRequests);
         Add("WebSiteUrl", _webSiteUrl);
         Add("LastCommand", _lastCommand);
+        Add("LineUps", _lineUps);
+        Add("AutoArrange", _autoArrange ? 1 : 0);
         AutomationProperties.SetHelpText(this, text.ToString());
 
         if (model is not null && Environment.GetEnvironmentVariable("BWC_E2E_GPEDIT_SHAPE") == "1")

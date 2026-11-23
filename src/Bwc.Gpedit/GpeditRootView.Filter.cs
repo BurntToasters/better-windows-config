@@ -27,6 +27,9 @@ public sealed partial class GpeditRootView
     private const int FilterReApplyCommand = 2006;
     private const int ViewSubmenuCommand = 2100;
     private const int TasksSubmenuCommand = 2101;
+    private const int ArrangeSubmenuCommand = 2104;
+    private const int AutoArrangeCommand = 2105;
+    private const int LineUpCommand = 2106;
 
     /// <summary>The tag of the separator after the filter entries of the Action popup, so it hides with them.</summary>
     private const int FilterSeparatorTag = 2102;
@@ -38,6 +41,9 @@ public sealed partial class GpeditRootView
     private const string FilterToolbarGlyph = "";
     private const string TasksPrefix = "TasksCommand_";
     private const string ViewSubmenuPrefix = "ViewSubmenuCommand_";
+    private const string ArrangePrefix = "ArrangeSubmenuCommand_";
+    private const string CommandLineUp = "LineUp";
+    private const string CommandAutoArrange = "AutoArrange";
     private const string CommandFilterOn = "FilterOn";
     private const string CommandFilterOptions = "FilterOptions";
     private const string CommandReApplyFilter = "ReApplyFilter";
@@ -48,6 +54,8 @@ public sealed partial class GpeditRootView
     private (bool HasFilter, bool Ready, bool On, bool HasTemplates)? _filterUiState;
     private string? _sortNodeKey;
     private int _filterTotal;
+    private int _lineUps;
+    private bool _autoArrange;
 
     // ---- the commands -------------------------------------------------------------------------------
 
@@ -230,23 +238,100 @@ public sealed partial class GpeditRootView
     }
 
     /// <summary>
-    /// The menu of the result list where no row is: Refresh, a View submenu that holds the filter entries (at the nodes that
-    /// have the filter), and Help.
+    /// The menu of the result list where no row is, in the order of the captures (F/Menus_Computer, F/Menus_User): Export List
+    /// (not at Software Settings), a separator, the View submenu, a separator, the icon arrangement submenu, Line Up Icons,
+    /// then Refresh (the DIFF-007 addition), a separator and Help.
     /// </summary>
-    private List<ClassicCommandItem> BuildEmptyAreaItems(bool includeFilter)
+    private List<ClassicCommandItem> BuildEmptyAreaItems(bool includeFilter, bool includeExport)
+    {
+        var items = new List<ClassicCommandItem>();
+        if (includeExport)
+        {
+            items.Add(ClassicMenuBuilder.Command(ConsoleStrings.Get("ConsoleMenuActionExportList"), ConsoleCommandIds.ExportList, true, invoke: RunExport));
+            items.Add(ClassicCommandItem.Separator);
+        }
+
+        items.Add(ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandViewSubmenu"), ViewSubmenuCommand, true, children: ViewSubmenuItems(includeFilter)));
+        items.Add(ClassicCommandItem.Separator);
+        items.Add(ClassicMenuBuilder.Command(
+            GpeditStrings.Commands("GpeditCommandArrangeIcons"),
+            ArrangeSubmenuCommand,
+            true,
+            children: [ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandAutoArrange"), AutoArrangeCommand, true, invoke: RunAutoArrange, kind: ClassicCommandKind.Check)]));
+        items.Add(ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandLineUpIcons"), LineUpCommand, true, invoke: RunLineUp));
+        items.Add(ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandRefresh"), RefreshCommand, true, invoke: RunRefresh));
+        items.Add(ClassicCommandItem.Separator);
+        items.Add(ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandHelp"), HelpCommand, true, invoke: RunHelp));
+        return items;
+    }
+
+    /// <summary>
+    /// The View submenu of the list menu, as the View popup of the menu bar: Add/Remove Columns, a separator, the four view
+    /// modes, a separator, the filter entries and a separator (at the nodes that have the filter), Customize View.
+    /// </summary>
+    private List<ClassicCommandItem> ViewSubmenuItems(bool includeFilter)
     {
         var items = new List<ClassicCommandItem>
         {
-            ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandRefresh"), RefreshCommand, true, invoke: RunRefresh),
+            ClassicMenuBuilder.Command(ConsoleStrings.Get("ConsoleMenuViewColumns"), ConsoleCommandIds.AddRemoveColumns, true, invoke: RunColumns),
             ClassicCommandItem.Separator,
         };
+        items.AddRange(ViewModeItems());
+        items.Add(ClassicCommandItem.Separator);
         if (includeFilter)
         {
-            items.Add(ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandViewSubmenu"), ViewSubmenuCommand, true, children: FilterItems()));
+            items.AddRange(FilterItems());
+            items.Add(ClassicCommandItem.Separator);
         }
 
-        items.Add(ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandHelp"), HelpCommand, true, invoke: RunHelp));
+        items.Add(ClassicMenuBuilder.Command(ConsoleStrings.Get("ConsoleMenuViewCustomize"), ConsoleCommandIds.CustomizeView, _options.AllowCustomizeViews, invoke: RunCustomize));
         return items;
+    }
+
+    /// <summary>
+    /// Line Up Icons. The list has no free icon placement (the items follow the item order on a grid), so the command lays the
+    /// grid out again and changes neither the mode, the rows nor the selection.
+    /// </summary>
+    private void RunLineUp()
+    {
+        RecordCommand(CommandLineUp);
+        _lineUps++;
+        _list.LineUpItems();
+        UpdateReadout();
+    }
+
+    /// <summary>Auto Arrange: a check item. Switching it on lays the grid out again.</summary>
+    private void RunAutoArrange()
+    {
+        RecordCommand(CommandAutoArrange);
+        _autoArrange = !_autoArrange;
+        if (_autoArrange)
+        {
+            _list.LineUpItems();
+        }
+
+        UpdateReadout();
+    }
+
+    /// <summary>Sets the view mode radio items and the Auto Arrange item of a new menu to the state they show.</summary>
+    private void SetContextStates(IList<MenuFlyoutItemBase> items)
+    {
+        int mode = CurrentViewModeCommand();
+        foreach (MenuFlyoutItemBase item in items)
+        {
+            switch (item)
+            {
+                case RadioMenuFlyoutItem { Tag: int id } radio when radio.GroupName == ViewModeGroup:
+                    radio.IsChecked = id == mode;
+                    break;
+                case FilterToggleMenuItem { Tag: int id } toggle when id == AutoArrangeCommand:
+                    toggle.IsChecked = _autoArrange;
+                    break;
+                case MenuFlyoutSubItem sub:
+                    SetContextStates(sub.Items);
+                    break;
+            }
+        }
     }
 
     /// <summary>The menu of the console tree: the filter entries flat (where the node has the filter), Refresh, Help.</summary>
@@ -268,16 +353,18 @@ public sealed partial class GpeditRootView
     /// <summary>
     /// Gives the built entries their final form: the filter toggle is an entry with the Toggle pattern, and the entries
     /// inside the tasks and View submenus have the ids of their own (<c>TasksCommand_</c> and <c>ViewSubmenuCommand_</c> plus
-    /// the command id), so the same command in two places stays tellable.
+    /// the command id; the arrangement submenu has <c>ArrangeSubmenuCommand_</c>), so the same command in two places stays
+    /// tellable.
     /// </summary>
     private static void FinishItems(IList<MenuFlyoutItemBase> items)
     {
         FilterToggleMenuItem.Replace(items, FilterToggleCommand);
+        FilterToggleMenuItem.Replace(items, AutoArrangeCommand);
         foreach (MenuFlyoutItemBase item in items)
         {
-            if (item is MenuFlyoutSubItem { Tag: int id } sub && id is TasksSubmenuCommand or ViewSubmenuCommand)
+            if (item is MenuFlyoutSubItem { Tag: int id } sub && id is TasksSubmenuCommand or ViewSubmenuCommand or ArrangeSubmenuCommand)
             {
-                string prefix = id == TasksSubmenuCommand ? TasksPrefix : ViewSubmenuPrefix;
+                string prefix = id == TasksSubmenuCommand ? TasksPrefix : id == ViewSubmenuCommand ? ViewSubmenuPrefix : ArrangePrefix;
                 foreach (MenuFlyoutItemBase child in sub.Items)
                 {
                     if (child.Tag is int childId)

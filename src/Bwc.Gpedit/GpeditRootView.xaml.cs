@@ -69,6 +69,8 @@ public sealed partial class GpeditRootView : UserControl
         Shell.SetMenuExtensions(CreateMenuExtensions());
         if (IsEditorHost)
         {
+            // Classic hides the Properties button (TOOL-009); Edit stays in the Action menu, the policy row menu and Alt+Enter.
+            Shell.Toolbar.SetButtonVisible(ConsoleToolbarIds.Properties, false);
             PrepareFilterMenus();
             ClassicMenuBuilder.SetCommandVisible(Shell.MenuBar, EditCommand, false);
             ClassicMenuBuilder.SetCommandVisible(Shell.MenuBar, AddRemoveTemplatesCommand, false);
@@ -157,13 +159,7 @@ public sealed partial class GpeditRootView : UserControl
 #endif
 
         // The four view modes. Add/Remove Columns and Customize View are the frame's.
-        var view = new List<ClassicCommandItem>
-        {
-            ClassicMenuBuilder.Command("Lar&ge Icons", ViewLargeIconsCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.LargeIcons), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
-            ClassicMenuBuilder.Command("S&mall Icons", ViewSmallIconsCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.SmallIcons), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
-            ClassicMenuBuilder.Command("&List", ViewListCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.List), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
-            ClassicMenuBuilder.Command("&Detail", ViewDetailCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.Detail), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
-        };
+        List<ClassicCommandItem> view = ViewModeItems();
 
         // After the modes and the frame's separator, right before Customize View.
         var viewTail = new List<ClassicCommandItem>();
@@ -212,6 +208,24 @@ public sealed partial class GpeditRootView : UserControl
         };
     }
 
+    /// <summary>The four view mode entries, radio items of one group, for the View menu and the list menu.</summary>
+    private List<ClassicCommandItem> ViewModeItems() =>
+    [
+        ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandViewLargeIcons"), ViewLargeIconsCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.LargeIcons), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
+        ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandViewSmallIcons"), ViewSmallIconsCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.SmallIcons), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
+        ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandViewList"), ViewListCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.List), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
+        ClassicMenuBuilder.Command(GpeditStrings.Commands("GpeditCommandViewDetail"), ViewDetailCommand, true, invoke: () => SetViewMode(ConsoleListViewMode.Detail), kind: ClassicCommandKind.Radio, radioGroup: ViewModeGroup),
+    ];
+
+    /// <summary>The command id of the view mode entry that stands for the mode the list is in.</summary>
+    private int CurrentViewModeCommand() => _list.ViewMode switch
+    {
+        ConsoleListViewMode.LargeIcons => ViewLargeIconsCommand,
+        ConsoleListViewMode.SmallIcons => ViewSmallIconsCommand,
+        ConsoleListViewMode.List => ViewListCommand,
+        _ => ViewDetailCommand,
+    };
+
     /// <summary>Sets the view mode. The menu keyboard returns the focus to where it was before the menu was entered.</summary>
     private void SetViewMode(ConsoleListViewMode mode)
     {
@@ -220,14 +234,7 @@ public sealed partial class GpeditRootView : UserControl
 
     private void SyncViewChecks()
     {
-        int modeCommand = _list.ViewMode switch
-        {
-            ConsoleListViewMode.LargeIcons => ViewLargeIconsCommand,
-            ConsoleListViewMode.SmallIcons => ViewSmallIconsCommand,
-            ConsoleListViewMode.List => ViewListCommand,
-            _ => ViewDetailCommand,
-        };
-        ClassicMenuBuilder.SetRadioChecked(Shell.MenuBar, ViewModeGroup, modeCommand);
+        ClassicMenuBuilder.SetRadioChecked(Shell.MenuBar, ViewModeGroup, CurrentViewModeCommand());
     }
 
     private void OnTreeSelectionChanged(object? sender, TreeNodeEventArgs e)
@@ -419,6 +426,11 @@ public sealed partial class GpeditRootView : UserControl
         if (e.Pane == ConsolePane.Tree)
         {
             ShowTreeContextMenu(e);
+        }
+        else if (e.Pane == ConsolePane.Result && !e.FromKeyboard && _placeholderShown)
+        {
+            // A placeholder page has no list to hit, so the shell's right click on the result pane is the empty area (CTX-004).
+            OnEditorListContext(this, new ConsoleListContextEventArgs(ConsoleListContextArea.Background, null, null, null, fromKeyboard: false));
         }
     }
 

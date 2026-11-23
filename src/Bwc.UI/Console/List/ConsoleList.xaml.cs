@@ -1010,6 +1010,17 @@ public sealed partial class ConsoleList : UserControl
         UpdateHelpText();
     }
 
+    /// <summary>
+    /// Lays the items out on the grid of the current view mode again (the Line Up Icons command). The items have no free
+    /// placement, so the grid is always the item order; this makes a new layout object and keeps the mode, the scroll
+    /// position, the selection and the focus.
+    /// </summary>
+    public void LineUpItems()
+    {
+        ApplyLayout();
+        Body.UpdateLayout();
+    }
+
     private void ApplyLayout()
     {
         double itemWidth = _mode == ConsoleListViewMode.LargeIcons ? ConsoleListMetrics.LargeCellWidth : _labelItemWidth;
