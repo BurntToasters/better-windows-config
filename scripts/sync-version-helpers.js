@@ -175,6 +175,62 @@ export function updateDirectoryBuildProps(xml, version) {
   return updated;
 }
 
+/**
+ * Locate the single <assemblyIdentity> tag in an app.manifest.
+ *
+ * @param {string} xml
+ * @returns {string}
+ */
+function findAssemblyIdentityTag(xml) {
+  const tags = String(xml).match(/<assemblyIdentity\b[^>]*>/g) ?? [];
+  if (tags.length !== 1) {
+    throw new Error(
+      `app.manifest must contain exactly one <assemblyIdentity>; found ${tags.length}`,
+    );
+  }
+  return tags[0];
+}
+
+/**
+ * Read the version attribute of the <assemblyIdentity> tag, or null when the
+ * tag has none.
+ *
+ * @param {string} xml
+ * @returns {string | null}
+ */
+export function readAppManifestVersion(xml) {
+  const version = findAssemblyIdentityTag(xml).match(/\sversion="([^"]*)"/);
+  return version ? version[1] : null;
+}
+
+/**
+ * Set the version attribute of <assemblyIdentity> to the four-part FileVersion
+ * for `version` (0.2.0 becomes 0.2.0.0, 0.2.0-beta.3 becomes 0.2.0.3). Only that
+ * attribute value changes; all other bytes are preserved.
+ *
+ * @param {string} xml
+ * @param {string} version
+ * @returns {string}
+ */
+export function updateAppManifest(xml, version) {
+  const parsed = parsePackageVersion(version);
+  const text = String(xml);
+  const tag = findAssemblyIdentityTag(text);
+  const versionAttribute = /(\sversion=")[^"]*(")/;
+  if (!versionAttribute.test(tag)) {
+    throw new Error("app.manifest <assemblyIdentity> has no version attribute");
+  }
+  const nextTag = tag.replace(
+    versionAttribute,
+    (_match, open, close) => `${open}${parsed.fileVersion}${close}`,
+  );
+  const updated = text.replace(tag, () => nextTag);
+  if (readAppManifestVersion(updated) !== parsed.fileVersion) {
+    throw new Error("app.manifest update did not produce the expected version");
+  }
+  return updated;
+}
+
 /*
  * CHANGELOG.md is the full GitHub release body in BCLS `binary` form: the
  * downloads table, the signing callout, one `## Changes in \`vX.Y.Z:\`` section

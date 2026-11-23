@@ -118,6 +118,21 @@ directly. `0.2.0-beta.3` maps to `0.2.0.3`; stable `0.2.0` maps to `0.2.0.0`.
 Only `X.Y.Z` and `X.Y.Z-beta.N` with `N >= 0` are accepted. Anything else, including
 `rc`, build metadata, and leading zeroes, exits 1 before any file is touched.
 
+### F19 app.manifest version drift
+
+Every `src/*/app.manifest` carried `<assemblyIdentity version="1.0.0.0">` while the product
+was 0.2.0, so the manifest version disagreed with the FileVersion the build stamps.
+
+`sync-version.js` writes the four-part FileVersion into the `version` attribute of each
+`src/*/app.manifest` (`0.2.0` becomes `0.2.0.0`, `0.2.0-beta.3` becomes `0.2.0.3`). Only that
+attribute value changes; the rest of the file stays byte-identical. `--check` reports an
+out-of-step manifest and exits 1. A manifest with no `<assemblyIdentity>`, or with more than
+one, is an error, not a silent skip.
+
+Check: `node scripts/sync-version.js --self-test` covers a manifest at 1.0.0.0 reported by
+`--check`, a matching manifest passing, the prerelease mapping, a missing `<assemblyIdentity>`,
+and a byte-exact write.
+
 ### Non-idempotent sync
 
 A second run that rewrites formatting, duplicates a CHANGELOG heading, or appends another

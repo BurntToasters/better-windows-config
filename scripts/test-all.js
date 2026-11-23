@@ -60,7 +60,7 @@ Runs the quality gate steps in order and writes artifacts/gate/result.json
 artifacts/gate/logs/<NN>-<step-name>.log; logs from earlier runs are removed first.
 The default RID comes from process.arch, never PROCESSOR_ARCHITECTURE.
 
-Steps: sync-version, registry-writer, registry-writer-selftest, policy-writer,
+Steps: sync-version, sync-version-selftest, registry-writer, registry-writer-selftest, policy-writer,
 policy-writer-selftest, no-em-dash, no-em-dash-selftest, regedit-strings, tracked-paths-selftest,
 tracked-paths, oracle-json-selftest, oracle-json, e2e-timing-selftest, changelog-version, comment-lint, release-selftest,
 release-flow-selftest,
@@ -224,6 +224,7 @@ const NORMAL_TEST_FILTER = "TestCategory!=Elevated&TestCategory!=ReleaseGate";
 function sharedSteps(testPlatform) {
   return [
     nodeStep("sync-version", "scripts/sync-version.js", ["--check"]),
+    nodeStep("sync-version-selftest", "scripts/sync-version.js", ["--self-test"]),
     nodeStep("registry-writer", "scripts/check-registry-writer.js", []),
     // Each guard's self-test proves the guard still detects what it exists to catch.
     nodeStep("registry-writer-selftest", "scripts/check-registry-writer.js", ["--self-test"]),

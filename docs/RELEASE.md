@@ -83,7 +83,7 @@ This runs, in order:
    session. A quick gate, a one-rid gate, and a gate with a skipped, NOT RUN, or failed step are refused
    (`qualityGateProof` and `GATE_REQUIRED_RIDS` in `scripts/lib/release-policy.js`). The gate stops at the first
    failure and writes `artifacts/gate/result.json`. Its steps run in this order:
-   - Shared steps, run once: `sync-version`, `registry-writer`, `registry-writer-selftest`, `policy-writer`,
+   - Shared steps, run once: `sync-version`, `sync-version-selftest`, `registry-writer`, `registry-writer-selftest`, `policy-writer`,
      `policy-writer-selftest`, `no-em-dash`, `no-em-dash-selftest`, `regedit-strings`, `tracked-paths-selftest`,
      `tracked-paths`, `oracle-json-selftest`, `oracle-json`, `e2e-timing-selftest`, `changelog-version`,
      `comment-lint`, `release-selftest`, `release-flow-selftest`, `release-assets-selftest`, `embed-key-selftest`,

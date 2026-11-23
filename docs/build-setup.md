@@ -65,7 +65,7 @@ A minimal self-contained WinUI app published this way is about 280 MB (x64) and 
 
 The shared steps run once, in this order:
 
-- Static checks: `sync-version`, `registry-writer`, `registry-writer-selftest`, `policy-writer`,
+- Static checks: `sync-version`, `sync-version-selftest`, `registry-writer`, `registry-writer-selftest`, `policy-writer`,
   `policy-writer-selftest`, `no-em-dash`, `no-em-dash-selftest`, `regedit-strings`,
   `tracked-paths-selftest`, `tracked-paths`, `oracle-json-selftest`, `oracle-json`,
   `e2e-timing-selftest`, `changelog-version`, and `comment-lint`.
