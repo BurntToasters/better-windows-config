@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Bwc.Core\Bwc.Core.csproj" />
     <ProjectReference Include="..\Bwc.UI\Bwc.UI.csproj" />
     <ProjectReference Include="..\Bwc.Policy\Bwc.Policy.csproj" />
   </ItemGroup>

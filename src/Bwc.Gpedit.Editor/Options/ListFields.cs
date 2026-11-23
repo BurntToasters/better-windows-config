@@ -1,4 +1,5 @@
 using System.Globalization;
+using Bwc.Core;
 using Bwc.Policy.Admx;
 using Bwc.Policy.Model;
 using Bwc.UI.Dialogs;
@@ -84,7 +85,7 @@ internal sealed class ListField : OptionField
     {
         _element = element;
         _label = MakeLabel();
-        _button = (Button)CreateButton(IdFor("button"), OptionsStrings.Get("OptionsShowButton"), () => _ = OpenAsync());
+        _button = (Button)CreateButton(IdFor("button"), OptionsStrings.Get("OptionsShowButton"), () => OpenAsync().Forget("list field show contents"));
         _button.IsTabStop = true;
         Parts = _label is null ? [_button] : [_label, _button];
     }

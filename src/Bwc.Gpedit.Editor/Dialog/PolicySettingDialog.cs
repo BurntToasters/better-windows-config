@@ -1,4 +1,5 @@
 using System.Globalization;
+using Bwc.Core;
 using Bwc.Gpo.Comments;
 using Bwc.Gpedit.Editor.Options;
 using Bwc.Gpo.Pol;
@@ -485,13 +486,13 @@ public sealed class PolicySettingDialog : ClassicDialog
         switch (id)
         {
             case PreviousId:
-                _ = MoveAsync(-1);
+                MoveAsync(-1).Forget("policy setting previous");
                 break;
             case NextId:
-                _ = MoveAsync(1);
+                MoveAsync(1).Forget("policy setting next");
                 break;
             case ApplyId:
-                _ = ApplyAsync();
+                ApplyAsync().Forget("policy setting apply");
                 break;
             default:
                 if (_busy)
@@ -524,7 +525,7 @@ public sealed class PolicySettingDialog : ClassicDialog
             return true;
         }
 
-        _ = ApplyThenAcceptAsync();
+        ApplyThenAcceptAsync().Forget("policy setting apply then accept");
         return false;
     }
 
@@ -690,7 +691,7 @@ public sealed class PolicySettingDialog : ClassicDialog
 
     private void ShowMessage(string caption, string text, Action? afterClose = null, string? textId = null)
     {
-        _ = ShowMessageAndWaitAsync(caption, text, afterClose, textId);
+        ShowMessageAndWaitAsync(caption, text, afterClose, textId).Forget("policy setting message");
     }
 
     /// <summary>Shows a message box and completes when it has been closed. A message that is already open wins.</summary>

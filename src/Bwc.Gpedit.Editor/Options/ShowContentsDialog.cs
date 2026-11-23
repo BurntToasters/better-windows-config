@@ -1,3 +1,4 @@
+using Bwc.Core;
 using Bwc.Gpedit.Editor.Dialog;
 using Bwc.UI;
 using Bwc.UI.Dialogs;
@@ -217,7 +218,7 @@ internal sealed class ShowContentsDialog : ClassicDialog
         }
 
         _messageOpen = true;
-        _ = ShowMessageAsync(caption, text, row, column);
+        ShowMessageAsync(caption, text, row, column).Forget("show contents message");
     }
 
     private async Task ShowMessageAsync(string caption, string text, int row, int column)
