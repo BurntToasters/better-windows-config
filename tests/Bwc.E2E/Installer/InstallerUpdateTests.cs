@@ -294,6 +294,10 @@ public sealed partial class InstallerUpdateTests
             fileVersion == inputs.VersionB,
             $"The installed {InstallerRun.HubExeName} reports {fileVersion}, expected {inputs.VersionB}.");
         InstallerChecks.Record(
+            caseId + ".installed.aumid",
+            ShortcutAumidsAre(run, out string updatedAumidNotes),
+            updatedAumidNotes);
+        InstallerChecks.Record(
             caseId + ".relaunch.started",
             relaunched is not null,
             relaunched is null

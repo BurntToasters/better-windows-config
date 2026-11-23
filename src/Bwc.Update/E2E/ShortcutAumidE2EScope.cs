@@ -13,9 +13,13 @@ internal static class ShortcutAumidE2EScope
     private const string SandboxFolder = "BWC-E2E";
     private const string MachineStartPrefix = "BWC-E2E-";
 
-    public static Func<string, bool> For(string tempRoot, string programFiles, string commonPrograms) =>
+    /// <param name="userTempRoot">The user profile's own temp folder (<c>%LOCALAPPDATA%\Temp</c>), when known. The installer
+    /// runs this helper with TEMP and TMP set to the protected copy folder (update-elevation.md HT1), so after an in-app
+    /// update the process's own temp folder is not the one the per-user sandbox was made in (SA5).</param>
+    public static Func<string, bool> For(string tempRoot, string programFiles, string commonPrograms, string? userTempRoot = null) =>
         folder =>
             ProgramFilesRule.IsUnder(folder, tempRoot)
+            || (userTempRoot is not null && ProgramFilesRule.IsUnder(folder, userTempRoot))
             || ProgramFilesRule.IsUnder(folder, Path.Combine(programFiles, SandboxFolder))
             || IsMachineStartFolder(folder, commonPrograms);
 

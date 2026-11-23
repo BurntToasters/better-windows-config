@@ -456,11 +456,14 @@ The press, the redirect, the helper, the staging folders, the relaunch, and the 
      new publish folder and setup are build outputs under `publish/` and `artifacts/installer/`, ignored by git and overwritten by
      the next run.
 
-124. **Observed with R1: shortcut AppUserModelIDs are empty after an in-app update (product finding, not fixed here).** The check
-     `old.after.aumid` fails on the first full run: all three shortcuts read back an empty AppUserModelID after the update from the Hub.
-     The same read passes right after a silent install of the old setup (`old.a.aumid`), after the new setup run directly over the old
-     layout, and after the new setup run over itself, so `--set-aumid` and the installer's upgrade path work. A diagnostic run of the
-     plain A to B in-app update (case 1) shows the same empty ids, so the loss is in the in-app chain (the helper starts the installer),
-     not in the old layout. Case 1 never read the ids after an update, which is why it was not seen. The check stays in the old-layout
-     case as the honest proof; it fails until the product is fixed. Targets, icons, the shortcut set, `BwcGpedit.exe` and the rest of
-     the case pass.
+124. **Shortcut AppUserModelIDs are empty after an in-app update (fixed).** The checks `old.after.aumid`, `old.installed.aumid` and
+     `update.installed.aumid` failed with all three ids empty after an update from the Hub, while the same read passed after a silent
+     install, a setup run directly over an older layout, and a setup run over itself. Cause: the installed
+     `BwcUpdate.exe --set-aumid` was refused with `PathRejected` (exit 3, "the shortcut is not in the folder the installer writes
+     to"), which the installer logs as a non-fatal warning. The helper starts the setup with TEMP and TMP set to its protected copy
+     folder (update-elevation.md HT1), and the E2E flavor allowed the per-user sandbox's shortcut folder only below the process's own
+     temp folder. A run of the E2E `BwcUpdate.exe` on a sandbox shortcut gave exit 0 with the normal TEMP and exit 3 with another
+     TEMP. The ship rule (directly in the all-users Programs folder) does not use TEMP and is not affected. Fix:
+     `ShortcutAumidE2EScope.For` also allows folders below the user profile's temp folder (`%LOCALAPPDATA%\Temp`), which the
+     installer's TEMP override does not move. Case 1 now reads the ids after the update too (`update.installed.aumid`), so both
+     update paths prove them. Targets, icons, the shortcut set, `BwcGpedit.exe` and the rest of the case passed throughout.

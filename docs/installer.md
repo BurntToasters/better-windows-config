@@ -309,7 +309,9 @@ silent uninstall. The steps below are still open.
    has been compiled, so the `!finalize` and `!uninstfinalize` lines of the signing hook are not
    yet checked by NSIS (see "Authenticode signing" in `docs/failure-modes/installer.md`).
 2. Check that the Start menu AUMID write works on this machine. `BwcUpdate.exe --set-aumid` reads the value
-   back and exits `4` on a mismatch or a COM failure. Either case only logs a warning.
+   back and exits `4` on a mismatch or a COM failure. Either case only logs a warning. After an in-app update the
+   installer runs with the updater's TEMP override, so the shortcut-folder rule must not depend on TEMP
+   (E2E flavor: `docs/failure-modes/installer-e2e.md` 124).
 3. Test the upgrade rollback on a disposable machine: make one file in the new payload unwritable
    during the swap and confirm that the previous version runs again.
 4. Turn the manual E2E run into a repeatable test that writes a verifiable artifact. It should run the
