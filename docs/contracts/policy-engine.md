@@ -124,8 +124,8 @@ The rules that no capture reaches are the rows GAP-01 to GAP-06 of the Gaps sect
   `{D02B1F73-3407-48AE-BA88-E8213C6761F1}` for User Configuration (user). Existing entries for
   other extensions are preserved. The exact line text and ordering are fixed by `GptIniGoldenTests`
   (captures `A/User_Enabled`, `A/Machine_Then_User`, `A/User_Then_Machine`): a missing line goes at the
-  end of the General section. When a side holds no setting the line stays with one space as its
-  value (`K/KeyTrailingBackslash_Enable` step 2), and a missing line is not added when `Registry.pol`
+  end of the General section. When a side holds no setting the line keeps its tail and gains one
+  space as its value (`K/KeyTrailingBackslash_Enable` step 2, `E/Decimal_EdgeValues` step 4), and a missing line is not added when `Registry.pol`
   holds no record (`A/Machine_CommentOnly`). Foreign extension groups stay (`C/GptIni_ForeignExtensions`).
 
 ## `Bwc.Gpo`: comment.cmtx

@@ -91,6 +91,15 @@ internal static class DialogControlRules
             return;
         }
 
+        // C2b: a minus sign and digits (WM_SETTEXT "-5" on a 10 to 500 box, "-1" on a 0 to 65535 storeAsText box) are held
+        // at the minimum. Captures E/Decimal_NotNumber step 'negative' (writes 10) and E/Decimal_StoreAsText_OutOfRange
+        // step 'negative' (writes "0").
+        if (text.Length > 1 && text[0] == '-' && text[1..].All(char.IsAsciiDigit))
+        {
+            option["text"] = (element.MinValue ?? 0UL).ToString(CultureInfo.InvariantCulture);
+            return;
+        }
+
         // C3: an empty box that is not required reads as the default of the control; an empty required one is refused.
         if (text.Length == 0)
         {

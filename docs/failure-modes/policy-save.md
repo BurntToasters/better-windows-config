@@ -69,7 +69,7 @@ these ways, and none of them is a skip.
 | R6 | Classic refused a press (a message box, no change) and the engine saved or reported no problem. | Fails: problems expected, nothing written. |
 | R7 | A step with no change writes, or a changing step writes other files than classic's `changedFiles`. | Fails comparing the written set with `changedFiles` of the press. |
 | R8 | The template of an operation is not in the loaded set (a bad edge fixture). | Fails with the template load failures. |
-| R9 | The step shows CAP-4: a set changed an option's text, the state did not change, Apply stayed disabled, no message box. The golden is then a write that a person would get and the capture did not. | Fails with the tool's wording (rule ported from `UnnoticedEdit.Find`). |
+| R9 | The step shows CAP-4: a set changed an option's text, the state did not change, Apply stayed disabled, no message box. The golden is then a write that a person would get and the capture did not. | Fails with the tool's wording (rule ported from `UnnoticedEdit.Find`). The positive example is a sandbox copy of `B/Pol_Decimal_MinMax` with its alternate-value set changed to the CAP-4 pattern; the ten recaptured cases (`B/Pol_Decimal_MinMax`, `E/Decimal_EdgeValues` and the others) are checked not to be flagged. |
 | R10 | A case is on `awaiting-recapture.txt`. | Its row reports "awaiting recapture" with `Assert.Inconclusive`; it is never replayed. |
 | R11 | The list names a case that has no folder, appears twice, or no longer shows CAP-4 (it was recaptured). | Fails: the list is wrong. |
 | R12 | The list is not empty at a release. | `AwaitingRecaptureListIsEmpty` (`ReleaseGate`) fails while it holds any case. The quick gate leaves `ReleaseGate` out; the full gate runs it in the step `test-policy-release-gate` (quality-gate.md, GATE-5). |
@@ -85,8 +85,9 @@ these ways, and none of them is a skip.
 
 Piece E6c adds the replay rows of group D (113 crafted Registry.pol start states, each followed by one unrelated save) and
 group E (30 validation cases), a state matrix over group D, and a store-level test of the refused starts. R1 to R19 above
-apply to every row. The cases of group E on `awaiting-recapture.txt` (`E/Decimal_EdgeValues`, `E/Decimal_NotNumber`,
-`E/Decimal_Soft_OutOfRange`, `E/Decimal_StoreAsText_OutOfRange`, `E/LongDecimal_AboveMax`) stay Inconclusive (R10). No
+apply to every row. The one group E case on `awaiting-recapture.txt`, `E/Decimal_Soft_OutOfRange`, stays Inconclusive (R10). The recaptured
+group E cases `E/Decimal_EdgeValues`, `E/Decimal_NotNumber`, `E/Decimal_StoreAsText_OutOfRange` and `E/LongDecimal_AboveMax`
+are replayed against their recaptured goldens. No
 group D case has a crafted `gpt.ini`: every D start state is one or two Registry.pol files, and the version file of a step
 is what classic wrote around them.
 
@@ -161,7 +162,7 @@ directly for every press that classic refused. The table maps the cases to what 
 | V12 | Next Setting with an invalid value saves or moves on; Previous (disabled) is pressed. | Next shows the message and writes nothing; Previous is recorded as not pressed and skipped (B2). | `E/Next_WithInvalid`, `E/Previous_WithInvalid` |
 | V13 | A refusal that classic showed with a message box is accepted by the engine because the harness never asked it. | The refusal of the dialog itself (a number with no digits on a required box) still goes to `PolicySave` with the element empty and must give `Required`. | `PolicyEditRefusalTests` |
 | V14 | A refusal gives the wrong kind or the wrong element. | The kind and the element id match the table of the test. | `PolicyEditRefusalTests` |
-| V15 | A step where classic did not notice the edit (CAP-4) is replayed as "no change". | Those cases are on `awaiting-recapture.txt` and stay Inconclusive. A case that shows the pattern and is not on the list fails (R9). | see R9 |
+| V15 | A step where classic did not notice the edit (CAP-4) is replayed as "no change". | Those cases are on `awaiting-recapture.txt` and stay Inconclusive (now only `E/Decimal_Soft_OutOfRange`). A case that shows the pattern and is not on the list fails (R9). | see R9 |
 | V16 | A refusal leaves the lock held, the store dirty or a temp file. | The sandbox folder holds only the five files and no refresh happened. | every refusal row |
 
 ### C. Dialog control rules used by the E rows (test side)
@@ -175,6 +176,7 @@ validator.
 |---|---|---|
 | C1 | In a number box, typed characters that are not digits are not taken (typing). Set text is not filtered. | `E/Decimal_TypedLetters` |
 | C2 | The number a box returns is held inside the minimum and maximum of the element (a decimal up to 4294967295, a long decimal up to 18446744073709551615 when the element states no maximum), for a soft element and one stored as text too. | `E/Decimal_TypedAboveMax`, `E/Decimal_AboveMax`, `E/Decimal_BelowMin`, `E/Decimal_Apply` |
+| C2b | A number box given a minus sign and digits (WM_SETTEXT `-5` on a 10 to 500 box, `-1` on a 0 to 65535 box stored as text) writes the minimum. Letters set in the box keep the shown value (C3). | `E/Decimal_NotNumber` step 'negative' (10), `E/Decimal_StoreAsText_OutOfRange` step 'negative' (`"0"`) |
 | C3 | A number box with no digits (empty, or letters set without typing) on an element that is not required reads as the default of the control. A required one is refused. | `E/Decimal_Empty`, `E/Decimal_Required_Empty` |
 | C4 | A text box or combo box cuts typed text at `maxLength` (1023 when the element states none). Set text is not cut. | `E/Text_TooLong_Typed`, `E/Text_TooLong_SetText` |
 | C5 | A row of an explicit list with only a name has an empty value. | `E/List_Explicit_NameOnly` |

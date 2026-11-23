@@ -106,7 +106,8 @@ public sealed class GptIni
         var value = string.Concat(groups.Select(g => "[" + string.Concat(g) + "]"));
         if (index >= 0 && ValueOf(_lines[index].Text).Trim().Length == 0)
         {
-            _lines[index].Text = key + "=" + value;
+            // A blank line is all tail: the groups go before the text it kept (captures E/Decimal_EdgeValues steps 3 and 5).
+            _lines[index].Text = key + "=" + value + GptIniRules.Tail(ValueOf(_lines[index].Text));
             return;
         }
 
@@ -115,7 +116,7 @@ public sealed class GptIni
 
     /// <summary>
     /// Takes the registry pair out of the side's extension line after the side lost its last setting. When nothing else is
-    /// listed the key stays and its value becomes one space (capture K/KeyTrailingBackslash_Enable step 2,
+    /// listed the key stays and its value becomes the kept tail plus one space (capture K/KeyTrailingBackslash_Enable step 2,
     /// C/GptIni_PairRemoval). When other groups remain the line keeps them and loses only the pair (capture
     /// C/GptIni_ForeignExtensions step 4). A missing line is not added.
     /// </summary>
@@ -136,7 +137,9 @@ public sealed class GptIni
             return;
         }
 
-        SetKey(key, groups.Count == 0 ? " " : string.Concat(groups.Select(g => "[" + string.Concat(g) + "]")));
+        var tail = GptIniRules.Tail(ValueOf(_lines[index].Text));
+        var kept = string.Concat(groups.Select(g => "[" + string.Concat(g) + "]"));
+        _lines[index].Text = key + "=" + (groups.Count == 0 ? tail + GptIniRules.EmptiedLineSpacer : kept + tail);
     }
 
     /// <summary>Serializes the file.</summary>

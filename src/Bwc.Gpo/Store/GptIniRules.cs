@@ -35,6 +35,25 @@ public static class GptIniRules
     public const bool EmptiedSideBlanksPairLine = true;
 
     /// <summary>
+    /// The text an extension line becomes when the side's pair is removed and no group remains: the tail the line kept
+    /// plus this one space (captures C/GptIni_PairRemoval, where the tail is empty, and E/Decimal_EdgeValues step 4, where
+    /// the tail is one space and the line reads two).
+    /// </summary>
+    public const string EmptiedLineSpacer = " ";
+
+    /// <summary>
+    /// The text after the last GUID group of an extension value, kept as it is (the tail). A value without a group is all
+    /// tail. Settled by E/Decimal_EdgeValues steps 2 to 5 and C/GptIni_ForeignExtensions step 4 (the tail is empty there).
+    /// </summary>
+    /// <param name="value">The raw value, after the equals sign.</param>
+    /// <returns>The tail.</returns>
+    public static string Tail(string value)
+    {
+        var close = value.LastIndexOf(']');
+        return close < 0 ? value : value[(close + 1)..];
+    }
+
+    /// <summary>
     /// The keys the store writes: the extension line of each side and Version. Their order no longer places a missing key (see
     /// <see cref="InsertionIndex"/>); a new file gets its keys in the order they are first written.
     /// </summary>

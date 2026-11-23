@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json.Nodes;
 using Bwc.Gpo.Store;
 
 namespace Bwc.Policy.Tests.Golden;
@@ -126,8 +128,39 @@ public sealed class GoldenHarnessTests
     [TestMethod]
     public void R9_Cap4Rule_FlagsADecimalCaseThatTheDialogDidNotNotice_AndNoGroupACase()
     {
-        Assert.IsNotNull(UnnoticedEditRule.FindInCase(GoldenCase.Load("B/Pol_Decimal_MinMax")));
+        // The positive example is a copy of B/Pol_Decimal_MinMax with its alternate-value set changed to the CAP-4 pattern:
+        // the state is Enabled before and after, the number is set with typed false and its text changes, Apply is
+        // disabled after the set, and no message box or file change follows. The tracked golden is never edited.
+        const string caseId = "B/Pol_Decimal_MinMax";
+        using var sandbox = new GoldenSandbox();
+        var root = sandbox.CopyCase(GoldenCase.FolderOf(caseId), caseId);
+        var casePath = Path.Combine(GoldenCase.FolderOf(caseId, root), "case.json");
+        var node = (JsonObject)JsonNode.Parse(File.ReadAllBytes(casePath))!;
+        var alt1 = node["observed"]!.AsArray().OfType<JsonObject>().Single(o => o["index"]!.GetValue<int>() == 2);
+        var data = (JsonObject)alt1["data"]!;
+        var numberSet = (JsonObject)data["sets"]!.AsArray()[1]!;
+        numberSet["typed"] = false;
+        ((JsonObject)data["afterSet"]!["buttons"]!["Apply"]!)["enabled"] = false;
+        var press = (JsonObject)data["presses"]!.AsArray()[0]!;
+        press["messageBoxes"] = new JsonArray();
+        press["files"]!["changed"] = false;
+        alt1["changedFiles"] = new JsonArray();
+        sandbox.Overwrite(casePath, Encoding.UTF8.GetBytes(node.ToJsonString()));
+
+        Assert.IsNotNull(UnnoticedEditRule.FindInCase(GoldenCase.Load(caseId, root)));
         foreach (var id in PolicyGoldenReplayTests.GroupA.Select(c => "A/" + c).Concat(PolicyGoldenReplayTests.GroupK.Select(c => "K/" + c)))
+        {
+            Assert.IsNull(UnnoticedEditRule.FindInCase(GoldenCase.Load(id)), id);
+        }
+
+        // The ten recaptured cases (awaiting-recapture.txt no longer lists them) are not flagged.
+        string[] recaptured =
+        [
+            "B/Pol_Both_WithElements.Computer", "B/Pol_Both_WithElements.User", "B/Pol_Decimal_MinMax", "B/Pol_Decimal_Soft",
+            "B/Pol_Decimal_StoreAsText", "B/Pol_LongDecimal_Basic", "E/Decimal_EdgeValues", "E/Decimal_NotNumber",
+            "E/Decimal_StoreAsText_OutOfRange", "E/LongDecimal_AboveMax",
+        ];
+        foreach (var id in recaptured)
         {
             Assert.IsNull(UnnoticedEditRule.FindInCase(GoldenCase.Load(id)), id);
         }
