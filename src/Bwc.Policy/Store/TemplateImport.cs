@@ -4,7 +4,7 @@ using Bwc.Policy.Admx;
 namespace Bwc.Policy.Store;
 
 /// <summary>
-/// Checks a chosen ADMX (with its ADML for the UI culture, else en-US), copies the pair into the import store through
+/// Checks a chosen ADMX (with its ADML from the UI culture's language chain), copies the pair into the import store through
 /// <see cref="TemplateStoreWriter"/>, and removes an imported template. The check loads the file through the hardened
 /// <see cref="TemplateLoader"/> together with the system folder and the store, so a using reference resolves the way it
 /// will after the copy. A refusal is a list of typed problems, never an exception; only cancellation throws.
@@ -12,8 +12,6 @@ namespace Bwc.Policy.Store;
 /// </summary>
 public sealed class TemplateImport
 {
-    private const string FallbackCulture = "en-US";
-
     /// <summary>The most ADMX files the folder of a chosen file may hold, itself included (template-store.md, I6).</summary>
     public const int MaxSourceFolderAdmxFiles = 1000;
 
@@ -289,16 +287,10 @@ public sealed class TemplateImport
     /// <summary>Reads a file the way the check does, without a problem list. Null when it cannot be read.</summary>
     private static byte[]? TryRead(string path) => ReadBounded(path, []);
 
-    /// <summary>The ADML the loader picks for the chosen ADMX (the culture folder, else en-US) and its bytes.</summary>
+    /// <summary>The ADML the loader picks for the chosen ADMX (the first folder of the language chain) and its bytes.</summary>
     private static (string? Path, byte[]? Bytes) ReadPredictedAdml(string sourceFolder, string stem, string? uiCulture)
     {
-        var culture = uiCulture?.Trim();
-        if (string.IsNullOrEmpty(culture) || culture is "." or ".." || culture.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-        {
-            culture = FallbackCulture;
-        }
-
-        foreach (var language in new[] { culture, FallbackCulture })
+        foreach (var language in AdmlLanguageChain.Names(uiCulture))
         {
             try
             {
@@ -439,8 +431,7 @@ public sealed class TemplateImport
             return true;
         }
 
-        var cultureName = string.IsNullOrWhiteSpace(uiCulture) ? FallbackCulture : uiCulture.Trim();
-        foreach (var language in new[] { cultureName, FallbackCulture })
+        foreach (var language in AdmlLanguageChain.Names(uiCulture))
         {
             string folder;
             try

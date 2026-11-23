@@ -10,11 +10,12 @@ namespace Bwc.Policy.Admx;
 /// </summary>
 public static class TemplateLoader
 {
-    private const string FallbackCulture = "en-US";
-
     /// <summary>Loads every ADMX in the folders. Earlier folders win when two files define one namespace.</summary>
     /// <param name="folders">The source folders, such as the system folder and then the import store.</param>
-    /// <param name="uiCulture">The UI culture name for the ADML folder, or null for en-US. en-US is the fallback.</param>
+    /// <param name="uiCulture">
+    /// The UI culture name. Each template's ADML comes from the first folder of its language chain that holds it
+    /// (docs/failure-modes/policy-admx.md, section 52). A null or invalid name, or no folder of the chain, falls to en-US.
+    /// </param>
     /// <param name="cancellationToken">Checked once per file.</param>
     /// <returns>The linked set, with every problem listed in <see cref="TemplateSet.Failures"/>.</returns>
     public static TemplateSet Load(
@@ -32,7 +33,7 @@ public static class TemplateLoader
 
         var work = sources.SelectMany(s => s.Items).ToArray();
         var results = new FileResult[work.Length];
-        RunParallel(work, results, culture, cancellationToken);
+        RunParallel(work, results, cancellationToken);
 
         var parsed = new List<ParsedAdmx>();
         var next = 0;
@@ -59,13 +60,13 @@ public static class TemplateLoader
             || culture is "." or ".."
             || culture.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
-            return FallbackCulture;
+            return AdmlLanguageChain.Fallback;
         }
 
         return culture;
     }
 
-    private static void RunParallel(WorkItem[] work, FileResult[] results, string culture, CancellationToken token)
+    private static void RunParallel(WorkItem[] work, FileResult[] results, CancellationToken token)
     {
         var options = new ParallelOptions
         {
@@ -77,7 +78,7 @@ public static class TemplateLoader
             Parallel.For(0, work.Length, options, i =>
             {
                 token.ThrowIfCancellationRequested();
-                results[i] = LoadFile(work[i], culture);
+                results[i] = LoadFile(work[i]);
             });
         }
         catch (AggregateException ex) when (ex.InnerExceptions.All(e => e is OperationCanceledException))
@@ -114,10 +115,16 @@ public static class TemplateLoader
             return source;
         }
 
-        var cultureDir = UsableLanguageFolder(Path.Combine(full, culture), failures);
-        var fallbackDir = string.Equals(culture, FallbackCulture, StringComparison.OrdinalIgnoreCase)
-            ? null
-            : UsableLanguageFolder(Path.Combine(full, FallbackCulture), failures);
+        var languageDirs = new List<AdmlLanguageDir>();
+        foreach (var language in AdmlLanguageChain.Names(culture))
+        {
+            var dir = UsableLanguageFolder(Path.Combine(full, language), failures);
+            if (dir is not null)
+            {
+                languageDirs.Add(new AdmlLanguageDir(language, dir));
+            }
+        }
+
         var admxFiles = new List<string>();
         try
         {
@@ -138,7 +145,8 @@ public static class TemplateLoader
         admxFiles.Sort(CompareFileNames);
         foreach (var path in admxFiles)
         {
-            items.Add(new WorkItem(path, index, cultureDir, fallbackDir, Path.Combine(full, FallbackCulture, Path.GetFileNameWithoutExtension(path) + ".adml")));
+            items.Add(new WorkItem(
+                path, index, languageDirs, Path.Combine(full, AdmlLanguageChain.Fallback, Path.GetFileNameWithoutExtension(path) + ".adml")));
         }
 
         return source;
@@ -166,12 +174,12 @@ public static class TemplateLoader
         return path;
     }
 
-    private static FileResult LoadFile(WorkItem item, string culture)
+    private static FileResult LoadFile(WorkItem item)
     {
         var sink = new FailureSink(AdmxLimits.MaxFailuresPerFile);
         try
         {
-            return new FileResult(ReadFile(item, culture, sink), sink.Items);
+            return new FileResult(ReadFile(item, sink), sink.Items);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -180,7 +188,7 @@ public static class TemplateLoader
         }
     }
 
-    private static ParsedAdmx? ReadFile(WorkItem item, string culture, FailureSink sink)
+    private static ParsedAdmx? ReadFile(WorkItem item, FailureSink sink)
     {
         var admxRoot = SafeXml.Load(item.AdmxPath, sink);
         if (admxRoot is null)
@@ -196,24 +204,14 @@ public static class TemplateLoader
         }
 
         var baseName = Path.GetFileNameWithoutExtension(item.AdmxPath) + ".adml";
-        string? admlPath = null;
-        var usedCulture = culture;
-        if (item.CultureDir is not null && AdmlExists(Path.Combine(item.CultureDir, baseName)))
-        {
-            admlPath = Path.Combine(item.CultureDir, baseName);
-        }
-        else if (item.FallbackDir is not null && AdmlExists(Path.Combine(item.FallbackDir, baseName)))
-        {
-            admlPath = Path.Combine(item.FallbackDir, baseName);
-            usedCulture = FallbackCulture;
-        }
-
-        if (admlPath is null)
+        var found = FindAdml(item, baseName);
+        if (found is null)
         {
             sink.Add(TemplateFailureCode.MissingAdml, item.ExpectedAdmlPath, item.AdmxPath);
             return null;
         }
 
+        var (admlPath, language) = found.Value;
         var admlRoot = SafeXml.Load(admlPath, sink);
         if (admlRoot is null)
         {
@@ -227,7 +225,7 @@ public static class TemplateLoader
         }
 
         file.AdmlPath = admlPath;
-        file.Culture = usedCulture;
+        file.Culture = language;
         file.SourceIndex = item.SourceIndex;
         file.DisplayName = adml.DisplayName;
         file.Description = adml.Description;
@@ -240,11 +238,29 @@ public static class TemplateLoader
         return sink.Items.Count > 0 ? null : parsed;
     }
 
+    /// <summary>The first ADML of the chain for the template, with the language folder it came from.</summary>
+    private static (string Path, string Language)? FindAdml(WorkItem item, string baseName)
+    {
+        foreach (var dir in item.LanguageDirs)
+        {
+            var candidate = Path.Combine(dir.Path, baseName);
+            if (AdmlExists(candidate))
+            {
+                return (candidate, dir.Language);
+            }
+        }
+
+        return null;
+    }
+
     private static bool AdmlExists(string path) => File.Exists(path) || SafeXml.IsReparsePointPath(path);
 
     private sealed record SourceWork(List<TemplateFailure> Failures, List<WorkItem> Items);
 
-    private sealed record WorkItem(string AdmxPath, int SourceIndex, string? CultureDir, string? FallbackDir, string ExpectedAdmlPath);
+    /// <summary>A language folder of the chain that exists and is usable, with its name as the chain gives it.</summary>
+    private sealed record AdmlLanguageDir(string Language, string Path);
+
+    private sealed record WorkItem(string AdmxPath, int SourceIndex, List<AdmlLanguageDir> LanguageDirs, string ExpectedAdmlPath);
 
     private sealed record FileResult(ParsedAdmx? Parsed, List<TemplateFailure> Failures);
 }

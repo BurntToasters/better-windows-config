@@ -80,6 +80,16 @@ public sealed class TemplateImportTests
     }
 
     [TestMethod]
+    public void Check_PredictsTheAdmlOfTheLanguageChain_NotOnlyTheExactCulture()
+    {
+        using var box = new TemplateStoreSandbox();
+        var source = box.AddTemplate(box.Folder("src"), "Imp", "T.Imp", culture: "de");
+        var check = box.Importer().Check(source, "de-AT");
+        Assert.IsTrue(check.CanImport, string.Join(", ", check.Problems.Select(p => p.Code)));
+        Assert.AreEqual("de", check.Culture);
+    }
+
+    [TestMethod]
     public void Import_RefusesATemplateWithNoAdmlAndCreatesNoStore()
     {
         using var box = new TemplateStoreSandbox();

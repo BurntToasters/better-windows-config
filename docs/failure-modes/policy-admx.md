@@ -541,3 +541,27 @@ How the loader can fail against them:
 | H5 | The root of Administrative Templates shows the category of a bad template. | The root categories of the set are the good fixture's root only (classic: `BWC Oracle`), for the ten refused templates. |
 | H6 | `H/UndefinedUsing` is rejected, or its policy loses the display name or the supported-on text. | The category, the policy `Bad fixture policy` and the supported-on text `BWC oracle bad fixture` are in the set. |
 | H7 | A capture is missing, incomplete or answers differently after a recapture and the test passes. | The test reads every H case from the capture (the dialog count at start, the tree children, whether the bad category could be selected) and fails when the set of refused templates is not the ten named above. |
+
+## Language fallback (LANG-1)
+
+### 52. The ADML language chain
+
+Classic picks the ADML of a template from a fallback list, not from one folder. BWC follows the same rule in every place
+that chooses an ADML (the loader, the store import check and its predicted path). For a UI culture `C`, the chain is:
+`C`, then each parent culture of `C` by `CultureInfo.Parent` until the invariant culture (for example `zh-Hant-TW`, then
+`zh-Hant`, then `zh`), then `en-US`. The loader uses the first folder of the chain that holds the ADML of that template.
+The rule is per template, so two templates in one folder may come from different folders. Folder names match
+case-insensitively. A culture whose name is not valid (it does not resolve as a .NET culture) has the chain `en-US` only.
+The ADML of an `en-US` chain is still the `en-US` folder, so a template with no ADML in any folder of the chain is skipped
+and reported as `MissingAdml`, naming the `en-US` path, as in the H/MissingAdml capture (section 51).
+
+How the chain can fail:
+
+| Id | Way it fails | Expected |
+|---|---|---|
+| L1 | A parent culture is skipped: `de-AT` with only a `de` folder loads `en-US`, or nothing. | `de` loads. |
+| L2 | The chain is out of order: `zh-Hant-TW` with `zh-Hant` and `zh` loads `zh`. | `zh-Hant` loads, the nearer parent first. |
+| L3 | A folder name in another case (`DE` for `de-AT`'s parent `de`) is not found. | Found, case-insensitive. |
+| L4 | An invalid culture name is used as a folder name. | The chain is `en-US` only. |
+| L5 | A template with no ADML in any folder of the chain is loaded, or it is not reported. | Skipped, one `MissingAdml` at the `en-US` path. |
+| L6 | The store import check predicts a different ADML than the loader picks, so it refuses a template that loads, or it accepts one that does not. | The import check uses the same chain (the shared helper). |

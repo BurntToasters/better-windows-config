@@ -581,7 +581,7 @@
 | ID | Feature | Oracle source | Package | Status |
 | --- | --- | --- | --- | --- |
 | ADMX-001 | Two template sources: the system folder and the BWC import store. The system folder wins on a duplicate namespace and the import is listed as shadowed. | docs/contracts/policy-engine.md; src/Bwc.Policy/Store/TemplateSources.cs | G6, E5 | pass |
-| ADMX-002 | Language: the ADML is taken from the folder of the UI language, then en-US. Classic's own fallback list differs (finding LANG-1). | src/Bwc.Policy/Admx/TemplateLoader.cs; H/MissingAdml | A3 | gap |
+| ADMX-002 | Language: the ADML is taken from the language chain of the UI culture (its parents, then en-US), as classic's fallback list does (finding LANG-1). | src/Bwc.Policy/Admx/TemplateLoader.cs, src/Bwc.Policy/Admx/AdmlLanguageChain.cs; H/MissingAdml; test class AdmlLanguageChainTests | A3 | pass |
 | ADMX-003 | No schema validation: attributes and elements that the parser does not need are ignored; shipped templates that break the schema still load. | docs/contracts/policy-engine.md; H/ClassLowerCase, H/BoolAttributeUpper, H/BoolAttributeMixed | G6 | pass |
 | ADMX-004 | Hardening: no DTD, no resolver, size cap, depth cap, reparse points refused, name length limits. | src/Bwc.Policy/Admx/SafeXml.cs, AdmxLimits.cs; H/DtdEntity | G6 | pass |
 | ADMX-005 | A malformed XML template is skipped and reported; the other templates load. | H/MalformedXml | G6 | pass |

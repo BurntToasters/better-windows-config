@@ -32,7 +32,7 @@ State after A1 (2026-11-22, HEAD 5ccff10): every row has a verdict. E2E evidence
 | TREE | 16 | 0 | 3 | 1 | 0 |
 | BEH | 23 | 4 | 1 | 1 | 0 |
 | POL | 63 | 0 | 5 | 0 | 7 |
-| ADMX | 31 | 0 | 1 | 0 | 0 |
+| ADMX | 32 | 0 | 0 | 0 | 0 |
 | All (534) | 277 | 186 | 61 | 3 | 7 |
 
 ## Gaps
@@ -113,11 +113,10 @@ Gap rows of the audit (A1). Each line names the row, what is missing and the pie
 | POL-070 | The live registry after Disabled and Not Configured (group G), elevated only. | A2 |
 | POL-071 | The live registry after a comment-only change (group G), elevated only. | A2 |
 | POL-072 | The live registry types for element policies (group G), elevated only. | A2 |
-| ADMX-002 | The ADML language fallback differs from classic (finding LANG-1). | A3 |
 
 | Piece | Rows |
 | --- | --- |
-| A3 | CTX-001, CTX-002, CTX-003, CTX-004, CTX-005, CTX-006, CTX-010, TOOL-009, TOOL-014, ACC-001, ACC-003, ACC-005, ACC-008, ACC-017, ACC-018, ACC-019, ACC-020, ACC-021, ACC-022, ACC-023, ACC-029, ACC-030, ACC-031, ACC-034, ACC-035, ACC-036, ACC-037, ACC-038, ACC-039, ACC-040, ACC-041, ACC-042, ACC-043, MSG-001, MSG-023, MSG-024, MSG-028, MSG-029, MSG-031, MSG-032, MSG-033, MSG-037, MSG-038, MSG-050, MSG-059, MSG-062, MSG-064, MSG-091, MSG-092, MSG-093, VIEW-023, TREE-010, TREE-017, TREE-019, ADMX-002 |
+| A3 | CTX-001, CTX-002, CTX-003, CTX-004, CTX-005, CTX-006, CTX-010, TOOL-009, TOOL-014, ACC-001, ACC-003, ACC-005, ACC-008, ACC-017, ACC-018, ACC-019, ACC-020, ACC-021, ACC-022, ACC-023, ACC-029, ACC-030, ACC-031, ACC-034, ACC-035, ACC-036, ACC-037, ACC-038, ACC-039, ACC-040, ACC-041, ACC-042, ACC-043, MSG-001, MSG-023, MSG-024, MSG-028, MSG-029, MSG-031, MSG-032, MSG-033, MSG-037, MSG-038, MSG-050, MSG-059, MSG-062, MSG-064, MSG-091, MSG-092, MSG-093, VIEW-023, TREE-010, TREE-017, TREE-019 |
 | A2 | BEH-027, POL-068, POL-069, POL-070, POL-071, POL-072 |
 
 Notes for the fix pieces:
@@ -716,7 +715,7 @@ Not differences: the default list order and the policy id ordering follow classi
 | ID | Verdict | Evidence or reason | Piece |
 | --- | --- | --- | --- |
 | ADMX-001 | pass | Gpedit_Import_Shadowed, Gpedit_Import_Refused_Duplicates and TemplateSourcesTests. | G6, E5 |
-| ADMX-002 | gap | Finding LANG-1: BWC takes the UI language then en-US; classic's fallback list differs. | A3 |
+| ADMX-002 | pass | AdmlLanguageChainTests (tests/Bwc.Policy.Tests): the UI culture's parents, then en-US, as classic's fallback list does (finding LANG-1). | A3 |
 | ADMX-003 | pass | StrictTemplateTests and SystemTemplatesInvariantTests (the shipped templates load). The H attribute cases are refused as in classic (ADMX-012, ADMX-013). | G6 |
 | ADMX-004 | pass | HardeningTests and Gpedit_TreeBlind_BadTemplatesLeaveGoodTree (H/DtdEntity). | G6 |
 | ADMX-005 | pass | PolicyTemplateGoldenTests and Gpedit_Templates_LoadErrors_BoxCases. | G6 |
