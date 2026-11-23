@@ -279,14 +279,20 @@ template). What loads and what is reported, for the engine and therefore for BWC
 - The notice or the list needs the dialog or a node selection to appear; the notice shows only after the first selection.
 - The notice re-appears as an event after a node selection (it is a pane that stays as it is).
 - Selecting nodes, browsing the good policies and opening the good policy dialog fail while a template is bad.
+- A row shows the bare engine code (MSG-031 to MSG-033: classic shows a sentence), a code has no sentence (the row shows the key
+  name), or the sentence replaces the code so that it is not visible any more. Each code of `TemplateFailureCode` has the entry
+  `TemplateProblem<Code>` in `Templates.resw` (a store problem has `TemplateProblemStore`, an unexpected error
+  `TemplateProblemLoadException`); the row shows the sentence in the middle column and the code in the last one. The details box
+  of a refused import adds the sentence of the loader code after the code line. BWC wording: classic's own texts are about
+  parse errors in .adm and .admx files and are not the same set of causes.
 
 Handling: `GpeditModel.Problems` of kinds `TemplateFailure`, `TemplateStore` and `LoadException` feed the notice (count) and the
 Problems list (one row each); the sandbox and policy-file problems (kinds `StorePolicy`, `PolicyFile`, `CommentFile`,
 `VersionFile`) are not template problems and are not in the list. Check: `Gpedit_Templates_LoadErrors_BoxCases`
 (`notice`, `noticeCount`, `noModalBox`, `tree.good`, `tree.noBadCategory`, `policyCount`, `goodPolicies`, `opens`, `list.count`,
-`list.noDuplicates`, `list.kind`, `list.<case>`, `list.storeEmpty`, `noReload`),
+`list.noDuplicates`, `list.kind`, `list.<case>`, `sentence.<case>`, `list.storeEmpty`, `noReload`),
 `Gpedit_Templates_LoadErrors_UndefinedUsing` (`notice`, `tree.category`, `policy.row`, `policy.opens`, `list.count`, `list.code`,
-`list.detail`), `Gpedit_Templates_LoadErrors_AttributeCases` (`notice`, `tree.noCategory`, `list.count`, `list.<case>`),
+`list.sentence`, `list.detail`), `Gpedit_Templates_LoadErrors_AttributeCases` (`notice`, `tree.noCategory`, `list.count`, `list.<case>`, `sentence.<case>`),
 `Gpedit_Templates_Notice_ClearsAndReturns` (`clean.noNotice`, `added.refreshed`, `added.notice`, `added.list`, `removed.refreshed`,
 `removed.noNotice`, `removed.list`, `again.refreshed`, `again.notice`, `afterReload.list`), `Gpedit_Templates_Notice_NotAnEvent`
 (`shown`, `<node>.same`, `goodRows`, `noReloadStarted`).

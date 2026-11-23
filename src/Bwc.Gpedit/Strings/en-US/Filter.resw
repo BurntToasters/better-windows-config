@@ -138,16 +138,20 @@
     <value>Platforms</value>
   </data>
   <!-- Refusal texts: one for each reason the options are refused. -->
+  <!-- Oracle admtmpl.dll.mui:3122 -->
   <data name="FilterRefusalKeywordText" xml:space="preserve">
-    <value>Enter at least one word to look for, or clear Enable Keyword Filters.</value>
+    <value>Please specify keyword filter text.</value>
   </data>
+  <!-- Oracle admtmpl.dll.mui:3123 (the classic text, with its repeated word). -->
   <data name="FilterRefusalKeywordWithin" xml:space="preserve">
-    <value>Select where to look for the keywords: the title, the help text or the comment.</value>
+    <value>Please select one more more keyword filter Within options.</value>
   </data>
+  <!-- BWC wording: classic has no message for a keyword text that is too long. -->
   <data name="FilterRefusalKeywordTooLong" xml:space="preserve">
     <value>The keyword text is too long.</value>
   </data>
+  <!-- Oracle admtmpl.dll.mui:3121 -->
   <data name="FilterRefusalPlatforms" xml:space="preserve">
-    <value>Select at least one platform, or clear Enable Requirements Filters.</value>
+    <value>Please select at least one platform or application requirement.</value>
   </data>
 </root>

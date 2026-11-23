@@ -29,6 +29,8 @@ internal sealed class GpeditTemplatesDialog : ClassicDialog
     private const int CloseId = 2;
     private const double NameColumnDip = 150;
     private const double NamespaceColumnDip = 170;
+    private const double ProblemNameColumnDip = 95;
+    private const double ProblemCodeColumnDip = 95;
 
     private readonly GpeditTemplateStore _store;
     private readonly IReadOnlyList<GpeditProblem> _problems;
@@ -269,12 +271,15 @@ internal sealed class GpeditTemplatesDialog : ClassicDialog
                 continue;
             }
 
+            // MSG-031 to MSG-033: a sentence for the code, then the code itself as a detail (the engine detail is in the help text).
             string name = GpeditTemplateStore.FileNameOf(problem.Path);
+            string key = GpeditTemplateProblemText.KeyFor(problem);
+            string sentence = GpeditTemplateProblemText.SentenceFor(problem);
             _problemList.Items.Add(MakeItem(
                 _problemList,
                 name,
-                $"Code={Plain(problem.Detail)};Detail={Plain(problem.Message)};Kind={problem.Kind};",
-                [(name, NameColumnDip), (problem.Detail, NamespaceColumnDip), (problem.Message, double.NaN)]));
+                $"Code={Plain(problem.Detail)};Detail={Plain(problem.Message)};Kind={problem.Kind};Key={key};Sentence={Plain(sentence)};",
+                [(name, ProblemNameColumnDip), (sentence, double.NaN), (problem.Detail, ProblemCodeColumnDip)]));
         }
     }
 

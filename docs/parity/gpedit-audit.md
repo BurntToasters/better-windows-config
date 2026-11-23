@@ -27,13 +27,13 @@ State after A1 (2026-11-22, HEAD 5ccff10): every row has a verdict. E2E evidence
 | TOOL | 16 | 1 | 0 | 0 | 0 |
 | DLG | 35 | 88 | 0 | 0 | 0 |
 | ACC | 41 | 7 | 2 | 0 | 0 |
-| MSG | 3 | 73 | 17 | 0 | 0 |
+| MSG | 8 | 85 | 0 | 0 | 0 |
 | VIEW | 28 | 15 | 0 | 0 | 0 |
 | TREE | 17 | 2 | 0 | 1 | 0 |
 | BEH | 23 | 4 | 1 | 1 | 0 |
 | POL | 63 | 0 | 5 | 0 | 7 |
 | ADMX | 32 | 0 | 0 | 0 | 0 |
-| All (534) | 285 | 196 | 43 | 3 | 7 |
+| All (534) | 308 | 208 | 8 | 3 | 7 |
 
 ## Gaps
 
@@ -49,29 +49,12 @@ Engine rules that no capture settles are listed first (E6c). Each has a pointer 
 | GAP-06 | A key that a new record joins takes the spelling of its ancestors; on load two spellings of one key merge under the first. | D/Case_KeyDiffers and D/Case_KeyTwoSpellings show one level; deeper trees and ties between several first spellings are not captured. | `PolDocument.SpellNewKey` |
 | GAP-07 | The namespaces that stay in comment.cmtx after the first save of a session. | Only the one-namespace case is captured (A/Machine_Enabled, A/User_Enabled). | `CmtxDocument.RestrictNamespacesTo` |
 
-Gap rows of the audit (A1). Each line names the row, what is missing and the piece that closes it: A3 for a fix or a test after this audit, A2 for the elevated run (a real save with refresh). Gap rows by section: ACC 2, MSG 17, VIEW 0, TREE 0, BEH 1, POL 5, ADMX 1.
+Gap rows of the audit (A1). Each line names the row, what is missing and the piece that closes it: A3 for a fix or a test after this audit, A2 for the elevated run (a real save with refresh). Gap rows by section: ACC 2, MSG 0, VIEW 0, TREE 0, BEH 1, POL 5, ADMX 1.
 
 | Row | What is missing | Piece |
 | --- | --- | --- |
 | ACC-030 | Alt+Left with the focus on the result side: BWC walks the history (the console frame handles it in every pane); the capture shows no change. | A3 |
 | ACC-031 | Alt+Right with the focus on the result side: the same frame difference as ACC-030. | A3 |
-| MSG-001 | gpedit.dll id 9 (the window title form) differs (STR-1). | A3 |
-| MSG-023 | The Add/Remove Templates menu label is not found by the string check (access key and ellipsis form). | A3 |
-| MSG-024 | The Show Contents refusal messages have BWC wording that the check does not find. | A3 |
-| MSG-028 | The number and text validation messages have BWC wording that the check does not find. | A3 |
-| MSG-029 | admtmpl.dll id 236 differs (STR-1). | A3 |
-| MSG-031 | Template file errors show the engine code; user wording per code is open. | A3 |
-| MSG-032 | Template element errors show the engine code; user wording per code is open. | A3 |
-| MSG-033 | Template resource errors show the engine code; user wording per code is open. | A3 |
-| MSG-037 | The Re-Apply Filter labels are not found by the string check (access key form). | A3 |
-| MSG-038 | The platform match texts and the three Filter Options refusal messages have BWC wording. | A3 |
-| MSG-050 | The view mode and arrange labels are not found (the classic string holds a help line after the label). | A3 |
-| MSG-059 | The Export List write errors and file types have BWC wording or filters that the check does not find. | A3 |
-| MSG-062 | The toolbar names are not found (the classic string holds a tooltip copy after the name). | A3 |
-| MSG-064 | The Export List and action pane toggle names are not found (ellipsis and tooltip forms). | A3 |
-| MSG-091 | Setting dialog form texts are outside the string check; only button and radio names are asserted. | A3 |
-| MSG-092 | Show Contents form texts are outside the string check and untested. | A3 |
-| MSG-093 | Setting dialog resource texts are outside the string check and untested. | A3 |
 | BEH-027 | The refresh timing of group G needs a real elevated save with refresh. | A2 |
 | POL-068 | The live registry after OK (group G), elevated only. | A2 |
 | POL-069 | The live registry after Apply then Cancel (group G), elevated only. | A2 |
@@ -81,13 +64,13 @@ Gap rows of the audit (A1). Each line names the row, what is missing and the pie
 
 | Piece | Rows |
 | --- | --- |
-| A3 | ACC-030, ACC-031, MSG-001, MSG-023, MSG-024, MSG-028, MSG-029, MSG-031, MSG-032, MSG-033, MSG-037, MSG-038, MSG-050, MSG-059, MSG-062, MSG-064, MSG-091, MSG-092, MSG-093 |
+| A3 | ACC-030, ACC-031 |
 | A2 | BEH-027, POL-068, POL-069, POL-070, POL-071, POL-072 |
 
 Notes for the fix pieces:
 
 - The context menu rows (CTX-001 to CTX-006) and TOOL-009 were closed by A3a-1; CTX-010, TOOL-014, ACC-001, ACC-003, ACC-005 and ACC-008 were declared by it (user to confirm).
-- The MSG gaps are mostly forms the string check cannot match (access keys, ellipses, a help line or tooltip after the text) and wording BWC chose itself. A3 either aligns the text or extends the check, then writes `string-parity.json` again.
+- The MSG gaps were closed by A3b (the 17 rows, `pass` or `declared-difference`). The string check now compares access keys, a trailing ellipsis, the label before a help line or tooltip, a format string with its argument (`with <module>:<id>` in the citing comment), the console frame strings and the managed resources of the setting dialog (`forms:` ids); `docs/failure-modes/oracle.md`, section 19. BWC text that was changed to the classic wording: the three Filter Options refusals, Line up Icons, the Administrative Templates node text.
 - The latest full E2E run fails one check only, the category guard: `Gpedit_ReadOnly_Notice` has no E2EOnly category and is not on the allowlist. The test itself passes. A3 adds the category.
 
 ## Declared differences
@@ -122,6 +105,9 @@ The differences decided during the overnight run, with the rows that carry them 
 | No action pane toggle button (BWC has no action pane). | TOOL-014 | `docs/failure-modes/gpedit-commands.md`, section 11; declared by the manager, user to confirm |
 | Ctrl+P, Ctrl+F10, Ctrl+F5 and Ctrl+Alt+Shift+F7 are not bound (not captured; the multiple-window console keys have no meaning in the single-window frame). | ACC-001, ACC-003, ACC-005, ACC-008 | `docs/failure-modes/gpedit-commands.md`, section 11; declared by the manager, user to confirm |
 | The icon arrangement entries run over the view modes: BWC has no free icon placement, so Line Up Icons lays the grid out again and Auto Arrange toggles. | CTX-003 | `docs/failure-modes/gpedit-commands.md`, section 11.11 |
+| Each template problem shows a BWC sentence for its engine code, with the code kept as a detail; classic shows its own texts in one start-up box. | MSG-031 to MSG-033 | `docs/failure-modes/gpedit-templates.md`, section 10 |
+| The Show Contents refusals and the number and text validation messages are the managed texts of the setting dialog, not the native admtmpl texts of ids 33 to 36 and 100 to 103. | MSG-024, MSG-028 | MSG-093 (string-parity, `forms:` ids) |
+| The Export List write errors and the Filter Options status words are BWC wording; the Export List file types differ from classic in letter case only. | MSG-038, MSG-059 | `docs/failure-modes/console-frame.md`, `docs/failure-modes/gpedit-filter.md`; the case fix is open (Resources.resw of Bwc.UI) |
 
 Not differences: the default list order and the policy id ordering follow classic (VIEW-013, pass). The Export List format and encodings (`docs/failure-modes/console-frame.md`, declared difference 5) are a BWC definition, but no inventory row states classic's format, so no row carries them. The Help web site entry (MENU-034) exists as in classic and opens the project page; it is `pass`, for the user to confirm. Resources classic never shows in the local editor (static menus, wizard pages, Favorites dialogs, the author mode and MDI tables) are `declared-difference` "not reachable in the local editor, not built".
 
@@ -398,7 +384,7 @@ Not differences: the default list order and the policy id ordering follow classi
 
 | ID | Verdict | Evidence or reason | Piece |
 | --- | --- | --- | --- |
-| MSG-001 | gap | string-parity: equal 1, differs 1, template 0, absent 13. Id 9 (the window title form) differs; fix the wording or declare it (STR-1). The other absent ids are GPO, RSoP and domain texts not shown. | A3 |
+| MSG-001 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 13. Id 9 (the window title form) is equal: classic stores the format and the name apart and the check composes them (STR-1 closed), BWC stores the composed text. Not shown: GPO, RSoP and domain texts; the equal ids pass (string-parity). | A3b |
 | MSG-002 | declared-difference | string-parity: equal 3, differs 0, template 0, absent 12. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-003 | declared-difference | string-parity: equal 3, differs 0, template 0, absent 12. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-004 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
@@ -408,7 +394,7 @@ Not differences: the default list order and the policy id ordering follow classi
 | MSG-008 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 11. Not shown: BWC never shows any id of this block. | none |
 | MSG-009 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 12. Not shown: BWC never shows any id of this block. | none |
 | MSG-010 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
-| MSG-011 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 12. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-011 | declared-difference | string-parity: equal 3, differs 0, template 0, absent 11. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-012 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 8. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-013 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 7. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-014 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 13. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
@@ -420,22 +406,22 @@ Not differences: the default list order and the policy id ordering follow classi
 | MSG-020 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 6. Not shown: BWC never shows any id of this block. | none |
 | MSG-021 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 2. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-022 | declared-difference | string-parity: equal 6, differs 0, template 0, absent 2. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
-| MSG-023 | gap | string-parity: equal 3, differs 0, template 0, absent 9. The Add/Remove Templates menu label (id 22) is shown by BWC but not found (access key and ellipsis form); the rest are .adm and size texts not shown. | A3 |
-| MSG-024 | gap | string-parity: equal 1, differs 0, template 0, absent 14. The Show Contents refusal messages (ids 33 to 36) are shown by BWC with its own words and not found; the rest are .adm, merged GPO and Extra Registry texts not shown. | A3 |
+| MSG-023 | declared-difference | string-parity: equal 4, differs 0, template 0, absent 8. The Add/Remove Templates menu label (id 22) is equal in folded form (access key and ellipsis). Not shown: the .adm, browse, size and modified texts (BWC imports .admx only, DIFF-005); the equal ids pass (string-parity). | A3b |
+| MSG-024 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 14. Ids 33 to 36 (the Show Contents refusals) are the native admtmpl dialog's texts. The setting dialog of the local editor is the managed one, and BWC shows the managed Show Contents refusal texts, which are equal (MSG-093, Gpedit_Options_List). Not shown: ids 33 to 36 and the .adm, merged GPO and Extra Registry texts; the equal ids pass (string-parity). | A3b |
 | MSG-025 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
 | MSG-026 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 7. Not shown: BWC never shows any id of this block. | none |
 | MSG-027 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 4. Not shown: BWC never shows any id of this block. | none |
-| MSG-028 | gap | string-parity: equal 0, differs 0, template 0, absent 6. The number and text validation messages (ids 100 to 103) have BWC counterparts (DLG-101) that the check does not find; the template file message is not shown. | A3 |
-| MSG-029 | gap | string-parity: equal 0, differs 1, template 0, absent 1. Id 236 differs (STR-1); id 237 is not shown. | A3 |
+| MSG-028 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 6. Ids 100 to 103 (required field, number and range messages) are the native admtmpl texts. BWC shows the managed validation texts of the setting dialog, which are equal (MSG-093, Gpedit_Options_Validation, Gpedit_Dialog_Validation). Not shown: ids 100 to 103; id 104 (a save error: BWC has its own save error texts, DialogSave* in Dialog.resw) and id 105 (the .adm refusal: BWC refuses .adm files in its own import wording, DIFF-005). | A3b |
+| MSG-029 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 1. Id 236 (the Administrative Templates node text) is equal: BWC's text now ends in the same space as classic's (STR-1 closed). Id 237 is not shown. | A3b |
 | MSG-030 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 8. Not shown: BWC never shows any id of this block. | none |
-| MSG-031 | gap | string-parity: equal 0, differs 0, template 1, absent 3. BWC shows the engine failure code instead of these texts; the user wording per code is open in gpedit-templates.md. | A3 |
-| MSG-032 | gap | string-parity: equal 0, differs 0, template 3, absent 10. BWC shows the engine failure code instead of these texts; the user wording per code is open in gpedit-templates.md. | A3 |
-| MSG-033 | gap | string-parity: equal 0, differs 0, template 1, absent 10. BWC shows the engine failure code instead of these texts; the user wording per code is open in gpedit-templates.md. | A3 |
+| MSG-031 | pass | Gpedit_Templates_LoadErrors_BoxCases (sentence.<case>), Gpedit_Templates_LoadErrors_UndefinedUsing (list.sentence) and Gpedit_Templates_LoadErrors_AttributeCases (sentence.<case>): the Problems list shows a sentence for each engine code and keeps the code as a detail. string-parity: equal 0, differs 0, template 1, absent 3. The sentences are BWC wording (Templates.resw, TemplateProblem<Code>); classic shows one start-up box (declared in the load-error rows). | A3b |
+| MSG-032 | pass | Gpedit_Templates_LoadErrors_BoxCases (sentence.<case>) and Gpedit_Templates_LoadErrors_AttributeCases (sentence.<case>): the element codes (MissingAttribute, InvalidAttributeValue, DuplicatePolicy and the others) each have a sentence beside the code. string-parity: equal 0, differs 0, template 3, absent 10. BWC wording, as MSG-031. | A3b |
+| MSG-033 | pass | Gpedit_Templates_LoadErrors_BoxCases (sentence.<case>): the resource codes (MissingAdml, UndefinedString and the others) each have a sentence beside the code. string-parity: equal 0, differs 0, template 1, absent 10. BWC wording, as MSG-031. | A3b |
 | MSG-034 | pass | string-parity: equal 4, differs 0, template 0, absent 0. Every id is equal (string-parity). | G1 |
 | MSG-035 | pass | string-parity: equal 6, differs 0, template 0, absent 0. Every id is equal (string-parity). | G5 |
 | MSG-036 | pass | string-parity: equal 4, differs 0, template 0, absent 0. Every id is equal (string-parity). | G5 |
-| MSG-037 | gap | string-parity: equal 3, differs 0, template 0, absent 3. The Re-Apply Filter labels (ids 3104 and 3105) are shown by BWC but not found (access key form); the platform match text and the status text are BWC words (gpedit-filter.md). | A3 |
-| MSG-038 | gap | string-parity: equal 0, differs 0, template 3, absent 5. The platform match texts and the three refusal messages of Filter Options (ids 3119 to 3123) are shown by BWC with its own words; the three status templates are not compared. | A3 |
+| MSG-037 | declared-difference | string-parity: equal 5, differs 0, template 0, absent 1. The Re-Apply Filter labels (ids 3104 and 3105) are equal in folded form, with the Filter and All Settings texts. Not shown: id 3119 (the platform match text; BWC shows the match combo with Any and All). | A3b |
+| MSG-038 | declared-difference | string-parity: equal 3, differs 0, template 3, absent 2. The three refusal messages of Filter Options (ids 3121 to 3123) are equal (BWC now uses the classic texts; id 3123 keeps the classic repeated word). BWC adds one refusal that classic has no message for (a keyword text that is too long). The three status templates (ids 3124 to 3126) are not compared; BWC's filtered status words are its own (gpedit-filter.md). Not shown: id 3120 (platform match text) and id 3127. | A3b |
 | MSG-039 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 6. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-040 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 1. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-041 | declared-difference | string-parity: equal 0, differs 0, template 3, absent 4. Not shown: BWC never shows any id of this block. | none |
@@ -447,40 +433,40 @@ Not differences: the default list order and the policy id ordering follow classi
 | MSG-047 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 5. Not shown: BWC never shows any id of this block. | none |
 | MSG-048 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 2. Not shown: BWC never shows any id of this block. | none |
 | MSG-049 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 1. Not shown: BWC never shows any id of this block. | none |
-| MSG-050 | gap | string-parity: equal 1, differs 0, template 0, absent 15. The view mode and arrange labels (ids 12001 to 12009) carry a help line after the label, so the check does not find the labels BWC shows; the rest are snap-in errors and Favorites texts not shown. | A3 |
+| MSG-050 | declared-difference | string-parity: equal 9, differs 0, template 0, absent 7. The view mode and arrange labels (ids 12001 to 12005, 12007 to 12009, and 12010) are equal in folded form (BWC's Line up Icons now has the classic wording). The help line after each label is not compared. Not shown: the Web view mode (id 12006), the Favorites texts and the snap-in errors; the equal ids pass (string-parity). | A3b |
 | MSG-051 | declared-difference | string-parity: equal 0, differs 0, template 1, absent 5. Not shown: BWC never shows any id of this block. | none |
-| MSG-052 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 3. Not shown: BWC never shows any id of this block. | none |
+| MSG-052 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 2. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-053 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 1. Not shown: BWC never shows any id of this block. | none |
 | MSG-054 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 2. Not shown: BWC never shows any id of this block. | none |
 | MSG-055 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 2. Not shown: BWC never shows any id of this block. | none |
 | MSG-056 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 12. Not shown: BWC never shows any id of this block. | none |
 | MSG-057 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 15. Not shown: BWC never shows any id of this block. | none |
-| MSG-058 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
-| MSG-059 | gap | string-parity: equal 0, differs 0, template 0, absent 16. The Export List write errors and file types (ids 13344 to 13348) are shown by BWC with its own words or filters and are not found (console-frame.md). | A3 |
+| MSG-058 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 15. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-059 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. The Export List write errors (ids 13344 to 13346) say what the classic ones say (cannot create, cannot write, read-only) in BWC's words, without the product name and without the file in brackets; showing the file needs a code change that this piece did not make. The file types (ids 13347 and 13348) differ in letter case only (BWC "tab delimited", classic "Tab Delimited"); they live in the shared Resources.resw of Bwc.UI, which this piece does not edit. Not shown: the other ids of the block. | A3b |
 | MSG-060 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 4. Not shown: BWC never shows any id of this block. | none |
-| MSG-061 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
-| MSG-062 | gap | string-parity: equal 0, differs 0, template 0, absent 15. The toolbar names (ids 13392 to 13398) carry a tooltip copy after the name, so the check does not find the names BWC shows; the rest are frame errors not shown. | A3 |
+| MSG-061 | declared-difference | string-parity: equal 6, differs 0, template 0, absent 10. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-062 | declared-difference | string-parity: equal 6, differs 0, template 0, absent 9. The toolbar names Back, Forward, Refresh, Help, Export List and the console tree toggles are equal in folded form (the tooltip copy after the name is not compared). Not shown: Stop and Home (BWC has no such buttons, F/Toolbar_States shows 7 standard buttons) and the frame errors. | A3b |
 | MSG-063 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 15. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
-| MSG-064 | gap | string-parity: equal 1, differs 0, template 0, absent 11. Export List (id 13436) and the action pane toggle name (id 13432) are not found (ellipsis and tooltip forms); the size units are not shown. | A3 |
+| MSG-064 | declared-difference | string-parity: equal 3, differs 0, template 0, absent 9. Export List (id 13436), View (id 13434) and Help (id 13437) are equal in folded form (ellipsis). Not shown: the action pane toggle name (id 13432, TOOL-014: BWC has no action pane) and the size units. | A3b |
 | MSG-065 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-066 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 5. Not shown: BWC never shows any id of this block. | none |
-| MSG-067 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
+| MSG-067 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-068 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
-| MSG-069 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 15. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
-| MSG-070 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
-| MSG-071 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 12. Not shown: BWC never shows any id of this block. | none |
+| MSG-069 | declared-difference | string-parity: equal 3, differs 0, template 0, absent 13. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-070 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-071 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 10. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-072 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
 | MSG-073 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 15. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-074 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-075 | declared-difference | string-parity: equal 0, differs 0, template 2, absent 14. Not shown: BWC never shows any id of this block. | none |
 | MSG-076 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
-| MSG-077 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 11. DIFF-006: About follows the Registry Editor, so the classic About text is not shown. | none |
-| MSG-078 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 5. Not shown: BWC never shows any id of this block. | none |
+| MSG-077 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 9. DIFF-006: About follows the Registry Editor, so the classic About text is not shown. | none |
+| MSG-078 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 4. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-079 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 1. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-080 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 9. Not shown: BWC never shows any id of this block. | none |
 | MSG-081 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
 | MSG-082 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 8. Not shown: BWC never shows any id of this block. | none |
-| MSG-083 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 7. Not shown: BWC never shows any id of this block. | none |
+| MSG-083 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 6. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
 | MSG-084 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 2. Not shown: BWC never shows any id of this block. | none |
 | MSG-085 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 2. Not shown: BWC never shows any id of this block. | none |
 | MSG-086 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 6. Not shown: BWC never shows any id of this block. | none |
@@ -488,9 +474,9 @@ Not differences: the default list order and the policy id ordering follow classi
 | MSG-088 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 7. Not shown: BWC never shows any id of this block. | none |
 | MSG-089 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 3. Not shown: BWC never shows any id of this block. | none |
 | MSG-090 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 1. Not shown: BWC never shows any id of this block. | none |
-| MSG-091 | gap | Managed form texts are outside string-parity. Gpedit_Dialog_Frame asserts the button and radio names only; the label, Supported on, Comment and Help texts are not compared. | A3 |
-| MSG-092 | gap | Managed form texts of the Show Contents dialog are outside string-parity and no test compares them. | A3 |
-| MSG-093 | gap | Managed resource texts of the setting dialog are outside string-parity and no test compares them. | A3 |
+| MSG-091 | declared-difference | string-parity: the 17 text entries of Editor.resources (forms:Editor.resources:*): 15 equal, 2 absent. Every button, radio, label and accessible name is equal. Not shown: the accessible descriptions of the Comment and Supported on boxes (BWC names the boxes and sets no description). Sizes and anchors are not strings; Gpedit_Dialog_Frame covers the frame. | A3b |
+| MSG-092 | pass | string-parity: the 3 text entries of ListBoxDialog.resources are equal (forms:ListBoxDialog.resources:*). Gpedit_Options_List shows the dialog. Sizes and anchors are not strings and are judged by DLG-111. | A3b |
+| MSG-093 | pass | string-parity: the 22 text entries of AdmTmplEditor.resources are equal (forms:resources:*): the message captions, validation texts and list column names. Gpedit_Options_Validation and Gpedit_Options_List show them. | A3b |
 
 ### VIEW
 

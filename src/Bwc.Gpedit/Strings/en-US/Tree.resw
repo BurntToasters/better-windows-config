@@ -170,7 +170,7 @@
   </data>
   <!-- Oracle admtmpl.dll.mui:236 -->
   <data name="GpeditDescriptionAdministrativeTemplates" xml:space="preserve">
-    <value>The Group Policy Administrative Templates node contains all registry-based policy information.</value>
+    <value>The Group Policy Administrative Templates node contains all registry-based policy information. </value>
   </data>
   <!-- BWC authored: the page of a node whose snap-in extension is not part of this release (declared difference). -->
   <data name="GpeditPlaceholderTitle" xml:space="preserve">

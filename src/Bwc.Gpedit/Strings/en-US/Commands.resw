@@ -92,8 +92,9 @@
   <data name="GpeditCommandAutoArrange" xml:space="preserve">
     <value>&amp;Auto Arrange</value>
   </data>
+  <!-- Oracle mmcbase.dll.mui:12009 (the label before the help line). -->
   <data name="GpeditCommandLineUpIcons" xml:space="preserve">
-    <value>Line &amp;Up Icons</value>
+    <value>Lin&amp;e up Icons</value>
   </data>
   <!-- The name of the Filter button of the toolbar. -->
   <data name="GpeditToolbarFilter" xml:space="preserve">

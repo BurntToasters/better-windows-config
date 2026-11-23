@@ -107,7 +107,8 @@ internal sealed class GpeditTemplateStore
 
     /// <summary>
     /// The text of the details box: one line per problem, <c>&lt;ProblemCode&gt;[/&lt;load code or store reason&gt;] &lt;file
-    /// name&gt; &lt;detail&gt;</c>. The codes are the engine's names.
+    /// name&gt; &lt;detail&gt;</c>, and for a loader refusal the sentence for the loader code after it. The codes are the
+    /// engine's names.
     /// </summary>
     internal static string FormatProblems(IEnumerable<TemplateImportProblem> problems)
     {
@@ -138,6 +139,12 @@ internal sealed class GpeditTemplateStore
             if (problem.Detail.Length > 0)
             {
                 _ = text.Append(' ').Append(problem.Detail);
+            }
+
+            // A refusal by the loader gets the sentence for its code after the code line (MSG-031 to MSG-033).
+            if (problem.LoadCode is { } loadCode)
+            {
+                _ = text.Append("  ").Append(GpeditTemplateProblemText.SentenceFor(loadCode));
             }
         }
 

@@ -318,7 +318,7 @@ public sealed class GpeditContextMenuLayoutTests
             NameOf(top, ExportList, "Export List", export) &&
             NameOf(top, ViewSubmenu, "View") &&
             NameOf(top, ArrangeSubmenu, "Arrange Icons") &&
-            NameOf(top, LineUp, "Line Up Icons") &&
+            NameOf(top, LineUp, "Line up Icons") &&
             NameOf(top, GpeditCommandIds.Refresh, "Refresh") &&
             NameOf(top, GpeditCommandIds.Help, "Help") &&
             NameOf(view, Columns, "Add/Remove Columns") &&

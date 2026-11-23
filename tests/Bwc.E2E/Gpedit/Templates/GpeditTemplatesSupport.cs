@@ -48,9 +48,20 @@ internal static class TemplateIds
 /// <summary>One row of the imported templates list: the file name, the namespace and the status word.</summary>
 internal sealed record TemplateRow(string Name, string Namespace, string Status);
 
-/// <summary>One row of the load-error list: the file name, the engine code, the engine detail and the
-/// kind of problem.</summary>
-internal sealed record ProblemRow(string Name, string Code, string Detail, string Kind);
+/// <summary>One row of the load-error list: the file name, the engine code, the engine detail, the kind of
+/// problem, the resource key of the sentence the row shows for the code and that sentence (the key itself when the
+/// resource is missing).</summary>
+internal sealed record ProblemRow(string Name, string Code, string Detail, string Kind, string SentenceKey, string Sentence)
+{
+    /// <summary>True when the row shows a real sentence for <paramref name="code"/>: the key is the one for that
+    /// code, and the sentence is neither the key nor the bare code.</summary>
+    internal bool ShowsSentenceFor(string code) =>
+        SentenceKey == "TemplateProblem" + code &&
+        Sentence.Length > 20 &&
+        Sentence != SentenceKey &&
+        Sentence != code &&
+        Sentence.Contains(' ', StringComparison.Ordinal);
+}
 
 /// <summary>What Add did after the picker was accepted.</summary>
 internal enum AddOutcome
@@ -295,7 +306,7 @@ internal static class GpeditTemplatesRun
         string.Join("|", rows.Select(r => $"{r.Name}:{r.Namespace}:{r.Status}"));
 
     internal static string Describe(this IEnumerable<ProblemRow> rows) =>
-        string.Join("|", rows.Select(r => $"{r.Name}:{r.Code}:{r.Kind}"));
+        string.Join("|", rows.Select(r => $"{r.Name}:{r.Code}:{r.Kind}:{r.SentenceKey}"));
 }
 
 /// <summary>
@@ -408,7 +419,7 @@ internal sealed class GpeditTemplatesDialog : IDisposable
     /// <summary>The rows of the load-error list, in screen order.</summary>
     internal List<ProblemRow> Problems() =>
         Items(TemplateIds.Problems)
-            .Select(i => new ProblemRow(i.Name, i.Help.GetValueOrDefault("Code", string.Empty), i.Help.GetValueOrDefault("Detail", string.Empty), i.Help.GetValueOrDefault("Kind", string.Empty)))
+            .Select(i => new ProblemRow(i.Name, i.Help.GetValueOrDefault("Code", string.Empty), i.Help.GetValueOrDefault("Detail", string.Empty), i.Help.GetValueOrDefault("Kind", string.Empty), i.Help.GetValueOrDefault("Key", string.Empty), i.Help.GetValueOrDefault("Sentence", string.Empty)))
             .ToList();
 
     internal bool WaitRows(Func<List<TemplateRow>, bool> condition, double seconds = 15) =>

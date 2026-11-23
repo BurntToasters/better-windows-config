@@ -96,4 +96,110 @@
   <data name="TemplatesNotice" xml:space="preserve">
     <value>Template problems: {0}</value>
   </data>
+  <!-- MSG-031 to MSG-033: the user wording of each template problem code of the engine (BWC wording; classic shows one box at start-up). The key is TemplateProblem plus the code name. A sentence has no semicolon and no equals sign: the list puts it into its help text. -->
+  <data name="TemplateProblemFolderNotFound" xml:space="preserve">
+    <value>A template folder was not found, so no template was read from it.</value>
+  </data>
+  <data name="TemplateProblemReparsePoint" xml:space="preserve">
+    <value>A template file or folder is a link, and links are not followed, so it was skipped.</value>
+  </data>
+  <data name="TemplateProblemFileTooLarge" xml:space="preserve">
+    <value>A template file is larger than the allowed size, so it was skipped.</value>
+  </data>
+  <data name="TemplateProblemFileNameTooLong" xml:space="preserve">
+    <value>A template file name is longer than the allowed length, so the file was skipped.</value>
+  </data>
+  <data name="TemplateProblemUnreadable" xml:space="preserve">
+    <value>A template file could not be read. Check that the file exists and that you can open it.</value>
+  </data>
+  <data name="TemplateProblemMalformedXml" xml:space="preserve">
+    <value>A template file is not well formed XML, so it was left out. Fix the markup of the file.</value>
+  </data>
+  <data name="TemplateProblemDtdProhibited" xml:space="preserve">
+    <value>A template file has a document type declaration, which is not allowed, so it was left out.</value>
+  </data>
+  <data name="TemplateProblemXmlTooDeep" xml:space="preserve">
+    <value>A template file nests its elements too deeply, so it was left out.</value>
+  </data>
+  <data name="TemplateProblemNotATemplate" xml:space="preserve">
+    <value>A file is well formed XML but is not a policy template, so it was left out.</value>
+  </data>
+  <data name="TemplateProblemMissingAdml" xml:space="preserve">
+    <value>A template has no language file for this language or for English, so it was left out.</value>
+  </data>
+  <data name="TemplateProblemDuplicateNamespace" xml:space="preserve">
+    <value>Two template files define the same namespace, so the second one was left out.</value>
+  </data>
+  <data name="TemplateProblemNamespaceShadowed" xml:space="preserve">
+    <value>A template defines a namespace that an earlier template folder already defines, so it was left out.</value>
+  </data>
+  <data name="TemplateProblemNameTooLong" xml:space="preserve">
+    <value>A name, key or value name in a template is longer than the allowed length.</value>
+  </data>
+  <data name="TemplateProblemStringTooLong" xml:space="preserve">
+    <value>A resource string in a template language file is longer than the allowed length.</value>
+  </data>
+  <data name="TemplateProblemMissingAttribute" xml:space="preserve">
+    <value>A template element is missing an attribute or element that it needs. Add the missing part.</value>
+  </data>
+  <data name="TemplateProblemInvalidAttributeValue" xml:space="preserve">
+    <value>A template attribute has a value that cannot be used. Correct the value.</value>
+  </data>
+  <data name="TemplateProblemDuplicatePolicy" xml:space="preserve">
+    <value>A policy name is defined more than once in a template file. Each policy needs a unique name.</value>
+  </data>
+  <data name="TemplateProblemDuplicateCategory" xml:space="preserve">
+    <value>A category name is defined more than once in a template file. Each category needs a unique name.</value>
+  </data>
+  <data name="TemplateProblemDuplicateElement" xml:space="preserve">
+    <value>An element identifier is used more than once in one policy. Each element needs a unique identifier.</value>
+  </data>
+  <data name="TemplateProblemDuplicateSupportedOn" xml:space="preserve">
+    <value>A supported on definition is defined more than once in a template file.</value>
+  </data>
+  <data name="TemplateProblemDuplicateString" xml:space="preserve">
+    <value>A resource string identifier is defined more than once in a template language file.</value>
+  </data>
+  <data name="TemplateProblemDuplicatePresentation" xml:space="preserve">
+    <value>A presentation identifier is defined more than once in a template language file.</value>
+  </data>
+  <data name="TemplateProblemUndefinedString" xml:space="preserve">
+    <value>A template refers to a resource string that its language file does not define.</value>
+  </data>
+  <data name="TemplateProblemUndefinedPresentation" xml:space="preserve">
+    <value>A template refers to a presentation that its language file does not define.</value>
+  </data>
+  <data name="TemplateProblemUndefinedPresentationRef" xml:space="preserve">
+    <value>A presentation control refers to a policy element that the policy does not have.</value>
+  </data>
+  <data name="TemplateProblemUndefinedUsing" xml:space="preserve">
+    <value>A template uses a namespace that no loaded template defines.</value>
+  </data>
+  <data name="TemplateProblemUndefinedPrefix" xml:space="preserve">
+    <value>A template uses a namespace prefix that it does not declare.</value>
+  </data>
+  <data name="TemplateProblemUndefinedCategory" xml:space="preserve">
+    <value>A template refers to a category that does not exist.</value>
+  </data>
+  <data name="TemplateProblemMissingCategory" xml:space="preserve">
+    <value>A policy in a template has no parent category.</value>
+  </data>
+  <data name="TemplateProblemUndefinedSupportedOn" xml:space="preserve">
+    <value>A template refers to a supported on definition that does not exist.</value>
+  </data>
+  <data name="TemplateProblemCategoryCycle" xml:space="preserve">
+    <value>The parent categories of a template form a loop, so the categories cannot be placed.</value>
+  </data>
+  <data name="TemplateProblemInternalError" xml:space="preserve">
+    <value>An unexpected error occurred while a template file was loaded, so the file was left out.</value>
+  </data>
+  <data name="TemplateProblemTooManyFailures" xml:space="preserve">
+    <value>A template file has more problems than are listed. Only the first ones are shown.</value>
+  </data>
+  <data name="TemplateProblemStore" xml:space="preserve">
+    <value>The folder of imported templates cannot be used, so imported templates were not loaded.</value>
+  </data>
+  <data name="TemplateProblemLoadException" xml:space="preserve">
+    <value>An unexpected error stopped the loading of the templates.</value>
+  </data>
 </root>

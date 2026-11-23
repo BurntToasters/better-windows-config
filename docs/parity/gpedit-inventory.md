@@ -295,7 +295,7 @@
 
 | ID | Feature | Oracle source | Package | Status |
 | --- | --- | --- | --- | --- |
-| MSG-001 | gpedit.dll string ids 1 to 15 (15 strings): snap-in and editor titles. | gpedit.dll RT_STRING block 1; parity check: equal 1, differs 0, template 0, absent 14 | A1 | gap |
+| MSG-001 | gpedit.dll string ids 1 to 15 (15 strings): snap-in and editor titles. | gpedit.dll RT_STRING block 1; parity check: equal 1, differs 0, template 0, absent 14 | A1 | declared-difference |
 | MSG-002 | gpedit.dll string ids 16 to 30 (15 strings): RSoP archive and node text. | gpedit.dll RT_STRING block 2; parity check: equal 3, differs 0, template 0, absent 12 | A1 | declared-difference |
 | MSG-003 | gpedit.dll string ids 33 to 47 (15 strings): tree node names and node descriptions. | gpedit.dll RT_STRING block 3; parity check: equal 3, differs 0, template 0, absent 12 | A1 | declared-difference |
 | MSG-004 | gpedit.dll string ids 48 to 63 (16 strings): RSoP status values. | gpedit.dll RT_STRING block 4; parity check: equal 0, differs 0, template 0, absent 16 | A1 | declared-difference |
@@ -317,22 +317,22 @@
 | MSG-020 | gpedit.dll string ids 320 to 330 (6 strings): RSoP wizard help text. | gpedit.dll RT_STRING block 21; parity check: equal 0, differs 0, template 0, absent 6 | A1 | declared-difference |
 | MSG-021 | gpedit.dll string ids 337 to 340 (4 strings): editor window titles. | gpedit.dll RT_STRING block 22; parity check: equal 2, differs 0, template 0, absent 2 | A1 | declared-difference |
 | MSG-022 | admtmpl.dll string ids 4 to 15 (8 strings): list column names and state names. | admtmpl.dll RT_STRING block 1; parity check: equal 6, differs 0, template 0, absent 2 | A1 | declared-difference |
-| MSG-023 | admtmpl.dll string ids 16 to 31 (12 strings): template node text and browse text. | admtmpl.dll RT_STRING block 2; parity check: equal 3, differs 0, template 0, absent 9 | A1 | gap |
-| MSG-024 | admtmpl.dll string ids 32 to 47 (15 strings): template dialog messages. | admtmpl.dll RT_STRING block 3; parity check: equal 0, differs 0, template 0, absent 15 | A1 | gap |
+| MSG-023 | admtmpl.dll string ids 16 to 31 (12 strings): template node text and browse text. | admtmpl.dll RT_STRING block 2; parity check: equal 3, differs 0, template 0, absent 9 | A1 | declared-difference |
+| MSG-024 | admtmpl.dll string ids 32 to 47 (15 strings): template dialog messages. | admtmpl.dll RT_STRING block 3; parity check: equal 0, differs 0, template 0, absent 15 | A1 | declared-difference |
 | MSG-025 | admtmpl.dll string ids 48 to 63 (16 strings): classic template (.adm) parse errors. | admtmpl.dll RT_STRING block 4; parity check: equal 0, differs 0, template 0, absent 16 | A1 | declared-difference |
 | MSG-026 | admtmpl.dll string ids 64 to 73 (7 strings): classic template parse errors (help and client extension). | admtmpl.dll RT_STRING block 5; parity check: equal 0, differs 0, template 0, absent 7 | A1 | declared-difference |
 | MSG-027 | admtmpl.dll string ids 90 to 93 (4 strings): error follow-up text. | admtmpl.dll RT_STRING block 6; parity check: equal 0, differs 0, template 0, absent 4 | A1 | declared-difference |
-| MSG-028 | admtmpl.dll string ids 100 to 105 (6 strings): input validation messages. | admtmpl.dll RT_STRING block 7; parity check: equal 0, differs 0, template 0, absent 6 | A1 | gap |
-| MSG-029 | admtmpl.dll string ids 236 to 237 (2 strings): template administration text. | admtmpl.dll RT_STRING block 15; parity check: equal 0, differs 0, template 0, absent 2 | A1 | gap |
+| MSG-028 | admtmpl.dll string ids 100 to 105 (6 strings): input validation messages. | admtmpl.dll RT_STRING block 7; parity check: equal 0, differs 0, template 0, absent 6 | A1 | declared-difference |
+| MSG-029 | admtmpl.dll string ids 236 to 237 (2 strings): template administration text. | admtmpl.dll RT_STRING block 15; parity check: equal 0, differs 0, template 0, absent 2 | A1 | declared-difference |
 | MSG-030 | admtmpl.dll string ids 240 to 250 (8 strings): registry value display text. | admtmpl.dll RT_STRING block 16; parity check: equal 0, differs 0, template 0, absent 8 | A1 | declared-difference |
-| MSG-031 | admtmpl.dll string ids 300 to 303 (4 strings): template file error text. | admtmpl.dll RT_STRING block 19; parity check: equal 0, differs 0, template 1, absent 3 | G6 | gap |
-| MSG-032 | admtmpl.dll string ids 304 to 319 (13 strings): template element error text. | admtmpl.dll RT_STRING block 20; parity check: equal 0, differs 0, template 3, absent 10 | G6 | gap |
-| MSG-033 | admtmpl.dll string ids 320 to 330 (11 strings): template resource error text. | admtmpl.dll RT_STRING block 21; parity check: equal 0, differs 0, template 1, absent 10 | G6 | gap |
+| MSG-031 | admtmpl.dll string ids 300 to 303 (4 strings): template file error text. | admtmpl.dll RT_STRING block 19; parity check: equal 0, differs 0, template 1, absent 3 | G6 | pass |
+| MSG-032 | admtmpl.dll string ids 304 to 319 (13 strings): template element error text. | admtmpl.dll RT_STRING block 20; parity check: equal 0, differs 0, template 3, absent 10 | G6 | pass |
+| MSG-033 | admtmpl.dll string ids 320 to 330 (11 strings): template resource error text. | admtmpl.dll RT_STRING block 21; parity check: equal 0, differs 0, template 1, absent 10 | G6 | pass |
 | MSG-034 | admtmpl.dll string ids 2000 to 2003 (4 strings): comment column values and the path column name. | admtmpl.dll RT_STRING block 126; parity check: equal 4, differs 0, template 0, absent 0 | G1 | pass |
 | MSG-035 | admtmpl.dll string ids 3000 to 3005 (6 strings): filter combo values and keyword match modes. | admtmpl.dll RT_STRING block 188; parity check: equal 2, differs 0, template 0, absent 4 | G5 | pass |
 | MSG-036 | admtmpl.dll string ids 3100 to 3103 (4 strings): filter menu text. | admtmpl.dll RT_STRING block 194; parity check: equal 0, differs 0, template 0, absent 4 | G5 | pass |
-| MSG-037 | admtmpl.dll string ids 3104 to 3119 (6 strings): re-apply filter text and filter status text. | admtmpl.dll RT_STRING block 195; parity check: equal 1, differs 0, template 0, absent 5 | G5 | gap |
-| MSG-038 | admtmpl.dll string ids 3120 to 3127 (8 strings): filter requirement text and messages. | admtmpl.dll RT_STRING block 196; parity check: equal 0, differs 0, template 3, absent 5 | G5 | gap |
+| MSG-037 | admtmpl.dll string ids 3104 to 3119 (6 strings): re-apply filter text and filter status text. | admtmpl.dll RT_STRING block 195; parity check: equal 1, differs 0, template 0, absent 5 | G5 | declared-difference |
+| MSG-038 | admtmpl.dll string ids 3120 to 3127 (8 strings): filter requirement text and messages. | admtmpl.dll RT_STRING block 196; parity check: equal 0, differs 0, template 3, absent 5 | G5 | declared-difference |
 | MSG-039 | mmc.exe string ids 128 to 134 (7 strings): console titles. | mmc.exe RT_STRING block 9; parity check: equal 1, differs 0, template 0, absent 6 | A1 | declared-difference |
 | MSG-040 | mmc.exe string ids 208 to 210 (3 strings): window button names. | mmc.exe RT_STRING block 14; parity check: equal 0, differs 0, template 0, absent 3 | A1 | declared-difference |
 | MSG-041 | mmcndmgr.dll string ids 7001 to 7007 (7 strings): progress text. | mmcndmgr.dll RT_STRING block 438; parity check: equal 0, differs 0, template 3, absent 4 | A1 | declared-difference |
@@ -344,7 +344,7 @@
 | MSG-047 | mmcbase.dll string ids 181 to 187 (5 strings): default names of new items. | mmcbase.dll RT_STRING block 12; parity check: equal 0, differs 0, template 0, absent 5 | A1 | declared-difference |
 | MSG-048 | mmcbase.dll string ids 213 to 214 (2 strings): taskpad category names. | mmcbase.dll RT_STRING block 14; parity check: equal 0, differs 0, template 0, absent 2 | A1 | declared-difference |
 | MSG-049 | mmcbase.dll string ids 1008 to 1008 (1 strings): icon file filter. | mmcbase.dll RT_STRING block 64; parity check: equal 0, differs 0, template 0, absent 1 | A1 | declared-difference |
-| MSG-050 | mmcbase.dll string ids 12000 to 12015 (16 strings): snap-in error text and menu help text. | mmcbase.dll RT_STRING block 751; parity check: equal 1, differs 0, template 0, absent 15 | A1 | gap |
+| MSG-050 | mmcbase.dll string ids 12000 to 12015 (16 strings): snap-in error text and menu help text. | mmcbase.dll RT_STRING block 751; parity check: equal 1, differs 0, template 0, absent 15 | A1 | declared-difference |
 | MSG-051 | mmcbase.dll string ids 12016 to 12021 (6 strings): error text. | mmcbase.dll RT_STRING block 752; parity check: equal 0, differs 0, template 1, absent 5 | A1 | declared-difference |
 | MSG-052 | mmcbase.dll string ids 12804 to 12813 (3 strings): Help menu item help text. | mmcbase.dll RT_STRING block 801; parity check: equal 0, differs 0, template 0, absent 3 | A1 | declared-difference |
 | MSG-053 | mmcbase.dll string ids 13201 to 13201 (1 strings): snap-in management help text. | mmcbase.dll RT_STRING block 826; parity check: equal 0, differs 0, template 0, absent 1 | A1 | declared-difference |
@@ -353,12 +353,12 @@
 | MSG-056 | mmcbase.dll string ids 13300 to 13311 (12 strings): console file messages. | mmcbase.dll RT_STRING block 832; parity check: equal 0, differs 0, template 0, absent 12 | A1 | declared-difference |
 | MSG-057 | mmcbase.dll string ids 13312 to 13327 (15 strings): view creation messages. | mmcbase.dll RT_STRING block 833; parity check: equal 0, differs 0, template 0, absent 15 | A1 | declared-difference |
 | MSG-058 | mmcbase.dll string ids 13328 to 13343 (16 strings): Window menu help text. | mmcbase.dll RT_STRING block 834; parity check: equal 0, differs 0, template 0, absent 16 | A1 | declared-difference |
-| MSG-059 | mmcbase.dll string ids 13344 to 13359 (16 strings): console file write errors. | mmcbase.dll RT_STRING block 835; parity check: equal 0, differs 0, template 0, absent 16 | A1 | gap |
+| MSG-059 | mmcbase.dll string ids 13344 to 13359 (16 strings): console file write errors. | mmcbase.dll RT_STRING block 835; parity check: equal 0, differs 0, template 0, absent 16 | A1 | declared-difference |
 | MSG-060 | mmcbase.dll string ids 13360 to 13375 (4 strings): console file open errors. | mmcbase.dll RT_STRING block 836; parity check: equal 0, differs 0, template 0, absent 4 | A1 | declared-difference |
 | MSG-061 | mmcbase.dll string ids 13376 to 13391 (16 strings): snap-in management messages. | mmcbase.dll RT_STRING block 837; parity check: equal 0, differs 0, template 0, absent 16 | A1 | declared-difference |
-| MSG-062 | mmcbase.dll string ids 13392 to 13406 (15 strings): toolbar button names. | mmcbase.dll RT_STRING block 838; parity check: equal 0, differs 0, template 0, absent 15 | A1 | gap |
+| MSG-062 | mmcbase.dll string ids 13392 to 13406 (15 strings): toolbar button names. | mmcbase.dll RT_STRING block 838; parity check: equal 0, differs 0, template 0, absent 15 | A1 | declared-difference |
 | MSG-063 | mmcbase.dll string ids 13408 to 13423 (16 strings): list and column messages. | mmcbase.dll RT_STRING block 839; parity check: equal 1, differs 0, template 0, absent 15 | A1 | declared-difference |
-| MSG-064 | mmcbase.dll string ids 13424 to 13439 (12 strings): size unit text. | mmcbase.dll RT_STRING block 840; parity check: equal 1, differs 0, template 0, absent 11 | A1 | gap |
+| MSG-064 | mmcbase.dll string ids 13424 to 13439 (12 strings): size unit text. | mmcbase.dll RT_STRING block 840; parity check: equal 1, differs 0, template 0, absent 11 | A1 | declared-difference |
 | MSG-065 | mmcbase.dll string ids 13440 to 13455 (16 strings): menu item names. | mmcbase.dll RT_STRING block 841; parity check: equal 2, differs 0, template 0, absent 14 | A1 | declared-difference |
 | MSG-066 | mmcbase.dll string ids 13456 to 13460 (5 strings): Edit menu help text. | mmcbase.dll RT_STRING block 842; parity check: equal 0, differs 0, template 0, absent 5 | A1 | declared-difference |
 | MSG-067 | mmcbase.dll string ids 14000 to 14015 (16 strings): View and Properties menu help text. | mmcbase.dll RT_STRING block 876; parity check: equal 0, differs 0, template 0, absent 16 | A1 | declared-difference |
@@ -385,9 +385,9 @@
 | MSG-088 | mmcbase.dll string ids 61184 to 61190 (7 strings): system menu help text. | mmcbase.dll RT_STRING block 3825; parity check: equal 0, differs 0, template 0, absent 7 | A1 | declared-difference |
 | MSG-089 | mmcbase.dll string ids 61202 to 61215 (3 strings): system menu help text, restore and task list. | mmcbase.dll RT_STRING block 3826; parity check: equal 0, differs 0, template 0, absent 3 | A1 | declared-difference |
 | MSG-090 | mmcbase.dll string ids 61445 to 61445 (1 strings): print preview help text. | mmcbase.dll RT_STRING block 3841; parity check: equal 0, differs 0, template 0, absent 1 | A1 | declared-difference |
-| MSG-091 | Managed resource file Editor.resources (322 entries): setting dialog form texts, sizes and anchors. | gpedit-forms.json Microsoft.GroupPolicy.AdmTmplEditor.Editor.resources | G3a, G3b | gap |
-| MSG-092 | Managed resource file ListBoxDialog.resources (56 entries): setting dialog form texts, sizes and anchors. | gpedit-forms.json Microsoft.GroupPolicy.AdmTmplEditor.ListBoxDialog.resources | G3a, G3b | gap |
-| MSG-093 | Managed resource file resources (22 entries): setting dialog form texts, sizes and anchors. | gpedit-forms.json Microsoft.GroupPolicy.AdmTmplEditor.resources | G3a, G3b | gap |
+| MSG-091 | Managed resource file Editor.resources (322 entries): setting dialog form texts, sizes and anchors. | gpedit-forms.json Microsoft.GroupPolicy.AdmTmplEditor.Editor.resources | G3a, G3b | declared-difference |
+| MSG-092 | Managed resource file ListBoxDialog.resources (56 entries): setting dialog form texts, sizes and anchors. | gpedit-forms.json Microsoft.GroupPolicy.AdmTmplEditor.ListBoxDialog.resources | G3a, G3b | pass |
+| MSG-093 | Managed resource file resources (22 entries): setting dialog form texts, sizes and anchors. | gpedit-forms.json Microsoft.GroupPolicy.AdmTmplEditor.resources | G3a, G3b | pass |
 
 ### 2.7 VIEW: layout and density
 

@@ -13,17 +13,28 @@
  *            docs/parity/oracle/gpedit/string-parity.json. Ids are qualified by module, "admtmpl.dll.mui:123".
  *            Citation in a resw comment: "Oracle admtmpl.dll.mui:123" (a list may follow the colon).
  *            Compared: every Strings/en-US/*.resw under src/Bwc.Gpedit, src/Bwc.Gpedit.Editor and src/Bwc.UI/Console
- *            (none need exist), and the C# literals under those folders.
+ *            (none need exist), src/Bwc.UI/Strings/en-US/Console.resw (the console frame), and the C# literals under
+ *            those folders.
  *
  * The dumps are untracked (written by `npm run oracle -- [--tool gpedit] --only resources`). When a tool's dump is
  * absent (CI, a fresh clone) the script prints a skip note for it and exits 0.
  *
+ * The folded comparisons apply to gpedit only; the regedit comparison is exact, so its tracked file stays as it is.
+ *
  * Status per id:
  *   template  the text has %%u or %1!...! tokens, which are not compared.
  *   equal     the text (with %1 and %2 turned into {0} and {1}) is the value of a resw entry that the oracle cites, or
- *             of any resw entry, or appears as a C# string literal in the compared sources.
+ *             of any resw entry, or appears as a C# string literal in the compared sources. Failing that, the folded
+ *             forms are compared (see fold below): access keys (&), a trailing ellipsis, and for a classic string that
+ *             holds a help line or tooltip copy after one newline, the label before it. A citing comment that ends
+ *             "with <module>:<id>" also lets a classic "%s" stand for the text of that other id (the classic string is
+ *             a format; BWC stores the composed text).
  *   differs   a resw entry whose comment cites the id has other text.
  *   absent    none of the above.
+ *
+ * The gpedit tool also reads docs/parity/oracle/gpedit/gpedit-forms.json (untracked, the managed resources of the
+ * setting dialog): every string entry of the main assembly's resource files that is a text (not designer metadata) gets
+ * the id "forms:<resource file>:<entry name>" and is compared with the same rules, without citations.
  *
  * Tracked output holds ids and statuses only, sorted by id, with no text and no timestamp. Written to a temporary file
  * and renamed into place.
@@ -39,6 +50,10 @@ const SKIPPED_DIRECTORIES = new Set(["bin", "obj", "node_modules"]);
 // The gpedit projects whose strings and C# literals are compared, relative to the repository root.
 const GPEDIT_ROOTS = ["src/Bwc.Gpedit", "src/Bwc.Gpedit.Editor", "src/Bwc.UI/Console"];
 
+// The console frame's strings live in Bwc.UI beside the Registry Editor's Resources.resw, outside GPEDIT_ROOTS, so the
+// file is named here. The Registry Editor's own resw files are not compared for gpedit.
+const GPEDIT_EXTRA_RESW = ["src/Bwc.UI/Strings/en-US/Console.resw"];
+
 const XML_ENTITIES = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
 
 const TOOLS = {
@@ -52,20 +67,24 @@ const TOOLS = {
     compared: () => ["src/Bwc.Regedit/Strings/en-US/Resources.resw", "src/Bwc.UI/Strings/en-US/Resources.resw", "src/**/*.cs (excluding bin and obj)"],
     source: "regedit.exe RT_STRING ids (untracked dump, regedit-resources.json)",
     qualified: false,
+    folded: false,
     readOracleStrings: readRegeditStrings,
   },
   gpedit: {
     dump: path.join("docs", "parity", "oracle", "gpedit", "gpedit-resources.json"),
     out: path.join("docs", "parity", "oracle", "gpedit", "string-parity.json"),
     skipHint: "npm run oracle -- --tool gpedit --only resources",
-    reswFiles: () => findReswFiles(GPEDIT_ROOTS),
+    reswFiles: () => [...findReswFiles(GPEDIT_ROOTS), ...GPEDIT_EXTRA_RESW].sort(),
     sourceRoots: GPEDIT_ROOTS.map((root) => path.join(ROOT, root)),
     compared: () => [
       ...GPEDIT_ROOTS.map((root) => `${root}/**/Strings/en-US/*.resw`),
+      ...GPEDIT_EXTRA_RESW,
       ...GPEDIT_ROOTS.map((root) => `${root}/**/*.cs (excluding bin and obj)`),
     ],
     source: "gpedit RT_STRING ids by module (untracked dump, gpedit-resources.json)",
     qualified: true,
+    folded: true,
+    formsDump: path.join("docs", "parity", "oracle", "gpedit", "gpedit-forms.json"),
     readOracleStrings: readGpeditStrings,
   },
 };
@@ -139,6 +158,39 @@ function readGpeditStrings(dump) {
 
   if (byKey.size === 0) {
     throw new Error("gpedit-resources.json has no RT_STRING entries.");
+  }
+  return byKey;
+}
+
+// The texts of the managed resource files of the main assembly in gpedit-forms.json, keyed "forms:<file>:<entry>" with the
+// file name short ("Editor.resources"). Designer metadata (names starting ">>", booleans) is not a text. A dump without
+// resourceFiles contributes nothing; one with a malformed entry throws.
+function readFormsStrings(forms) {
+  const byKey = new Map();
+  if (!Array.isArray(forms.resourceFiles)) {
+    return byKey;
+  }
+  const assemblies = new Map((forms.assemblies ?? []).map((assembly) => [assembly.assembly, assembly.role]));
+  for (const file of forms.resourceFiles) {
+    if (assemblies.get(file.assembly) !== "main") {
+      continue;
+    }
+    const shortName = String(file.name).slice(String(file.assembly).length + 1);
+    for (const entry of file.entries ?? []) {
+      if (typeof entry.name !== "string") {
+        throw new Error(`a resource entry of ${file.name} has no name.`);
+      }
+      if (entry.kind !== "string" || entry.name.startsWith(">>") || typeof entry.value !== "string") {
+        continue;
+      }
+      if (entry.value.trim().length === 0 || entry.value === "true" || entry.value === "false") {
+        continue;
+      }
+      const key = `forms:${shortName}:${entry.name}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, entry.value);
+      }
+    }
   }
   return byKey;
 }
@@ -251,15 +303,52 @@ function csharpLiteral(text) {
   return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
-function statusOf(id, text, resw, citedBy, sources) {
+// The comparable form of a text: access keys removed ("&&" is a literal ampersand and stays one) and a trailing
+// ellipsis (three dots or U+2026) removed.
+function fold(text) {
+  return text
+    .replace(/&&/g, "\u0000")
+    .replace(/&/g, "")
+    .replace(/\u0000/g, "&")
+    .replace(/(?:\.{3}|…)\s*$/, "");
+}
+
+// The label of a classic string that holds one help line or tooltip copy after a single newline ("Name\nHelp text").
+// A message of several paragraphs, or a first line that ends a sentence, has no label part and keeps its whole text.
+function labelPart(text) {
+  const lines = text.split("\n");
+  if (lines.length === 2 && lines[0].length > 0 && lines[1].length > 0 && !/[.:!?]\s*$/.test(lines[0])) {
+    return lines[0];
+  }
+  return text;
+}
+
+// The classic text with a "%s" completed by the text of the id a citing comment names after "with" (a format string
+// whose argument BWC stores inside its own text).
+function composedTexts(text, entry, oracle, qualified) {
+  if (!qualified || !text.includes("%s")) {
+    return [];
+  }
+  const match = /\bwith\s+([A-Za-z0-9_.\-]+:\d+)/.exec(entry.comment);
+  const other = match ? oracle.get(match[1]) : undefined;
+  return other === undefined ? [] : [normalizeLines(text.replace("%s", () => other))];
+}
+
+function statusOf(id, text, context) {
+  const { resw, citedBy, sources, oracle, qualified, folded } = context;
   if (text.includes("%%") || /%\d+!/.test(text)) {
     return "template";
   }
 
   const expected = normalizeLines(text.replace(/%(\d)/g, (_, n) => `{${Number(n) - 1}}`));
+  const foldedExpected = folded ? fold(labelPart(expected)) : "";
   const cited = citedBy.get(id) ?? [];
   if (cited.length > 0) {
-    return cited.some((entry) => entry.value === expected) ? "equal" : "differs";
+    const matches = (entry) =>
+      entry.value === expected ||
+      (folded && composedTexts(text, entry, oracle, qualified).some((composed) => entry.value === composed)) ||
+      (foldedExpected.length > 0 && fold(entry.value) === foldedExpected);
+    return cited.some(matches) ? "equal" : "differs";
   }
 
   if (expected.length === 0) {
@@ -277,6 +366,10 @@ function statusOf(id, text, resw, citedBy, sources) {
     }
   }
 
+  if (foldedExpected.length > 0 && resw.some((entry) => fold(entry.value) === foldedExpected)) {
+    return "equal";
+  }
+
   return "absent";
 }
 
@@ -284,6 +377,14 @@ function statusOf(id, text, resw, citedBy, sources) {
 function compareKeys(a, b) {
   if (typeof a === "number" && typeof b === "number") {
     return a - b;
+  }
+  const formA = String(a).startsWith("forms:");
+  const formB = String(b).startsWith("forms:");
+  if (formA || formB) {
+    if (formA && formB) {
+      return a < b ? -1 : a > b ? 1 : 0;
+    }
+    return formA ? 1 : -1;
   }
   const [moduleA, idA] = String(a).split(/:(?=\d+$)/);
   const [moduleB, idB] = String(b).split(/:(?=\d+$)/);
@@ -311,6 +412,14 @@ function checkTool(name) {
 
   const dump = JSON.parse(fs.readFileSync(dumpPath, "utf8"));
   const oracle = tool.readOracleStrings(dump);
+  if (tool.formsDump) {
+    const formsPath = path.join(ROOT, tool.formsDump);
+    if (fs.existsSync(formsPath)) {
+      for (const [key, text] of readFormsStrings(JSON.parse(fs.readFileSync(formsPath, "utf8")))) {
+        oracle.set(key, text);
+      }
+    }
+  }
   const reswFiles = tool.reswFiles();
   const resw = readResw(reswFiles);
   const citedBy = new Map();
@@ -325,7 +434,7 @@ function checkTool(name) {
   const sources = readCSharpSources(tool.sourceRoots);
 
   const keys = [...oracle.keys()].sort(compareKeys);
-  const strings = keys.map((id) => ({ id, status: statusOf(id, oracle.get(id), resw, citedBy, sources) }));
+  const strings = keys.map((id) => ({ id, status: statusOf(id, oracle.get(id), { resw, citedBy, sources, oracle, qualified: tool.qualified, folded: tool.folded }) }));
   const counts = { equal: 0, differs: 0, template: 0, absent: 0 };
   for (const s of strings) {
     counts[s.status] += 1;

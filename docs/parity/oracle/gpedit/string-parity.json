@@ -6,15 +6,16 @@
     "src/Bwc.Gpedit/**/Strings/en-US/*.resw",
     "src/Bwc.Gpedit.Editor/**/Strings/en-US/*.resw",
     "src/Bwc.UI/Console/**/Strings/en-US/*.resw",
+    "src/Bwc.UI/Strings/en-US/Console.resw",
     "src/Bwc.Gpedit/**/*.cs (excluding bin and obj)",
     "src/Bwc.Gpedit.Editor/**/*.cs (excluding bin and obj)",
     "src/Bwc.UI/Console/**/*.cs (excluding bin and obj)"
   ],
   "counts": {
-    "equal": 140,
-    "differs": 2,
+    "equal": 269,
+    "differs": 0,
     "template": 32,
-    "absent": 2010
+    "absent": 1925
   },
   "strings": [
     {
@@ -67,7 +68,7 @@
     },
     {
       "id": "admtmpl.dll:22",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:23",
@@ -291,7 +292,7 @@
     },
     {
       "id": "admtmpl.dll:236",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:237",
@@ -499,11 +500,11 @@
     },
     {
       "id": "admtmpl.dll:3104",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3105",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3106",
@@ -527,15 +528,15 @@
     },
     {
       "id": "admtmpl.dll:3121",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3122",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3123",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll:3124",
@@ -603,7 +604,7 @@
     },
     {
       "id": "admtmpl.dll.mui:22",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:23",
@@ -827,7 +828,7 @@
     },
     {
       "id": "admtmpl.dll.mui:236",
-      "status": "differs"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:237",
@@ -1035,11 +1036,11 @@
     },
     {
       "id": "admtmpl.dll.mui:3104",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3105",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3106",
@@ -1063,15 +1064,15 @@
     },
     {
       "id": "admtmpl.dll.mui:3121",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3122",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3123",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "admtmpl.dll.mui:3124",
@@ -1695,7 +1696,7 @@
     },
     {
       "id": "gpedit.dll:165",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll:166",
@@ -2167,7 +2168,7 @@
     },
     {
       "id": "gpedit.dll.mui:9",
-      "status": "differs"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll.mui:10",
@@ -2739,7 +2740,7 @@
     },
     {
       "id": "gpedit.dll.mui:165",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "gpedit.dll.mui:166",
@@ -3359,23 +3360,23 @@
     },
     {
       "id": "mmcbase.dll:12001",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:12002",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:12003",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:12004",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:12005",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:12006",
@@ -3383,15 +3384,15 @@
     },
     {
       "id": "mmcbase.dll:12007",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:12008",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:12009",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:12010",
@@ -3443,7 +3444,7 @@
     },
     {
       "id": "mmcbase.dll:12804",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:12811",
@@ -3643,7 +3644,7 @@
     },
     {
       "id": "mmcbase.dll:13343",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13344",
@@ -3735,11 +3736,11 @@
     },
     {
       "id": "mmcbase.dll:13378",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13379",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13380",
@@ -3763,19 +3764,19 @@
     },
     {
       "id": "mmcbase.dll:13385",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13386",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13387",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13388",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13389",
@@ -3791,11 +3792,11 @@
     },
     {
       "id": "mmcbase.dll:13392",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13393",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13394",
@@ -3803,7 +3804,7 @@
     },
     {
       "id": "mmcbase.dll:13395",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13396",
@@ -3811,11 +3812,11 @@
     },
     {
       "id": "mmcbase.dll:13397",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13398",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13399",
@@ -3823,7 +3824,7 @@
     },
     {
       "id": "mmcbase.dll:13400",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13401",
@@ -3939,7 +3940,7 @@
     },
     {
       "id": "mmcbase.dll:13434",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13435",
@@ -3947,7 +3948,7 @@
     },
     {
       "id": "mmcbase.dll:13436",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:13437",
@@ -4047,7 +4048,7 @@
     },
     {
       "id": "mmcbase.dll:14000",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14001",
@@ -4099,7 +4100,7 @@
     },
     {
       "id": "mmcbase.dll:14013",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14014",
@@ -4171,7 +4172,7 @@
     },
     {
       "id": "mmcbase.dll:14032",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14033",
@@ -4227,7 +4228,7 @@
     },
     {
       "id": "mmcbase.dll:14046",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14047",
@@ -4259,7 +4260,7 @@
     },
     {
       "id": "mmcbase.dll:14054",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14055",
@@ -4279,7 +4280,7 @@
     },
     {
       "id": "mmcbase.dll:14059",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14060",
@@ -4303,11 +4304,11 @@
     },
     {
       "id": "mmcbase.dll:14065",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14066",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14067",
@@ -4687,7 +4688,7 @@
     },
     {
       "id": "mmcbase.dll:14170",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14171",
@@ -4707,7 +4708,7 @@
     },
     {
       "id": "mmcbase.dll:14175",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:14176",
@@ -4727,7 +4728,7 @@
     },
     {
       "id": "mmcbase.dll:14180",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:57344",
@@ -4895,7 +4896,7 @@
     },
     {
       "id": "mmcbase.dll:57654",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll:57664",
@@ -5091,23 +5092,23 @@
     },
     {
       "id": "mmcbase.dll.mui:12001",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:12002",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:12003",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:12004",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:12005",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:12006",
@@ -5115,15 +5116,15 @@
     },
     {
       "id": "mmcbase.dll.mui:12007",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:12008",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:12009",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:12010",
@@ -5175,7 +5176,7 @@
     },
     {
       "id": "mmcbase.dll.mui:12804",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:12811",
@@ -5375,7 +5376,7 @@
     },
     {
       "id": "mmcbase.dll.mui:13343",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13344",
@@ -5467,11 +5468,11 @@
     },
     {
       "id": "mmcbase.dll.mui:13378",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13379",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13380",
@@ -5495,19 +5496,19 @@
     },
     {
       "id": "mmcbase.dll.mui:13385",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13386",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13387",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13388",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13389",
@@ -5523,11 +5524,11 @@
     },
     {
       "id": "mmcbase.dll.mui:13392",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13393",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13394",
@@ -5535,7 +5536,7 @@
     },
     {
       "id": "mmcbase.dll.mui:13395",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13396",
@@ -5543,11 +5544,11 @@
     },
     {
       "id": "mmcbase.dll.mui:13397",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13398",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13399",
@@ -5555,7 +5556,7 @@
     },
     {
       "id": "mmcbase.dll.mui:13400",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13401",
@@ -5671,7 +5672,7 @@
     },
     {
       "id": "mmcbase.dll.mui:13434",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13435",
@@ -5679,7 +5680,7 @@
     },
     {
       "id": "mmcbase.dll.mui:13436",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:13437",
@@ -5779,7 +5780,7 @@
     },
     {
       "id": "mmcbase.dll.mui:14000",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14001",
@@ -5831,7 +5832,7 @@
     },
     {
       "id": "mmcbase.dll.mui:14013",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14014",
@@ -5903,7 +5904,7 @@
     },
     {
       "id": "mmcbase.dll.mui:14032",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14033",
@@ -5959,7 +5960,7 @@
     },
     {
       "id": "mmcbase.dll.mui:14046",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14047",
@@ -5991,7 +5992,7 @@
     },
     {
       "id": "mmcbase.dll.mui:14054",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14055",
@@ -6011,7 +6012,7 @@
     },
     {
       "id": "mmcbase.dll.mui:14059",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14060",
@@ -6035,11 +6036,11 @@
     },
     {
       "id": "mmcbase.dll.mui:14065",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14066",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14067",
@@ -6419,7 +6420,7 @@
     },
     {
       "id": "mmcbase.dll.mui:14170",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14171",
@@ -6439,7 +6440,7 @@
     },
     {
       "id": "mmcbase.dll.mui:14175",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:14176",
@@ -6459,7 +6460,7 @@
     },
     {
       "id": "mmcbase.dll.mui:14180",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:57344",
@@ -6627,7 +6628,7 @@
     },
     {
       "id": "mmcbase.dll.mui:57654",
-      "status": "absent"
+      "status": "equal"
     },
     {
       "id": "mmcbase.dll.mui:57664",
@@ -8752,6 +8753,174 @@
     {
       "id": "mmcndmgr.dll.mui:30267",
       "status": "absent"
+    },
+    {
+      "id": "forms:Editor.resources:buttonApply.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:buttonCancel.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:buttonNext.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:buttonOK.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:buttonPrevious.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:label1.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:label2.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:labelComment.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:labelSupportedOn.AccessibleName",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:labelSupportedOn.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:labelSupportedOnText.AccessibleDescription",
+      "status": "absent"
+    },
+    {
+      "id": "forms:Editor.resources:labelSupportedOnText.AccessibleName",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:radioButtonDisabled.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:radioButtonEnabled.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:radioButtonNotConfigured.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:Editor.resources:textBoxComment.AccessibleDescription",
+      "status": "absent"
+    },
+    {
+      "id": "forms:Editor.resources:textBoxComment.AccessibleName",
+      "status": "equal"
+    },
+    {
+      "id": "forms:ListBoxDialog.resources:$this.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:ListBoxDialog.resources:buttonCancel.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:ListBoxDialog.resources:buttonOK.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:Generic.MessageBox.Caption",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:ListBoxControl.ShowButton.Label",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:ListBoxControl.Validate.Caption",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:ListBoxControl.Validate.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:ListBoxDialog.Column.Value",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:ListBoxDialog.Column.ValueName",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:ListBoxDialog.Validate.Caption",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:ListBoxDialog.Validate.DuplicateName",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:ListBoxDialog.Validate.DuplicateValue",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:ListBoxDialog.Validate.EmptyName",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:ListBoxDialog.Validate.EmptyValue",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:MultiTextBoxControl.Validate.Count.Caption",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:MultiTextBoxControl.Validate.Count.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:MultiTextBoxControl.Validate.Empty.Caption",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:MultiTextBoxControl.Validate.Empty.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:MultiTextBoxControl.Validate.Length.Caption",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:MultiTextBoxControl.Validate.Length.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:NumericControl.Validate.Caption",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:NumericControl.Validate.Max.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:NumericControl.Validate.Min.Text",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:SettingControl.Validate.Caption",
+      "status": "equal"
+    },
+    {
+      "id": "forms:resources:SettingControl.Validate.Text",
+      "status": "equal"
     }
   ]
 }

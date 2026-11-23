@@ -96,6 +96,9 @@ public sealed class GpeditTemplatesLoadErrorTests
         {
             ProblemRow? row = problems.FirstOrDefault(p => p.Name.StartsWith("Bwc" + name, StringComparison.Ordinal));
             checks.Record("list." + name, row is not null && row.Code == code, $"expected a row for Bwc{name} with {code}; problems={problems.Describe()}.");
+
+            // MSG-031 to MSG-033: the row shows a sentence for the code (the code stays as a detail), not the bare code.
+            checks.Record("sentence." + name, row is not null && row.ShowsSentenceFor(code), $"expected the sentence key TemplateProblem{code} for Bwc{name}; row={row?.SentenceKey}/'{row?.Sentence}'.");
         }
 
         checks.Record("list.storeEmpty", dialog.Rows().Count == 0, $"imported templates={dialog.Rows().Describe()}; the problems are not imports.");
@@ -151,6 +154,7 @@ public sealed class GpeditTemplatesLoadErrorTests
         List<ProblemRow> problems = dialog.Problems();
         checks.Record("list.count", problems.Count == 1, $"problems={problems.Describe()}.");
         checks.Record("list.code", problems.Count == 1 && problems[0].Code == "UndefinedUsing" && problems[0].Name.StartsWith("BwcUndefinedUsing", StringComparison.Ordinal), $"problems={problems.Describe()}.");
+        checks.Record("list.sentence", problems.Count == 1 && problems[0].ShowsSentenceFor("UndefinedUsing"), $"problems={problems.Describe()}; sentence='{problems.FirstOrDefault()?.Sentence}'.");
         checks.Record("list.detail", problems.Count == 1 && problems[0].Detail.Contains("Ghost", StringComparison.Ordinal), $"detail='{problems.FirstOrDefault()?.Detail}'.");
         _ = dialog.Close();
 
@@ -190,6 +194,7 @@ public sealed class GpeditTemplatesLoadErrorTests
         {
             ProblemRow? row = problems.FirstOrDefault(p => p.Name.StartsWith("Bwc" + name, StringComparison.Ordinal));
             checks.Record("list." + name, row is { Code: "InvalidAttributeValue" }, $"expected a row for Bwc{name} with InvalidAttributeValue; problems={problems.Describe()}.");
+            checks.Record("sentence." + name, row is not null && row.ShowsSentenceFor("InvalidAttributeValue"), $"expected the sentence key TemplateProblemInvalidAttributeValue for Bwc{name}; row={row?.SentenceKey}/'{row?.Sentence}'.");
         }
 
         _ = dialog.Close();
