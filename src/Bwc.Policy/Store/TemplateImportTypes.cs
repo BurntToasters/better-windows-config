@@ -61,6 +61,19 @@ public enum TemplateImportProblemCode
 
     /// <summary>Another imported template uses the namespace. The detail is the dependent file.</summary>
     UsedByTemplate,
+
+    /// <summary>The source folder holds more ADMX files than the cap (template-store.md, I6). Not raised yet.</summary>
+    SourceFolderTooLarge,
+}
+
+/// <summary>The points of a check that a test can observe (docs/failure-modes/template-store.md, I8).</summary>
+internal enum TemplateImportStage
+{
+    /// <summary>The chosen ADMX was read and the load of the source folder has not started.</summary>
+    AdmxRead,
+
+    /// <summary>The load of the source folder returned and no later read has started.</summary>
+    Loaded,
 }
 
 /// <summary>One problem of an import or a removal.</summary>

@@ -23,6 +23,15 @@ public sealed class TemplateImport
         this.sources = sources;
     }
 
+    /// <summary>
+    /// Test seam (docs/failure-modes/template-store.md, I8). The observer gets AdmxRead right after the chosen
+    /// ADMX was read and Loaded right after the templates loaded. Stub: written by the G6 tests-first pass.
+    /// </summary>
+    internal TemplateImport(TemplateSources sources, Action<TemplateImportStage> observer)
+    {
+        throw new NotImplementedException("G6 C: the import stage observer (failure mode I8).");
+    }
+
     /// <summary>Checks a template without writing anything.</summary>
     /// <param name="admxPath">The chosen ADMX file.</param>
     /// <param name="uiCulture">The UI culture name, or null for en-US.</param>
