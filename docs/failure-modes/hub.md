@@ -322,6 +322,17 @@ so before the click, and it has a plain sentence for each new failure code of `u
 | UD6 | A check or download that fails with one of the four codes shows the generic "could not be verified" sentence | A misleading reason | `FriendlyFailureKey` maps the four codes to their own `UpdateFail*` sentences. Code review of the switch and the resource keys (only the apply path produces these codes, so no check or download run reaches them) |
 | UD7 | Any other unknown code | A blank or technical text | Unchanged: the generic sentence (`UpdateResultNotInstalled`, `UpdateFailGeneric`) |
 
+## Release notes link (UPD-1)
+
+The Update Available window opens the manifest's release notes link with the shell when the user presses the notes
+button. Before the shell is called, `ManifestLocation.IsOpenableNotesUrl` (`src/Bwc.Update/Manifest/ManifestLocation.cs`,
+compiled into the Hub) accepts only a plain absolute https URL with a host and no user information. The unit tests are
+`ManifestLocationTests` in `tests/Bwc.Update.Tests`, and they never open a browser.
+
+| ID | Failure | What the user sees | Detection (check id) |
+|----|---------|--------------------|----------------------|
+| UPD-1 | The manifest's notes link is `http`, `javascript:`, `file:`, relative, empty, has spaces or control characters, or carries user information, and the shell would open it | Nothing opens, or a local file or script runs from the Hub's notes button | `ManifestLocationTests.Notes_Url_*`: each refused text returns false. `UpdateDialogs.OpenNotes` then writes one WARN line ("Release notes link refused ...") and returns without calling `Process.Start` |
+
 ## Single instance race
 
 The first Hub instance creates the named mutex and starts the pipe server. A second instance opens
