@@ -1,6 +1,6 @@
 {
   "case": "B/Pol_Decimal_MinMax",
-  "planHash": "a6c07cb325a8dce3e212f2d13bcceb358caae96fe3cfde31c7858206ee5b720d",
+  "planHash": "32ec7d08c20ece42d191ba2c1524b54dff3122dbb963ed400baeedf8e4fce2b5",
   "files": [
     "Machine.Registry.pol",
     "Machine.comment.cmtx",

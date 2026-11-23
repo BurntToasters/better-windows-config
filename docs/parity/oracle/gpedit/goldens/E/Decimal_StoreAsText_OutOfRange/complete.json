@@ -1,6 +1,6 @@
 {
   "case": "E/Decimal_StoreAsText_OutOfRange",
-  "planHash": "67b95ea9ac326de2d1b0a0026643c4a211844a1f957e70265a72c4d900cc6e6e",
+  "planHash": "aff998fc86158d2337c78971fc41de86afaf8da973db934b65149bc006d6d477",
   "files": [
     "Machine.Registry.pol",
     "Machine.comment.cmtx",
@@ -9,8 +9,11 @@
     "step-01-above/Machine.Registry.pol",
     "step-01-above/Machine.comment.cmtx",
     "step-01-above/gpt.ini",
-    "step-02-negative/Machine.Registry.pol",
-    "step-02-negative/Machine.comment.cmtx",
-    "step-02-negative/gpt.ini"
+    "step-02-clear-before-negative/Machine.Registry.pol",
+    "step-02-clear-before-negative/Machine.comment.cmtx",
+    "step-02-clear-before-negative/gpt.ini",
+    "step-03-negative/Machine.Registry.pol",
+    "step-03-negative/Machine.comment.cmtx",
+    "step-03-negative/gpt.ini"
   ]
 }

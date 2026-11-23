@@ -1,6 +1,6 @@
 {
   "case": "B/Pol_Both_WithElements.User",
-  "planHash": "dd7e62bf22fdebcb11c21bbf58d63ec96e48165c15fc79726f7cc99f038fe364",
+  "planHash": "e52b0b3f53cf426190514e114b99af9b6a5c487e627d8df4532b47a2daae47db",
   "files": [
     "User.Registry.pol",
     "User.comment.cmtx",

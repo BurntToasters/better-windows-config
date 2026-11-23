@@ -1,6 +1,6 @@
 {
   "case": "B/Pol_Decimal_StoreAsText",
-  "planHash": "4ffbe7b69eec607caa5ef44a0668a59dc142927efc2405e1e74e5a235dc394d6",
+  "planHash": "bbbd7600d74d3dc393dd94c84480704e03d049e8d08372ea2aa326dec3bb1403",
   "files": [
     "Machine.Registry.pol",
     "Machine.comment.cmtx",

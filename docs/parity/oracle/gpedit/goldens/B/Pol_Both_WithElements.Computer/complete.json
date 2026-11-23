@@ -1,6 +1,6 @@
 {
   "case": "B/Pol_Both_WithElements.Computer",
-  "planHash": "c5300251abf24deb3b24546db5af18e9234cfa4079e08f9a217c23352904c5bf",
+  "planHash": "80c99a8f45f522cb76e20b4e42ee9eca1e1b333c243916f794c1e37cbd2ec9c9",
   "files": [
     "Machine.Registry.pol",
     "Machine.comment.cmtx",

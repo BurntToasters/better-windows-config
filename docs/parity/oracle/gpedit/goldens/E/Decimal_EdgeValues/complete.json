@@ -1,6 +1,6 @@
 {
   "case": "E/Decimal_EdgeValues",
-  "planHash": "311aa57b32261474084ac46edbba301f246a85bc4456b230d858a005bd065362",
+  "planHash": "3c5237976fb1834b21b9c6ec7737aaa9d115b113ca65a6799ee469f74ef2ac09",
   "files": [
     "Machine.Registry.pol",
     "Machine.comment.cmtx",
@@ -9,11 +9,17 @@
     "step-01-min/Machine.Registry.pol",
     "step-01-min/Machine.comment.cmtx",
     "step-01-min/gpt.ini",
-    "step-02-max/Machine.Registry.pol",
-    "step-02-max/Machine.comment.cmtx",
-    "step-02-max/gpt.ini",
-    "step-03-max-plus-one/Machine.Registry.pol",
-    "step-03-max-plus-one/Machine.comment.cmtx",
-    "step-03-max-plus-one/gpt.ini"
+    "step-02-clear-before-max/Machine.Registry.pol",
+    "step-02-clear-before-max/Machine.comment.cmtx",
+    "step-02-clear-before-max/gpt.ini",
+    "step-03-max/Machine.Registry.pol",
+    "step-03-max/Machine.comment.cmtx",
+    "step-03-max/gpt.ini",
+    "step-04-clear-before-max-plus-one/Machine.Registry.pol",
+    "step-04-clear-before-max-plus-one/Machine.comment.cmtx",
+    "step-04-clear-before-max-plus-one/gpt.ini",
+    "step-05-max-plus-one/Machine.Registry.pol",
+    "step-05-max-plus-one/Machine.comment.cmtx",
+    "step-05-max-plus-one/gpt.ini"
   ]
 }

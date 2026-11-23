@@ -1,6 +1,6 @@
 {
   "case": "E/Decimal_NotNumber",
-  "planHash": "87fe95109c682f652cb40a49923307a35b91f89c73941654acf8c5aaf88cef6d",
+  "planHash": "0105d98f2a560b7aa03b5e6faa17f82d3e4262ed421165590982491c8f1e1e42",
   "files": [
     "Machine.Registry.pol",
     "Machine.comment.cmtx",
@@ -9,8 +9,11 @@
     "step-01-letters/Machine.Registry.pol",
     "step-01-letters/Machine.comment.cmtx",
     "step-01-letters/gpt.ini",
-    "step-02-negative/Machine.Registry.pol",
-    "step-02-negative/Machine.comment.cmtx",
-    "step-02-negative/gpt.ini"
+    "step-02-clear-before-negative/Machine.Registry.pol",
+    "step-02-clear-before-negative/Machine.comment.cmtx",
+    "step-02-clear-before-negative/gpt.ini",
+    "step-03-negative/Machine.Registry.pol",
+    "step-03-negative/Machine.comment.cmtx",
+    "step-03-negative/gpt.ini"
   ]
 }

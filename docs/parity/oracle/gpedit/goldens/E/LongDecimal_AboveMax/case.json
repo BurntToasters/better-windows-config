@@ -2,7 +2,7 @@
   "case": "E/LongDecimal_AboveMax",
   "description": "long decimal given 9000000000001 and a 25 digit number",
   "planVersion": 2,
-  "planHash": "eb19108b89f21de39e78bbeff9a9d22b7771e9758b72db9d83de259e7d46e177",
+  "planHash": "30645b0f5a34dbdd1aabbcb69272fb14c59f58e14b4d41fa0bfce8548377f841",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -53,6 +53,41 @@
       "index": 2,
       "kind": "editPolicy",
       "label": null,
+      "plan": "editPolicy 'Long decimal with a range' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Long decimal with a range",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_LongDecimal_Basic",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step clear-before-huge",
+      "plan": "snapshot  [step clear-before-huge]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step clear-before-huge"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
       "plan": "editPolicy 'Long decimal with a range' state Enabled options [Long number: = text '9999999999999999999999999'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
       "op": {
         "kind": "editPolicy",
@@ -79,7 +114,7 @@
       "optional": true
     },
     {
-      "index": 3,
+      "index": 5,
       "kind": "snapshot",
       "label": "step huge",
       "plan": "snapshot  [step huge]",
@@ -133,16 +168,16 @@
     },
     {
       "number": 2,
-      "label": "huge",
-      "folder": "step-02-huge",
+      "label": "clear-before-huge",
+      "folder": "step-02-clear-before-huge",
       "files": {
         "Machine.Registry.pol": {
-          "size": 148,
-          "sha256": "e3ef4f29c6226f82d99408c4247c2edf06b9ffc7b434253d03df2a46e8298a5e"
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
         },
         "gpt.ini": {
-          "size": 127,
-          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+          "size": 50,
+          "sha256": "4db24e823e9f9262f5164dbf974a3de0a61eac40d1fc1a430112712068e38833"
         },
         "Machine.comment.cmtx": {
           "size": 539,
@@ -152,14 +187,54 @@
         "User.comment.cmtx": null
       },
       "gptVersion": {
-        "raw": 1,
-        "machine": 1,
+        "raw": 2,
+        "machine": 2,
         "user": 0
       },
       "listing": [
         {
           "path": "gpt.ini",
-          "size": 127
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "huge",
+      "folder": "step-03-huge",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "e3ef4f29c6226f82d99408c4247c2edf06b9ffc7b434253d03df2a46e8298a5e"
+        },
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "a7a086c22774e988bb27044cd5aca4c95194c04219f4cdc4181404ca0ca67289"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 128
         },
         {
           "path": "Machine\\comment.cmtx",
@@ -217,10 +292,10 @@
               "kind": "#05585f55fed2",
               "label": "Long number:",
               "panelId": "#904ce3e42c67",
-              "controlId": "29427374",
+              "controlId": "37618804",
               "rect": [
-                388,
-                952,
+                440,
+                1004,
                 426,
                 58
               ],
@@ -248,7 +323,7 @@
             "label": "Long number:",
             "labelMatch": "exact",
             "kind": "#05585f55fed2",
-            "controlId": "29427374"
+            "controlId": "37618804"
           }
         ],
         "afterSet": {
@@ -282,10 +357,10 @@
               "kind": "#05585f55fed2",
               "label": "Long number:",
               "panelId": "#904ce3e42c67",
-              "controlId": "29427374",
+              "controlId": "37618804",
               "rect": [
-                388,
-                952,
+                440,
+                1004,
                 426,
                 58
               ],
@@ -362,6 +437,12 @@
       "index": 2,
       "kind": "editPolicy",
       "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
       "data": {
         "policy": "Long decimal with a range",
         "before": {
@@ -395,10 +476,10 @@
               "kind": "#05585f55fed2",
               "label": "Long number:",
               "panelId": "#904ce3e42c67",
-              "controlId": "527369692",
+              "controlId": "13698240",
               "rect": [
-                440,
-                1004,
+                492,
+                1056,
                 426,
                 58
               ],
@@ -410,29 +491,136 @@
         "sets": [
           {
             "set": "#4ba69735ca53",
-            "requested": "Enabled",
+            "requested": "Not Configured",
             "before": "Enabled",
-            "observed": "Enabled"
-          },
-          {
-            "typed": false,
-            "multiline": false,
-            "requested": "9999999999999999999999999",
-            "before": "9000000000000",
-            "immediate": "9999999999999999999999999",
-            "observed": "9999999999999999999999999",
-            "clamped": false,
-            "set": "#a11a75e0feee",
-            "label": "Long number:",
-            "labelMatch": "exact",
-            "kind": "#05585f55fed2",
-            "controlId": "527369692"
+            "observed": "Not Configured"
           }
         ],
         "afterSet": {
           "title": "Long decimal with a range",
           "windowTitle": "Long decimal with a range",
-          "state": "Enabled",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A 64-bit number from 0 to 9000000000000.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Long number:",
+              "panelId": "#904ce3e42c67",
+              "controlId": "13698240",
+              "rect": [
+                492,
+                1056,
+                426,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Long decimal with a range",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Long decimal with a range"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "4db24e823e9f9262f5164dbf974a3de0a61eac40d1fc1a430112712068e38833"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 2,
+      "gptVersionAfter": 3,
+      "data": {
+        "policy": "Long decimal with a range",
+        "before": {
+          "title": "Long decimal with a range",
+          "windowTitle": "Long decimal with a range",
+          "state": "Not Configured",
           "comment": "",
           "supportedOn": "BWC oracle fixture: any system",
           "help": "A 64-bit number from 0 to 9000000000000.",
@@ -460,10 +648,75 @@
               "kind": "#05585f55fed2",
               "label": "Long number:",
               "panelId": "#904ce3e42c67",
-              "controlId": "527369692",
+              "controlId": "54854082",
               "rect": [
-                440,
-                1004,
+                544,
+                1108,
+                426,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "9999999999999999999999999",
+            "before": "123456789012",
+            "immediate": "9999999999999999999999999",
+            "observed": "9999999999999999999999999",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Long number:",
+            "labelMatch": "exact",
+            "kind": "#05585f55fed2",
+            "controlId": "54854082"
+          }
+        ],
+        "afterSet": {
+          "title": "Long decimal with a range",
+          "windowTitle": "Long decimal with a range",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A 64-bit number from 0 to 9000000000000.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Long number:",
+              "panelId": "#904ce3e42c67",
+              "controlId": "54854082",
+              "rect": [
+                544,
+                1108,
                 426,
                 58
               ],
@@ -481,18 +734,29 @@
             "messageBoxes": [],
             "closed": true,
             "files": {
-              "changed": false,
-              "changedFiles": [],
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
               "groups": {
-                "machine": false,
+                "machine": true,
                 "user": false,
-                "gptIni": false
+                "gptIni": true
               },
               "settleTimedOut": false,
-              "writes": {},
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
               "gptVersionAfter": {
-                "raw": 1,
-                "machine": 1,
+                "raw": 3,
+                "machine": 3,
                 "user": 0
               }
             }
@@ -502,7 +766,7 @@
       }
     },
     {
-      "index": 3,
+      "index": 5,
       "kind": "snapshot",
       "ok": true,
       "state": {
@@ -511,8 +775,8 @@
           "sha256": "e3ef4f29c6226f82d99408c4247c2edf06b9ffc7b434253d03df2a46e8298a5e"
         },
         "gpt.ini": {
-          "size": 127,
-          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+          "size": 128,
+          "sha256": "a7a086c22774e988bb27044cd5aca4c95194c04219f4cdc4181404ca0ca67289"
         },
         "Machine.comment.cmtx": {
           "size": 539,
@@ -522,8 +786,8 @@
         "User.comment.cmtx": null
       },
       "gptVersion": {
-        "raw": 1,
-        "machine": 1,
+        "raw": 3,
+        "machine": 3,
         "user": 0
       }
     }

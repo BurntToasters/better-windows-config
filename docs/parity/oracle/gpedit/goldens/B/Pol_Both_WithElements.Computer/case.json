@@ -2,7 +2,7 @@
   "case": "B/Pol_Both_WithElements.Computer",
   "description": "Pol_Both_WithElements under Computer Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
   "planVersion": 2,
-  "planHash": "c5300251abf24deb3b24546db5af18e9234cfa4079e08f9a217c23352904c5bf",
+  "planHash": "80c99a8f45f522cb76e20b4e42ee9eca1e1b333c243916f794c1e37cbd2ec9c9",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -44,7 +44,7 @@
       "index": 2,
       "kind": "editPolicy",
       "label": null,
-      "plan": "editPolicy 'Class both with an element' state Enabled options [Shared number: = text '33'] press [OK] at Computer/Administrative Templates/BWC Oracle/Basics",
+      "plan": "editPolicy 'Class both with an element' state Enabled options [Shared number: = typed text '33'] press [OK] at Computer/Administrative Templates/BWC Oracle/Basics",
       "op": {
         "kind": "editPolicy",
         "root": "Computer",
@@ -60,6 +60,7 @@
             "label": "Shared number:",
             "expectKind": "decimalTextBox",
             "text": "33",
+            "typed": true,
             "elementId": "BothNumber"
           }
         ],
@@ -193,47 +194,7 @@
       "files": {
         "Machine.Registry.pol": {
           "size": 254,
-          "sha256": "2282b988da2e13f6b5d2a9a0e0634f676957ddaa05c673c7703e76c7a69c841b"
-        },
-        "gpt.ini": {
-          "size": 127,
-          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
-        },
-        "Machine.comment.cmtx": {
-          "size": 539,
-          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
-        },
-        "User.Registry.pol": null,
-        "User.comment.cmtx": null
-      },
-      "gptVersion": {
-        "raw": 1,
-        "machine": 1,
-        "user": 0
-      },
-      "listing": [
-        {
-          "path": "gpt.ini",
-          "size": 127
-        },
-        {
-          "path": "Machine\\comment.cmtx",
-          "size": 539
-        },
-        {
-          "path": "Machine\\Registry.pol",
-          "size": 254
-        }
-      ]
-    },
-    {
-      "number": 3,
-      "label": "disabled",
-      "folder": "step-03-disabled",
-      "files": {
-        "Machine.Registry.pol": {
-          "size": 278,
-          "sha256": "84b9e312d038d6da1cbfd5f22fda88444be3d4e9a4ea250d671db4790dbbfe96"
+          "sha256": "8908c9461e35c6f4ffd4f32fac83a1dfc01d2da1fbf9298c6f396cc517adaa03"
         },
         "gpt.ini": {
           "size": 127,
@@ -262,6 +223,46 @@
         },
         {
           "path": "Machine\\Registry.pol",
+          "size": 254
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "disabled",
+      "folder": "step-03-disabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 278,
+          "sha256": "84b9e312d038d6da1cbfd5f22fda88444be3d4e9a4ea250d671db4790dbbfe96"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
           "size": 278
         }
       ]
@@ -277,7 +278,7 @@
         },
         "gpt.ini": {
           "size": 50,
-          "sha256": "a2d93ec7dce7529feacc9b1943ce7dcb118d81da8ab3a23e8cedb66a35ebb749"
+          "sha256": "bbff97b1f1386f1ac16f8e6f9cbe1f14c21d84b7e9f674638465cc046494d153"
         },
         "Machine.comment.cmtx": {
           "size": 539,
@@ -287,8 +288,8 @@
         "User.comment.cmtx": null
       },
       "gptVersion": {
-        "raw": 3,
-        "machine": 3,
+        "raw": 4,
+        "machine": 4,
         "user": 0
       },
       "listing": [
@@ -352,10 +353,10 @@
               "kind": "#05585f55fed2",
               "label": "Shared number:",
               "panelId": "#1c3ee57ad6e7",
-              "controlId": "149356658",
+              "controlId": "27919424",
               "rect": [
-                284,
-                848,
+                76,
+                640,
                 446,
                 58
               ],
@@ -403,10 +404,10 @@
               "kind": "#05585f55fed2",
               "label": "Shared number:",
               "panelId": "#1c3ee57ad6e7",
-              "controlId": "149356658",
+              "controlId": "27919424",
               "rect": [
-                284,
-                848,
+                76,
+                640,
                 446,
                 58
               ],
@@ -483,175 +484,6 @@
       "index": 2,
       "kind": "editPolicy",
       "ok": true,
-      "data": {
-        "policy": "Class both with an element",
-        "before": {
-          "title": "Class both with an element",
-          "windowTitle": "Class both with an element",
-          "state": "Enabled",
-          "comment": "",
-          "supportedOn": "BWC oracle fixture: defined in the same file as the policy",
-          "help": "A policy of class Both that also has a number element, so each hive file receives a flag and a number.",
-          "buttons": {
-            "Apply": {
-              "enabled": false
-            },
-            "OK": {
-              "enabled": true
-            },
-            "Cancel": {
-              "enabled": true
-            },
-            "Previous": {
-              "enabled": false
-            },
-            "Next": {
-              "enabled": true
-            }
-          },
-          "options": [
-            {
-              "index": 0,
-              "controlIndex": 0,
-              "kind": "#05585f55fed2",
-              "label": "Shared number:",
-              "panelId": "#1c3ee57ad6e7",
-              "controlId": "102630398",
-              "rect": [
-                336,
-                900,
-                446,
-                58
-              ],
-              "enabled": true,
-              "text": "42"
-            }
-          ]
-        },
-        "sets": [
-          {
-            "set": "#4ba69735ca53",
-            "requested": "Enabled",
-            "before": "Enabled",
-            "observed": "Enabled"
-          },
-          {
-            "typed": false,
-            "multiline": false,
-            "requested": "33",
-            "before": "42",
-            "immediate": "33",
-            "observed": "33",
-            "clamped": false,
-            "set": "#a11a75e0feee",
-            "label": "Shared number:",
-            "labelMatch": "exact",
-            "kind": "#05585f55fed2",
-            "controlId": "102630398"
-          }
-        ],
-        "afterSet": {
-          "title": "Class both with an element",
-          "windowTitle": "Class both with an element",
-          "state": "Enabled",
-          "comment": "",
-          "supportedOn": "BWC oracle fixture: defined in the same file as the policy",
-          "help": "A policy of class Both that also has a number element, so each hive file receives a flag and a number.",
-          "buttons": {
-            "Apply": {
-              "enabled": false
-            },
-            "OK": {
-              "enabled": true
-            },
-            "Cancel": {
-              "enabled": true
-            },
-            "Previous": {
-              "enabled": false
-            },
-            "Next": {
-              "enabled": true
-            }
-          },
-          "options": [
-            {
-              "index": 0,
-              "controlIndex": 0,
-              "kind": "#05585f55fed2",
-              "label": "Shared number:",
-              "panelId": "#1c3ee57ad6e7",
-              "controlId": "102630398",
-              "rect": [
-                336,
-                900,
-                446,
-                58
-              ],
-              "enabled": true,
-              "text": "33"
-            }
-          ]
-        },
-        "presses": [
-          {
-            "button": "OK",
-            "enabledBefore": true,
-            "titleBefore": "Class both with an element",
-            "pressed": true,
-            "messageBoxes": [],
-            "closed": true,
-            "files": {
-              "changed": false,
-              "changedFiles": [],
-              "groups": {
-                "machine": false,
-                "user": false,
-                "gptIni": false
-              },
-              "settleTimedOut": false,
-              "writes": {},
-              "gptVersionAfter": {
-                "raw": 1,
-                "machine": 1,
-                "user": 0
-              }
-            }
-          }
-        ],
-        "finalTitle": "Class both with an element"
-      }
-    },
-    {
-      "index": 3,
-      "kind": "snapshot",
-      "ok": true,
-      "state": {
-        "Machine.Registry.pol": {
-          "size": 254,
-          "sha256": "2282b988da2e13f6b5d2a9a0e0634f676957ddaa05c673c7703e76c7a69c841b"
-        },
-        "gpt.ini": {
-          "size": 127,
-          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
-        },
-        "Machine.comment.cmtx": {
-          "size": 539,
-          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
-        },
-        "User.Registry.pol": null,
-        "User.comment.cmtx": null
-      },
-      "gptVersion": {
-        "raw": 1,
-        "machine": 1,
-        "user": 0
-      }
-    },
-    {
-      "index": 4,
-      "kind": "editPolicy",
-      "ok": true,
       "changedFiles": [
         "Machine\\Registry.pol",
         "gpt.ini"
@@ -691,10 +523,10 @@
               "kind": "#05585f55fed2",
               "label": "Shared number:",
               "panelId": "#1c3ee57ad6e7",
-              "controlId": "242091172",
+              "controlId": "41550860",
               "rect": [
-                388,
-                952,
+                128,
+                692,
                 446,
                 58
               ],
@@ -706,15 +538,29 @@
         "sets": [
           {
             "set": "#4ba69735ca53",
-            "requested": "Disabled",
+            "requested": "Enabled",
             "before": "Enabled",
-            "observed": "Disabled"
+            "observed": "Enabled"
+          },
+          {
+            "typed": true,
+            "multiline": false,
+            "requested": "33",
+            "before": "42",
+            "immediate": "33",
+            "observed": "33",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Shared number:",
+            "labelMatch": "exact",
+            "kind": "#05585f55fed2",
+            "controlId": "41550860"
           }
         ],
         "afterSet": {
           "title": "Class both with an element",
           "windowTitle": "Class both with an element",
-          "state": "Disabled",
+          "state": "Enabled",
           "comment": "",
           "supportedOn": "BWC oracle fixture: defined in the same file as the policy",
           "help": "A policy of class Both that also has a number element, so each hive file receives a flag and a number.",
@@ -742,15 +588,15 @@
               "kind": "#05585f55fed2",
               "label": "Shared number:",
               "panelId": "#1c3ee57ad6e7",
-              "controlId": "242091172",
+              "controlId": "41550860",
               "rect": [
-                388,
-                952,
+                128,
+                692,
                 446,
                 58
               ],
-              "enabled": false,
-              "text": "0"
+              "enabled": true,
+              "text": "33"
             }
           ]
         },
@@ -795,13 +641,13 @@
       }
     },
     {
-      "index": 5,
+      "index": 3,
       "kind": "snapshot",
       "ok": true,
       "state": {
         "Machine.Registry.pol": {
-          "size": 278,
-          "sha256": "84b9e312d038d6da1cbfd5f22fda88444be3d4e9a4ea250d671db4790dbbfe96"
+          "size": 254,
+          "sha256": "8908c9461e35c6f4ffd4f32fac83a1dfc01d2da1fbf9298c6f396cc517adaa03"
         },
         "gpt.ini": {
           "size": 127,
@@ -821,7 +667,7 @@
       }
     },
     {
-      "index": 6,
+      "index": 4,
       "kind": "editPolicy",
       "ok": true,
       "changedFiles": [
@@ -835,7 +681,7 @@
         "before": {
           "title": "Class both with an element",
           "windowTitle": "Class both with an element",
-          "state": "Disabled",
+          "state": "Enabled",
           "comment": "",
           "supportedOn": "BWC oracle fixture: defined in the same file as the policy",
           "help": "A policy of class Both that also has a number element, so each hive file receives a flag and a number.",
@@ -863,30 +709,30 @@
               "kind": "#05585f55fed2",
               "label": "Shared number:",
               "panelId": "#1c3ee57ad6e7",
-              "controlId": "44041188",
+              "controlId": "26018800",
               "rect": [
-                440,
-                1004,
+                180,
+                744,
                 446,
                 58
               ],
-              "enabled": false,
-              "text": "0"
+              "enabled": true,
+              "text": "33"
             }
           ]
         },
         "sets": [
           {
             "set": "#4ba69735ca53",
-            "requested": "Not Configured",
-            "before": "Disabled",
-            "observed": "Not Configured"
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
           }
         ],
         "afterSet": {
           "title": "Class both with an element",
           "windowTitle": "Class both with an element",
-          "state": "Not Configured",
+          "state": "Disabled",
           "comment": "",
           "supportedOn": "BWC oracle fixture: defined in the same file as the policy",
           "help": "A policy of class Both that also has a number element, so each hive file receives a flag and a number.",
@@ -914,10 +760,10 @@
               "kind": "#05585f55fed2",
               "label": "Shared number:",
               "panelId": "#1c3ee57ad6e7",
-              "controlId": "44041188",
+              "controlId": "26018800",
               "rect": [
-                440,
-                1004,
+                180,
+                744,
                 446,
                 58
               ],
@@ -967,17 +813,17 @@
       }
     },
     {
-      "index": 7,
+      "index": 5,
       "kind": "snapshot",
       "ok": true,
       "state": {
         "Machine.Registry.pol": {
-          "size": 8,
-          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+          "size": 278,
+          "sha256": "84b9e312d038d6da1cbfd5f22fda88444be3d4e9a4ea250d671db4790dbbfe96"
         },
         "gpt.ini": {
-          "size": 50,
-          "sha256": "a2d93ec7dce7529feacc9b1943ce7dcb118d81da8ab3a23e8cedb66a35ebb749"
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
         },
         "Machine.comment.cmtx": {
           "size": 539,
@@ -989,6 +835,178 @@
       "gptVersion": {
         "raw": 3,
         "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 3,
+      "gptVersionAfter": 4,
+      "data": {
+        "policy": "Class both with an element",
+        "before": {
+          "title": "Class both with an element",
+          "windowTitle": "Class both with an element",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: defined in the same file as the policy",
+          "help": "A policy of class Both that also has a number element, so each hive file receives a flag and a number.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Shared number:",
+              "panelId": "#1c3ee57ad6e7",
+              "controlId": "44499122",
+              "rect": [
+                232,
+                796,
+                446,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Class both with an element",
+          "windowTitle": "Class both with an element",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: defined in the same file as the policy",
+          "help": "A policy of class Both that also has a number element, so each hive file receives a flag and a number.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Shared number:",
+              "panelId": "#1c3ee57ad6e7",
+              "controlId": "44499122",
+              "rect": [
+                232,
+                796,
+                446,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Class both with an element",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Class both with an element"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "bbff97b1f1386f1ac16f8e6f9cbe1f14c21d84b7e9f674638465cc046494d153"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
         "user": 0
       }
     }
