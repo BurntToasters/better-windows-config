@@ -89,7 +89,8 @@ public sealed partial class GpeditRootView
 
     private void RunCustomize()
     {
-        if (!FrameDialogAllowed || !TryGetOwnerHandle(out nint owner))
+        // The menu entry is disabled while the options forbid customizing; the guard keeps any other way in out as well.
+        if (!_options.AllowCustomizeViews || !FrameDialogAllowed || !TryGetOwnerHandle(out nint owner))
         {
             return;
         }

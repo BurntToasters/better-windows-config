@@ -204,6 +204,11 @@ public sealed partial class GpeditRootView : UserControl
             CustomizeView = RunCustomize,
             ExportList = RunExport,
             HelpTopics = IsEditorHost ? RunHelp : null,
+            Options = RunOptions,
+            WebSite = RunWebSite,
+            About = RunAbout,
+            SnapInAbout = IsEditorHost ? RunSnapInAbout : null,
+            SnapInAboutText = IsEditorHost ? GpeditStrings.Commands("GpeditCommandSnapInAbout") : null,
         };
     }
 

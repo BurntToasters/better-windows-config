@@ -102,6 +102,7 @@ public sealed partial class GpeditRootView
         Shell.TreeContent.SelectionChanged += OnTreeSelectionChanged;
         ApplySavedView();
         ApplySavedSwitches();
+        ApplySavedOptions();
         Shell.TreeContent.SelectNode(_source.Root);
         SyncViewChecks();
         Shell.ViewChanged += (_, _) => ScheduleSettingsSave();
@@ -550,6 +551,7 @@ public sealed partial class GpeditRootView
             ViewSnapInToolbars = Shell.AreSnapInToolbarsVisible,
             ViewStatusBar = Shell.IsStatusBarVisible,
             ViewDescriptionBar = _extended.IsDescriptionBarShown,
+            AllowCustomizeViews = _options.AllowCustomizeViews,
         };
         foreach (KeyValuePair<string, double> pair in _columnWidths)
         {
@@ -714,6 +716,8 @@ public sealed partial class GpeditRootView
         Add("TemplateReloads", _templateReloads);
         Add("Reloading", _loadInFlight && !_loadIsInitial ? 1 : 0);
         Add("HelpRequests", _helpRequests);
+        Add("WebSiteRequests", _webSiteRequests);
+        Add("WebSiteUrl", _webSiteUrl);
         Add("LastCommand", _lastCommand);
         AutomationProperties.SetHelpText(this, text.ToString());
 

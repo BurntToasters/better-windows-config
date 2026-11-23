@@ -49,6 +49,21 @@ public sealed record ConsoleMenuExtensions
 
     /// <summary>Help > Help Topics.</summary>
     public Action? HelpTopics { get; init; }
+
+    /// <summary>Help > the web site entry.</summary>
+    public Action? WebSite { get; init; }
+
+    /// <summary>Help > About.</summary>
+    public Action? About { get; init; }
+
+    /// <summary>
+    /// Help > the snap-in About entry. The entry is in the popup only when this and <see cref="SnapInAboutText"/> are set; the
+    /// host shows and hides it with <see cref="ConsoleCommandIds.SnapInAbout"/> as the nodes change.
+    /// </summary>
+    public Action? SnapInAbout { get; init; }
+
+    /// <summary>The raw menu text of the snap-in About entry (an ampersand marks the access key).</summary>
+    public string? SnapInAboutText { get; init; }
 }
 
 /// <summary>The menu table of the frame and the access keys it had to give up.</summary>
@@ -61,7 +76,8 @@ public sealed record ConsoleMenuTable(IReadOnlyList<ClassicCommand> Commands, IR
 /// popups hold the snap-in's entries first and the frame's after them. The Action popup holds the snap-in's entries, the
 /// frame's Export List and the snap-in's tail. The View popup is Add/Remove Columns, a separator, the view modes, a
 /// separator, the snap-in's tail and Customize View (the console tree, toolbar and status bar switches are in
-/// Customize View, not in the menu). Nothing here knows a snap-in.
+/// Customize View, not in the menu). The Help popup is the snap-in entries, Help Topics, the web site entry, a separator,
+/// About and the snap-in About entry. Nothing here knows a snap-in.
 /// </summary>
 public static class ConsoleMenu
 {
@@ -77,6 +93,9 @@ public static class ConsoleMenu
         ConsoleCommandIds.CustomizeView,
         ConsoleCommandIds.ExportList,
         ConsoleCommandIds.HelpTopics,
+        ConsoleCommandIds.WebSite,
+        ConsoleCommandIds.About,
+        ConsoleCommandIds.SnapInAbout,
     ];
 
     /// <summary>
@@ -143,12 +162,22 @@ public static class ConsoleMenu
                 .. extensions.HelpEntries,
                 .. SeparatorBefore(extensions.HelpEntries),
                 Frame("ConsoleMenuHelpTopics", ConsoleCommandIds.HelpTopics, extensions.HelpTopics),
+                Frame("ConsoleMenuHelpWebSite", ConsoleCommandIds.WebSite, extensions.WebSite),
+                ClassicCommandItem.Separator,
+                Frame("ConsoleMenuHelpAbout", ConsoleCommandIds.About, extensions.About),
+                .. SnapInAboutEntry(extensions),
             ],
             [extensions.HelpEntries],
             collisions);
 
         return new ConsoleMenuTable([file, action, view, help], collisions);
     }
+
+    /// <summary>The snap-in About entry, or nothing when the host has none.</summary>
+    private static ClassicCommandItem[] SnapInAboutEntry(ConsoleMenuExtensions extensions) =>
+        extensions.SnapInAbout is { } invoke && extensions.SnapInAboutText is { } text
+            ? [ClassicMenuBuilder.Command(text, ConsoleCommandIds.SnapInAbout, isEnabled: true, invoke: invoke)]
+            : [];
 
     private static ClassicCommand Frame(string labelKey, int id, Action? invoke) =>
         ClassicMenuBuilder.Command(ConsoleStrings.Get(labelKey), id, isEnabled: invoke is not null, invoke: invoke);

@@ -150,6 +150,7 @@ public sealed partial class GpeditRootView
     {
         UpdateToolbarStates();
         UpdateActionMenu();
+        UpdateHelpMenu();
         UpdateFilterUi();
     }
 

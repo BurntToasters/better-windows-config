@@ -82,4 +82,12 @@
   <data name="GpeditAboutVersionUnknown" xml:space="preserve">
     <value>unknown</value>
   </data>
+  <!-- Help menu entry of the snap-in About box, command 13242: shown at the configuration nodes and the placeholder nodes. -->
+  <data name="GpeditCommandSnapInAbout" xml:space="preserve">
+    <value>About Local Group Policy Editor s&amp;nap-in</value>
+  </data>
+  <!-- The name of the snap-in; the native box is titled About plus this name. -->
+  <data name="GpeditSnapInName" xml:space="preserve">
+    <value>Local Group Policy Editor snap-in</value>
+  </data>
 </root>

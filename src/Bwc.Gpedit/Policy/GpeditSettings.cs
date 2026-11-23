@@ -63,6 +63,12 @@ public sealed class GpeditSettings
     public bool ViewDescriptionBar { get; set; } = true;
 
     /// <summary>
+    /// Options: the user may customize views, so View > Customize View is enabled. Absent means allowed (a file from before
+    /// the option existed keeps the command), and File > Options is never disabled, so a saved false cannot lock the user out.
+    /// </summary>
+    public bool AllowCustomizeViews { get; set; } = true;
+
+    /// <summary>
     /// The sort of each list by node: the names of the node from the root joined with " > ", then the columns sorted so far,
     /// oldest first, each as "column id:Ascending" or "column id:Descending". A click sorts the order shown now, so the
     /// whole list of clicks is what restores an order (docs/failure-modes/gpedit-filter.md, section 15).

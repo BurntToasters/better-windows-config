@@ -46,6 +46,15 @@ public static class ConsoleCommandIds
     public const int CustomizeView = 13231;
     public const int HelpTopics = 12804;
 
+    /// <summary>Help > the project web site entry (the BWC entry of the classic web site role).</summary>
+    public const int WebSite = 13245;
+
+    /// <summary>Help > About, the native About box of the tool.</summary>
+    public const int About = 57664;
+
+    /// <summary>Help > the snap-in About entry. The host shows it at the nodes that have it.</summary>
+    public const int SnapInAbout = 13242;
+
     /// <summary>View > Add/Remove Columns. The id is BWC's (the capture names the command by its role).</summary>
     public const int AddRemoveColumns = 1000;
 

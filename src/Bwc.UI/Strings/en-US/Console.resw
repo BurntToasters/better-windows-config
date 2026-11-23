@@ -303,4 +303,60 @@
   <data name="ConsoleExportErrorReadOnly" xml:space="preserve">
     <value>The file is read-only.</value>
   </data>
+  <!-- BWC wording: Help menu entry that opens the project web site, command 13245. -->
+  <data name="ConsoleMenuHelpWebSite" xml:space="preserve">
+    <value>Better Windows Config on the &amp;Web</value>
+  </data>
+  <!-- BWC wording: Help menu entry that shows the About box, command 57664. -->
+  <data name="ConsoleMenuHelpAbout" xml:space="preserve">
+    <value>&amp;About</value>
+  </data>
+  <!-- BWC wording: Caption of the Options dialog of the console frame. -->
+  <data name="ConsoleOptionsCaption" xml:space="preserve">
+    <value>Options</value>
+  </data>
+  <!-- BWC wording: Label before the name box of the Options dialog. -->
+  <data name="ConsoleOptionsNameLabel" xml:space="preserve">
+    <value>Name:</value>
+  </data>
+  <!-- BWC wording: Accessible name of the read-only name box of the Options dialog. -->
+  <data name="ConsoleOptionsNameName" xml:space="preserve">
+    <value>Console name</value>
+  </data>
+  <!-- BWC wording: Change Icon button of the Options dialog. It stays disabled: the icon is fixed. -->
+  <data name="ConsoleOptionsChangeIcon" xml:space="preserve">
+    <value>Change &amp;Icon...</value>
+  </data>
+  <!-- BWC wording: Label before the console mode drop-down of the Options dialog. -->
+  <data name="ConsoleOptionsModeLabel" xml:space="preserve">
+    <value>Console mode:</value>
+  </data>
+  <!-- BWC wording: Accessible name of the console mode drop-down of the Options dialog. -->
+  <data name="ConsoleOptionsModeName" xml:space="preserve">
+    <value>Console mode</value>
+  </data>
+  <!-- BWC wording: The one console mode of BWC, shown in the disabled drop-down. -->
+  <data name="ConsoleOptionsModeValue" xml:space="preserve">
+    <value>Fixed tool</value>
+  </data>
+  <!-- BWC wording: Caption of the Description group of the Options dialog. -->
+  <data name="ConsoleOptionsGroupDescription" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <!-- BWC wording: Accessible name of the description area of the Options dialog. -->
+  <data name="ConsoleOptionsDescriptionName" xml:space="preserve">
+    <value>Console mode description</value>
+  </data>
+  <!-- BWC wording: Text of the description area: what the one console mode means. -->
+  <data name="ConsoleOptionsDescriptionText" xml:space="preserve">
+    <value>This tool has one mode. Its menus, tree and result views are fixed, and no console file is created or changed.</value>
+  </data>
+  <!-- BWC wording: The check box that is checked and disabled: BWC never writes a console file. -->
+  <data name="ConsoleOptionsNoSave" xml:space="preserve">
+    <value>Do not &amp;save changes to this console</value>
+  </data>
+  <!-- BWC wording: The one real choice of the Options dialog; it enables or disables View &gt; Customize View. -->
+  <data name="ConsoleOptionsCustomizeViews" xml:space="preserve">
+    <value>Allow the user to &amp;customize views</value>
+  </data>
 </root>

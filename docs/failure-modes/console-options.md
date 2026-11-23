@@ -39,7 +39,8 @@ user's word before it counts as settled (the plan rule: a difference from classi
   nothing and only counts in `HelpRequests`. BWC has no help file; if one is ever added, Help Topics is the entry that opens it.
 - **About** (command 57664) shows the native About box through `GpeditAbout.Show`, the Registry Editor's box: the caption is
   "About " plus the tool's window title, the text is the product, the version line and the copyright line. It opens in both
-  flavors (the tests need the real box), is modal to the main window, and does not count as a Help request.
+  flavors (the tests need the real box), is modal to the main window, and does not count as a Help request. The command
+  returns first and the box opens from the dispatcher, so a UI Automation Invoke of the entry is not held until the box closes.
 - **The web site entry** (command 13245) is added; the audit may still remove it (MENU-034). Its label is BWC's own words and
   names the web. It opens the project page, `https://github.com/BurntToasters/better-windows-config` (the address the update
   feed already names), with the shell, in the default browser, from a fixed constant: no address comes from a file or the
@@ -55,7 +56,9 @@ user's word before it counts as settled (the plan rule: a difference from classi
   mode drop-down is disabled and shows the one mode (BWC's own words), with its own description text in the Description area;
   the not-saving check box is checked and disabled (BWC never writes a console file; the settings file holds window and view
   state only). The classic note line (the options take effect the next time) is not shown, because BWC applies the one real
-  choice at once.
+  choice at once. The icon picture and the rule of the classic page are not drawn: BWC has no console icon to show and the
+  classic dialog control set of the frame has no picture or rule control (the code of this piece, `ConsoleOptionsDialog`,
+  lays out the other parts in the reading order and the 252 x 250 dialog unit size the tests check).
 - **The customize-views check box is real** and starts checked. Cleared and confirmed with OK, View > Customize View stays in
   its place (last entry of the View popup, the same separator groups) and is disabled; nothing already applied changes (the
   hidden parts stay hidden, the shown parts stay shown). Set again and confirmed, the command is enabled and the dialog shows
