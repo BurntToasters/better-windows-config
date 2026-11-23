@@ -1,6 +1,5 @@
 using System.Drawing;
 using Bwc.E2E.Controls;
-using Bwc.E2E.Editing;
 using Bwc.E2E.Harness;
 using Bwc.E2E.List;
 using FlaUI.Core.AutomationElements;
@@ -19,8 +18,6 @@ namespace Bwc.E2E.ConsoleFrame;
 public sealed class ConsoleShellTests
 {
     private const int ViewMenuCommand = 59003;
-    private const int ViewToolbarCommand = 1002;
-    private const int ViewStatusBarCommand = 1003;
     private const string ComputerNode = "Computer Configuration";
     private const string UserNode = "User Configuration";
 
@@ -353,9 +350,13 @@ public sealed class ConsoleShellTests
         AutomationElement? view = run.Find("MenuCommand_59003");
         bool viewOpen = ShellRun.WaitUntil(() => ExpandState(view) == ExpandCollapseState.Expanded);
         checks.Record("altVOpensView", viewOpen, $"View expand state after Alt+V={ExpandState(view)}.");
-        string[] viewItems = ["MenuCommand_1001", "MenuCommand_1002", "MenuCommand_1003", "MenuCommand_13231"];
+        // MENU-020 and MENU-022: Add/Remove Columns (1000), the four view modes (1004 to 1007) and Customize View (13231).
+        // VIEW-1: the Console Tree, Toolbar and Status Bar entries (1001 to 1003) are not in the View menu.
+        string[] viewItems = ["MenuCommand_1000", "MenuCommand_1004", "MenuCommand_1005", "MenuCommand_1006", "MenuCommand_1007", "MenuCommand_13231"];
         bool itemsThere = ShellRun.WaitUntil(() => viewItems.All(id => run.Find(id) is not null));
         checks.Record("viewItems", itemsThere, $"View entries found: {string.Join(", ", viewItems.Select(id => id + "=" + (run.Find(id) is not null)))}.");
+        string[] removedItems = ["MenuCommand_1001", "MenuCommand_1002", "MenuCommand_1003"];
+        checks.Record("viewNoToggles", removedItems.All(id => run.Find(id) is null), "the View menu has no Console Tree, Toolbar or Status Bar entry (VIEW-1).");
         run.WriteArtifacts("console-shell-menu-view.png");
         run.Tap(ShellRun.VkEscape);
         run.Tap(ShellRun.VkEscape);
@@ -437,27 +438,28 @@ public sealed class ConsoleShellTests
         string[] fromResult = Press(run, ShellRun.VkF6, 1);
         checks.Record("f6ReachesTreeAgain", fromResult[0] == "tree", $"F6 from the result pane with the tree back visited [{fromResult[0]}].");
 
-        // View > Toolbar hides the toolbar band and the panes move up.
+        // Customize View > Standard toolbar hides the toolbar band and the panes move up (TOOL-017, DLG-117; the View menu
+        // no longer holds a Toolbar entry, VIEW-1).
         Rectangle? treeWithToolbar = run.Rect(ShellRun.TreePaneId);
-        MenuPath(run, ViewMenuCommand, ViewToolbarCommand);
-        bool toolbarGone = ShellRun.WaitUntil(() => run.IsHidden(ShellRun.ToolbarId));
-        checks.Record("toolbarHidden", toolbarGone, "the toolbar is gone after View > Toolbar.");
+        bool toolbarSet = SetCustomizeBox(run, FrameIds.StandardToolbar, false);
+        bool toolbarGone = toolbarSet && ShellRun.WaitUntil(() => run.IsHidden(ShellRun.ToolbarId));
+        checks.Record("toolbarHidden", toolbarGone, "the toolbar is gone after Customize View > Standard toolbar is cleared.");
         Rectangle? treeWithoutToolbar = run.Rect(ShellRun.TreePaneId);
         double moved = treeWithToolbar is null || treeWithoutToolbar is null ? 0 : run.Logical(treeWithToolbar.Value.Top - treeWithoutToolbar.Value.Top);
         checks.Record("panesMovedUp", moved >= 25, $"the tree moved up by {moved:0.##} DIP when the toolbar went away; the band is 30 DIP.");
 
-        // View > Status Bar hides the bar; text set while it is hidden shows when it comes back.
+        // Customize View > Status bar hides the bar; text set while it is hidden shows when it comes back.
         Rectangle? treeWithStatus = run.Rect(ShellRun.TreePaneId);
-        MenuPath(run, ViewMenuCommand, ViewStatusBarCommand);
-        bool statusGone = ShellRun.WaitUntil(() => run.IsHidden(ShellRun.StatusBarId));
-        checks.Record("statusHidden", statusGone, "the status bar is gone after View > Status Bar.");
+        bool statusSet = SetCustomizeBox(run, FrameIds.StatusBar, false);
+        bool statusGone = statusSet && ShellRun.WaitUntil(() => run.IsHidden(ShellRun.StatusBarId));
+        checks.Record("statusHidden", statusGone, "the status bar is gone after Customize View > Status bar is cleared.");
         Rectangle? treeWithoutStatus = run.Rect(ShellRun.TreePaneId);
         double grew = treeWithStatus is null || treeWithoutStatus is null ? 0 : run.Logical(treeWithoutStatus.Value.Bottom - treeWithStatus.Value.Bottom);
         checks.Record("panesGrewDown", grew >= 20, $"the tree grew by {grew:0.##} DIP when the status bar went away; the bar is 23 DIP.");
 
         run.Chord(RawKeyboard.Shift, ShellRun.VkF10);
-        MenuPath(run, ViewMenuCommand, ViewStatusBarCommand);
-        bool statusBack = ShellRun.WaitUntil(() => !run.IsHidden(ShellRun.StatusBarId));
+        bool statusShown = SetCustomizeBox(run, FrameIds.StatusBar, true);
+        bool statusBack = statusShown && ShellRun.WaitUntil(() => !run.IsHidden(ShellRun.StatusBarId));
         string text = run.StatusText();
         checks.Record(
             "textSetWhileHidden",
@@ -490,7 +492,7 @@ public sealed class ConsoleShellTests
             ["ShowHideConsoleTree"] = true,
             ["Properties"] = true,
             ["Refresh"] = true,
-            ["ExportList"] = false,
+            ["ExportList"] = true, // TOOL-011: Export List is enabled in every capture dump.
             ["Help"] = false,
         };
         ReportStates(checks, run, "initial", initial);
@@ -691,11 +693,17 @@ public sealed class ConsoleShellTests
         Thread.Sleep(ShellRun.KeySettle.Milliseconds);
     }
 
-    private static void MenuPath(ShellRun run, params int[] commandIds)
+    /// <summary>Opens View > Customize View, sets one check box and closes the dialog with OK.</summary>
+    private static bool SetCustomizeBox(ShellRun run, string boxId, bool wanted)
     {
-        using var driver = new EditingDriver(run.Session);
-        driver.OpenMenu(commandIds);
-        Thread.Sleep(ShellRun.KeySettle.Milliseconds);
+        using FrameDialog? dialog = FrameDialog.Open(run, FrameIds.CustomizeDialog, ViewMenuCommand, FrameIds.CustomizeCommand);
+        if (dialog is null)
+        {
+            return false;
+        }
+
+        bool set = dialog.SetChecked(boxId, wanted);
+        return dialog.PressAndClose(FrameIds.CustomizeOk) && set;
     }
 
     private static ExpandCollapseState? ExpandState(AutomationElement? element)

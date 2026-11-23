@@ -1,0 +1,4 @@
+Setting	State	Comment
+Class both flag	Enabled	Yes
+Class machine flag	Enabled	Yes
+Decimal enabled and disabled values	Disabled	No
