@@ -34,6 +34,8 @@ public partial class App : Application
         // Logging and crash reporting start before anything else in the window path can fail.
         Log.Initialize("regedit");
         Bwc.UI.UiDiagnostics.Warn = Log.Warn;
+        Bwc.Registry.Privileges.PrivilegeDiagnostics.RestoreFailed = (name, error) => Log.Warn(
+            $"The privilege {name} could not be restored on dispose (Win32 error {error}). The process token may keep it enabled.");
         CrashHandler.Install("regedit", showDialog: true);
         UnhandledException += OnUnhandledException;
         Log.Info("Registry Editor " + AboutBox.VersionText(System.Reflection.Assembly.GetEntryAssembly() ?? typeof(App).Assembly) + " starting.");

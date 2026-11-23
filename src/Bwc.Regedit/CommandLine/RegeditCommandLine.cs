@@ -120,6 +120,8 @@ public static class RegeditCommandLine
         }
 
         Log.Initialize("regedit");
+        Bwc.Registry.Privileges.PrivilegeDiagnostics.RestoreFailed = (name, error) => Log.Warn(
+            $"The privilege {name} could not be restored on dispose (Win32 error {error}). The process token may keep it enabled.");
         exitCode = Execute(operation, file, key);
         return true;
     }

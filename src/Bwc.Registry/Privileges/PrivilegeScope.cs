@@ -16,12 +16,14 @@ public sealed class PrivilegeScope : IDisposable
     public const string RestorePrivilege = "SeRestorePrivilege";
 
     private const int ErrorInsufficientBuffer = 122;
+    private const int ErrorGenFailure = 31;
 
     private readonly SafeFileHandle _token;
     private readonly LUID _backupLuid;
     private readonly LUID _restoreLuid;
     private readonly bool _disableBackup;
     private readonly bool _disableRestore;
+    private readonly Func<string, int>? _restoreOverride;
     private int _disposed;
 
     private PrivilegeScope(
@@ -29,13 +31,33 @@ public sealed class PrivilegeScope : IDisposable
         LUID backupLuid,
         bool disableBackup,
         LUID restoreLuid,
-        bool disableRestore)
+        bool disableRestore,
+        Func<string, int>? restoreOverride)
     {
         _token = token;
         _backupLuid = backupLuid;
         _disableBackup = disableBackup;
         _restoreLuid = restoreLuid;
         _disableRestore = disableRestore;
+        _restoreOverride = restoreOverride;
+    }
+
+    /// <summary>
+    /// Test seam: a scope whose restore call is <paramref name="restore"/> (privilege name to Win32 error, 0 for
+    /// success). It never touches the process token, and its token handle does not own anything.
+    /// </summary>
+    internal static PrivilegeScope CreateForRestoreTest(
+        bool disableBackup,
+        bool disableRestore,
+        Func<string, int> restore)
+    {
+        return new PrivilegeScope(
+            new SafeFileHandle(IntPtr.Zero, ownsHandle: false),
+            default,
+            disableBackup,
+            default,
+            disableRestore,
+            restore);
     }
 
     /// <summary>
@@ -124,7 +146,7 @@ public sealed class PrivilegeScope : IDisposable
                 return false;
             }
 
-            scope = new PrivilegeScope(token!, backupLuid, enableBackup, restoreLuid, enableRestore);
+            scope = new PrivilegeScope(token!, backupLuid, enableBackup, restoreLuid, enableRestore, null);
             token = null;
             return true;
         }
@@ -145,12 +167,12 @@ public sealed class PrivilegeScope : IDisposable
         {
             if (_disableBackup)
             {
-                DisablePrivilege(_token, _backupLuid);
+                ResetPrivilege(BackupPrivilege, _backupLuid);
             }
 
             if (_disableRestore)
             {
-                DisablePrivilege(_token, _restoreLuid);
+                ResetPrivilege(RestorePrivilege, _restoreLuid);
             }
         }
         catch
@@ -303,7 +325,10 @@ public sealed class PrivilegeScope : IDisposable
         }
     }
 
-    internal static unsafe void DisablePrivilege(SafeFileHandle token, LUID luid)
+    /// <summary>
+    /// Disables one privilege. Returns 0 when the call succeeded, otherwise the Win32 error that explains the failure.
+    /// </summary>
+    internal static unsafe int DisablePrivilege(SafeFileHandle token, LUID luid)
     {
         byte[] stateBuffer = new byte[TOKEN_PRIVILEGES.SizeOf(1)];
         fixed (byte* statePointer = stateBuffer)
@@ -313,7 +338,26 @@ public sealed class PrivilegeScope : IDisposable
             state->Privileges[0].Luid = luid;
             state->Privileges[0].Attributes = default;
 
-            _ = PInvoke.AdjustTokenPrivileges(token, false, state, default);
+            BOOL adjusted = PInvoke.AdjustTokenPrivileges(token, false, state, default);
+            int win32Error = Marshal.GetLastWin32Error();
+            if (adjusted)
+            {
+                return 0;
+            }
+
+            return win32Error != 0 ? win32Error : ErrorGenFailure;
+        }
+    }
+
+    private void ResetPrivilege(string privilegeName, LUID luid)
+    {
+        int win32Error = _restoreOverride is null
+            ? DisablePrivilege(_token, luid)
+            : _restoreOverride(privilegeName);
+
+        if (win32Error != 0)
+        {
+            PrivilegeDiagnostics.ReportRestoreFailed(privilegeName, win32Error);
         }
     }
 
