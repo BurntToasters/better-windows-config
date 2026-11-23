@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Bwc.Core;
 using Bwc.UI.Theme;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
@@ -886,7 +887,7 @@ public sealed partial class DenseTree : UserControl
                 e.Handled = true;
                 break;
             case VirtualKey.Multiply:
-                _ = ExpandSubtreeSelectedAsync();
+                ExpandSubtreeSelectedAsync().Forget("dense tree expand subtree");
                 e.Handled = true;
                 break;
             case VirtualKey.F2:

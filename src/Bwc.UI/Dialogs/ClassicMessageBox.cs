@@ -1,3 +1,4 @@
+using Bwc.Core;
 using Bwc.UI.Theme;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
@@ -213,7 +214,7 @@ public class ClassicMessageBox : ClassicDialog
     {
         if (_stockIcon is not null && _stockKind is { } kind)
         {
-            _ = LoadStockIconAsync(kind, Math.Max(1, (int)Math.Round(IconDip * context.Scale)));
+            LoadStockIconAsync(kind, Math.Max(1, (int)Math.Round(IconDip * context.Scale))).Forget("classic message box stock icon");
         }
 
         double workWidthDip = context.WorkArea.Width / context.Scale;

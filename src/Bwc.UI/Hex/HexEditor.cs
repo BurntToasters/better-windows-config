@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Globalization;
 using System.Text;
+using Bwc.Core;
 using Bwc.UI.Tree;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
@@ -989,7 +990,7 @@ public sealed partial class HexEditor : UserControl
         }
     }
 
-    private void PasteFromClipboard() => _ = PasteFromClipboardAsync();
+    private void PasteFromClipboard() => PasteFromClipboardAsync().Forget("hex editor paste");
 
     private async Task PasteFromClipboardAsync()
     {

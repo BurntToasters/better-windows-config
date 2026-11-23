@@ -1,4 +1,5 @@
 using System.Linq;
+using Bwc.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using WinRT.Interop;
@@ -41,7 +42,7 @@ public sealed class MultiStringValueDialog : ClassicDialog
         int empty = lines.Count(line => line.Length == 0);
         if (empty > 0 && !_emptyStringsRemoved)
         {
-            _ = ConfirmEmptyStringsAsync(empty);
+            ConfirmEmptyStringsAsync(empty).Forget("multi string empty warning");
             return false;
         }
 

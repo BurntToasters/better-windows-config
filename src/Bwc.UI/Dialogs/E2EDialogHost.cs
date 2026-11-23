@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using Bwc.Core;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -79,7 +80,7 @@ internal static class E2EDialogHost
         try
         {
             HostDialog dialog = Create(_scenario);
-            _ = dialog.ShowAsync(owner);
+            dialog.ShowAsync(owner).Forget("E2E host dialog");
         }
         catch (Exception ex)
         {

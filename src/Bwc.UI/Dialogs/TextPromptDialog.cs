@@ -1,3 +1,4 @@
+using Bwc.Core;
 using Microsoft.UI.Xaml.Controls;
 using WinRT.Interop;
 
@@ -43,7 +44,7 @@ public sealed class TextPromptDialog : ClassicDialog
         string? error = _validate?.Invoke(text);
         if (error is not null)
         {
-            _ = ShowErrorAsync(error);
+            ShowErrorAsync(error).Forget("text prompt error");
             return false;
         }
 

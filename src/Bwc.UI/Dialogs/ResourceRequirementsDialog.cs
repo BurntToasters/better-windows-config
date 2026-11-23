@@ -1,3 +1,4 @@
+using Bwc.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using WinRT.Interop;
@@ -35,7 +36,7 @@ public sealed class ResourceRequirementsDialog : ClassicDialog
             ResourceText.PartialType(r.Type),
         }).ToArray());
         _list.SelectionChanged += (_, _) => _display.IsEnabled = _list.SelectedIndex >= 0;
-        _list.RowActivated += (_, _) => _ = OpenSelectedAsync();
+        _list.RowActivated += (_, _) => OpenSelectedAsync().Forget("resource requirements row activation");
     }
 
     /// <summary>Number of requirement rows.</summary>
@@ -48,7 +49,7 @@ public sealed class ResourceRequirementsDialog : ClassicDialog
     {
         if (id == DisplayId)
         {
-            _ = OpenSelectedAsync();
+            OpenSelectedAsync().Forget("resource requirements display command");
             return;
         }
 
