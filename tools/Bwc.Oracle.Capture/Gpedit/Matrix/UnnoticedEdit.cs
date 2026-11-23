@@ -83,7 +83,10 @@ internal static class UnnoticedEdit
                 problems.Add($"{c.FullId} op[{i}] editPolicy '{op.Policy}': only a number box with a range is set, without keys, on a policy that is already Enabled; classic does not notice it (failure mode 21 of the matrix document). Type it, or start the step from Not Configured");
             }
 
-            if (op.State is not null)
+            // A soft decimal keeps its record on Not Configured (the **soft. value stays in Registry.pol, golden B/Pol_Decimal_Soft), so the policy
+            // reads back as Enabled after that step and the state is not cleared in the plan either.
+            bool keepsEnabled = known == "Enabled" && op.State == "Not Configured" && HasSoftDecimal(op, fixture);
+            if (op.State is not null && !keepsEnabled)
             {
                 states[key] = op.State;
             }
@@ -92,6 +95,12 @@ internal static class UnnoticedEdit
         return problems;
     }
 
+    private static PolicyInfo? PolicyOf(GpeditOp op, FixtureModel fixture) => fixture.Policies.FirstOrDefault(p => p.Name == op.PolicyId);
+
+    // A policy with a soft decimal element: classic keeps its record on Not Configured (failure mode 21 of the matrix document).
+    internal static bool HasSoftDecimal(GpeditOp op, FixtureModel fixture) =>
+        PolicyOf(op, fixture) is { } policy && policy.Elements.Any(e => e.Soft && e.Kind == "decimal");
+
     private static bool OnlyUnkeyedRanges(GpeditOp op, FixtureModel fixture)
     {
         if (op.Options is not { Count: > 0 } options)
@@ -99,7 +108,7 @@ internal static class UnnoticedEdit
             return false;
         }
 
-        PolicyInfo? policy = fixture.Policies.FirstOrDefault(p => p.Name == op.PolicyId);
+        PolicyInfo? policy = PolicyOf(op, fixture);
         return policy is not null && options.All(o =>
             o.Typed is not true && policy.Elements.FirstOrDefault(e => e.Id == o.ElementId) is { } element && NeedsKeys(element));
     }

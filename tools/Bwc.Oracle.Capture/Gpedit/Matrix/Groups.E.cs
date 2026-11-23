@@ -15,18 +15,21 @@ internal static partial class MatrixGroups
         List<OptionSpec> One(PolicyInfo policy, string text, bool typed = false, int element = 0) =>
             new() { OptionChoices.Base(policy, policy.Elements[element]) with { Text = text, Typed = typed ? true : null } };
 
-        // clearBetween: a recorded Not Configured step (OK) before every step after the first. A number box with a range set without keys is not
-        // noticed on a policy that is already Enabled, and typing an out-of-range value is another classic behaviour (Decimal_TypedAboveMax), so each
-        // later step starts from Not Configured and the state change carries the edit, as in the first step (failure mode 21 of the matrix document).
+        // clearBetween: a recorded clear step (OK) before every step after the first. A number box with a range set without keys is not noticed on a
+        // policy that is already Enabled, and typing an out-of-range value is another classic behaviour (Decimal_TypedAboveMax), so each later step
+        // starts from a state other than Enabled and the state change carries the edit, as in the first step (failure mode 21 of the matrix document).
+        // The clear is Not Configured, except on a policy with a soft decimal: classic keeps its record on Not Configured and reads it back as
+        // Enabled (golden B/Pol_Decimal_Soft), so the clear there is Disabled.
         MatrixCase Build(bool clearBetween, string id, string description, PolicyInfo policy, string root, (string Label, List<OptionSpec>? Options, string[]? Press)[] steps)
         {
             var builder = new CaseBuilder("E", id, description);
             bool first = true;
+            bool soft = policy.Elements.Any(e => e.Soft && e.Kind == "decimal");
             foreach ((string label, List<OptionSpec>? options, string[]? press) in steps)
             {
                 if (clearBetween && !first)
                 {
-                    builder.Step($"clear-before-{label}", Edit(policy, root, "Not Configured", press: new[] { "OK" }));
+                    builder.Step(soft ? $"disable-before-{label}" : $"clear-before-{label}", Edit(policy, root, soft ? "Disabled" : "Not Configured", press: new[] { "OK" }));
                 }
 
                 first = false;

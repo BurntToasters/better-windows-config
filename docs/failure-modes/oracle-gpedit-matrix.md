@@ -313,9 +313,17 @@ The 11 cases and the steps that were wrong:
 | `B/Pol_LongDecimal_Basic` | `enabled-alt1-value` | the value is typed |
 | `E/Decimal_EdgeValues` | `max`, `max-plus-one` | a Not Configured step before each |
 | `E/Decimal_NotNumber` | `negative` | a Not Configured step before it |
-| `E/Decimal_Soft_OutOfRange` | `below` | a Not Configured step before it |
+| `E/Decimal_Soft_OutOfRange` | `below` | a Disabled step before it (not Not Configured, see the soft finding below) |
 | `E/Decimal_StoreAsText_OutOfRange` | `negative` | a Not Configured step before it |
 | `E/LongDecimal_AboveMax` | `huge` | a Not Configured step before it |
+
+The soft decimal finding (`E/Decimal_Soft_OutOfRange`, policy `Pol_Decimal_Soft` with the soft decimal `SoftNumber`, range 1 to 100): a Not Configured
+step does not leave that policy Not Configured. In the user's recapture (`artifacts/oracle/gpedit/matrix/E/Decimal_Soft_OutOfRange/result.json`) op 2,
+the Not Configured clear, wrote only `gpt.ini`: `Registry.pol` kept its record. Op 4 then opened the dialog in state Enabled with text 100, so the set
+of `0` was not noticed (Apply disabled, no write), and the result check failed the case, correctly. The tracked golden `B/Pol_Decimal_Soft` confirms
+it: after its not-configured step `Machine.Registry.pol` still holds the `**soft.SoftNumber` record. Classic keeps the `**soft.` record on Not
+Configured and reads the policy back as Enabled. So the clear before each later step of this case is Disabled (OK), labelled
+`disable-before-<label>`, which changes the state from Enabled. Every other clearing case keeps `clear-before-<label>` (Not Configured).
 
 What the plan does now:
 
@@ -325,15 +333,19 @@ What the plan does now:
 - Group E does not type the out-of-range values. Typing above the maximum triggers another classic behaviour (a box and a reset to the maximum),
   which `E/Decimal_TypedAboveMax` covers. The five E cases are built with `CaseClearing`: before every step after the first, the case gets a recorded
   step `clear-before-<label>` (Not Configured, OK). Each later step then starts from Not Configured, so the state change carries the edit exactly as
-  in the first step. The clear steps appear in the golden as steps of their own, so the replay sees every write.
-- Only these 11 plan hashes change. `gpedit matrix --dry-run` reports 336 valid cases and 325 complete; the 11 are incomplete until the user
-  recaptures them (`gpedit matrix --only B,E --resume`).
+  in the first step. The clear steps appear in the golden as steps of their own, so the replay sees every write. The soft case uses
+  `disable-before-<label>` (Disabled, OK) instead, see the soft finding.
+- Only these 11 plan hashes change. `gpedit matrix --dry-run` reports 336 valid cases and 335 complete; the one case that is incomplete until the user
+  recaptures it is `E/Decimal_Soft_OutOfRange` (`gpedit matrix --case E/Decimal_Soft_OutOfRange --resume`). The counts before the soft finding were 336
+  and 335 as well, so the soft change did not move any other case's plan hash.
 
 What the tool checks now, so the pattern cannot return:
 
 - Plan check (`MatrixPlan.Check`, `UnnoticedEdit.PlanProblems`): a step whose only options are number boxes with a range and no `typed`, on a policy that the
   same case already Enabled in the same root, is a plan problem. `--dry-run` and `--list` print it and exit with an error. The state of a policy
-  is followed only through the operations of the case; a policy with no earlier operation is not judged.
+  is followed only through the operations of the case; a policy with no earlier operation is not judged. On a policy with a soft decimal, a Not
+  Configured step does not clear the Enabled state in this follow-up (the record stays, see the soft finding), so a later unkeyed set on it is a
+  plan problem too; a Not Configured step on any other policy still clears it.
 - Result check (`CaseOutput.Evaluate`, `UnnoticedEdit.Find`): an `editPolicy` operation fails the case, with no golden written, when a set changed the
   text of a control (`before` differs from `observed`), no state set changed the radio, `afterSet` reports Apply disabled, and no message box
   refused the edit (no `boxesBeforePress` and no `messageBoxes` in any press). This applies to optional operations too, because the group E
@@ -354,4 +366,6 @@ What can go wrong and the guard of each:
 
 The self test (`gpedit selftest`, no classic needed) checks: the pure decision for each combination of the four facts, the evaluation of a made-up result
 (an unnoticed edit fails the case, also as an optional operation; each fact that clears the pattern lets it pass), the plan check on a made-up case and
-on the real plan (no problem), that group B types exactly the ranged number steps, and that the five E cases carry the clear steps.
+on the real plan (no problem), the soft rule (a Not Configured step on a soft decimal policy keeps the state, a clear on a policy with no soft element does
+not), that the soft case clears with Disabled and has no plan problem, that group B types exactly the ranged number steps, and that the five E cases
+carry the clear steps.

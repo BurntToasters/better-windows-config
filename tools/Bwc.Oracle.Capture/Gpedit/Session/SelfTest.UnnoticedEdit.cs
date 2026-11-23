@@ -171,6 +171,45 @@ internal static partial class SelfTest
             Expect(UnnoticedEdit.PlanProblems(noEarlierOp, Plan().Fixture).Count == 0, "a policy with no earlier operation was judged");
         });
 
+        Case("unnoticed edit: a Not Configured step on a soft decimal policy leaves it Enabled, so a later unkeyed set is a problem", () =>
+        {
+            PolicyInfo soft = Plan().Fixture.Policy("Pol_Decimal_Soft");
+            ElementInfo softNumber = soft.Elements.Single(e => e.Soft && e.Kind == "decimal");
+            Expect(UnnoticedEdit.NeedsKeys(softNumber), "the soft decimal has no range, so the plan check cannot apply to it");
+
+            List<OptionSpec> Number(bool typed) => new() { OptionChoices.Base(soft, softNumber) with { Text = "50", Typed = typed ? true : null } };
+            MatrixCase Make(bool clear, string? state2, bool typed)
+            {
+                var b = new CaseBuilder("E", "PlanCheck", "made up").Step("one", MatrixOps.Edit(soft, "Computer", "Enabled"));
+                if (clear)
+                {
+                    b.Step("clear", MatrixOps.Edit(soft, "Computer", "Not Configured", press: new[] { "OK" }));
+                }
+
+                return b.Step("two", MatrixOps.Edit(soft, "Computer", state2, options: Number(typed))).Build();
+            }
+
+            Expect(UnnoticedEdit.PlanProblems(Make(clear: true, state2: "Enabled", typed: false), Plan().Fixture).Count == 1,
+                "a Not Configured step on a soft decimal policy cleared the state, so a later unkeyed set on Enabled was not a problem");
+            Expect(UnnoticedEdit.PlanProblems(Make(clear: true, state2: null, typed: false), Plan().Fixture).Count == 1,
+                "a later unkeyed set with no state requested, after a Not Configured step on a soft decimal policy, was not a problem");
+            Expect(UnnoticedEdit.PlanProblems(Make(clear: true, state2: "Enabled", typed: true), Plan().Fixture).Count == 0,
+                "a typed set after a Not Configured step on a soft decimal policy was a problem");
+            Expect(UnnoticedEdit.PlanProblems(Make(clear: false, state2: "Enabled", typed: false), Plan().Fixture).Count == 1,
+                "the unkeyed set without the clear step was not a problem");
+        });
+
+        Case("unnoticed edit: the soft decimal case clears with Disabled, so its plan has no problem", () =>
+        {
+            MatrixCase c = Plan().Cases.Single(x => x.FullId == "E/Decimal_Soft_OutOfRange");
+            Expect(!Plan().Problems.Any(p => p.StartsWith("E/Decimal_Soft_OutOfRange", StringComparison.Ordinal)), "the plan of the soft case has a problem");
+
+            List<GpeditOp> edits = c.Ops.Where(o => o.Kind == "editPolicy").ToList();
+            Expect(edits.Count == 3, $"the soft case has {edits.Count} edit steps, wanted 3 (above, the clear step, below)");
+            Expect(edits[1].State == "Disabled", $"the step before 'below' is '{edits[1].State}', wanted Disabled");
+            Expect(edits[1].Options is null, "the clear step before 'below' sets a value");
+        });
+
         Case("unnoticed edit: the plan holds no such step, group B types the ranged numbers and five E cases clear between steps", () =>
         {
             Expect(Plan().Problems.Count == 0, "the plan has problems: " + string.Join("; ", Plan().Problems.Take(5)));
@@ -197,12 +236,12 @@ internal static partial class SelfTest
             {
                 MatrixCase c = Plan().Cases.Single(x => x.FullId == id);
                 List<GpeditOp> edits = c.Ops.Where(o => o.Kind == "editPolicy").ToList();
-                int clears = edits.Count(o => o.State == "Not Configured");
-                Expect(clears == (edits.Count - clears) - 1, $"{id}: {clears} Not Configured steps for {edits.Count - clears} value steps");
+                int clears = edits.Count(o => o.State is "Not Configured" or "Disabled");
+                Expect(clears == (edits.Count - clears) - 1, $"{id}: {clears} clear steps for {edits.Count - clears} value steps");
                 Expect(edits.Where(o => o.Options is { Count: > 0 }).All(o => o.Options!.All(x => x.Typed is not true)), $"{id}: an out-of-range step is typed");
                 for (int i = 1; i < edits.Count; i += 2)
                 {
-                    Expect(edits[i].State == "Not Configured", $"{id}: the step before value step {(i / 2) + 2} is not Not Configured");
+                    Expect(edits[i].State is "Not Configured" or "Disabled", $"{id}: the step before value step {(i / 2) + 2} is neither Not Configured nor Disabled");
                 }
             }
 
