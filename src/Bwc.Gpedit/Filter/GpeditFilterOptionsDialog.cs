@@ -1,3 +1,4 @@
+using Bwc.Core;
 using Bwc.Policy.Admx;
 using Bwc.Policy.Filter;
 using Bwc.UI;
@@ -138,7 +139,7 @@ internal sealed class GpeditFilterOptionsDialog : ClassicDialog
         IReadOnlyList<FilterProblem> problems = options.Validate();
         if (problems.Count > 0)
         {
-            _ = ShowRefusalAsync(problems[0]);
+            ShowRefusalAsync(problems[0]).Forget("filter refusal message");
             return false;
         }
 

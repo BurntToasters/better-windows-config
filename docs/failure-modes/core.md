@@ -444,6 +444,22 @@ The Hub subscribes to `Application.UnhandledException` and reports through `Cras
 `Handled` is not set, so the process still terminates after the log entry and optional dialog.
 The existing launcher rows, automation ids, and merged resource dictionaries are unchanged.
 
+## Fire-and-forget tasks
+
+### Faulted task that nobody awaits (CORE-4)
+
+A call that returns a `Task` and is started without `await` drops its exception: nothing observes
+the task, so the fault reaches `TaskScheduler.UnobservedTaskException` only at a later garbage
+collection, with no entry naming the operation that failed. `TaskExtensions.Forget(context)`
+attaches a continuation that runs on every outcome. A faulted task logs one ERROR entry through
+`Log.Exception` with the context text and the exception type and message, and the continuation then
+ends, so the fault counts as observed. A cancelled task and a completed task log nothing. A task
+that faults after the call returns is logged when it faults. A null context is logged as
+`unnamed task` instead of failing. The continuation itself never throws: the logging call is
+guarded, so a logger failure falls back to the safe trace helper and cannot become a new unobserved
+fault. A null task is a programming error at the call site and throws `ArgumentNullException`
+immediately, before anything is started.
+
 ## Verification
 
 `tests/Bwc.Core.Tests` covers path validation, log writing, rolling, retention, failed

@@ -138,9 +138,9 @@ public sealed partial class MainWindow
         Task<bool> closed = progress.ShowAsync(_hwnd);
         StatusText.Text = HubStrings.Format("UpdateChecking", channel);
 
-        _ = work.ContinueWith(
+        work.ContinueWith(
             _ => DispatcherQueue.TryEnqueue(progress.FinishFromWorker),
-            TaskScheduler.Default);
+            TaskScheduler.Default).Forget("Hub update progress close");
 
         _ = await closed;
         if (!progress.Finished)
@@ -311,9 +311,9 @@ public sealed partial class MainWindow
         });
 
         Task<(UpdateCheckResult Result, StagedUpdate? Staged)> work = _updates.DownloadAsync(manifestUrl, channel, currentVersion, progress, cancel.Token);
-        _ = work.ContinueWith(
+        work.ContinueWith(
             _ => DispatcherQueue.TryEnqueue(dialog.FinishFromWorker),
-            TaskScheduler.Default);
+            TaskScheduler.Default).Forget("Hub update dialog close");
 
         _ = await closed;
         if (!dialog.Finished)

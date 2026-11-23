@@ -188,7 +188,7 @@ internal sealed class ValueCommands
             }
 
             dialog.Activated -= OnFirstActivation;
-            _ = dialog.DispatcherQueue.TryEnqueue(() => error.ShowAsync(WindowNative.GetWindowHandle(dialog)));
+            _ = dialog.DispatcherQueue.TryEnqueue(() => error.ShowAsync(WindowNative.GetWindowHandle(dialog)).Forget("value error dialog"));
         }
 
         dialog.Activated += OnFirstActivation;
