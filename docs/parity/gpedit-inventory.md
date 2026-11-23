@@ -259,7 +259,7 @@
 | ACC-017 | Tree pane, Home (step 5): the selection moves to the root, Local Computer Policy. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeWalk) |
 | ACC-018 | Tree pane, End (step 6): the selection moves to the last visible node. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeWalk) |
 | ACC-019 | Tree pane, PageDown (step 7): from the last visible node the selection does not change. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeWalk) |
-| ACC-020 | Tree pane, PageUp (step 8): the selection moves up by a page. | F/Keys_Tree | G2 | gap |
+| ACC-020 | Tree pane, PageUp (step 8): the selection moves up by a page. | F/Keys_Tree | G2 | declared-difference |
 | ACC-021 | Tree pane, Plus (step 9): no selection change; opens no window and no menu. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeExpand) |
 | ACC-022 | Tree pane, Minus (step 10): no selection change; opens no window and no menu. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeExpand) |
 | ACC-023 | Tree pane, Asterisk (step 11): no selection change; opens no window and no menu. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeExpand) |
@@ -282,7 +282,7 @@
 | ACC-040 | Result list, Space (step 7): no window, no menu; focus stays. | F/Keys_List | G2 | pass (Gpedit_Keys_ListInert) |
 | ACC-041 | Result list, Right (step 8): no window, no menu; focus stays. | F/Keys_List | G2 | pass (Gpedit_Keys_ListInert) |
 | ACC-042 | Result list, Left (step 9): no window, no menu; focus stays. | F/Keys_List | G2 | pass (Gpedit_Keys_ListInert) |
-| ACC-043 | Result list, Ctrl+A (step 10): no window, no menu; focus stays on the same row. | F/Keys_List | G2 | gap |
+| ACC-043 | Result list, Ctrl+A (step 10): no window, no menu; focus stays on the same row. | F/Keys_List | G2 | pass (Gpedit_Keys_ListInert) |
 | ACC-044 | Result list, F5 (step 11): no window, no menu; focus stays. | F/Keys_List | G2 | pass |
 | ACC-045 | Result list, Tab (step 12): the focus leaves the list for the next pane. | F/Keys_List | G2 | pass |
 | ACC-046 | Result list, Shift+Tab (step 13): no popup, no window in this capture. | F/Keys_List | G2 | pass |
@@ -415,7 +415,7 @@
 | VIEW-020 | Status bar with a filter on: the filtered flag and the narrowed count after each filter setting. | F/Filter_Options | G5 | pass |
 | VIEW-021 | Placeholder node lists: Software Settings has an empty list and one header. Windows Settings lists its placeholder children (5 under Computer, 4 under User) in a single column. | F/Placeholders_Computer, F/Placeholders_User | G1 | pass |
 | VIEW-022 | Computer Configuration and User Configuration nodes list three rows: Software Settings, Windows Settings, Administrative Templates, in one column. | F/Placeholders_Computer, F/Placeholders_User | G1 | pass |
-| VIEW-023 | Tree node icons, by image index: root 25, Computer Configuration 27, User Configuration 28, folder 23 (selected 24), Administrative Templates 60 and 61 under Computer and 70 and 71 under User, All Settings 68. | F/Tree_Computer, F/Tree_User, F/AllSettings_Computer | G1, U2a | gap |
+| VIEW-023 | Tree node icons, by image index: root 25, Computer Configuration 27, User Configuration 28, folder 23 (selected 24), Administrative Templates 60 and 61 under Computer and 70 and 71 under User, All Settings 68. | F/Tree_Computer, F/Tree_User, F/AllSettings_Computer | G1, U2a | declared-difference |
 | VIEW-024 | Initial tree expansion: the root and both configuration nodes are expanded, other nodes collapsed. Administrative Templates expands to its categories and All Settings. | F/Tree_Computer, F/Tree_User | G1 | pass |
 | VIEW-025 | A category name with a literal ampersand (Tools & Utilities in the fixture) shows the ampersand as typed, in the tree and in the list. | F/Tree_Computer, F/Nodes_Computer | G1 | pass |
 | VIEW-026 | Setting dialog size: 1400 x 1286 px at 192 DPI, the same for every option kind and both states. | F/Dialog_Layouts | G3a | pass |
@@ -450,14 +450,14 @@
 | TREE-007 | Windows Settings under User Configuration has four placeholder children in order: scripts (logon), Security Settings, Policy-based QoS, Deployed Printers. This order differs from the Computer side. | F/Tree_User | G1 | pass |
 | TREE-008 | Placeholder nodes have no children. | F/Tree_Computer, F/Tree_User, F/Placeholders_* | G1 | pass |
 | TREE-009 | Administrative Templates children: the categories of the loaded templates, then All Settings last (All Settings is a leaf, image 68). | F/Tree_Computer, F/Tree_User | G1 | pass |
-| TREE-010 | Administrative Templates uses image 60 (selected 61) under Computer and 70 (selected 71) under User. | F/Tree_Computer, F/Tree_User | G1 | gap |
+| TREE-010 | Administrative Templates uses image 60 (selected 61) under Computer and 70 (selected 71) under User. | F/Tree_Computer, F/Tree_User | G1 | declared-difference |
 | TREE-011 | Categories under a parent sort by display name. | F/Tree_Computer, F/Tree_User | G1 | pass |
 | TREE-012 | A category shows on a side only when it or a descendant holds a policy that applies to that side. Machine-only and user-only branches show on one side only. | F/Tree_Computer, F/Tree_User | G1 | pass |
 | TREE-013 | A category that holds no policy and has no child with one is not shown on either side. | F/Tree_Computer (the empty category) | G1 | pass |
 | TREE-014 | A policy of class Both appears under both configuration roots. | F/Tree_Computer, F/Tree_User | G1 | pass |
 | TREE-015 | Nested categories to three levels (Machine only, Machine nested, Machine deep on the computer side; User only and User nested on the user side). | F/Tree_Computer, F/Tree_User | G1 | pass |
 | TREE-016 | A policy placed directly under the top category shows in that category's list, next to the subcategory folder rows. | F/Tree_User, F/Nodes_User | G1 | pass |
-| TREE-017 | Category node icons: folder style, same as placeholder nodes except Administrative Templates and its descendants. | F/Tree_Computer, F/Tree_User | G1, U2a | gap |
+| TREE-017 | Category node icons: folder style, same as placeholder nodes except Administrative Templates and its descendants. | F/Tree_Computer, F/Tree_User | G1, U2a | declared-difference |
 | TREE-018 | Selecting a node updates the result list at once; selecting a placeholder node shows an empty or children-only list. | F/Placeholders_Computer, F/Placeholders_User | G1 | pass |
 | TREE-019 | Expand and collapse keys on the tree (Right, Left, Plus, Minus, Asterisk, Backspace). | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeWalk, Gpedit_Keys_TreeExpand) |
 | TREE-020 | Removed 2026-11-22 by user decision: an Extra Registry Settings node. Classic shows none; records that match no policy stay invisible (see BEH-014). BWC builds none. | F/Tree_Computer, F/Tree_User; D/Foreign_* | none | removed |

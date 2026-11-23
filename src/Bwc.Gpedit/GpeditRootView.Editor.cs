@@ -183,6 +183,10 @@ public sealed partial class GpeditRootView
             ShowList();
             ApplyLayout(content.Layout);
             ApplySortOf(node);
+
+            // The policy list is single-select, as classic gpedit's result list is: Ctrl+A does nothing. The shared list
+            // keeps multi-select by default for the console frame.
+            _list.MultiSelect = false;
             _list.SetRows(content.Rows);
         }
 

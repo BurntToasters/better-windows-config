@@ -233,11 +233,14 @@ public sealed class GpeditKeysNavTests
         run.Press(GpeditKeys.Left);
         Thread.Sleep(800);
         checks.Record("ACC-042", KeptRow(run, "Policy 1") && NoWindowNoMenu(run), $"row after Left='{run.DescriptionTitle}', window and menus: {DescribeWindows(run)}.");
+        Dictionary<string, string> before = ListReadout(run);
         run.Shell.Chord(RawKeyboard.Control, A);
         Thread.Sleep(800);
-        // ACC-043 stays a gap: Ctrl+A selects every row of the list, so the description shows the folder and not the row. The
-        // capture keeps the focus on the same row. The observed title is noted.
-        checks.Note("ACC-043", $"gap: after Ctrl+A the description shows '{run.DescriptionTitle}'; the capture keeps 'Policy 1'.");
+        // ACC-043: the policy list is single-select. Ctrl+A does nothing: the focus and the one selected row stay on the same
+        // row, the description keeps the policy, and no window or menu opens.
+        Dictionary<string, string> after = ListReadout(run);
+        bool oneRow = after.GetValueOrDefault("Selected") == "1" && after.GetValueOrDefault("SelectedIdx") == after.GetValueOrDefault("Focus") && after.GetValueOrDefault("Focus") == before.GetValueOrDefault("Focus");
+        checks.Record("ACC-043", oneRow && KeptRow(run, "Policy 1") && run.FocusPane("result") && NoWindowNoMenu(run), $"after Ctrl+A: selected={after.GetValueOrDefault("Selected")}, selectedIdx={after.GetValueOrDefault("SelectedIdx")}, focus={after.GetValueOrDefault("Focus")} (was {before.GetValueOrDefault("Focus")}), row '{run.DescriptionTitle}', window and menus: {DescribeWindows(run)}.");
 
         checks.Record("ACC-040.noEdit", run.Count("Edits") == edits && run.Rows().Select(r => r.Name).SequenceEqual(rowsBefore), $"Edits={run.Count("Edits")}, expected {edits}; the rows are the same.");
 
@@ -296,6 +299,13 @@ public sealed class GpeditKeysNavTests
         ShellRun.WaitUntil(() => run.DescriptionTitle == title, TimeSpan.FromSeconds(5));
 
     private static bool KeptRow(GpeditRun run, string title) => run.DescriptionTitle == title;
+
+    /// <summary>The state of the policy list from its help text: Selected, SelectedIdx, Focus and the other keys.</summary>
+    private static Dictionary<string, string> ListReadout(GpeditRun run) =>
+        run.Shell.HelpTextOf("ConsoleList").Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part.Split('=', 2))
+            .Where(part => part.Length == 2)
+            .ToDictionary(part => part[0], part => part[1], StringComparer.Ordinal);
 
     private static bool NoWindowNoMenu(GpeditRun run) =>
         run.Shell.Session.IsEnabled && run.MenuEntries(GpeditCommandIds.MenuPrefix).Count == 0 && run.MenuEntries("ContextMenuCommand_").Count == 0;

@@ -166,6 +166,9 @@ F5, F1, Alt+Enter, Delete and Alt+Up have no handler today. The captures show:
   focus on the result side change nothing (ACC-030 to ACC-032); Alt+Up with the focus in the result pane changes nothing.
 - A key press that is handled in one pane but also reaches the other (Enter edits and also opens a folder).
 - A key handled while a menu or the dialog is open.
+- Ctrl+A in the policy list selects every row, so the description shows the folder and not the policy (ACC-043). The policy
+  list is single-select (ConsoleList.MultiSelect is off in Bwc.Gpedit): Ctrl+A does nothing there, and Shift or Ctrl with a
+  click or an arrow key selects only the row it reaches. Check: Gpedit_Keys_ListInert.
 
 Checks: `Gpedit_Keys_F5`, `Gpedit_Keys_Edit`, `Gpedit_Keys_WrongPane`, `Gpedit_Keys_F1`, `Gpedit_Keys_Delete`,
 `Gpedit_Keys_History`.

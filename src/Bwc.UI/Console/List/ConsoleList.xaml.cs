@@ -206,6 +206,12 @@ public sealed partial class ConsoleList : UserControl
     /// </summary>
     public Func<ConsoleListRow, string>? ItemNameFormatter { get; set; }
 
+    /// <summary>
+    /// True (the default) lets the list hold several selected rows. False keeps one: Ctrl+A does nothing, and Ctrl+Space,
+    /// Ctrl+click, Shift+click and Shift+arrow select only the row they reach.
+    /// </summary>
+    public bool MultiSelect { get; set; } = true;
+
     /// <summary>The sum of the visible column widths in DIPs.</summary>
     public double ColumnsTotalWidth => _visible.Sum(column => column.Width);
 
@@ -717,6 +723,16 @@ public sealed partial class ConsoleList : UserControl
 
     internal void AddIndexToSelection(int index)
     {
+        if (!MultiSelect)
+        {
+            if (index >= 0 && index < _rows.Count)
+            {
+                SetSingle(_rows[index]);
+            }
+
+            return;
+        }
+
         if (index >= 0 && index < _rows.Count && _selected.Add(_rows[index]))
         {
             _anchorRow = _rows[index];
@@ -1347,8 +1363,8 @@ public sealed partial class ConsoleList : UserControl
         }
 
         ConsoleListRow row = _rows[index];
-        bool shift = IsShiftDown();
-        bool control = IsKeyDown(VirtualKey.Control);
+        bool shift = MultiSelect && IsShiftDown();
+        bool control = MultiSelect && IsKeyDown(VirtualKey.Control);
         if (shift && _anchorRow is { Index: >= 0 } anchor)
         {
             SelectRange(anchor.Index, index, add: control);
@@ -1482,6 +1498,15 @@ public sealed partial class ConsoleList : UserControl
 
     private void ToggleSelection(ConsoleListRow row)
     {
+        if (!MultiSelect)
+        {
+            SetSingle(row);
+            _focusRow = row;
+            RefreshRealized();
+            UpdateHelpText();
+            return;
+        }
+
         if (!_selected.Remove(row))
         {
             _ = _selected.Add(row);
@@ -1512,7 +1537,7 @@ public sealed partial class ConsoleList : UserControl
 
     private void SelectAllRows()
     {
-        if (_rows.Count == 0)
+        if (_rows.Count == 0 || !MultiSelect)
         {
             return;
         }
@@ -1692,6 +1717,12 @@ public sealed partial class ConsoleList : UserControl
 
         target = Math.Clamp(target, 0, _rows.Count - 1);
         ConsoleListRow row = _rows[target];
+        if (!MultiSelect)
+        {
+            shift = false;
+            control = false;
+        }
+
         if (shift)
         {
             ConsoleListRow anchor = _anchorRow is { Index: >= 0 } ? _anchorRow : (_focusRow ?? row);
