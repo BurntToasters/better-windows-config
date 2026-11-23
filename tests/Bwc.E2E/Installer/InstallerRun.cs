@@ -37,6 +37,11 @@ internal sealed class InstallerRun : IDisposable
         new("Registry Editor (BWC).lnk", "BetterWindowsConfig.Regedit", RegeditExeName),
         new("Local Group Policy Editor (BWC).lnk", "BetterWindowsConfig.Gpedit", GpeditExeName),
     ];
+
+    /// <summary>The shortcuts of the 0.1.x layout: the table without the Local Group Policy Editor row (R1).</summary>
+    public static readonly IReadOnlyList<ProductShortcut> OldLayoutShortcuts =
+        [.. ProductShortcuts.Where(shortcut => shortcut.ExeName != GpeditExeName)];
+
     private const string RegistryParent = @"Software\BWC-E2E";
     private const string UninstallSubkey = @"Uninstall\BetterWindowsConfig";
     private const string MachineParentName = "BWC-E2E";

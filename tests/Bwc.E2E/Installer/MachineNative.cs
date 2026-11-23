@@ -224,6 +224,37 @@ internal static class MachineNative
     }
 
     /// <summary>
+    /// The target path of a shortcut (IShellLinkW.GetPath, as stored in the file). Throws <see cref="COMException"/> when the
+    /// file cannot be loaded or read.
+    /// </summary>
+    public static string ShortcutTarget(string shortcutPath)
+    {
+        Type shellLink = Type.GetTypeFromCLSID(ShellLinkClassId) ?? throw new COMException("The shell link class is not registered.");
+        var link = (IShellLinkW)Activator.CreateInstance(shellLink)!;
+        try
+        {
+            int hr = ((IPersistFile)link).Load(shortcutPath, 0);
+            if (hr < 0)
+            {
+                throw new COMException("IPersistFile.Load failed for " + shortcutPath, hr);
+            }
+
+            var path = new StringBuilder(1024);
+            hr = link.GetPath(path, path.Capacity, nint.Zero, 0);
+            if (hr < 0)
+            {
+                throw new COMException("IShellLinkW.GetPath failed for " + shortcutPath, hr);
+            }
+
+            return path.ToString();
+        }
+        finally
+        {
+            _ = Marshal.ReleaseComObject(link);
+        }
+    }
+
+    /// <summary>
     /// The System.AppUserModel.ID of a shortcut, read through the shell property store, or null when it has none. Throws
     /// <see cref="Win32Exception"/> or <see cref="COMException"/> when the property store cannot be opened or read.
     /// </summary>

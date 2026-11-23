@@ -29,17 +29,23 @@ internal static class InstallerChecks
     public static void Write(string path, string rid, InstallerInputs inputs)
     {
         bool pass = Entries.Count > 0 && Entries.All(check => check.Pass);
+        var versions = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["from"] = inputs.VersionA,
+            ["to"] = inputs.VersionB,
+        };
+        if (inputs.OldVersion is not null)
+        {
+            versions["oldLayout"] = inputs.OldVersion;
+        }
+
         var document = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["schema"] = 1,
             ["product"] = "Better Windows Config",
             ["rid"] = rid,
             ["flavor"] = "e2e",
-            ["versions"] = new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["from"] = inputs.VersionA,
-                ["to"] = inputs.VersionB,
-            },
+            ["versions"] = versions,
             ["startedUtc"] = StartedUtc.ToString("o"),
             ["durationMs"] = Clock.ElapsedMilliseconds,
             ["pass"] = pass,

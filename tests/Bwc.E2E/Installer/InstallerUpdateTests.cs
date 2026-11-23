@@ -177,7 +177,9 @@ public sealed partial class InstallerUpdateTests
         InstallerRun run,
         InstallerInputs inputs,
         string caseId,
-        bool holdRegedit)
+        bool holdRegedit,
+        Action<UIA3Automation, int>? afterHubStart = null,
+        Action<UIA3Automation, int>? afterRelaunch = null)
     {
         if (holdRegedit)
         {
@@ -196,6 +198,7 @@ public sealed partial class InstallerUpdateTests
         using Process hubProcess = Process.GetProcessById(hubPid);
         InstallEvidence.CacheHandle(hubProcess);
         using var automation = new UIA3Automation();
+        afterHubStart?.Invoke(automation, hubPid);
 
         HubUi.OpenHelpMenuByMouse(hub, automation);
         AutomationElement? item = HubUi.FindInProcess(automation, hubPid, CheckMenuId, ElementTimeout);
@@ -300,6 +303,7 @@ public sealed partial class InstallerUpdateTests
         if (relaunched is not null)
         {
             CheckRelaunchedWindow(automation, relaunched.Id, caseId);
+            afterRelaunch?.Invoke(automation, relaunched.Id);
         }
 
     }
@@ -513,8 +517,14 @@ public sealed partial class InstallerUpdateTests
     /// Silent install of one setup into the run's folders. Records the exit code, the uninstall key's DisplayVersion,
     /// and the shortcut count. Returns true only when the install ran and shows the expected version.
     /// </summary>
-    private static bool InstallSilently(InstallerRun run, string setupPath, string version, string prefix)
+    private static bool InstallSilently(
+        InstallerRun run,
+        string setupPath,
+        string version,
+        string prefix,
+        IReadOnlyList<InstallerRun.ProductShortcut>? expected = null)
     {
+        IReadOnlyList<InstallerRun.ProductShortcut> shortcutTable = expected ?? InstallerRun.ProductShortcuts;
         int exitCode = run.RunSetup(setupPath, SetupTimeout);
         bool hubPresent = File.Exists(run.HubExe);
         bool ran = exitCode == 0 && hubPresent;
@@ -531,16 +541,16 @@ public sealed partial class InstallerUpdateTests
             $"The uninstall key shows DisplayVersion '{displayVersion}', expected {version}.");
 
         int shortcuts = run.ShortcutCount();
-        int expectedShortcuts = InstallerRun.ProductShortcuts.Count;
+        int expectedShortcuts = shortcutTable.Count;
         InstallerChecks.Record(
             prefix + ".shortcuts",
             shortcuts == expectedShortcuts,
-            $"{shortcuts} shortcut(s) were written; expected {expectedShortcuts} (" + string.Join(", ", InstallerRun.ProductShortcuts.Select(shortcut => shortcut.Name)) + ").");
+            $"{shortcuts} shortcut(s) were written; expected {expectedShortcuts} (" + string.Join(", ", shortcutTable.Select(shortcut => shortcut.Name)) + ").");
         if (ran)
         {
-            bool aumid = ShortcutAumidsAre(run, out string aumidNotes);
+            bool aumid = ShortcutAumidsAre(run, out string aumidNotes, shortcutTable);
             InstallerChecks.Record(prefix + ".aumid", aumid, aumidNotes);
-            bool icons = ShortcutIconsAre(run, out string iconNotes);
+            bool icons = ShortcutIconsAre(run, out string iconNotes, shortcutTable);
             InstallerChecks.Record(prefix + ".icons", icons, iconNotes);
         }
 
@@ -552,11 +562,11 @@ public sealed partial class InstallerUpdateTests
     /// property store (installer.md M45, M54: the installed BwcUpdate.exe --set-aumid wrote them). The installer only warns
     /// on a miss, so this is where a broken write fails.
     /// </summary>
-    private static bool ShortcutAumidsAre(InstallerRun run, out string notes)
+    private static bool ShortcutAumidsAre(InstallerRun run, out string notes, IReadOnlyList<InstallerRun.ProductShortcut>? table = null)
     {
         var lines = new List<string>();
         bool all = true;
-        foreach ((string name, string id, _) in InstallerRun.ProductShortcuts)
+        foreach ((string name, string id, _) in table ?? InstallerRun.ProductShortcuts)
         {
             string path = Path.Combine(run.ShortcutDir, name);
             try
@@ -581,11 +591,11 @@ public sealed partial class InstallerUpdateTests
     /// (installer.md M53). The exe embeds its own icon (bwc-gpo.ico for the Local Group Policy Editor), so this keeps the
     /// Start menu entry from showing the Hub icon or a missing path.
     /// </summary>
-    private static bool ShortcutIconsAre(InstallerRun run, out string notes)
+    private static bool ShortcutIconsAre(InstallerRun run, out string notes, IReadOnlyList<InstallerRun.ProductShortcut>? table = null)
     {
         var lines = new List<string>();
         bool all = true;
-        foreach ((string name, _, string exeName) in InstallerRun.ProductShortcuts)
+        foreach ((string name, _, string exeName) in table ?? InstallerRun.ProductShortcuts)
         {
             string path = Path.Combine(run.ShortcutDir, name);
             string expected = Path.Combine(run.InstallDir, exeName);
