@@ -360,6 +360,59 @@ internal sealed class GpeditRun : IDisposable
         }
     }
 
+    /// <summary>
+    /// Starts another publish folder of the editor, normally the ship editor that the elevated runner
+    /// verifies, on the real policy object. It waits for the real tree, not for the E2E readout.
+    /// </summary>
+    internal static GpeditRun OpenShip(string name, string exePath, TimeSpan? loadTimeout = null)
+    {
+        ShellRun shell = ShellRun.Open(name, exePath: exePath);
+        var run = new GpeditRun(shell, GpeditSandbox.Create(name));
+        try
+        {
+            shell.PlaceWindow(20, 20, Math.Min(1900, ShellRun.ScreenWidth - 60), 1000);
+            bool ready = ShellRun.WaitUntil(
+                () => TreeNames(shell).Contains(RootName, StringComparer.Ordinal),
+                loadTimeout ?? TimeSpan.FromSeconds(120));
+            if (!ready)
+            {
+                throw new TimeoutException($"The real tree did not show '{RootName}'. Tree rows: '{string.Join("|", TreeNames(shell))}'.");
+            }
+
+            return run;
+        }
+        catch
+        {
+            shell.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>The names of the realized rows of the real tree, in display order.</summary>
+    internal static List<string> TreeNames(ShellRun shell)
+    {
+        var names = new List<string>();
+        try
+        {
+            AutomationElement? tree = shell.Find(ShellRun.TreeControlId);
+            if (tree is null)
+            {
+                return names;
+            }
+
+            foreach (AutomationElement row in tree.FindAllDescendants(cf => cf.ByControlType(ControlType.TreeItem)))
+            {
+                names.Add(ShellRun.SafeName(row));
+            }
+        }
+        catch (Exception)
+        {
+            // The tree is being rebuilt; the caller polls again.
+        }
+
+        return names;
+    }
+
     public void Dispose() => Shell.Dispose();
 
     // ---- readout ----------------------------------------------------------------------------------

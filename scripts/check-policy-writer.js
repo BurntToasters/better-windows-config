@@ -219,6 +219,10 @@ const policyPathAllowlist = new Map([
   ["tools/Bwc.Oracle.Capture/Gpedit/Driver/**", oracleCaptureReason],
   ["tools/Bwc.Oracle.Capture/Gpedit/Matrix/**", oracleCaptureReason],
   ["tools/Bwc.Oracle.Capture/Gpedit/Probe/**", oracleCaptureReason],
+  [
+    "tests/Bwc.E2E/Gpedit/Interop/GpeditInteropSupport.cs",
+    "Elevated interop tests: the five real GPO files are copied to memory and restored byte for byte, and the fixture templates are installed in PolicyDefinitions with the file they replace restored.",
+  ],
 ]);
 
 // Protected-scope writes that are allowed, by file. Unlike the whole-file allowlists above, an entry names exact hit
@@ -262,7 +266,12 @@ const refreshNameAllowlist = new Map([
     "Prints a help line that says gpupdate and RefreshPolicyEx are never called. It calls neither.",
   ],
 ]);
-const launchAllowlist = new Map([]);
+const launchAllowlist = new Map([
+  [
+    "tests/Bwc.E2E/Gpedit/Interop/GpeditInteropSupport.cs",
+    "Elevated interop tests: starts mmc.exe gpedit.msc to read the policy BWC saved, and closes only the mmc.exe this test started.",
+  ],
+]);
 
 function countedUsage() {
   return [...countedWriteAllowlist]

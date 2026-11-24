@@ -39,6 +39,8 @@ Read this before you install it.
 - refuses to reuse an existing `%ProgramData%\BwcElevatedRunner` (or its files) that is a link or
   junction, or that is owned by anything other than Administrators or SYSTEM. It stops and changes
   nothing; run `uninstall.ps1` from an elevated shell, then install again;
+- refuses a `node.exe` that is not under `%ProgramFiles%`, `%ProgramFiles(x86)%`, or `%SystemRoot%`,
+  because the task runs node elevated and a normal user must not be able to replace it;
 - copies `run-elevated.ps1` to `%ProgramData%\BwcElevatedRunner\run-elevated.ps1`, with the owner set
   to Administrators and an ACL that only Administrators and SYSTEM can modify (your user gets read
   access);
@@ -46,6 +48,8 @@ Read this before you install it.
 - registers the task "BWC Elevated E2E" for the current user, interactive, with "Run with highest
   privileges". The action is a fixed command: PowerShell runs the copied runner with no arguments.
   The task has no triggers and is disabled unless you pass `-Enable`.
+- with `-Marker`, writes the empty `%ProgramData%\BwcElevatedRunner\real-save.marker` with the same
+  Administrators-only ACL. An install without `-Marker` removes an existing marker.
 
 When the task runs, `run-elevated.ps1` does only this:
 
@@ -54,8 +58,10 @@ When the task runs, `run-elevated.ps1` does only this:
    link or junction) and a BWC checkout, and checks that the node file exists;
 3. sets the PATH to `System32` and the machine PATH only, then maps the node architecture to the
    host RID (`win-arm64` or `win-x64`);
-4. checks the E2E publish folder `publish/<rid>-e2e` with `scripts/flavor-metadata.js`. It must
-   be flavor E2E, with `asInvoker` in every exe head;
+4. checks the E2E publish folder `publish/<rid>-e2e` and the ship publish folder `publish/<rid>`
+   with `scripts/flavor-metadata.js`. The E2E folder must be flavor E2E, with `asInvoker` in every
+   exe head, and the ship folder must be flavor ship. The gpedit interop tests start the ship
+   editor from that folder;
 5. runs `node scripts/test-e2e.js --rid <rid> --flavor e2e --filter "TestCategory=Elevated"` from
    that repo, and nothing else;
 6. disables the scheduled task "BWC Elevated E2E", on every path including a refused run, and
@@ -69,9 +75,12 @@ When the task runs, `run-elevated.ps1` does only this:
    exits 2;
 2. checks that the recorded checkout is the one `run.js` is in. If not, it refuses, so results never
    come from a different tree. Re-run `install.ps1` from the other checkout to switch;
-3. checks the E2E publish folder, and asks for a build if it is missing or wrong;
+3. checks the E2E publish folder and the ship publish folder, and asks for a build if either is
+   missing or wrong;
 4. starts the task with `schtasks /Run /TN "BWC Elevated E2E"`, polls the task state and
-   `last-run.txt`, and stops after 30 minutes;
+   `last-run.txt`, and stops after 30 minutes. The task disables itself before it writes its final
+   record, so a stop is followed by a 60 second wait for that record before the run counts as
+   NOT RUN;
 5. prints the result and the artifact summary from `artifacts/e2e/result-<rid>-e2e.json`.
 
 ## Commands
@@ -86,8 +95,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\elevated-runner\inst
 # Before a run: enable the task. Elevated. The runner disables it again when it finishes.
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\elevated-runner\install.ps1 -Enable
 
-# Build the E2E publish the runner tests. Normal shell.
+# Once: authorize the real policy save by the gpedit interop tests, and enable the task. Elevated.
+# An install without -Marker removes the marker, so include it in the enable command for this run.
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\elevated-runner\install.ps1 -Marker -Enable
+
+# Build the E2E publish the runner tests and the ship publish the interop tests start. Normal shell.
 node scripts/dotnet-build.js --rid win-arm64 --flavor e2e
+node scripts/dotnet-build.js --rid win-arm64 --flavor ship
 
 # Before the first run, and again after any rebuild of the installers: write the installer inputs. Normal shell.
 # It builds the two E2E setups (versions A and B) and records them in artifacts/e2e/installer-inputs.json.
@@ -110,7 +124,9 @@ since, the seven installer tests below report Inconclusive (not run) with the co
 after the E2E publish build, so the recorded setups match what the runner tests.
 
 `install.ps1 -Enable` and `-Disable` both need an elevated shell. A later `install.ps1` without
-a switch registers the task again and leaves it disabled.
+a switch registers the task again and leaves it disabled. The marker is separate: `-Marker` writes
+it, and any install without `-Marker` removes it. The marker folder is owned by Administrators, and
+only Administrators and SYSTEM can write it, so only an elevated install can create the marker.
 
 ## Results
 
@@ -171,6 +187,26 @@ The E2E tests (`tests/Bwc.E2E`) are run by `run.js` through `test-e2e.js --filte
   the next restart and are recorded in the artifact. Results: `artifacts/e2e/installer-machine.json` (every check, plus
   the icacls and SDDL text of the folders). A stray key under `HKLMSoftwareWOW6432NodeBWC-E2E` is reported, not deleted.
 
+- `Gpedit/Interop/GpeditInteropTests.cs`: four tests that start the ship editor from `publish/<rid>` and drive the real
+  Local Group Policy Editor in classic. They need the administrator marker
+  `%ProgramData%\BwcElevatedRunner\real-save.marker`, which `install.ps1 -Marker` writes; without it they report
+  Inconclusive. Tests 1 to 3 install the fixture templates (BwcOracle.admx, BwcOracleBase.admx and their ADML) into
+  `%SystemRoot%\PolicyDefinitions`, back up any file they replace, and remove or restore them in `finally`. They back
+  up the five real policy files (`gpt.ini`, `Machine\Registry.pol`, `Machine\comment.cmtx`, `User\Registry.pol`,
+  `User\comment.cmtx`) and restore them byte for byte. They write only the BWC-Oracle fixture registry values. Test 4
+  only starts the editor and asks the updater to close it.
+  - `GpeditInterop_BwcWrites_ClassicReads`: the ship editor enables the fixture policy and presses OK, classic
+    `gpedit.msc` shows Enabled, BWC sets Not Configured and presses OK, classic shows Not Configured.
+  - `GpeditInterop_ClassicWrites_BwcReadsByFileCopy`: copies the classic-written step of golden
+    `B/Pol_Value_Decimal` into the real policy folder, opens the dialog in the ship editor, and requires its state and
+    shown options to equal the golden `before` read. It presses only Cancel, then restores the files.
+  - `GpeditInterop_RealSaveWithRefresh`: after OK and after Not Configured, reads the live
+    `HKLM\Software\Policies\BWC-Oracle\Basics` value with the oracle matrix timing (settle up to 6 s, then one late read
+    after 4 s). The value must appear and later be gone.
+  - `GpeditInterop_UpdateClosesElevatedEditor`: starts the ship Local Group Policy Editor elevated, and the ship
+    `BwcUpdate.exe --close-running --install-dir publish/<rid>` must close it.
+  Failure modes: `docs/failure-modes/e2e-harness.md`, section 49.
+
 The registry tests (`tests/Bwc.Registry.Tests`) are compiled in the E2E flavor, but `run.js` does not run them. Run
 them yourself from an elevated shell, for example
 `dotnet test tests/Bwc.Registry.Tests/Bwc.Registry.Tests.csproj -c Release -p:BwcFlavor=E2E --filter TestCategory=Elevated`:
@@ -193,4 +229,5 @@ MENU-006, DLG-007, DLG-008) stay `gap` with the reason "pending the user's eleva
 | `scripts/elevated-runner/elevation.mjs` | Elevation check shared with `test-e2e.js` and the launch helper. |
 | `%ProgramData%\BwcElevatedRunner\config.json` | Repo and node paths recorded by `install.ps1`. |
 | `%ProgramData%\BwcElevatedRunner\last-run.txt` | Status of the latest run, read by `run.js`. |
+| `%ProgramData%\BwcElevatedRunner\real-save.marker` | Empty administrator opt-in for the real policy save; written by `install.ps1 -Marker`. |
 | `%ProgramData%\BwcElevatedRunner\logs\` | One log per run. |

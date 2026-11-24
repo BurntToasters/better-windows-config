@@ -17,13 +17,21 @@
 .PARAMETER Disable
   Disable an installed task and leave the runner files in place. Needs an elevated shell.
 
+.PARAMETER Marker
+  Write %ProgramData%\BwcElevatedRunner\real-save.marker, the administrator marker that lets the
+  elevated gpedit interop tests save the real policy. An install without -Marker removes it.
+
 .EXAMPLE
   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\elevated-runner\install.ps1
+
+.EXAMPLE
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\elevated-runner\install.ps1 -Marker -Enable
 #>
 [CmdletBinding()]
 param(
     [switch]$Enable,
-    [switch]$Disable
+    [switch]$Disable,
+    [switch]$Marker
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,10 +49,16 @@ if ($Enable -and $Disable) {
     exit 2
 }
 
+if ($Marker -and $Disable) {
+    Write-Host 'Use -Marker with an install or -Enable, not -Disable.'
+    exit 2
+}
+
 $RunnerRoot = Join-Path $env:ProgramData 'BwcElevatedRunner'
 $LogDir = Join-Path $RunnerRoot 'logs'
 $RunnerTarget = Join-Path $RunnerRoot 'run-elevated.ps1'
 $ConfigPath = Join-Path $RunnerRoot 'config.json'
+$MarkerPath = Join-Path $RunnerRoot 'real-save.marker'
 $RunnerSource = Join-Path $PSScriptRoot 'run-elevated.ps1'
 $PowerShellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 
@@ -80,6 +94,32 @@ if ($null -eq $nodeCommand) {
     exit 1
 }
 $NodePath = $nodeCommand.Source
+
+# The task runs node elevated. A node.exe in a folder a normal user can change would let that user
+# supply the code the task runs as administrator, so only the program folders and the system folder
+# are accepted. All checks before this one only read; nothing has been changed yet.
+function Test-UnderAllowedNodeRoot([string]$Path, [string[]]$Roots) {
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    foreach ($root in $Roots) {
+        if ([string]::IsNullOrWhiteSpace($root)) { continue }
+        $fullRoot = [System.IO.Path]::GetFullPath($root).TrimEnd('\')
+        if ($fullPath.StartsWith($fullRoot + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+$allowedNodeRoots = @(
+    $env:ProgramFiles,
+    [Environment]::GetEnvironmentVariable('ProgramFiles(x86)'),
+    $env:SystemRoot
+)
+if (-not (Test-UnderAllowedNodeRoot $NodePath $allowedNodeRoots)) {
+    Write-Host ('Refusing: node is {0}, which is not under %ProgramFiles%, %ProgramFiles(x86)%, or %SystemRoot%.' -f $NodePath)
+    Write-Host 'The task runs node elevated, so node must come from a folder that a normal user cannot change. Nothing was changed.'
+    exit 1
+}
 
 # --- copy the fixed runner and write config --------------------------------------------------
 
@@ -127,7 +167,7 @@ function Assert-RunnerOwnerIsAdministrators([string]$Path) {
     }
 }
 
-foreach ($existing in @($RunnerRoot, $LogDir, $RunnerTarget, $ConfigPath)) {
+foreach ($existing in @($RunnerRoot, $LogDir, $RunnerTarget, $ConfigPath, $MarkerPath)) {
     Assert-RunnerPathIsSafe $existing
 }
 Assert-RunnerOwnerIsAdministrators $RunnerRoot
@@ -174,11 +214,26 @@ if ($Enable) {
     Disable-ScheduledTask -TaskName $TaskName | Out-Null
 }
 
+# The real-save marker is the administrator's opt-in for the gpedit interop tests, which save the
+# machine's real policy. The folder is admin-only, so only an elevated install can create it. An
+# install without -Marker takes the opt-in away again.
+if ($Marker) {
+    [System.IO.File]::WriteAllText($MarkerPath, '')
+    Set-RunnerAcl $MarkerPath $false
+} elseif (Test-Path -LiteralPath $MarkerPath) {
+    Remove-Item -LiteralPath $MarkerPath -Force
+}
+
 Write-Host ('Installed task "{0}" for {1}.' -f $TaskName, $userId)
 Write-Host ('  repo:   {0}' -f $RepoRoot)
 Write-Host ('  node:   {0}' -f $NodePath)
 Write-Host ('  runner: {0}' -f $RunnerTarget)
 Write-Host ('  state:  {0}' -f (Get-TaskState))
+if ($Marker) {
+    Write-Host ('  marker: {0} (the real-save gpedit tests may run)' -f $MarkerPath)
+} else {
+    Write-Host '  marker: absent (the real-save gpedit tests report Inconclusive)'
+}
 if ($Enable) {
     Write-Host 'The task is enabled. Disable it with: install.ps1 -Disable'
 } else {

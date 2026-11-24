@@ -5,8 +5,8 @@
 #
 # It runs exactly one test command, from the repo recorded in config.json at install time:
 #   node scripts/test-e2e.js --rid <host rid> --flavor e2e --filter "TestCategory=Elevated"
-# It first checks the E2E publish folder with scripts/flavor-metadata.js. It writes its log to
-# %ProgramData%\BwcElevatedRunner\logs and its state to last-run.txt, then exits.
+# It first checks the E2E and the ship publish folders with scripts/flavor-metadata.js. It writes
+# its log to %ProgramData%\BwcElevatedRunner\logs and its state to last-run.txt, then exits.
 #
 # Exit codes: 0 pass, 1 fail, 2 refused before the tests ran, 3 not run.
 # Windows PowerShell 5.1 compatible. Keep this file ASCII.
@@ -171,6 +171,13 @@ $resultArtifact = Join-Path $repo ('artifacts\e2e\result-' + $rid + '-e2e.json')
 $flavorCode = Invoke-LoggedNode 'verify-flavor-e2e' @('scripts/flavor-metadata.js', '--rid', $rid, '--flavor', 'e2e')
 if ($flavorCode -ne 0) {
     Stop-Refused ('The E2E publish folder is not verified as flavor E2E. Run: node scripts/dotnet-build.js --rid ' + $rid + ' --flavor e2e')
+}
+
+# The gpedit interop tests start BwcGpedit.exe from the ship publish, the real product on the real
+# policy folder. It is checked before the tests so a stale or E2E folder fails here, not inside a test.
+$shipCode = Invoke-LoggedNode 'verify-flavor-ship' @('scripts/flavor-metadata.js', '--rid', $rid, '--flavor', 'ship')
+if ($shipCode -ne 0) {
+    Stop-Refused ('The ship publish folder is not verified as flavor ship. Run: node scripts/dotnet-build.js --rid ' + $rid + ' --flavor ship')
 }
 
 $testCode = Invoke-LoggedNode 'e2e-elevated' @('scripts/test-e2e.js', '--rid', $rid, '--flavor', 'e2e', '--filter', 'TestCategory=Elevated')

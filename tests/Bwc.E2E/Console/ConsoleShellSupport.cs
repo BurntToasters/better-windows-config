@@ -80,11 +80,22 @@ internal sealed class ShellRun : IDisposable
 
     internal static IReadOnlyList<string> StandardButtonIds => StandardButtons;
 
-    /// <summary>Starts the editor under a data root scope, with extra environment, and waits for the shell.</summary>
-    internal static ShellRun Open(string name, IReadOnlyDictionary<string, string>? extraEnvironment = null)
+    /// <summary>
+    /// Starts the editor under a data root scope, with extra environment, and waits for the shell. The
+    /// optional <paramref name="exePath"/> starts another publish folder, for example the ship editor.
+    /// </summary>
+    internal static ShellRun Open(string name, IReadOnlyDictionary<string, string>? extraEnvironment = null, string? exePath = null)
     {
         E2EConfig config = GuiGate.Config;
-        config.EnsureExecutablesExist();
+        if (exePath is null)
+        {
+            config.EnsureExecutablesExist();
+        }
+        else if (!File.Exists(exePath))
+        {
+            throw new FileNotFoundException($"The editor executable was not found: {exePath}", exePath);
+        }
+
         string scope = "console-" + name;
         var environment = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (KeyValuePair<string, string> pair in config.DataRootEnvironment(scope))
@@ -107,7 +118,7 @@ internal sealed class ShellRun : IDisposable
             }
         }
 
-        var session = new AppSession(config, config.GpeditExePath, TimeSpan.FromSeconds(30), environment);
+        var session = new AppSession(config, exePath ?? config.GpeditExePath, TimeSpan.FromSeconds(30), environment);
         E2EResults.CurrentSession = session;
         UIA3Automation? automation = null;
         try

@@ -104,6 +104,11 @@ const managedWriteAllowlist = new Map([
       "AssertAllowed refuses every other key before the delete.",
   ],
   [
+    "tests/Bwc.E2E/Gpedit/Interop/GpeditInteropSupport.cs",
+    "Restores only HKLM Software/Policies/BWC-Oracle Basics ModeNumber, the fixture value the policy writes, " +
+      "and removes the two fixture keys again only when they did not exist before and are empty.",
+  ],
+  [
     "tools/Bwc.Oracle.Capture/Gpedit/Session/SelfTest.cs",
     "Creates and deletes only HKCU/Software/BWC-Oracle-Gpedit-Selftest to exercise the session restore without elevation.",
   ],

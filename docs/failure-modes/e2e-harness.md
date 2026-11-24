@@ -684,6 +684,27 @@ through `ProcessWindows`. No timeout, fixed sleep, check id, check order or chec
 | A faster dialog wait hands a one-shot lookup a dialog whose controls are not all in the UIA tree yet. Seen once after this change: the export dialog was found, the Selected branch edit was on screen, and `FindBranchEdit` returned nothing, so four checks of `ExportDialogs_BranchPathEditReportsAnUnreadableKey` failed | The export branch tests look up the branch edit through a wait of 5 s that ends as soon as the edit is found. The checks after it are unchanged, and a missing edit still fails them after the wait. |
 | A scan that must see windows of other processes is narrowed by mistake (a system file dialog hosted elsewhere, classic regedit) | Only scans that already compared the process id of each window with the app process id use `ProcessWindows`. A scan with another process or no process filter is left as it was and is listed in the piece report. |
 
+## 49. Elevated interop with the classic Local Group Policy Editor (A2)
+
+The four tests in `tests/Bwc.E2E/Gpedit/Interop` run only through the elevated runner and start
+`BwcGpedit.exe` from the ship publish `publish/<rid>`, the real product on the real policy folder.
+Every test calls `RequireE2EOnlyFlavor` first, then checks elevation and the administrator marker
+`%ProgramData%\BwcElevatedRunner\real-save.marker`. Tests 1 to 3 install the fixture templates in the system
+PolicyDefinitions folder and back up each file they replace, and they back up the five real policy
+files before they change any. The cleanup runs in `finally` on every path, including a refused dialog.
+Test 4 only starts the editor and closes it through the updater. The ship publish is checked by the
+runner before any test starts (`docs/elevated-runner.md`); each test checks the marker itself.
+
+| Failure | Guard |
+| --- | --- |
+| The test runs from a normal shell and saves the real policy without an administrator decision | The elevation gate reports Inconclusive with `node scripts/elevated-runner/run.js`; the marker gate reports Inconclusive with `install.ps1 -Marker`. No file or registry write happens before both pass. |
+| `GpeditInterop_BwcWrites_ClassicReads`: BWC saves Enabled but classic reads a stale file or a cached state, or BWC's Not Configured still shows Enabled | Classic is started after each BWC save and reads the dialog of the same policy. The test requires Enabled after the first save and Not Configured after the second. The live registry is read after each OK, so the save and its refresh have completed before the policy files are restored. |
+| `GpeditInterop_ClassicWrites_BwcReadsByFileCopy`: the copied golden step does not reach the dialog, or the dialog shows a different state or options | The five-file copy is compared with the golden before the editor starts. The dialog state and the options pane are compared with the golden `before.state` and `before.options`; only Cancel is pressed. `finally` restores the original five files byte for byte and the test records `cleanup.policyFiles`. |
+| `GpeditInterop_RealSaveWithRefresh`: the refresh applies the value later than the settle, or does not remove it after Not Configured | The live value is polled for up to 6 s, then read once more after 4 s, the oracle matrix timing (`docs/failure-modes/oracle-gpedit-matrix.md`, sections 6 and 7). The kind is recorded as DWord. A value that appears only in the late read still passes; a value still there after Not Configured fails. |
+| `GpeditInterop_UpdateClosesElevatedEditor`: the helper scans another folder or closes an editor the test did not start | The helper gets `--install-dir publish/<rid>`, and the test keeps the process handle of the one editor it started. It requires that process to be at high integrity before the call and to exit after exit code 0. |
+| A template or policy file is left changed after a crash in the test body | The template and policy backups are in memory, so a hard process crash leaves the files changed. `GpoGuard` fails the run at assembly cleanup (`gpo.real-unchanged`) for the policy files; the four fixture template names are fixed (BwcOracle.admx, BwcOracleBase.admx and their en-US ADML) and can be removed by hand. A normal failure, including an assertion or a timeout, still runs the `finally` restore and records the cleanup checks. |
+| A test writes a policy file, a template file, or a registry key that is not the fixture | `scripts/check-policy-writer.js` and `scripts/check-registry-writer.js` allow exactly `GpeditInteropSupport.cs`, with the reason that it writes only the five policy files, the four fixture templates, and the BWC-Oracle `ModeNumber` value. Every other file write or registry write in the test project still fails the guard. |
+
 ## Verification artifact
 
 A successful harness run leaves `artifacts/e2e/result-<rid>-<flavor>.json` with schema 2, the run

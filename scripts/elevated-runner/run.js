@@ -36,6 +36,9 @@ const POWERSHELL = path.join(
 const POLL_MS = 3000;
 // The task must reach Running (or write a record) within this window after schtasks /Run.
 const START_GRACE_MS = 120_000;
+// The task disables itself before it writes its final record, so a state that is no longer Running
+// with a fresh record that still says running is not the end yet. Wait this long for the record.
+const STOP_GRACE_MS = 60_000;
 const TIMEOUT_MS = 30 * 60_000;
 const EXIT_PASS = 0;
 const EXIT_FAIL = 1;
@@ -179,6 +182,7 @@ function sleep(ms) {
 async function waitForResult(startedRunId) {
   const begin = Date.now();
   let sawRunning = false;
+  let stoppedAt = null;
 
   for (;;) {
     await sleep(POLL_MS);
@@ -193,12 +197,26 @@ async function waitForResult(startedRunId) {
       return reportRecord(record);
     }
 
-    const elapsed = Date.now() - begin;
-    if (fresh && state !== null && state !== "Running") {
-      console.error("NOT RUN: the task stopped without writing a final result.");
-      console.error(`See the log: ${record.log || LAST_RUN_PATH}`);
-      return EXIT_NOT_RUN;
+    const stopped = fresh && state !== null && state !== "Running";
+    if (stopped) {
+      if (stoppedAt === null) {
+        stoppedAt = Date.now();
+      }
+
+      if (Date.now() - stoppedAt >= STOP_GRACE_MS) {
+        const final = readLastRun();
+        if (final !== null && final.runId !== startedRunId && final.status !== "running") {
+          return reportRecord(final);
+        }
+        console.error("NOT RUN: the task stopped without writing a final result.");
+        console.error(`See the log: ${record.log || LAST_RUN_PATH}`);
+        return EXIT_NOT_RUN;
+      }
+    } else {
+      stoppedAt = null;
     }
+
+    const elapsed = Date.now() - begin;
     if (!fresh && !sawRunning && state !== null && state !== "Running" && elapsed > START_GRACE_MS) {
       console.error(`NOT RUN: the task did not start (state: ${state}).`);
       console.error("Check that you are logged on at the desktop, then the task history in Task Scheduler.");
@@ -265,7 +283,7 @@ async function main(argv) {
     return EXIT_SETUP;
   }
 
-  // Check the publish folder before the elevated run, so a stale or missing build fails here.
+  // Check the publish folders before the elevated run, so a stale or missing build fails here.
   const publish = checkPublishFlavor(
     path.join(REPO_ROOT, "publish", publishFolderName(rid, "e2e")),
     "e2e",
@@ -275,6 +293,19 @@ async function main(argv) {
       console.error(line);
     }
     console.error(`NOT RUN: build the E2E publish first: node scripts/dotnet-build.js --rid ${rid} --flavor e2e`);
+    return EXIT_SETUP;
+  }
+
+  // The gpedit interop tests start the ship editor from this folder, the real product on the real policy.
+  const ship = checkPublishFlavor(
+    path.join(REPO_ROOT, "publish", publishFolderName(rid, "ship")),
+    "ship",
+  );
+  if (!ship.ok) {
+    for (const line of formatFlavorReport(ship)) {
+      console.error(line);
+    }
+    console.error(`NOT RUN: build the ship publish first: node scripts/dotnet-build.js --rid ${rid} --flavor ship`);
     return EXIT_SETUP;
   }
 
