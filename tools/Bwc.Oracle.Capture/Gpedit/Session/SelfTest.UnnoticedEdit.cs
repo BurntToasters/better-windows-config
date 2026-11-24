@@ -11,7 +11,7 @@ internal static partial class SelfTest
 {
     private static readonly string[] ClearedCases =
     {
-        "E/Decimal_EdgeValues", "E/Decimal_NotNumber", "E/Decimal_Soft_OutOfRange", "E/Decimal_StoreAsText_OutOfRange", "E/LongDecimal_AboveMax",
+        "E/Decimal_EdgeValues", "E/Decimal_NotNumber", "E/Decimal_StoreAsText_OutOfRange", "E/LongDecimal_AboveMax",
     };
 
     // The data of an editPolicy operation: an optional state set, one number box set, Apply after the sets, and the presses.
@@ -171,46 +171,56 @@ internal static partial class SelfTest
             Expect(UnnoticedEdit.PlanProblems(noEarlierOp, Plan().Fixture).Count == 0, "a policy with no earlier operation was judged");
         });
 
-        Case("unnoticed edit: a Not Configured step on a soft decimal policy leaves it Enabled, so a later unkeyed set is a problem", () =>
+        Case("unnoticed edit: a clear on a soft decimal policy leaves it Enabled, so a later unkeyed set is a problem; without a soft element both clear", () =>
         {
             PolicyInfo soft = Plan().Fixture.Policy("Pol_Decimal_Soft");
             ElementInfo softNumber = soft.Elements.Single(e => e.Soft && e.Kind == "decimal");
             Expect(UnnoticedEdit.NeedsKeys(softNumber), "the soft decimal has no range, so the plan check cannot apply to it");
+            PolicyInfo ranged = Plan().Fixture.Policy("Pol_Decimal_MinMax");
+            ElementInfo rangedNumber = ranged.Elements[0];
 
-            List<OptionSpec> Number(bool typed) => new() { OptionChoices.Base(soft, softNumber) with { Text = "50", Typed = typed ? true : null } };
-            MatrixCase Make(bool clear, string? state2, bool typed)
+            List<OptionSpec> Number(PolicyInfo p, ElementInfo e, bool typed) => new() { OptionChoices.Base(p, e) with { Text = "50", Typed = typed ? true : null } };
+            MatrixCase Make(PolicyInfo p, ElementInfo e, string? clear, string? state2, bool typed)
             {
-                var b = new CaseBuilder("E", "PlanCheck", "made up").Step("one", MatrixOps.Edit(soft, "Computer", "Enabled"));
-                if (clear)
+                var b = new CaseBuilder("E", "PlanCheck", "made up").Step("one", MatrixOps.Edit(p, "Computer", "Enabled"));
+                if (clear is not null)
                 {
-                    b.Step("clear", MatrixOps.Edit(soft, "Computer", "Not Configured", press: new[] { "OK" }));
+                    b.Step("clear", MatrixOps.Edit(p, "Computer", clear, press: new[] { "OK" }));
                 }
 
-                return b.Step("two", MatrixOps.Edit(soft, "Computer", state2, options: Number(typed))).Build();
+                return b.Step("two", MatrixOps.Edit(p, "Computer", state2, options: Number(p, e, typed))).Build();
             }
 
-            Expect(UnnoticedEdit.PlanProblems(Make(clear: true, state2: "Enabled", typed: false), Plan().Fixture).Count == 1,
+            int Problems(MatrixCase c) => UnnoticedEdit.PlanProblems(c, Plan().Fixture).Count;
+
+            Expect(Problems(Make(soft, softNumber, "Not Configured", "Enabled", typed: false)) == 1,
                 "a Not Configured step on a soft decimal policy cleared the state, so a later unkeyed set on Enabled was not a problem");
-            Expect(UnnoticedEdit.PlanProblems(Make(clear: true, state2: null, typed: false), Plan().Fixture).Count == 1,
-                "a later unkeyed set with no state requested, after a Not Configured step on a soft decimal policy, was not a problem");
-            Expect(UnnoticedEdit.PlanProblems(Make(clear: true, state2: "Enabled", typed: true), Plan().Fixture).Count == 0,
-                "a typed set after a Not Configured step on a soft decimal policy was a problem");
-            Expect(UnnoticedEdit.PlanProblems(Make(clear: false, state2: "Enabled", typed: false), Plan().Fixture).Count == 1,
+            Expect(Problems(Make(soft, softNumber, "Disabled", "Enabled", typed: false)) == 1,
+                "a Disabled step on a soft decimal policy cleared the state, so a later unkeyed set on Enabled was not a problem");
+            Expect(Problems(Make(soft, softNumber, "Disabled", null, typed: false)) == 1,
+                "a later unkeyed set with no state requested, after a Disabled step on a soft decimal policy, was not a problem");
+            Expect(Problems(Make(soft, softNumber, "Disabled", "Enabled", typed: true)) == 0,
+                "a typed set after a Disabled step on a soft decimal policy was a problem");
+            Expect(Problems(Make(soft, softNumber, null, "Enabled", typed: false)) == 1,
                 "the unkeyed set without the clear step was not a problem");
+            Expect(Problems(Make(ranged, rangedNumber, "Disabled", "Enabled", typed: false)) == 0,
+                "a Disabled step on a policy with no soft element did not clear the state");
+            Expect(Problems(Make(ranged, rangedNumber, "Not Configured", "Enabled", typed: false)) == 0,
+                "a Not Configured step on a policy with no soft element did not clear the state");
         });
 
-        Case("unnoticed edit: the soft decimal case clears with Disabled, so its plan has no problem", () =>
+        Case("unnoticed edit: the soft decimal case has no clear step and types its 'below' value, so its plan has no problem", () =>
         {
             MatrixCase c = Plan().Cases.Single(x => x.FullId == "E/Decimal_Soft_OutOfRange");
             Expect(!Plan().Problems.Any(p => p.StartsWith("E/Decimal_Soft_OutOfRange", StringComparison.Ordinal)), "the plan of the soft case has a problem");
 
             List<GpeditOp> edits = c.Ops.Where(o => o.Kind == "editPolicy").ToList();
-            Expect(edits.Count == 3, $"the soft case has {edits.Count} edit steps, wanted 3 (above, the clear step, below)");
-            Expect(edits[1].State == "Disabled", $"the step before 'below' is '{edits[1].State}', wanted Disabled");
-            Expect(edits[1].Options is null, "the clear step before 'below' sets a value");
+            Expect(edits.Count == 2, $"the soft case has {edits.Count} edit steps, wanted 2 (above and below, no clear step)");
+            Expect(edits.All(o => o.State == "Enabled"), "a step of the soft case has a state other than Enabled: " + string.Join(", ", edits.Select(o => o.State)));
+            Expect(edits[1].Options is { Count: 1 } && edits[1].Options![0].Typed is true, "the 'below' step of the soft case is not typed");
         });
 
-        Case("unnoticed edit: the plan holds no such step, group B types the ranged numbers and five E cases clear between steps", () =>
+        Case("unnoticed edit: the plan holds no such step, group B types the ranged numbers and four E cases clear between steps", () =>
         {
             Expect(Plan().Problems.Count == 0, "the plan has problems: " + string.Join("; ", Plan().Problems.Take(5)));
 
@@ -236,12 +246,12 @@ internal static partial class SelfTest
             {
                 MatrixCase c = Plan().Cases.Single(x => x.FullId == id);
                 List<GpeditOp> edits = c.Ops.Where(o => o.Kind == "editPolicy").ToList();
-                int clears = edits.Count(o => o.State is "Not Configured" or "Disabled");
-                Expect(clears == (edits.Count - clears) - 1, $"{id}: {clears} clear steps for {edits.Count - clears} value steps");
+                int clears = edits.Count(o => o.State == "Not Configured");
+                Expect(clears == (edits.Count - clears) - 1, $"{id}: {clears} Not Configured steps for {edits.Count - clears} value steps");
                 Expect(edits.Where(o => o.Options is { Count: > 0 }).All(o => o.Options!.All(x => x.Typed is not true)), $"{id}: an out-of-range step is typed");
                 for (int i = 1; i < edits.Count; i += 2)
                 {
-                    Expect(edits[i].State is "Not Configured" or "Disabled", $"{id}: the step before value step {(i / 2) + 2} is neither Not Configured nor Disabled");
+                    Expect(edits[i].State == "Not Configured", $"{id}: the step before value step {(i / 2) + 2} is not Not Configured");
                 }
             }
 

@@ -15,11 +15,12 @@ internal static partial class MatrixGroups
         List<OptionSpec> One(PolicyInfo policy, string text, bool typed = false, int element = 0) =>
             new() { OptionChoices.Base(policy, policy.Elements[element]) with { Text = text, Typed = typed ? true : null } };
 
-        // clearBetween: a recorded clear step (OK) before every step after the first. A number box with a range set without keys is not noticed on a
-        // policy that is already Enabled, and typing an out-of-range value is another classic behaviour (Decimal_TypedAboveMax), so each later step
-        // starts from a state other than Enabled and the state change carries the edit, as in the first step (failure mode 21 of the matrix document).
-        // The clear is Not Configured, except on a policy with a soft decimal: classic keeps its record on Not Configured and reads it back as
-        // Enabled (golden B/Pol_Decimal_Soft), so the clear there is Disabled.
+        // clearBetween: a recorded Not Configured step (OK) before every step after the first. A number box with a range set without keys is not
+        // noticed on a policy that is already Enabled, and typing an out-of-range value is another classic behaviour (Decimal_TypedAboveMax), so each
+        // later step starts from Not Configured and the state change carries the edit, as in the first step (failure mode 21 of the matrix document).
+        // A policy with a soft decimal gets no clear step at all: classic keeps its **soft. record on Not Configured and on Disabled and reads it back
+        // as Enabled (golden B/Pol_Decimal_Soft), so a clear cannot start the next step from another state. Its later steps type their value instead,
+        // because classic notices keystrokes.
         MatrixCase Build(bool clearBetween, string id, string description, PolicyInfo policy, string root, (string Label, List<OptionSpec>? Options, string[]? Press)[] steps)
         {
             var builder = new CaseBuilder("E", id, description);
@@ -27,9 +28,9 @@ internal static partial class MatrixGroups
             bool soft = policy.Elements.Any(e => e.Soft && e.Kind == "decimal");
             foreach ((string label, List<OptionSpec>? options, string[]? press) in steps)
             {
-                if (clearBetween && !first)
+                if (clearBetween && !first && !soft)
                 {
-                    builder.Step(soft ? $"disable-before-{label}" : $"clear-before-{label}", Edit(policy, root, soft ? "Disabled" : "Not Configured", press: new[] { "OK" }));
+                    builder.Step($"clear-before-{label}", Edit(policy, root, "Not Configured", press: new[] { "OK" }));
                 }
 
                 first = false;
@@ -68,7 +69,7 @@ internal static partial class MatrixGroups
         yield return Case("Decimal_TypedLetters", "decimal typed key by key: 12ab", minMax, "Computer", ("typed", One(minMax, "12ab", typed: true), null));
         yield return Case("Decimal_Apply", "decimal out of range pressed with Apply, then Cancel", minMax, "Computer", ("apply", One(minMax, "9999"), new[] { "Apply", "Cancel" }));
         yield return Case("Decimal_Required_Empty", "required decimal left empty and given an empty text", requiredNumber, "User", ("defaults", null, null), ("empty", One(requiredNumber, string.Empty), null));
-        yield return CaseClearing("Decimal_Soft_OutOfRange", "soft decimal 1 to 100 given 1000 and 0", soft, "Computer", ("above", One(soft, "1000"), null), ("below", One(soft, "0"), null));
+        yield return CaseClearing("Decimal_Soft_OutOfRange", "soft decimal 1 to 100 given 1000 and 0", soft, "Computer", ("above", One(soft, "1000"), null), ("below", One(soft, "0", typed: true), null));
         yield return CaseClearing("Decimal_StoreAsText_OutOfRange", "storeAsText decimal 0 to 65535 given 65536 and -1", storeText, "Computer", ("above", One(storeText, "65536"), null), ("negative", One(storeText, "-1"), null));
         yield return CaseClearing("LongDecimal_AboveMax", "long decimal given 9000000000001 and a 25 digit number", longNumber, "Computer", ("above", One(longNumber, "9000000000001"), null), ("huge", One(longNumber, "9999999999999999999999999"), null));
         yield return Case("LongDecimal_Required_Empty", "required long decimal given an empty text and a letter", longRequired, "User", ("defaults", null, null), ("empty", One(longRequired, string.Empty), null), ("letter", One(longRequired, "x"), null));
