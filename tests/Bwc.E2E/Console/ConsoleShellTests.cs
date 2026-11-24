@@ -178,6 +178,16 @@ public sealed class ConsoleShellTests
 
         double Tree() => run.Logical(run.Rect(ShellRun.TreePaneId)?.Width ?? -1);
         double Result() => run.Logical(run.Rect(ShellRun.ResultPaneId)?.Width ?? -1);
+
+        // Under load the layout can trail the mouse release, so a width is read again until it reaches the expected
+        // value or three seconds pass. The check still compares the last value read.
+        double Settled(Func<double> read, double expected, double tolerance)
+        {
+            double value = read();
+            _ = ShellRun.WaitUntil(() => Near(value = read(), expected, tolerance), TimeSpan.FromSeconds(3));
+            return value;
+        }
+
         Point SplitterCenter()
         {
             Rectangle r = run.Rect(ShellRun.SplitterId) ?? throw new InvalidOperationException("The splitter is not showing.");
@@ -194,7 +204,7 @@ public sealed class ConsoleShellTests
         Point center = SplitterCenter();
         ShellRun.DragStart(center, (int)Math.Round(100 * run.Scale));
         ShellRun.DragEnd();
-        double widened = Tree();
+        double widened = Settled(Tree, 256, 2);
         checks.Record("dragRight", Near(widened, 256, 2), $"tree after a 100 DIP drag right={widened:0.##} DIP; expected 256.");
         run.Measure("afterDragRight", widened);
 
@@ -202,7 +212,7 @@ public sealed class ConsoleShellTests
         center = SplitterCenter();
         ShellRun.DragStart(center, -(int)Math.Round((widened + 400) * run.Scale));
         ShellRun.DragEnd();
-        double narrowest = Tree();
+        double narrowest = Settled(Tree, 48, 2);
         checks.Record("dragLeftLimit", Near(narrowest, 48, 2), $"tree after a drag far left={narrowest:0.##} DIP; the minimum is 48.");
         run.Measure("afterDragFarLeft", narrowest);
 
@@ -210,7 +220,7 @@ public sealed class ConsoleShellTests
         center = SplitterCenter();
         ShellRun.DragStart(center, ShellRun.ScreenWidth - 2 - center.X);
         ShellRun.DragEnd();
-        double widest = Tree();
+        double widest = Settled(Tree, total - 51, 2);
         double resultAtLimit = Result();
         checks.Record(
             "dragRightLimit",
@@ -226,7 +236,7 @@ public sealed class ConsoleShellTests
         double during = Tree();
         run.Tap(ShellRun.VkEscape);
         ShellRun.DragEnd();
-        double after = Tree();
+        double after = Settled(Tree, before, 2);
         checks.Record(
             "escapeCancels",
             during < before - 50 && Near(after, before, 2),
