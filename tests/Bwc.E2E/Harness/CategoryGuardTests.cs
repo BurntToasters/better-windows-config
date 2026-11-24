@@ -26,6 +26,8 @@ public sealed class CategoryGuardTests
     [
         "Gpedit_Smoke_WindowOpens",
         "Gpedit_Tree_SystemTemplates",
+        // Reads the real policy object without elevation and presses only Cancel; passed in the ship runs of arm64 and x64 (2026-11-23).
+        "Gpedit_ReadOnly_Notice",
     ];
 
     [TestMethod]
