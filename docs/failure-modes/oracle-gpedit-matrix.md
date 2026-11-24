@@ -337,8 +337,8 @@ What the plan does now:
   so the state change carries the edit exactly as in the first step. The clear steps appear in the golden as steps of their own, so the replay sees
   every write. The soft case gets no clear step (see the soft finding): its `below` value is typed. Typing a value below the minimum into a soft box is
   a classic behaviour the capture records as it is.
-- In this follow-up only the plan hash of `E/Decimal_Soft_OutOfRange` changes. `gpedit matrix --dry-run` reports 336 valid cases and 335 complete; the one
-  case that waits for a recapture is `E/Decimal_Soft_OutOfRange` (`gpedit matrix --case E/Decimal_Soft_OutOfRange --resume`).
+- In this follow-up only the plan hash of `E/Decimal_Soft_OutOfRange` changes. The user recaptured it (`gpedit matrix --only E --resume`): the typed 0
+  showed a message box while it was typed, the box ended at 1, and OK wrote 1. `gpedit matrix --dry-run` now reports 336 valid cases and 336 complete.
 
 What the tool checks now, so the pattern cannot return:
 

@@ -75,8 +75,7 @@ another group enables is checked too.
 ## B. Group B and C replay
 
 Rows are added in `PolicyGoldenReplayTests` for the 72 cases of group B and the 37 cases of group C. R1 to R19 of
-`policy-save.md` apply. Cases on `awaiting-recapture.txt` stay Inconclusive (R10): six of group B (the CAP-4 number box
-cases).
+`policy-save.md` apply. No case is on `awaiting-recapture.txt` now (R10 does not apply): the six CAP-4 number box cases of group B were recaptured and replay against their recaptured goldens.
 
 | Id | Way it goes wrong | Expected | Case |
 |---|---|---|---|

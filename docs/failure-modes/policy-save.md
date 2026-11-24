@@ -85,8 +85,8 @@ these ways, and none of them is a skip.
 
 Piece E6c adds the replay rows of group D (113 crafted Registry.pol start states, each followed by one unrelated save) and
 group E (30 validation cases), a state matrix over group D, and a store-level test of the refused starts. R1 to R19 above
-apply to every row. The one group E case on `awaiting-recapture.txt`, `E/Decimal_Soft_OutOfRange`, stays Inconclusive (R10). The recaptured
-group E cases `E/Decimal_EdgeValues`, `E/Decimal_NotNumber`, `E/Decimal_StoreAsText_OutOfRange` and `E/LongDecimal_AboveMax`
+apply to every row. No case is on `awaiting-recapture.txt` now, so none stays Inconclusive (R10). The recaptured
+group E cases `E/Decimal_EdgeValues`, `E/Decimal_NotNumber`, `E/Decimal_Soft_OutOfRange`, `E/Decimal_StoreAsText_OutOfRange` and `E/LongDecimal_AboveMax`
 are replayed against their recaptured goldens. No
 group D case has a crafted `gpt.ini`: every D start state is one or two Registry.pol files, and the version file of a step
 is what classic wrote around them.
@@ -162,7 +162,7 @@ directly for every press that classic refused. The table maps the cases to what 
 | V12 | Next Setting with an invalid value saves or moves on; Previous (disabled) is pressed. | Next shows the message and writes nothing; Previous is recorded as not pressed and skipped (B2). | `E/Next_WithInvalid`, `E/Previous_WithInvalid` |
 | V13 | A refusal that classic showed with a message box is accepted by the engine because the harness never asked it. | The refusal of the dialog itself (a number with no digits on a required box) still goes to `PolicySave` with the element empty and must give `Required`. | `PolicyEditRefusalTests` |
 | V14 | A refusal gives the wrong kind or the wrong element. | The kind and the element id match the table of the test. | `PolicyEditRefusalTests` |
-| V15 | A step where classic did not notice the edit (CAP-4) is replayed as "no change". | Those cases are on `awaiting-recapture.txt` and stay Inconclusive (now only `E/Decimal_Soft_OutOfRange`). A case that shows the pattern and is not on the list fails (R9). | see R9 |
+| V15 | A step where classic did not notice the edit (CAP-4) is replayed as "no change". | The CAP-4 cases were recaptured, so no case is on `awaiting-recapture.txt` and none stays Inconclusive. A case that shows the pattern and is not on the list fails (R9). | see R9 |
 | V16 | A refusal leaves the lock held, the store dirty or a temp file. | The sandbox folder holds only the five files and no refresh happened. | every refusal row |
 
 ### C. Dialog control rules used by the E rows (test side)

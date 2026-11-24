@@ -68,8 +68,8 @@ Configured (`B/Pol_LongDecimal_RequiredSoftText` steps 3 and 4). Disabled over D
   Disabled (`B/Pol_Bool_TrueFalseValues` step 3).
 - A decimal element with `soft="true"` is stored under `**soft.<name>` with the typed data of the number (DWORD, QWORD or
   REG_SZ digits), not under its own name (`B/Pol_LongDecimal_RequiredSoftText` steps 1 and 2). The soft record counts as
-  a value, so the policy keeps reading Enabled after Disabled and Not Configured. `B/Pol_Decimal_Soft` is on the awaiting
-  recapture list (CAP-4), so only the long decimal case settles it.
+  a value, so the policy keeps reading Enabled after Disabled and Not Configured. `B/Pol_Decimal_Soft` was recaptured
+  (CAP-4) and shows the same: classic opens it as Enabled 34 after Disabled at op 6, so it settles the soft rule with `B/Pol_LongDecimal_RequiredSoftText`.
   `**delvals.` is written for lists only, see section 7.
 - Enabled removes `**del.<name>` for every name it writes.
 - An instruction that is not owned by the policy (another policy's name, an unknown `**` name) is never touched.

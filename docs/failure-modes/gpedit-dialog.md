@@ -284,8 +284,8 @@ The contract the code must meet (the names are the ones the tests look for):
 | W15 | One generic text covers every failure, so the user cannot tell a read-only file from a held lock. | One text and one automation id per kind (item 4); the texts differ. | `Gpedit_Save_Errors_TextsDiffer`, and the `notOther` checks of the three `Gpedit_Save_Errors_*` tests |
 | W16 | A save differs from classic in any byte, a file that must be absent exists, or a file the capture does not know appears in the policy folder. | Every file of every step equals the capture byte for byte; an absent file is absent; the folder holds the five files only (and the refresh record of the sandbox). | `Gpedit_Replay_GroupA` (all 19 cases), `Gpedit_Replay_GroupB_ElementKinds` (one case per element kind: check box, text box, combo box, number box, long number box, drop-down list, multi-line text, list) |
 
-Cases that are not replayed through the window, and why: the cases of `awaiting-recapture.txt` (CAP-4: classic did not notice a
-number box edit made without key presses, so their goldens are stale until a recapture); groups C, D, E and K stay engine
+Cases that are not replayed through the window, and why: no case is on `awaiting-recapture.txt` now, because the CAP-4 cases (classic did not notice a
+number box edit made without key presses) were recaptured; groups C, D, E and K stay engine
 replays (`tests/Bwc.Policy.Tests/Golden`), because the window adds no behavior to them beyond what groups A and B show.
 
 Tests written before G4 that the code piece had to change, because they stated the G3a behavior: `Gpedit_Options_List` (two checks,

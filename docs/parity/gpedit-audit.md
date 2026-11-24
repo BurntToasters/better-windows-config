@@ -12,11 +12,11 @@ Verdicts:
 - `removed`: the row was retired by a user decision. It carries the reason and needs no further verdict.
 - `open`: not judged yet.
 
-Inputs for the verdicts: the capture goldens under `docs/parity/oracle/gpedit/goldens` (336 cases), the static dump, `string-parity.json` for MSG rows, and the visual review against the group F captures. The recapture of the 11 CAP-4 cases changes some recorded bytes; a POL or VIEW row that cites one of them stays `open` until the recapture is committed.
+Inputs for the verdicts: the capture goldens under `docs/parity/oracle/gpedit/goldens` (336 cases), the static dump, `string-parity.json` for MSG rows, and the visual review against the group F captures. The recapture of the 11 CAP-4 cases is committed (6eba6cb to f01bc41): the goldens hold the recaptured bytes, and a POL row that cites one of them is judged on those bytes.
 
 When a piece closes a gap, it changes the row here and in the inventory to `pass` with its test, or to `declared-difference` with the reason.
 
-State after A1 (2026-11-22, HEAD 5ccff10): every row has a verdict. E2E evidence is the latest full arm64 E2E flavor run (`artifacts/e2e/result-win-arm64-e2e-full.json`, from commit a28ee65) and the later filtered runs; every test named here passed. The U3b tests (`Console_Options_*`, `Gpedit_Help_*`) came after the full run and passed in filtered runs, marked "filtered run". Engine classes passed in the latest quick gate. MSG counts are those of the current `string-parity.json`; the counts in the inventory's oracle column are older. The 7 `open` rows wait for the CAP-4 recapture (`tests/Bwc.Policy.Tests/Golden/awaiting-recapture.txt`).
+State after A1 (2026-11-22, HEAD 5ccff10): every row has a verdict. E2E evidence is the latest full arm64 E2E flavor run (`artifacts/e2e/result-win-arm64-e2e-full.json`, from commit a28ee65) and the later filtered runs; every test named here passed. The U3b tests (`Console_Options_*`, `Gpedit_Help_*`) came after the full run and passed in filtered runs, marked "filtered run". Engine classes passed in the latest quick gate. MSG counts are those of the current `string-parity.json`; the counts in the inventory's oracle column are older. The 7 rows that waited for the CAP-4 recapture (POL-018, POL-020, POL-021, POL-059 to POL-062) are `pass` now, each with the test that replays its recaptured cases. `tests/Bwc.Policy.Tests/Golden/awaiting-recapture.txt` holds no case, and `AwaitingRecaptureListIsEmpty` passes. The policy test project, with the ReleaseGate tests included, ran 1541 tests with 0 failed.
 
 ## Totals
 
@@ -31,9 +31,9 @@ State after A1 (2026-11-22, HEAD 5ccff10): every row has a verdict. E2E evidence
 | VIEW | 28 | 15 | 0 | 0 | 0 |
 | TREE | 17 | 2 | 0 | 1 | 0 |
 | BEH | 23 | 4 | 1 | 1 | 0 |
-| POL | 63 | 0 | 5 | 0 | 7 |
+| POL | 70 | 0 | 5 | 0 | 0 |
 | ADMX | 32 | 0 | 0 | 0 | 0 |
-| All (534) | 308 | 208 | 8 | 3 | 7 |
+| All (534) | 315 | 208 | 8 | 3 | 0 |
 
 ## Gaps
 
@@ -606,10 +606,10 @@ Not differences: the default list order and the policy id ordering follow classi
 | POL-015 | pass | PolicyGoldenReplayTests. | E6b |
 | POL-016 | pass | PolicyGoldenReplayTests (B case). The live case G/Outside_KeyOutsideRoots is A2. | E6b |
 | POL-017 | pass | PolicyGoldenReplayTests. | E6b |
-| POL-018 | open | Awaiting recapture: B/Pol_Both_WithElements.Computer and .User are CAP-4 cases. | E6b |
+| POL-018 | pass | PolicyGoldenReplayTests (group B): B/Pol_Both_WithElements.Computer and .User replay byte for byte against their recaptured goldens. | E6b |
 | POL-019 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupB_ElementKinds. | E6b |
-| POL-020 | open | Awaiting recapture: B/Pol_Decimal_MinMax, B/Pol_Decimal_Soft and B/Pol_Decimal_StoreAsText are CAP-4 cases. | E6b |
-| POL-021 | open | Awaiting recapture: B/Pol_LongDecimal_Basic is a CAP-4 case. | E6b |
+| POL-020 | pass | PolicyGoldenReplayTests (group B): B/Pol_Decimal_MinMax, B/Pol_Decimal_Soft and B/Pol_Decimal_StoreAsText replay byte for byte against their recaptured goldens. | E6b |
+| POL-021 | pass | PolicyGoldenReplayTests (group B): B/Pol_LongDecimal_Basic replays byte for byte against its recaptured golden. | E6b |
 | POL-022 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupB_ElementKinds. | E6b |
 | POL-023 | pass | PolicyGoldenReplayTests. | E6b |
 | POL-024 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupB_ElementKinds. | E6b |
@@ -647,10 +647,10 @@ Not differences: the default list order and the policy id ordering follow classi
 | POL-056 | pass | PolicyGoldenReplayDETests and PolicyStateMatrixTests. | E6c |
 | POL-057 | pass | PolMalformedStartGoldenTests, PolicyGoldenReplayDETests (refused-start path) and Gpedit_Save_Errors_MalformedAtSave. | E6c, G4 |
 | POL-058 | pass | PolicyGoldenReplayDETests and PolMalformedStartGoldenTests. Other tails are GAP-05. | E6c |
-| POL-059 | open | Awaiting recapture: E/Decimal_EdgeValues is a CAP-4 case. | E6c, G3b |
-| POL-060 | open | Awaiting recapture: E/Decimal_NotNumber is a CAP-4 case. | E6c, G3b |
-| POL-061 | open | Awaiting recapture: E/Decimal_Soft_OutOfRange and E/Decimal_StoreAsText_OutOfRange are CAP-4 cases. | E6c, G3b |
-| POL-062 | open | Awaiting recapture: E/LongDecimal_AboveMax is a CAP-4 case. | E6c, G3b |
+| POL-059 | pass | PolicyGoldenReplayDETests (group E): E/Decimal_EdgeValues replays byte for byte against its recaptured golden. | E6c, G3b |
+| POL-060 | pass | PolicyGoldenReplayDETests (group E): E/Decimal_NotNumber replays byte for byte against its recaptured golden. | E6c, G3b |
+| POL-061 | pass | PolicyGoldenReplayDETests (group E): E/Decimal_Soft_OutOfRange and E/Decimal_StoreAsText_OutOfRange replay byte for byte against their recaptured goldens. | E6c, G3b |
+| POL-062 | pass | PolicyGoldenReplayDETests (group E): E/LongDecimal_AboveMax replays byte for byte against its recaptured golden. | E6c, G3b |
 | POL-063 | pass | PolicyGoldenReplayDETests and PolicyEditRefusalTests. | E6c, G3b |
 | POL-064 | pass | PolicyGoldenReplayDETests, PolicyEditRefusalTests and Gpedit_Dialog_Defaults. | E6c, G3b |
 | POL-065 | pass | PolicyGoldenReplayDETests, PolicyEditRefusalTests and Gpedit_Options_List. | E6c, G3b |
@@ -684,9 +684,9 @@ Not differences: the default list order and the policy id ordering follow classi
 | ADMX-013 | pass | PolicyTemplateGoldenTests and Gpedit_Templates_LoadErrors_AttributeCases. | G6 |
 | ADMX-014 | pass | AdmxParserTests and PolicyGoldenReplayTests (B/Pol_Element_KeyOverride). | E2, E6b |
 | ADMX-015 | pass | AdmxParserTests, PolicyGoldenReplayTests (B/Pol_Value_*) and PolicyStateMatrixTests (D/Mismatch_*). | E2, E6b |
-| ADMX-016 | pass | AdmxParserTests and Gpedit_Options_Elements. The bytes of some number cases wait for the recapture (POL-020, POL-021). | E2, E6b |
+| ADMX-016 | pass | AdmxParserTests and Gpedit_Options_Elements. | E2, E6b |
 | ADMX-017 | pass | Gpedit_Options_Elements and Gpedit_Options_Choices. | E2, G3b |
-| ADMX-018 | pass | AdmxParserTests, Gpedit_Options_Numbers and PolicyGoldenReplayDETests. The bytes of some number cases wait for the recapture (POL-059 to POL-062). | E6b, E6c |
+| ADMX-018 | pass | AdmxParserTests, Gpedit_Options_Numbers and PolicyGoldenReplayDETests. | E6b, E6c |
 | ADMX-019 | pass | TemplateSetTests, AdmxBlindTests and Gpedit_TreeBlind_ShapeAndInitialState. | E2, G1 |
 | ADMX-020 | pass | AdmxParserTests, BadTemplateTests and Gpedit_ListBlind_ExtendedPane (the requirements text). | E2 |
 | ADMX-021 | pass | KeyBackslashTests and PolicyGoldenReplayTests (K). | E6a, E6c |
