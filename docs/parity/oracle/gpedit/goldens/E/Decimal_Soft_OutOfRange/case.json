@@ -2,7 +2,7 @@
   "case": "E/Decimal_Soft_OutOfRange",
   "description": "soft decimal 1 to 100 given 1000 and 0",
   "planVersion": 2,
-  "planHash": "5826f20b2c29e424ed9b52823d082273598d56191dd6c0eb23cdba74cbcd1ef0",
+  "planHash": "0b68919f03eb13ed490f0a1435ad91f2287120404ff5260f88cd55f02794ff09",
   "startState": {
     "description": "empty folder",
     "files": []
@@ -53,7 +53,7 @@
       "index": 2,
       "kind": "editPolicy",
       "label": null,
-      "plan": "editPolicy 'Decimal with a soft range' state Enabled options [Soft number: = text '0'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "plan": "editPolicy 'Decimal with a soft range' state Enabled options [Soft number: = typed text '0'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
       "op": {
         "kind": "editPolicy",
         "root": "Computer",
@@ -70,6 +70,7 @@
             "label": "Soft number:",
             "expectKind": "decimalTextBox",
             "text": "0",
+            "typed": true,
             "elementId": "SoftNumber"
           }
         ],
@@ -138,11 +139,11 @@
       "files": {
         "Machine.Registry.pol": {
           "size": 158,
-          "sha256": "8831a4eeb6a9ca08187701f85505c89f705bb1d70848a2e35158f466537904b1"
+          "sha256": "7c788cee2479299d6088c8d742fa11df54494c03e05ac9b4020d316a3ae70258"
         },
         "gpt.ini": {
           "size": 127,
-          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
         },
         "Machine.comment.cmtx": {
           "size": 539,
@@ -152,8 +153,8 @@
         "User.comment.cmtx": null
       },
       "gptVersion": {
-        "raw": 1,
-        "machine": 1,
+        "raw": 2,
+        "machine": 2,
         "user": 0
       },
       "listing": [
@@ -217,10 +218,10 @@
               "kind": "#05585f55fed2",
               "label": "Soft number:",
               "panelId": "#fc950cd55441",
-              "controlId": "48826096",
+              "controlId": "66802",
               "rect": [
-                336,
-                900,
+                76,
+                640,
                 414,
                 58
               ],
@@ -248,7 +249,7 @@
             "label": "Soft number:",
             "labelMatch": "exact",
             "kind": "#05585f55fed2",
-            "controlId": "48826096"
+            "controlId": "66802"
           }
         ],
         "afterSet": {
@@ -282,10 +283,10 @@
               "kind": "#05585f55fed2",
               "label": "Soft number:",
               "panelId": "#fc950cd55441",
-              "controlId": "48826096",
+              "controlId": "66802",
               "rect": [
-                336,
-                900,
+                76,
+                640,
                 414,
                 58
               ],
@@ -362,6 +363,12 @@
       "index": 2,
       "kind": "editPolicy",
       "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
       "data": {
         "policy": "Decimal with a soft range",
         "before": {
@@ -395,10 +402,10 @@
               "kind": "#05585f55fed2",
               "label": "Soft number:",
               "panelId": "#fc950cd55441",
-              "controlId": "156173908",
+              "controlId": "66806",
               "rect": [
-                388,
-                952,
+                128,
+                692,
                 414,
                 58
               ],
@@ -415,18 +422,18 @@
             "observed": "Enabled"
           },
           {
-            "typed": false,
+            "typed": true,
             "multiline": false,
             "requested": "0",
             "before": "100",
             "immediate": "0",
-            "observed": "0",
-            "clamped": false,
+            "observed": "1",
+            "clamped": true,
             "set": "#a11a75e0feee",
             "label": "Soft number:",
             "labelMatch": "exact",
             "kind": "#05585f55fed2",
-            "controlId": "156173908"
+            "controlId": "66806"
           }
         ],
         "afterSet": {
@@ -441,16 +448,16 @@
               "enabled": false
             },
             "OK": {
-              "enabled": true
+              "enabled": false
             },
             "Cancel": {
-              "enabled": true
+              "enabled": false
             },
             "Previous": {
-              "enabled": true
+              "enabled": false
             },
             "Next": {
-              "enabled": true
+              "enabled": false
             }
           },
           "options": [
@@ -460,39 +467,70 @@
               "kind": "#05585f55fed2",
               "label": "Soft number:",
               "panelId": "#fc950cd55441",
-              "controlId": "156173908",
+              "controlId": "66806",
               "rect": [
-                388,
-                952,
+                128,
+                692,
                 414,
                 58
               ],
               "enabled": true,
-              "text": "0"
+              "text": "1"
             }
           ]
         },
         "presses": [
           {
             "button": "OK",
+            "boxesBeforePress": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#c292eda8b688"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
             "enabledBefore": true,
             "titleBefore": "Decimal with a soft range",
             "pressed": true,
             "messageBoxes": [],
             "closed": true,
             "files": {
-              "changed": false,
-              "changedFiles": [],
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
               "groups": {
-                "machine": false,
+                "machine": true,
                 "user": false,
-                "gptIni": false
+                "gptIni": true
               },
               "settleTimedOut": false,
-              "writes": {},
-              "gptVersionAfter": {
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
                 "raw": 1,
                 "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
                 "user": 0
               }
             }
@@ -508,11 +546,11 @@
       "state": {
         "Machine.Registry.pol": {
           "size": 158,
-          "sha256": "8831a4eeb6a9ca08187701f85505c89f705bb1d70848a2e35158f466537904b1"
+          "sha256": "7c788cee2479299d6088c8d742fa11df54494c03e05ac9b4020d316a3ae70258"
         },
         "gpt.ini": {
           "size": 127,
-          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
         },
         "Machine.comment.cmtx": {
           "size": 539,
@@ -522,8 +560,8 @@
         "User.comment.cmtx": null
       },
       "gptVersion": {
-        "raw": 1,
-        "machine": 1,
+        "raw": 2,
+        "machine": 2,
         "user": 0
       }
     }
