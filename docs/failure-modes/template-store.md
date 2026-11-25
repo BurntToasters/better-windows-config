@@ -118,6 +118,7 @@ code, the path and a detail.
 | E5 | The ADMX is open in another process | A failed delete | Reason `InUse`. |
 | E6 | The file name from the caller has a separator or `..` | A delete outside the store | `UnsafeName`, same checks as D8. |
 | E7 | Remove by file name of a template that does not load | A broken file that cannot be removed | `RemoveFile` takes the file name and does not need the file to load. |
+| E8 | The template (or a dependent template in the store) has an ADML only for the caller's UI culture (no `en-US` ADML) | `Remove` fails with `NotImported`, or `Dependents` misses the dependent and deletes the base template | `Remove` and `RemoveFile` take an optional `uiCulture` (matching `Check` and `Import`) and pass it to `TemplateLoader.Load` in both the namespace lookup and `Dependents`; `GpeditTemplateStore.Remove` passes `_culture`. |
 
 ## F. ACL
 

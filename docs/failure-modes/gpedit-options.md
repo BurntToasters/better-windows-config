@@ -140,7 +140,8 @@ Failure mode: the text box is longer than `maxLength`, the combo box is not edit
 should be sorted or sorted when `noSort` is set, the typed text is lost when a suggestion list opens, a multi-line box joins
 its lines, an empty line stays in the value, an ampersand in a default disappears.
 
-- Handling: a text box has `MaxLength = maxLength` (1023 when absent). A combo box is editable, its items are the suggestions
+- Handling: a text box has `MaxLength = maxLength` (1023 when absent). An editable combo box applies the same `maxLength`
+  (1023 when absent) to its inner text box, matching `TextBoxField`. A combo box is editable, its items are the suggestions
   sorted by culture ignore case unless `noSort`, its text is the value. A multi-line box accepts Enter, its value is its lines
   (empty lines are dropped by the engine). Text is never parsed for access keys.
 - E2E: `Gpedit_Options_Choices` reads `I.ComboText` (sorted: Cairo, Lima, Oslo, Paris; the document order is Paris, Oslo, Lima,

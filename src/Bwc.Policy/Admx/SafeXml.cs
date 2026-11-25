@@ -139,7 +139,7 @@ internal static class SafeXml
                 return null;
             }
 
-            if (IsReparsePoint(info.Attributes))
+            if (IsReparsePoint(File.GetAttributes(path)))
             {
                 sink.Add(TemplateFailureCode.ReparsePoint, path);
                 return null;

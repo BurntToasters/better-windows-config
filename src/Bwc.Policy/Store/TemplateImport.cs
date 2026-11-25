@@ -122,8 +122,12 @@ public sealed class TemplateImport
 
     /// <summary>Removes an imported template by its namespace.</summary>
     /// <param name="templateNamespace">The namespace of a template in the store.</param>
+    /// <param name="uiCulture">The UI culture name, or null for en-US.</param>
     /// <param name="cancellationToken">Checked while the store loads.</param>
-    public TemplateRemoveResult Remove(string templateNamespace, CancellationToken cancellationToken = default)
+    public TemplateRemoveResult Remove(
+        string templateNamespace,
+        string? uiCulture = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(templateNamespace);
         var (status, detail) = sources.InspectStore();
@@ -133,17 +137,21 @@ public sealed class TemplateImport
             return new TemplateRemoveResult(false, [blocked], []);
         }
 
-        var set = TemplateLoader.Load([sources.StoreFolder], null, cancellationToken);
+        var set = TemplateLoader.Load([sources.StoreFolder], uiCulture, cancellationToken);
         var file = set.FindFile(templateNamespace);
         return file is null
             ? new TemplateRemoveResult(false, [new TemplateImportProblem(TemplateImportProblemCode.NotImported, sources.StoreFolder, templateNamespace)], [])
-            : RemoveFile(Path.GetFileName(file.AdmxPath), cancellationToken);
+            : RemoveFile(Path.GetFileName(file.AdmxPath), uiCulture, cancellationToken);
     }
 
     /// <summary>Removes an imported template by its ADMX file name. It works for a file that does not load.</summary>
     /// <param name="admxFileName">The file name in the store.</param>
+    /// <param name="uiCulture">The UI culture name, or null for en-US.</param>
     /// <param name="cancellationToken">Checked while the store loads.</param>
-    public TemplateRemoveResult RemoveFile(string admxFileName, CancellationToken cancellationToken = default)
+    public TemplateRemoveResult RemoveFile(
+        string admxFileName,
+        string? uiCulture = null,
+        CancellationToken cancellationToken = default)
     {
         if (!TemplateFileNames.IsSafeAdmxFileName(admxFileName))
         {
@@ -163,7 +171,7 @@ public sealed class TemplateImport
             return new TemplateRemoveResult(false, [new TemplateImportProblem(TemplateImportProblemCode.NotImported, path, admxFileName)], []);
         }
 
-        var dependents = Dependents(path, cancellationToken);
+        var dependents = Dependents(path, uiCulture, cancellationToken);
         if (dependents.Count > 0)
         {
             return new TemplateRemoveResult(false, dependents, []);
@@ -326,9 +334,9 @@ public sealed class TemplateImport
             TemplateImportProblemCode.VerifyFailed, admxPath, templateNamespace, failure?.Code);
     }
 
-    private List<TemplateImportProblem> Dependents(string admxPath, CancellationToken cancellationToken)
+    private List<TemplateImportProblem> Dependents(string admxPath, string? uiCulture, CancellationToken cancellationToken)
     {
-        var set = TemplateLoader.Load([sources.StoreFolder], null, cancellationToken);
+        var set = TemplateLoader.Load([sources.StoreFolder], uiCulture, cancellationToken);
         var self = set.Files.FirstOrDefault(f => TemplateStoreChecks.IsSame(f.AdmxPath, admxPath));
         var result = new List<TemplateImportProblem>();
         if (self is null)

@@ -95,8 +95,8 @@ internal sealed class GpeditTemplateStore
         {
             var importer = new TemplateImport(_sources);
             TemplateRemoveResult result = row.Status == TemplateRowStatus.Loaded
-                ? importer.Remove(row.Namespace)
-                : importer.RemoveFile(row.FileName);
+                ? importer.Remove(row.Namespace, _culture)
+                : importer.RemoveFile(row.FileName, _culture);
             return new TemplateOperationResult(result.Problems, result.Removed);
         }
         catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)

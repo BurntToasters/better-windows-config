@@ -154,6 +154,10 @@ internal sealed class GpeditTemplatesDialog : ClassicDialog
         {
             Log.Warn("An Add of the Add/Remove Templates dialog failed: " + ex.Message);
             _busy = false;
+            if (!_closed)
+            {
+                UpdateButtons();
+            }
         }
     }
 
@@ -183,6 +187,10 @@ internal sealed class GpeditTemplatesDialog : ClassicDialog
         {
             Log.Warn("A Remove of the Add/Remove Templates dialog failed: " + ex.Message);
             _busy = false;
+            if (!_closed)
+            {
+                UpdateButtons();
+            }
         }
     }
 

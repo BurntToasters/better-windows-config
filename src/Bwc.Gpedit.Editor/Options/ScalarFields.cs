@@ -243,6 +243,7 @@ internal sealed class ComboField : OptionField
     private readonly TextBlock? _label;
     private readonly ComboBox _combo;
     private readonly List<string> _items;
+    private readonly int _maxLength;
     private TextBox? _inner;
     private string _text = string.Empty;
 
@@ -257,7 +258,7 @@ internal sealed class ComboField : OptionField
             ? [.. control.Suggestions]
             : [.. control.Suggestions.OrderBy(s => s, StringComparer.Create(CultureInfo.CurrentCulture, ignoreCase: true))];
         _combo.ItemsSource = _items;
-        _ = element;
+        _maxLength = (int)Math.Clamp(element.MaxLength ?? OptionsMetrics.DefaultTextMaxLength, 1UL, (ulong)int.MaxValue);
         _combo.Loaded += OnLoaded;
         _combo.TextSubmitted += (_, args) =>
         {
@@ -313,6 +314,7 @@ internal sealed class ComboField : OptionField
         _inner = FindText(_combo);
         if (_inner is not null)
         {
+            _inner.MaxLength = _maxLength;
             _inner.TextChanged += (_, _) => NotifyChanged();
             if (_inner.Text != _text && _text.Length > 0)
             {
