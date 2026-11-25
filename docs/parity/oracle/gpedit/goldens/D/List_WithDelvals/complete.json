@@ -1,0 +1,19 @@
+{
+  "case": "D/List_WithDelvals",
+  "planHash": "6c1a035ed57a5fc45176d911c059c3d571e7f5295e9be9f0e2e33bb44d35f8c8",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.Registry.pol",
+    "step-01-start/Machine.Registry.pol",
+    "step-01-start/gpt.ini",
+    "step-02-unrelated-save/Machine.Registry.pol",
+    "step-02-unrelated-save/Machine.comment.cmtx",
+    "step-02-unrelated-save/gpt.ini",
+    "step-03-unrelated-cleared/Machine.Registry.pol",
+    "step-03-unrelated-cleared/Machine.comment.cmtx",
+    "step-03-unrelated-cleared/gpt.ini"
+  ]
+}

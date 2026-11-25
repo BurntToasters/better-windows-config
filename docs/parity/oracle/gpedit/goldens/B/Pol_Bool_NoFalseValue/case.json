@@ -1,0 +1,1258 @@
+{
+  "case": "B/Pol_Bool_NoFalseValue",
+  "description": "Pol_Bool_NoFalseValue under Computer Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
+  "planVersion": 2,
+  "planHash": "948f9252b019d7e5c7bb59f19429308a1a9b128e942eefc009feda7ec59ebb98",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Boolean without a false value' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Boolean without a false value",
+        "state": "Enabled",
+        "policyId": "Pol_Bool_NoFalseValue",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step enabled-defaults",
+      "plan": "snapshot  [step enabled-defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Boolean without a false value' state Enabled options [Check without a false value = checked True] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Boolean without a false value",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Check without a false value",
+            "expectKind": "checkBox",
+            "checked": true,
+            "elementId": "NoFalseCheck"
+          }
+        ],
+        "policyId": "Pol_Bool_NoFalseValue",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step enabled-alt1-checked",
+      "plan": "snapshot  [step enabled-alt1-checked]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt1-checked"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Boolean without a false value' state Enabled options [Check without a false value = checked False] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Boolean without a false value",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Check without a false value",
+            "expectKind": "checkBox",
+            "checked": false,
+            "elementId": "NoFalseCheck"
+          }
+        ],
+        "policyId": "Pol_Bool_NoFalseValue",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step enabled-alt2-unchecked",
+      "plan": "snapshot  [step enabled-alt2-unchecked]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt2-unchecked"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Boolean without a false value' state Disabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Boolean without a false value",
+        "state": "Disabled",
+        "policyId": "Pol_Bool_NoFalseValue",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Boolean without a false value' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Boolean without a false value",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Bool_NoFalseValue",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled-defaults",
+      "folder": "step-01-enabled-defaults",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 156,
+          "sha256": "0c2653e64ce483e3bece5d28e1519c1ae1a3f338876d3d9c7573118b2f6dda91"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 156
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-alt1-checked",
+      "folder": "step-02-enabled-alt1-checked",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 144,
+          "sha256": "41635bef78de19e3adbb190257990432a26b43e1cdcc4f512eb23b2612f0def1"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 144
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "enabled-alt2-unchecked",
+      "folder": "step-03-enabled-alt2-unchecked",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 156,
+          "sha256": "0c2653e64ce483e3bece5d28e1519c1ae1a3f338876d3d9c7573118b2f6dda91"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 156
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "disabled",
+      "folder": "step-04-disabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 156,
+          "sha256": "0c2653e64ce483e3bece5d28e1519c1ae1a3f338876d3d9c7573118b2f6dda91"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 156
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "not-configured",
+      "folder": "step-05-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "bbff97b1f1386f1ac16f8e6f9cbe1f14c21d84b7e9f674638465cc046494d153"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Boolean without a false value",
+        "before": {
+          "title": "Boolean without a false value",
+          "windowTitle": "Boolean without a false value",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box with a true value of 1 and no false value. The oracle records what a cleared box writes.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Check without a false value",
+              "panelId": "#d168e96e96e3",
+              "controlId": "#d168e96e96e3",
+              "rect": [
+                446,
+                1010,
+                342,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Boolean without a false value",
+          "windowTitle": "Boolean without a false value",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box with a true value of 1 and no false value. The oracle records what a cleared box writes.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Check without a false value",
+              "panelId": "#d168e96e96e3",
+              "controlId": "#d168e96e96e3",
+              "rect": [
+                446,
+                1010,
+                342,
+                44
+              ],
+              "enabled": true,
+              "checkState": 0
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Boolean without a false value",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Boolean without a false value"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 156,
+          "sha256": "0c2653e64ce483e3bece5d28e1519c1ae1a3f338876d3d9c7573118b2f6dda91"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Boolean without a false value",
+        "before": {
+          "title": "Boolean without a false value",
+          "windowTitle": "Boolean without a false value",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box with a true value of 1 and no false value. The oracle records what a cleared box writes.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Check without a false value",
+              "panelId": "#d168e96e96e3",
+              "controlId": "#d168e96e96e3",
+              "rect": [
+                498,
+                1062,
+                342,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Disabled",
+            "observed": "Enabled"
+          },
+          {
+            "requested": true,
+            "beforeCheckState": 0,
+            "observedCheckState": 1,
+            "set": "#a11a75e0feee",
+            "label": "Check without a false value",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#d168e96e96e3"
+          }
+        ],
+        "afterSet": {
+          "title": "Boolean without a false value",
+          "windowTitle": "Boolean without a false value",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box with a true value of 1 and no false value. The oracle records what a cleared box writes.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Check without a false value",
+              "panelId": "#d168e96e96e3",
+              "controlId": "#d168e96e96e3",
+              "rect": [
+                498,
+                1062,
+                342,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Boolean without a false value",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Boolean without a false value"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 144,
+          "sha256": "41635bef78de19e3adbb190257990432a26b43e1cdcc4f512eb23b2612f0def1"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 2,
+      "gptVersionAfter": 3,
+      "data": {
+        "policy": "Boolean without a false value",
+        "before": {
+          "title": "Boolean without a false value",
+          "windowTitle": "Boolean without a false value",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box with a true value of 1 and no false value. The oracle records what a cleared box writes.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Check without a false value",
+              "panelId": "#d168e96e96e3",
+              "controlId": "#d168e96e96e3",
+              "rect": [
+                550,
+                1114,
+                342,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requested": false,
+            "beforeCheckState": 1,
+            "observedCheckState": 0,
+            "set": "#a11a75e0feee",
+            "label": "Check without a false value",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#d168e96e96e3"
+          }
+        ],
+        "afterSet": {
+          "title": "Boolean without a false value",
+          "windowTitle": "Boolean without a false value",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box with a true value of 1 and no false value. The oracle records what a cleared box writes.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Check without a false value",
+              "panelId": "#d168e96e96e3",
+              "controlId": "#d168e96e96e3",
+              "rect": [
+                550,
+                1114,
+                342,
+                44
+              ],
+              "enabled": true,
+              "checkState": 0
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Boolean without a false value",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Boolean without a false value"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 156,
+          "sha256": "0c2653e64ce483e3bece5d28e1519c1ae1a3f338876d3d9c7573118b2f6dda91"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Boolean without a false value",
+        "before": {
+          "title": "Boolean without a false value",
+          "windowTitle": "Boolean without a false value",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box with a true value of 1 and no false value. The oracle records what a cleared box writes.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Check without a false value",
+              "panelId": "#d168e96e96e3",
+              "controlId": "#d168e96e96e3",
+              "rect": [
+                602,
+                1166,
+                342,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Disabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Boolean without a false value",
+          "windowTitle": "Boolean without a false value",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box with a true value of 1 and no false value. The oracle records what a cleared box writes.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Check without a false value",
+              "panelId": "#d168e96e96e3",
+              "controlId": "#d168e96e96e3",
+              "rect": [
+                602,
+                1166,
+                342,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Boolean without a false value",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Boolean without a false value"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 156,
+          "sha256": "0c2653e64ce483e3bece5d28e1519c1ae1a3f338876d3d9c7573118b2f6dda91"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 3,
+      "gptVersionAfter": 4,
+      "data": {
+        "policy": "Boolean without a false value",
+        "before": {
+          "title": "Boolean without a false value",
+          "windowTitle": "Boolean without a false value",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box with a true value of 1 and no false value. The oracle records what a cleared box writes.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Check without a false value",
+              "panelId": "#d168e96e96e3",
+              "controlId": "#d168e96e96e3",
+              "rect": [
+                82,
+                646,
+                342,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Boolean without a false value",
+          "windowTitle": "Boolean without a false value",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box with a true value of 1 and no false value. The oracle records what a cleared box writes.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Check without a false value",
+              "panelId": "#d168e96e96e3",
+              "controlId": "#d168e96e96e3",
+              "rect": [
+                82,
+                646,
+                342,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Boolean without a false value",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Boolean without a false value"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "bbff97b1f1386f1ac16f8e6f9cbe1f14c21d84b7e9f674638465cc046494d153"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      }
+    }
+  ]
+}

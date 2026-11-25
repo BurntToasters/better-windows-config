@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Bwc.Core;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Bwc.Update.Tests;
@@ -36,6 +37,35 @@ public sealed class ProcessCommandsTests
         finally
         {
             Kill(running);
+        }
+    }
+
+    // HC5: each tool of the catalog (Registry Editor, Local Group Policy Editor) is found by its exe name under the folder,
+    // and the hub's name is in the list too.
+    [TestMethod]
+    public void CloseRunning_Every_Catalog_Tool_Is_Found()
+    {
+        CollectionAssert.AreEqual(
+            new[] { "BetterWindowsConfig", "BwcRegedit", "BwcGpedit" },
+            ProcessCommands.ProcessNames.ToArray(),
+            "the Hub and every catalog tool");
+        foreach (var tool in ToolCatalog.Tools)
+        {
+            using var dir = new TempDir();
+            var installDir = dir.Sub("install");
+            using var running = StartLongRunningTool(installDir, tool.ExeName);
+            var output = new StringWriter();
+            try
+            {
+                var code = ProcessCommands.CloseRunning(installDir, [], 1, output);
+
+                Assert.AreEqual(3, code, tool.ExeName + ": " + output);
+                StringAssert.Contains(output.ToString(), Path.GetFileNameWithoutExtension(tool.ExeName) + " pid=" + running.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+            finally
+            {
+                Kill(running);
+            }
         }
     }
 
@@ -97,9 +127,9 @@ public sealed class ProcessCommandsTests
         Assert.IsTrue(process.HasExited);
     }
 
-    private static Process StartLongRunningTool(string installDir)
+    private static Process StartLongRunningTool(string installDir, string exeName = "BwcRegedit.exe")
     {
-        var copy = Path.Combine(installDir, "BwcRegedit.exe");
+        var copy = Path.Combine(installDir, exeName);
         File.Copy(Path.Combine(Environment.SystemDirectory, "cmd.exe"), copy);
         var psi = new ProcessStartInfo(copy)
         {

@@ -1,0 +1,10 @@
+{
+  "case": "E/List_Explicit_NameOnly",
+  "planHash": "ed84dc507ddd537c1b3caa9a1890768b2af4ef748df12e527a6faf345c5c5c2d",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini"
+  ]
+}

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="FilterDialogCaption" xml:space="preserve">
+    <value>Filter Options</value>
+  </data>
+  <data name="FilterLabelManaged" xml:space="preserve">
+    <value>Man&amp;aged:</value>
+  </data>
+  <data name="FilterLabelConfigured" xml:space="preserve">
+    <value>Co&amp;nfigured:</value>
+  </data>
+  <data name="FilterLabelCommented" xml:space="preserve">
+    <value>Comm&amp;ented:</value>
+  </data>
+  <data name="FilterAny" xml:space="preserve">
+    <value>Any</value>
+  </data>
+  <data name="FilterYes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="FilterNo" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="FilterAll" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="FilterExact" xml:space="preserve">
+    <value>Exact</value>
+  </data>
+  <data name="FilterGroupKeywords" xml:space="preserve">
+    <value>Keywords</value>
+  </data>
+  <data name="FilterKeywordsEnabled" xml:space="preserve">
+    <value>Enable &amp;Keyword Filters</value>
+  </data>
+  <data name="FilterLabelKeywordText" xml:space="preserve">
+    <value>Filter for &amp;word(s):</value>
+  </data>
+  <data name="FilterLabelKeywordMatch" xml:space="preserve">
+    <value>&amp;Match:</value>
+  </data>
+  <data name="FilterLabelWithin" xml:space="preserve">
+    <value>Look in:</value>
+  </data>
+  <data name="FilterInTitle" xml:space="preserve">
+    <value>Policy Setting &amp;Title</value>
+  </data>
+  <data name="FilterInHelp" xml:space="preserve">
+    <value>&amp;Help Text</value>
+  </data>
+  <data name="FilterInComment" xml:space="preserve">
+    <value>&amp;Comment</value>
+  </data>
+  <data name="FilterGroupRequirements" xml:space="preserve">
+    <value>Requirements</value>
+  </data>
+  <data name="FilterRequirementsEnabled" xml:space="preserve">
+    <value>Enable &amp;Requirements Filters</value>
+  </data>
+  <data name="FilterLabelPlatformMatch" xml:space="preserve">
+    <value>Policy supports:</value>
+  </data>
+  <data name="FilterLabelPlatforms" xml:space="preserve">
+    <value>&amp;Platforms:</value>
+  </data>
+  <data name="FilterSelectAll" xml:space="preserve">
+    <value>&amp;Select All</value>
+  </data>
+  <data name="FilterClearAll" xml:space="preserve">
+    <value>Clear A&amp;ll</value>
+  </data>
+  <data name="FilterOk" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="FilterCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="FilterNameManaged" xml:space="preserve">
+    <value>Managed</value>
+  </data>
+  <data name="FilterNameConfigured" xml:space="preserve">
+    <value>Configured</value>
+  </data>
+  <data name="FilterNameCommented" xml:space="preserve">
+    <value>Commented</value>
+  </data>
+  <data name="FilterNameKeywordText" xml:space="preserve">
+    <value>Keywords</value>
+  </data>
+  <data name="FilterNameKeywordMatch" xml:space="preserve">
+    <value>Keyword match</value>
+  </data>
+  <data name="FilterNamePlatformMatch" xml:space="preserve">
+    <value>Platform match</value>
+  </data>
+  <data name="FilterNamePlatformList" xml:space="preserve">
+    <value>Platforms</value>
+  </data>
+  <!-- Refusal texts: one for each reason the options are refused. -->
+  <!-- Oracle admtmpl.dll.mui:3122 -->
+  <data name="FilterRefusalKeywordText" xml:space="preserve">
+    <value>Please specify keyword filter text.</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:3123 (the classic text, with its repeated word). -->
+  <data name="FilterRefusalKeywordWithin" xml:space="preserve">
+    <value>Please select one more more keyword filter Within options.</value>
+  </data>
+  <!-- BWC wording: classic has no message for a keyword text that is too long. -->
+  <data name="FilterRefusalKeywordTooLong" xml:space="preserve">
+    <value>The keyword text is too long.</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:3121 -->
+  <data name="FilterRefusalPlatforms" xml:space="preserve">
+    <value>Please select at least one platform or application requirement.</value>
+  </data>
+</root>

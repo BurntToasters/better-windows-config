@@ -1,0 +1,1399 @@
+{
+  "case": "B/Pol_Text_ComboBoxNoSortRequired",
+  "description": "Pol_Text_ComboBoxNoSortRequired under Computer Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
+  "planVersion": 2,
+  "planHash": "324bc2b5dd67b83737b27e24e4010b8f38a6a6ed17719717b068bcde15d0e9b1",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text with an unsorted required combo box' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text with an unsorted required combo box",
+        "state": "Enabled",
+        "policyId": "Pol_Text_ComboBoxNoSortRequired",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step enabled-defaults",
+      "plan": "snapshot  [step enabled-defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text with an unsorted required combo box' state Enabled options [Pick or type a size: = text 'bwc-alt'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text with an unsorted required combo box",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Pick or type a size:",
+            "expectKind": "comboBox",
+            "text": "bwc-alt",
+            "elementId": "ComboNoSortText"
+          }
+        ],
+        "policyId": "Pol_Text_ComboBoxNoSortRequired",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step enabled-alt1-text",
+      "plan": "snapshot  [step enabled-alt1-text]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt1-text"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text with an unsorted required combo box' state Enabled options [Pick or type a size: = item 'Small'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text with an unsorted required combo box",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Pick or type a size:",
+            "expectKind": "comboBox",
+            "item": "Small",
+            "elementId": "ComboNoSortText"
+          }
+        ],
+        "policyId": "Pol_Text_ComboBoxNoSortRequired",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step enabled-alt2-suggestion",
+      "plan": "snapshot  [step enabled-alt2-suggestion]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt2-suggestion"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text with an unsorted required combo box' state Disabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text with an unsorted required combo box",
+        "state": "Disabled",
+        "policyId": "Pol_Text_ComboBoxNoSortRequired",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text with an unsorted required combo box' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text with an unsorted required combo box",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Text_ComboBoxNoSortRequired",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled-defaults",
+      "folder": "step-01-enabled-defaults",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-alt1-text",
+      "folder": "step-02-enabled-alt1-text",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 162,
+          "sha256": "8e58a336ea9605237ccd363db1f3ef25ed211e9fde435c1a86f7b394b9dc33cb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 162
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "enabled-alt2-suggestion",
+      "folder": "step-03-enabled-alt2-suggestion",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 158,
+          "sha256": "06d3911017bc0dca630b795fa0a190cbb3a52480f0ac95e1c7302d2ab319e0bb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 158
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "disabled",
+      "folder": "step-04-disabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 162,
+          "sha256": "06182420d758682d3b72ed1cb1c7fd149995a87bbec8e47e4785434bb29983eb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 162
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "not-configured",
+      "folder": "step-05-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "bbff97b1f1386f1ac16f8e6f9cbe1f14c21d84b7e9f674638465cc046494d153"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Text with an unsorted required combo box",
+        "before": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a size:",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                180,
+                744,
+                450,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "Small"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": ""
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a size:",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                180,
+                744,
+                450,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "Small"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": ""
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text with an unsorted required combo box",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#0474db6e43e3"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "applyEnabledAfter": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a size:",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                180,
+                744,
+                450,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "Small"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": ""
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "Text with an unsorted required combo box",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": null
+          }
+        },
+        "finalTitle": "Text with an unsorted required combo box"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Text with an unsorted required combo box",
+        "before": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a size:",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                232,
+                796,
+                450,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "Small"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": ""
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "bwc-alt",
+            "before": "",
+            "immediate": "bwc-alt",
+            "observed": "bwc-alt",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Pick or type a size:",
+            "labelMatch": "exact",
+            "kind": "#487b5e96c714",
+            "controlId": "#89f300b464cc"
+          }
+        ],
+        "afterSet": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a size:",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                232,
+                796,
+                450,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "Small"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": "bwc-alt"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text with an unsorted required combo box",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Text with an unsorted required combo box"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 162,
+          "sha256": "8e58a336ea9605237ccd363db1f3ef25ed211e9fde435c1a86f7b394b9dc33cb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Text with an unsorted required combo box",
+        "before": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a size:",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                284,
+                848,
+                450,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "Small"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": "bwc-alt"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Small",
+            "requestedIndex": 2,
+            "beforeIndex": -1,
+            "observedIndex": 2,
+            "observedText": "Small",
+            "items": [
+              "#ab80540d98d2",
+              "#8e588cd18774",
+              "Small"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Pick or type a size:",
+            "labelMatch": "exact",
+            "kind": "#487b5e96c714",
+            "controlId": "#89f300b464cc"
+          }
+        ],
+        "afterSet": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a size:",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                284,
+                848,
+                450,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "Small"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "Small",
+              "text": "Small"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text with an unsorted required combo box",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Text with an unsorted required combo box"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 158,
+          "sha256": "06d3911017bc0dca630b795fa0a190cbb3a52480f0ac95e1c7302d2ab319e0bb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 2,
+      "gptVersionAfter": 3,
+      "data": {
+        "policy": "Text with an unsorted required combo box",
+        "before": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a size:",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                336,
+                900,
+                450,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "Small"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "Small",
+              "text": "Small"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a size:",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                336,
+                900,
+                450,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "Small"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "Small",
+              "text": ""
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text with an unsorted required combo box",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Text with an unsorted required combo box"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 162,
+          "sha256": "06182420d758682d3b72ed1cb1c7fd149995a87bbec8e47e4785434bb29983eb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 3,
+      "gptVersionAfter": 4,
+      "data": {
+        "policy": "Text with an unsorted required combo box",
+        "before": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a size:",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                388,
+                952,
+                450,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "Small"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": ""
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a size:",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                388,
+                952,
+                450,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "Small"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": ""
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text with an unsorted required combo box",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Text with an unsorted required combo box"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "bbff97b1f1386f1ac16f8e6f9cbe1f14c21d84b7e9f674638465cc046494d153"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      }
+    }
+  ]
+}

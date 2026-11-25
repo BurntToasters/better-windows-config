@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Control label of the WinForms Editor form (buttonPrevious). -->
+  <data name="DialogPrevious" xml:space="preserve">
+    <value>&amp;Previous Setting</value>
+  </data>
+  <!-- Control label of the WinForms Editor form (buttonNext). -->
+  <data name="DialogNext" xml:space="preserve">
+    <value>&amp;Next Setting</value>
+  </data>
+  <!-- Control label of the WinForms Editor form (radioButtonNotConfigured). -->
+  <data name="DialogNotConfigured" xml:space="preserve">
+    <value>Not &amp;Configured</value>
+  </data>
+  <!-- Control label of the WinForms Editor form (radioButtonEnabled). -->
+  <data name="DialogEnabled" xml:space="preserve">
+    <value>&amp;Enabled</value>
+  </data>
+  <!-- Control label of the WinForms Editor form (radioButtonDisabled). -->
+  <data name="DialogDisabled" xml:space="preserve">
+    <value>&amp;Disabled</value>
+  </data>
+  <!-- Control label of the WinForms Editor form (buttonApply). -->
+  <data name="DialogApply" xml:space="preserve">
+    <value>&amp;Apply</value>
+  </data>
+  <!-- Control label of the WinForms Editor form (buttonOK). -->
+  <data name="DialogOk" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <!-- Control label of the WinForms Editor form (buttonCancel). -->
+  <data name="DialogCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <!-- Control label of the WinForms Editor form (labelComment). -->
+  <data name="DialogCommentLabel" xml:space="preserve">
+    <value>Comment:</value>
+  </data>
+  <!-- Control label of the WinForms Editor form (labelSupportedOn). -->
+  <data name="DialogSupportedOnLabel" xml:space="preserve">
+    <value>Supported on:</value>
+  </data>
+  <!-- Control label of the WinForms Editor form (label2). -->
+  <data name="DialogOptionsLabel" xml:space="preserve">
+    <value>Options:</value>
+  </data>
+  <!-- Control label of the WinForms Editor form (label1). -->
+  <data name="DialogHelpLabel" xml:space="preserve">
+    <value>Help:</value>
+  </data>
+  <!-- Accessible name of the Comment box (textBoxComment). -->
+  <data name="DialogCommentName" xml:space="preserve">
+    <value>Comment</value>
+  </data>
+  <!-- Accessible name of the Supported on box (labelSupportedOnText). -->
+  <data name="DialogSupportedOnName" xml:space="preserve">
+    <value>Supported On</value>
+  </data>
+  <!-- Accessible name of the Help box (textBoxHelp). -->
+  <data name="DialogHelpName" xml:space="preserve">
+    <value>Help:</value>
+  </data>
+  <!-- Accessible name of the Options pane (flowLayoutPanelDynamic). -->
+  <data name="DialogOptionsName" xml:space="preserve">
+    <value>Options:</value>
+  </data>
+  <!-- Caption of a message of the setting dialog (Generic.MessageBox.Caption of the WinForms assembly). -->
+  <data name="DialogMessageCaption" xml:space="preserve">
+    <value>Group Policy</value>
+  </data>
+  <!-- Caption of the message for an empty required field (SettingControl.Validate.Caption of the WinForms assembly). -->
+  <data name="DialogRequiredCaption" xml:space="preserve">
+    <value>Field "{0}" is required</value>
+  </data>
+  <!-- Text of the message for an empty required field (SettingControl.Validate.Text of the WinForms assembly). -->
+  <data name="DialogRequiredText" xml:space="preserve">
+    <value>No value was entered for this field. Make sure that you enter a value.</value>
+  </data>
+  <!-- BWC text for every other validation problem, until the options pane maps each kind (piece G3b). -->
+  <data name="DialogProblemText" xml:space="preserve">
+    <value>The setting could not be applied because a value is not valid. Check the options of the setting.</value>
+  </data>
+  <!-- BWC text for an engine failure while applying. -->
+  <data name="DialogFailedText" xml:space="preserve">
+    <value>The setting could not be applied. The policy template holds a value that cannot be stored.</value>
+  </data>
+  <!-- BWC text for the notice of a setting dialog over a policy object that cannot be changed. -->
+  <data name="DialogReadOnlyNotice" xml:space="preserve">
+    <value>This setting cannot be changed because the policy object is read-only.</value>
+  </data>
+  <!-- BWC text for the notice of a setting dialog whose policy file could not be read. -->
+  <data name="DialogUnreadableNotice" xml:space="preserve">
+    <value>This setting cannot be changed because its policy file could not be read.</value>
+  </data>
+  <!-- BWC text of the save error for a policy file with the read-only attribute. {0} is the file. -->
+  <data name="DialogSaveReadOnlyFile" xml:space="preserve">
+    <value>The setting was not saved because a policy file is read-only: {0}. Clear the read-only attribute of the file and try again.</value>
+  </data>
+  <!-- BWC text of the save error for a policy file that is not valid. {0} is the file. -->
+  <data name="DialogSaveMalformed" xml:space="preserve">
+    <value>The setting was not saved because a policy file is not valid: {0}. The file was left as it is.</value>
+  </data>
+  <!-- BWC text of the save error for a write lock that another program holds. -->
+  <data name="DialogSaveLockTimeout" xml:space="preserve">
+    <value>The setting was not saved because another program is saving policy settings. Wait a moment and try again.</value>
+  </data>
+  <!-- BWC text of the save error for a policy file that another program has open. {0} is the file. -->
+  <data name="DialogSaveInUse" xml:space="preserve">
+    <value>The setting was not saved because another program is using a policy file: {0}. Wait a moment and try again.</value>
+  </data>
+  <!-- BWC text of the save error for a save that wrote some files before it failed. {0} lists the files written. -->
+  <data name="DialogSavePartial" xml:space="preserve">
+    <value>The setting was only partly saved. These files were written before the error: {0}. The other files were not changed. Check the setting before you try again.</value>
+  </data>
+  <!-- BWC text of the notice for a save whose policy refresh failed. -->
+  <data name="DialogSaveRefreshFailed" xml:space="preserve">
+    <value>The setting was saved, but Windows could not apply policy now. It takes effect the next time policy is refreshed.</value>
+  </data>
+  <!-- BWC text of the save error for a store that is read-only. -->
+  <data name="DialogSaveReadOnlyMode" xml:space="preserve">
+    <value>The setting was not saved because policy cannot be changed in this window.</value>
+  </data>
+  <!-- BWC text of the save error for every other failure. {0} is the file. -->
+  <data name="DialogSaveFailed" xml:space="preserve">
+    <value>The setting was not saved because a policy file could not be written: {0}.</value>
+  </data>
+</root>

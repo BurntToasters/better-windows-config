@@ -1,3 +1,4 @@
+using Bwc.Core;
 using Bwc.UI.Dialogs;
 using Microsoft.UI.Xaml.Controls;
 using WinRT.Interop;
@@ -56,7 +57,7 @@ public sealed class RemoteComputerListDialog : ClassicDialog
         string[] names = _list.SelectedItems.OfType<string>().Where(name => !string.IsNullOrWhiteSpace(name)).ToArray();
         if (names.Length == 0)
         {
-            _ = ShowEmptySelectionAsync();
+            ShowEmptySelectionAsync().Forget("remote computer empty selection");
             return false;
         }
 

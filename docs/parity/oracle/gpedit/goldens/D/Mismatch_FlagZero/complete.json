@@ -1,0 +1,19 @@
+{
+  "case": "D/Mismatch_FlagZero",
+  "planHash": "8126e6a02f8dad0e9a554a3bc3266c6c3af4b1bfef53e2ffd166a3f2ee4cb268",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.Registry.pol",
+    "step-01-start/Machine.Registry.pol",
+    "step-01-start/gpt.ini",
+    "step-02-unrelated-save/Machine.Registry.pol",
+    "step-02-unrelated-save/Machine.comment.cmtx",
+    "step-02-unrelated-save/gpt.ini",
+    "step-03-unrelated-cleared/Machine.Registry.pol",
+    "step-03-unrelated-cleared/Machine.comment.cmtx",
+    "step-03-unrelated-cleared/gpt.ini"
+  ]
+}

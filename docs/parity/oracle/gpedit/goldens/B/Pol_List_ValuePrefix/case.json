@@ -1,0 +1,1722 @@
+{
+  "case": "B/Pol_List_ValuePrefix",
+  "description": "Pol_List_ValuePrefix under User Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
+  "planVersion": 2,
+  "planHash": "5dfbbe582400af26496a7f17854b3948160f67bfce81f71249d411fffeed67f0",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'List with a value prefix' state Enabled press [OK] at User/Administrative Templates/BWC Oracle/Elements/Lists",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Lists"
+        ],
+        "policy": "List with a value prefix",
+        "state": "Enabled",
+        "policyId": "Pol_List_ValuePrefix",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step enabled-defaults",
+      "plan": "snapshot  [step enabled-defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'List with a value prefix' state Enabled options [Prefixed entries: = 2 rows] press [OK] at User/Administrative Templates/BWC Oracle/Elements/Lists",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Lists"
+        ],
+        "policy": "List with a value prefix",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Prefixed entries:",
+            "expectKind": "list",
+            "rows": [
+              [
+                "bwc-1"
+              ],
+              [
+                "bwc-2"
+              ]
+            ],
+            "clearRows": true,
+            "elementId": "PrefixList"
+          }
+        ],
+        "policyId": "Pol_List_ValuePrefix",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step enabled-alt1-rows2",
+      "plan": "snapshot  [step enabled-alt1-rows2]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt1-rows2"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'List with a value prefix' state Enabled options [Prefixed entries: = 1 rows] press [OK] at User/Administrative Templates/BWC Oracle/Elements/Lists",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Lists"
+        ],
+        "policy": "List with a value prefix",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Prefixed entries:",
+            "expectKind": "list",
+            "rows": [
+              [
+                "bwc-1"
+              ]
+            ],
+            "clearRows": true,
+            "elementId": "PrefixList"
+          }
+        ],
+        "policyId": "Pol_List_ValuePrefix",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step enabled-alt2-rows1",
+      "plan": "snapshot  [step enabled-alt2-rows1]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt2-rows1"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'List with a value prefix' state Enabled options [Prefixed entries: = clear rows] press [OK] at User/Administrative Templates/BWC Oracle/Elements/Lists",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Lists"
+        ],
+        "policy": "List with a value prefix",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Prefixed entries:",
+            "expectKind": "list",
+            "clearRows": true,
+            "elementId": "PrefixList"
+          }
+        ],
+        "policyId": "Pol_List_ValuePrefix",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step enabled-alt3-rows0",
+      "plan": "snapshot  [step enabled-alt3-rows0]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt3-rows0"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'List with a value prefix' state Disabled press [OK] at User/Administrative Templates/BWC Oracle/Elements/Lists",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Lists"
+        ],
+        "policy": "List with a value prefix",
+        "state": "Disabled",
+        "policyId": "Pol_List_ValuePrefix",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'List with a value prefix' state Not Configured press [OK] at User/Administrative Templates/BWC Oracle/Elements/Lists",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Lists"
+        ],
+        "policy": "List with a value prefix",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_List_ValuePrefix",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled-defaults",
+      "folder": "step-01-enabled-defaults",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-alt1-rows2",
+      "folder": "step-02-enabled-alt1-rows2",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 394,
+          "sha256": "6568dc6bf6c478c2f34b94442b731af6ef43eddadfa52d9776ff7ad2ded8f869"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 128
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 394
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "enabled-alt2-rows1",
+      "folder": "step-03-enabled-alt2-rows1",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 266,
+          "sha256": "0f8c81fb089b7a7b88698084ecc348d398021f3c081efd45f10d000e7c8a0779"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 266
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "enabled-alt3-rows0",
+      "folder": "step-04-enabled-alt3-rows0",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 266,
+          "sha256": "0f8c81fb089b7a7b88698084ecc348d398021f3c081efd45f10d000e7c8a0779"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 266
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "disabled",
+      "folder": "step-05-disabled",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "e0378043742df23a630339ef3188e12870fc2579437d14951487b2fe52f42028"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 138,
+          "sha256": "7550ffd47cecbed4cc3b62ecaebc3919690e1d783d87f41aa624f6c4eb9ce138"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 196608,
+        "machine": 0,
+        "user": 3
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 138
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "label": "not-configured",
+      "folder": "step-06-not-configured",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 52,
+          "sha256": "f0172d0833398fe4345f4e10f7fb81b2d6a05bacdca57f80adff1f48d400b18e"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 262144,
+        "machine": 0,
+        "user": 4
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 52
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "List with a value prefix",
+        "before": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                284,
+                848,
+                322,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11",
+              "contents": "#5a077ccfda20"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                284,
+                848,
+                322,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "List with a value prefix",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#539b1d4b3316"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "applyEnabledAfter": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                284,
+                848,
+                322,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "List with a value prefix",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": null
+          }
+        },
+        "finalTitle": "List with a value prefix"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol",
+        "User\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 65536,
+      "data": {
+        "policy": "List with a value prefix",
+        "before": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                336,
+                900,
+                322,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11",
+              "contents": "#5a077ccfda20"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "before": {
+              "title": "Show Contents",
+              "label": "Prefixed entries:",
+              "rowCount": 0,
+              "filledRows": 0,
+              "rows": []
+            },
+            "cells": [
+              {
+                "row": 0,
+                "column": 0,
+                "requested": "bwc-1",
+                "read": "bwc-1"
+              },
+              {
+                "row": 1,
+                "column": 0,
+                "requested": "bwc-2",
+                "read": "bwc-2"
+              }
+            ],
+            "afterEdit": {
+              "title": "Show Contents",
+              "label": "Prefixed entries:",
+              "rowCount": 2,
+              "filledRows": 2,
+              "rows": [
+                [
+                  "bwc-1"
+                ],
+                [
+                  "bwc-2"
+                ]
+              ]
+            },
+            "close": {
+              "button": "OK",
+              "closed": true
+            },
+            "set": "#a11a75e0feee",
+            "label": "Prefixed entries:",
+            "labelMatch": "exact",
+            "kind": "#a330395cc0a5",
+            "controlId": "#b32449b2b425"
+          }
+        ],
+        "afterSet": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                336,
+                900,
+                322,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "List with a value prefix",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol",
+                "User\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1,
+                "User\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              }
+            }
+          }
+        ],
+        "finalTitle": "List with a value prefix"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 394,
+          "sha256": "6568dc6bf6c478c2f34b94442b731af6ef43eddadfa52d9776ff7ad2ded8f869"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 65536,
+      "gptVersionAfter": 131072,
+      "data": {
+        "policy": "List with a value prefix",
+        "before": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                440,
+                1004,
+                322,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11",
+              "contents": {
+                "title": "Show Contents",
+                "label": "Prefixed entries:",
+                "rowCount": 2,
+                "filledRows": 2,
+                "rows": [
+                  [
+                    "bwc-1"
+                  ],
+                  [
+                    "bwc-2"
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "before": {
+              "title": "Show Contents",
+              "label": "Prefixed entries:",
+              "rowCount": 2,
+              "filledRows": 2,
+              "rows": [
+                [
+                  "bwc-1"
+                ],
+                [
+                  "bwc-2"
+                ]
+              ]
+            },
+            "cells": [
+              {
+                "row": 0,
+                "column": 0,
+                "requested": "bwc-1",
+                "read": "bwc-1"
+              }
+            ],
+            "afterEdit": {
+              "title": "Show Contents",
+              "label": "Prefixed entries:",
+              "rowCount": 1,
+              "filledRows": 1,
+              "rows": [
+                [
+                  "bwc-1"
+                ]
+              ]
+            },
+            "close": {
+              "button": "OK",
+              "closed": true
+            },
+            "set": "#a11a75e0feee",
+            "label": "Prefixed entries:",
+            "labelMatch": "exact",
+            "kind": "#a330395cc0a5",
+            "controlId": "#b32449b2b425"
+          }
+        ],
+        "afterSet": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                440,
+                1004,
+                322,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "List with a value prefix",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              },
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              }
+            }
+          }
+        ],
+        "finalTitle": "List with a value prefix"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 266,
+          "sha256": "0f8c81fb089b7a7b88698084ecc348d398021f3c081efd45f10d000e7c8a0779"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "List with a value prefix",
+        "before": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                76,
+                640,
+                322,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11",
+              "contents": {
+                "title": "Show Contents",
+                "label": "Prefixed entries:",
+                "rowCount": 1,
+                "filledRows": 1,
+                "rows": [
+                  [
+                    "bwc-1"
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "before": {
+              "title": "Show Contents",
+              "label": "Prefixed entries:",
+              "rowCount": 1,
+              "filledRows": 1,
+              "rows": [
+                [
+                  "bwc-1"
+                ]
+              ]
+            },
+            "cells": [],
+            "afterEdit": {
+              "title": "Show Contents",
+              "label": "Prefixed entries:",
+              "rowCount": 0,
+              "filledRows": 0,
+              "rows": []
+            },
+            "close": {
+              "button": "OK",
+              "messageBoxes": [
+                {
+                  "title": "#befe31d7c120",
+                  "class": "#32770",
+                  "kind": "MessageBox",
+                  "texts": [
+                    "#539b1d4b3316"
+                  ],
+                  "buttons": [
+                    {
+                      "text": "OK",
+                      "id": 2
+                    }
+                  ],
+                  "answeredWith": "OK",
+                  "answeredVia": "BM_CLICK",
+                  "answerRequested": null,
+                  "answerFallback": false
+                }
+              ],
+              "blockedByMessageBox": true
+            },
+            "okMessageBox": true,
+            "refused": true,
+            "dialogOpenAfterBox": true,
+            "cancelled": true,
+            "set": "#a11a75e0feee",
+            "label": "Prefixed entries:",
+            "labelMatch": "exact",
+            "kind": "#a330395cc0a5",
+            "controlId": "#b32449b2b425"
+          }
+        ],
+        "afterSet": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                76,
+                640,
+                322,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "List with a value prefix",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              }
+            }
+          }
+        ],
+        "finalTitle": "List with a value prefix"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 266,
+          "sha256": "0f8c81fb089b7a7b88698084ecc348d398021f3c081efd45f10d000e7c8a0779"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 131072,
+      "gptVersionAfter": 196608,
+      "data": {
+        "policy": "List with a value prefix",
+        "before": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                232,
+                796,
+                322,
+                68
+              ],
+              "enabled": true,
+              "text": "#1f92e5657c11",
+              "contents": {
+                "title": "Show Contents",
+                "label": "Prefixed entries:",
+                "rowCount": 1,
+                "filledRows": 1,
+                "rows": [
+                  [
+                    "bwc-1"
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                232,
+                796,
+                322,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "List with a value prefix",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              },
+              "gptVersionAfter": {
+                "raw": 196608,
+                "machine": 0,
+                "user": 3
+              }
+            }
+          }
+        ],
+        "finalTitle": "List with a value prefix"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "e0378043742df23a630339ef3188e12870fc2579437d14951487b2fe52f42028"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 138,
+          "sha256": "7550ffd47cecbed4cc3b62ecaebc3919690e1d783d87f41aa624f6c4eb9ce138"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 196608,
+        "machine": 0,
+        "user": 3
+      }
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 196608,
+      "gptVersionAfter": 262144,
+      "data": {
+        "policy": "List with a value prefix",
+        "before": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                336,
+                900,
+                322,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11",
+              "contents": "#5a077ccfda20"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "List with a value prefix",
+          "windowTitle": "List with a value prefix",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user list whose value names start with the prefix Item.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#a330395cc0a5",
+              "label": "Prefixed entries:",
+              "panelId": "#0b6a2e2d934c",
+              "controlId": "#b32449b2b425",
+              "rect": [
+                336,
+                900,
+                322,
+                68
+              ],
+              "enabled": false,
+              "text": "#1f92e5657c11"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "List with a value prefix",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 196608,
+                "machine": 0,
+                "user": 3
+              },
+              "gptVersionAfter": {
+                "raw": 262144,
+                "machine": 0,
+                "user": 4
+              }
+            }
+          }
+        ],
+        "finalTitle": "List with a value prefix"
+      }
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 52,
+          "sha256": "f0172d0833398fe4345f4e10f7fb81b2d6a05bacdca57f80adff1f48d400b18e"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 262144,
+        "machine": 0,
+        "user": 4
+      }
+    }
+  ]
+}

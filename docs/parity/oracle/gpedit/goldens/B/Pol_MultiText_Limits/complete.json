@@ -1,0 +1,20 @@
+{
+  "case": "B/Pol_MultiText_Limits",
+  "planHash": "f6bf9e46e4f75b0c95b8b04beea4b14417a72273d3b0c16d1d124afc2f5420bf",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-enabled-alt1-lines/User.Registry.pol",
+    "step-02-enabled-alt1-lines/User.comment.cmtx",
+    "step-02-enabled-alt1-lines/gpt.ini",
+    "step-03-disabled/User.Registry.pol",
+    "step-03-disabled/User.comment.cmtx",
+    "step-03-disabled/gpt.ini",
+    "step-04-not-configured/User.Registry.pol",
+    "step-04-not-configured/User.comment.cmtx",
+    "step-04-not-configured/gpt.ini"
+  ]
+}

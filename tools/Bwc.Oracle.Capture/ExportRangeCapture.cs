@@ -112,7 +112,7 @@ internal static class ExportRangeCapture
             },
             ["typedKey"] = MissingKey,
             ["typedKeyReadBack"] = typedBack,
-            ["fileNameReadBack"] = fileBack,
+            ["fileNameReadBack"] = fileBack.Replace(paths.Root, "<repo>", StringComparison.OrdinalIgnoreCase),
             ["steps"] = steps,
             ["save"] = new JsonObject
             {

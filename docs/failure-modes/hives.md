@@ -282,3 +282,33 @@ Failure modes:
 
 Evidence: the test records `hives.elevated.*` checks in the E2E result artifact. A run that is not elevated is
 Inconclusive, so the artifact never shows a pass for a run that did not load a hive.
+
+## 15. Privilege restore fails on dispose
+
+`PrivilegeScope.Dispose` and `OptionalPrivilegeScope.Dispose` put a privilege back to disabled with
+`AdjustTokenPrivileges`. If that call fails, Dispose must still never throw, and it must still try
+the other privilege and close the token. Before this entry the failure was swallowed with no trace,
+so a token could stay enabled and nobody could tell.
+
+Failure modes:
+
+- A restore call fails for `SeBackupPrivilege` or `SeRestorePrivilege`. Dispose calls
+  `PrivilegeDiagnostics.RestoreFailed` with the privilege name and the Win32 error, then continues
+  with the other privilege and closes the token.
+- A restore call fails for an `OptionalPrivilegeScope` privilege (`SeSecurityPrivilege` or
+  `SeTakeOwnershipPrivilege`). The hook gets the same name and error, and every other privilege
+  this scope enabled is still restored.
+- The hook throws. The exception is swallowed inside `PrivilegeDiagnostics`, so Dispose does not
+  throw and the token is still closed.
+- No hook is set (a process that does not start the logger). The failure is silent by design, and
+  Dispose still returns normally.
+- Every restore succeeds. The hook is not called.
+
+The Registry Editor sets the hook at startup in `src/Bwc.Regedit.App/App.xaml.cs` and in
+`src/Bwc.Regedit/CommandLine/RegeditCommandLine.cs`, after `Log.Initialize`. It writes a
+`Log.Warn` line that names the privilege and the Win32 error. `Bwc.Registry` references no other
+project, so the hook is the only route out of the library.
+
+Evidence: `PrivilegeScopeRestoreTests` in `tests/Bwc.Registry.Tests` covers the hook call, a
+throwing hook, a successful restore, and the optional scope. It uses a test seam for the restore
+call and never changes the real process token.

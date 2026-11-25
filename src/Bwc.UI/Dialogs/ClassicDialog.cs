@@ -45,6 +45,7 @@ public class ClassicDialog : ModalDialogWindow
     private ClassicFontSpec _font;
     private ClassicDialogMetrics _metrics;
     private bool _metricsReady;
+    private ClassicDialogMetrics? _minimumMetrics;
     private FrameworkElement? _initialFocus;
     private bool _windowActive;
     private bool _cueVisible;
@@ -108,9 +109,61 @@ public class ClassicDialog : ModalDialogWindow
                 ClassicHostedControl hosted = AddHosted(definition);
                 _canvas.Children.Add(hosted.Element);
             }
+
+            if (template.Resizable)
+            {
+                _root.SizeChanged += OnRootSizeChanged;
+            }
         }
 
         Content = _root;
+    }
+
+    /// <summary>True when the template is <see cref="ClassicDialogDefinition.Resizable"/>. Flow dialogs override.</summary>
+    protected override bool IsResizableDialog => _template?.Resizable == true;
+
+    /// <summary>
+    /// The smallest client size of a resizable template dialog: <see cref="ClassicDialogDefinition.MinWidthDlu"/> and
+    /// <see cref="ClassicDialogDefinition.MinHeightDlu"/> (the template size when 0) converted at this DPI. The metrics are
+    /// cached for the last DPI, because the system asks for the minimum on every step of a drag.
+    /// </summary>
+    protected override (int Width, int Height) MinimumClientSize(uint dpi)
+    {
+        if (_template is null)
+        {
+            return base.MinimumClientSize(dpi);
+        }
+
+        if (_minimumMetrics is not { } metrics || metrics.Dpi != (dpi == 0 ? 96u : dpi))
+        {
+            metrics = ClassicDialogMetrics.Create(_font.Face, _font.PointSize, dpi);
+            _minimumMetrics = metrics;
+        }
+
+        int widthDlu = _template.MinWidthDlu > 0 ? _template.MinWidthDlu : _template.WidthDlu;
+        int heightDlu = _template.MinHeightDlu > 0 ? _template.MinHeightDlu : _template.HeightDlu;
+        return (metrics.ToPixelsX(widthDlu), metrics.ToPixelsY(heightDlu));
+    }
+
+    /// <summary>
+    /// Runs when the client area of a resizable dialog changes size, with the new size in DIP. The canvas already has that
+    /// size. A dialog moves and sizes its controls here (anchoring the buttons, stretching a list); one that does not
+    /// override it keeps the template layout and still paints the whole client area.
+    /// </summary>
+    protected virtual void OnClientResized(double widthDip, double heightDip)
+    {
+    }
+
+    private void OnRootSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_canvas is null || !_metricsReady)
+        {
+            return;
+        }
+
+        _canvas.Width = e.NewSize.Width;
+        _canvas.Height = e.NewSize.Height;
+        OnClientResized(e.NewSize.Width, e.NewSize.Height);
     }
 
     /// <summary>The metrics for the window DPI. Valid after the dialog has been sized, before it is shown.</summary>
@@ -450,7 +503,11 @@ public class ClassicDialog : ModalDialogWindow
     {
         ValidateDefinition(definition);
 
-        ClassicMnemonicText? mnemonic = IsMnemonicKind(definition.Kind) ? new ClassicMnemonicText(definition.Text) : null;
+        // A literal control (text from an ADML template) keeps its ampersands, has no access key, and is not checked
+        // against the other controls' mnemonics.
+        ClassicMnemonicText? mnemonic = !IsMnemonicKind(definition.Kind)
+            ? null
+            : definition.LiteralText ? ClassicMnemonicText.Literal(definition.Text) : new ClassicMnemonicText(definition.Text);
         if (mnemonic?.Mnemonic is char letter)
         {
             if (_mnemonics.TryGetValue(letter, out string? existing))
@@ -688,7 +745,7 @@ public class ClassicDialog : ModalDialogWindow
     private ClassicHostedControl? FocusedHosted()
     {
         object? focused = FocusManager.GetFocusedElement(_root.XamlRoot);
-        return _controls.FirstOrDefault(hosted => ReferenceEquals(hosted.Element, focused));
+        return _controls.FirstOrDefault(hosted => hosted.OwnsFocus(focused));
     }
 
     private void MoveFocus(bool backward)
@@ -700,11 +757,11 @@ public class ClassicDialog : ModalDialogWindow
         }
 
         object? focused = FocusManager.GetFocusedElement(_root.XamlRoot);
-        int current = stops.FindIndex(hosted => ReferenceEquals(hosted.Element, focused));
+        int current = stops.FindIndex(hosted => hosted.OwnsFocus(focused));
         int next = current < 0
             ? (backward ? stops.Count - 1 : 0)
             : (current + (backward ? -1 : 1) + stops.Count) % stops.Count;
-        _ = stops[next].Element.Focus(FocusState.Keyboard);
+        _ = stops[next].FocusTarget.Focus(FocusState.Keyboard);
     }
 
     private void FocusNextTabStopAfter(int index)
@@ -716,7 +773,7 @@ public class ClassicDialog : ModalDialogWindow
         }
 
         ClassicHostedControl next = stops.FirstOrDefault(hosted => hosted.Index > index) ?? stops[0];
-        _ = next.Element.Focus(FocusState.Keyboard);
+        _ = next.FocusTarget.Focus(FocusState.Keyboard);
     }
 
     private void FocusFirstTabStop()
@@ -724,7 +781,7 @@ public class ClassicDialog : ModalDialogWindow
         List<ClassicHostedControl> stops = TabStops();
         if (stops.Count > 0)
         {
-            _ = stops[0].Element.Focus(FocusState.Programmatic);
+            _ = stops[0].FocusTarget.Focus(FocusState.Programmatic);
         }
     }
 

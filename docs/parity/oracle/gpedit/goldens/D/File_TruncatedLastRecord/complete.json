@@ -1,0 +1,10 @@
+{
+  "case": "D/File_TruncatedLastRecord",
+  "planHash": "6d8298c9a2f550a8bcd64d8b39a240c4e12ee31b4d9ff254de8c48532e203334",
+  "files": [
+    "Machine.Registry.pol",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.Registry.pol"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "case": "D/Partial_BoolNoFalse_One",
+  "planHash": "51e6a31a44e8565c7578099c7d39e981c38becbf6e04b8946f2afebbe61a5c8e",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.Registry.pol",
+    "step-01-start/Machine.Registry.pol",
+    "step-01-start/gpt.ini",
+    "step-02-unrelated-save/Machine.Registry.pol",
+    "step-02-unrelated-save/Machine.comment.cmtx",
+    "step-02-unrelated-save/gpt.ini",
+    "step-03-unrelated-cleared/Machine.Registry.pol",
+    "step-03-unrelated-cleared/Machine.comment.cmtx",
+    "step-03-unrelated-cleared/gpt.ini"
+  ]
+}

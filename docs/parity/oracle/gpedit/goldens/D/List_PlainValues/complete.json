@@ -1,0 +1,19 @@
+{
+  "case": "D/List_PlainValues",
+  "planHash": "1bdd7f2657aa3ac1e64765fb8b371d595ec2227878b38022cd5cdfe8006ce594",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.Registry.pol",
+    "step-01-start/Machine.Registry.pol",
+    "step-01-start/gpt.ini",
+    "step-02-unrelated-save/Machine.Registry.pol",
+    "step-02-unrelated-save/Machine.comment.cmtx",
+    "step-02-unrelated-save/gpt.ini",
+    "step-03-unrelated-cleared/Machine.Registry.pol",
+    "step-03-unrelated-cleared/Machine.comment.cmtx",
+    "step-03-unrelated-cleared/gpt.ini"
+  ]
+}

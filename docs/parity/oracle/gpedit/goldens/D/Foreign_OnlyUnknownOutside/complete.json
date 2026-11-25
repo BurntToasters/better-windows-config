@@ -1,0 +1,19 @@
+{
+  "case": "D/Foreign_OnlyUnknownOutside",
+  "planHash": "c6778c3d517e0786a9d3a2faf2cac9b6d7da016f5be818ef2f33889e64bfdd86",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.Registry.pol",
+    "step-01-start/Machine.Registry.pol",
+    "step-01-start/gpt.ini",
+    "step-02-unrelated-save/Machine.Registry.pol",
+    "step-02-unrelated-save/Machine.comment.cmtx",
+    "step-02-unrelated-save/gpt.ini",
+    "step-03-unrelated-cleared/Machine.Registry.pol",
+    "step-03-unrelated-cleared/Machine.comment.cmtx",
+    "step-03-unrelated-cleared/gpt.ini"
+  ]
+}

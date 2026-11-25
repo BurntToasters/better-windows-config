@@ -1,0 +1,16 @@
+{
+  "case": "K/KeyLeadingBackslash_Enable",
+  "planHash": "181cc5763f707066d87b4b2dc8ddced592e833e41c6f7ae075b0eecc517b41b4",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled/Machine.Registry.pol",
+    "step-01-enabled/Machine.comment.cmtx",
+    "step-01-enabled/gpt.ini",
+    "step-02-not-configured/Machine.Registry.pol",
+    "step-02-not-configured/Machine.comment.cmtx",
+    "step-02-not-configured/gpt.ini"
+  ]
+}

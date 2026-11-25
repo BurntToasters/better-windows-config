@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BWC oracle fixture. Authored by Better Windows Config. Not a Microsoft file. -->
+<policyDefinitions revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <policyNamespaces>
+    <target prefix="bwcbase" namespace="BWC.Policies.OracleBase" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <supportedOn>
+    <definitions>
+      <definition name="SUPPORTED_BwcAny" displayName="$(string.SUPPORTED_BwcAny)" />
+      <definition name="SUPPORTED_BwcNewer" displayName="$(string.SUPPORTED_BwcNewer)" />
+      <definition name="SUPPORTED_BwcOlder" displayName="$(string.SUPPORTED_BwcOlder)" />
+    </definitions>
+  </supportedOn>
+  <categories>
+    <category name="BwcOracle" displayName="$(string.BwcOracle)" explainText="$(string.BwcOracle_Help)" />
+  </categories>
+</policyDefinitions>

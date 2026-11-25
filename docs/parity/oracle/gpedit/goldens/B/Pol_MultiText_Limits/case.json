@@ -1,0 +1,1211 @@
+{
+  "case": "B/Pol_MultiText_Limits",
+  "description": "Pol_MultiText_Limits under User Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
+  "planVersion": 2,
+  "planHash": "f6bf9e46e4f75b0c95b8b04beea4b14417a72273d3b0c16d1d124afc2f5420bf",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Multiple text lines with limits' state Enabled press [OK] at User/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Multiple text lines with limits",
+        "state": "Enabled",
+        "policyId": "Pol_MultiText_Limits",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step enabled-defaults",
+      "plan": "snapshot  [step enabled-defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Multiple text lines with limits' state Enabled options [#0 = 2 lines] press [OK] at User/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Multiple text lines with limits",
+        "state": "Enabled",
+        "options": [
+          {
+            "index": 0,
+            "expectKind": "multiText",
+            "lines": [
+              "alpha",
+              "beta"
+            ],
+            "elementId": "LimitedLines"
+          }
+        ],
+        "policyId": "Pol_MultiText_Limits",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step enabled-alt1-lines",
+      "plan": "snapshot  [step enabled-alt1-lines]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt1-lines"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Multiple text lines with limits' state Disabled press [OK] at User/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Multiple text lines with limits",
+        "state": "Disabled",
+        "policyId": "Pol_MultiText_Limits",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Multiple text lines with limits' state Not Configured press [OK] at User/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Multiple text lines with limits",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_MultiText_Limits",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled-defaults",
+      "folder": "step-01-enabled-defaults",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-alt1-lines",
+      "folder": "step-02-enabled-alt1-lines",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 164,
+          "sha256": "6106c4480630f96566853aab267f51614b8a62b1c190748a2e41e293752f8abc"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 128
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 164
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "disabled",
+      "folder": "step-03-disabled",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 156,
+          "sha256": "535c1f9ade2b0f06bd978c6aa92ff9cbd540af6d5a1e9720d61f088e9ccb21e0"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 156
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "not-configured",
+      "folder": "step-04-not-configured",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 52,
+          "sha256": "3f8e263ed5391a247d615ec55b8943ff5a57cbec36d48e18ab5baf5658bfef7c"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 196608,
+        "machine": 0,
+        "user": 3
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 52
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Multiple text lines with limits",
+        "before": {
+          "title": "Multiple text lines with limits",
+          "windowTitle": "Multiple text lines with limits",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required multi-line text box with at most 3 strings of at most 20 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#64bc1d9434c4",
+              "panelId": "#61b6cf105add",
+              "controlId": "",
+              "rect": [
+                498,
+                1056,
+                220,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                492,
+                1108,
+                564,
+                168
+              ],
+              "enabled": false,
+              "text": "",
+              "lines": [
+                ""
+              ]
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Multiple text lines with limits",
+          "windowTitle": "Multiple text lines with limits",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required multi-line text box with at most 3 strings of at most 20 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#64bc1d9434c4",
+              "panelId": "#61b6cf105add",
+              "controlId": "",
+              "rect": [
+                498,
+                1056,
+                220,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                492,
+                1108,
+                564,
+                168
+              ],
+              "enabled": true,
+              "text": "",
+              "lines": [
+                ""
+              ]
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Multiple text lines with limits",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#0474db6e43e3"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "applyEnabledAfter": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "Multiple text lines with limits",
+          "windowTitle": "Multiple text lines with limits",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required multi-line text box with at most 3 strings of at most 20 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#64bc1d9434c4",
+              "panelId": "#61b6cf105add",
+              "controlId": "",
+              "rect": [
+                498,
+                1056,
+                220,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                492,
+                1108,
+                564,
+                168
+              ],
+              "enabled": true,
+              "text": "",
+              "lines": [
+                ""
+              ]
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "Multiple text lines with limits",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": null
+          }
+        },
+        "finalTitle": "Multiple text lines with limits"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol",
+        "User\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 65536,
+      "data": {
+        "policy": "Multiple text lines with limits",
+        "before": {
+          "title": "Multiple text lines with limits",
+          "windowTitle": "Multiple text lines with limits",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required multi-line text box with at most 3 strings of at most 20 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#64bc1d9434c4",
+              "panelId": "#61b6cf105add",
+              "controlId": "",
+              "rect": [
+                550,
+                1108,
+                220,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                544,
+                1160,
+                564,
+                168
+              ],
+              "enabled": false,
+              "text": "",
+              "lines": [
+                ""
+              ]
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "typed": true,
+            "multiline": true,
+            "requested": "#4854aaef7450",
+            "before": "",
+            "immediate": "#4854aaef7450",
+            "observed": "#4854aaef7450",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "",
+            "labelMatch": "index",
+            "kind": "#8abcf1af72d3",
+            "controlId": "#68e85187d390"
+          }
+        ],
+        "afterSet": {
+          "title": "Multiple text lines with limits",
+          "windowTitle": "Multiple text lines with limits",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required multi-line text box with at most 3 strings of at most 20 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#64bc1d9434c4",
+              "panelId": "#61b6cf105add",
+              "controlId": "",
+              "rect": [
+                550,
+                1108,
+                220,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                544,
+                1160,
+                564,
+                168
+              ],
+              "enabled": true,
+              "text": "#4854aaef7450",
+              "lines": [
+                "alpha",
+                "beta"
+              ]
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Multiple text lines with limits",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol",
+                "User\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1,
+                "User\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              }
+            }
+          }
+        ],
+        "finalTitle": "Multiple text lines with limits"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 164,
+          "sha256": "6106c4480630f96566853aab267f51614b8a62b1c190748a2e41e293752f8abc"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 65536,
+      "gptVersionAfter": 131072,
+      "data": {
+        "policy": "Multiple text lines with limits",
+        "before": {
+          "title": "Multiple text lines with limits",
+          "windowTitle": "Multiple text lines with limits",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required multi-line text box with at most 3 strings of at most 20 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#64bc1d9434c4",
+              "panelId": "#61b6cf105add",
+              "controlId": "",
+              "rect": [
+                602,
+                1160,
+                220,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                596,
+                1212,
+                564,
+                168
+              ],
+              "enabled": true,
+              "text": "#4854aaef7450",
+              "lines": [
+                "alpha",
+                "beta"
+              ]
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Multiple text lines with limits",
+          "windowTitle": "Multiple text lines with limits",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required multi-line text box with at most 3 strings of at most 20 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#64bc1d9434c4",
+              "panelId": "#61b6cf105add",
+              "controlId": "",
+              "rect": [
+                602,
+                1160,
+                220,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                596,
+                1212,
+                564,
+                168
+              ],
+              "enabled": false,
+              "text": "",
+              "lines": [
+                ""
+              ]
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Multiple text lines with limits",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              },
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              }
+            }
+          }
+        ],
+        "finalTitle": "Multiple text lines with limits"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 156,
+          "sha256": "535c1f9ade2b0f06bd978c6aa92ff9cbd540af6d5a1e9720d61f088e9ccb21e0"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 131072,
+      "gptVersionAfter": 196608,
+      "data": {
+        "policy": "Multiple text lines with limits",
+        "before": {
+          "title": "Multiple text lines with limits",
+          "windowTitle": "Multiple text lines with limits",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required multi-line text box with at most 3 strings of at most 20 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#64bc1d9434c4",
+              "panelId": "#61b6cf105add",
+              "controlId": "",
+              "rect": [
+                82,
+                640,
+                220,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                76,
+                692,
+                564,
+                168
+              ],
+              "enabled": false,
+              "text": "",
+              "lines": [
+                ""
+              ]
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Multiple text lines with limits",
+          "windowTitle": "Multiple text lines with limits",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required multi-line text box with at most 3 strings of at most 20 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#64bc1d9434c4",
+              "panelId": "#61b6cf105add",
+              "controlId": "",
+              "rect": [
+                82,
+                640,
+                220,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                76,
+                692,
+                564,
+                168
+              ],
+              "enabled": false,
+              "text": "",
+              "lines": [
+                ""
+              ]
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Multiple text lines with limits",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              },
+              "gptVersionAfter": {
+                "raw": 196608,
+                "machine": 0,
+                "user": 3
+              }
+            }
+          }
+        ],
+        "finalTitle": "Multiple text lines with limits"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 52,
+          "sha256": "3f8e263ed5391a247d615ec55b8943ff5a57cbec36d48e18ab5baf5658bfef7c"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 196608,
+        "machine": 0,
+        "user": 3
+      }
+    }
+  ]
+}

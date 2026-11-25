@@ -1,0 +1,1234 @@
+{
+  "case": "D/Order_KeysDescending",
+  "description": "keys written in descending order",
+  "planVersion": 2,
+  "planHash": "e59f3e93b215cbddf12e689fef569476ee13a0c8f500afb6ce52e262a57027b2",
+  "startState": {
+    "description": "keys written in descending order",
+    "files": [
+      {
+        "name": "Machine.Registry.pol",
+        "size": 344,
+        "sha256": "8be9c7b203e7ce86e29a50590718a6dee141cc5724a656b2796f0bc804c6aeef"
+      }
+    ]
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "label": "step start",
+      "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "readList",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates/BWC Oracle/Sort cases",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at Computer/Administrative Templates/BWC Oracle/Sort cases",
+      "op": {
+        "kind": "readList",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "readList",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "editPolicy",
+      "label": "read state of Pol_Class_Machine under Computer",
+      "plan": "editPolicy 'Class machine flag' press [Cancel] at Computer/Administrative Templates/BWC Oracle/Basics  [read state of Pol_Class_Machine under Computer]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "read state of Pol_Class_Machine under Computer",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class machine flag",
+        "policyId": "Pol_Class_Machine",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": "read state of Pol_Sort_Zulu under Computer",
+      "plan": "editPolicy 'Zulu sort case' press [Cancel] at Computer/Administrative Templates/BWC Oracle/Sort cases  [read state of Pol_Sort_Zulu under Computer]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "read state of Pol_Sort_Zulu under Computer",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ],
+        "policy": "Zulu sort case",
+        "policyId": "Pol_Sort_Zulu",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "editPolicy",
+      "label": "read state of Pol_Shared_Zeta under Computer",
+      "plan": "editPolicy 'Shared key, Zeta' press [Cancel] at Computer/Administrative Templates/BWC Oracle/Shared keys  [read state of Pol_Shared_Zeta under Computer]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "read state of Pol_Shared_Zeta under Computer",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared key, Zeta",
+        "policyId": "Pol_Shared_Zeta",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Zulu sort case' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Sort cases",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ],
+        "policy": "Zulu sort case",
+        "state": "Enabled",
+        "policyId": "Pol_Sort_Zulu",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "label": "step unrelated-save",
+      "plan": "snapshot  [step unrelated-save]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step unrelated-save"
+      },
+      "optional": null
+    },
+    {
+      "index": 12,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Zulu sort case' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Sort cases",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ],
+        "policy": "Zulu sort case",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Sort_Zulu",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 13,
+      "kind": "snapshot",
+      "label": "step unrelated-cleared",
+      "plan": "snapshot  [step unrelated-cleared]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step unrelated-cleared"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "start",
+      "folder": "step-01-start",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 344,
+          "sha256": "8be9c7b203e7ce86e29a50590718a6dee141cc5724a656b2796f0bc804c6aeef"
+        },
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 344
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "unrelated-save",
+      "folder": "step-02-unrelated-save",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 344,
+          "sha256": "8be9c7b203e7ce86e29a50590718a6dee141cc5724a656b2796f0bc804c6aeef"
+        },
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 344
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "unrelated-cleared",
+      "folder": "step-03-unrelated-cleared",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 234,
+          "sha256": "0e48ace0ff40e2aa5e6f60e822db0cac4ce3f57fa7c3a6649e2552322891bd65"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 234
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 344,
+          "sha256": "8be9c7b203e7ce86e29a50590718a6dee141cc5724a656b2796f0bc804c6aeef"
+        },
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    },
+    {
+      "index": 1,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 2,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 12,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Class both with an element",
+            "cells": [
+              "Class both with an element",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Class both with an element",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 1,
+            "name": "Class both flag",
+            "cells": [
+              "Class both flag",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Class both flag",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 2,
+            "name": "Class machine flag",
+            "cells": [
+              "Class machine flag",
+              "Enabled",
+              "No"
+            ],
+            "setting": "Class machine flag",
+            "state": "Enabled",
+            "comment": "No"
+          },
+          {
+            "index": 3,
+            "name": "Element key differs from policy key",
+            "cells": [
+              "Element key differs from policy key",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Element key differs from policy key",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 4,
+            "name": "Key outside the policy roots",
+            "cells": [
+              "Key outside the policy roots",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Key outside the policy roots",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 5,
+            "name": "Enabled list and disabled list with value name",
+            "cells": [
+              "Enabled list and disabled list with value name",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Enabled list and disabled list with value name",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 6,
+            "name": "Decimal enabled and disabled values",
+            "cells": [
+              "Decimal enabled and disabled values",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Decimal enabled and disabled values",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 7,
+            "name": "Disabled list only",
+            "cells": [
+              "Disabled list only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Disabled list only",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 8,
+            "name": "Disabled value only",
+            "cells": [
+              "Disabled value only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Disabled value only",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 9,
+            "name": "Enabled list only",
+            "cells": [
+              "Enabled list only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Enabled list only",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 10,
+            "name": "Enabled value only",
+            "cells": [
+              "Enabled value only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Enabled value only",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 11,
+            "name": "No value name, elements only",
+            "cells": [
+              "No value name, elements only",
+              "Not configured",
+              "No"
+            ],
+            "setting": "No value name, elements only",
+            "state": "Not configured",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#db03ccd74d36",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#d60995aea828",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": [
+          12
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 4,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 8,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Policy 1",
+            "cells": [
+              "Policy 1",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Policy 1",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 1,
+            "name": "Policy 10",
+            "cells": [
+              "Policy 10",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Policy 10",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 2,
+            "name": "Policy 2",
+            "cells": [
+              "Policy 2",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Policy 2",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 3,
+            "name": "#Symbol policy",
+            "cells": [
+              "#Symbol policy",
+              "Not configured",
+              "No"
+            ],
+            "setting": "#Symbol policy",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 4,
+            "name": "alpha policy",
+            "cells": [
+              "alpha policy",
+              "Not configured",
+              "No"
+            ],
+            "setting": "alpha policy",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 5,
+            "name": "Éclair policy",
+            "cells": [
+              "Éclair policy",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Éclair policy",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 6,
+            "name": "Alpha Policy",
+            "cells": [
+              "Alpha Policy",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Alpha Policy",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 7,
+            "name": "Zulu sort case",
+            "cells": [
+              "Zulu sort case",
+              "Enabled",
+              "No"
+            ],
+            "setting": "Zulu sort case",
+            "state": "Enabled",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#4f30f9b956bb",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#832a6c2846b2",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": [
+          8
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 6,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": true,
+        "headers": [
+          "Setting",
+          "State",
+          "Comment"
+        ],
+        "sort": [
+          "#140bedbf9c3f",
+          "#140bedbf9c3f",
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 6,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Shared list, first policy",
+            "cells": [
+              "Shared list, first policy",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Shared list, first policy",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 1,
+            "name": "Shared list, second policy",
+            "cells": [
+              "Shared list, second policy",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Shared list, second policy",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 2,
+            "name": "Shared key, Alpha",
+            "cells": [
+              "Shared key, Alpha",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Shared key, Alpha",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 3,
+            "name": "Shared key, elements in reverse order",
+            "cells": [
+              "Shared key, elements in reverse order",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Shared key, elements in reverse order",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 4,
+            "name": "Shared key, Mid",
+            "cells": [
+              "Shared key, Mid",
+              "Not configured",
+              "No"
+            ],
+            "setting": "Shared key, Mid",
+            "state": "Not configured",
+            "comment": "No"
+          },
+          {
+            "index": 5,
+            "name": "Shared key, Zeta",
+            "cells": [
+              "Shared key, Zeta",
+              "Enabled",
+              "No"
+            ],
+            "setting": "Shared key, Zeta",
+            "state": "Enabled",
+            "comment": "No"
+          }
+        ],
+        "status": {
+          "text": "#8c090306008e",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#4c38e3e69251",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": [
+          6
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Class machine flag",
+        "before": {
+          "title": "Class machine flag",
+          "windowTitle": "Class machine flag",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A machine policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Class machine flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Class machine flag"
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Zulu sort case",
+        "before": {
+          "title": "Zulu sort case",
+          "windowTitle": "Zulu sort case",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A sort case. Its display name starts with a late letter.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": []
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Zulu sort case",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Zulu sort case"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Shared key, Zeta",
+        "before": {
+          "title": "Shared key, Zeta",
+          "windowTitle": "Shared key, Zeta",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Writes Zeta in a key that three policies share. It is defined first although its name sorts last.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": []
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Shared key, Zeta",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Shared key, Zeta"
+      }
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Zulu sort case",
+        "before": {
+          "title": "Zulu sort case",
+          "windowTitle": "Zulu sort case",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A sort case. Its display name starts with a late letter.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": []
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Zulu sort case",
+          "windowTitle": "Zulu sort case",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A sort case. Its display name starts with a late letter.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": []
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Zulu sort case",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Zulu sort case"
+      }
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 344,
+          "sha256": "8be9c7b203e7ce86e29a50590718a6dee141cc5724a656b2796f0bc804c6aeef"
+        },
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    },
+    {
+      "index": 12,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Zulu sort case",
+        "before": {
+          "title": "Zulu sort case",
+          "windowTitle": "Zulu sort case",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A sort case. Its display name starts with a late letter.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": []
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Enabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Zulu sort case",
+          "windowTitle": "Zulu sort case",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A sort case. Its display name starts with a late letter.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": []
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Zulu sort case",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Zulu sort case"
+      }
+    },
+    {
+      "index": 13,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 234,
+          "sha256": "0e48ace0ff40e2aa5e6f60e822db0cac4ce3f57fa7c3a6649e2552322891bd65"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    }
+  ]
+}

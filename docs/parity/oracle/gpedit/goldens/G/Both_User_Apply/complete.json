@@ -1,0 +1,10 @@
+{
+  "case": "G/Both_User_Apply",
+  "planHash": "634fa8e2d0012e40e2c2340963ed024faf1ff1730c4f0d09a43ec9d459429231",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini"
+  ]
+}

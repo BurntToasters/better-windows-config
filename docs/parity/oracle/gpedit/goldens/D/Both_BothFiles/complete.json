@@ -1,0 +1,24 @@
+{
+  "case": "D/Both_BothFiles",
+  "planHash": "0a3e449d6bd3af5d3680ca7df447c2027d9053cf796ec7b69ccde8adda562b37",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "User.Registry.pol",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.Registry.pol",
+    "start/User.Registry.pol",
+    "step-01-start/Machine.Registry.pol",
+    "step-01-start/User.Registry.pol",
+    "step-01-start/gpt.ini",
+    "step-02-unrelated-save/Machine.Registry.pol",
+    "step-02-unrelated-save/Machine.comment.cmtx",
+    "step-02-unrelated-save/User.Registry.pol",
+    "step-02-unrelated-save/gpt.ini",
+    "step-03-unrelated-cleared/Machine.Registry.pol",
+    "step-03-unrelated-cleared/Machine.comment.cmtx",
+    "step-03-unrelated-cleared/User.Registry.pol",
+    "step-03-unrelated-cleared/gpt.ini"
+  ]
+}

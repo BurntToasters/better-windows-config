@@ -1,0 +1,864 @@
+{
+  "case": "G/Elements_Pol_Decimal_MinMax",
+  "description": "Pol_Decimal_MinMax: Enabled with values (registry types), then Not Configured",
+  "planVersion": 2,
+  "planHash": "d39cdc61ece3621517ccce9449308919ffd439de491d1cb0e61ed8f097316925",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "label": "registry at start",
+      "plan": "snapshot  [registry at start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "registry at start"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal with a range' state Enabled options [Number from 10 to 500: = text '173'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal with a range",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Number from 10 to 500:",
+            "expectKind": "decimalTextBox",
+            "text": "173",
+            "elementId": "MinMaxNumber"
+          }
+        ],
+        "policyId": "Pol_Decimal_MinMax",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "snapshot",
+      "label": "step enabled",
+      "plan": "snapshot  [step enabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "wait",
+      "label": "wait 4 s",
+      "plan": "wait 4000 ms  [wait 4 s]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "snapshot",
+      "label": "enabled: registry 4 s later",
+      "plan": "snapshot  [enabled: registry 4 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "enabled: registry 4 s later"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "wait",
+      "label": "wait 4 s more",
+      "plan": "wait 4000 ms  [wait 4 s more]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s more",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "snapshot",
+      "label": "enabled: registry 8 s later",
+      "plan": "snapshot  [enabled: registry 8 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "enabled: registry 8 s later"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal with a range' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal with a range",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Decimal_MinMax",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "wait",
+      "label": "wait 4 s",
+      "plan": "wait 4000 ms  [wait 4 s]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "snapshot",
+      "label": "not-configured: registry 4 s later",
+      "plan": "snapshot  [not-configured: registry 4 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "not-configured: registry 4 s later"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "wait",
+      "label": "wait 4 s more",
+      "plan": "wait 4000 ms  [wait 4 s more]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s more",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 12,
+      "kind": "snapshot",
+      "label": "not-configured: registry 8 s later",
+      "plan": "snapshot  [not-configured: registry 8 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "not-configured: registry 8 s later"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled",
+      "folder": "step-01-enabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "a2f9ad1a78b8478ce55bbbcdaa511c29b63968e891572007c3fe825d068f13db"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 148
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "not-configured",
+      "folder": "step-02-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "4db24e823e9f9262f5164dbf974a3de0a61eac40d1fc1a430112712068e38833"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 1,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Decimal with a range",
+        "before": {
+          "title": "Decimal with a range",
+          "windowTitle": "Decimal with a range",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number between 10 and 500. The presentation starts at 25 and steps by 5.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number from 10 to 500:",
+              "panelId": "#78e745aaa79c",
+              "controlId": "329732",
+              "rect": [
+                492,
+                1056,
+                536,
+                58
+              ],
+              "enabled": false,
+              "text": "10"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "173",
+            "before": "25",
+            "immediate": "173",
+            "observed": "173",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Number from 10 to 500:",
+            "labelMatch": "exact",
+            "kind": "#05585f55fed2",
+            "controlId": "329732"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal with a range",
+          "windowTitle": "Decimal with a range",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number between 10 and 500. The presentation starts at 25 and steps by 5.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number from 10 to 500:",
+              "panelId": "#78e745aaa79c",
+              "controlId": "329732",
+              "rect": [
+                492,
+                1056,
+                536,
+                58
+              ],
+              "enabled": true,
+              "text": "173"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Decimal with a range",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "liveRegistry": {
+                "after": {
+                  "HKLM\\Software\\Policies\\BWC-Oracle": {},
+                  "HKLM\\Software\\Policies\\BWC-Oracle\\Elements": {},
+                  "HKLM\\Software\\Policies\\BWC-Oracle\\Elements\\Number": {
+                    "MinMaxNumber": {
+                      "type": "DWord",
+                      "data": 173
+                    }
+                  },
+                  "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+                  "HKCU\\Software\\Policies\\BWC-Oracle": null,
+                  "HKCU\\Software\\BWC-Oracle-Gpedit": null
+                },
+                "changed": true,
+                "waited": true,
+                "timedOut": false
+              }
+            }
+          }
+        ],
+        "finalTitle": "Decimal with a range"
+      }
+    },
+    {
+      "index": 2,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "a2f9ad1a78b8478ce55bbbcdaa511c29b63968e891572007c3fe825d068f13db"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Elements": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Elements\\Number": {
+          "MinMaxNumber": {
+            "type": "DWord",
+            "data": 173
+          }
+        },
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 3,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 4,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "a2f9ad1a78b8478ce55bbbcdaa511c29b63968e891572007c3fe825d068f13db"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Elements": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Elements\\Number": {
+          "MinMaxNumber": {
+            "type": "DWord",
+            "data": 173
+          }
+        },
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 5,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 6,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "a2f9ad1a78b8478ce55bbbcdaa511c29b63968e891572007c3fe825d068f13db"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Elements": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Elements\\Number": {
+          "MinMaxNumber": {
+            "type": "DWord",
+            "data": 173
+          }
+        },
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 7,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Decimal with a range",
+        "before": {
+          "title": "Decimal with a range",
+          "windowTitle": "Decimal with a range",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number between 10 and 500. The presentation starts at 25 and steps by 5.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number from 10 to 500:",
+              "panelId": "#78e745aaa79c",
+              "controlId": "264040",
+              "rect": [
+                544,
+                1108,
+                536,
+                58
+              ],
+              "enabled": true,
+              "text": "173"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Enabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal with a range",
+          "windowTitle": "Decimal with a range",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number between 10 and 500. The presentation starts at 25 and steps by 5.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number from 10 to 500:",
+              "panelId": "#78e745aaa79c",
+              "controlId": "264040",
+              "rect": [
+                544,
+                1108,
+                536,
+                58
+              ],
+              "enabled": false,
+              "text": "10"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Decimal with a range",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "liveRegistry": {
+                "after": {
+                  "HKLM\\Software\\Policies\\BWC-Oracle": null,
+                  "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+                  "HKCU\\Software\\Policies\\BWC-Oracle": null,
+                  "HKCU\\Software\\BWC-Oracle-Gpedit": null
+                },
+                "changed": true,
+                "waited": true,
+                "timedOut": false
+              }
+            }
+          }
+        ],
+        "finalTitle": "Decimal with a range"
+      }
+    },
+    {
+      "index": 8,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "4db24e823e9f9262f5164dbf974a3de0a61eac40d1fc1a430112712068e38833"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 9,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 10,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "4db24e823e9f9262f5164dbf974a3de0a61eac40d1fc1a430112712068e38833"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 11,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 12,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "4db24e823e9f9262f5164dbf974a3de0a61eac40d1fc1a430112712068e38833"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    }
+  ]
+}

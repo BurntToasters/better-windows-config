@@ -435,7 +435,7 @@ internal static class ExportTextCapture
             ["filter"] = new JsonObject
             {
                 ["branchEditReadBack"] = branchBack,
-                ["fileNameReadBack"] = fileBack,
+                ["fileNameReadBack"] = fileBack.Replace(paths.Root, "<repo>", StringComparison.OrdinalIgnoreCase),
                 ["saveMessagePosted"] = saveSent,
             },
             ["box"] = new JsonObject { ["shown"] = box != IntPtr.Zero },

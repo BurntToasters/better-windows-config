@@ -1,0 +1,25 @@
+{
+  "case": "C/TwoInKey_ChangeFirstAgain",
+  "planHash": "2d37ef4596f3f2c3b187c0aada39478cb9f3ec29ef83d6a21ce92190223b6ae5",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-first/Machine.Registry.pol",
+    "step-01-first/Machine.comment.cmtx",
+    "step-01-first/gpt.ini",
+    "step-02-second/Machine.Registry.pol",
+    "step-02-second/Machine.comment.cmtx",
+    "step-02-second/gpt.ini",
+    "step-03-first-disabled/Machine.Registry.pol",
+    "step-03-first-disabled/Machine.comment.cmtx",
+    "step-03-first-disabled/gpt.ini",
+    "step-04-first-enabled-again/Machine.Registry.pol",
+    "step-04-first-enabled-again/Machine.comment.cmtx",
+    "step-04-first-enabled-again/gpt.ini",
+    "step-05-second-disabled/Machine.Registry.pol",
+    "step-05-second-disabled/Machine.comment.cmtx",
+    "step-05-second-disabled/gpt.ini"
+  ]
+}

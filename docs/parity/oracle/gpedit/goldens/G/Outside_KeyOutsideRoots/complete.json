@@ -1,0 +1,16 @@
+{
+  "case": "G/Outside_KeyOutsideRoots",
+  "planHash": "1f6f4a3d522d1612ec7c21a7fc8ae1d7e53a903b8fdddc499c230994b283613b",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled/Machine.Registry.pol",
+    "step-01-enabled/Machine.comment.cmtx",
+    "step-01-enabled/gpt.ini",
+    "step-02-not-configured/Machine.Registry.pol",
+    "step-02-not-configured/Machine.comment.cmtx",
+    "step-02-not-configured/gpt.ini"
+  ]
+}

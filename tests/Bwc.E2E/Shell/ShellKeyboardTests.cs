@@ -200,6 +200,8 @@ public sealed class ShellKeyboardTests
         using var session = OpenBwc(checks, "shell-addressflat");
         using var automation = new UIA3Automation();
 
+        // A key sent before the shell has the keyboard misses its accelerators, so the tree takes the focus first.
+        _ = EnsurePane(session, automation, "tree", "TAB", 6);
         session.SendKeys("CONTROL+KEY_L");
         _ = WaitUntil(() => FocusedPane(automation) == "address", UiTimeout);
         Thread.Sleep(300);

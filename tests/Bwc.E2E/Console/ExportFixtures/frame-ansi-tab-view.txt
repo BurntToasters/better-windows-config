@@ -1,0 +1,9 @@
+Name	Comment
+Setting 00000	Yes
+Setting 00001	No
+Setting 00002	Yes
+Setting 00003	No
+Setting 00004	Yes
+Setting 00005	No
+Setting 00006	Yes
+Setting 00007	No

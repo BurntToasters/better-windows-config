@@ -1,0 +1,7 @@
+Setting	State	Comment
+Shared list, first policy	Not configured	No
+Shared list, second policy	Not configured	No
+Shared key, Alpha	Not configured	No
+Shared key, elements in reverse order	Not configured	No
+Shared key, Mid	Not configured	No
+Shared key, Zeta	Not configured	No

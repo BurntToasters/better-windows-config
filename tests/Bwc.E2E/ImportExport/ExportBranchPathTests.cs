@@ -75,7 +75,7 @@ public sealed class ExportBranchPathTests
             }
 
             CheckPrefillAndRadios(dialogs, dialog, sandbox, "branch.refuse");
-            AutomationElement? edit = dialogs.FindBranchEdit(dialog);
+            AutomationElement? edit = WaitForBranchEdit(dialogs, dialog);
             string missing = RunRootClassicPath(sandbox) + @"\DoesNotExist";
             string typedBack = "(not typed)";
             bool typed = edit is not null && dialogs.TrySetEditText(dialog, edit, missing, out typedBack);
@@ -164,7 +164,7 @@ public sealed class ExportBranchPathTests
 
             // The tree selection is the run root. The typed key is the child, so only the child may be exported.
             string typedKey = RunRootClassicPath(sandbox) + @"\" + BranchChildName;
-            AutomationElement? edit = dialogs.FindBranchEdit(dialog);
+            AutomationElement? edit = WaitForBranchEdit(dialogs, dialog);
             string typedBack = "(not typed)";
             bool typed = edit is not null && dialogs.TrySetEditText(dialog, edit, typedKey, out typedBack);
             E2EResults.Record("branch.typed.edit", typed, $"typed '{typedKey}', edit reads '{typedBack}'.");
@@ -244,7 +244,7 @@ public sealed class ExportBranchPathTests
             }
 
             string typedKey = RunRootClassicPath(sandbox) + @"\" + BranchChildName;
-            AutomationElement? edit = dialogs.FindBranchEdit(dialog);
+            AutomationElement? edit = WaitForBranchEdit(dialogs, dialog);
             string typedBack = "(not typed)";
             bool typed = edit is not null && dialogs.TrySetEditText(dialog, edit, typedKey, out typedBack);
             E2EResults.Record(
@@ -332,10 +332,21 @@ public sealed class ExportBranchPathTests
         E2EGuards.RequireSandboxSelection(session, sandbox, checkId + ".sandbox.selection");
     }
 
+    /// <summary>
+    /// The Selected branch edit of the export dialog. The dialog wait can return before every control of the
+    /// dialog is in the UIA tree, so the lookup is repeated for up to 5 s. Null when it never shows.
+    /// </summary>
+    private static AutomationElement? WaitForBranchEdit(SystemFileDialogDriver dialogs, IntPtr dialog)
+    {
+        AutomationElement? edit = null;
+        _ = ControlTestSupport.WaitUntil(() => (edit = dialogs.FindBranchEdit(dialog)) is not null, TimeSpan.FromSeconds(5));
+        return edit;
+    }
+
     private static void CheckPrefillAndRadios(SystemFileDialogDriver dialogs, IntPtr dialog, SandboxRegistry sandbox, string checkId)
     {
         string expectedPrefill = RunRootClassicPath(sandbox);
-        AutomationElement? edit = dialogs.FindBranchEdit(dialog);
+        AutomationElement? edit = WaitForBranchEdit(dialogs, dialog);
         string prefill = edit is null ? "(no edit)" : ReadEditValue(edit);
         E2EResults.Record(
             checkId + ".prefill",

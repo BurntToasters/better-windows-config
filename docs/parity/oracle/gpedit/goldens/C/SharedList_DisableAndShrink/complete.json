@@ -1,0 +1,31 @@
+{
+  "case": "C/SharedList_DisableAndShrink",
+  "planHash": "9f034ec599bdfd276532a76895b9b0b3651a07aabb4eba6142ac18ea37fdd8cf",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-one-three/Machine.Registry.pol",
+    "step-01-one-three/Machine.comment.cmtx",
+    "step-01-one-three/gpt.ini",
+    "step-02-two-one/Machine.Registry.pol",
+    "step-02-two-one/Machine.comment.cmtx",
+    "step-02-two-one/gpt.ini",
+    "step-03-one-shrunk/Machine.Registry.pol",
+    "step-03-one-shrunk/Machine.comment.cmtx",
+    "step-03-one-shrunk/gpt.ini",
+    "step-04-one-disabled/Machine.Registry.pol",
+    "step-04-one-disabled/Machine.comment.cmtx",
+    "step-04-one-disabled/gpt.ini",
+    "step-05-two-disabled/Machine.Registry.pol",
+    "step-05-two-disabled/Machine.comment.cmtx",
+    "step-05-two-disabled/gpt.ini",
+    "step-06-one-not-configured/Machine.Registry.pol",
+    "step-06-one-not-configured/Machine.comment.cmtx",
+    "step-06-one-not-configured/gpt.ini",
+    "step-07-two-not-configured/Machine.Registry.pol",
+    "step-07-two-not-configured/Machine.comment.cmtx",
+    "step-07-two-not-configured/gpt.ini"
+  ]
+}

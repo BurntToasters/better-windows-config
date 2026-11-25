@@ -34,6 +34,22 @@ public sealed class RobustnessTests
     private const string ListRowZebra = "ZebraString";
     private const string ListRowAlpha = "AlphaString";
     private const string ContextDeleteName = "Delete";
+
+    // The names of the whole menu, in order, so the wait for the menu sees the state the menu really reaches.
+    private static readonly string[] ValueMenuNames = ["Modify...", "Modify Binary Data...", ContextDeleteName, "Rename"];
+
+    private static readonly string[] ExpandedKeyMenuNames =
+    [
+        "Collapse",
+        "New",
+        "Find...",
+        "Delete",
+        "Rename",
+        "Export",
+        "Permissions...",
+        "Copy Key Name",
+    ];
+
     private const string PolicyCaption = "Registry Editor";
     private const string PolicyMessage = "Registry editing has been disabled by your administrator.";
 
@@ -79,7 +95,7 @@ public sealed class RobustnessTests
             E2EGuards.RequireSandboxSelection(session, sandbox, "robust.valuedelete.sandbox");
             MenuSnapshot? snapshot = menus.RightClickForMenu(
                 () => ControlTestSupport.FindRowByName(session, ControlTestSupport.ListControl, ControlType.DataItem, ListRowZebra),
-                new[] { ContextDeleteName });
+                ValueMenuNames);
             bool opened = rows && snapshot is not null;
             bool invoked = opened && menus.Invoke(MenuEditDelete);
             bool dialog = invoked && driver.WaitForDialog();
@@ -340,7 +356,7 @@ public sealed class RobustnessTests
             MenuSnapshot? snapshot = expanded
                 ? menus.RightClickForMenu(
                     () => ControlTestSupport.FindRowByName(session, ControlTestSupport.TreeControl, ControlType.TreeItem, "Wide"),
-                    new[] { "Collapse", "New" })
+                    ExpandedKeyMenuNames)
                 : null;
             string label = snapshot?.Find(915)?.Name ?? string.Empty;
             bool collapse = label == "Collapse";
@@ -612,9 +628,8 @@ public sealed class RobustnessTests
             .Any(element => element.Name.Contains(expected, StringComparison.Ordinal));
 
     private static AutomationElement? FindOwnedMessageBox(UIA3Automation automation, int processId) =>
-        automation.GetDesktop().FindAllChildren(cf => cf.ByName(PolicyCaption))
-            .FirstOrDefault(window => window.Properties.ProcessId.IsSupported &&
-                window.Properties.ProcessId.Value == processId);
+        ProcessWindows.Of(automation, processId)
+            .FirstOrDefault(window => string.Equals(ControlTestSupport.SafeName(window), PolicyCaption, StringComparison.Ordinal));
 
     private static Process StartRegedit(
         E2EConfig config,

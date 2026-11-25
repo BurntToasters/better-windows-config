@@ -1,0 +1,598 @@
+{
+  "case": "E/Decimal_Required_Empty",
+  "description": "required decimal left empty and given an empty text",
+  "planVersion": 2,
+  "planHash": "d481929bf4a63735fdcd4760477fa81cbd2f9a10e155a8b054271b682a48f0e5",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal that is required' state Enabled press [OK] at User/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal that is required",
+        "state": "Enabled",
+        "policyId": "Pol_Decimal_Required",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step defaults",
+      "plan": "snapshot  [step defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal that is required' state Enabled options [Required number: = text ''] press [OK] at User/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal that is required",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Required number:",
+            "expectKind": "decimalTextBox",
+            "text": "",
+            "elementId": "RequiredNumber"
+          }
+        ],
+        "policyId": "Pol_Decimal_Required",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step empty",
+      "plan": "snapshot  [step empty]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step empty"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "defaults",
+      "folder": "step-01-defaults",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 152,
+          "sha256": "d4ef69cb698094d0c93907b538959f197e687055caa48d1003b88468696d2c6d"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 128
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 152
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "empty",
+      "folder": "step-02-empty",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 152,
+          "sha256": "d4ef69cb698094d0c93907b538959f197e687055caa48d1003b88468696d2c6d"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 128
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 152
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol",
+        "User\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 65536,
+      "data": {
+        "policy": "Decimal that is required",
+        "before": {
+          "title": "Decimal that is required",
+          "windowTitle": "Decimal that is required",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number that must be entered. It has no range. The presentation turns the spin buttons off.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Required number:",
+              "panelId": "#e89a7390c9d6",
+              "controlId": "#46886a766af5",
+              "rect": [
+                544,
+                1108,
+                468,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal that is required",
+          "windowTitle": "Decimal that is required",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number that must be entered. It has no range. The presentation turns the spin buttons off.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Required number:",
+              "panelId": "#e89a7390c9d6",
+              "controlId": "#46886a766af5",
+              "rect": [
+                544,
+                1108,
+                468,
+                58
+              ],
+              "enabled": true,
+              "text": "1"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Decimal that is required",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol",
+                "User\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1,
+                "User\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              }
+            }
+          }
+        ],
+        "finalTitle": "Decimal that is required"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 152,
+          "sha256": "d4ef69cb698094d0c93907b538959f197e687055caa48d1003b88468696d2c6d"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Decimal that is required",
+        "before": {
+          "title": "Decimal that is required",
+          "windowTitle": "Decimal that is required",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number that must be entered. It has no range. The presentation turns the spin buttons off.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Required number:",
+              "panelId": "#e89a7390c9d6",
+              "controlId": "#46886a766af5",
+              "rect": [
+                76,
+                640,
+                468,
+                58
+              ],
+              "enabled": true,
+              "text": "1"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "",
+            "before": "1",
+            "immediate": "",
+            "observed": "",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Required number:",
+            "labelMatch": "exact",
+            "kind": "#68e85187d390",
+            "controlId": "#46886a766af5"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal that is required",
+          "windowTitle": "Decimal that is required",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number that must be entered. It has no range. The presentation turns the spin buttons off.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Required number:",
+              "panelId": "#e89a7390c9d6",
+              "controlId": "#46886a766af5",
+              "rect": [
+                76,
+                640,
+                468,
+                58
+              ],
+              "enabled": true,
+              "text": ""
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Decimal that is required",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#0474db6e43e3"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "applyEnabledAfter": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              }
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "Decimal that is required",
+          "windowTitle": "Decimal that is required",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number that must be entered. It has no range. The presentation turns the spin buttons off.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Required number:",
+              "panelId": "#e89a7390c9d6",
+              "controlId": "#46886a766af5",
+              "rect": [
+                76,
+                640,
+                468,
+                58
+              ],
+              "enabled": true,
+              "text": ""
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "Decimal that is required",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": {
+              "raw": 65536,
+              "machine": 0,
+              "user": 1
+            }
+          }
+        },
+        "finalTitle": "Decimal that is required"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 152,
+          "sha256": "d4ef69cb698094d0c93907b538959f197e687055caa48d1003b88468696d2c6d"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      }
+    }
+  ]
+}

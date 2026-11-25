@@ -1,0 +1,10 @@
+{
+  "case": "C/SharedList_EmptyList",
+  "planHash": "232a32ed8fdccfe3cda19c2d1e6cf1297708fdd099588678580ca8f2a79b4c86",
+  "files": [
+    "case.json",
+    "gpt.ini",
+    "step-01-one-empty/gpt.ini",
+    "step-02-one-not-configured/gpt.ini"
+  ]
+}

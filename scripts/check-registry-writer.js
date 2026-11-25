@@ -98,6 +98,19 @@ const managedWriteAllowlist = new Map([
     "tests/Bwc.E2E/Harness/AppletState.cs",
     "Restores the classic regedit applet key from its own snapshot. Writes go only under Applets/Regedit.",
   ],
+  [
+    "tools/Bwc.Oracle.Capture/Gpedit/Session/GpeditRegistry.cs",
+    "Deletes only Software/Policies/BWC-Oracle and Software/BWC-Oracle-Gpedit (HKLM and HKCU) and the HKCU self test key. " +
+      "AssertAllowed refuses every other key before the delete.",
+  ],
+  [
+    "tests/Bwc.E2E/Gpedit/Interop/GpeditInteropSupport.cs",
+    "Backs up, clears, and restores only the four fixed BWC-Oracle fixture keys (HKLM/HKCU Software/Policies/BWC-Oracle and Software/BWC-Oracle-Gpedit) through AssertAllowed.",
+  ],
+  [
+    "tools/Bwc.Oracle.Capture/Gpedit/Session/SelfTest.cs",
+    "Creates and deletes only HKCU/Software/BWC-Oracle-Gpedit-Selftest to exercise the session restore without elevation.",
+  ],
   ["tests/Bwc.Registry.Tests/RegFileExporterTests.cs", "Seeds and removes sandbox run keys for export tests."],
   ["tests/Bwc.Registry.Tests/RegFileImporterTests.cs", "Seeds and removes sandbox run keys for import tests."],
   ["tests/Bwc.Registry.Tests/RegistryFinderTests.cs", "Seeds and removes sandbox run keys for find tests."],
@@ -140,6 +153,42 @@ const sandboxedSeedReason = "Seeds through SandboxRegistry, which confines every
 
 // C# files that name no registry type but call SetValue or CreateSubKey. Each entry says what the receiver is.
 const unnamedCallAllowlist = new Map([
+  [
+    "src/Bwc.UI/Menu/MenuItemActions.cs",
+    "Calls DependencyObject.SetValue to store a menu action on the item. No registry API is reached.",
+  ],
+  [
+    "tests/Bwc.Gpo.Tests/PolWriterTests.cs",
+    "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
+  ],
+  [
+    "tests/Bwc.Gpo.Tests/GpoStorePolHelper.cs",
+    "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
+  ],
+  [
+    "src/Bwc.Policy/Model/PolicyStateWriter.cs",
+    "Calls PolDocument.SetValue, the in-memory Registry.pol model. The GPO files are written only by GpoFileWriter.",
+  ],
+  [
+    "tests/Bwc.Gpo.Tests/PolRoundTripTests.cs",
+    "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
+  ],
+  [
+    "tests/Bwc.Policy.Tests/Blind/StateBlindTests.cs",
+    "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
+  ],
+  [
+    "tests/Bwc.E2E/Gpedit/Filter/GpeditFilterSupport.cs",
+    "Calls PolDocument.SetValue inside a save of the E2E sandbox store. No registry API is reached.",
+  ],
+  [
+    "tests/Bwc.Policy.Tests/Blind/FilterStoreBlindTests.cs",
+    "Calls PolDocument.SetValue, the in-memory Registry.pol model. No registry API is reached.",
+  ],
+  [
+    "tests/Bwc.E2E/Tree/TreeCanRenameTests.cs",
+    "Seeds two keys under the E2E run root through SandboxRegistry, the harness writer.",
+  ],
   [
     "src/Bwc.Regedit/Controllers/ValueCommands.cs",
     "Sets a hex dialog model in memory (HexViewerDialog and HexEditorDialog), and writes through RegistryStore, the guarded writer.",
@@ -187,6 +236,10 @@ const unnamedCallAllowlist = new Map([
 // C# files that start classic or Hub processes whose literal names reg or regedit. Each entry says why it is safe.
 const launchAllowlist = new Map([
   [
+    "src/Bwc.UI/Icons/IconSelfCheck.cs",
+    "E2E flavor only. Names regedit.exe as the module whose icons it loads with LoadLibraryEx; it starts no process.",
+  ],
+  [
     "tests/Bwc.E2E/Installer/InstallerUpdateTests.cs",
     "Starts classic regedit to look at the installed state. Its writes go through the harness, not a reg command.",
   ],
@@ -213,6 +266,10 @@ const scriptWriteAllowlist = new Map([
   [
     "scripts/check-registry-writer.js",
     "Defines the patterns this checker looks for. Its own literals are the patterns, not registry writes.",
+  ],
+  [
+    "scripts/oracle.js",
+    "Names the regedit oracle as a --tool value and starts only the oracle tools it builds. It runs no reg command.",
   ],
   [
     "scripts/run-app.js",

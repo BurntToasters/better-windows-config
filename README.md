@@ -3,7 +3,7 @@
 
   <h1>Better Windows Config</h1>
 
-  <p>Faithful, modern re-implementations of the classic Windows tools, starting with the Registry Editor.</p>
+  <p>Faithful, modern re-implementations of the classic Windows tools: the Registry Editor and the Local Group Policy Editor.</p>
 
   <p>
     <a href="https://github.com/BurntToasters/better-windows-config/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/BurntToasters/better-windows-config?label=release" /></a>
@@ -28,8 +28,9 @@ don't like is that they look and feel stuck in 2001 next to the rest of Windows 
 Config keeps the classic layout and behavior and rebuilds the tools on .NET 10 and WinUI 3, with
 proper light, dark, and high contrast themes.
 
-The first tool is the **Registry Editor**. Classic `regedit.exe` is the reference: if it behaves
-differently from the original, that's a bug.
+The first tool is the **Registry Editor**, and 0.2.0 adds the **Local Group Policy Editor**. The
+classic tools (`regedit.exe` and `gpedit.msc`) are the reference: if one of these behaves differently
+from the original, that's a bug.
 
 > [!WARNING]
 > Better Windows Config is early and unstable. Keep a backup (`File` > `Export`) before you change
@@ -38,6 +39,13 @@ differently from the original, that's a bug.
 ## Tools
 
 <table>
+  <tr>
+    <td width="96" align="center" valign="top"><img src="resources/bwc.png" alt="Hub icon" width="64" /></td>
+    <td valign="top">
+      <b>Hub</b><br />
+      A launcher for the tools, with About, update settings, and a signed self-updater.
+    </td>
+  </tr>
   <tr>
     <td width="96" align="center" valign="top"><img src="resources/bwc-regedit.png" alt="Registry Editor icon" width="64" /></td>
     <td valign="top">
@@ -49,15 +57,22 @@ differently from the original, that's a bug.
     </td>
   </tr>
   <tr>
-    <td width="96" align="center" valign="top"><img src="resources/bwc.png" alt="Hub icon" width="64" /></td>
+    <td width="96" align="center" valign="top"><img src="resources/bwc-gpo.png" alt="Local Group Policy Editor icon" width="64" /></td>
     <td valign="top">
-      <b>Hub</b><br />
-      A launcher for the tools, with About, update settings, and a signed self-updater.
+      <b>Local Group Policy Editor</b><br />
+      Browses the Administrative Templates of Computer Configuration and User Configuration, opens
+      the setting dialog for a policy, and saves it to the local policy (<code>Registry.pol</code>,
+      <code>gpt.ini</code>, and <code>comment.cmtx</code>) when it runs as an administrator. Without
+      elevation, on Windows Home, or without write access to the policy folder, it is read-only and
+      shows a notice. It also has the filter, sorting, All Settings, Add/Remove Templates for ADMX
+      files and the classic View, File and Help menus. The changelog lists where it differs from
+      classic <code>gpedit.msc</code> on purpose.
     </td>
   </tr>
 </table>
 
-More classic tools will follow once the Registry Editor is solid.
+The Local Group Policy Editor has not been verified on a real Windows Home machine or on a
+non-English Windows. More classic tools will follow once these are solid.
 
 ## Install
 
@@ -86,7 +101,13 @@ those with [my public key](https://tuxedo.rosie.run/GPG/BurntToasters_0xF2FBC20F
 ## Use
 
 - Open **Better Windows Config** from the Start menu to get the Hub, or open
-  **Registry Editor (BWC)** directly.
+  **Registry Editor (BWC)** or **Local Group Policy Editor (BWC)** directly.
+- The Hub lists the Local Group Policy Editor next to the Registry Editor. Choose it there, or open
+  **Local Group Policy Editor (BWC)** from the Start menu.
+- To change a policy, start the Local Group Policy Editor as an administrator. Saving needs
+  administrator rights, and the policy files are written only then.
+- Without administrator rights, or on Windows Home, the editor opens read-only. It shows the current
+  policy and a notice, so you can browse settings but not save them.
 - The Registry Editor also works from the command line the way classic regedit does:
 
   ```powershell
@@ -146,6 +167,7 @@ new `## Changes in` section). Replace the placeholder notes before you release.
 | Path | What it is |
 | --- | --- |
 | `src/Bwc.Regedit.App` | The Registry Editor app. Its engine is `src/Bwc.Registry`. |
+| `src/Bwc.Gpedit.App` | The Local Group Policy Editor app. Its engines are `src/Bwc.Policy` and `src/Bwc.Gpo`. |
 | `src/Bwc.Hub` | The Hub launcher. |
 | `src/Bwc.Update` | The self-updater. |
 | `installer/` | The NSIS installer script. |

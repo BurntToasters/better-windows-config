@@ -1,0 +1,16 @@
+{
+  "case": "C/Comment_MultiLine",
+  "planHash": "1d31f955760470f97245547d6e5d5aab1f177f4d0b7c5a8f2b0aba74d1562c09",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-two-lines/Machine.Registry.pol",
+    "step-01-two-lines/Machine.comment.cmtx",
+    "step-01-two-lines/gpt.ini",
+    "step-02-non-ascii/Machine.Registry.pol",
+    "step-02-non-ascii/Machine.comment.cmtx",
+    "step-02-non-ascii/gpt.ini"
+  ]
+}

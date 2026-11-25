@@ -1,0 +1,471 @@
+{
+  "case": "F/Placeholders_Computer",
+  "description": "the top nodes and the placeholder nodes under Computer Configuration",
+  "planVersion": 2,
+  "planHash": "baac685bc363eef77ca50653842682e369bb4f0534d8751fb45efb064ad6203d",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "label": "Computer Configuration",
+      "plan": "selectNode at Computer/  [Computer Configuration]",
+      "op": {
+        "kind": "selectNode",
+        "label": "Computer Configuration",
+        "root": "Computer",
+        "path": []
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at Computer/",
+      "op": {
+        "kind": "readList",
+        "root": "Computer",
+        "path": []
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at Computer/",
+      "op": {
+        "kind": "readStatus",
+        "root": "Computer",
+        "path": []
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "computer-configuration"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Software Settings",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Software Settings"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 5,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at Computer/Software Settings",
+      "op": {
+        "kind": "readList",
+        "root": "Computer",
+        "path": [
+          "Software Settings"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 6,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "software-settings"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Windows Settings",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Windows Settings"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 8,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at Computer/Windows Settings",
+      "op": {
+        "kind": "readList",
+        "root": "Computer",
+        "path": [
+          "Windows Settings"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 9,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "windows-settings"
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 11,
+      "kind": "readStatus",
+      "label": null,
+      "plan": "readStatus at Computer/Administrative Templates",
+      "op": {
+        "kind": "readStatus",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 12,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "administrative-templates"
+      },
+      "optional": null
+    },
+    {
+      "index": 13,
+      "kind": "snapshot",
+      "label": "step final",
+      "plan": "snapshot  [step final]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step final"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "final",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 1,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": false,
+        "headers": [
+          "#dcd1d5223f73"
+        ],
+        "sort": [
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 3,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Software Settings",
+            "cells": [
+              "Software Settings"
+            ],
+            "setting": null,
+            "state": null,
+            "comment": null
+          },
+          {
+            "index": 1,
+            "name": "Windows Settings",
+            "cells": [
+              "Windows Settings"
+            ],
+            "setting": null,
+            "state": null,
+            "comment": null
+          },
+          {
+            "index": 2,
+            "name": "Administrative Templates",
+            "cells": [
+              "Administrative Templates"
+            ],
+            "setting": null,
+            "state": null,
+            "comment": null
+          }
+        ],
+        "status": {
+          "text": "",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "Computer Configuration",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": []
+      }
+    },
+    {
+      "index": 2,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "text": "",
+        "filtered": false,
+        "error": null,
+        "statusNumbers": []
+      }
+    },
+    {
+      "index": 3,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 4,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 5,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": false,
+        "headers": [
+          "#dcd1d5223f73"
+        ],
+        "sort": [
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 0,
+        "truncated": false,
+        "rows": [],
+        "status": {
+          "text": "",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#e5734f87a673",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": []
+      }
+    },
+    {
+      "index": 6,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 7,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 8,
+      "kind": "readList",
+      "ok": true,
+      "data": {
+        "settingStateList": false,
+        "headers": [
+          "#dcd1d5223f73"
+        ],
+        "sort": [
+          "#140bedbf9c3f"
+        ],
+        "rowCount": 5,
+        "truncated": false,
+        "rows": [
+          {
+            "index": 0,
+            "name": "Name Resolution Policy",
+            "cells": [
+              "Name Resolution Policy"
+            ],
+            "setting": null,
+            "state": null,
+            "comment": null
+          },
+          {
+            "index": 1,
+            "name": "#70a64a447bd9",
+            "cells": [
+              "#70a64a447bd9"
+            ],
+            "setting": null,
+            "state": null,
+            "comment": null
+          },
+          {
+            "index": 2,
+            "name": "Deployed Printers",
+            "cells": [
+              "Deployed Printers"
+            ],
+            "setting": null,
+            "state": null,
+            "comment": null
+          },
+          {
+            "index": 3,
+            "name": "Security Settings",
+            "cells": [
+              "Security Settings"
+            ],
+            "setting": null,
+            "state": null,
+            "comment": null
+          },
+          {
+            "index": 4,
+            "name": "Policy-based QoS",
+            "cells": [
+              "Policy-based QoS"
+            ],
+            "setting": null,
+            "state": null,
+            "comment": null
+          }
+        ],
+        "status": {
+          "text": "#735d45c9a777",
+          "filtered": false,
+          "error": null
+        },
+        "filtered": false,
+        "selectedNode": "#310e6524d9c1",
+        "activeTabGuess": {
+          "guess": "Extended"
+        },
+        "statusNumbers": []
+      }
+    },
+    {
+      "index": 9,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 10,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 11,
+      "kind": "readStatus",
+      "ok": true,
+      "data": {
+        "text": "",
+        "filtered": false,
+        "error": null,
+        "statusNumbers": []
+      }
+    },
+    {
+      "index": 12,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 13,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    }
+  ]
+}

@@ -43,7 +43,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- .NET 10 has no Ed25519 or BLAKE2b in the BCL (see spikes/S5-minisign/README.md). -->
+    <!-- .NET 10 has no Ed25519 or BLAKE2b in the BCL (see docs/failure-modes/minisign.md). -->
     <PackageReference Include="BouncyCastle.Cryptography" />
   </ItemGroup>
 

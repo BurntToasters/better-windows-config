@@ -6,7 +6,7 @@ verified installer and asks for elevation, and the two process commands (`--clos
 that the installer calls. Since 0.1.2 (per-machine install) the elevated half, `--apply-elevated`, `--launch-hub`,
 and the other-session check of `--close-running` are in `docs/failure-modes/update-elevation.md`; this file's
 rows HT4, HT5, HT7, HL9, HL14, NE8, N1, N10, Q5, S8 and S18 changed with that hand-off. The minisign layer is the verifier proven in
-`spikes/S5-minisign/FAILURE-MODES.md`; this file covers what the update flow adds on top of it.
+`docs/failure-modes/minisign.md`; this file covers what the update flow adds on top of it.
 
 Written before the tests and before the code, per AGENTS.md ("FIRST write all the ways it could
 fail, THEN write the code"). This revision adds sections L to R and changes rows MS14, NE4, IN15,
@@ -36,7 +36,7 @@ Terms:
 | MS9 | Legacy `Ed` algorithm on the manifest signature | WA: legacy signs raw bytes and is not prehashed | Reject (`allowLegacy` is false in production) | `Manifest_LegacyEd_Rejected` |
 | MS10 | Unknown algorithm bytes (not `ED` or `Ed`) | WA if treated as legacy | Reject | `Manifest_UnknownAlgorithm_Rejected` |
 | MS11 | Signature as raw minisign text, or as the base64 envelope | WR if one form is refused | Accept both | `Manifest_RawAndEnvelope_Both_Accepted` |
-| MS12 | Signature with a BOM, stray CR, extra whitespace, wrong line count | WA if trimmed silently | Reject (spike rules B11 to B17) | `Manifest_Signature_Format_Rejected` |
+| MS12 | Signature with a BOM, stray CR, extra whitespace, wrong line count | WA if trimmed silently | Reject (minisign rules B11 to B17) | `Manifest_Signature_Format_Rejected` |
 | MS13 | Trusted key list is empty | WA if "no keys" means "accept" | Reject, fail closed (`TrustedKeysInvalid`) | `Empty_Key_List_Rejected` |
 | MS14 | Shipped placeholder public key (no real key yet) | WA if the placeholder verifies anything | Every manifest is refused, `TrustedKeysNotConfigured` (see R1) | `Placeholder_Key_Fails_Closed` |
 | MS15 | Key rotation: the second trusted key signed | WR | Accept, return the trusted comment | `Rotation_Second_Key_Accepted` |
@@ -357,6 +357,7 @@ Added in the 0.1.1 audit. Every row is written before its test or code.
 | S18 | Unexpected exception after the elevated helper started | Hub relaunched while the installer runs | No relaunch; `elevatedHelperStarted: true`, failure `Unexpected`, exit code 7 | `Doc` (the exception before the start is `Unexpected_During_Elevated_Start_Relaunches_Hub`) |
 | S19 | Proxy that requires the Windows account | Download fails behind an authenticated proxy | Default credentials sent to the proxy | `Doc` |
 | S20 | Second instance sends to a pipe name that another user or session owns | Squatting or collision | See core.md, SingleInstance: client uses CurrentUserOnly, pipe name carries the session id | `Second_Instance_Message_Reaches_First` (core.md section) |
-| S21 | The staging path is given in 8.3 short form (for example `C:\Users\JOHNSM~1\...`, which `Path.GetTempPath` can return) | Every update refused as PathRejected on such machines | Accepted: the final-path check compares resolved paths, so the short form applies. Skipped with a recorded reason only when 8.3 names are disabled on the volume | `Staging_Path_8dot3_Applies` |
+| S21 | The staging path is given in 8.3 short form (for example `C:\Users\<USERNA~1>\...`, which `Path.GetTempPath` can return) | Every update refused as PathRejected on such machines | Accepted: the final-path check compares resolved paths, so the short form applies. Skipped with a recorded reason only when 8.3 names are disabled on the volume | `Staging_Path_8dot3_Applies` |
 | S22 | The staging root is reached through a directory junction in a parent (TEMP relocated through a junction) | Every update refused as PathRejected | Accepted: both paths resolve to the same final path and the update applies. A junction as the staging root itself is still refused (section F) | `Staging_Via_Junction_Applies` |
 | S23 | Between the folder open and the installer open, the installer name is redirected to another folder (swap) | A different file is started | Refused `PathRejected`: the installer's final path is not the held folder's final path plus `installer.exe` | `Installer_Outside_Held_Folder_Refused` |
+| S24 | A P/Invoke in a src assembly resolves its DLL through the default search order (application folder, then current folder, then System32) | A DLL planted beside the app or in the current folder is loaded with the app rights | Every src assembly with a P/Invoke carries `[assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]`. CA5392 is a warning for `src/**.cs` in `.editorconfig`, and the build fails on it. Every import names a System32 DLL, so no import uses `AssemblyDirectory` | `Doc` (the build gate: CA5392 is an error under TreatWarningsAsErrors; a planted DLL in System32 cannot be tested) |

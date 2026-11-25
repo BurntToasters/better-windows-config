@@ -5,6 +5,7 @@ import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { elevationState } from "./elevated-runner/elevation.mjs";
+import { summaryLines } from "./e2e-timing-report.js";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -73,8 +74,15 @@ It needs --flavor e2e and an elevated process. Start it through
 scripts/elevated-runner/run.js, not from an elevated shell by hand. A process that is
 not elevated, or a run with no Elevated tests, exits ${NOT_RUN_EXIT_CODE} and reports NOT RUN.
 
+Ship flavor: --flavor ship never runs in an elevated process, or one whose elevation cannot be
+checked. The ship tools would run with an administrator token against the real registry. Such a run
+prints NOT RUN and exits ${NOT_RUN_EXIT_CODE} before any build or test. --flavor e2e stays allowed when elevated,
+because its apps are sandboxed.
+
 Environment:
   BWC_PUBLISH_DIR           Override the publish folder (relative to the repo root)
+  BWC_E2E_FORCE_ELEVATED=1  Test switch: treat this process as elevated, so --flavor ship refuses. It can
+                            only make the script refuse. Nothing makes an elevated process look unelevated.
 
 Output: artifacts/e2e/result-<rid>-<flavor>.json (overwritten by every run), plus
 result-<rid>-<flavor>-<runId>.json for this run, and result-<rid>-<flavor>-full.json
@@ -266,6 +274,19 @@ function printResult(result, verdict = result.pass === true) {
 
   console.log(`artifact: ${resultPath}`);
   console.log(`run artifact: ${runResultPath}`);
+  printTimings(result);
+}
+
+// Prints the slowest tests, the session totals and the slowest waits when the artifact has a timings object.
+// An older artifact has none: nothing extra is printed. A failure here never changes the result.
+function printTimings(result) {
+  try {
+    for (const line of summaryLines(result)) {
+      console.log(line);
+    }
+  } catch (error) {
+    console.error(`test-e2e: the timing summary could not be printed: ${error.message}`);
+  }
 }
 
 function groupedWorkPackages(knownGaps) {
@@ -335,6 +356,29 @@ if (elevatedRun) {
   if (!elevation.elevated) {
     console.error("NOT RUN: this process is not elevated, so the Elevated E2E tests did not run.");
     console.error("Start them with: node scripts/elevated-runner/run.js");
+    process.exit(NOT_RUN_EXIT_CODE);
+  }
+}
+
+// The ship publish writes the real registry, so it never runs with an administrator token. The switch below can
+// only force the refusal.
+if (flavor === "ship") {
+  if (process.env.BWC_E2E_FORCE_ELEVATED === "1") {
+    console.error("NOT RUN: BWC_E2E_FORCE_ELEVATED=1 forces the ship flavor to refuse as if this process were elevated.");
+    process.exit(NOT_RUN_EXIT_CODE);
+  }
+  const shipElevation = elevationState();
+  if (!shipElevation.known) {
+    console.error(
+      `NOT RUN: could not check whether this process is elevated (${shipElevation.detail}), so the ship flavor did not run.`,
+    );
+    process.exit(NOT_RUN_EXIT_CODE);
+  }
+  if (shipElevation.elevated) {
+    console.error(
+      "NOT RUN: this process is elevated, and the ship flavor would run the ship tools with an administrator token against the real registry.",
+    );
+    console.error("Start a normal (not elevated) shell and run it again.");
     process.exit(NOT_RUN_EXIT_CODE);
   }
 }

@@ -1,0 +1,16 @@
+{
+  "case": "C/Clear_LastSetting_User",
+  "planHash": "c5e29a45762e66bd23fc4122abf1ff56c881747d93e80b267809b8a786b18b59",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled/User.Registry.pol",
+    "step-01-enabled/User.comment.cmtx",
+    "step-01-enabled/gpt.ini",
+    "step-02-not-configured/User.Registry.pol",
+    "step-02-not-configured/User.comment.cmtx",
+    "step-02-not-configured/gpt.ini"
+  ]
+}

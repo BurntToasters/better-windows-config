@@ -1,0 +1,1018 @@
+{
+  "case": "B/Pol_Decimal_StoreAsText",
+  "description": "Pol_Decimal_StoreAsText under Computer Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
+  "planVersion": 2,
+  "planHash": "bbbd7600d74d3dc393dd94c84480704e03d049e8d08372ea2aa326dec3bb1403",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal stored as text' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal stored as text",
+        "state": "Enabled",
+        "policyId": "Pol_Decimal_StoreAsText",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step enabled-defaults",
+      "plan": "snapshot  [step enabled-defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal stored as text' state Enabled options [Number stored as text: = typed text '21845'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal stored as text",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Number stored as text:",
+            "expectKind": "decimalTextBox",
+            "text": "21845",
+            "typed": true,
+            "elementId": "TextNumber"
+          }
+        ],
+        "policyId": "Pol_Decimal_StoreAsText",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step enabled-alt1-value",
+      "plan": "snapshot  [step enabled-alt1-value]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt1-value"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal stored as text' state Disabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal stored as text",
+        "state": "Disabled",
+        "policyId": "Pol_Decimal_StoreAsText",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal stored as text' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal stored as text",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Decimal_StoreAsText",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled-defaults",
+      "folder": "step-01-enabled-defaults",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "44149ec9374f1f17ec0e990b9fb9c588baa5f5b3d14a442cf5548ea8fdf46981"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 150
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-alt1-value",
+      "folder": "step-02-enabled-alt1-value",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 152,
+          "sha256": "38cadcf281a814850d185a5ebd96896efd88a76cc131d2b0efaf5e8cd63f5c30"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 152
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "disabled",
+      "folder": "step-03-disabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 156,
+          "sha256": "969d10d89c636209420b3344539e846868937ba0fe8af0c458c82c4adf63cf54"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 156
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "not-configured",
+      "folder": "step-04-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "bbff97b1f1386f1ac16f8e6f9cbe1f14c21d84b7e9f674638465cc046494d153"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Decimal stored as text",
+        "before": {
+          "title": "Decimal stored as text",
+          "windowTitle": "Decimal stored as text",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number from 0 to 65535 that is stored as a string value instead of a DWORD.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number stored as text:",
+              "panelId": "#f3bfa8d379b2",
+              "controlId": "45548690",
+              "rect": [
+                180,
+                744,
+                522,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal stored as text",
+          "windowTitle": "Decimal stored as text",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number from 0 to 65535 that is stored as a string value instead of a DWORD.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number stored as text:",
+              "panelId": "#f3bfa8d379b2",
+              "controlId": "45548690",
+              "rect": [
+                180,
+                744,
+                522,
+                58
+              ],
+              "enabled": true,
+              "text": "8080"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Decimal stored as text",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Decimal stored as text"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "44149ec9374f1f17ec0e990b9fb9c588baa5f5b3d14a442cf5548ea8fdf46981"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Decimal stored as text",
+        "before": {
+          "title": "Decimal stored as text",
+          "windowTitle": "Decimal stored as text",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number from 0 to 65535 that is stored as a string value instead of a DWORD.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number stored as text:",
+              "panelId": "#f3bfa8d379b2",
+              "controlId": "32703596",
+              "rect": [
+                232,
+                796,
+                522,
+                58
+              ],
+              "enabled": true,
+              "text": "8080"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "typed": true,
+            "multiline": false,
+            "requested": "21845",
+            "before": "8080",
+            "immediate": "21845",
+            "observed": "21845",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Number stored as text:",
+            "labelMatch": "exact",
+            "kind": "#05585f55fed2",
+            "controlId": "32703596"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal stored as text",
+          "windowTitle": "Decimal stored as text",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number from 0 to 65535 that is stored as a string value instead of a DWORD.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number stored as text:",
+              "panelId": "#f3bfa8d379b2",
+              "controlId": "32703596",
+              "rect": [
+                232,
+                796,
+                522,
+                58
+              ],
+              "enabled": true,
+              "text": "21845"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Decimal stored as text",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Decimal stored as text"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 152,
+          "sha256": "38cadcf281a814850d185a5ebd96896efd88a76cc131d2b0efaf5e8cd63f5c30"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 2,
+      "gptVersionAfter": 3,
+      "data": {
+        "policy": "Decimal stored as text",
+        "before": {
+          "title": "Decimal stored as text",
+          "windowTitle": "Decimal stored as text",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number from 0 to 65535 that is stored as a string value instead of a DWORD.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number stored as text:",
+              "panelId": "#f3bfa8d379b2",
+              "controlId": "721692",
+              "rect": [
+                284,
+                848,
+                522,
+                58
+              ],
+              "enabled": true,
+              "text": "21845"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal stored as text",
+          "windowTitle": "Decimal stored as text",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number from 0 to 65535 that is stored as a string value instead of a DWORD.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number stored as text:",
+              "panelId": "#f3bfa8d379b2",
+              "controlId": "721692",
+              "rect": [
+                284,
+                848,
+                522,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Decimal stored as text",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Decimal stored as text"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 156,
+          "sha256": "969d10d89c636209420b3344539e846868937ba0fe8af0c458c82c4adf63cf54"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 3,
+      "gptVersionAfter": 4,
+      "data": {
+        "policy": "Decimal stored as text",
+        "before": {
+          "title": "Decimal stored as text",
+          "windowTitle": "Decimal stored as text",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number from 0 to 65535 that is stored as a string value instead of a DWORD.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number stored as text:",
+              "panelId": "#f3bfa8d379b2",
+              "controlId": "36570228",
+              "rect": [
+                336,
+                900,
+                522,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal stored as text",
+          "windowTitle": "Decimal stored as text",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number from 0 to 65535 that is stored as a string value instead of a DWORD.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number stored as text:",
+              "panelId": "#f3bfa8d379b2",
+              "controlId": "36570228",
+              "rect": [
+                336,
+                900,
+                522,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Decimal stored as text",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Decimal stored as text"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "bbff97b1f1386f1ac16f8e6f9cbe1f14c21d84b7e9f674638465cc046494d153"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      }
+    }
+  ]
+}

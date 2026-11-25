@@ -1,0 +1,347 @@
+{
+  "case": "H/ListItemNoKey",
+  "description": "the bad fixture ListItemNoKey installed next to the good fixture: error UI and tree",
+  "planVersion": 2,
+  "planHash": "ee953720d969368977325a8a0e40a69eebf3efeba529d88dec47c9e8254fd7ef",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 3,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "dismissDialogs",
+      "label": "error UI present at start",
+      "plan": "dismissDialogs  [error UI present at start]",
+      "op": {
+        "kind": "dismissDialogs",
+        "label": "error UI present at start"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "start"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 3,
+      "kind": "dismissDialogs",
+      "label": "error UI after selecting Administrative Templates",
+      "plan": "dismissDialogs  [error UI after selecting Administrative Templates]",
+      "op": {
+        "kind": "dismissDialogs",
+        "label": "error UI after selecting Administrative Templates"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "treeChildren",
+      "label": "children of Administrative Templates",
+      "plan": "treeChildren at Computer/Administrative Templates  [children of Administrative Templates]",
+      "op": {
+        "kind": "treeChildren",
+        "label": "children of Administrative Templates",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 5,
+      "kind": "treeChildren",
+      "label": "children of Administrative Templates under User",
+      "plan": "treeChildren at User/Administrative Templates  [children of Administrative Templates under User]",
+      "op": {
+        "kind": "treeChildren",
+        "label": "children of Administrative Templates under User",
+        "root": "User",
+        "path": [
+          "Administrative Templates"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 6,
+      "kind": "treeChildren",
+      "label": "the good fixture still loads",
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle  [the good fixture still loads]",
+      "op": {
+        "kind": "treeChildren",
+        "label": "the good fixture still loads",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 7,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates/Bad fixture ListItemNoKey",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "Bad fixture ListItemNoKey"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 8,
+      "kind": "readList",
+      "label": "rows of the bad category",
+      "plan": "readList at Computer/Administrative Templates/Bad fixture ListItemNoKey  [rows of the bad category]",
+      "op": {
+        "kind": "readList",
+        "label": "rows of the bad category",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "Bad fixture ListItemNoKey"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 9,
+      "kind": "editPolicy",
+      "label": "open the bad policy",
+      "plan": "editPolicy 'Bad fixture policy' press [Cancel] at Computer/Administrative Templates/Bad fixture ListItemNoKey  [open the bad policy]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "open the bad policy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "Bad fixture ListItemNoKey"
+        ],
+        "policy": "Bad fixture policy"
+      },
+      "optional": true
+    },
+    {
+      "index": 10,
+      "kind": "dismissDialogs",
+      "label": "error UI after browsing",
+      "plan": "dismissDialogs  [error UI after browsing]",
+      "op": {
+        "kind": "dismissDialogs",
+        "label": "error UI after browsing"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "end"
+      },
+      "optional": null
+    },
+    {
+      "index": 12,
+      "kind": "snapshot",
+      "label": "step final",
+      "plan": "snapshot  [step final]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step final"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "final",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "dismissDialogs",
+      "ok": true,
+      "data": {
+        "handled": [
+          {
+            "title": "Administrative Templates",
+            "class": "#32770",
+            "kind": "MessageBox",
+            "texts": [
+              "#4a0577ad8f6d"
+            ],
+            "buttons": [
+              {
+                "text": "OK",
+                "id": 2
+              }
+            ],
+            "answeredWith": "OK",
+            "answeredVia": "BM_CLICK",
+            "answerRequested": null,
+            "answerFallback": false
+          }
+        ]
+      }
+    },
+    {
+      "index": 1,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 2,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 3,
+      "kind": "dismissDialogs",
+      "ok": true,
+      "data": {
+        "handled": []
+      }
+    },
+    {
+      "index": 4,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [
+          "BWC Oracle",
+          "All Settings"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [
+          "BWC Oracle",
+          "All Settings"
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [
+          "Basics",
+          "Elements",
+          "Explain text",
+          "Machine only",
+          "Shared keys",
+          "Sort cases",
+          "Tools & Utilities"
+        ],
+        "count": 7
+      }
+    },
+    {
+      "index": 7,
+      "kind": "selectNode",
+      "ok": false,
+      "error": "#d35a4dcb45d4"
+    },
+    {
+      "index": 8,
+      "kind": "readList",
+      "ok": false,
+      "error": "#d35a4dcb45d4"
+    },
+    {
+      "index": 9,
+      "kind": "editPolicy",
+      "ok": false,
+      "error": "#d35a4dcb45d4"
+    },
+    {
+      "index": 10,
+      "kind": "dismissDialogs",
+      "ok": true,
+      "data": {
+        "handled": []
+      }
+    },
+    {
+      "index": 11,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 12,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    }
+  ]
+}

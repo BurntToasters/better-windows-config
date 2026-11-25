@@ -1,0 +1,303 @@
+{
+  "case": "E/Decimal_TypedAboveMax",
+  "description": "decimal typed key by key: 9999",
+  "planVersion": 2,
+  "planHash": "fd3b2566d44f0e6e511f9e8833e39dbcdb02023a6564cca367e9c8265e155305",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal with a range' state Enabled options [Number from 10 to 500: = typed text '9999'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal with a range",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Number from 10 to 500:",
+            "expectKind": "decimalTextBox",
+            "text": "9999",
+            "typed": true,
+            "elementId": "MinMaxNumber"
+          }
+        ],
+        "policyId": "Pol_Decimal_MinMax",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step typed",
+      "plan": "snapshot  [step typed]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step typed"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "typed",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "46471be36cfe81586ae36e21bd5e9e92548e70fb3a954ecfd914ec49a5faac14"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 148
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Decimal with a range",
+        "before": {
+          "title": "Decimal with a range",
+          "windowTitle": "Decimal with a range",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number between 10 and 500. The presentation starts at 25 and steps by 5.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number from 10 to 500:",
+              "panelId": "#78e745aaa79c",
+              "controlId": "1389495020",
+              "rect": [
+                388,
+                952,
+                536,
+                58
+              ],
+              "enabled": false,
+              "text": "10"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "typed": true,
+            "multiline": false,
+            "requested": "9999",
+            "before": "25",
+            "immediate": "9999",
+            "observed": "500",
+            "clamped": true,
+            "set": "#a11a75e0feee",
+            "label": "Number from 10 to 500:",
+            "labelMatch": "exact",
+            "kind": "#05585f55fed2",
+            "controlId": "1389495020"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal with a range",
+          "windowTitle": "Decimal with a range",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number between 10 and 500. The presentation starts at 25 and steps by 5.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": false
+            },
+            "Cancel": {
+              "enabled": false
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Number from 10 to 500:",
+              "panelId": "#78e745aaa79c",
+              "controlId": "1389495020",
+              "rect": [
+                388,
+                952,
+                536,
+                58
+              ],
+              "enabled": true,
+              "text": "500"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "boxesBeforePress": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#7ec2134f4415"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "enabledBefore": true,
+            "titleBefore": "Decimal with a range",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Decimal with a range"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "46471be36cfe81586ae36e21bd5e9e92548e70fb3a954ecfd914ec49a5faac14"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    }
+  ]
+}

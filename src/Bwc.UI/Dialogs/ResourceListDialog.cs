@@ -1,3 +1,4 @@
+using Bwc.Core;
 using Microsoft.UI.Xaml.Controls;
 using WinRT.Interop;
 
@@ -37,7 +38,7 @@ public sealed class ResourceListDialog : ClassicDialog
             ResourceText.InterfaceType(r.InterfaceType),
         }).ToArray());
         _list.SelectionChanged += (_, _) => _display.IsEnabled = _list.SelectedIndex >= 0;
-        _list.RowActivated += (_, _) => _ = OpenSelectedAsync();
+        _list.RowActivated += (_, _) => OpenSelectedAsync().Forget("resource list row activation");
     }
 
     /// <summary>The selected full descriptor, or null when no row is selected.</summary>
@@ -53,7 +54,7 @@ public sealed class ResourceListDialog : ClassicDialog
     {
         if (id == DisplayId)
         {
-            _ = OpenSelectedAsync();
+            OpenSelectedAsync().Forget("resource list display command");
             return;
         }
 

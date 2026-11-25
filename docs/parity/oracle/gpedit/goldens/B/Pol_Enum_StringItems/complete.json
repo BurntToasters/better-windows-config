@@ -1,0 +1,26 @@
+{
+  "case": "B/Pol_Enum_StringItems",
+  "planHash": "e161ca0756b46cc5f69b3f88ad098dcf972f2d39fbe68cc3bfbffbcab73f8979",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-enabled-alt1-item0/User.Registry.pol",
+    "step-02-enabled-alt1-item0/User.comment.cmtx",
+    "step-02-enabled-alt1-item0/gpt.ini",
+    "step-03-enabled-alt2-item1/User.Registry.pol",
+    "step-03-enabled-alt2-item1/User.comment.cmtx",
+    "step-03-enabled-alt2-item1/gpt.ini",
+    "step-04-enabled-alt3-item2/User.Registry.pol",
+    "step-04-enabled-alt3-item2/User.comment.cmtx",
+    "step-04-enabled-alt3-item2/gpt.ini",
+    "step-05-disabled/User.Registry.pol",
+    "step-05-disabled/User.comment.cmtx",
+    "step-05-disabled/gpt.ini",
+    "step-06-not-configured/User.Registry.pol",
+    "step-06-not-configured/User.comment.cmtx",
+    "step-06-not-configured/gpt.ini"
+  ]
+}

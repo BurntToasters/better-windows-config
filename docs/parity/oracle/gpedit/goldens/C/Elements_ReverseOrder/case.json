@@ -1,0 +1,1520 @@
+{
+  "case": "C/Elements_ReverseOrder",
+  "description": "one policy writing a value and two elements, defined Zeta then Alpha",
+  "planVersion": 2,
+  "planHash": "7bebe0d4b0a0fe8184fdade7c4991a0bf3e34dfa99a105aa21adfc072ecffd7f",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Shared key, elements in reverse order' state Enabled options [Zeta text: = text 'zz'; Alpha number: = text '5'] press [OK] at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared key, elements in reverse order",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Zeta text:",
+            "expectKind": "textBox",
+            "text": "zz",
+            "elementId": "ZetaElement"
+          },
+          {
+            "label": "Alpha number:",
+            "expectKind": "decimalTextBox",
+            "text": "5",
+            "elementId": "AlphaElement"
+          }
+        ],
+        "policyId": "Pol_Shared_ElementsReverseOrder",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step both-elements",
+      "plan": "snapshot  [step both-elements]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step both-elements"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Shared key, elements in reverse order' state Enabled options [Zeta text: = text 'zz'; Alpha number: = text '6'] press [OK] at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared key, elements in reverse order",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Zeta text:",
+            "expectKind": "textBox",
+            "text": "zz",
+            "elementId": "ZetaElement"
+          },
+          {
+            "label": "Alpha number:",
+            "expectKind": "decimalTextBox",
+            "text": "6",
+            "elementId": "AlphaElement"
+          }
+        ],
+        "policyId": "Pol_Shared_ElementsReverseOrder",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step alpha-changed",
+      "plan": "snapshot  [step alpha-changed]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step alpha-changed"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Shared key, elements in reverse order' state Enabled options [Zeta text: = text 'yy'; Alpha number: = text '6'] press [OK] at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared key, elements in reverse order",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Zeta text:",
+            "expectKind": "textBox",
+            "text": "yy",
+            "elementId": "ZetaElement"
+          },
+          {
+            "label": "Alpha number:",
+            "expectKind": "decimalTextBox",
+            "text": "6",
+            "elementId": "AlphaElement"
+          }
+        ],
+        "policyId": "Pol_Shared_ElementsReverseOrder",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step zeta-changed",
+      "plan": "snapshot  [step zeta-changed]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step zeta-changed"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Shared key, elements in reverse order' state Disabled press [OK] at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared key, elements in reverse order",
+        "state": "Disabled",
+        "policyId": "Pol_Shared_ElementsReverseOrder",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Shared key, elements in reverse order' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ],
+        "policy": "Shared key, elements in reverse order",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Shared_ElementsReverseOrder",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "both-elements",
+      "folder": "step-01-both-elements",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 358,
+          "sha256": "edbf7f60bb38ad3f86b80311cab0845ec3660c733175e27bf11c16f0f78ed966"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 358
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "alpha-changed",
+      "folder": "step-02-alpha-changed",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 358,
+          "sha256": "d5c2c963bda154ecad2d5b30fdca5ffb3b757c39dfb3c31ed6fca0b2a2c7fd09"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 358
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "zeta-changed",
+      "folder": "step-03-zeta-changed",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 358,
+          "sha256": "87c65996908b901eb3e07a10d094cd54cdfd2a40365db71a911a62b03e0f1a04"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 358
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "disabled",
+      "folder": "step-04-disabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 392,
+          "sha256": "35152fd13354f8c46ddf68f4f38d4addaa4bbc378ddf50dadfe45ceec5523e06"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 392
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "not-configured",
+      "folder": "step-05-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "add17e86ef8a5c6ca59ccc21acb39d786700609e1a42954b2d189b9d3511c19c"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Shared key, elements in reverse order",
+        "before": {
+          "title": "Shared key, elements in reverse order",
+          "windowTitle": "Shared key, elements in reverse order",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "One policy writes Gate and two elements into the shared key. The text element ZetaElement is defined before the number element AlphaElement.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Zeta text:",
+              "panelId": "#5c15b9e961ae",
+              "controlId": "#99db6a01b0ab",
+              "rect": [
+                388,
+                952,
+                574,
+                58
+              ],
+              "enabled": false,
+              "text": ""
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "Alpha number:",
+              "panelId": "#1aaddafb5980",
+              "controlId": "197948",
+              "rect": [
+                388,
+                1010,
+                434,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "zz",
+            "before": "",
+            "immediate": "zz",
+            "observed": "zz",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Zeta text:",
+            "labelMatch": "exact",
+            "kind": "#68e85187d390",
+            "controlId": "#99db6a01b0ab"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "5",
+            "before": "1",
+            "immediate": "5",
+            "observed": "5",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Alpha number:",
+            "labelMatch": "exact",
+            "kind": "#05585f55fed2",
+            "controlId": "197948"
+          }
+        ],
+        "afterSet": {
+          "title": "Shared key, elements in reverse order",
+          "windowTitle": "Shared key, elements in reverse order",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "One policy writes Gate and two elements into the shared key. The text element ZetaElement is defined before the number element AlphaElement.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Zeta text:",
+              "panelId": "#5c15b9e961ae",
+              "controlId": "#99db6a01b0ab",
+              "rect": [
+                388,
+                952,
+                574,
+                58
+              ],
+              "enabled": true,
+              "text": "zz"
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "Alpha number:",
+              "panelId": "#1aaddafb5980",
+              "controlId": "197948",
+              "rect": [
+                388,
+                1010,
+                434,
+                58
+              ],
+              "enabled": true,
+              "text": "5"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Shared key, elements in reverse order",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Shared key, elements in reverse order"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 358,
+          "sha256": "edbf7f60bb38ad3f86b80311cab0845ec3660c733175e27bf11c16f0f78ed966"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Shared key, elements in reverse order",
+        "before": {
+          "title": "Shared key, elements in reverse order",
+          "windowTitle": "Shared key, elements in reverse order",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "One policy writes Gate and two elements into the shared key. The text element ZetaElement is defined before the number element AlphaElement.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Zeta text:",
+              "panelId": "#5c15b9e961ae",
+              "controlId": "#99db6a01b0ab",
+              "rect": [
+                440,
+                1004,
+                574,
+                58
+              ],
+              "enabled": true,
+              "text": "zz"
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "Alpha number:",
+              "panelId": "#1aaddafb5980",
+              "controlId": "705953940",
+              "rect": [
+                440,
+                1062,
+                434,
+                58
+              ],
+              "enabled": true,
+              "text": "5"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "zz",
+            "before": "zz",
+            "immediate": "zz",
+            "observed": "zz",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Zeta text:",
+            "labelMatch": "exact",
+            "kind": "#68e85187d390",
+            "controlId": "#99db6a01b0ab"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "6",
+            "before": "5",
+            "immediate": "6",
+            "observed": "6",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Alpha number:",
+            "labelMatch": "exact",
+            "kind": "#05585f55fed2",
+            "controlId": "705953940"
+          }
+        ],
+        "afterSet": {
+          "title": "Shared key, elements in reverse order",
+          "windowTitle": "Shared key, elements in reverse order",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "One policy writes Gate and two elements into the shared key. The text element ZetaElement is defined before the number element AlphaElement.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Zeta text:",
+              "panelId": "#5c15b9e961ae",
+              "controlId": "#99db6a01b0ab",
+              "rect": [
+                440,
+                1004,
+                574,
+                58
+              ],
+              "enabled": true,
+              "text": "zz"
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "Alpha number:",
+              "panelId": "#1aaddafb5980",
+              "controlId": "705953940",
+              "rect": [
+                440,
+                1062,
+                434,
+                58
+              ],
+              "enabled": true,
+              "text": "6"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Shared key, elements in reverse order",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Shared key, elements in reverse order"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 358,
+          "sha256": "d5c2c963bda154ecad2d5b30fdca5ffb3b757c39dfb3c31ed6fca0b2a2c7fd09"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 2,
+      "gptVersionAfter": 3,
+      "data": {
+        "policy": "Shared key, elements in reverse order",
+        "before": {
+          "title": "Shared key, elements in reverse order",
+          "windowTitle": "Shared key, elements in reverse order",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "One policy writes Gate and two elements into the shared key. The text element ZetaElement is defined before the number element AlphaElement.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Zeta text:",
+              "panelId": "#5c15b9e961ae",
+              "controlId": "#99db6a01b0ab",
+              "rect": [
+                492,
+                1056,
+                574,
+                58
+              ],
+              "enabled": true,
+              "text": "zz"
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "Alpha number:",
+              "panelId": "#1aaddafb5980",
+              "controlId": "804979382",
+              "rect": [
+                492,
+                1114,
+                434,
+                58
+              ],
+              "enabled": true,
+              "text": "6"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "yy",
+            "before": "zz",
+            "immediate": "yy",
+            "observed": "yy",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Zeta text:",
+            "labelMatch": "exact",
+            "kind": "#68e85187d390",
+            "controlId": "#99db6a01b0ab"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "6",
+            "before": "6",
+            "immediate": "6",
+            "observed": "6",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Alpha number:",
+            "labelMatch": "exact",
+            "kind": "#05585f55fed2",
+            "controlId": "804979382"
+          }
+        ],
+        "afterSet": {
+          "title": "Shared key, elements in reverse order",
+          "windowTitle": "Shared key, elements in reverse order",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "One policy writes Gate and two elements into the shared key. The text element ZetaElement is defined before the number element AlphaElement.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Zeta text:",
+              "panelId": "#5c15b9e961ae",
+              "controlId": "#99db6a01b0ab",
+              "rect": [
+                492,
+                1056,
+                574,
+                58
+              ],
+              "enabled": true,
+              "text": "yy"
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "Alpha number:",
+              "panelId": "#1aaddafb5980",
+              "controlId": "804979382",
+              "rect": [
+                492,
+                1114,
+                434,
+                58
+              ],
+              "enabled": true,
+              "text": "6"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Shared key, elements in reverse order",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Shared key, elements in reverse order"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 358,
+          "sha256": "87c65996908b901eb3e07a10d094cd54cdfd2a40365db71a911a62b03e0f1a04"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 3,
+      "gptVersionAfter": 4,
+      "data": {
+        "policy": "Shared key, elements in reverse order",
+        "before": {
+          "title": "Shared key, elements in reverse order",
+          "windowTitle": "Shared key, elements in reverse order",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "One policy writes Gate and two elements into the shared key. The text element ZetaElement is defined before the number element AlphaElement.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Zeta text:",
+              "panelId": "#5c15b9e961ae",
+              "controlId": "#99db6a01b0ab",
+              "rect": [
+                544,
+                1108,
+                574,
+                58
+              ],
+              "enabled": true,
+              "text": "yy"
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "Alpha number:",
+              "panelId": "#1aaddafb5980",
+              "controlId": "142279898",
+              "rect": [
+                544,
+                1166,
+                434,
+                58
+              ],
+              "enabled": true,
+              "text": "6"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Shared key, elements in reverse order",
+          "windowTitle": "Shared key, elements in reverse order",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "One policy writes Gate and two elements into the shared key. The text element ZetaElement is defined before the number element AlphaElement.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Zeta text:",
+              "panelId": "#5c15b9e961ae",
+              "controlId": "#99db6a01b0ab",
+              "rect": [
+                544,
+                1108,
+                574,
+                58
+              ],
+              "enabled": false,
+              "text": ""
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "Alpha number:",
+              "panelId": "#1aaddafb5980",
+              "controlId": "142279898",
+              "rect": [
+                544,
+                1166,
+                434,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Shared key, elements in reverse order",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Shared key, elements in reverse order"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 392,
+          "sha256": "35152fd13354f8c46ddf68f4f38d4addaa4bbc378ddf50dadfe45ceec5523e06"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 4,
+      "gptVersionAfter": 5,
+      "data": {
+        "policy": "Shared key, elements in reverse order",
+        "before": {
+          "title": "Shared key, elements in reverse order",
+          "windowTitle": "Shared key, elements in reverse order",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "One policy writes Gate and two elements into the shared key. The text element ZetaElement is defined before the number element AlphaElement.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Zeta text:",
+              "panelId": "#5c15b9e961ae",
+              "controlId": "#99db6a01b0ab",
+              "rect": [
+                76,
+                640,
+                574,
+                58
+              ],
+              "enabled": false,
+              "text": ""
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "Alpha number:",
+              "panelId": "#1aaddafb5980",
+              "controlId": "167248918",
+              "rect": [
+                76,
+                698,
+                434,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Shared key, elements in reverse order",
+          "windowTitle": "Shared key, elements in reverse order",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "One policy writes Gate and two elements into the shared key. The text element ZetaElement is defined before the number element AlphaElement.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Zeta text:",
+              "panelId": "#5c15b9e961ae",
+              "controlId": "#99db6a01b0ab",
+              "rect": [
+                76,
+                640,
+                574,
+                58
+              ],
+              "enabled": false,
+              "text": ""
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "Alpha number:",
+              "panelId": "#1aaddafb5980",
+              "controlId": "167248918",
+              "rect": [
+                76,
+                698,
+                434,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Shared key, elements in reverse order",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 5,
+                "machine": 5,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Shared key, elements in reverse order"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "add17e86ef8a5c6ca59ccc21acb39d786700609e1a42954b2d189b9d3511c19c"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      }
+    }
+  ]
+}

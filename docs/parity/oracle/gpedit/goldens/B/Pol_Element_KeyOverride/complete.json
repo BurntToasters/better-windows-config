@@ -1,0 +1,22 @@
+{
+  "case": "B/Pol_Element_KeyOverride",
+  "planHash": "3cd6340cf5ff9c236422d2382a6f9e03ac2372d4943e218bd2d46acfc767d86e",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/Machine.Registry.pol",
+    "step-01-enabled-defaults/Machine.comment.cmtx",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-enabled-alt1-text/Machine.Registry.pol",
+    "step-02-enabled-alt1-text/Machine.comment.cmtx",
+    "step-02-enabled-alt1-text/gpt.ini",
+    "step-03-disabled/Machine.Registry.pol",
+    "step-03-disabled/Machine.comment.cmtx",
+    "step-03-disabled/gpt.ini",
+    "step-04-not-configured/Machine.Registry.pol",
+    "step-04-not-configured/Machine.comment.cmtx",
+    "step-04-not-configured/gpt.ini"
+  ]
+}

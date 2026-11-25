@@ -20,6 +20,10 @@ internal static unsafe class IconExtraction
     private const int ClosedFolderGroupId = 203;
     private const int StringGroupId = 205;
     private const int BinaryGroupId = 206;
+    private const string RegeditModule = "regedit.exe";
+
+    /// <summary>RT_GROUP_ICON, the resource type of group icons (MAKEINTRESOURCE(14)).</summary>
+    private const nint RtGroupIcon = 14;
 
     private const uint BiRgb = 0;
     private const uint DibRgbColors = 0;
@@ -52,8 +56,8 @@ internal static unsafe class IconExtraction
     internal readonly record struct Pixels(int Width, int Height, byte[] Bgra);
 
     /// <summary>
-    /// Loads the regedit group icon at the requested size. The module is opened and freed inside this
-    /// call. Returns null when the file or the group is missing.
+    /// Loads the regedit group icon at the requested size. It names the icon by id and takes the same
+    /// path as every other module icon. Returns null when the file or the group is missing.
     /// </summary>
     public static Pixels? TryLoadRegeditIcon(IconKind kind, int size)
     {
@@ -65,7 +69,21 @@ internal static unsafe class IconExtraction
             _ => BinaryGroupId,
         };
 
-        string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "regedit.exe");
+        return TryLoadModuleIcon(ModuleIcon.ById(RegeditModule, groupId, IconModuleDirectory.Windows), size);
+    }
+
+    /// <summary>
+    /// Loads one group icon of an installed module at the requested size. The module is opened as a data
+    /// file and freed inside this call, and the icon and bitmaps are released before return. Returns null
+    /// when the name is not a plain file name, the file is missing, or the id or index is absent.
+    /// </summary>
+    public static Pixels? TryLoadModuleIcon(ModuleIcon icon, int size)
+    {
+        if (size < 1 || !TryModulePath(icon, out string path))
+        {
+            return null;
+        }
+
         HMODULE module;
         fixed (char* pathChars = path)
         {
@@ -82,33 +100,171 @@ internal static unsafe class IconExtraction
 
         try
         {
-            // An integer resource id is passed as a pointer value: MAKEINTRESOURCE.
-            HANDLE handle = PInvoke.LoadImage(
-                new HINSTANCE(module.Value),
-                new PCWSTR((char*)groupId),
-                GDI_IMAGE_TYPE.IMAGE_ICON,
-                size,
-                size,
-                IMAGE_FLAGS.LR_DEFAULTCOLOR);
+            if (!TryResolveGroup(module, icon, out GroupName group))
+            {
+                return null;
+            }
+
+            HANDLE handle;
+            if (group.Name is null)
+            {
+                // An integer resource id is passed as a pointer value: MAKEINTRESOURCE.
+                handle = PInvoke.LoadImage(
+                    new HINSTANCE(module.Value),
+                    new PCWSTR((char*)group.Id),
+                    GDI_IMAGE_TYPE.IMAGE_ICON,
+                    size,
+                    size,
+                    IMAGE_FLAGS.LR_DEFAULTCOLOR);
+            }
+            else
+            {
+                fixed (char* nameChars = group.Name)
+                {
+                    handle = PInvoke.LoadImage(
+                        new HINSTANCE(module.Value),
+                        new PCWSTR(nameChars),
+                        GDI_IMAGE_TYPE.IMAGE_ICON,
+                        size,
+                        size,
+                        IMAGE_FLAGS.LR_DEFAULTCOLOR);
+                }
+            }
+
             if (handle.Value == null)
             {
                 return null;
             }
 
-            nint icon = (nint)handle.Value;
+            nint iconHandle = (nint)handle.Value;
             try
             {
-                return IconToPixels(icon);
+                return IconToPixels(iconHandle);
             }
             finally
             {
-                DestroyIcon(icon);
+                DestroyIcon(iconHandle);
             }
         }
         finally
         {
             PInvoke.FreeLibrary(module);
         }
+    }
+
+    /// <summary>
+    /// The resource ids of the module's group icons in resource directory order, or null when the module
+    /// cannot be opened. A group icon with a string name is listed as -1. Used by the E2E self check.
+    /// </summary>
+    internal static IReadOnlyList<int>? TryListGroupIconIds(ModuleIcon icon)
+    {
+        if (!TryModulePath(icon, out string path))
+        {
+            return null;
+        }
+
+        HMODULE module;
+        fixed (char* pathChars = path)
+        {
+            module = PInvoke.LoadLibraryEx(
+                new PCWSTR(pathChars),
+                default,
+                LOAD_LIBRARY_FLAGS.LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_FLAGS.LOAD_LIBRARY_AS_DATAFILE);
+        }
+
+        if (module.Value == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            List<GroupName> groups = EnumerateGroups((nint)module.Value, int.MaxValue);
+            return groups.Select(group => group.Name is null ? group.Id : -1).ToArray();
+        }
+        finally
+        {
+            PInvoke.FreeLibrary(module);
+        }
+    }
+
+    /// <summary>A group icon resource name: an integer id, or a string name when <see cref="Name"/> is set.</summary>
+    private readonly record struct GroupName(int Id, string? Name);
+
+    private delegate bool EnumResourceNameProc(nint module, nint type, nint name, nint parameter);
+
+    [DllImport("kernel32.dll", EntryPoint = "EnumResourceNamesW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumResourceNames(nint module, nint type, EnumResourceNameProc callback, nint parameter);
+
+    /// <summary>
+    /// Builds the full path of the module. The name must be a plain file name, so the path always stays
+    /// inside the System32 or Windows folder.
+    /// </summary>
+    private static bool TryModulePath(ModuleIcon icon, out string path)
+    {
+        path = string.Empty;
+        string? name = icon.Module;
+        if (string.IsNullOrEmpty(name) ||
+            name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+            name.Contains(':', StringComparison.Ordinal) ||
+            name is "." or "..")
+        {
+            return false;
+        }
+
+        string folder = icon.Directory == IconModuleDirectory.Windows
+            ? Environment.GetFolderPath(Environment.SpecialFolder.Windows)
+            : Environment.SystemDirectory;
+        path = Path.Combine(folder, name);
+        return true;
+    }
+
+    private static bool TryResolveGroup(HMODULE module, ModuleIcon icon, out GroupName group)
+    {
+        group = default;
+        if (!icon.IsIndex)
+        {
+            if (icon.Value <= 0 || icon.Value > ushort.MaxValue)
+            {
+                return false;
+            }
+
+            group = new GroupName(icon.Value, null);
+            return true;
+        }
+
+        if (icon.Value < 0)
+        {
+            return false;
+        }
+
+        List<GroupName> groups = EnumerateGroups((nint)module.Value, icon.Value + 1);
+        if (icon.Value >= groups.Count)
+        {
+            return false;
+        }
+
+        group = groups[icon.Value];
+        return true;
+    }
+
+    /// <summary>Lists group icon names in resource directory order, stopping once <paramref name="limit"/> are found.</summary>
+    private static List<GroupName> EnumerateGroups(nint module, int limit)
+    {
+        var groups = new List<GroupName>();
+        EnumResourceNameProc callback = (_, _, name, _) =>
+        {
+            // A name below 64K is MAKEINTRESOURCE; anything else points at a string valid during the callback.
+            groups.Add(((ulong)name >> 16) == 0
+                ? new GroupName((int)name, null)
+                : new GroupName(0, Marshal.PtrToStringUni(name)));
+            return groups.Count < limit;
+        };
+
+        _ = EnumResourceNames(module, RtGroupIcon, callback, 0);
+        GC.KeepAlive(callback);
+        return groups;
     }
 
     /// <summary>Reads the stock folder or computer icon. Null when the shell has no such icon.</summary>

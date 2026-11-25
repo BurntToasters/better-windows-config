@@ -346,6 +346,43 @@ The artifact test writes `artifacts/export-formats/result.json` with the case na
 whole-registry root list, and SHA-256 of each golden comparison. Re-running the test rewrites the
 same content.
 
+## Command line: named-key export and walk depth (AF8)
+
+### `/e file key` and `/a file key` stream to a temp file and move it into place
+
+The command line used to build the whole subtree as a `RegFileDocument`, copy it into a `MemoryStream`, copy that
+again with `ToArray`, and write the target in place with `File.WriteAllBytes`. A large key needed several times its
+size in memory, and a failed write left a cut-off target. Now a named key goes through `RegistryExportService.WriteRegFile`
+(scope `Selection`) into `.<file>.<guid>.tmp` beside the target, is flushed to disk, and then `File.Move(overwrite)`
+replaces the target. It shares the temp-and-move helper with the whole-registry export.
+
+- A failed write leaves the old target as it was, byte for byte, and the temp file is deleted in a `finally`.
+- A key that does not exist or cannot be read gives the same result as before: exit 1, `Export failed for '<file>': <message>`
+  on standard error, and the target is not created, truncated, or replaced. The start key is read first (its values and
+  sub key names, the same two calls the walk makes) so the failure is the same one as before even when the target folder
+  is also bad. Only then is the temp file created.
+- The key is read through the live reader in both builds, as before. Only the whole-registry export maps
+  `HKEY_CURRENT_USER` to the E2E sandbox.
+- The exported bytes (header, encoding, line endings, ordering) are identical to the old path. Section 4 states that
+  the streamed bytes equal `RegFileWriter` on the built document.
+- The success log line keeps the key count. The count is taken from the `Completed` progress report, which always carries
+  the final totals.
+- Tests: `CommandLine_NamedKeyExportKeepsBytesAndLeavesTheTargetOnFailure` (E2E, sandbox only).
+
+### An export walk stops at 512 levels
+
+The walk is recursive and opens keys without `REG_OPTION_OPEN_LINK`, so it follows registry links. A link that points at
+its own ancestor makes the walk go deeper than any real tree and could overflow the call stack. The registry allows 512
+levels, the same limit `RegistryWriter` uses for its subtree walks (`MaxSubtreeDepth`, private to the writer, so the
+exporters share `RegistryExportLimits.MaxSubtreeDepth`, also 512).
+
+- The start key is level 0. Keys down to level 512 below it are exported. A key at level 513 is skipped with its subtree,
+  as an unreadable sub key is: no exception, no section for it or anything below it, `KeysSkipped` counts it, and a
+  `KeySkipped` progress report names it. Its parent and siblings are written as usual.
+- The .reg export and the text export use the same limit. It applies to the whole-registry roots too (each root is level 0).
+- Tests: `RegFileExportStopsAtFiveHundredTwelveLevels` and `TextExportStopsAtFiveHundredTwelveLevels` (an in-memory source
+  600 levels deep).
+
 ## Dot-named keys, text export skips, and progress volume (regression set)
 
 ### A key named "." or ".." stops the whole export

@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -20,6 +21,8 @@ namespace Bwc.E2E.Harness;
 /// percent pure black). A capture that has not settled after 10 seconds is never judged: it throws
 /// <see cref="NotJudgedException"/> and records the note <c>harness.capture.unsettled</c>. Every judged or saved
 /// picture goes through this class.
+/// Every public entry point is timed as a <c>capture</c> site of its caller (docs/failure-modes/e2e-harness.md,
+/// section 46). The timing only measures: the settle rule is unchanged.
 /// </summary>
 internal static class WindowCapture
 {
@@ -35,6 +38,10 @@ internal static class WindowCapture
     private static readonly TimeSpan SettleTimeout = TimeSpan.FromSeconds(10);
     private static int _dumpSequence;
 
+    // Set when the settle bound is reached on this thread, so the timing can count it.
+    [ThreadStatic]
+    private static bool t_unsettled;
+
     /// <summary>
     /// The window could not be seen unobscured by the app, so no pixel check can be judged. The test is
     /// inconclusive, which is neither a pass nor a failure. The note names the foreign process that covered it.
@@ -48,25 +55,48 @@ internal static class WindowCapture
     }
 
     /// <summary>The whole window rectangle (GetWindowRect bounds), verified unobscured by the app.</summary>
-    internal static Bitmap CaptureWindow(IntPtr hwnd)
+    internal static Bitmap CaptureWindow(
+        IntPtr hwnd,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
+        Timed(callerFile, callerLine, () => CaptureWindowCore(hwnd));
+
+    private static Bitmap CaptureWindowCore(IntPtr hwnd)
     {
         Rectangle area = WindowArea(hwnd);
-        return CaptureArea(area, ProcessIdOfWindow(hwnd), hwnd);
+        return CaptureAreaCore(area, ProcessIdOfWindow(hwnd), hwnd);
     }
 
     /// <summary>
     /// A region of the window, given by its top left in screen coordinates. Used for the client area, so pixel
     /// positions match <c>ClientToScreen</c>. The region is verified like <see cref="CaptureWindow"/>.
     /// </summary>
-    internal static Bitmap CaptureRegion(IntPtr hwnd, Point screenOrigin, int width, int height) =>
-        CaptureArea(new Rectangle(screenOrigin.X, screenOrigin.Y, width, height), ProcessIdOfWindow(hwnd), hwnd);
+    internal static Bitmap CaptureRegion(
+        IntPtr hwnd,
+        Point screenOrigin,
+        int width,
+        int height,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
+        Timed(
+            callerFile,
+            callerLine,
+            () => CaptureAreaCore(new Rectangle(screenOrigin.X, screenOrigin.Y, width, height), ProcessIdOfWindow(hwnd), hwnd));
 
     /// <summary>
     /// A screen rectangle that must be shown by windows of <paramref name="processId"/> only (the app's popups and
     /// dialogs included). <paramref name="reassertTarget"/> is the app window re-asserted once when a foreign process
     /// covers the area.
     /// </summary>
-    internal static Bitmap CaptureArea(Rectangle area, uint processId, IntPtr reassertTarget)
+    internal static Bitmap CaptureArea(
+        Rectangle area,
+        uint processId,
+        IntPtr reassertTarget,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
+        Timed(callerFile, callerLine, () => CaptureAreaCore(area, processId, reassertTarget));
+
+    private static Bitmap CaptureAreaCore(Rectangle area, uint processId, IntPtr reassertTarget)
     {
         if (area.Width <= 0 || area.Height <= 0)
         {
@@ -120,6 +150,7 @@ internal static class WindowCapture
                 previous?.Dispose();
                 string text = UnsettledText(area, unpainted, black, identicalRun);
                 E2EResults.Note(UnsettledNoteId, text);
+                t_unsettled = true;
                 current.Dispose();
                 throw new NotJudgedException(text);
             }
@@ -259,7 +290,13 @@ internal static class WindowCapture
     /// most recently started app. Popups, flyouts and dialogs of that process count as the app. With no session the
     /// capture is not judged.
     /// </summary>
-    internal static Bitmap CaptureAreaOfCurrentSession(Rectangle area)
+    internal static Bitmap CaptureAreaOfCurrentSession(
+        Rectangle area,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
+        Timed(callerFile, callerLine, () => CaptureAreaOfCurrentSessionCore(area));
+
+    private static Bitmap CaptureAreaOfCurrentSessionCore(Rectangle area)
     {
         AppSession? session = E2EResults.CurrentSession;
         if (session is null)
@@ -267,17 +304,24 @@ internal static class WindowCapture
             throw new NotJudgedException($"No app session is current for the capture of {area}, so it is not judged.");
         }
 
-        return CaptureArea(area, unchecked((uint)session.ProcessId), session.MainHwnd);
+        return CaptureAreaCore(area, unchecked((uint)session.ProcessId), session.MainHwnd);
     }
 
     /// <summary>
     /// Saves the whole window as a PNG and returns the path. Throws <see cref="NotJudgedException"/> when the window is
     /// covered, and when the file is not written.
     /// </summary>
-    internal static string Save(IntPtr hwnd, string path)
+    internal static string Save(
+        IntPtr hwnd,
+        string path,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
+        Timed(callerFile, callerLine, () => SaveCore(hwnd, path));
+
+    private static string SaveCore(IntPtr hwnd, string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        using (Bitmap bitmap = CaptureWindow(hwnd))
+        using (Bitmap bitmap = CaptureWindowCore(hwnd))
         {
             bitmap.Save(path, ImageFormat.Png);
         }
@@ -294,16 +338,44 @@ internal static class WindowCapture
     /// Saves an artifact picture. A capture that is not judged is recorded as a note and returns an empty string, so an
     /// artifact never fails a test. The PNG is the output, not a check.
     /// </summary>
-    internal static string SaveArtifact(string noteId, IntPtr hwnd, string path)
+    internal static string SaveArtifact(
+        string noteId,
+        IntPtr hwnd,
+        string path,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
+        Timed(callerFile, callerLine, () => SaveArtifactCore(noteId, hwnd, path));
+
+    private static string SaveArtifactCore(string noteId, IntPtr hwnd, string path)
     {
         try
         {
-            return Save(hwnd, path);
+            return SaveCore(hwnd, path);
         }
         catch (NotJudgedException ex)
         {
             E2EResults.Note(noteId, $"artifact not written: {ex.Message}");
             return string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Runs one public capture call and records its time as a capture site of the caller. The call itself is not
+    /// changed: whatever it returns or throws passes through, and the record is made in a finally.
+    /// </summary>
+    private static T Timed<T>(string callerFile, int callerLine, Func<T> body)
+    {
+        long started = E2ETimings.Now();
+        t_unsettled = false;
+        try
+        {
+            return body();
+        }
+        finally
+        {
+            bool unsettled = t_unsettled;
+            t_unsettled = false;
+            E2ETimings.Current.RecordCapture(callerFile, callerLine, started, unsettled);
         }
     }
 

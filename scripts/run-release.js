@@ -3,8 +3,8 @@
  * Windows release VM entry point (`npm run release:win`, `npm run release:win:continue`,
  * `npm run release:win:upload`).
  *
- * release:win      stable policy, preflight, the quick quality gate (no GUI E2E on a signing VM),
- *                  a release session that records that gate, a clean release folder, then continue.
+ * release:win      stable policy, preflight, the full quality gate (`test:all --rid all`, GUI E2E included,
+ *                  so run it on a machine with a GUI session), a release session that records that gate, a clean release folder, then continue.
  * --continue       the gate (policy, preflight with the signing readiness checks, session verify),
  *                  then build both RIDs, the live updater client rehearsal (release:rehearse:client, before any
  *                  paid signing), the installers, the signed bundle, GPG signatures, Authenticode, the single
@@ -53,7 +53,7 @@ function usageError(message, exitCode = EXIT.USAGE) {
 
 function printHelp() {
   console.log(`Usage:
-  node ${SCRIPT}                       Stable policy, preflight, quick gate, session, clean, then continue.
+  node ${SCRIPT}                       Stable policy, preflight, full gate, session, clean, then continue.
   node ${SCRIPT} --continue            Gate, build, sign, bundle, upload the draft, verify it, mirror.
   node ${SCRIPT} --continue --from <step>
                                        The gate, then the steps from <step> on (release:win:upload is
@@ -150,7 +150,7 @@ export function releaseSteps(mode, { version, env = process.env, from = null }) 
     return [
       { name: "release:policy", args: [] },
       { name: "release:preflight", args: ["--", "--require-trusted-key"] },
-      { name: "test:all", args: ["--", "--quick", "--rid", "all"] },
+      { name: "test:all", args: ["--", "--rid", "all"] },
       // --force replaces a session left by an earlier attempt, so the proof is for this run's gate.
       { name: "release:session:create", args: ["--", "--require-gate", "--force"] },
       { name: CLEAN_STEP, args: [] },

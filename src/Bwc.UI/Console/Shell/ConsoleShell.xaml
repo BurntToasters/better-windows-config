@@ -1,0 +1,86 @@
+<UserControl
+    x:Class="Bwc.UI.Console.Shell.ConsoleShell"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Bwc.UI.Console.Shell"
+    xmlns:primitives="using:Microsoft.UI.Xaml.Controls.Primitives"
+    xmlns:regshell="using:Bwc.UI.Shell"
+    xmlns:tree="using:Bwc.UI.Tree"
+    AutomationProperties.AutomationId="ConsoleShell"
+    Background="{StaticResource BwcFaceBrush}"
+    IsTabStop="False"
+    UseSystemFocusVisuals="False">
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <MenuBar
+            x:Name="MenuBarRoot"
+            Grid.Row="0"
+            Background="{StaticResource BwcFaceBrush}"
+            Style="{StaticResource BwcMenuBarStyle}" />
+
+        <Border
+            x:Name="ToolbarBand"
+            Grid.Row="1"
+            Height="30"
+            Padding="2,0,2,0"
+            Background="{StaticResource BwcFaceBrush}"
+            BorderBrush="{StaticResource BwcShadowBrush}"
+            BorderThickness="0,0,0,1">
+            <local:ConsoleToolbar x:Name="ToolbarControl" VerticalAlignment="Center" HorizontalAlignment="Left" />
+        </Border>
+
+        <Grid x:Name="MainGrid" Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="TreeColumn" Width="156" />
+                <ColumnDefinition x:Name="SplitterColumn" Width="3" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border
+                x:Name="TreePaneBorder"
+                AutomationProperties.AutomationId="ConsoleTreePane"
+                Background="{StaticResource BwcWindowBrush}">
+                <tree:DenseTree x:Name="TreeControl" />
+            </Border>
+
+            <primitives:Thumb
+                x:Name="SplitterThumb"
+                Grid.Column="1"
+                Width="3"
+                AutomationProperties.AutomationId="ConsoleSplitter"
+                DragCompleted="OnSplitterDragCompleted"
+                DragDelta="OnSplitterDragDelta"
+                DragStarted="OnSplitterDragStarted"
+                IsTabStop="True"
+                LostFocus="OnSplitterLostFocus">
+                <primitives:Thumb.Template>
+                    <ControlTemplate TargetType="primitives:Thumb">
+                        <regshell:SplitterSurface Background="{StaticResource BwcFaceBrush}" />
+                    </ControlTemplate>
+                </primitives:Thumb.Template>
+            </primitives:Thumb>
+
+            <Border
+                x:Name="ResultPaneBorder"
+                Grid.Column="2"
+                AutomationProperties.AutomationId="ConsoleResultPane"
+                Background="{StaticResource BwcWindowBrush}">
+                <ContentControl
+                    x:Name="ResultHost"
+                    HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Stretch"
+                    IsTabStop="True"
+                    UseSystemFocusVisuals="False" />
+            </Border>
+        </Grid>
+
+        <local:ConsoleStatusBar x:Name="StatusBarControl" Grid.Row="3" />
+    </Grid>
+</UserControl>

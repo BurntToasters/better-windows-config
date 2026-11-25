@@ -32,6 +32,26 @@
       <Platform Solution="*|x64" Project="x64" />
       <Platform Solution="*|ARM64" Project="ARM64" />
     </Project>
+    <Project Path="src/Bwc.Gpo/Bwc.Gpo.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|ARM64" Project="ARM64" />
+    </Project>
+    <Project Path="src/Bwc.Policy/Bwc.Policy.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|ARM64" Project="ARM64" />
+    </Project>
+    <Project Path="src/Bwc.Gpedit.Editor/Bwc.Gpedit.Editor.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|ARM64" Project="ARM64" />
+    </Project>
+    <Project Path="src/Bwc.Gpedit/Bwc.Gpedit.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|ARM64" Project="ARM64" />
+    </Project>
+    <Project Path="src/Bwc.Gpedit.App/Bwc.Gpedit.App.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|ARM64" Project="ARM64" />
+    </Project>
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Bwc.E2E/Bwc.E2E.csproj">
@@ -55,6 +75,14 @@
       <Platform Solution="*|ARM64" Project="ARM64" />
     </Project>
     <Project Path="tests/Bwc.Update.Tests/Bwc.Update.Tests.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|ARM64" Project="ARM64" />
+    </Project>
+    <Project Path="tests/Bwc.Gpo.Tests/Bwc.Gpo.Tests.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|ARM64" Project="ARM64" />
+    </Project>
+    <Project Path="tests/Bwc.Policy.Tests/Bwc.Policy.Tests.csproj">
       <Platform Solution="*|x64" Project="x64" />
       <Platform Solution="*|ARM64" Project="ARM64" />
     </Project>

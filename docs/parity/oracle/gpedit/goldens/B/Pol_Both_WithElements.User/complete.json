@@ -1,0 +1,22 @@
+{
+  "case": "B/Pol_Both_WithElements.User",
+  "planHash": "e52b0b3f53cf426190514e114b99af9b6a5c487e627d8df4532b47a2daae47db",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/User.Registry.pol",
+    "step-01-enabled-defaults/User.comment.cmtx",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-enabled-alt1-value/User.Registry.pol",
+    "step-02-enabled-alt1-value/User.comment.cmtx",
+    "step-02-enabled-alt1-value/gpt.ini",
+    "step-03-disabled/User.Registry.pol",
+    "step-03-disabled/User.comment.cmtx",
+    "step-03-disabled/gpt.ini",
+    "step-04-not-configured/User.Registry.pol",
+    "step-04-not-configured/User.comment.cmtx",
+    "step-04-not-configured/gpt.ini"
+  ]
+}

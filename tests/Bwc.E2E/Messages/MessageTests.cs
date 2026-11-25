@@ -454,16 +454,10 @@ public sealed class MessageTests
     {
         try
         {
-            AutomationElement desktop = automation.GetDesktop();
-            foreach (AutomationElement window in desktop.FindAllChildren(cf => cf.ByControlType(ControlType.Window)))
+            foreach (AutomationElement window in ProcessWindows.Of(automation, session.ProcessId))
             {
                 try
                 {
-                    if (window.Properties.ProcessId.Value != session.ProcessId)
-                    {
-                        continue;
-                    }
-
                     AutomationElement? found = window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
                     if (found is not null)
                     {

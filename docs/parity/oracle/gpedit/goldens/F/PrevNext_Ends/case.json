@@ -1,0 +1,1363 @@
+{
+  "case": "F/PrevNext_Ends",
+  "description": "Previous Setting and Next Setting from the first, a middle and the last policy of a node, and from the only policy of a node",
+  "planVersion": 2,
+  "planHash": "11ac5258a461ac9190f6eb1e4e8a1b16989d3a04badd59c22252a695a9cdebae",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": "Previous from Pol_Class_Both",
+      "plan": "editPolicy 'Class both flag' press [Previous, Cancel] at Computer/Administrative Templates/BWC Oracle/Basics  [Previous from Pol_Class_Both]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "Previous from Pol_Class_Both",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class both flag",
+        "press": [
+          "Previous",
+          "Cancel"
+        ],
+        "policyId": "Pol_Class_Both",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 1,
+      "kind": "editPolicy",
+      "label": "Next from Pol_Class_Both",
+      "plan": "editPolicy 'Class both flag' press [Next, Cancel] at Computer/Administrative Templates/BWC Oracle/Basics  [Next from Pol_Class_Both]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "Next from Pol_Class_Both",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class both flag",
+        "press": [
+          "Next",
+          "Cancel"
+        ],
+        "policyId": "Pol_Class_Both",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": "Next then Previous from Pol_Class_Both",
+      "plan": "editPolicy 'Class both flag' press [Next, Previous, Cancel] at Computer/Administrative Templates/BWC Oracle/Basics  [Next then Previous from Pol_Class_Both]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "Next then Previous from Pol_Class_Both",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class both flag",
+        "press": [
+          "Next",
+          "Previous",
+          "Cancel"
+        ],
+        "policyId": "Pol_Class_Both",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 3,
+      "kind": "editPolicy",
+      "label": "Previous from Pol_Element_KeyOverride",
+      "plan": "editPolicy 'Element key differs from policy key' press [Previous, Cancel] at Computer/Administrative Templates/BWC Oracle/Basics  [Previous from Pol_Element_KeyOverride]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "Previous from Pol_Element_KeyOverride",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Element key differs from policy key",
+        "press": [
+          "Previous",
+          "Cancel"
+        ],
+        "policyId": "Pol_Element_KeyOverride",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": "Next from Pol_Element_KeyOverride",
+      "plan": "editPolicy 'Element key differs from policy key' press [Next, Cancel] at Computer/Administrative Templates/BWC Oracle/Basics  [Next from Pol_Element_KeyOverride]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "Next from Pol_Element_KeyOverride",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Element key differs from policy key",
+        "press": [
+          "Next",
+          "Cancel"
+        ],
+        "policyId": "Pol_Element_KeyOverride",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 5,
+      "kind": "editPolicy",
+      "label": "Next then Previous from Pol_Element_KeyOverride",
+      "plan": "editPolicy 'Element key differs from policy key' press [Next, Previous, Cancel] at Computer/Administrative Templates/BWC Oracle/Basics  [Next then Previous from Pol_Element_KeyOverride]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "Next then Previous from Pol_Element_KeyOverride",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Element key differs from policy key",
+        "press": [
+          "Next",
+          "Previous",
+          "Cancel"
+        ],
+        "policyId": "Pol_Element_KeyOverride",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": "Previous from Pol_Value_NoValueName_ElementsOnly",
+      "plan": "editPolicy 'No value name, elements only' press [Previous, Cancel] at Computer/Administrative Templates/BWC Oracle/Basics  [Previous from Pol_Value_NoValueName_ElementsOnly]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "Previous from Pol_Value_NoValueName_ElementsOnly",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "No value name, elements only",
+        "press": [
+          "Previous",
+          "Cancel"
+        ],
+        "policyId": "Pol_Value_NoValueName_ElementsOnly",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 7,
+      "kind": "editPolicy",
+      "label": "Next from Pol_Value_NoValueName_ElementsOnly",
+      "plan": "editPolicy 'No value name, elements only' press [Next, Cancel] at Computer/Administrative Templates/BWC Oracle/Basics  [Next from Pol_Value_NoValueName_ElementsOnly]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "Next from Pol_Value_NoValueName_ElementsOnly",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "No value name, elements only",
+        "press": [
+          "Next",
+          "Cancel"
+        ],
+        "policyId": "Pol_Value_NoValueName_ElementsOnly",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": "Next then Previous from Pol_Value_NoValueName_ElementsOnly",
+      "plan": "editPolicy 'No value name, elements only' press [Next, Previous, Cancel] at Computer/Administrative Templates/BWC Oracle/Basics  [Next then Previous from Pol_Value_NoValueName_ElementsOnly]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "Next then Previous from Pol_Value_NoValueName_ElementsOnly",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "No value name, elements only",
+        "press": [
+          "Next",
+          "Previous",
+          "Cancel"
+        ],
+        "policyId": "Pol_Value_NoValueName_ElementsOnly",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 9,
+      "kind": "editPolicy",
+      "label": "Previous from the only policy",
+      "plan": "editPolicy 'Top level user flag' press [Previous, Cancel] at User/Administrative Templates/BWC Oracle  [Previous from the only policy]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "Previous from the only policy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle"
+        ],
+        "policy": "Top level user flag",
+        "press": [
+          "Previous",
+          "Cancel"
+        ],
+        "policyId": "Pol_Top_DirectUnderRoot",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "label": "Next from the only policy",
+      "plan": "editPolicy 'Top level user flag' press [Next, Cancel] at User/Administrative Templates/BWC Oracle  [Next from the only policy]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "Next from the only policy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle"
+        ],
+        "policy": "Top level user flag",
+        "press": [
+          "Next",
+          "Cancel"
+        ],
+        "policyId": "Pol_Top_DirectUnderRoot",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "label": "step final",
+      "plan": "snapshot  [step final]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step final"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "final",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Class both flag",
+        "before": {
+          "title": "Class both flag",
+          "windowTitle": "Class both flag",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: older systems only",
+          "help": "A policy of class Both. It appears under Computer Configuration and under User Configuration and writes to the matching hive file of each.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Previous",
+            "enabledBefore": true,
+            "titleBefore": "Class both flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": false,
+            "titleAfter": "Class both with an element",
+            "moved": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          },
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Class both with an element",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Class both with an element"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Class both flag",
+        "before": {
+          "title": "Class both flag",
+          "windowTitle": "Class both flag",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: older systems only",
+          "help": "A policy of class Both. It appears under Computer Configuration and under User Configuration and writes to the matching hive file of each.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Next",
+            "enabledBefore": true,
+            "titleBefore": "Class both flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": false,
+            "titleAfter": "Class machine flag",
+            "moved": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          },
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Class machine flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Class machine flag"
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Class both flag",
+        "before": {
+          "title": "Class both flag",
+          "windowTitle": "Class both flag",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: older systems only",
+          "help": "A policy of class Both. It appears under Computer Configuration and under User Configuration and writes to the matching hive file of each.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Next",
+            "enabledBefore": true,
+            "titleBefore": "Class both flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": false,
+            "titleAfter": "Class machine flag",
+            "moved": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          },
+          {
+            "button": "Previous",
+            "enabledBefore": true,
+            "titleBefore": "Class machine flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": false,
+            "titleAfter": "Class both flag",
+            "moved": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          },
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Class both flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Class both flag"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Element key differs from policy key",
+        "before": {
+          "title": "Element key differs from policy key",
+          "windowTitle": "Element key differs from policy key",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "The policy writes ElementKeyFlag in its own key, and its text element writes in a different subkey.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#2da7478c9add",
+              "panelId": "#ef11a047a9ec",
+              "controlId": "#f641fb016ab1",
+              "rect": [
+                336,
+                900,
+                452,
+                110
+              ],
+              "enabled": false,
+              "text": ""
+            }
+          ]
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Previous",
+            "enabledBefore": true,
+            "titleBefore": "Element key differs from policy key",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": false,
+            "titleAfter": "Class machine flag",
+            "moved": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          },
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Class machine flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Class machine flag"
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Element key differs from policy key",
+        "before": {
+          "title": "Element key differs from policy key",
+          "windowTitle": "Element key differs from policy key",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "The policy writes ElementKeyFlag in its own key, and its text element writes in a different subkey.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#2da7478c9add",
+              "panelId": "#ef11a047a9ec",
+              "controlId": "#f641fb016ab1",
+              "rect": [
+                388,
+                952,
+                452,
+                110
+              ],
+              "enabled": false,
+              "text": ""
+            }
+          ]
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Next",
+            "enabledBefore": true,
+            "titleBefore": "Element key differs from policy key",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": false,
+            "titleAfter": "Key outside the policy roots",
+            "moved": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          },
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Key outside the policy roots",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Key outside the policy roots"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Element key differs from policy key",
+        "before": {
+          "title": "Element key differs from policy key",
+          "windowTitle": "Element key differs from policy key",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "The policy writes ElementKeyFlag in its own key, and its text element writes in a different subkey.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#2da7478c9add",
+              "panelId": "#ef11a047a9ec",
+              "controlId": "#f641fb016ab1",
+              "rect": [
+                440,
+                1004,
+                452,
+                110
+              ],
+              "enabled": false,
+              "text": ""
+            }
+          ]
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Next",
+            "enabledBefore": true,
+            "titleBefore": "Element key differs from policy key",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": false,
+            "titleAfter": "Key outside the policy roots",
+            "moved": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          },
+          {
+            "button": "Previous",
+            "enabledBefore": true,
+            "titleBefore": "Key outside the policy roots",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": false,
+            "titleAfter": "Element key differs from policy key",
+            "moved": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          },
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Element key differs from policy key",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Element key differs from policy key"
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "No value name, elements only",
+        "before": {
+          "title": "No value name, elements only",
+          "windowTitle": "No value name, elements only",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "This policy has no value name of its own. Only its two elements write values.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#5e30c713513b",
+              "panelId": "#43e76fbdb8dc",
+              "controlId": "#14ca31a5b53a",
+              "rect": [
+                492,
+                1056,
+                576,
+                58
+              ],
+              "enabled": false,
+              "text": ""
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "#acf041519f02",
+              "panelId": "#92c49ff13786",
+              "controlId": "179963498",
+              "rect": [
+                492,
+                1114,
+                422,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Previous",
+            "enabledBefore": true,
+            "titleBefore": "No value name, elements only",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": false,
+            "titleAfter": "Enabled value only",
+            "moved": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          },
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Enabled value only",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Enabled value only"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "No value name, elements only",
+        "before": {
+          "title": "No value name, elements only",
+          "windowTitle": "No value name, elements only",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "This policy has no value name of its own. Only its two elements write values.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#5e30c713513b",
+              "panelId": "#43e76fbdb8dc",
+              "controlId": "#14ca31a5b53a",
+              "rect": [
+                544,
+                1108,
+                576,
+                58
+              ],
+              "enabled": false,
+              "text": ""
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "#acf041519f02",
+              "panelId": "#92c49ff13786",
+              "controlId": "264164",
+              "rect": [
+                544,
+                1166,
+                422,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Next",
+            "enabledBefore": false,
+            "pressed": false,
+            "reason": "#c9ca18c58acd"
+          },
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "No value name, elements only",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "No value name, elements only"
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "No value name, elements only",
+        "before": {
+          "title": "No value name, elements only",
+          "windowTitle": "No value name, elements only",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "This policy has no value name of its own. Only its two elements write values.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#5e30c713513b",
+              "panelId": "#43e76fbdb8dc",
+              "controlId": "#14ca31a5b53a",
+              "rect": [
+                596,
+                1160,
+                576,
+                58
+              ],
+              "enabled": false,
+              "text": ""
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#05585f55fed2",
+              "label": "#acf041519f02",
+              "panelId": "#92c49ff13786",
+              "controlId": "310838610",
+              "rect": [
+                596,
+                1218,
+                422,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Next",
+            "enabledBefore": false,
+            "pressed": false,
+            "reason": "#c9ca18c58acd"
+          },
+          {
+            "button": "Previous",
+            "enabledBefore": true,
+            "titleBefore": "No value name, elements only",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": false,
+            "titleAfter": "Enabled value only",
+            "moved": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          },
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Enabled value only",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Enabled value only"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Top level user flag",
+        "before": {
+          "title": "Top level user flag",
+          "windowTitle": "Top level user flag",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user policy that sits directly under the top category, next to the subcategories. It writes the flag TopFlag.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": []
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Previous",
+            "enabledBefore": false,
+            "pressed": false,
+            "reason": "#c9ca18c58acd"
+          },
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Top level user flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Top level user flag"
+      }
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Top level user flag",
+        "before": {
+          "title": "Top level user flag",
+          "windowTitle": "Top level user flag",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A user policy that sits directly under the top category, next to the subcategories. It writes the flag TopFlag.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": []
+        },
+        "sets": [],
+        "presses": [
+          {
+            "button": "Next",
+            "enabledBefore": false,
+            "pressed": false,
+            "reason": "#c9ca18c58acd"
+          },
+          {
+            "button": "Cancel",
+            "enabledBefore": true,
+            "titleBefore": "Top level user flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "finalTitle": "Top level user flag"
+      }
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    }
+  ]
+}

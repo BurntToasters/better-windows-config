@@ -1,0 +1,1672 @@
+{
+  "case": "B/Pol_Enum_StringItems",
+  "description": "Pol_Enum_StringItems under User Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
+  "planVersion": 2,
+  "planHash": "e161ca0756b46cc5f69b3f88ad098dcf972f2d39fbe68cc3bfbffbcab73f8979",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with string items' state Enabled press [OK] at User/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with string items",
+        "state": "Enabled",
+        "policyId": "Pol_Enum_StringItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step enabled-defaults",
+      "plan": "snapshot  [step enabled-defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with string items' state Enabled options [Color choice: = item 'Red'] press [OK] at User/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with string items",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Color choice:",
+            "expectKind": "dropdownList",
+            "item": "Red",
+            "elementId": "StringChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_StringItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step enabled-alt1-item0",
+      "plan": "snapshot  [step enabled-alt1-item0]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt1-item0"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with string items' state Enabled options [Color choice: = item 'Green'] press [OK] at User/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with string items",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Color choice:",
+            "expectKind": "dropdownList",
+            "item": "Green",
+            "elementId": "StringChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_StringItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step enabled-alt2-item1",
+      "plan": "snapshot  [step enabled-alt2-item1]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt2-item1"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with string items' state Enabled options [Color choice: = item 'Blue'] press [OK] at User/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with string items",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Color choice:",
+            "expectKind": "dropdownList",
+            "item": "Blue",
+            "elementId": "StringChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_StringItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step enabled-alt3-item2",
+      "plan": "snapshot  [step enabled-alt3-item2]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt3-item2"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with string items' state Disabled press [OK] at User/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with string items",
+        "state": "Disabled",
+        "policyId": "Pol_Enum_StringItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice with string items' state Not Configured press [OK] at User/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice with string items",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Enum_StringItems",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled-defaults",
+      "folder": "step-01-enabled-defaults",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-alt1-item0",
+      "folder": "step-02-enabled-alt1-item0",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 152,
+          "sha256": "15e29a418665b82a3fd23885e606706a202380e1bdfbd7dc3c8971b743a12d70"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 128
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 152
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "enabled-alt2-item1",
+      "folder": "step-03-enabled-alt2-item1",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 156,
+          "sha256": "a53a0eea4f5ca206240add6fa499a567818bdd79e38d17075fbe8700e0f12b63"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 156
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "enabled-alt3-item2",
+      "folder": "step-04-enabled-alt3-item2",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "e0378043742df23a630339ef3188e12870fc2579437d14951487b2fe52f42028"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 154,
+          "sha256": "fdb664c974724b8bba97ff29809e47acb08f4f2c14ce6adc124909f66fa075f1"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 196608,
+        "machine": 0,
+        "user": 3
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 154
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "disabled",
+      "folder": "step-05-disabled",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "1dd6ac6166eb1471877178d2c212fd43d12dd3ae067cba765156c905872d1ee8"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 160,
+          "sha256": "3ef8f1a120e4aa5ff02fa258e62415522378181af2384ab3c6556f0c7f43d859"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 262144,
+        "machine": 0,
+        "user": 4
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 160
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "label": "not-configured",
+      "folder": "step-06-not-configured",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 52,
+          "sha256": "6b6bd65b379ee6b8cc8334276114cab7ef6732dde8f2f91732132f8fb84e15c8"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 327680,
+        "machine": 0,
+        "user": 5
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 52
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Choice with string items",
+        "before": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                336,
+                900,
+                374,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                336,
+                900,
+                374,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with string items",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#0474db6e43e3"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "applyEnabledAfter": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                336,
+                900,
+                374,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "Choice with string items",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": null
+          }
+        },
+        "finalTitle": "Choice with string items"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol",
+        "User\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 65536,
+      "data": {
+        "policy": "Choice with string items",
+        "before": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                388,
+                952,
+                374,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Red",
+            "requestedIndex": 2,
+            "beforeIndex": -1,
+            "observedIndex": 2,
+            "observedText": "Red",
+            "items": [
+              "Blue",
+              "Green",
+              "Red"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Color choice:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#e3562b7f91f7"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                388,
+                952,
+                374,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "Red"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with string items",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol",
+                "User\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1,
+                "User\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice with string items"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 152,
+          "sha256": "15e29a418665b82a3fd23885e606706a202380e1bdfbd7dc3c8971b743a12d70"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 65536,
+      "gptVersionAfter": 131072,
+      "data": {
+        "policy": "Choice with string items",
+        "before": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                440,
+                1004,
+                374,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "Red"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Green",
+            "requestedIndex": 1,
+            "beforeIndex": 2,
+            "observedIndex": 1,
+            "observedText": "Green",
+            "items": [
+              "Blue",
+              "Green",
+              "Red"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Color choice:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#e3562b7f91f7"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                440,
+                1004,
+                374,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": 1,
+              "selectedText": "Green"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with string items",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              },
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice with string items"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 156,
+          "sha256": "a53a0eea4f5ca206240add6fa499a567818bdd79e38d17075fbe8700e0f12b63"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 131072,
+      "gptVersionAfter": 196608,
+      "data": {
+        "policy": "Choice with string items",
+        "before": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                492,
+                1056,
+                374,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": 1,
+              "selectedText": "Green"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Blue",
+            "requestedIndex": 0,
+            "beforeIndex": 1,
+            "observedIndex": 0,
+            "observedText": "Blue",
+            "items": [
+              "Blue",
+              "Green",
+              "Red"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Color choice:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#e3562b7f91f7"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                492,
+                1056,
+                374,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Blue"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with string items",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              },
+              "gptVersionAfter": {
+                "raw": 196608,
+                "machine": 0,
+                "user": 3
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice with string items"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "e0378043742df23a630339ef3188e12870fc2579437d14951487b2fe52f42028"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 154,
+          "sha256": "fdb664c974724b8bba97ff29809e47acb08f4f2c14ce6adc124909f66fa075f1"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 196608,
+        "machine": 0,
+        "user": 3
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 196608,
+      "gptVersionAfter": 262144,
+      "data": {
+        "policy": "Choice with string items",
+        "before": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                544,
+                1108,
+                374,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Blue"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                544,
+                1108,
+                374,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with string items",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 196608,
+                "machine": 0,
+                "user": 3
+              },
+              "gptVersionAfter": {
+                "raw": 262144,
+                "machine": 0,
+                "user": 4
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice with string items"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "1dd6ac6166eb1471877178d2c212fd43d12dd3ae067cba765156c905872d1ee8"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 160,
+          "sha256": "3ef8f1a120e4aa5ff02fa258e62415522378181af2384ab3c6556f0c7f43d859"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 262144,
+        "machine": 0,
+        "user": 4
+      }
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 262144,
+      "gptVersionAfter": 327680,
+      "data": {
+        "policy": "Choice with string items",
+        "before": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                596,
+                1160,
+                374,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice with string items",
+          "windowTitle": "Choice with string items",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list whose items write the texts red, green, and blue.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Color choice:",
+              "panelId": "#a07f02eb55e8",
+              "controlId": "#e3562b7f91f7",
+              "rect": [
+                596,
+                1160,
+                374,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Blue",
+                "Green",
+                "Red"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice with string items",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 262144,
+                "machine": 0,
+                "user": 4
+              },
+              "gptVersionAfter": {
+                "raw": 327680,
+                "machine": 0,
+                "user": 5
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice with string items"
+      }
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 52,
+          "sha256": "6b6bd65b379ee6b8cc8334276114cab7ef6732dde8f2f91732132f8fb84e15c8"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 327680,
+        "machine": 0,
+        "user": 5
+      }
+    }
+  ]
+}

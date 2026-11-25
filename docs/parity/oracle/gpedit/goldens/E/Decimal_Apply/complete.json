@@ -1,0 +1,10 @@
+{
+  "case": "E/Decimal_Apply",
+  "planHash": "16d886ac87c9d5e9ca486309f88d82e72ec3cfcd282becf008d63b44bb3fd51e",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini"
+  ]
+}

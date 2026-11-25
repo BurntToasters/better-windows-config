@@ -15,12 +15,13 @@ namespace Bwc.E2E.Installer;
 /// artifacts/e2e/installer-update.json. Without that driver the tests are Inconclusive.
 /// </summary>
 [TestClass]
-public sealed class InstallerUpdateTests
+public sealed partial class InstallerUpdateTests
 {
     private const string HubTitle = "Better Windows Config";
     private const string AvailableTitle = "Update Available";
     private const string RefusalTitle = "Check for Updates";
     private const string RegeditName = "Registry Editor";
+    private const string GpeditName = "Local Group Policy Editor";
     private const string CheckMenuId = "MenuItem_CheckForUpdates";
     private const string InstallButtonId = "UpdateInstall";
     private const string HubProcessName = "BetterWindowsConfig";
@@ -176,11 +177,14 @@ public sealed class InstallerUpdateTests
         InstallerRun run,
         InstallerInputs inputs,
         string caseId,
-        bool holdRegedit)
+        bool holdRegedit,
+        Action<UIA3Automation, int>? afterHubStart = null,
+        Action<UIA3Automation, int>? afterRelaunch = null)
     {
         if (holdRegedit)
         {
             _ = StartRegedit(config, run, caseId);
+            _ = StartGpedit(config, run, caseId);
         }
         string installerName = Path.GetFileName(inputs.InstallerB);
         byte[] installerBytes = File.ReadAllBytes(inputs.InstallerB);
@@ -194,6 +198,7 @@ public sealed class InstallerUpdateTests
         using Process hubProcess = Process.GetProcessById(hubPid);
         InstallEvidence.CacheHandle(hubProcess);
         using var automation = new UIA3Automation();
+        afterHubStart?.Invoke(automation, hubPid);
 
         HubUi.OpenHelpMenuByMouse(hub, automation);
         AutomationElement? item = HubUi.FindInProcess(automation, hubPid, CheckMenuId, ElementTimeout);
@@ -289,6 +294,10 @@ public sealed class InstallerUpdateTests
             fileVersion == inputs.VersionB,
             $"The installed {InstallerRun.HubExeName} reports {fileVersion}, expected {inputs.VersionB}.");
         InstallerChecks.Record(
+            caseId + ".installed.aumid",
+            ShortcutAumidsAre(run, out string updatedAumidNotes),
+            updatedAumidNotes);
+        InstallerChecks.Record(
             caseId + ".relaunch.started",
             relaunched is not null,
             relaunched is null
@@ -298,6 +307,7 @@ public sealed class InstallerUpdateTests
         if (relaunched is not null)
         {
             CheckRelaunchedWindow(automation, relaunched.Id, caseId);
+            afterRelaunch?.Invoke(automation, relaunched.Id);
         }
 
     }
@@ -472,7 +482,15 @@ public sealed class InstallerUpdateTests
             using InstallerRun run = InstallerRun.Create(config, "uninstall");
             if (InstallSilently(run, inputs.InstallerA, inputs.VersionA, "uninstall.a"))
             {
-                bool gone = run.Uninstall(UninstallTimeout);
+                // Run without the data-root seam: the uninstaller must not look at the real %ProgramData% (installer.md M65).
+                string realProgramData = RealProgramDataRoot();
+                string realBefore = ListFolder(realProgramData);
+                bool gone = run.Uninstall(UninstallTimeout, withProgramData: false);
+                string realAfter = ListFolder(realProgramData);
+                InstallerChecks.Record(
+                    "uninstall.realProgramDataUntouched",
+                    realBefore == realAfter,
+                    "The real " + realProgramData + " was listed (read only) before and after the uninstall and did not change.");
                 InstallerChecks.Record(
                     "uninstall.files",
                     gone && !File.Exists(run.HubExe),
@@ -503,8 +521,14 @@ public sealed class InstallerUpdateTests
     /// Silent install of one setup into the run's folders. Records the exit code, the uninstall key's DisplayVersion,
     /// and the shortcut count. Returns true only when the install ran and shows the expected version.
     /// </summary>
-    private static bool InstallSilently(InstallerRun run, string setupPath, string version, string prefix)
+    private static bool InstallSilently(
+        InstallerRun run,
+        string setupPath,
+        string version,
+        string prefix,
+        IReadOnlyList<InstallerRun.ProductShortcut>? expected = null)
     {
+        IReadOnlyList<InstallerRun.ProductShortcut> shortcutTable = expected ?? InstallerRun.ProductShortcuts;
         int exitCode = run.RunSetup(setupPath, SetupTimeout);
         bool hubPresent = File.Exists(run.HubExe);
         bool ran = exitCode == 0 && hubPresent;
@@ -521,30 +545,32 @@ public sealed class InstallerUpdateTests
             $"The uninstall key shows DisplayVersion '{displayVersion}', expected {version}.");
 
         int shortcuts = run.ShortcutCount();
-        InstallerChecks.Record(prefix + ".shortcuts", shortcuts > 0, $"{shortcuts} shortcut(s) were written.");
+        int expectedShortcuts = shortcutTable.Count;
+        InstallerChecks.Record(
+            prefix + ".shortcuts",
+            shortcuts == expectedShortcuts,
+            $"{shortcuts} shortcut(s) were written; expected {expectedShortcuts} (" + string.Join(", ", shortcutTable.Select(shortcut => shortcut.Name)) + ").");
         if (ran)
         {
-            bool aumid = ShortcutAumidsAre(run, out string aumidNotes);
+            bool aumid = ShortcutAumidsAre(run, out string aumidNotes, shortcutTable);
             InstallerChecks.Record(prefix + ".aumid", aumid, aumidNotes);
+            bool icons = ShortcutIconsAre(run, out string iconNotes, shortcutTable);
+            InstallerChecks.Record(prefix + ".icons", icons, iconNotes);
         }
 
         return ran && sameVersion;
     }
 
     /// <summary>
-    /// Both shortcuts carry their AppUserModelID, read back through the shell property store (installer.md M45: the installed
-    /// BwcUpdate.exe --set-aumid wrote them). The installer only warns on a miss, so this is where a broken write fails.
+    /// Every shortcut of <see cref="InstallerRun.ProductShortcuts"/> carries its AppUserModelID, read back through the shell
+    /// property store (installer.md M45, M54: the installed BwcUpdate.exe --set-aumid wrote them). The installer only warns
+    /// on a miss, so this is where a broken write fails.
     /// </summary>
-    private static bool ShortcutAumidsAre(InstallerRun run, out string notes)
+    private static bool ShortcutAumidsAre(InstallerRun run, out string notes, IReadOnlyList<InstallerRun.ProductShortcut>? table = null)
     {
-        var expected = new[]
-        {
-            (Name: "Better Windows Config.lnk", Id: "BetterWindowsConfig.Hub"),
-            (Name: "Registry Editor (BWC).lnk", Id: "BetterWindowsConfig.Regedit"),
-        };
         var lines = new List<string>();
         bool all = true;
-        foreach ((string name, string id) in expected)
+        foreach ((string name, string id, _) in table ?? InstallerRun.ProductShortcuts)
         {
             string path = Path.Combine(run.ShortcutDir, name);
             try
@@ -554,6 +580,37 @@ public sealed class InstallerUpdateTests
                 all &= string.Equals(actual, id, StringComparison.Ordinal);
             }
             catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or System.Runtime.InteropServices.COMException or FileNotFoundException)
+            {
+                lines.Add($"{name}: could not be read ({ex.GetType().Name})");
+                all = false;
+            }
+        }
+
+        notes = string.Join("; ", lines) + ".";
+        return all;
+    }
+
+    /// <summary>
+    /// Every shortcut shows the icon of its own exe: the icon location is that exe in the install folder at index 0
+    /// (installer.md M53). The exe embeds its own icon (bwc-gpo.ico for the Local Group Policy Editor), so this keeps the
+    /// Start menu entry from showing the Hub icon or a missing path.
+    /// </summary>
+    private static bool ShortcutIconsAre(InstallerRun run, out string notes, IReadOnlyList<InstallerRun.ProductShortcut>? table = null)
+    {
+        var lines = new List<string>();
+        bool all = true;
+        foreach ((string name, _, string exeName) in table ?? InstallerRun.ProductShortcuts)
+        {
+            string path = Path.Combine(run.ShortcutDir, name);
+            string expected = Path.Combine(run.InstallDir, exeName);
+            try
+            {
+                (string icon, int index) = MachineNative.ShortcutIconLocation(path);
+                bool same = string.Equals(Path.GetFullPath(icon), Path.GetFullPath(expected), StringComparison.OrdinalIgnoreCase) && index == 0;
+                lines.Add($"{name}: '{icon}',{index}, expected '{expected}',0");
+                all &= same;
+            }
+            catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or ArgumentException or FileNotFoundException)
             {
                 lines.Add($"{name}: could not be read ({ex.GetType().Name})");
                 all = false;
@@ -576,22 +633,36 @@ public sealed class InstallerUpdateTests
         return regedit;
     }
 
+    /// <summary>Starts BwcGpedit from the install folder, unelevated, beside the open Registry Editor (installer-e2e.md 95).
+    /// </summary>
+    private static Process StartGpedit(E2EConfig config, InstallerRun run, string caseId)
+    {
+        Process gpedit = run.StartTracked(run.GpeditExe, config.DataRootEnvironment("installer-" + caseId));
+        Thread.Sleep(RegeditSettle);
+        InstallerChecks.Record(
+            caseId + ".gpedit.open",
+            !gpedit.HasExited,
+            "BwcGpedit.exe from the install folder is open before the update.");
+        return gpedit;
+    }
+
     /// <summary>
-    /// With BwcRegedit open, the Hub shows "Close these running tools ... Registry Editor" in a Check for Updates
-    /// window and does not start the update. The check reads that message from the Hub's own dialog.
+    /// With BwcRegedit and BwcGpedit open, the Hub shows "Close these running tools ... Registry Editor, Local Group Policy
+    /// Editor" in a Check for Updates window and does not start the update. The check reads that message from the Hub's
+    /// own dialog.
     /// </summary>
     private static void CheckRegeditRefusal(UIA3Automation automation, int hubPid, string caseId)
     {
         AutomationElement? window = HubUi.FindWindowInProcess(automation, hubPid, RefusalTitle, DialogTimeout);
         AutomationElement? message = window is null ? null : HubUi.WaitWithin(window, "DialogMessage", DialogTimeout);
         string text = message is null ? string.Empty : HubUi.TextOf(message);
-        bool refused = text.Contains(RegeditName, StringComparison.Ordinal);
+        bool refused = text.Contains(RegeditName, StringComparison.Ordinal) && text.Contains(GpeditName, StringComparison.Ordinal);
         InstallerChecks.Record(
-            caseId + ".hub.refusesWhileRegeditOpen",
+            caseId + ".hub.refusesWhileToolsOpen",
             refused,
             refused
-                ? "The Hub refused the update while BwcRegedit was open: " + text
-                : "The Hub did not show the Registry Editor refusal. Message: '" + text + "'.");
+                ? "The Hub refused the update while BwcRegedit and BwcGpedit were open: " + text
+                : "The Hub did not name both the Registry Editor and the Local Group Policy Editor. Message: '" + text + "'.");
     }
 
     private static void CheckRelaunchedWindow(UIA3Automation automation, int pid, string caseId)

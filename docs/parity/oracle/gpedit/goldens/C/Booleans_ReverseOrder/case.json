@@ -1,0 +1,1256 @@
+{
+  "case": "C/Booleans_ReverseOrder",
+  "description": "two check boxes defined Zeta then Alpha: both on, Zeta off, Alpha off, then Zeta on",
+  "planVersion": 2,
+  "planHash": "9bda66b1193d76f44218bee160e80a41afee81a775d3bdd3331bdfa66476761d",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Two checks defined in reverse name order' state Enabled options [Zeta check = checked True; Alpha check = checked True] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Two checks defined in reverse name order",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Zeta check",
+            "expectKind": "checkBox",
+            "checked": true,
+            "elementId": "ZetaCheck"
+          },
+          {
+            "label": "Alpha check",
+            "expectKind": "checkBox",
+            "checked": true,
+            "elementId": "AlphaCheck"
+          }
+        ],
+        "policyId": "Pol_Bool_TwoChecksReverseOrder",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step both-on",
+      "plan": "snapshot  [step both-on]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step both-on"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Two checks defined in reverse name order' state Enabled options [Zeta check = checked False; Alpha check = checked True] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Two checks defined in reverse name order",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Zeta check",
+            "expectKind": "checkBox",
+            "checked": false,
+            "elementId": "ZetaCheck"
+          },
+          {
+            "label": "Alpha check",
+            "expectKind": "checkBox",
+            "checked": true,
+            "elementId": "AlphaCheck"
+          }
+        ],
+        "policyId": "Pol_Bool_TwoChecksReverseOrder",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step zeta-off",
+      "plan": "snapshot  [step zeta-off]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step zeta-off"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Two checks defined in reverse name order' state Enabled options [Zeta check = checked False; Alpha check = checked False] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Two checks defined in reverse name order",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Zeta check",
+            "expectKind": "checkBox",
+            "checked": false,
+            "elementId": "ZetaCheck"
+          },
+          {
+            "label": "Alpha check",
+            "expectKind": "checkBox",
+            "checked": false,
+            "elementId": "AlphaCheck"
+          }
+        ],
+        "policyId": "Pol_Bool_TwoChecksReverseOrder",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step alpha-off",
+      "plan": "snapshot  [step alpha-off]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step alpha-off"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Two checks defined in reverse name order' state Enabled options [Zeta check = checked True; Alpha check = checked False] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Two checks defined in reverse name order",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Zeta check",
+            "expectKind": "checkBox",
+            "checked": true,
+            "elementId": "ZetaCheck"
+          },
+          {
+            "label": "Alpha check",
+            "expectKind": "checkBox",
+            "checked": false,
+            "elementId": "AlphaCheck"
+          }
+        ],
+        "policyId": "Pol_Bool_TwoChecksReverseOrder",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step zeta-on",
+      "plan": "snapshot  [step zeta-on]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step zeta-on"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "both-on",
+      "folder": "step-01-both-on",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 294,
+          "sha256": "80f6309c50491cc4f52a5fa96878643f297fcdda01d09fb5f0452449be170957"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 294
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "zeta-off",
+      "folder": "step-02-zeta-off",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 294,
+          "sha256": "78abb31d86093d2d215191d1666d61aadb4123eebd774e8f9c2efa185d556b6d"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 294
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "alpha-off",
+      "folder": "step-03-alpha-off",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 294,
+          "sha256": "5237d247f2106405c5206f6f7526dd498fcc7ef381e750944c39773068768e70"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 294
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "zeta-on",
+      "folder": "step-04-zeta-on",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 294,
+          "sha256": "9704d8cae2d4ab92d8e668cab79095606abfaf5ae2adc9c8f91aeae1af765f67"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 294
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Two checks defined in reverse name order",
+        "before": {
+          "title": "Two checks defined in reverse name order",
+          "windowTitle": "Two checks defined in reverse name order",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Two check boxes share one key. ZetaCheck is defined before AlphaCheck, so the record order shows whether the policy engine follows definition order or name order.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Zeta check",
+              "panelId": "#320245d754fb",
+              "controlId": "#320245d754fb",
+              "rect": [
+                342,
+                906,
+                164,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Alpha check",
+              "panelId": "#3eb5ab6a39d6",
+              "controlId": "#3eb5ab6a39d6",
+              "rect": [
+                342,
+                962,
+                178,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "requested": true,
+            "beforeCheckState": 0,
+            "observedCheckState": 1,
+            "set": "#a11a75e0feee",
+            "label": "Zeta check",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#320245d754fb"
+          },
+          {
+            "requested": true,
+            "beforeCheckState": 0,
+            "observedCheckState": 1,
+            "set": "#a11a75e0feee",
+            "label": "Alpha check",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#3eb5ab6a39d6"
+          }
+        ],
+        "afterSet": {
+          "title": "Two checks defined in reverse name order",
+          "windowTitle": "Two checks defined in reverse name order",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Two check boxes share one key. ZetaCheck is defined before AlphaCheck, so the record order shows whether the policy engine follows definition order or name order.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Zeta check",
+              "panelId": "#320245d754fb",
+              "controlId": "#320245d754fb",
+              "rect": [
+                342,
+                906,
+                164,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Alpha check",
+              "panelId": "#3eb5ab6a39d6",
+              "controlId": "#3eb5ab6a39d6",
+              "rect": [
+                342,
+                962,
+                178,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Two checks defined in reverse name order",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Two checks defined in reverse name order"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 294,
+          "sha256": "80f6309c50491cc4f52a5fa96878643f297fcdda01d09fb5f0452449be170957"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Two checks defined in reverse name order",
+        "before": {
+          "title": "Two checks defined in reverse name order",
+          "windowTitle": "Two checks defined in reverse name order",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Two check boxes share one key. ZetaCheck is defined before AlphaCheck, so the record order shows whether the policy engine follows definition order or name order.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Zeta check",
+              "panelId": "#320245d754fb",
+              "controlId": "#320245d754fb",
+              "rect": [
+                394,
+                958,
+                164,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Alpha check",
+              "panelId": "#3eb5ab6a39d6",
+              "controlId": "#3eb5ab6a39d6",
+              "rect": [
+                394,
+                1014,
+                178,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requested": false,
+            "beforeCheckState": 1,
+            "observedCheckState": 0,
+            "set": "#a11a75e0feee",
+            "label": "Zeta check",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#320245d754fb"
+          },
+          {
+            "requested": true,
+            "beforeCheckState": 1,
+            "observedCheckState": 1,
+            "set": "#a11a75e0feee",
+            "label": "Alpha check",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#3eb5ab6a39d6"
+          }
+        ],
+        "afterSet": {
+          "title": "Two checks defined in reverse name order",
+          "windowTitle": "Two checks defined in reverse name order",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Two check boxes share one key. ZetaCheck is defined before AlphaCheck, so the record order shows whether the policy engine follows definition order or name order.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Zeta check",
+              "panelId": "#320245d754fb",
+              "controlId": "#320245d754fb",
+              "rect": [
+                394,
+                958,
+                164,
+                44
+              ],
+              "enabled": true,
+              "checkState": 0
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Alpha check",
+              "panelId": "#3eb5ab6a39d6",
+              "controlId": "#3eb5ab6a39d6",
+              "rect": [
+                394,
+                1014,
+                178,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Two checks defined in reverse name order",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Two checks defined in reverse name order"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 294,
+          "sha256": "78abb31d86093d2d215191d1666d61aadb4123eebd774e8f9c2efa185d556b6d"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 2,
+      "gptVersionAfter": 3,
+      "data": {
+        "policy": "Two checks defined in reverse name order",
+        "before": {
+          "title": "Two checks defined in reverse name order",
+          "windowTitle": "Two checks defined in reverse name order",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Two check boxes share one key. ZetaCheck is defined before AlphaCheck, so the record order shows whether the policy engine follows definition order or name order.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Zeta check",
+              "panelId": "#320245d754fb",
+              "controlId": "#320245d754fb",
+              "rect": [
+                446,
+                1010,
+                164,
+                44
+              ],
+              "enabled": true,
+              "checkState": 0
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Alpha check",
+              "panelId": "#3eb5ab6a39d6",
+              "controlId": "#3eb5ab6a39d6",
+              "rect": [
+                446,
+                1066,
+                178,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requested": false,
+            "beforeCheckState": 0,
+            "observedCheckState": 0,
+            "set": "#a11a75e0feee",
+            "label": "Zeta check",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#320245d754fb"
+          },
+          {
+            "requested": false,
+            "beforeCheckState": 1,
+            "observedCheckState": 0,
+            "set": "#a11a75e0feee",
+            "label": "Alpha check",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#3eb5ab6a39d6"
+          }
+        ],
+        "afterSet": {
+          "title": "Two checks defined in reverse name order",
+          "windowTitle": "Two checks defined in reverse name order",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Two check boxes share one key. ZetaCheck is defined before AlphaCheck, so the record order shows whether the policy engine follows definition order or name order.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Zeta check",
+              "panelId": "#320245d754fb",
+              "controlId": "#320245d754fb",
+              "rect": [
+                446,
+                1010,
+                164,
+                44
+              ],
+              "enabled": true,
+              "checkState": 0
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Alpha check",
+              "panelId": "#3eb5ab6a39d6",
+              "controlId": "#3eb5ab6a39d6",
+              "rect": [
+                446,
+                1066,
+                178,
+                44
+              ],
+              "enabled": true,
+              "checkState": 0
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Two checks defined in reverse name order",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Two checks defined in reverse name order"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 294,
+          "sha256": "5237d247f2106405c5206f6f7526dd498fcc7ef381e750944c39773068768e70"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 3,
+      "gptVersionAfter": 4,
+      "data": {
+        "policy": "Two checks defined in reverse name order",
+        "before": {
+          "title": "Two checks defined in reverse name order",
+          "windowTitle": "Two checks defined in reverse name order",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Two check boxes share one key. ZetaCheck is defined before AlphaCheck, so the record order shows whether the policy engine follows definition order or name order.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Zeta check",
+              "panelId": "#320245d754fb",
+              "controlId": "#320245d754fb",
+              "rect": [
+                498,
+                1062,
+                164,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Alpha check",
+              "panelId": "#3eb5ab6a39d6",
+              "controlId": "#3eb5ab6a39d6",
+              "rect": [
+                498,
+                1118,
+                178,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Disabled",
+            "observed": "Enabled"
+          },
+          {
+            "requested": true,
+            "beforeCheckState": 0,
+            "observedCheckState": 1,
+            "set": "#a11a75e0feee",
+            "label": "Zeta check",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#320245d754fb"
+          },
+          {
+            "requested": false,
+            "beforeCheckState": 0,
+            "observedCheckState": 0,
+            "set": "#a11a75e0feee",
+            "label": "Alpha check",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#3eb5ab6a39d6"
+          }
+        ],
+        "afterSet": {
+          "title": "Two checks defined in reverse name order",
+          "windowTitle": "Two checks defined in reverse name order",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Two check boxes share one key. ZetaCheck is defined before AlphaCheck, so the record order shows whether the policy engine follows definition order or name order.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "Zeta check",
+              "panelId": "#320245d754fb",
+              "controlId": "#320245d754fb",
+              "rect": [
+                498,
+                1062,
+                164,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Alpha check",
+              "panelId": "#3eb5ab6a39d6",
+              "controlId": "#3eb5ab6a39d6",
+              "rect": [
+                498,
+                1118,
+                178,
+                44
+              ],
+              "enabled": true,
+              "checkState": 0
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Two checks defined in reverse name order",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Two checks defined in reverse name order"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 294,
+          "sha256": "9704d8cae2d4ab92d8e668cab79095606abfaf5ae2adc9c8f91aeae1af765f67"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      }
+    }
+  ]
+}

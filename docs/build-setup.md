@@ -63,16 +63,30 @@ A minimal self-contained WinUI app published this way is about 280 MB (x64) and 
 `node scripts/test-all.js` runs the gate steps in order and stops at the first failure.
 `--rid win-x64|win-arm64|all` picks the target (default from `process.arch`).
 
-The shared steps are `sync-version`, `registry-writer`, `no-em-dash`, `changelog-version`, and
-`comment-lint`, then `build-arm64`, `build-x64`, and four test projects: `test-core`
-(`Bwc.Core.Tests`), `test-registry-e2e` (`Bwc.Registry.Tests`), `test-registry-shipping`
-(`Bwc.Registry.Shipping.Tests`), and `test-update` (`Bwc.Update.Tests`).
+The shared steps run once, in this order:
 
-`--quick` runs the shared steps only. Without it, each RID then runs `publish-ship`,
-`verify-flavor-ship`, `e2e-ship`, `publish-e2e`, `verify-flavor-e2e`, and `e2e-flavor`.
+- Static checks: `sync-version`, `sync-version-selftest`, `registry-writer`, `registry-writer-selftest`, `policy-writer`,
+  `policy-writer-selftest`, `no-em-dash`, `no-em-dash-selftest`, `regedit-strings`,
+  `tracked-paths-selftest`, `tracked-paths`, `oracle-json-selftest`, `oracle-json`,
+  `e2e-timing-selftest`, `changelog-version`, and `comment-lint`.
+- Release tooling self-tests: `release-selftest`, `release-flow-selftest`, `release-assets-selftest`,
+  `embed-key-selftest`, and `signing-selftest`.
+- Builds: `build-arm64` and `build-x64`.
+- Test projects: `test-core` (`Bwc.Core.Tests`), `test-gpo` (`Bwc.Gpo.Tests`), `test-policy`
+  (`Bwc.Policy.Tests`), `test-registry-e2e` (`Bwc.Registry.Tests`), `test-registry-shipping`
+  (`Bwc.Registry.Shipping.Tests`), `test-update` (`Bwc.Update.Tests`), and `test-update-e2e`
+  (`Bwc.Update.Tests` compiled in the E2E flavor). The normal steps skip tests tagged `Elevated` or
+  `ReleaseGate`.
+`--quick` runs only the shared steps. Without it, each RID then runs
+`publish-ship`, `verify-flavor-ship`, `e2e-ship`, `publish-e2e`, `verify-flavor-e2e`, and `e2e-flavor`.
 `--rid all` runs the shared steps once and the publish, flavor, and E2E steps once for each RID.
+After the steps of every RID, a full gate (no `--quick`) runs `test-policy-release-gate` last. It runs
+the tests tagged `ReleaseGate` in `Bwc.Policy.Tests`, and fails while a capture case still awaits a
+recapture. It belongs to no RID (`rid` is null in `steps`), and it fails the gate when it fails, but the
+GUI evidence of every RID is collected before it runs.
+A release needs one full `--rid all` gate that passed on a clean HEAD (see `docs/RELEASE.md`).
 
-The four test projects always build and run for the host architecture (`process.arch`:
+The test projects always build and run for the host architecture (`process.arch`:
 ARM64 or x64), whatever `--rid` is. `--rid` only picks the app RID for the publish and E2E
 steps. On an ARM64 machine, `--rid win-x64` therefore runs the tests as ARM64 against the
 x64 app, which runs under emulation. The x64 app is self-contained, so no x64 .NET runtime
@@ -87,11 +101,11 @@ Each run removes the previous run's outputs first, then writes:
 
 Schema 2 fields of `result.json`:
 
-- `schema`, `startedUtc`, `durationMs`, `rid` (requested: `win-x64`, `win-arm64`, or `all`), `testPlatform` (the host architecture the four test projects ran as: `ARM64` or `x64`), `quick`, `pass`
+- `schema`, `startedUtc`, `durationMs`, `rid` (requested: `win-x64`, `win-arm64`, or `all`), `testPlatform` (the host architecture the test projects ran as: `ARM64` or `x64`), `quick`, `pass`
 - `git`: `commit` (full SHA), `branch`, `dirty`, `dirtyPaths` (from `git status --porcelain -z`; a rename reads `new (from old)`), `error`
 - `environment`: `node` (version), `dotnet` (`version`, `error` from `dotnet --version`), `os` (`type`, `version`, `release`), `arch` (`process.arch`)
 - `rids`: one entry per requested RID with `platform`, `status` (`pass`, `fail`, `not-run` after an earlier failure, or `skipped` in quick mode), and its step names
-- `steps`: every step that ran, in order, with `name`, `rid` (null for shared steps), `command`, `pass`, `exitCode`, `durationMs`, `summary`, `log` (repo-relative path), and `e2eResult` (set on the two E2E steps of each RID, null otherwise)
+- `steps`: every step that ran, in order, with `name`, `rid` (null for shared steps and for `test-policy-release-gate`), `command`, `pass`, `exitCode`, `durationMs`, `summary`, `log` (repo-relative path), and `e2eResult` (set on the two E2E steps of each RID, null otherwise)
 
 `e2eResult` is `{ path, exists, pass, passed, failed, total, error }`. `path` is
 `artifacts/e2e/result-<rid>-<flavor>.json`. Counts are read only when that file exists,
@@ -106,7 +120,7 @@ Every assembly carries `BwcFlavor` from `Directory.Build.props`: `ship` in ship 
 - Every managed `Bwc*` and `BetterWindowsConfig*` `.dll` or `.exe` must carry exactly the
   folder's value: `publish/<rid>` expects `ship`, and `publish/<rid>-e2e` expects `E2E`.
   A missing value, a value from the other flavor, or two values fails the check.
-- The two managed project main assemblies (`BetterWindowsConfig.dll`, `BwcRegedit.dll`) must be
+- The three managed project main assemblies (`BetterWindowsConfig.dll`, `BwcRegedit.dll`, `BwcGpedit.dll`) must be
   present.
 - Native apphost `.exe` files have no managed metadata and are listed as skipped.
 - The self-contained runtime must be there: `hostfxr.dll`, `hostpolicy.dll`, `coreclr.dll`, `System.Private.CoreLib.dll`, and
@@ -123,10 +137,10 @@ Every assembly carries `BwcFlavor` from `Directory.Build.props`: `ship` in ship 
   unexpected-error log line (`src/Bwc.Update/Cli/BuildFlavor.cs`), so the trimmer keeps it. The folder
   must hold exactly its own value. In a ship folder the exe is also searched for `BWC_E2E_UPDATE_` as
   UTF-8 and UTF-16LE.
-- Each exe head's embedded manifest (`BwcRegedit.exe`, `BetterWindowsConfig.exe`,
+- Each exe head's embedded manifest (`BwcRegedit.exe`, `BwcGpedit.exe`, `BetterWindowsConfig.exe`,
   `BwcUpdate.exe`) must declare one `requestedExecutionLevel`. In `publish/<rid>-e2e` it must be
   `asInvoker`. In `publish/<rid>` it must be the level in that project's source manifest:
-  `highestAvailable` (`src/Bwc.Regedit.App/app.manifest`), `asInvoker` (`src/Bwc.Hub/app.manifest`),
+  `highestAvailable` (`src/Bwc.Regedit.App/app.manifest` and `src/Bwc.Gpedit.App/app.manifest`), `asInvoker` (`src/Bwc.Hub/app.manifest`),
   and `asInvoker` (`src/Bwc.Update/app.manifest`). The check reads the manifest bytes
   in both ASCII and UTF-16LE. It ignores closing tags.
 
@@ -153,7 +167,7 @@ node scripts/flavor-metadata.js --rid win-arm64 --flavor e2e
 ### E2E flavor never elevates
 
 The E2E flavor must not raise UAC when an agent or developer starts an exe directly.
-`src/Bwc.Regedit.App/Bwc.Regedit.App.csproj` and `src/Bwc.Update/Bwc.Update.csproj` select
+`src/Bwc.Regedit.App/Bwc.Regedit.App.csproj`, `src/Bwc.Gpedit.App/Bwc.Gpedit.App.csproj`, and `src/Bwc.Update/Bwc.Update.csproj` select
 `app.e2e.manifest` (asInvoker) instead of their ship manifest when `BwcFlavor` is `E2E`. The NativeAOT
 linker copies the manifest from the managed build output into `BwcUpdate.exe`, and the manifest check
 below reads it back from the exe.
@@ -162,7 +176,7 @@ check above enforces these levels.
 
 The apphost and merged manifest in `obj` are shared by both flavors, and the SDK does not
 rebuild them when only the manifest selection changes. The two projects that select a
-different manifest (Regedit and Update) therefore run `BwcDropFlavorManifestOutputs` before
+different manifest (Regedit, Gpedit, and Update) therefore run `BwcDropFlavorManifestOutputs` before
 `PrepareForBuild`. It records the last flavor in
 `obj/.../bwc-flavor.txt` and deletes the `Manifests` folder and `apphost.exe` when the flavor
 changes. Without it, the ship publish kept `asInvoker` after an E2E build.
@@ -210,8 +224,8 @@ described in [elevated-runner.md](elevated-runner.md).
 ## App icons
 
 Each app has a 1024x1024 PNG source in `resources/` and a generated `.ico` beside it.
-The Hub uses `bwc.ico`. The Registry Editor uses `bwc-regedit.ico`, which its exe embeds and its
-window loads. `npm run icons:normalize` rebuilds every `.ico` with ImageMagick (`magick` on PATH or
+The Hub uses `bwc.ico`. The Registry Editor uses `bwc-regedit.ico` and the Local Group Policy Editor uses
+`bwc-gpo.ico`; each exe embeds its icon (the installer shortcuts read it from the exe) and its window loads it. `npm run icons:normalize` rebuilds every `.ico` with ImageMagick (`magick` on PATH or
 under `C:\Program Files\ImageMagick-*`; nothing is downloaded). Each `.ico` holds 256, 128, 96, 72,
 64, 48, 40, 32, 24, 20, and 16 px images. `npm run icons:normalize -- --check` fails when an `.ico` is
 missing a size or older than its source. Run the normalize command again, then commit the `.ico`.
@@ -224,8 +238,9 @@ missing a size or older than its source. Run the normalize command again, then c
 | `npm run build:win:e2e` | `scripts/dotnet-build.js` for arm64 in the E2E flavor |
 | `npm run test:all`, `npm run gate` | `scripts/test-all.js` (the full gate) |
 | `npm run test:e2e` | `scripts/test-e2e.js` |
+| `npm run test:installer-e2e` | `scripts/test-installer-e2e.js` (real NSIS installers, unelevated) |
 | `npm run installer:x64`, `installer:arm64` | `scripts/build-installer.js` (needs NSIS 3.10 or newer) |
-| `npm run run:hub`, `run:regedit` | `scripts/run-app.js` (starts the app with RunAsInvoker) |
+| `npm run run:hub`, `run:regedit`, `run:gpedit` | `scripts/run-app.js` (starts the app with RunAsInvoker) |
 | `npm run oracle` | `scripts/oracle.js` (regenerates the classic regedit captures) |
 | `npm run sync-version` | `scripts/sync-version.js` |
 | `npm run icons:normalize`, `-- --check` | `scripts/normalize-icons.js` (regenerates or verifies the app `.ico` files) |

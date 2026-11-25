@@ -11,13 +11,14 @@ const REPO_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const APPS = new Map([
   ["hub", "BetterWindowsConfig.exe"],
   ["regedit", "BwcRegedit.exe"],
+  ["gpedit", "BwcGpedit.exe"],
 ]);
 const RIDS = new Set(["win-x64", "win-arm64"]);
 const FLAVORS = new Set(["ship", "e2e"]);
 
 function printHelp() {
   console.log(`Usage:
-  node ${SCRIPT} <hub|regedit> [--build] [--elevated] [--rid win-x64|win-arm64] [--flavor ship|e2e]
+  node ${SCRIPT} <hub|regedit|gpedit> [--build] [--elevated] [--rid win-x64|win-arm64] [--flavor ship|e2e]
 
 Options:
   --build            Run scripts/dotnet-build.js first.

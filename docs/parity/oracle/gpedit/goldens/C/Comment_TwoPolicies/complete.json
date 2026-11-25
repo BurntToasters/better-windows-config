@@ -1,0 +1,25 @@
+{
+  "case": "C/Comment_TwoPolicies",
+  "planHash": "731979aba68623233d3f7debec559496ca33aca4ede50e6ec42e039bd415b9d0",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-first/Machine.Registry.pol",
+    "step-01-first/Machine.comment.cmtx",
+    "step-01-first/gpt.ini",
+    "step-02-second/Machine.Registry.pol",
+    "step-02-second/Machine.comment.cmtx",
+    "step-02-second/gpt.ini",
+    "step-03-first-removed/Machine.Registry.pol",
+    "step-03-first-removed/Machine.comment.cmtx",
+    "step-03-first-removed/gpt.ini",
+    "step-04-second-edited/Machine.Registry.pol",
+    "step-04-second-edited/Machine.comment.cmtx",
+    "step-04-second-edited/gpt.ini",
+    "step-05-second-removed/Machine.Registry.pol",
+    "step-05-second-removed/Machine.comment.cmtx",
+    "step-05-second-removed/gpt.ini"
+  ]
+}

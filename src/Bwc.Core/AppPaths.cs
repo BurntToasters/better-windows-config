@@ -9,31 +9,42 @@ public static class AppPaths
 
     /// <summary>
     /// Gets the base data directory. <c>BWC_DATA_ROOT</c> wins when it contains a fully
-    /// qualified path; otherwise the per-user local application data folder is used.
+    /// qualified path; otherwise the per-user local application data folder is used. The ship flavor
+    /// ignores the variable while the process is elevated or high integrity, because a non-elevated
+    /// process controls what the elevated one inherits.
     /// </summary>
     public static string BaseDirectory
     {
         get
         {
-            string? configured = Environment.GetEnvironmentVariable(DataRootEnvironmentVariable);
-            if (!string.IsNullOrWhiteSpace(configured))
+            return DataPathPolicy.ChooseRoot(
+                ElevationProbe.IsElevatedOrHighIntegrity(),
+                DataPathPolicy.IsE2EFlavor,
+                ConfiguredRoot(),
+                () => Path.Combine(UserFallbackRoot(), ProductFolderName));
+        }
+    }
+
+    private static string? ConfiguredRoot()
+    {
+        string? configured = Environment.GetEnvironmentVariable(DataRootEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            string candidate = configured.Trim();
+            try
             {
-                string candidate = configured.Trim();
-                try
+                if (Path.IsPathFullyQualified(candidate))
                 {
-                    if (Path.IsPathFullyQualified(candidate))
-                    {
-                        return Path.GetFullPath(candidate);
-                    }
-                }
-                catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-                {
-                    // A malformed override is ignored in favor of the per-user default.
+                    return Path.GetFullPath(candidate);
                 }
             }
-
-            return Path.Combine(UserFallbackRoot(), ProductFolderName);
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                // A malformed override is ignored in favor of the per-user default.
+            }
         }
+
+        return null;
     }
 
     /// <summary>

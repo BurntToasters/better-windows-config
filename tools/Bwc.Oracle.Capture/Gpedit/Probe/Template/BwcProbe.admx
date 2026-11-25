@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BWC-authored probe template for the gpedit oracle. It writes only below Software\Policies\BWC-Oracle, a key nothing reads. -->
+<policyDefinitions revision="1.0" schemaVersion="1.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <policyNamespaces>
+    <target prefix="bwcprobe" namespace="BWC.Policies.Probe" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <supportedOn>
+    <definitions>
+      <definition name="SUPPORTED_BwcProbe" displayName="$(string.SupportedBwcProbe)" />
+    </definitions>
+  </supportedOn>
+  <categories>
+    <category name="BwcProbe" displayName="$(string.BwcProbe)" explainText="$(string.BwcProbe_Help)" />
+  </categories>
+  <policies>
+    <policy name="Probe_Zeta" class="Machine" displayName="$(string.Probe_Zeta)" explainText="$(string.Probe_Zeta_Help)" key="Software\Policies\BWC-Oracle\Probe" valueName="Zeta">
+      <parentCategory ref="BwcProbe" />
+      <supportedOn ref="SUPPORTED_BwcProbe" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+    <policy name="Probe_Alpha" class="Machine" displayName="$(string.Probe_Alpha)" explainText="$(string.Probe_Alpha_Help)" key="Software\Policies\BWC-Oracle\Probe" valueName="Alpha">
+      <parentCategory ref="BwcProbe" />
+      <supportedOn ref="SUPPORTED_BwcProbe" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+    </policy>
+    <policy name="Probe_Options" class="Machine" displayName="$(string.Probe_Options)" explainText="$(string.Probe_Options_Help)" presentation="$(presentation.Probe_Options)" key="Software\Policies\BWC-Oracle\Probe">
+      <parentCategory ref="BwcProbe" />
+      <supportedOn ref="SUPPORTED_BwcProbe" />
+      <elements>
+        <decimal id="Probe_Decimal" valueName="OptDecimal" minValue="1" maxValue="99" />
+        <text id="Probe_Text" valueName="OptText" maxLength="50" />
+        <enum id="Probe_Enum" valueName="OptEnum">
+          <item displayName="$(string.EnumOne)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+          <item displayName="$(string.EnumTwo)">
+            <value>
+              <decimal value="2" />
+            </value>
+          </item>
+        </enum>
+        <boolean id="Probe_Boolean" valueName="OptBool">
+          <trueValue>
+            <decimal value="1" />
+          </trueValue>
+          <falseValue>
+            <decimal value="0" />
+          </falseValue>
+        </boolean>
+        <list id="Probe_List" key="Software\Policies\BWC-Oracle\Probe\OptList" valuePrefix="Item" />
+      </elements>
+    </policy>
+  </policies>
+</policyDefinitions>

@@ -1,3 +1,5 @@
+using Bwc.UI.Icons;
+
 namespace Bwc.UI.Tree;
 
 /// <summary>
@@ -35,7 +37,36 @@ public sealed class TreeNode
         HasChildren = hasChildren;
         Source = source;
         Loader = loader ?? (source is null ? null : source.LoadChildrenAsync);
+#if BWC_E2E
+        // E2E only: the regedit tree has no node that cannot be renamed, so the tree test names some.
+        CanRename = !E2ENoRenameNames.Contains(name);
+#endif
     }
+
+#if BWC_E2E
+    /// <summary>E2E only: semicolon list of node names that start with CanRename false.</summary>
+    internal const string E2ENoRenameVariable = "BWC_E2E_TREE_NO_RENAME_NAMES";
+
+    private static readonly HashSet<string> E2ENoRenameNames = new(
+        (Environment.GetEnvironmentVariable(E2ENoRenameVariable) ?? string.Empty)
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+        StringComparer.OrdinalIgnoreCase);
+#endif
+
+    /// <summary>
+    /// The icon to draw for this node, or null for the classic default (the computer icon for a root,
+    /// the closed folder for every other node). The reference is resolved to an image at the row's DPI.
+    /// </summary>
+    public IconReference? Icon { get; set; }
+
+    /// <summary>The tool's own model for this node. <see cref="DenseTree"/> never reads it.</summary>
+    public object? Tag { get; set; }
+
+    /// <summary>
+    /// False when the node must not start an in-place rename: neither F2, <see cref="DenseTree.BeginRenameSelected"/>
+    /// nor the slow second click opens the rename box for it. True by default.
+    /// </summary>
+    public bool CanRename { get; set; } = true;
 
     /// <summary>Display name. Registry key names are case-insensitive; the spelling here is preserved.</summary>
     public string Name { get; set; }

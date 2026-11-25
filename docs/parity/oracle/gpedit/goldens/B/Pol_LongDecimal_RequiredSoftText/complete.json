@@ -1,0 +1,22 @@
+{
+  "case": "B/Pol_LongDecimal_RequiredSoftText",
+  "planHash": "e8a3c084f0cd99ad131f43c3813d336fc8eb91ccffaea169bfda39e878db7b35",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/User.Registry.pol",
+    "step-01-enabled-defaults/User.comment.cmtx",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-enabled-alt1-value/User.Registry.pol",
+    "step-02-enabled-alt1-value/User.comment.cmtx",
+    "step-02-enabled-alt1-value/gpt.ini",
+    "step-03-disabled/User.Registry.pol",
+    "step-03-disabled/User.comment.cmtx",
+    "step-03-disabled/gpt.ini",
+    "step-04-not-configured/User.Registry.pol",
+    "step-04-not-configured/User.comment.cmtx",
+    "step-04-not-configured/gpt.ini"
+  ]
+}

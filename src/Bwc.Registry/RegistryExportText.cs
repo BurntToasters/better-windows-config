@@ -56,7 +56,7 @@ public static class RegistryTextExporter
         var state = new TextExportState { KeyDisplay = keyDisplay };
         var gate = new ExportProgressGate(progress);
         gate.Always(Starting(startKey, state));
-        Walk(source, startKey, writer, isStart: true, cancellationToken, gate, state);
+        Walk(source, startKey, writer, isStart: true, depth: 0, cancellationToken, gate, state);
         gate.Always(Completed(startKey, state));
     }
 
@@ -88,7 +88,7 @@ public static class RegistryTextExporter
         foreach (RegistryPath root in roots)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Walk(source, root, writer, isStart: false, cancellationToken, gate, state);
+            Walk(source, root, writer, isStart: false, depth: 0, cancellationToken, gate, state);
         }
 
         gate.Always(Completed(roots[^1], state));
@@ -99,11 +99,19 @@ public static class RegistryTextExporter
         RegistryPath path,
         TextWriter writer,
         bool isStart,
+        int depth,
         CancellationToken cancellationToken,
         ExportProgressGate gate,
         TextExportState state)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (depth > RegistryExportLimits.MaxSubtreeDepth)
+        {
+            // Deeper than the registry allows: only a link to an ancestor gets here. Skipped like an unreadable key.
+            SkipKey(path, gate, state);
+            return;
+        }
 
         RegistryKeyInfo info;
         IReadOnlyList<RegistryValueInfo> values;
@@ -119,14 +127,7 @@ public static class RegistryTextExporter
         }
         catch (RegistryOperationException ex) when (!isStart && IsSkippableKeyError(ex.Win32Error))
         {
-            state.KeysSkipped += 1;
-            gate.Always(new ExportProgress(
-                ExportPhase.KeySkipped,
-                path,
-                null,
-                state.KeysExported,
-                state.ValuesExported,
-                state.KeysSkipped));
+            SkipKey(path, gate, state);
             return;
         }
 
@@ -177,8 +178,20 @@ public static class RegistryTextExporter
         foreach (string subKeyName in subKeyNames)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Walk(source, path.AppendEnumeratedName(subKeyName), writer, isStart: false, cancellationToken, gate, state);
+            Walk(source, path.AppendEnumeratedName(subKeyName), writer, isStart: false, depth + 1, cancellationToken, gate, state);
         }
+    }
+
+    private static void SkipKey(RegistryPath path, ExportProgressGate gate, TextExportState state)
+    {
+        state.KeysSkipped += 1;
+        gate.Always(new ExportProgress(
+            ExportPhase.KeySkipped,
+            path,
+            null,
+            state.KeysExported,
+            state.ValuesExported,
+            state.KeysSkipped));
     }
 
     // The same skip set as the .reg exporter: a key that vanished or was deleted mid-walk is skipped.

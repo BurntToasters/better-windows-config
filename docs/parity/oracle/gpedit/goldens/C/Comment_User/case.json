@@ -1,0 +1,670 @@
+{
+  "case": "C/Comment_User",
+  "description": "a comment on a user policy: add, edit, remove",
+  "planVersion": 2,
+  "planHash": "e7e7f4c5e042683801211158345e8e3ebff6adf6ed283af4dd027ebc31e4138e",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Class user flag' state Not Configured comment press [OK] at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class user flag",
+        "state": "Not Configured",
+        "comment": "bwc comment one",
+        "policyId": "Pol_Class_User",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step add",
+      "plan": "snapshot  [step add]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step add"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Class user flag' state Not Configured comment press [OK] at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class user flag",
+        "state": "Not Configured",
+        "comment": "bwc comment two",
+        "policyId": "Pol_Class_User",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step edit",
+      "plan": "snapshot  [step edit]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step edit"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Class user flag' state Not Configured comment press [OK] at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class user flag",
+        "state": "Not Configured",
+        "comment": "",
+        "policyId": "Pol_Class_User",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step remove",
+      "plan": "snapshot  [step remove]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step remove"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "add",
+      "folder": "step-01-add",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 26,
+          "sha256": "e64889db9424e16b10b89e1074319b15ce136d80602ce74e8c03745a9f460091"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "1d47ffd061d679c8a8d61ce7b7ba2c13b57ebdb88876e743840e87e470ac8f2e"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 26
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 718
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 8
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "edit",
+      "folder": "step-02-edit",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 27,
+          "sha256": "1970a6002c7c882628e11c90783f7d11e0026a7448d350b00352e37cdf46ecf4"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "18c13e70fe13a27ca316dee39d4bf9262a2f10a6de03ef29cf87c68da0c4f216"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 27
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 718
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 8
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "remove",
+      "folder": "step-03-remove",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 27,
+          "sha256": "42fd6ce64e76d178f90306f2d3d7117e0441971b4aa4b91b1dcd8405bce1e078"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 196608,
+        "machine": 0,
+        "user": 3
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 27
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol",
+        "User\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 65536,
+      "data": {
+        "policy": "Class user flag",
+        "before": {
+          "title": "Class user flag",
+          "windowTitle": "Class user flag",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: newer systems only",
+          "help": "A user policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Not Configured",
+            "observed": "Not Configured"
+          },
+          {
+            "set": "#c44bb2fd5169",
+            "requested": "bwc comment one",
+            "before": "",
+            "observed": "bwc comment one",
+            "applyEnabledBefore": false,
+            "applyEnabledAfter": true
+          }
+        ],
+        "afterSet": {
+          "title": "Class user flag",
+          "windowTitle": "Class user flag",
+          "state": "Not Configured",
+          "comment": "bwc comment one",
+          "supportedOn": "BWC oracle fixture: newer systems only",
+          "help": "A user policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Class user flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol",
+                "User\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1,
+                "User\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              }
+            }
+          }
+        ],
+        "finalTitle": "Class user flag"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 26,
+          "sha256": "e64889db9424e16b10b89e1074319b15ce136d80602ce74e8c03745a9f460091"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "1d47ffd061d679c8a8d61ce7b7ba2c13b57ebdb88876e743840e87e470ac8f2e"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\comment.cmtx"
+      ],
+      "gptVersionBefore": 65536,
+      "gptVersionAfter": 131072,
+      "data": {
+        "policy": "Class user flag",
+        "before": {
+          "title": "Class user flag",
+          "windowTitle": "Class user flag",
+          "state": "Not Configured",
+          "comment": "bwc comment one",
+          "supportedOn": "BWC oracle fixture: newer systems only",
+          "help": "A user policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Not Configured",
+            "observed": "Not Configured"
+          },
+          {
+            "set": "#c44bb2fd5169",
+            "requested": "bwc comment two",
+            "before": "bwc comment one",
+            "observed": "bwc comment two",
+            "applyEnabledBefore": false,
+            "applyEnabledAfter": true
+          }
+        ],
+        "afterSet": {
+          "title": "Class user flag",
+          "windowTitle": "Class user flag",
+          "state": "Not Configured",
+          "comment": "bwc comment two",
+          "supportedOn": "BWC oracle fixture: newer systems only",
+          "help": "A user policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Class user flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\comment.cmtx": 1
+              },
+              "gptVersionBefore": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              },
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              }
+            }
+          }
+        ],
+        "finalTitle": "Class user flag"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 27,
+          "sha256": "1970a6002c7c882628e11c90783f7d11e0026a7448d350b00352e37cdf46ecf4"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "18c13e70fe13a27ca316dee39d4bf9262a2f10a6de03ef29cf87c68da0c4f216"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\comment.cmtx"
+      ],
+      "gptVersionBefore": 131072,
+      "gptVersionAfter": 196608,
+      "data": {
+        "policy": "Class user flag",
+        "before": {
+          "title": "Class user flag",
+          "windowTitle": "Class user flag",
+          "state": "Not Configured",
+          "comment": "bwc comment two",
+          "supportedOn": "BWC oracle fixture: newer systems only",
+          "help": "A user policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Not Configured",
+            "observed": "Not Configured"
+          },
+          {
+            "set": "#c44bb2fd5169",
+            "requested": "",
+            "before": "bwc comment two",
+            "observed": "",
+            "applyEnabledBefore": false,
+            "applyEnabledAfter": true
+          }
+        ],
+        "afterSet": {
+          "title": "Class user flag",
+          "windowTitle": "Class user flag",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: newer systems only",
+          "help": "A user policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Class user flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\comment.cmtx": 1
+              },
+              "gptVersionBefore": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              },
+              "gptVersionAfter": {
+                "raw": 196608,
+                "machine": 0,
+                "user": 3
+              }
+            }
+          }
+        ],
+        "finalTitle": "Class user flag"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 27,
+          "sha256": "42fd6ce64e76d178f90306f2d3d7117e0441971b4aa4b91b1dcd8405bce1e078"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 196608,
+        "machine": 0,
+        "user": 3
+      }
+    }
+  ]
+}

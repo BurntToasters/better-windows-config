@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using Bwc.Core;
 using Bwc.Hub.Theme;
+using Bwc.Update;
 using Bwc.Hub.Updates;
 using Bwc.UI.Dialogs;
 using Microsoft.UI.Xaml;
@@ -198,6 +199,12 @@ internal sealed class UpdateAvailableDialog : ClassicDialog
 
     private static void OpenNotes(string url)
     {
+        if (!ManifestLocation.IsOpenableNotesUrl(url))
+        {
+            Log.Warn("Release notes link refused: it is not a plain absolute https address. Nothing was opened.");
+            return;
+        }
+
         try
         {
             using Process? process = Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });

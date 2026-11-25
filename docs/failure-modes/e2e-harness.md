@@ -559,6 +559,152 @@ and the result records `staleCopyLocalRemoved` for each project. The shared-fold
 are unchanged. The exact timing that produced the collision was not reproduced; the guard removes the input
 that the verified tree shows to be stale.
 
+## 44. The real Local Group Policy store changed during a run (G0b)
+
+The Local Group Policy Editor of 0.2.0 writes `%SystemRoot%\System32\GroupPolicy` when a user runs it elevated.
+The E2E flavor is `asInvoker` and every GPO test is meant to use a private store, but a wrong path in a
+test, a default store location, or a refresh call that reaches the real machine would write the developer's
+real policy and no check would say so. `GpoGuard` hashes the real folder before the first test and after the last,
+and the run fails when the two differ. It only reads.
+
+What counts as a change:
+
+- Each file and each directory under the folder is one entry: relative path, a kind (file, directory, reparse
+  point, unreadable), and for a file its size and SHA-256. A file added, removed, resized, or with different
+  bytes is a change. A directory added or removed is a change, because an empty `Machine\Scripts` folder is a
+  write. A time stamp alone is not a change, because the content is the policy and a read can touch times.
+- A folder that does not exist is a valid state with no entries. Missing before and missing after is a pass.
+  Missing before and present after (or the reverse) is a change.
+- The path is compared without case. Entries are sorted by ordinal ignore-case path, so enumeration order never
+  produces a difference.
+
+Failure modes and guards:
+
+| Failure | Guard |
+| --- | --- |
+| The hash reads through WOW64 redirection and sees `SysWOW64`, which has no GroupPolicy folder, so a real change is invisible | A 32-bit process on a 64-bit OS reads `%SystemRoot%\Sysnative`. The root actually read is recorded in the check notes. |
+| The guard writes: opens with write access, touches times, or creates a snapshot file in the folder | Files open with `FileAccess.Read` and `FileShare` read, write and delete. Nothing is created or deleted below the root. The guard self-test captures a folder twice and asserts that no entry, size, or last write time changed. The snapshot lives in memory only. |
+| A reparse point under the folder leads the walk outside it, or in a loop | A directory or file with `FileAttributes.ReparsePoint` is recorded as one `reparse` entry with its attributes and is never followed or hashed. |
+| One unreadable file or folder aborts the guard, or hides a change | Each entry is read in its own try block, retried 3 times 100 ms apart for a sharing violation. A still unreadable entry becomes `unreadable:<ExceptionType>` and takes part in the comparison. A file that is unreadable only in one of the two snapshots is a change and says so. |
+| Windows or a management agent refreshes policy during the run and changes `gpt.ini` or `Registry.pol`, so the guard blames BWC | The check fails, because the run cannot prove it did not write. The notes list every changed path with before and after size and hash prefix, so the cause can be read. Rerun on a quiet machine. This is accepted: a false failure is visible, a false pass is not. |
+| The baseline fails (the walk throws) and the run ends "unchanged" because both sides are empty | A baseline that could not be captured is a failed `gpo.real-unchanged` check with the exception, never a pass. The final capture failing is the same. |
+| The guard runs only on a full run, or only when a test touches policy | `GuiGate.AssemblyInit` takes the baseline and `GuiGate.AssemblyCleanup` takes the final snapshot, so every run, including a filtered one, records the check. |
+| The check is recorded after `E2EResults.Finish`, so it never reaches the artifact | `GpoGuard.Finish` runs in assembly cleanup before `Finish`, in its own try block, so an exception in the guard cannot stop the artifact from being written. |
+| A passing check that proves nothing (the root is wrong, so zero entries both times) | The notes carry the root, the entry count, and a digest of the whole snapshot. A root that exists with entries and a count of zero is impossible by construction; a missing root is stated as "missing" in the notes. |
+
+Self test: `GpoGuardTests` (category Harness, under `tests/Bwc.E2E/Harness`) runs `GpoGuard.Capture` and
+`GpoGuard.Compare` against folders it builds under the run data root. Cases: both missing; missing then created;
+file added; file removed; same size with different bytes; time stamp only; empty directory added; nested file
+changed; a file held open with `FileShare.None` in one snapshot only; a capture that leaves the folder
+byte-identical with the same last write times. The check in the real run is named `gpo.real-unchanged`.
+
+## 45. Category guard, policy editor stand-in, Hub launch of the policy editor (GT1)
+
+The Gpedit and Console tests drive seams that only the E2E flavor has, and they carried no `E2EOnly` category,
+so the ship step selected them. The fake installer had no stand-in for the policy editor, and no test started the
+policy editor from the Hub.
+
+| Failure | Guard |
+| --- | --- |
+| A new test file in `tests/Bwc.E2E/Gpedit` (Blind included) or `tests/Bwc.E2E/Console` has no `E2EOnly` category, and the ship step selects it | `CategoryGuardTests` (category `Harness`, under `tests/Bwc.E2E/Harness`) walks every `[TestMethod]` of the test assembly. A test belongs to the group when its class lives in a `Gpedit` or `Console` folder of the test project (the namespace and the source folder both count) or it carries the category `Gpedit` or `Console`. The check fails and names each method that has no `E2EOnly` and is not on the allowlist. |
+| A test class outside those folders opens a console seam run (`ListRun.Open`, `ShellRun.Open` or `GpeditRun.Open`) and has no `E2EOnly` category. `Menus_ActionLookupSurvivesWrapperCollection` did this, and the ship step timed out waiting for a readout that the ship build never shows | The group of `CategoryGuardTests` also holds every test class anywhere under `tests/Bwc.E2E` whose source file text calls one of the three `Open` methods, so the same two checks apply to it. The category of that test (for example `Menus`) stays. |
+| An `E2EOnly` test in those folders forgets `E2EGuards.RequireE2EOnlyFlavor`, so a ship run reaches the seam and fails with a confusing message | The same test reads the source file of each such method and requires the call inside the method body, and fails naming the method when it is missing. |
+| The allowlist grows without proof that the test passes in the ship flavor | The allowlist is three names in the test source and each one was run in the ship flavor. `Gpedit_ReadOnly_Notice` is on it because it is written for the ship flavor: it opens the real policy object without elevation, presses only Cancel, and compares the real policy folder before and after. A test that cannot pass in ship because it needs a seam becomes `E2EOnly` and leaves the list. |
+| The Hub or the installer payload names a policy editor that the stand-in installer does not provide, so an install, update or launch test ends in a missing file | `tests/Bwc.E2E.FakeInstaller` has a stand-in named `BwcGpedit` next to `BetterWindowsConfig` and `BwcRegedit`. It is used for the payload, the shortcut and every other place the Registry Editor stand-in appears. Existing install and update tests stay green. |
+| No test starts the policy editor from the Hub, so a wrong catalog entry, executable name or launch argument goes unseen | A Hub test starts the policy editor from its tool row, like the Registry Editor test, and checks that a window of the policy editor appears. It never runs where the launch would prompt for elevation: a launch that would show a UAC prompt is `E2EOnly` and runs against the E2E publish, which is `asInvoker`. |
+
+## 46. Timing record of the run (ST0)
+
+The full E2E flavor run takes about 45 minutes and nothing measured a test, an app start, an app close or a wait, so a
+speed fix would have been a guess. The result file now has one more top-level object, `timings`, beside the existing
+fields (schema stays 2, no existing field changes). It has `tests` (class, method, duration, outcome and the session ids
+a test started), `sessions` (id, exe, test, ms to the main window, ms in `Close`, whether it had to kill, ms alive),
+`sessionsNotClosed`, `waits` (one row per call site: file relative to `tests/Bwc.E2E`, line, calls, total ms, max ms,
+timeouts) and `totals`. Recording is measurement only: no test, timeout, interval, check id or outcome changes.
+
+| Failure | Guard |
+| --- | --- |
+| The timing recorder throws into a test (a null, a lock, a bad key, a serializer error) and a passing test fails because of the measurement | Every public entry point of `E2ETimings` is one try block that swallows the exception and adds one entry to an internal problem list. The list is written as `timings.problems` and as the note `timings.problem`, so a broken recorder is visible and never fatal. When the object cannot be built, `Finish` leaves `timings` out, still writes the artifact, and notes each problem as `timings.problem`. A Harness test makes the recorder throw on purpose and asserts that nothing escapes. |
+| A wait site is attributed to the wrong line because a helper wraps `WaitUntil` (for example `AppServicesSupport.WaitUntil` or `WaitForTreeRow` call `ControlTestSupport.WaitUntil`), so the site is the helper line and many tests share it | Accepted and stated: the caller file and line come from `[CallerFilePath]` and `[CallerLineNumber]`, so a wrapper is the site. The row is still true (the total time of that helper), and a reader who wants the test reads the `tests` list. The report prints the file and line so the wrapper is easy to find. No test is edited to hide the wrapper. Private `WaitUntil` copies in `MenuTests`, `ShellTests`, `ShellKeyboardTests`, `KeyboardParityTests` and `InstallerRun` are not timed in this piece. Since ST0b the largest wrappers pass the caller on (see below). |
+| The caller parameters bind to a positional argument of an existing call and change its meaning | They are trailing optional parameters after `timeout`, so a call with the old argument count compiles to the same call. No call passes a third positional argument, and no method group of these methods is converted to a delegate (both were searched before the change). The build and the whole E2E project compile unchanged. |
+| A session is never closed through `Close` (the test only disposes it, or the test throws first) and its close time is missing | `Dispose` calls `Close`, so the time is still measured there. A session whose `Close` was never called by the test is counted in `sessionsNotClosed` (disposed only) and its row has `closedViaClose: false`. A session never disposed at all has no end time: the row has `aliveMs` `null` and is counted in `sessionsNeverDisposed` at `Finish`. |
+| The clock is not started for a test (`GlobalTestInitialize` did not run, a test is skipped, or two tests run at once) | The clock is keyed by class and method name, not by thread. A cleanup with no start is recorded with `durationMs` `null` and counted in `testsWithoutStart`, never as zero and never as a throw. The sum of test time ignores those rows. A session or wait that happens with no current test is attributed to `(none)`. |
+| The result file grows too large (one row per wait call instead of per site, a session list with no end) | Waits aggregate per site, so the count is the number of call sites (a few hundred), not the number of calls. Tests and sessions have one row each. A size guard in `Finish` writes the `timings` object only when the serialized part is at most 2 MB and otherwise writes the counts and totals with `truncated: true`, plus a problem entry that appears as the note `timings.problem`. |
+| The report treats an old result file (no `timings`) as broken | `scripts/test-e2e.js` prints nothing extra and exits as before. `scripts/e2e-timing-report.js` prints that the file has no timings, still compares the check id sets of two files, and the exit code depends only on removed check ids. Its `--self-test` has a case with an old file. |
+| A rename or removal of a check slips in with a speed change | `node scripts/e2e-timing-report.js <before.json> <after.json>` exits 1 when a check id of the first file is missing in the second and lists those ids. New ids are listed and allowed. |
+
+ST0b shows where the rest of the time goes, again with no change to what any test does. Wait helpers in the test
+project pass the caller of the helper on to `WaitUntil`, so the site is the test line. Each `tests` row gets `waitMs`,
+`sessionMs`, `captureMs` and `untimedMs` (duration minus those). `waits` count only the outermost wait of a thread and
+report the rest as `nestedCalls` and `nestedMs`. `capture` has one row per caller site of a screenshot call, and
+`lookups` counts the element lookups that enumerate every desktop window.
+
+| Failure | Guard |
+| --- | --- |
+| A wrapper passes the wrong line: a helper gets the caller attributes but a forwarding call inside it does not pass them on, or a helper has them and a second helper that calls it does not, so the site is still a wrapper line (or the line of the attributes themselves) | The inner call always passes `callerFile` and `callerLine` as named arguments, so a missing pass-through is a compile-visible difference in the diff. A helper with a `params` array cannot take trailing optional parameters and is left alone and listed in the piece report, never changed to another signature. Helpers that call a changed helper without being listed keep their own line as the site, which is still a real file and line. The Harness test of the caller line goes through the real helpers. |
+| One wait is counted twice because a timed wait runs inside another timed wait (a condition that calls `WaitForElement`, or a helper that waits twice in a row inside a wrapper wait), so the wait total is larger than the time spent | The recorder keeps a thread-static depth. `BeginWait` raises it and `EndWait` lowers it in a `finally`, so a throwing condition cannot leave it raised. Only the outermost wait adds to the site totals and to the test `waitMs`. A nested wait adds to `nestedCalls` and `nestedMs` of its site, so nothing disappears. A wait that was never begun (the private shell `WaitUntil` copy) counts as nested when it runs inside a begun wait, and does not open a scope of its own. A Harness test nests two waits and checks both counts. |
+| The residual `untimedMs` is negative because the pieces do not add up: the session and capture clocks run beside the test clock and the rounding of each part is 0.1 ms, or a session started in a test is closed after the test row ended | The value is clamped at 0. A residual below minus one millisecond also sets `untimedClamped` on the row, counts it in `totals.untimedClamped` and adds one problem entry, so a real overlap is visible and a rounding difference is not. A capture that runs inside a timed wait is in `capture` and in the wait time, so it is left out of the test `captureMs` and is not subtracted twice. |
+| The counters slow a hot path (`FindElement` runs about 1700 times a run and enumerates every desktop window, a capture copies the screen five times) and the measurement changes the speed it measures | A counter is a timestamp at the start and one short lock at the end, no allocation per call and no logging. The lookup itself is untouched: the existing body is called as it was and only wrapped. A Harness test records a large number of waits and lookups and asserts that the recorder cost per call stays far below a millisecond. |
+
+Self test: the `Harness` tests in `E2ETimingsTests.cs` exercise the recorder without a window: a wait that times out is
+counted, two calls from one line aggregate, a recorder failure does not escape, the JSON has the documented fields, a
+nested wait is counted once, and the residual adds up and is never negative.
+`node scripts/e2e-timing-report.js --self-test` covers the report.
+
+## 47. Waits that never see their state, and blocking invokes (ST2)
+
+The ST0 timing record showed waits that always run to their timeout in a passing run, because the condition cannot be
+true, and one test that spends a minute inside a single UI Automation call. ST2 fixes the conditions and the call.
+No timeout of a wait for something to appear is shortened, no wait that proves an absence is touched, and no check
+id or check order changes.
+
+| Failure | Guard |
+| --- | --- |
+| A fixed wait condition passes early on a stale value, or never passes because it compares with a form the app does not show (the address bar shows `Computer\HKEY_...`, the test waits for `HKEY_...`; a menu of an expanded key is waited for with the names of a collapsed key; a tree row that is scrolled out of the realized rows is waited for by id; a row count of the whole list is waited for against the realized rows only) | The condition is changed to the state the app really reaches, with the same timeout and the same step after it. The old form is not dropped when the new one cannot be mistaken for an older state: the address wait accepts only the full `Computer\` form of the same path, which the initial `Computer` text cannot match. A wait that is a deliberate probe for an absent cell, row or element keeps its length. |
+| A non-blocking invoke returns before the command ran, and the caller reads the state at once | `EditingDriver.Invoke` still calls the UI Automation Invoke pattern, now on a background task, and waits for it up to a grace period (5 s). A command that returns inside the grace period behaves as before, including the click fallback when the invoke throws. Only a call that is still inside the command after the grace period (a command that shows a native modal window and does not return until it closes) is reported as invoked, and the callers of such a command already wait for the window they expect with their own timeout. |
+| The background invoke throws after the grace period and nobody sees it, or it blocks a pool thread for a long time | The task catches every exception, so it never becomes an unobserved task exception. A thread that is stuck in a modal call is released when the window closes or the process ends. |
+| A speed change in a drag test makes the drag less real, so a test that proves nothing happened passes without a drag | Only the approach to the start point is changed (the cursor is placed there instead of animated across the screen). The button press, the stepped move and the release are unchanged. |
+| A focus test never gets the focus it checks, because its key went in before the window took keyboard focus, and it checks the unfocused control after a full timeout | The test puts the focus in the tree pane first, as the sibling tests do, then sends the key. The check text is unchanged. |
+
+## 48. Address bar value set and window lookup scoped to the app process (ST2c, ST1)
+
+Two speed pieces. The address bar helper of the Registry Editor tests set the path by typing it (about 43 ms per
+character, about 3 s per navigation), and `EditingDriver.FindElement` asked UI Automation for every top-level window
+of the desktop on each poll (about 47 ms a call, 2322 calls in a run). The path is now set through the value of the
+address bar text box, and the window scans that already filter by the app process id read the windows of that process
+through `ProcessWindows`. No timeout, fixed sleep, check id, check order or check text changes.
+
+| Failure | Guard |
+| --- | --- |
+| The value set does not raise the text change that the product listens to, so the box shows the new path but the product still holds the old one and Enter navigates to a stale path | The helper keeps the read-back wait, then Enter, then the arrival wait that needs the address text and the selected tree row of the same path. A navigation to a stale path ends in a failed arrival wait, and the existing retries (the type-ahead route and the second attempt from the root) still run. The arrival wait is unchanged and never accepts the starting text. |
+| The read-back passes on a stale value: the box already held the wanted path from an earlier step, so the wait is true before the set took effect | The text box is cleared first and the read-back must see the full path, as before. When the set throws or the read-back wait fails, the helper falls back once to the old keyboard route (clear, type, the same read-back wait) before it returns false, so a run is never less reliable than the typed route. |
+| `EnumWindows` misses a window that the desktop scan found: an owned popup, a window that is not visible yet when the poll runs, or a window of a type the UIA window condition did not list | `ProcessWindows` keeps the visible filter of the desktop scan, because a hidden window is not in the UIA desktop list either and a hidden leftover must not satisfy a lookup. A WinUI flyout is a separate visible top-level window of the same process, which `EnumWindows` lists (the Hub tests and `MenuOpen` already rely on this). A lookup that falls back to the desktop tree (`EditingDriver.FindElement`, `SystemFileDialogDriver.FindProcessElement`) still does so when no window of the process was listed or `FromHandle` skipped one, so a window the scoped scan could not read is still found by the wider search. With every visible window read, that search can only repeat the scoped scan and costs about 60 ms a miss, so it is not run. A poll that misses a window that is about to appear is repeated by the wait around it. |
+| A scan that collects every match (the menu items of `MenuTests` and `ContextMenuDriver`) counts a popup item twice, because the popup is reached from its own handle and again below its owner, and a menu then shows twice its items | The collected elements go through `ProcessWindows.Distinct`, which keeps one element for each automation id, class, name and rectangle. First-match scans are not affected. The first run of this change failed seven menu tests for this reason before the dedupe was added. |
+| A window closes between `EnumWindows` and `FromHandle`, or UIA cannot reach it yet | The lookup of one handle is in a try block that skips only that window (COM error, invalid operation, element not available). The other windows of the process are still returned, and the next poll tries again. |
+| A faster dialog wait hands a one-shot lookup a dialog whose controls are not all in the UIA tree yet. Seen once after this change: the export dialog was found, the Selected branch edit was on screen, and `FindBranchEdit` returned nothing, so four checks of `ExportDialogs_BranchPathEditReportsAnUnreadableKey` failed | The export branch tests look up the branch edit through a wait of 5 s that ends as soon as the edit is found. The checks after it are unchanged, and a missing edit still fails them after the wait. |
+| A scan that must see windows of other processes is narrowed by mistake (a system file dialog hosted elsewhere, classic regedit) | Only scans that already compared the process id of each window with the app process id use `ProcessWindows`. A scan with another process or no process filter is left as it was and is listed in the piece report. |
+
+## 49. Elevated interop with the classic Local Group Policy Editor (A2)
+
+The four tests in `tests/Bwc.E2E/Gpedit/Interop` run only through the elevated runner and start
+`BwcGpedit.exe` from the ship publish `publish/<rid>`, the real product on the real policy folder.
+Every test calls `RequireE2EOnlyFlavor` first, then checks elevation and the administrator marker
+`%ProgramData%\BwcElevatedRunner\real-save.marker`. Tests 1 to 3 install the fixture templates in the system
+PolicyDefinitions folder and back up each file they replace, and they back up the five real policy
+files before they change any. The cleanup runs in `finally` on every path, including a refused dialog.
+Test 4 only starts the editor and closes it through the updater. The ship publish is checked by the
+runner before any test starts (`docs/elevated-runner.md`); each test checks the marker itself.
+
+| Failure | Guard |
+| --- | --- |
+| The test runs from a normal shell and saves the real policy without an administrator decision | The elevation gate reports Inconclusive with `node scripts/elevated-runner/run.js`; the marker gate reports Inconclusive with `install.ps1 -Marker`. No file or registry write happens before both pass. |
+| `GpeditInterop_BwcWrites_ClassicReads`: BWC saves Enabled but classic reads a stale file or a cached state, or BWC's Not Configured still shows Enabled | Classic is started after each BWC save and reads the dialog of the same policy. The test requires Enabled after the first save and Not Configured after the second. The live registry is read after each OK, so the save and its refresh have completed before the policy files are restored. |
+| `GpeditInterop_ClassicWrites_BwcReadsByFileCopy`: the copied golden step does not reach the dialog, or the dialog shows a different state or options | The five-file copy is compared with the golden before the editor starts. The dialog state and the options pane are compared with the golden `before.state` and `before.options`; only Cancel is pressed. `finally` restores the original five files byte for byte and the test records `cleanup.policyFiles`. |
+| `GpeditInterop_GroupG_LiveRegistryReplay`: runs all 29 Group G capture cases through the ship editor on the real policy folder and compares the 5 GPO files byte for byte and the 4 `BWC-Oracle` registry roots at 0, 4 and 8 s | Before each case, the 5 policy files in `GroupPolicy` are cleared and the 4 `BWC-Oracle` registry roots (`HKLM`/`HKCU` `Software\Policies\BWC-Oracle` and `Software\BWC-Oracle-Gpedit`) are deleted and verified absent. Files are checked byte for byte at each step snapshot; the live registry is settled up to 6 s after each step and read verbatim at 0, 4 and 8 s. On the 8 classic version-collision cases (`*_Apply` x4 and `*_Disabled` x4, where classic's 2026-11-21 capture left `gpsvc` at `v=1` from `*_Ok` and omitted `RP_FORCE`), BWC intentionally passes `RP_FORCE` and therefore asserts the applied value on step 1 (`Flag=1` at 0/4/8 s) and its removal on `*_Disabled` step 2. Writes `artifacts/e2e/visual/gpedit/gpedit-interop-groupg.json`. |
+| `GpeditInterop_UpdateClosesElevatedEditor`: the helper scans another folder or closes an editor the test did not start | The helper gets `--install-dir publish/<rid>`, and the test keeps the process handle of the one editor it started. It requires that process to be at high integrity before the call and to exit after exit code 0. |
+| A template or policy file or registry key is left changed after a crash in the test body | The template, policy, and 4-key `BWC-Oracle` backups are in memory, so a hard process crash leaves the files or `BWC-Oracle` keys changed. `GpoGuard` fails the run at assembly cleanup (`gpo.real-unchanged`) for the policy files; the four fixture template names are fixed (BwcOracle.admx, BwcOracleBase.admx and their en-US ADML) and can be removed by hand. A normal failure, including an assertion or a timeout, still runs the `finally` restore and records the cleanup checks. |
+| A test writes a policy file, a template file, or a registry key that is not the fixture | `scripts/check-policy-writer.js` and `scripts/check-registry-writer.js` allow only `GpeditInteropSupport.cs`, with the reason that it writes only the five policy files, the four fixture templates, and the four fixed `BWC-Oracle` registry keys through `AssertAllowed`. Every other file write or registry write in the test project still fails the guard. |
+
 ## Verification artifact
 
 A successful harness run leaves `artifacts/e2e/result-<rid>-<flavor>.json` with schema 2, the run
@@ -570,4 +716,6 @@ the `notes` array, and the `knownGaps` array (sections 17 to 19 describe each ar
 not affect `pass`. A failed run leaves the same artifact with `pass: false`, failed check ids,
 notes, and screenshots under `artifacts/e2e/screenshots` when capture succeeded.
 `scripts/test-e2e.js` prints passed, failed, and total checks, the known gaps grouped by work
-package, and the notes count. It requires schema 2 and at least one check.
+package, and the notes count. It requires schema 2 and at least one check. Since ST0 the file also has
+the `timings` object (section 46), and `scripts/test-e2e.js` prints the slowest tests, session totals and
+slowest wait sites from it when it exists.

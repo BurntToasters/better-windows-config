@@ -7,5 +7,6 @@ public static class ToolCatalog
     public static IReadOnlyList<Tool> Tools { get; } =
     [
         new("regedit", "Registry Editor", "BwcRegedit.exe", "Browse and edit the Windows registry."),
+        new("gpedit", "Local Group Policy Editor", "BwcGpedit.exe", "Browse and edit local group policy."),
     ];
 }

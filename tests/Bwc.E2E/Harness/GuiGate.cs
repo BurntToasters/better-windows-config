@@ -37,6 +37,9 @@ public sealed class GuiGate
         _resultsStarted = true;
         _runStartedUtc = DateTime.UtcNow;
 
+        // Before any test can run: the hash of the real Local Group Policy folder (read only, never throws).
+        GpoGuard.Begin();
+
         _sandbox = new SandboxRegistry(_config);
         try
         {
@@ -51,6 +54,10 @@ public sealed class GuiGate
         AcquireGate();
     }
 
+    /// <summary>Starts the clock of one test. The matching stop is in <see cref="RecordTestOutcome"/>.</summary>
+    [GlobalTestInitialize]
+    public static void StartTestClock(TestContext testContext) => E2ETimings.Current.TestStarted(testContext);
+
     /// <summary>
     /// Runs after every test method. It records one outcome check per test, so the artifact fails when dotnet
     /// reports a failed test, even when the test threw before it recorded a check. An Inconclusive test records
@@ -59,6 +66,7 @@ public sealed class GuiGate
     [GlobalTestCleanup]
     public static void RecordTestOutcome(TestContext testContext)
     {
+        E2ETimings.Current.TestFinished(testContext);
         string className = testContext.FullyQualifiedTestClassName ?? "UnknownClass";
         string id = $"test.{className[(className.LastIndexOf('.') + 1)..]}.{testContext.TestName}.outcome";
         UnitTestOutcome outcome = testContext.CurrentTestOutcome;
@@ -94,6 +102,12 @@ public sealed class GuiGate
             {
                 E2EResults.Record("sandbox.cleanup", false, ex.Message);
             }
+        }
+
+        if (_resultsStarted)
+        {
+            // After the last test and before the artifact is written (never throws).
+            GpoGuard.Finish();
         }
 
         try

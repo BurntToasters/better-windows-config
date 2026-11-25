@@ -164,3 +164,58 @@ Check: `Editing_DotNamedKeyShowsItsValue` in `tests/Bwc.E2E/Editing/DotNamedKeyT
 `.` with one value under a sandbox key, then checks that the tree lists `.` and the value list shows the
 value after the node is selected. Remote `.` keys have no automated check. They use the same child path
 and parse code, which is reviewed in `RemoteRegistryTreeSource`.
+
+## 0.2.0: node icon, tag and CanRename (piece U1a)
+
+Scope: `TreeNode` gains `Icon` (an `IconReference`, not limited to regedit's `IconKind`), `Tag` (an `object?` for the
+tool's own model) and `CanRename` (default true). `DenseTree` consults `CanRename` before it starts an in-place rename.
+Regedit sets none of the three, so its behavior must not change.
+
+### The slow second click renames a node that cannot be renamed
+
+Failure mode: BEH-010 arms a timer on a slow second click and starts the rename when it fires. Checking `CanRename` only
+when the timer is armed misses a node whose flag turns false during the double-click time, and checking only when the
+timer fires leaves a pending timer that other code treats as live.
+
+Rule: the slow click does not arm the timer for a node that cannot be renamed, and `BeginRename` checks again when the
+timer fires. Regedit nodes always pass.
+
+### F2 and the menu start a rename the slow click would refuse
+
+Failure mode: F2, `BeginRenameSelected` (used by Edit > Rename and the context menu) and the slow click each reach
+`BeginRename`. A guard on the click path only lets F2 open the box.
+
+Rule: the guard is inside `BeginRename`, so every path is covered, and it returns before it touches `_renaming`,
+`_renameNode` or the rename box. F2 on a node with `CanRename == false` is handled (the key does not bubble) and does
+nothing. Check: `Tree_CanRenameFalseIgnoresF2AndSlowClick` presses F2 and slow-clicks a node that the E2E flavor marks
+as not renamable and requires that no `TreeRenameBox` appears, then does the same on a normal sibling and requires the
+box, so the test cannot pass because rename is broken everywhere.
+
+### Edit > Rename stays enabled for a node that cannot be renamed
+
+Failure mode: the tree guard stops the box, but a host that enables Rename only from "a key is selected" shows an
+enabled command that does nothing.
+
+Rule: `DenseTree.CanRenameSelected` exposes the check. A tool whose nodes can set `CanRename` to false includes it in
+its Rename enable state. The Registry Editor sets no such node, so `RegeditContext.UpdateCommandStates` is not edited in
+this piece. The gpedit command piece (G2) owns that use.
+
+### The E2E hook leaks into the ship build
+
+Failure mode: the regedit tree never produces a node that cannot be renamed, so a black-box test needs a hook. A hook
+that compiles into the ship flavor is a hidden switch for users.
+
+Rule: the hook is inside `#if BWC_E2E` in `src/Bwc.UI/Tree/TreeNode.cs` and reads `BWC_E2E_TREE_NO_RENAME_NAMES`, a
+semicolon list of node names compared case-insensitively. The constructor applies it to the real `CanRename` property,
+so the test exercises the production guard. The ship flavor does not compile it. The ship build is a required check of
+this piece.
+
+### Icon and Tag on a node
+
+Failure mode: `Icon` is a reference, not a bitmap. A node that holds an `ImageSource` ties the model to a DPI and a
+thread. A `Tag` that holds a UI object keeps it alive after the node is dropped.
+
+Rule: `Icon` is an `IconReference` (an `IconKind` or a `ModuleIcon`). `TreeRowElement` resolves it to an image at the
+row's rasterization scale through `IconProvider`, so a DPI change reloads it. A null `Icon` keeps the old rule
+(Computer root, then closed folder). `Tag` is never read by `DenseTree`. Check: the existing Icons and Tree suites read
+the regedit icons and rows through the same path.

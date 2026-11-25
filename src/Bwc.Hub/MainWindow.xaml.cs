@@ -239,7 +239,7 @@ public sealed partial class MainWindow : Window
         AutomationProperties.SetName(item, tool.DisplayName);
 
         _rows[tool.Id] = new RowParts(item, content, name, description, status, icon);
-        _ = LoadIconAsync(tool, icon);
+        LoadIconAsync(tool, icon).Forget("Hub tool icon load");
         return item;
     }
 

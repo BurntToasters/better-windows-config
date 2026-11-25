@@ -1,4 +1,5 @@
 using System.Globalization;
+using Bwc.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using WinRT.Interop;
@@ -70,11 +71,11 @@ public abstract class ClassicNumberDialog : ClassicDialog
         {
             if (_base == NumberBase.Decimal && IsDecimalOverflow(_input.Text, _bits))
             {
-                _ = ConfirmTruncationAsync();
+                ConfirmTruncationAsync().Forget("number dialog truncation confirm");
             }
             else
             {
-                _ = ShowInputErrorAsync();
+                ShowInputErrorAsync().Forget("number dialog input error");
             }
 
             return false;

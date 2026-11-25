@@ -1,0 +1,1855 @@
+{
+  "case": "E/Ok_DefaultsOfRequired",
+  "description": "OK on every required policy with its defaults, one after another",
+  "planVersion": 2,
+  "planHash": "ae0565e6c15e7c379e85041d6522de25691bf9c1906d8c664e010903b512677f",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal that is required' state Enabled press [OK] at User/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal that is required",
+        "state": "Enabled",
+        "policyId": "Pol_Decimal_Required",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step decimal",
+      "plan": "snapshot  [step decimal]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step decimal"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Long decimal required, soft, stored as text' state Enabled press [OK] at User/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Long decimal required, soft, stored as text",
+        "state": "Enabled",
+        "policyId": "Pol_LongDecimal_RequiredSoftText",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step long",
+      "plan": "snapshot  [step long]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step long"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text that is required' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text that is required",
+        "state": "Enabled",
+        "policyId": "Pol_Text_Required",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step text",
+      "plan": "snapshot  [step text]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step text"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text with an unsorted required combo box' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text with an unsorted required combo box",
+        "state": "Enabled",
+        "policyId": "Pol_Text_ComboBoxNoSortRequired",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step combo",
+      "plan": "snapshot  [step combo]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step combo"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice that is required' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice that is required",
+        "state": "Enabled",
+        "policyId": "Pol_Enum_Required",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step enum",
+      "plan": "snapshot  [step enum]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enum"
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Multiple text lines with limits' state Enabled press [OK] at User/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Multiple text lines with limits",
+        "state": "Enabled",
+        "policyId": "Pol_MultiText_Limits",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "label": "step multi",
+      "plan": "snapshot  [step multi]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step multi"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "decimal",
+      "folder": "step-01-decimal",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 152,
+          "sha256": "d4ef69cb698094d0c93907b538959f197e687055caa48d1003b88468696d2c6d"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 128
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 152
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "long",
+      "folder": "step-02-long",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 310,
+          "sha256": "aa69be33206be4c3fb01e8763c596d592fba80b9c27fa5f2ae278a0ceca9a099"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 310
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "text",
+      "folder": "step-03-text",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 310,
+          "sha256": "aa69be33206be4c3fb01e8763c596d592fba80b9c27fa5f2ae278a0ceca9a099"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 310
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "combo",
+      "folder": "step-04-combo",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 310,
+          "sha256": "aa69be33206be4c3fb01e8763c596d592fba80b9c27fa5f2ae278a0ceca9a099"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 310
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "enum",
+      "folder": "step-05-enum",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 310,
+          "sha256": "aa69be33206be4c3fb01e8763c596d592fba80b9c27fa5f2ae278a0ceca9a099"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 310
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "label": "multi",
+      "folder": "step-06-multi",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 310,
+          "sha256": "aa69be33206be4c3fb01e8763c596d592fba80b9c27fa5f2ae278a0ceca9a099"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 310
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol",
+        "User\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 65536,
+      "data": {
+        "policy": "Decimal that is required",
+        "before": {
+          "title": "Decimal that is required",
+          "windowTitle": "Decimal that is required",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number that must be entered. It has no range. The presentation turns the spin buttons off.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#a2edb7686b0d",
+              "panelId": "#e89a7390c9d6",
+              "controlId": "#46886a766af5",
+              "rect": [
+                180,
+                744,
+                468,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal that is required",
+          "windowTitle": "Decimal that is required",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number that must be entered. It has no range. The presentation turns the spin buttons off.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#a2edb7686b0d",
+              "panelId": "#e89a7390c9d6",
+              "controlId": "#46886a766af5",
+              "rect": [
+                180,
+                744,
+                468,
+                58
+              ],
+              "enabled": true,
+              "text": "1"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Decimal that is required",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol",
+                "User\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1,
+                "User\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              }
+            }
+          }
+        ],
+        "finalTitle": "Decimal that is required"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 152,
+          "sha256": "d4ef69cb698094d0c93907b538959f197e687055caa48d1003b88468696d2c6d"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 65536,
+      "gptVersionAfter": 131072,
+      "data": {
+        "policy": "Long decimal required, soft, stored as text",
+        "before": {
+          "title": "Long decimal required, soft, stored as text",
+          "windowTitle": "Long decimal required, soft, stored as text",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A 64-bit number that is required, soft, and stored as a string value.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#ebdd7dcea300",
+              "panelId": "#90e74ad3ed30",
+              "controlId": "#58ae412117b9",
+              "rect": [
+                232,
+                796,
+                524,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Long decimal required, soft, stored as text",
+          "windowTitle": "Long decimal required, soft, stored as text",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A 64-bit number that is required, soft, and stored as a string value.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#ebdd7dcea300",
+              "panelId": "#90e74ad3ed30",
+              "controlId": "#58ae412117b9",
+              "rect": [
+                232,
+                796,
+                524,
+                58
+              ],
+              "enabled": true,
+              "text": "1"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Long decimal required, soft, stored as text",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              },
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              }
+            }
+          }
+        ],
+        "finalTitle": "Long decimal required, soft, stored as text"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 310,
+          "sha256": "aa69be33206be4c3fb01e8763c596d592fba80b9c27fa5f2ae278a0ceca9a099"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Text that is required",
+        "before": {
+          "title": "Text that is required",
+          "windowTitle": "Text that is required",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text box that must not be empty.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#9510cae6d72a",
+              "panelId": "#23f80fd1b0d1",
+              "controlId": "#b936fac69b05",
+              "rect": [
+                284,
+                848,
+                452,
+                110
+              ],
+              "enabled": false,
+              "text": ""
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Text that is required",
+          "windowTitle": "Text that is required",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text box that must not be empty.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#9510cae6d72a",
+              "panelId": "#23f80fd1b0d1",
+              "controlId": "#b936fac69b05",
+              "rect": [
+                284,
+                848,
+                452,
+                110
+              ],
+              "enabled": true,
+              "text": ""
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text that is required",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#0474db6e43e3"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "applyEnabledAfter": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              }
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "Text that is required",
+          "windowTitle": "Text that is required",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text box that must not be empty.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#9510cae6d72a",
+              "panelId": "#23f80fd1b0d1",
+              "controlId": "#b936fac69b05",
+              "rect": [
+                284,
+                848,
+                452,
+                110
+              ],
+              "enabled": true,
+              "text": ""
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "Text that is required",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": {
+              "raw": 131072,
+              "machine": 0,
+              "user": 2
+            }
+          }
+        },
+        "finalTitle": "Text that is required"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 310,
+          "sha256": "aa69be33206be4c3fb01e8763c596d592fba80b9c27fa5f2ae278a0ceca9a099"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Text with an unsorted required combo box",
+        "before": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "#49ec239cb65e",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                336,
+                900,
+                450,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "#5263293fc202"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": ""
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "#49ec239cb65e",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                336,
+                900,
+                450,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "#5263293fc202"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": ""
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text with an unsorted required combo box",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#0474db6e43e3"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "applyEnabledAfter": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              }
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "Text with an unsorted required combo box",
+          "windowTitle": "Text with an unsorted required combo box",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required text element shown as a combo box whose suggestions keep the order of the template.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "#49ec239cb65e",
+              "panelId": "#d75184a9a515",
+              "controlId": "#89f300b464cc",
+              "rect": [
+                336,
+                900,
+                450,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "#ab80540d98d2",
+                "#8e588cd18774",
+                "#5263293fc202"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": ""
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "Text with an unsorted required combo box",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": {
+              "raw": 131072,
+              "machine": 0,
+              "user": 2
+            }
+          }
+        },
+        "finalTitle": "Text with an unsorted required combo box"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 310,
+          "sha256": "aa69be33206be4c3fb01e8763c596d592fba80b9c27fa5f2ae278a0ceca9a099"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Choice that is required",
+        "before": {
+          "title": "Choice that is required",
+          "windowTitle": "Choice that is required",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required drop-down list with two items.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "#7cc6078a35ba",
+              "panelId": "#da1375b7d20c",
+              "controlId": "#6c03b9b900d7",
+              "rect": [
+                388,
+                952,
+                280,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "High",
+                "Low"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice that is required",
+          "windowTitle": "Choice that is required",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required drop-down list with two items.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "#7cc6078a35ba",
+              "panelId": "#da1375b7d20c",
+              "controlId": "#6c03b9b900d7",
+              "rect": [
+                388,
+                952,
+                280,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "High",
+                "Low"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice that is required",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#0474db6e43e3"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "applyEnabledAfter": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              }
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "Choice that is required",
+          "windowTitle": "Choice that is required",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required drop-down list with two items.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "#7cc6078a35ba",
+              "panelId": "#da1375b7d20c",
+              "controlId": "#6c03b9b900d7",
+              "rect": [
+                388,
+                952,
+                280,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "High",
+                "Low"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "Choice that is required",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": {
+              "raw": 131072,
+              "machine": 0,
+              "user": 2
+            }
+          }
+        },
+        "finalTitle": "Choice that is required"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 310,
+          "sha256": "aa69be33206be4c3fb01e8763c596d592fba80b9c27fa5f2ae278a0ceca9a099"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      }
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Multiple text lines with limits",
+        "before": {
+          "title": "Multiple text lines with limits",
+          "windowTitle": "Multiple text lines with limits",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required multi-line text box with at most 3 strings of at most 20 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#64bc1d9434c4",
+              "panelId": "#61b6cf105add",
+              "controlId": "",
+              "rect": [
+                446,
+                1004,
+                220,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                440,
+                1056,
+                564,
+                168
+              ],
+              "enabled": false,
+              "text": "",
+              "lines": [
+                ""
+              ]
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Multiple text lines with limits",
+          "windowTitle": "Multiple text lines with limits",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required multi-line text box with at most 3 strings of at most 20 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#64bc1d9434c4",
+              "panelId": "#61b6cf105add",
+              "controlId": "",
+              "rect": [
+                446,
+                1004,
+                220,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                440,
+                1056,
+                564,
+                168
+              ],
+              "enabled": true,
+              "text": "",
+              "lines": [
+                ""
+              ]
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Multiple text lines with limits",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#0474db6e43e3"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "applyEnabledAfter": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              }
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "Multiple text lines with limits",
+          "windowTitle": "Multiple text lines with limits",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A required multi-line text box with at most 3 strings of at most 20 characters.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#64bc1d9434c4",
+              "panelId": "#61b6cf105add",
+              "controlId": "",
+              "rect": [
+                446,
+                1004,
+                220,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                440,
+                1056,
+                564,
+                168
+              ],
+              "enabled": true,
+              "text": "",
+              "lines": [
+                ""
+              ]
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "Multiple text lines with limits",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": {
+              "raw": 131072,
+              "machine": 0,
+              "user": 2
+            }
+          }
+        },
+        "finalTitle": "Multiple text lines with limits"
+      }
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 310,
+          "sha256": "aa69be33206be4c3fb01e8763c596d592fba80b9c27fa5f2ae278a0ceca9a099"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      }
+    }
+  ]
+}

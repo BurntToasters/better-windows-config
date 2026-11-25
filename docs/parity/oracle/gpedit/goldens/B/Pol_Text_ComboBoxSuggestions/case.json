@@ -1,0 +1,1367 @@
+{
+  "case": "B/Pol_Text_ComboBoxSuggestions",
+  "description": "Pol_Text_ComboBoxSuggestions under Computer Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
+  "planVersion": 2,
+  "planHash": "f37e17d0f0f989880e402a3c51119affcc8c94db7e58f3b4d1112fe8ed35e8b4",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text with a combo box and suggestions' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text with a combo box and suggestions",
+        "state": "Enabled",
+        "policyId": "Pol_Text_ComboBoxSuggestions",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step enabled-defaults",
+      "plan": "snapshot  [step enabled-defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text with a combo box and suggestions' state Enabled options [Pick or type a city: = text 'bwc-alt'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text with a combo box and suggestions",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Pick or type a city:",
+            "expectKind": "comboBox",
+            "text": "bwc-alt",
+            "elementId": "ComboText"
+          }
+        ],
+        "policyId": "Pol_Text_ComboBoxSuggestions",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step enabled-alt1-text",
+      "plan": "snapshot  [step enabled-alt1-text]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt1-text"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text with a combo box and suggestions' state Enabled options [Pick or type a city: = item 'Cairo'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text with a combo box and suggestions",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Pick or type a city:",
+            "expectKind": "comboBox",
+            "item": "Cairo",
+            "elementId": "ComboText"
+          }
+        ],
+        "policyId": "Pol_Text_ComboBoxSuggestions",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step enabled-alt2-suggestion",
+      "plan": "snapshot  [step enabled-alt2-suggestion]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt2-suggestion"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text with a combo box and suggestions' state Disabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text with a combo box and suggestions",
+        "state": "Disabled",
+        "policyId": "Pol_Text_ComboBoxSuggestions",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Text with a combo box and suggestions' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Text with a combo box and suggestions",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Text_ComboBoxSuggestions",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled-defaults",
+      "folder": "step-01-enabled-defaults",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 144,
+          "sha256": "ec2f99c9fa4fe8833fb07435a53a857d9f454290eb85432c7510d6280034aac3"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 144
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-alt1-text",
+      "folder": "step-02-enabled-alt1-text",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "3b6604048da49fea36bc3913daf1dfe73a8cec2d365269425de38b876b1d83c6"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 150
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "enabled-alt2-suggestion",
+      "folder": "step-03-enabled-alt2-suggestion",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 146,
+          "sha256": "7e01d80d1427bde1ec0a6274ebfa08dc4a062f96be28ce73551d7748d22c3ba5"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 146
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "disabled",
+      "folder": "step-04-disabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "76a5cd6b6db5553d80b15c174f4d629f78ab1e82313e8ccb5319b4691a705c76"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 150
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "not-configured",
+      "folder": "step-05-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "add17e86ef8a5c6ca59ccc21acb39d786700609e1a42954b2d189b9d3511c19c"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Text with a combo box and suggestions",
+        "before": {
+          "title": "Text with a combo box and suggestions",
+          "windowTitle": "Text with a combo box and suggestions",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text element shown as a combo box with four suggestions and a default. The suggestions are sorted.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a city:",
+              "panelId": "#679f6256e5c5",
+              "controlId": "#b83fbddf138b",
+              "rect": [
+                284,
+                848,
+                420,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Cairo",
+                "#aaf2d054d5f7",
+                "#43152cc97f45",
+                "#5dd272b4f316"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": ""
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Text with a combo box and suggestions",
+          "windowTitle": "Text with a combo box and suggestions",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text element shown as a combo box with four suggestions and a default. The suggestions are sorted.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a city:",
+              "panelId": "#679f6256e5c5",
+              "controlId": "#b83fbddf138b",
+              "rect": [
+                284,
+                848,
+                420,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Cairo",
+                "#aaf2d054d5f7",
+                "#43152cc97f45",
+                "#5dd272b4f316"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "#43152cc97f45",
+              "text": "#43152cc97f45"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text with a combo box and suggestions",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Text with a combo box and suggestions"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 144,
+          "sha256": "ec2f99c9fa4fe8833fb07435a53a857d9f454290eb85432c7510d6280034aac3"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Text with a combo box and suggestions",
+        "before": {
+          "title": "Text with a combo box and suggestions",
+          "windowTitle": "Text with a combo box and suggestions",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text element shown as a combo box with four suggestions and a default. The suggestions are sorted.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a city:",
+              "panelId": "#679f6256e5c5",
+              "controlId": "#b83fbddf138b",
+              "rect": [
+                336,
+                900,
+                420,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Cairo",
+                "#aaf2d054d5f7",
+                "#43152cc97f45",
+                "#5dd272b4f316"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "#43152cc97f45",
+              "text": "#43152cc97f45"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "bwc-alt",
+            "before": "#43152cc97f45",
+            "immediate": "bwc-alt",
+            "observed": "bwc-alt",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Pick or type a city:",
+            "labelMatch": "exact",
+            "kind": "#487b5e96c714",
+            "controlId": "#b83fbddf138b"
+          }
+        ],
+        "afterSet": {
+          "title": "Text with a combo box and suggestions",
+          "windowTitle": "Text with a combo box and suggestions",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text element shown as a combo box with four suggestions and a default. The suggestions are sorted.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a city:",
+              "panelId": "#679f6256e5c5",
+              "controlId": "#b83fbddf138b",
+              "rect": [
+                336,
+                900,
+                420,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Cairo",
+                "#aaf2d054d5f7",
+                "#43152cc97f45",
+                "#5dd272b4f316"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "#43152cc97f45",
+              "text": "bwc-alt"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text with a combo box and suggestions",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Text with a combo box and suggestions"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "3b6604048da49fea36bc3913daf1dfe73a8cec2d365269425de38b876b1d83c6"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 2,
+      "gptVersionAfter": 3,
+      "data": {
+        "policy": "Text with a combo box and suggestions",
+        "before": {
+          "title": "Text with a combo box and suggestions",
+          "windowTitle": "Text with a combo box and suggestions",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text element shown as a combo box with four suggestions and a default. The suggestions are sorted.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a city:",
+              "panelId": "#679f6256e5c5",
+              "controlId": "#b83fbddf138b",
+              "rect": [
+                388,
+                952,
+                420,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Cairo",
+                "#aaf2d054d5f7",
+                "#43152cc97f45",
+                "#5dd272b4f316"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": "bwc-alt"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Cairo",
+            "requestedIndex": 0,
+            "beforeIndex": -1,
+            "observedIndex": 0,
+            "observedText": "Cairo",
+            "items": [
+              "Cairo",
+              "#aaf2d054d5f7",
+              "#43152cc97f45",
+              "#5dd272b4f316"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Pick or type a city:",
+            "labelMatch": "exact",
+            "kind": "#487b5e96c714",
+            "controlId": "#b83fbddf138b"
+          }
+        ],
+        "afterSet": {
+          "title": "Text with a combo box and suggestions",
+          "windowTitle": "Text with a combo box and suggestions",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text element shown as a combo box with four suggestions and a default. The suggestions are sorted.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a city:",
+              "panelId": "#679f6256e5c5",
+              "controlId": "#b83fbddf138b",
+              "rect": [
+                388,
+                952,
+                420,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Cairo",
+                "#aaf2d054d5f7",
+                "#43152cc97f45",
+                "#5dd272b4f316"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Cairo",
+              "text": "Cairo"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text with a combo box and suggestions",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Text with a combo box and suggestions"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 146,
+          "sha256": "7e01d80d1427bde1ec0a6274ebfa08dc4a062f96be28ce73551d7748d22c3ba5"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 3,
+      "gptVersionAfter": 4,
+      "data": {
+        "policy": "Text with a combo box and suggestions",
+        "before": {
+          "title": "Text with a combo box and suggestions",
+          "windowTitle": "Text with a combo box and suggestions",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text element shown as a combo box with four suggestions and a default. The suggestions are sorted.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a city:",
+              "panelId": "#679f6256e5c5",
+              "controlId": "#b83fbddf138b",
+              "rect": [
+                440,
+                1004,
+                420,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Cairo",
+                "#aaf2d054d5f7",
+                "#43152cc97f45",
+                "#5dd272b4f316"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Cairo",
+              "text": "Cairo"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Text with a combo box and suggestions",
+          "windowTitle": "Text with a combo box and suggestions",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text element shown as a combo box with four suggestions and a default. The suggestions are sorted.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a city:",
+              "panelId": "#679f6256e5c5",
+              "controlId": "#b83fbddf138b",
+              "rect": [
+                440,
+                1004,
+                420,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Cairo",
+                "#aaf2d054d5f7",
+                "#43152cc97f45",
+                "#5dd272b4f316"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Cairo",
+              "text": ""
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text with a combo box and suggestions",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Text with a combo box and suggestions"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 150,
+          "sha256": "76a5cd6b6db5553d80b15c174f4d629f78ab1e82313e8ccb5319b4691a705c76"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 4,
+      "gptVersionAfter": 5,
+      "data": {
+        "policy": "Text with a combo box and suggestions",
+        "before": {
+          "title": "Text with a combo box and suggestions",
+          "windowTitle": "Text with a combo box and suggestions",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text element shown as a combo box with four suggestions and a default. The suggestions are sorted.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a city:",
+              "panelId": "#679f6256e5c5",
+              "controlId": "#b83fbddf138b",
+              "rect": [
+                492,
+                1056,
+                420,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Cairo",
+                "#aaf2d054d5f7",
+                "#43152cc97f45",
+                "#5dd272b4f316"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": ""
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Text with a combo box and suggestions",
+          "windowTitle": "Text with a combo box and suggestions",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A text element shown as a combo box with four suggestions and a default. The suggestions are sorted.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#487b5e96c714",
+              "label": "Pick or type a city:",
+              "panelId": "#679f6256e5c5",
+              "controlId": "#b83fbddf138b",
+              "rect": [
+                492,
+                1056,
+                420,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Cairo",
+                "#aaf2d054d5f7",
+                "#43152cc97f45",
+                "#5dd272b4f316"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null,
+              "text": ""
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Text with a combo box and suggestions",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 5,
+                "machine": 5,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Text with a combo box and suggestions"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "add17e86ef8a5c6ca59ccc21acb39d786700609e1a42954b2d189b9d3511c19c"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      }
+    }
+  ]
+}

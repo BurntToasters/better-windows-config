@@ -16,6 +16,7 @@ public static class IconProvider
     public const double IconDip = 16;
 
     private static readonly Dictionary<(IconKind Kind, int Size), ImageSource> Cache = new();
+    private static readonly Dictionary<(ModuleIcon Icon, int Size, IconKind? Fallback), ImageSource> ModuleCache = new();
     private static bool _loadFailureLogged;
 
     /// <summary>
@@ -24,8 +25,10 @@ public static class IconProvider
     /// </summary>
     public static ImageSource Get(IconKind kind, double rasterizationScale)
     {
-        double scale = double.IsFinite(rasterizationScale) && rasterizationScale > 0 ? rasterizationScale : 1.0;
-        int size = Math.Max(1, (int)Math.Round(IconDip * scale, MidpointRounding.AwayFromZero));
+#if BWC_E2E
+        IconSelfCheck.RunOnce();
+#endif
+        int size = PixelSize(rasterizationScale);
 
         if (Cache.TryGetValue((kind, size), out ImageSource? cached))
         {
@@ -36,6 +39,72 @@ public static class IconProvider
         ImageSource image = CreateBitmap(pixels);
         Cache[(kind, size)] = image;
         return image;
+    }
+
+    /// <summary>
+    /// Returns an icon read from an installed module at the given rasterization scale. Never returns
+    /// null and never throws: a module, id or index that is absent gives the fallback glyph for
+    /// <paramref name="fallback"/>, or the neutral generic glyph when it is null. The result, including a
+    /// fallback, is cached per icon and pixel size.
+    /// </summary>
+    public static ImageSource Get(ModuleIcon icon, double rasterizationScale, IconKind? fallback = null)
+    {
+#if BWC_E2E
+        IconSelfCheck.RunOnce();
+#endif
+        int size = PixelSize(rasterizationScale);
+
+        if (ModuleCache.TryGetValue((icon, size, fallback), out ImageSource? cached))
+        {
+            return cached;
+        }
+
+        ImageSource image = CreateBitmap(LoadModulePixels(icon, size, fallback));
+        ModuleCache[(icon, size, fallback)] = image;
+        return image;
+    }
+
+    /// <summary>Returns the image for a classic icon or a module icon reference.</summary>
+    public static ImageSource Get(IconReference icon, double rasterizationScale)
+    {
+        if (icon.Module is { } module)
+        {
+            return Get(module, rasterizationScale, icon.Fallback);
+        }
+
+        return Get(icon.Kind ?? IconKind.ClosedFolder, rasterizationScale);
+    }
+
+    /// <summary>The pixel size of a 16 DIP icon at the scale. A non-finite or non-positive scale counts as 1.0.</summary>
+    internal static int PixelSize(double rasterizationScale)
+    {
+        double scale = double.IsFinite(rasterizationScale) && rasterizationScale > 0 ? rasterizationScale : 1.0;
+        return Math.Max(1, (int)Math.Round(IconDip * scale, MidpointRounding.AwayFromZero));
+    }
+
+    /// <summary>
+    /// The pixels <see cref="Get(ModuleIcon, double, IconKind?)"/> shows at this pixel size: the module icon,
+    /// or the fallback glyph when it cannot be read. Never throws.
+    /// </summary>
+    internal static IconExtraction.Pixels LoadModulePixels(ModuleIcon icon, int size, IconKind? fallback)
+    {
+        IconExtraction.Pixels? pixels = null;
+        try
+        {
+            pixels = IconExtraction.TryLoadModuleIcon(icon, size);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            LogOnce($"{icon} icon load failed: {ex.Message}");
+        }
+
+        if (pixels is null)
+        {
+            LogOnce($"Using the BWC fallback glyph for {icon} at {size} px.");
+            return fallback is { } kind ? FallbackGlyph.Render(kind, size) : FallbackGlyph.RenderGeneric(size);
+        }
+
+        return pixels.Value;
     }
 
     /// <summary>The icon kind for a value type. String types use the "ab" icon, every other type the binary icon.</summary>

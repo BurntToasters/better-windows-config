@@ -1,0 +1,21 @@
+{
+  "case": "A/User_Then_Machine",
+  "planHash": "08bcdc5e95487ea640a8cbcfdcc14ad240cea67c0803700d358d9a311cfac1d8",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-user/User.Registry.pol",
+    "step-02-user/User.comment.cmtx",
+    "step-02-user/gpt.ini",
+    "step-03-machine/Machine.Registry.pol",
+    "step-03-machine/Machine.comment.cmtx",
+    "step-03-machine/User.Registry.pol",
+    "step-03-machine/User.comment.cmtx",
+    "step-03-machine/gpt.ini"
+  ]
+}

@@ -315,3 +315,155 @@ in the elevated runner (the unelevated run reports them as not run).
 81. **A run killed halfway.** Leftovers stay under the three locations. The run id is in the folder name, so the user removes
     `%ProgramFiles%\BWC-E2E\<id>*`, `HKLM\Software\BWC-E2E\<id>`, and the Start menu folder `BWC-E2E-<id>` by hand. The next run
     does not touch them (its id is new).
+
+## Third tool: Local Group Policy Editor (0.2.0)
+
+Written before the tests and the code. The product has three shortcuts and three apps now; the installer E2E reads that from one table
+(`InstallerRun.ProductShortcuts`: name, AUMID, exe) and not from three copies of the names. See installer.md M53 to M59.
+
+92. **The shortcut count is three.** Every silent install of the unelevated E2E (`<case>.a.shortcuts`, `<case>.b.shortcuts`) requires
+    exactly `ProductShortcuts.Length` shortcuts in the shortcut folder (it was "more than 0"), so a missing `Local Group Policy Editor
+    (BWC).lnk` fails the case and an extra stray one does too. The machine test (Elevated) requires the same count in the all-users folder.
+93. **Every shortcut carries its AUMID.** `<case>.a.aumid` reads all three through the shell property store: the Hub
+    `BetterWindowsConfig.Hub`, Registry Editor `BetterWindowsConfig.Regedit`, Local Group Policy Editor `BetterWindowsConfig.Gpedit`. The Elevated
+    run adds `fresh.shortcuts.gpeditAumid`. A missing or wrong id is a failed check, not a warning (88).
+94. **Every shortcut shows its own icon.** `<case>.a.icons` reads the icon location of each shortcut through `IShellLinkW` and requires the
+    exe of its own row (`BwcGpedit.exe` for the Gpedit shortcut, under the run's install folder) and index 0. A shortcut that points at
+    another exe, at the Hub icon file, or at a missing path fails. The check does not draw the icon: that the exe embeds `bwc-gpo.ico` is the
+    icon test of the Gpedit app (`resources/bwc-gpo.ico` as `ApplicationIcon`).
+95. **The Hub refuses while both tools are open.** The "regedit" update case now also starts `BwcGpedit.exe` from the install folder
+    (`regedit.gpedit.open`), and the Hub's refusal text must name `Registry Editor` and `Local Group Policy Editor` (`regedit.hub.refusesWhileToolsOpen`).
+    The process names the test stops at cleanup come from the same table.
+96. **Uninstall removes the third shortcut.** `uninstall.shortcuts` requires 0 remaining, which now includes the Gpedit shortcut.
+
+## Audit fixes (0.2.0): first-install rollback and template cleanup (installer.md M60 to M66)
+
+Written before the tests and the code. All of these run in the unelevated per-user sandbox. The uninstaller's data root is a
+folder inside the run's own folder (`<run folder>\programdata`), passed as `BWC_E2E_INSTALLER_PROGRAMDATA` to the uninstaller
+only. No case reads or writes the real `%ProgramData%`, the real registry, or Program Files.
+
+97. **A first install fails after the move-in and leaves a folder behind (M60).** `firstfail` puts a folder where the Hub shortcut
+    file goes (`<run>\shortcuts\Better Windows Config.lnk`), so `CreateShortCut` fails after the payload is in place and the setup
+    rolls back. Required: a non-zero exit (`firstfail.setup.exit`), no install folder at all (`firstfail.installDir`: before the fix
+    it held empty payload folders), no `installed-files.txt`, no uninstall key, no `.new` or `.old` (`firstfail.noLeftovers`). Then
+    the blocker is removed and the same setup runs again: exit 0, the Hub exe present, DisplayVersion A, three shortcuts
+    (`firstfail.rerun.*`). The rerun is what the old behavior broke: `BwcCheckInstDir` refused the leftover folder.
+98. **The first-install abort text (M61).** A silent setup shows no text, so no E2E check can read it. The NSIS source audit does
+    (`auditNsisSource`, run by `build-installer.js` and by this script for B): `BwcRollback` must hold the first-install text, and
+    that text must not say a previous version is installed. The audit is a build step, not a test of this file.
+99. **Uninstall removes the imported templates and keeps the backups (M62, M63).** `uninstallData` seeds the sandbox store
+    (`<programdata>\BetterWindowsConfig\PolicyDefinitions`): two `.admx` (one upper case), `.adml` in two language folders, an unrelated
+    `readme.txt` in the store and an unrelated `notes.txt` in one language folder, and a backup tree under `gpedit\backup` with
+    random bytes. After the uninstall: every `.admx` and `.adml` is gone (`uninstallData.templatesGone`), the language folder that
+    held only `.adml` files is gone and the one with `notes.txt` stays (`uninstallData.foldersEmptyOnly`), both unrelated files remain
+    byte for byte (`uninstallData.othersKept`), and every backup file is present with the same SHA-256 (`uninstallData.backupsKept`).
+100. **Only templates: the data root goes too (M62).** `uninstallClean` seeds the store with templates only. After the uninstall the
+    store, the language folders, and `<programdata>\BetterWindowsConfig` are gone, and the sandbox root `<programdata>` itself is
+    not touched (`uninstallClean.rootRemoved`). The data root is removed only because it is empty then (case 99 keeps it).
+101. **The store folder is a junction (M64).** `uninstallLinkStore` makes `PolicyDefinitions` a junction (`mklink /J`, no elevation)
+    to a folder of the run that holds `x.admx` and `en-US\x.adml`. After the uninstall the junction and every file behind it are
+    still there with the same SHA-256 (`uninstallLinkStore.targetUntouched`, `uninstallLinkStore.linkKept`). The cleanup removes the
+    junction as a link before the run folder is deleted, so the run's own recursive delete never meets it.
+102. **A language folder is a junction (M64).** `uninstallLinkLang` has a plain store folder with `a.admx` and `en-US` as a junction to
+    a folder that holds `a.adml`. The whole step is skipped: `a.admx` stays, the junction and its target file stay
+    (`uninstallLinkLang.skipped`). Skipping all of it, not only the linked folder, is the required behavior (M64).
+103. **The step never reads the real ProgramData (M65).** `uninstall.*` (the existing uninstall case) runs the uninstaller without the
+    variable, with the E2E flavor. The test lists the real `%ProgramData%\BetterWindowsConfig` (names, sizes, write times; read only)
+    before and after and requires the lists to be equal (`uninstall.realProgramDataUntouched`). This machine has no write to it from
+    any test.
+104. **The owner check (M67).** Cases 99, 100, and 102 already run the template cleanup over folders that the test user created, so
+    they prove that the E2E flavor's extra acceptance of the current user's SID lets the cleanup run (a broken `GetNamedSecurityInfoW`
+    or `EqualSid` call would skip the step and fail 99 and 100). The reverse, a folder owned by another principal that must make the
+    step skip, cannot be built without a privilege that an unelevated test lacks. That claim, and that the ship build has no
+    current-user acceptance and no read of the E2E variable, is the NSIS source audit (`auditTemplateCleanup` in
+    `scripts/build-installer.js`, run by `build-installer.js` and by this script for B). It is not a test of this file.
+105. **The policy-writer guard.** `tests/Bwc.E2E/Installer/InstallerRollbackAndDataTests.cs` names `PolicyDefinitions` and writes files
+    and folders, so `scripts/check-policy-writer.js` lists it in `policyPathAllowlist`. The reason: it writes only under the run's
+    stand-in `%ProgramData%` folder (`InstallerRun.ProgramDataRoot`, inside the temp run folder), never the real one. Only this file is
+    listed; no rule of the guard is widened.
+106. **A link left behind by a failed test.** A junction is always removed with a non-recursive delete in `finally`, before
+    `InstallerRun.Dispose` deletes the run folder. A junction that cannot be removed is a failed `cleanup.link` check naming the path.
+
+## Update from the 0.1.x layout to 0.2.0 (R1)
+
+Written before the test and the harness change. A 0.1.x install has two tools: two Start menu shortcuts (Hub, Registry Editor) and no
+`BwcGpedit.exe`. The claim is only that the 0.2.0 installer installs cleanly over that layout through the in-app update; 0.1.x has no
+migration code (the project rule), so nothing is proved about a real old release. The old layout is built from the current tree by
+`scripts/test-installer-e2e.js`, never from a checked-out or downloaded release, and never by `scripts/build-installer.js` (unchanged).
+The case id prefix is `old`; the test is `Installer_Update_From01xLayoutAddsGpedit` and runs unelevated in the per-user sandbox like case 1.
+It needs no elevated runner, and `--prepare` does not build the old setup.
+
+### Building the old layout (scripts/test-installer-e2e.js)
+
+107. **The old payload still carries Gpedit.** The old setup is built from a publish of all four projects at version 0.1.99
+     (`publish/<rid>-e2e-old`, so the publish passes the same flavor check as B), and the NSIS file list drops every `BwcGpedit.*` file.
+     The script stops when no file was dropped, when `BwcGpedit.exe` is still in the list, or when `BetterWindowsConfig.exe`,
+     `BwcRegedit.exe`, or `BwcUpdate.exe` is no longer in it (a filter that took too much). The installed `installed-files.txt` is
+     read by the test (`old.a.manifest`): it must not name `BwcGpedit.exe` and must name the other three.
+108. **The installer still writes the third shortcut.** `installer/bwc.nsi` writes the Gpedit shortcut and its AppUserModelID
+     unconditionally, so the old setup is compiled from a copy of `bwc.nsi` in `artifacts/installer/work/<name>` that lacks exactly
+     those two statements. The copy is made by exact line match: each of the two lines must occur once, or the script stops ("the
+     Gpedit statements were not found in bwc.nsi"). A changed installer source therefore fails the build instead of producing an old
+     setup that quietly keeps three shortcuts. `installer/bwc.nsi` itself is never written.
+109. **The copied script cannot find its includes.** `bwc.nsi` takes `BWC_ROOT` from `__FILEDIR__`, which would be the work folder. The
+     copy gets the absolute `installer` folder instead (one exact replacement, also required to match once), and the same
+     `auditNsisSource` and makensis exit-code checks run as for B.
+110. **The old setup is mistaken for a release artifact.** It is an E2E setup only: `BWC_E2E` is defined, the manifest must request
+     `asInvoker` (`checkSetupManifestLevel`, as for B), the publish passes the e2e flavor check, the patched script lives only under
+     the ignored `artifacts/` folder, and the switch exists only in `scripts/test-installer-e2e.js`. `build-installer.js`, the NSIS
+     sources, and the release build take no part in it.
+111. **The old version is not below 0.2.0.** The version is the constant 0.1.99, never read from or written to a tracked file. The
+     script refuses to run when package.json is not above it. The payload must report 0.1.99 (the `BetterWindowsConfig.dll` check of 4)
+     and the uninstall key must show it (`old.a.displayVersion`).
+112. **Old and new setups collide.** The old setup name carries 0.1.99 and `old-layout`, the work folder is its own, and the file is
+     removed before the build, so a failed build leaves no setup that looks new.
+
+### Before the update (`old.a.*`)
+
+113. **Three shortcuts exist.** Exactly two `.lnk` files, named `Better Windows Config.lnk` and `Registry Editor (BWC).lnk`, with their
+     AppUserModelIDs and their own exe as icon (`old.a.shortcuts`, `old.a.aumid`, `old.a.icons`), and no `Local Group Policy Editor
+     (BWC).lnk` (`old.a.gpeditShortcutAbsent`).
+114. **`BwcGpedit.exe` exists.** It must be absent from the install folder (`old.a.noGpeditExe`). The installed Hub must list the
+     Local Group Policy Editor row as "Not installed" and the Registry Editor row as "Installed" (`old.hub.rows.before`), which also
+     shows the Hub reads the same folder the test inspects.
+115. **Data is seeded wrongly.** The test writes a random 512-byte file under the case's scoped data root (never the real folders) and
+     keeps its SHA-256 for 120. Nothing is written to a policy path, so `scripts/check-policy-writer.js` is unaffected.
+
+### The update and after it (`old.*`, `old.after.*`)
+
+The press, the redirect, the helper, the staging folders, the relaunch, and the installed Hub version are the existing checks of case 1
+(`old.hub.*`, `old.feed.*`, `old.installer.*`, `old.installed.version`, `old.relaunch.*`; 24 to 30).
+
+116. **A stale shortcut set after the update.** Exactly three shortcuts named from `InstallerRun.ProductShortcuts`, no extra file
+     (`old.after.shortcuts`). Each shortcut's target is its own exe in the install folder (`old.after.targets`, read through
+     `IShellLinkW.GetPath`), carries its AppUserModelID (`old.after.aumid`) and its own icon (`old.after.icons`). A failure here is a
+     product defect: report it, do not change the installer or the test to fit.
+117. **`BwcGpedit.exe` is missing or not B after the update.** It must exist, report B's version (`old.after.gpedit.version`), and be
+     named by `installed-files.txt` together with the other three (`old.after.manifest`). A missing file is a product defect.
+118. **It is there but does not start.** The test starts it from the install folder with the scoped data root and requires the process to
+     stay alive and a window titled "Local Group Policy Editor" within 20 s (`old.after.gpedit.starts`). The process is tracked, and
+     `InstallerRun.Dispose` stops it by pid and image path before the folder is deleted (34, 35).
+119. **The relaunched Hub does not list the third tool.** The Hub the installer started must show the rows `ToolRow_regedit` and
+     `ToolRow_gpedit`, both "Installed" (`old.after.hub.rows`). The product is Hub plus two tools, which is the three apps and three
+     shortcuts; the Hub list itself has two rows (installer-e2e.md 92).
+120. **User data is lost or rewritten.** The seeded file of 115 must still exist with the same SHA-256 (`old.after.userData`).
+121. **The case is skipped without notice.** A run where the gate is off writes no checks (11). The script also requires the proof ids
+     `old.a.noGpeditExe`, `old.after.shortcuts`, `old.after.gpedit.starts`, and `old.after.userData` to be present and passed in the
+     result; a result without them is a failure, so a filter that dropped the case cannot pass.
+122. **Elevation.** Everything here is the asInvoker E2E setup in the per-user sandbox, run unelevated. No step prompts for UAC, elevates,
+     or touches the elevated runner or its task, and the old setup is not part of `--prepare` or of `installer-inputs.json`.
+123. **A leftover from a failed run.** Unchanged cleanup: the run's temp folder, its HKCU key, and its processes go in `finally` (36). The
+     new publish folder and setup are build outputs under `publish/` and `artifacts/installer/`, ignored by git and overwritten by
+     the next run.
+
+124. **Shortcut AppUserModelIDs are empty after an in-app update (fixed).** The checks `old.after.aumid`, `old.installed.aumid` and
+     `update.installed.aumid` failed with all three ids empty after an update from the Hub, while the same read passed after a silent
+     install, a setup run directly over an older layout, and a setup run over itself. Cause: the installed
+     `BwcUpdate.exe --set-aumid` was refused with `PathRejected` (exit 3, "the shortcut is not in the folder the installer writes
+     to"), which the installer logs as a non-fatal warning. The helper starts the setup with TEMP and TMP set to its protected copy
+     folder (update-elevation.md HT1), and the E2E flavor allowed the per-user sandbox's shortcut folder only below the process's own
+     temp folder. A run of the E2E `BwcUpdate.exe` on a sandbox shortcut gave exit 0 with the normal TEMP and exit 3 with another
+     TEMP. The ship rule (directly in the all-users Programs folder) does not use TEMP and is not affected. Fix:
+     `ShortcutAumidE2EScope.For` also allows folders below the user profile's temp folder (`%LOCALAPPDATA%\Temp`), which the
+     installer's TEMP override does not move. Case 1 now reads the ids after the update too (`update.installed.aumid`), so both
+     update paths prove them. Targets, icons, the shortcut set, `BwcGpedit.exe` and the rest of the case passed throughout.

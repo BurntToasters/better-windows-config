@@ -1,3 +1,4 @@
+using Bwc.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -185,7 +186,7 @@ public sealed class FindDialog : ClassicDialog
     /// <summary>Shows a validation message owned by this dialog. The dialog stays disabled until the message closes.</summary>
     private void ShowMessage(string text, ClassicMessageIcon icon, FrameworkElement? refocus = null)
     {
-        _ = ShowMessageAsync(text, icon, refocus);
+        ShowMessageAsync(text, icon, refocus).Forget("find dialog message");
     }
 
     private async Task ShowMessageAsync(string text, ClassicMessageIcon icon, FrameworkElement? refocus)

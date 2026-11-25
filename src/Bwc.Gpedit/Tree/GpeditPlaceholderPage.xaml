@@ -1,0 +1,28 @@
+<UserControl
+    x:Class="Bwc.Gpedit.Tree.GpeditPlaceholderPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    AutomationProperties.AutomationId="GpeditPlaceholderPage"
+    HorizontalContentAlignment="Stretch"
+    VerticalContentAlignment="Stretch"
+    IsTabStop="False">
+
+    <Grid Background="{StaticResource BwcWindowBrush}">
+        <StackPanel Margin="12,10,12,10" Spacing="6">
+            <TextBlock
+                x:Name="TitleText"
+                AutomationProperties.AutomationId="GpeditPlaceholderTitle"
+                FontWeight="SemiBold"
+                Foreground="{StaticResource BwcWindowTextBrush}"
+                IsTextSelectionEnabled="False"
+                TextWrapping="Wrap" />
+            <TextBlock
+                x:Name="BodyText"
+                AutomationProperties.AutomationId="GpeditPlaceholderText"
+                Foreground="{StaticResource BwcWindowTextBrush}"
+                IsTextSelectionEnabled="False"
+                TextWrapping="Wrap" />
+        </StackPanel>
+    </Grid>
+
+</UserControl>

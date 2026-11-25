@@ -1,0 +1,238 @@
+{
+  "case": "K/KeyLeadingBackslash_ReadAsWritten",
+  "description": "the edge fixture KeyLeadingBackslash (key \\Software\\Policies\\BWC-Oracle\\Edge\\Leading): Registry.pol holds EdgeValue 1 under the key exactly as the template spells it",
+  "planVersion": 2,
+  "planHash": "7a1364741abd4b2ca3ebaf5e45b7ca2469843812d0a8de6a1cca80abf052cd9d",
+  "startState": {
+    "description": "the edge fixture KeyLeadingBackslash (key \\Software\\Policies\\BWC-Oracle\\Edge\\Leading): Registry.pol holds EdgeValue 1 under the key exactly as the template spells it",
+    "files": [
+      {
+        "name": "Machine.Registry.pol",
+        "size": 138,
+        "sha256": "9917def236319e35383110a1070a57a4a83ee7711bcd896f3f0771330ad36068"
+      }
+    ]
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "label": "step start",
+      "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates/Edge fixture root/Edge fixture leading backslash",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "Edge fixture root",
+          "Edge fixture leading backslash"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at Computer/Administrative Templates/Edge fixture root/Edge fixture leading backslash",
+      "op": {
+        "kind": "readList",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "Edge fixture root",
+          "Edge fixture leading backslash"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "editPolicy",
+      "label": "read state of Pol_Edge under Computer",
+      "plan": "editPolicy 'Edge fixture policy' press [Cancel] at Computer/Administrative Templates/Edge fixture root/Edge fixture leading backslash  [read state of Pol_Edge under Computer]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "read state of Pol_Edge under Computer",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "Edge fixture root",
+          "Edge fixture leading backslash"
+        ],
+        "policy": "Edge fixture policy",
+        "policyId": "Pol_Edge",
+        "policyNamespace": "BWC.Policies.Edge.KeyLeadingBackslash"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Zulu sort case' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Sort cases",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ],
+        "policy": "Zulu sort case",
+        "state": "Enabled",
+        "policyId": "Pol_Sort_Zulu",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step unrelated-save",
+      "plan": "snapshot  [step unrelated-save]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step unrelated-save"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Zulu sort case' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Sort cases",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ],
+        "policy": "Zulu sort case",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Sort_Zulu",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step unrelated-cleared",
+      "plan": "snapshot  [step unrelated-cleared]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step unrelated-cleared"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "after-refusal",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 138,
+          "sha256": "9917def236319e35383110a1070a57a4a83ee7711bcd896f3f0771330ad36068"
+        },
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 138
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 1,
+      "kind": "selectNode",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 2,
+      "kind": "readList",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 3,
+      "kind": "editPolicy",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    }
+  ],
+  "startRefused": true,
+  "startFilesUnchanged": false
+}

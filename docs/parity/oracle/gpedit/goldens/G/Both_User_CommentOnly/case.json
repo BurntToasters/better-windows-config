@@ -1,0 +1,783 @@
+{
+  "case": "G/Both_User_CommentOnly",
+  "description": "Pol_Class_Both under User: a comment only, then Enabled with the comment",
+  "planVersion": 2,
+  "planHash": "61a19e3f668b3832b29d1b216d1b18e7972f1ad6bb89ffe305920a751419f244",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "label": "registry at start",
+      "plan": "snapshot  [registry at start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "registry at start"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Class both flag' state Not Configured comment press [OK] at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class both flag",
+        "state": "Not Configured",
+        "comment": "bwc comment one",
+        "policyId": "Pol_Class_Both",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "snapshot",
+      "label": "step comment",
+      "plan": "snapshot  [step comment]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step comment"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "wait",
+      "label": "wait 4 s",
+      "plan": "wait 4000 ms  [wait 4 s]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "snapshot",
+      "label": "comment: registry 4 s later",
+      "plan": "snapshot  [comment: registry 4 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "comment: registry 4 s later"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "wait",
+      "label": "wait 4 s more",
+      "plan": "wait 4000 ms  [wait 4 s more]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s more",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "snapshot",
+      "label": "comment: registry 8 s later",
+      "plan": "snapshot  [comment: registry 8 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "comment: registry 8 s later"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Class both flag' state Enabled comment press [OK] at User/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class both flag",
+        "state": "Enabled",
+        "comment": "bwc comment one",
+        "policyId": "Pol_Class_Both",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "snapshot",
+      "label": "step enabled",
+      "plan": "snapshot  [step enabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "wait",
+      "label": "wait 4 s",
+      "plan": "wait 4000 ms  [wait 4 s]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "snapshot",
+      "label": "enabled: registry 4 s later",
+      "plan": "snapshot  [enabled: registry 4 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "enabled: registry 4 s later"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "wait",
+      "label": "wait 4 s more",
+      "plan": "wait 4000 ms  [wait 4 s more]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s more",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 12,
+      "kind": "snapshot",
+      "label": "enabled: registry 8 s later",
+      "plan": "snapshot  [enabled: registry 8 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "enabled: registry 8 s later"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "comment",
+      "folder": "step-01-comment",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 26,
+          "sha256": "e64889db9424e16b10b89e1074319b15ce136d80602ce74e8c03745a9f460091"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "9cd6754fc24742e757fee19d232a075785c3cd649a99f26348ebcfd3ef4fcbd2"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 26
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 718
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 8
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled",
+      "folder": "step-02-enabled",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "88be8b048aa3afa065ba2571acd2eba297b3552f2c6820fdf082c23c403f3aab"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 122,
+          "sha256": "cf03d76e02d2cb487959ab2a653fb6f5fde26a7d6e3e3b8e04168cfc3c79d945"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "9cd6754fc24742e757fee19d232a075785c3cd649a99f26348ebcfd3ef4fcbd2"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 718
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 122
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 1,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol",
+        "User\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 65536,
+      "data": {
+        "policy": "Class both flag",
+        "before": {
+          "title": "Class both flag",
+          "windowTitle": "Class both flag",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: older systems only",
+          "help": "A policy of class Both. It appears under Computer Configuration and under User Configuration and writes to the matching hive file of each.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Not Configured",
+            "observed": "Not Configured"
+          },
+          {
+            "set": "#c44bb2fd5169",
+            "requested": "bwc comment one",
+            "before": "",
+            "observed": "bwc comment one",
+            "applyEnabledBefore": false,
+            "applyEnabledAfter": true
+          }
+        ],
+        "afterSet": {
+          "title": "Class both flag",
+          "windowTitle": "Class both flag",
+          "state": "Not Configured",
+          "comment": "bwc comment one",
+          "supportedOn": "BWC oracle fixture: older systems only",
+          "help": "A policy of class Both. It appears under Computer Configuration and under User Configuration and writes to the matching hive file of each.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Class both flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol",
+                "User\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1,
+                "User\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              },
+              "liveRegistry": {
+                "after": {
+                  "HKLM\\Software\\Policies\\BWC-Oracle": null,
+                  "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+                  "HKCU\\Software\\Policies\\BWC-Oracle": null,
+                  "HKCU\\Software\\BWC-Oracle-Gpedit": null
+                },
+                "changed": false,
+                "waited": true,
+                "timedOut": false
+              }
+            }
+          }
+        ],
+        "finalTitle": "Class both flag"
+      }
+    },
+    {
+      "index": 2,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 26,
+          "sha256": "e64889db9424e16b10b89e1074319b15ce136d80602ce74e8c03745a9f460091"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "9cd6754fc24742e757fee19d232a075785c3cd649a99f26348ebcfd3ef4fcbd2"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 3,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 4,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 26,
+          "sha256": "e64889db9424e16b10b89e1074319b15ce136d80602ce74e8c03745a9f460091"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "9cd6754fc24742e757fee19d232a075785c3cd649a99f26348ebcfd3ef4fcbd2"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 5,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 6,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 26,
+          "sha256": "e64889db9424e16b10b89e1074319b15ce136d80602ce74e8c03745a9f460091"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "9cd6754fc24742e757fee19d232a075785c3cd649a99f26348ebcfd3ef4fcbd2"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 7,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 65536,
+      "gptVersionAfter": 131072,
+      "data": {
+        "policy": "Class both flag",
+        "before": {
+          "title": "Class both flag",
+          "windowTitle": "Class both flag",
+          "state": "Not Configured",
+          "comment": "bwc comment one",
+          "supportedOn": "BWC oracle fixture: older systems only",
+          "help": "A policy of class Both. It appears under Computer Configuration and under User Configuration and writes to the matching hive file of each.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "set": "#c44bb2fd5169",
+            "requested": "bwc comment one",
+            "before": "bwc comment one",
+            "observed": "bwc comment one",
+            "applyEnabledBefore": true,
+            "applyEnabledAfter": true
+          }
+        ],
+        "afterSet": {
+          "title": "Class both flag",
+          "windowTitle": "Class both flag",
+          "state": "Enabled",
+          "comment": "bwc comment one",
+          "supportedOn": "BWC oracle fixture: older systems only",
+          "help": "A policy of class Both. It appears under Computer Configuration and under User Configuration and writes to the matching hive file of each.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": []
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Class both flag",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              },
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              },
+              "liveRegistry": {
+                "after": {
+                  "HKLM\\Software\\Policies\\BWC-Oracle": null,
+                  "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+                  "HKCU\\Software\\Policies\\BWC-Oracle": {},
+                  "HKCU\\Software\\Policies\\BWC-Oracle\\Basics": {
+                    "BothFlag": {
+                      "type": "DWord",
+                      "data": 1
+                    }
+                  },
+                  "HKCU\\Software\\BWC-Oracle-Gpedit": null
+                },
+                "changed": true,
+                "waited": true,
+                "timedOut": false
+              }
+            }
+          }
+        ],
+        "finalTitle": "Class both flag"
+      }
+    },
+    {
+      "index": 8,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "88be8b048aa3afa065ba2571acd2eba297b3552f2c6820fdf082c23c403f3aab"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 122,
+          "sha256": "cf03d76e02d2cb487959ab2a653fb6f5fde26a7d6e3e3b8e04168cfc3c79d945"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "9cd6754fc24742e757fee19d232a075785c3cd649a99f26348ebcfd3ef4fcbd2"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": {},
+        "HKCU\\Software\\Policies\\BWC-Oracle\\Basics": {
+          "BothFlag": {
+            "type": "DWord",
+            "data": 1
+          }
+        },
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 9,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 10,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "88be8b048aa3afa065ba2571acd2eba297b3552f2c6820fdf082c23c403f3aab"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 122,
+          "sha256": "cf03d76e02d2cb487959ab2a653fb6f5fde26a7d6e3e3b8e04168cfc3c79d945"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "9cd6754fc24742e757fee19d232a075785c3cd649a99f26348ebcfd3ef4fcbd2"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": {},
+        "HKCU\\Software\\Policies\\BWC-Oracle\\Basics": {
+          "BothFlag": {
+            "type": "DWord",
+            "data": 1
+          }
+        },
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 11,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 12,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "88be8b048aa3afa065ba2571acd2eba297b3552f2c6820fdf082c23c403f3aab"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 122,
+          "sha256": "cf03d76e02d2cb487959ab2a653fb6f5fde26a7d6e3e3b8e04168cfc3c79d945"
+        },
+        "User.comment.cmtx": {
+          "size": 718,
+          "sha256": "9cd6754fc24742e757fee19d232a075785c3cd649a99f26348ebcfd3ef4fcbd2"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": {},
+        "HKCU\\Software\\Policies\\BWC-Oracle\\Basics": {
+          "BothFlag": {
+            "type": "DWord",
+            "data": 1
+          }
+        },
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    }
+  ]
+}

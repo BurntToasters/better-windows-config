@@ -1,0 +1,79 @@
+{
+  "name": "smoke",
+  "description": "One operation of each kind on the BWC oracle fixture policies. Run elevated on a resettable VM: gpedit ops <this file>. Every write is undone by the session restore.",
+  "ops": [
+    { "kind": "screenshot", "name": "start" },
+    { "kind": "treeChildren", "root": "Computer", "path": ["Administrative Templates", "BWC Oracle"], "label": "categories under Computer" },
+    { "kind": "treeChildren", "root": "User", "path": ["Administrative Templates", "BWC Oracle"], "label": "categories under User" },
+    { "kind": "selectNode", "root": "Computer", "path": ["Administrative Templates", "BWC Oracle", "Basics"] },
+    { "kind": "readList", "label": "Basics under Computer" },
+    { "kind": "readStatus" },
+    { "kind": "selectTab", "tab": "Standard" },
+    { "kind": "selectTab", "tab": "Extended" },
+    { "kind": "dumpMenu", "menu": "Action" },
+    { "kind": "dumpMenu", "menu": "View" },
+    { "kind": "dumpMenu", "menu": "Context", "policy": "Class machine flag", "label": "context menu of a policy row" },
+
+    { "kind": "editPolicy", "policy": "Class machine flag", "label": "read only, Cancel" },
+    { "kind": "editPolicy", "policy": "Class machine flag", "state": "Enabled", "comment": "smoke comment", "label": "Enabled with a comment, OK" },
+    { "kind": "editPolicy", "policy": "Class machine flag", "state": "Enabled", "press": ["OK"], "label": "OK with no change writes nothing" },
+    { "kind": "editPolicy", "policy": "Class machine flag", "state": "Disabled", "press": ["Apply", "OK"], "label": "Apply then OK" },
+    { "kind": "editPolicy", "policy": "Class machine flag", "state": "Not Configured", "press": ["OK"] },
+    { "kind": "editPolicy", "policy": "Class machine flag", "press": ["Next", "Cancel"], "label": "Next Setting then Cancel" },
+    { "kind": "editPolicy", "policy": "Class both flag", "press": ["Previous", "Cancel"], "label": "Previous Setting then Cancel" },
+
+    { "kind": "selectNode", "root": "Computer", "path": ["Administrative Templates", "BWC Oracle", "Elements", "Texts"] },
+    { "kind": "editPolicy", "policy": "Plain text", "state": "Enabled", "options": [ { "label": "Plain text:", "text": "smoke value" } ], "label": "text box" },
+    { "kind": "editPolicy", "policy": "Text with a combo box and suggestions", "state": "Enabled", "options": [ { "label": "Pick or type a city:", "item": "Lima" } ], "label": "combo box item" },
+    { "kind": "editPolicy", "policy": "Multiple text lines", "state": "Enabled", "options": [ { "index": 0, "lines": ["one", "two"] } ], "label": "multi line text" },
+    { "kind": "editPolicy", "policy": "Plain text", "state": "Not Configured", "press": ["OK"], "label": "put Plain text back" },
+    { "kind": "editPolicy", "policy": "Text with a combo box and suggestions", "state": "Not Configured", "press": ["OK"] },
+    { "kind": "editPolicy", "policy": "Multiple text lines", "state": "Not Configured", "press": ["OK"] },
+
+    { "kind": "selectNode", "root": "Computer", "path": ["Administrative Templates", "BWC Oracle", "Elements", "Numbers"] },
+    { "kind": "editPolicy", "policy": "Decimal with a range", "state": "Enabled", "options": [ { "label": "Number from 10 to 500:", "text": "9999" } ], "press": ["Cancel"], "label": "spinner above its maximum, Cancel" },
+    { "kind": "editPolicy", "policy": "Decimal with a range", "state": "Enabled", "options": [ { "label": "Number from 10 to 500:", "text": "200" } ], "label": "spinner in range" },
+    { "kind": "editPolicy", "policy": "Decimal with a range", "state": "Not Configured", "press": ["OK"] },
+    { "kind": "editPolicy", "policy": "Long decimal with a range", "state": "Enabled", "options": [ { "label": "Long number:", "text": "4000000000" } ], "label": "long decimal" },
+    { "kind": "editPolicy", "policy": "Long decimal with a range", "state": "Not Configured", "press": ["OK"] },
+
+    { "kind": "selectNode", "root": "Computer", "path": ["Administrative Templates", "BWC Oracle", "Elements", "Booleans"] },
+    { "kind": "editPolicy", "policy": "Boolean with true and false values", "state": "Enabled", "options": [ { "label": "Number check", "checked": true } ], "label": "check box" },
+    { "kind": "editPolicy", "policy": "Boolean with true and false values", "state": "Not Configured", "press": ["OK"] },
+
+    { "kind": "selectNode", "root": "Computer", "path": ["Administrative Templates", "BWC Oracle", "Elements", "Choices"] },
+    { "kind": "editPolicy", "policy": "Choice with string items", "state": "Enabled", "options": [ { "label": "Color choice:", "item": "Green" } ], "label": "drop-down list" },
+    { "kind": "editPolicy", "policy": "Choice with string items", "state": "Not Configured", "press": ["OK"] },
+
+    { "kind": "selectNode", "root": "Computer", "path": ["Administrative Templates", "BWC Oracle", "Elements", "Lists"] },
+    { "kind": "editPolicy", "policy": "List with explicit values", "state": "Enabled", "options": [ { "label": "Name and value entries:", "clearRows": true, "rows": [["first", "1"], ["second", "2"]] } ], "label": "Show Contents grid" },
+    { "kind": "editPolicy", "policy": "List with explicit values", "state": "Not Configured", "press": ["OK"] },
+
+    { "kind": "selectNode", "root": "Computer", "path": ["Administrative Templates", "BWC Oracle", "Sort cases"] },
+    { "kind": "readList", "label": "sort cases, default order" },
+    { "kind": "sortColumn", "column": "Setting" },
+    { "kind": "sortColumn", "column": "Setting", "label": "second click reverses" },
+    { "kind": "sortColumn", "column": "Setting", "label": "third click" },
+
+    { "kind": "selectNode", "root": "Computer", "path": ["Administrative Templates", "All Settings"] },
+    { "kind": "readList", "maxRows": 200, "namesOnly": true, "label": "All Settings, first 200 rows" },
+
+    { "kind": "selectNode", "root": "User", "path": ["Administrative Templates", "BWC Oracle", "Basics"] },
+    { "kind": "editPolicy", "policy": "Class user flag", "state": "Enabled", "label": "user policy writes User\\Registry.pol" },
+    { "kind": "editPolicy", "policy": "Class user flag", "state": "Not Configured", "press": ["OK"] },
+    { "kind": "editPolicy", "policy": "Class both flag", "state": "Enabled", "label": "class Both under User" },
+    { "kind": "editPolicy", "policy": "Class both flag", "state": "Not Configured", "press": ["OK"] },
+
+    { "kind": "selectNode", "root": "Computer", "path": ["Administrative Templates", "BWC Oracle", "Basics"] },
+    { "kind": "setFilter", "filter": { "keywordsEnabled": true, "keywords": "machine", "match": "Any", "inTitle": true, "inHelp": false, "inComment": false } },
+    { "kind": "filterOn", "filterOn": true },
+    { "kind": "readList", "label": "filtered by keyword" },
+    { "kind": "clearFilter" },
+    { "kind": "readList", "label": "after clearing the filter" },
+
+    { "kind": "editPolicy", "policy": "No such policy name", "label": "a policy that does not exist (expected to fail)" },
+    { "kind": "snapshot", "label": "final files" },
+    { "kind": "dismissDialogs" },
+    { "kind": "wait", "waitMs": 500 }
+  ]
+}

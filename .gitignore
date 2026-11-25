@@ -6,6 +6,9 @@ obj/
 .vs/
 TestResults/
 
+# Oracle capture folders are tracked evidence. Some are named *.User, which the *.user rule above would ignore (git runs with core.ignorecase).
+!docs/parity/oracle/gpedit/goldens/**
+
 # Publish, installer, and release output
 publish/
 dist/
@@ -28,3 +31,10 @@ docs/parity/oracle/regedit-resources.md
 docs/parity/oracle/regedit-100dpi.png
 docs/parity/oracle/dialogs/
 docs/parity/oracle/local/
+
+# Microsoft gpedit content (resource dumps, WinForms resources, console file). Regenerated locally by `npm run oracle -- --tool gpedit --only resources`.
+# The tracked docs/parity/oracle/gpedit/gpedit-resource-index.json holds ids and names only.
+docs/parity/oracle/gpedit/gpedit-resources.json
+docs/parity/oracle/gpedit/gpedit-resources.md
+docs/parity/oracle/gpedit/gpedit-forms.json
+docs/parity/oracle/gpedit/gpedit-msc.json

@@ -1,0 +1,8 @@
+{
+  "case": "E/List_Explicit_DuplicateNames",
+  "planHash": "ff6759a21cf8d95cdb7c03023e04935a821008a6c6dcd3781bbe9adb8e287e3a",
+  "files": [
+    "case.json",
+    "gpt.ini"
+  ]
+}

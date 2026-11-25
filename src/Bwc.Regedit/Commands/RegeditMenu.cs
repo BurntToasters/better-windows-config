@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using Bwc.UI.Menu;
 using Bwc.UI.Shell;
 using Bwc.UI.Theme;
@@ -18,14 +17,8 @@ namespace Bwc.Regedit.Commands;
 /// </summary>
 public static class RegeditMenu
 {
-    private const string MenuBarItemStyleKey = "BwcMenuBarItemStyle";
-    private const string MenuFlyoutItemStyleKey = "BwcMenuFlyoutItemStyle";
-    private const string MenuFlyoutSubItemStyleKey = "BwcMenuFlyoutSubItemStyle";
-    private const string ToggleMenuFlyoutItemStyleKey = "BwcToggleMenuFlyoutItemStyle";
-
     /// <summary>Oracle command id of View &gt; Address Bar (RT_MENU 103, id 668), the one toggle item.</summary>
     private const int AddressBarCommandId = 668;
-    private const string MenuFlyoutSeparatorStyleKey = "BwcMenuFlyoutSeparatorStyle";
 
     /// <summary>The View > Theme submenu (BWC addition, outside the oracle ids) and its three radio items.</summary>
     internal const int ThemeMenuCommandId = 9100;
@@ -148,7 +141,7 @@ public static class RegeditMenu
             isEnabled: true,
             new ClassicCommandItem[]
             {
-                Command(loader, 668, "MenuViewAddressBar", isEnabled: true, NoChildren, shell.ToggleAddressBar),
+                Command(loader, AddressBarCommandId, "MenuViewAddressBar", isEnabled: true, NoChildren, shell.ToggleAddressBar, ClassicCommandKind.Check),
                 ClassicCommandItem.Separator,
                 Command(loader, 670, "MenuViewSplit", isEnabled: true, NoChildren, shell.BeginSplitKeyboardMode),
                 ClassicCommandItem.Separator,
@@ -164,9 +157,9 @@ public static class RegeditMenu
                     isEnabled: true,
                     new ClassicCommandItem[]
                     {
-                        Command(loader, ThemeSystemCommandId, "MenuViewThemeSystem", isEnabled: true, NoChildren, () => setTheme?.Invoke(BwcThemeOverride.System)),
-                        Command(loader, ThemeLightCommandId, "MenuViewThemeLight", isEnabled: true, NoChildren, () => setTheme?.Invoke(BwcThemeOverride.Light)),
-                        Command(loader, ThemeDarkCommandId, "MenuViewThemeDark", isEnabled: true, NoChildren, () => setTheme?.Invoke(BwcThemeOverride.Dark)),
+                        Command(loader, ThemeSystemCommandId, "MenuViewThemeSystem", isEnabled: true, NoChildren, () => setTheme?.Invoke(BwcThemeOverride.System), ClassicCommandKind.Radio, ThemeRadioGroupName),
+                        Command(loader, ThemeLightCommandId, "MenuViewThemeLight", isEnabled: true, NoChildren, () => setTheme?.Invoke(BwcThemeOverride.Light), ClassicCommandKind.Radio, ThemeRadioGroupName),
+                        Command(loader, ThemeDarkCommandId, "MenuViewThemeDark", isEnabled: true, NoChildren, () => setTheme?.Invoke(BwcThemeOverride.Dark), ClassicCommandKind.Radio, ThemeRadioGroupName),
                     }),
             });
 
@@ -195,33 +188,12 @@ public static class RegeditMenu
     }
 
     /// <summary>Clears the menu bar and adds one top-level item per command.</summary>
-    public static void Populate(MenuBar menuBar, IReadOnlyList<ClassicCommand> commands)
-    {
-        ArgumentNullException.ThrowIfNull(menuBar);
-        ArgumentNullException.ThrowIfNull(commands);
-
-        menuBar.Items.Clear();
-        foreach (var command in commands)
-        {
-            menuBar.Items.Add(BuildTopLevelItem(command));
-        }
-    }
+    public static void Populate(MenuBar menuBar, IReadOnlyList<ClassicCommand> commands) =>
+        ClassicMenuBuilder.Populate(menuBar, commands);
 
     /// <summary>Finds one top-level menu by oracle command id. Returns null for an unknown id.</summary>
-    public static MenuBarItem? FindTopLevelItem(MenuBar menuBar, int commandId)
-    {
-        ArgumentNullException.ThrowIfNull(menuBar);
-
-        foreach (var item in menuBar.Items.OfType<MenuBarItem>())
-        {
-            if (item.Tag is int id && id == commandId)
-            {
-                return item;
-            }
-        }
-
-        return null;
-    }
+    public static MenuBarItem? FindTopLevelItem(MenuBar menuBar, int commandId) =>
+        ClassicMenuBuilder.FindTopLevelItem(menuBar, commandId);
 
     /// <summary>
     /// Builds one dynamic favorite leaf. The entries have no oracle id, so they use a stable
@@ -242,7 +214,7 @@ public static class RegeditMenu
             FavoriteAutomationPrefix + index.ToString(CultureInfo.InvariantCulture));
 
         item.Click += (_, _) => invoke();
-        ApplyStyle(item, MenuFlyoutItemStyleKey);
+        ClassicMenuBuilder.ApplyItemStyle(item);
         return item;
     }
 
@@ -250,20 +222,8 @@ public static class RegeditMenu
     /// Enables or disables one command by oracle id. The flyout controls carry the id in Tag so the
     /// caller does not need to keep a parallel dictionary of generated controls.
     /// </summary>
-    public static void SetCommandEnabled(MenuBar menuBar, int commandId, bool isEnabled)
-    {
-        ArgumentNullException.ThrowIfNull(menuBar);
-
-        foreach (var item in menuBar.Items.OfType<MenuBarItem>())
-        {
-            if (item.Tag is int id && id == commandId)
-            {
-                item.IsEnabled = isEnabled;
-            }
-
-            WalkFlyout(item.Items, commandId, isEnabled);
-        }
-    }
+    public static void SetCommandEnabled(MenuBar menuBar, int commandId, bool isEnabled) =>
+        ClassicMenuBuilder.SetCommandEnabled(menuBar, commandId, isEnabled);
 
     /// <summary>
     /// Shows or hides the value items at the top of Edit (Modify, Modify Binary Data, and their
@@ -287,95 +247,13 @@ public static class RegeditMenu
         }
     }
 
-    private static void WalkFlyout(
-        IEnumerable<MenuFlyoutItemBase> items,
-        int commandId,
-        bool isEnabled)
-    {
-        foreach (var entry in items)
-        {
-            if (entry is MenuFlyoutItem leaf)
-            {
-                if (leaf.Tag is int id && id == commandId)
-                {
-                    leaf.IsEnabled = isEnabled;
-                }
-
-                continue;
-            }
-
-            if (entry is MenuFlyoutSubItem subItem)
-            {
-                if (subItem.Tag is int id && id == commandId)
-                {
-                    subItem.IsEnabled = isEnabled;
-                }
-
-                WalkFlyout(subItem.Items, commandId, isEnabled);
-            }
-        }
-    }
-
     /// <summary>
     /// Splits oracle menu text into visible text, access key, and accelerator.
     /// The resource holds the oracle TAB between text and accelerator. A literal backslash-t is
     /// also accepted so an older resource file keeps working.
     /// </summary>
-    public static (string Text, string? AccessKey, string? AcceleratorText) ParseMenuText(string? raw)
-    {
-        var text = raw ?? string.Empty;
-        string? accelerator = null;
-
-        var tabIndex = text.IndexOf('\t');
-        var separatorLength = 1;
-        if (tabIndex < 0)
-        {
-            tabIndex = text.IndexOf("\\t", StringComparison.Ordinal);
-            separatorLength = 2;
-        }
-
-        if (tabIndex >= 0)
-        {
-            accelerator = text[(tabIndex + separatorLength)..];
-            text = text[..tabIndex];
-        }
-
-        string? accessKey = null;
-        var builder = new StringBuilder(text.Length);
-        for (var i = 0; i < text.Length; i++)
-        {
-            var current = text[i];
-            if (current != '&')
-            {
-                builder.Append(current);
-                continue;
-            }
-
-            if (i + 1 < text.Length && text[i + 1] == '&')
-            {
-                builder.Append('&');
-                i++;
-                continue;
-            }
-
-            if (i + 1 < text.Length)
-            {
-                accessKey = text[i + 1].ToString();
-                builder.Append(text[i + 1]);
-                i++;
-                continue;
-            }
-
-            builder.Append('&');
-        }
-
-        if (string.IsNullOrEmpty(accelerator))
-        {
-            accelerator = null;
-        }
-
-        return (builder.ToString(), accessKey, accelerator);
-    }
+    public static (string Text, string? AccessKey, string? AcceleratorText) ParseMenuText(string? raw) =>
+        ClassicMenuBuilder.ParseMenuText(raw);
 
     private static ClassicCommand Command(
         ResourceLoader loader,
@@ -383,119 +261,15 @@ public static class RegeditMenu
         string resourceKey,
         bool isEnabled = false,
         IReadOnlyList<ClassicCommandItem>? children = null,
-        Action? invoke = null)
-    {
-        var parsed = ParseMenuText(loader.GetString(resourceKey));
-        return new ClassicCommand(
-            id,
-            parsed.Text,
-            parsed.AccessKey,
-            parsed.AcceleratorText,
-            isEnabled,
-            children ?? NoChildren,
-            invoke);
-    }
-
-    private static MenuBarItem BuildTopLevelItem(ClassicCommand command)
-    {
-        var item = new MenuBarItem
-        {
-            Title = command.Text,
-            IsEnabled = command.IsEnabled,
-            Tag = command.Id,
-        };
-
-        AutomationProperties.SetAutomationId(item, "MenuCommand_" + command.Id);
-
-        if (command.AccessKey is not null)
-        {
-            item.AccessKey = command.AccessKey;
-        }
-
-        ApplyStyle(item, MenuBarItemStyleKey);
-        foreach (var child in command.Children)
-        {
-            item.Items.Add(BuildFlyoutItem(child));
-        }
-
-        return item;
-    }
+        Action? invoke = null,
+        ClassicCommandKind kind = ClassicCommandKind.Normal,
+        string? radioGroup = null) =>
+        ClassicMenuBuilder.Command(loader.GetString(resourceKey), id, isEnabled, children, invoke, kind, radioGroup);
 
     internal static MenuFlyoutItemBase BuildFlyoutItem(
         ClassicCommandItem entry,
-        string automationPrefix = "MenuCommand_")
-    {
-        if (entry is not ClassicCommand command)
-        {
-            var separator = new MenuFlyoutSeparator();
-            ApplyStyle(separator, MenuFlyoutSeparatorStyleKey);
-            return separator;
-        }
-
-        if (command.Children.Count > 0)
-        {
-            var subItem = new MenuFlyoutSubItem
-            {
-                Text = command.Text,
-                IsEnabled = command.IsEnabled,
-                Tag = command.Id,
-            };
-
-            AutomationProperties.SetAutomationId(subItem, automationPrefix + command.Id);
-
-            if (command.AccessKey is not null)
-            {
-                subItem.AccessKey = command.AccessKey;
-            }
-
-            foreach (var child in command.Children)
-            {
-                subItem.Items.Add(BuildFlyoutItem(child, automationPrefix));
-            }
-
-            ApplyStyle(subItem, MenuFlyoutSubItemStyleKey);
-            return subItem;
-        }
-
-        // View > Address Bar is a toggle, so it is a ToggleMenuFlyoutItem and carries the check mark.
-        // The three theme items are radio items in one group, so exactly one shows a bullet.
-        bool radio = IsThemeRadio(command.Id);
-        MenuFlyoutItem item = command.Id == AddressBarCommandId
-            ? new CheckMenuFlyoutItem()
-            : radio
-                ? new RadioMenuFlyoutItem { GroupName = ThemeRadioGroupName }
-                : new MenuFlyoutItem();
-        item.Text = command.Text;
-        item.IsEnabled = command.IsEnabled;
-        item.Tag = command.Id;
-
-        AutomationProperties.SetAutomationId(item, automationPrefix + command.Id);
-
-        if (command.AccessKey is not null)
-        {
-            item.AccessKey = command.AccessKey;
-        }
-
-        if (command.AcceleratorText is not null)
-        {
-            // The shortcut is already the item's text. WinUI must not add an accelerator tooltip on top.
-            item.KeyboardAcceleratorTextOverride = command.AcceleratorText;
-            item.KeyboardAcceleratorPlacementMode = Microsoft.UI.Xaml.Input.KeyboardAcceleratorPlacementMode.Hidden;
-        }
-
-        if (command.Invoke is not null)
-        {
-            var invoke = command.Invoke;
-            item.Click += (_, _) => invoke();
-            MenuItemActions.Register(item, invoke);
-        }
-
-        ApplyStyle(item, item is CheckMenuFlyoutItem ? ToggleMenuFlyoutItemStyleKey : MenuFlyoutItemStyleKey);
-        return item;
-    }
-
-    private static bool IsThemeRadio(int commandId) =>
-        commandId is ThemeSystemCommandId or ThemeLightCommandId or ThemeDarkCommandId;
+        string automationPrefix = "MenuCommand_") =>
+        ClassicMenuBuilder.BuildFlyoutItem(entry, automationPrefix);
 
     /// <summary>
     /// Marks the View > Theme radio item that matches the override. Call after the menu is built and
@@ -503,8 +277,6 @@ public static class RegeditMenu
     /// </summary>
     public static void SetThemeChecked(MenuBar menuBar, BwcThemeOverride value)
     {
-        ArgumentNullException.ThrowIfNull(menuBar);
-
         int checkedId = value switch
         {
             BwcThemeOverride.Light => ThemeLightCommandId,
@@ -512,58 +284,6 @@ public static class RegeditMenu
             _ => ThemeSystemCommandId,
         };
 
-        foreach (var item in menuBar.Items.OfType<MenuBarItem>())
-        {
-            CheckThemeRadios(item.Items, checkedId);
-        }
-    }
-
-    private static void CheckThemeRadios(IEnumerable<MenuFlyoutItemBase> items, int checkedId)
-    {
-        foreach (var entry in items)
-        {
-            if (entry is RadioMenuFlyoutItem radio && radio.Tag is int id && IsThemeRadio(id))
-            {
-                radio.IsChecked = id == checkedId;
-            }
-            else if (entry is MenuFlyoutSubItem subItem)
-            {
-                CheckThemeRadios(subItem.Items, checkedId);
-            }
-        }
-    }
-
-    private static void ApplyStyle(FrameworkElement element, string key)
-    {
-        var style = FindStyle(key);
-        if (style is not null)
-        {
-            element.Style = style;
-        }
-    }
-
-    private static Style? FindStyle(string key)
-    {
-        var application = Application.Current;
-        return application is null ? null : FindStyle(application.Resources, key);
-    }
-
-    private static Style? FindStyle(ResourceDictionary dictionary, string key)
-    {
-        if (dictionary.TryGetValue(key, out var value) && value is Style style)
-        {
-            return style;
-        }
-
-        foreach (var merged in dictionary.MergedDictionaries)
-        {
-            var found = FindStyle(merged, key);
-            if (found is not null)
-            {
-                return found;
-            }
-        }
-
-        return null;
+        ClassicMenuBuilder.SetRadioChecked(menuBar, ThemeRadioGroupName, checkedId);
     }
 }

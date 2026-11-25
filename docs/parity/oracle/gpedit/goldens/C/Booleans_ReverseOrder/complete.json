@@ -1,0 +1,22 @@
+{
+  "case": "C/Booleans_ReverseOrder",
+  "planHash": "9bda66b1193d76f44218bee160e80a41afee81a775d3bdd3331bdfa66476761d",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-both-on/Machine.Registry.pol",
+    "step-01-both-on/Machine.comment.cmtx",
+    "step-01-both-on/gpt.ini",
+    "step-02-zeta-off/Machine.Registry.pol",
+    "step-02-zeta-off/Machine.comment.cmtx",
+    "step-02-zeta-off/gpt.ini",
+    "step-03-alpha-off/Machine.Registry.pol",
+    "step-03-alpha-off/Machine.comment.cmtx",
+    "step-03-alpha-off/gpt.ini",
+    "step-04-zeta-on/Machine.Registry.pol",
+    "step-04-zeta-on/Machine.comment.cmtx",
+    "step-04-zeta-on/gpt.ini"
+  ]
+}

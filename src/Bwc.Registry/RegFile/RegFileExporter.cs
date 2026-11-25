@@ -118,7 +118,7 @@ public static class RegFileExporter
         var state = new ExportState();
         var gate = new ExportProgressGate(progress);
         gate.Always(Starting(startKey, state));
-        Walk(source, startKey, isStart: true, cancellationToken, gate, state, emit);
+        Walk(source, startKey, isStart: true, depth: 0, cancellationToken, gate, state, emit);
         gate.Always(Completed(startKey, state));
     }
 
@@ -151,7 +151,7 @@ public static class RegFileExporter
         foreach (RegistryPath root in roots)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Walk(source, root, isStart: false, cancellationToken, gate, state, emit);
+            Walk(source, root, isStart: false, depth: 0, cancellationToken, gate, state, emit);
         }
 
         gate.Always(Completed(roots[^1], state));
@@ -161,12 +161,20 @@ public static class RegFileExporter
         IRegistryExportSource source,
         RegistryPath path,
         bool isStart,
+        int depth,
         CancellationToken cancellationToken,
         ExportProgressGate gate,
         ExportState state,
         Action<RegFileKey> emit)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (depth > RegistryExportLimits.MaxSubtreeDepth)
+        {
+            // Deeper than the registry allows: only a link to an ancestor gets here. Skipped like an unreadable key.
+            SkipKey(path, gate, state);
+            return;
+        }
 
         IReadOnlyList<RegistryValueInfo> values;
         IReadOnlyList<string> subKeyNames;
@@ -180,14 +188,7 @@ public static class RegFileExporter
         catch (RegistryOperationException ex) when (!isStart && IsSkippableKeyError(ex.Win32Error))
         {
             // Access denied, or a key that was deleted or never existed by the time it was read.
-            state.KeysSkipped += 1;
-            gate.Always(new ExportProgress(
-                ExportPhase.KeySkipped,
-                path,
-                null,
-                state.KeysExported,
-                state.ValuesExported,
-                state.KeysSkipped));
+            SkipKey(path, gate, state);
             return;
         }
 
@@ -244,8 +245,20 @@ public static class RegFileExporter
                     "A key name contains a NUL, line feed, or carriage return and cannot be written to a .reg file.");
             }
 
-            Walk(source, path.AppendEnumeratedName(subKeyName), isStart: false, cancellationToken, gate, state, emit);
+            Walk(source, path.AppendEnumeratedName(subKeyName), isStart: false, depth + 1, cancellationToken, gate, state, emit);
         }
+    }
+
+    private static void SkipKey(RegistryPath path, ExportProgressGate gate, ExportState state)
+    {
+        state.KeysSkipped += 1;
+        gate.Always(new ExportProgress(
+            ExportPhase.KeySkipped,
+            path,
+            null,
+            state.KeysExported,
+            state.ValuesExported,
+            state.KeysSkipped));
     }
 
     private static bool IsSkippableKeyError(int win32Error) =>

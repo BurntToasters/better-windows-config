@@ -322,6 +322,18 @@ the only one that connects to another registry, and it writes nothing to it.
 - **Comment misattribution.** An id is attributed to a resw entry only when the comment immediately before the
   `<data>` element cites `Oracle <id>` (the ids after "Oracle" are parsed from that comment). Ids in other
   comments are ignored.
+- **Folded forms read as differences (gpedit only, STR-1).** A classic string is also compared in folded form: access keys
+  (`&`) and a trailing ellipsis removed on both sides, and for a classic string with one help line or tooltip copy after a
+  single newline, the label before it. A multi-paragraph message, or a first line that ends a sentence, keeps its whole text.
+  A label match says nothing about the help line, which is not compared. Failure: the fold hides a real difference (a message
+  that equals another one's label), or a classic format string (`%s`) reads as absent although BWC shows the composed text. A
+  citing comment that ends "with <module>:<id>" lets the `%s` stand for the text of that id. The regedit comparison does not
+  fold, so its tracked file does not change (check: hash `docs/parity/oracle/string-parity.json` before and after).
+- **Texts outside the string tables not compared (gpedit only, MSG-091 to MSG-093).** The managed resources of the setting
+  dialog (`gpedit-forms.json`, untracked) are read as ids `forms:<file>:<entry>` for the string entries that are texts (not the
+  `>>` designer metadata, not booleans) of the main assembly, and compared with the same rules. The console frame's
+  `src/Bwc.UI/Strings/en-US/Console.resw` is in the compared set beside the gpedit folders. Failure: a text BWC shows lives in a
+  file the check does not read, and reads as absent.
 - **Source scan too broad or too narrow.** The C# literal search reads only `.cs` files under `src/`, skipping
   `bin` and `obj`, and matches the escaped literal form. Verbatim strings and raw literals are not matched.
 

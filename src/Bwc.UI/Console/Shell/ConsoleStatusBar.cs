@@ -1,0 +1,161 @@
+using Bwc.UI.Theme;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
+using Microsoft.UI.Xaml.Controls;
+
+namespace Bwc.UI.Console.Shell;
+
+/// <summary>
+/// The status bar: one line of text on the face color, 23 DIP high as in the probed classic window. The text is long
+/// text safe: one line, trimmed with an ellipsis, and the full string is the accessible name of the pane. A second, narrow
+/// pane at the right end holds a flag text a host sets (the filter flag of the Local Group Policy Editor); it exists only
+/// while the text is not empty. A third pane, left of the flag, holds a notice text in the same way.
+/// </summary>
+public sealed class ConsoleStatusBar : UserControl
+{
+    /// <summary>The height in DIPs (46 px at 192 DPI in the probe).</summary>
+    public const double BarHeight = 23;
+
+    private readonly Border _frame = new();
+    private readonly TextBlock _pane = new();
+    private readonly Border _flagFrame = new();
+    private readonly TextBlock _flag = new();
+    private readonly Border _noticeFrame = new();
+    private readonly TextBlock _notice = new();
+    private string _text = string.Empty;
+    private string _flagText = string.Empty;
+    private string _noticeText = string.Empty;
+
+    public ConsoleStatusBar()
+    {
+        AutomationProperties.SetAutomationId(this, "StatusBar");
+        AutomationProperties.SetName(this, ConsoleStrings.Get("ConsoleStatusBarName"));
+        IsTabStop = false;
+        Height = BarHeight;
+
+        _pane.TextWrapping = TextWrapping.NoWrap;
+        _pane.TextTrimming = TextTrimming.CharacterEllipsis;
+        _pane.VerticalAlignment = VerticalAlignment.Center;
+        _pane.Margin = new Thickness(4, 0, 4, 0);
+        _pane.IsTextSelectionEnabled = false;
+        AutomationProperties.SetAutomationId(_pane, "StatusBar.Pane0");
+        AutomationProperties.SetName(_pane, string.Empty);
+
+        _flag.TextWrapping = TextWrapping.NoWrap;
+        _flag.VerticalAlignment = VerticalAlignment.Center;
+        _flag.Margin = new Thickness(6, 0, 6, 0);
+        _flag.IsTextSelectionEnabled = false;
+        AutomationProperties.SetAutomationId(_flag, "StatusBar.Pane1");
+        AutomationProperties.SetName(_flag, string.Empty);
+        _flagFrame.BorderThickness = new Thickness(1, 0, 0, 0);
+        _flagFrame.Child = _flag;
+        _flagFrame.Visibility = Visibility.Collapsed;
+
+        _notice.TextWrapping = TextWrapping.NoWrap;
+        _notice.VerticalAlignment = VerticalAlignment.Center;
+        _notice.Margin = new Thickness(6, 0, 6, 0);
+        _notice.IsTextSelectionEnabled = false;
+        AutomationProperties.SetAutomationId(_notice, "StatusBar.Pane2");
+        AutomationProperties.SetName(_notice, string.Empty);
+        _noticeFrame.BorderThickness = new Thickness(1, 0, 0, 0);
+        _noticeFrame.Child = _notice;
+        _noticeFrame.Visibility = Visibility.Collapsed;
+
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.Children.Add(_pane);
+        Grid.SetColumn(_noticeFrame, 1);
+        row.Children.Add(_noticeFrame);
+        Grid.SetColumn(_flagFrame, 2);
+        row.Children.Add(_flagFrame);
+
+        _frame.BorderThickness = new Thickness(0, 1, 0, 0);
+        _frame.Child = row;
+        Content = _frame;
+        ApplyBrushes();
+    }
+
+    /// <summary>The text of the first pane. It is kept while the bar is hidden and shown again with the bar.</summary>
+    public string Text
+    {
+        get => _text;
+        set
+        {
+            _text = value ?? string.Empty;
+            _pane.Text = _text;
+            AutomationProperties.SetName(_pane, _text);
+        }
+    }
+
+    /// <summary>
+    /// The text of the flag pane at the right end. The pane is hidden (and so absent for UI Automation) while the text is
+    /// empty.
+    /// </summary>
+    public string FlagText
+    {
+        get => _flagText;
+        set
+        {
+            _flagText = value ?? string.Empty;
+            _flag.Text = _flagText;
+            AutomationProperties.SetName(_flag, _flagText);
+            _flagFrame.Visibility = _flagText.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        }
+    }
+
+    /// <summary>
+    /// The text of the notice pane, left of the flag pane (the template problem count of the Local Group Policy Editor). The
+    /// pane is hidden (and so absent for UI Automation) while the text is empty.
+    /// </summary>
+    public string NoticeText
+    {
+        get => _noticeText;
+        set
+        {
+            _noticeText = value ?? string.Empty;
+            _notice.Text = _noticeText;
+            AutomationProperties.SetName(_notice, _noticeText);
+            _noticeFrame.Visibility = _noticeText.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        }
+    }
+
+    /// <summary>Takes the colors from the current palette.</summary>
+    public void ApplyBrushes()
+    {
+        _frame.Background = BwcBrushes.Face;
+        _frame.BorderBrush = BwcBrushes.Highlight3D;
+        _pane.Foreground = BwcBrushes.WindowText;
+        _flag.Foreground = BwcBrushes.WindowText;
+        _flagFrame.BorderBrush = BwcBrushes.Shadow;
+        _notice.Foreground = BwcBrushes.WindowText;
+        _noticeFrame.BorderBrush = BwcBrushes.Shadow;
+    }
+
+    /// <summary>Takes the font from the dense metrics.</summary>
+    public void ApplyMetrics()
+    {
+        _pane.FontSize = DenseMetrics.FontSize;
+        _pane.FontFamily = DenseMetrics.FontFamily;
+        _flag.FontSize = DenseMetrics.FontSize;
+        _flag.FontFamily = DenseMetrics.FontFamily;
+        _notice.FontSize = DenseMetrics.FontSize;
+        _notice.FontFamily = DenseMetrics.FontFamily;
+    }
+
+    protected override AutomationPeer OnCreateAutomationPeer() => new ConsoleStatusBarPeer(this);
+
+    private sealed class ConsoleStatusBarPeer : FrameworkElementAutomationPeer
+    {
+        public ConsoleStatusBarPeer(ConsoleStatusBar owner)
+            : base(owner)
+        {
+        }
+
+        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.StatusBar;
+
+        protected override string GetClassNameCore() => nameof(ConsoleStatusBar);
+    }
+}

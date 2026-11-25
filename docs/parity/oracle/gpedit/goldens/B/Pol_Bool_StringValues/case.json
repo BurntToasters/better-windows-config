@@ -1,0 +1,1241 @@
+{
+  "case": "B/Pol_Bool_StringValues",
+  "description": "Pol_Bool_StringValues under User Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
+  "planVersion": 2,
+  "planHash": "9a927db23b9bec3ebd735d23538b12dd655a944b5338c68f0c4d280256ce31e2",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Boolean with string values' state Enabled press [OK] at User/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Boolean with string values",
+        "state": "Enabled",
+        "policyId": "Pol_Bool_StringValues",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step enabled-defaults",
+      "plan": "snapshot  [step enabled-defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Boolean with string values' state Enabled options [String check = checked True] press [OK] at User/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Boolean with string values",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "String check",
+            "expectKind": "checkBox",
+            "checked": true,
+            "elementId": "StringCheck"
+          }
+        ],
+        "policyId": "Pol_Bool_StringValues",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step enabled-alt1-checked",
+      "plan": "snapshot  [step enabled-alt1-checked]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt1-checked"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Boolean with string values' state Enabled options [String check = checked False] press [OK] at User/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Boolean with string values",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "String check",
+            "expectKind": "checkBox",
+            "checked": false,
+            "elementId": "StringCheck"
+          }
+        ],
+        "policyId": "Pol_Bool_StringValues",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step enabled-alt2-unchecked",
+      "plan": "snapshot  [step enabled-alt2-unchecked]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt2-unchecked"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Boolean with string values' state Disabled press [OK] at User/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Boolean with string values",
+        "state": "Disabled",
+        "policyId": "Pol_Bool_StringValues",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Boolean with string values' state Not Configured press [OK] at User/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ],
+        "policy": "Boolean with string values",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Bool_StringValues",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled-defaults",
+      "folder": "step-01-enabled-defaults",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 146,
+          "sha256": "e281f72b0f5a04db6ff4461d245aee8a632b9a2fd5ad4e7d10f4d70c786820d9"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 128
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 146
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-alt1-checked",
+      "folder": "step-02-enabled-alt1-checked",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 146,
+          "sha256": "e281f72b0f5a04db6ff4461d245aee8a632b9a2fd5ad4e7d10f4d70c786820d9"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 128
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 146
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "enabled-alt2-unchecked",
+      "folder": "step-03-enabled-alt2-unchecked",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 144,
+          "sha256": "3e3eedb647d6b4a67980cfed9e494dee753f07f20137a4e706236f4fc6428180"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 144
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "disabled",
+      "folder": "step-04-disabled",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 144,
+          "sha256": "3e3eedb647d6b4a67980cfed9e494dee753f07f20137a4e706236f4fc6428180"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 129
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 144
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "not-configured",
+      "folder": "step-05-not-configured",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 52,
+          "sha256": "3f8e263ed5391a247d615ec55b8943ff5a57cbec36d48e18ab5baf5658bfef7c"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 196608,
+        "machine": 0,
+        "user": 3
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 52
+        },
+        {
+          "path": "User\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "User\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol",
+        "User\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 65536,
+      "data": {
+        "policy": "Boolean with string values",
+        "before": {
+          "title": "Boolean with string values",
+          "windowTitle": "Boolean with string values",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box that writes the text yes when checked and the text no when cleared. It starts checked.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "String check",
+              "panelId": "#51fddef0f16b",
+              "controlId": "#51fddef0f16b",
+              "rect": [
+                82,
+                646,
+                180,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Boolean with string values",
+          "windowTitle": "Boolean with string values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box that writes the text yes when checked and the text no when cleared. It starts checked.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "String check",
+              "panelId": "#51fddef0f16b",
+              "controlId": "#51fddef0f16b",
+              "rect": [
+                82,
+                646,
+                180,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Boolean with string values",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol",
+                "User\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1,
+                "User\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              }
+            }
+          }
+        ],
+        "finalTitle": "Boolean with string values"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 146,
+          "sha256": "e281f72b0f5a04db6ff4461d245aee8a632b9a2fd5ad4e7d10f4d70c786820d9"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Boolean with string values",
+        "before": {
+          "title": "Boolean with string values",
+          "windowTitle": "Boolean with string values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box that writes the text yes when checked and the text no when cleared. It starts checked.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "String check",
+              "panelId": "#51fddef0f16b",
+              "controlId": "#51fddef0f16b",
+              "rect": [
+                134,
+                698,
+                180,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requested": true,
+            "beforeCheckState": 1,
+            "observedCheckState": 1,
+            "set": "#a11a75e0feee",
+            "label": "String check",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#51fddef0f16b"
+          }
+        ],
+        "afterSet": {
+          "title": "Boolean with string values",
+          "windowTitle": "Boolean with string values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box that writes the text yes when checked and the text no when cleared. It starts checked.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "String check",
+              "panelId": "#51fddef0f16b",
+              "controlId": "#51fddef0f16b",
+              "rect": [
+                134,
+                698,
+                180,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Boolean with string values",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              }
+            }
+          }
+        ],
+        "finalTitle": "Boolean with string values"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 128,
+          "sha256": "3d0d94dbe31c7a76115eb48785515a721424e13936afaf2d1b02d2663f809753"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 146,
+          "sha256": "e281f72b0f5a04db6ff4461d245aee8a632b9a2fd5ad4e7d10f4d70c786820d9"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 65536,
+        "machine": 0,
+        "user": 1
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 65536,
+      "gptVersionAfter": 131072,
+      "data": {
+        "policy": "Boolean with string values",
+        "before": {
+          "title": "Boolean with string values",
+          "windowTitle": "Boolean with string values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box that writes the text yes when checked and the text no when cleared. It starts checked.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "String check",
+              "panelId": "#51fddef0f16b",
+              "controlId": "#51fddef0f16b",
+              "rect": [
+                186,
+                750,
+                180,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requested": false,
+            "beforeCheckState": 1,
+            "observedCheckState": 0,
+            "set": "#a11a75e0feee",
+            "label": "String check",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#51fddef0f16b"
+          }
+        ],
+        "afterSet": {
+          "title": "Boolean with string values",
+          "windowTitle": "Boolean with string values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box that writes the text yes when checked and the text no when cleared. It starts checked.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "String check",
+              "panelId": "#51fddef0f16b",
+              "controlId": "#51fddef0f16b",
+              "rect": [
+                186,
+                750,
+                180,
+                44
+              ],
+              "enabled": true,
+              "checkState": 0
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Boolean with string values",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 65536,
+                "machine": 0,
+                "user": 1
+              },
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              }
+            }
+          }
+        ],
+        "finalTitle": "Boolean with string values"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 144,
+          "sha256": "3e3eedb647d6b4a67980cfed9e494dee753f07f20137a4e706236f4fc6428180"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Boolean with string values",
+        "before": {
+          "title": "Boolean with string values",
+          "windowTitle": "Boolean with string values",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box that writes the text yes when checked and the text no when cleared. It starts checked.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "String check",
+              "panelId": "#51fddef0f16b",
+              "controlId": "#51fddef0f16b",
+              "rect": [
+                238,
+                802,
+                180,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Disabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Boolean with string values",
+          "windowTitle": "Boolean with string values",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box that writes the text yes when checked and the text no when cleared. It starts checked.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "String check",
+              "panelId": "#51fddef0f16b",
+              "controlId": "#51fddef0f16b",
+              "rect": [
+                238,
+                802,
+                180,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Boolean with string values",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              }
+            }
+          }
+        ],
+        "finalTitle": "Boolean with string values"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 129,
+          "sha256": "c675e249b1d82947ddefb575eadf51f67a527e78c9d24aaffb99a8d3f440382d"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 144,
+          "sha256": "3e3eedb647d6b4a67980cfed9e494dee753f07f20137a4e706236f4fc6428180"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 131072,
+        "machine": 0,
+        "user": 2
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "gpt.ini",
+        "User\\Registry.pol"
+      ],
+      "gptVersionBefore": 131072,
+      "gptVersionAfter": 196608,
+      "data": {
+        "policy": "Boolean with string values",
+        "before": {
+          "title": "Boolean with string values",
+          "windowTitle": "Boolean with string values",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box that writes the text yes when checked and the text no when cleared. It starts checked.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "String check",
+              "panelId": "#51fddef0f16b",
+              "controlId": "#51fddef0f16b",
+              "rect": [
+                290,
+                854,
+                180,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Boolean with string values",
+          "windowTitle": "Boolean with string values",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A check box that writes the text yes when checked and the text no when cleared. It starts checked.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#dafa34cfe6c0",
+              "label": "String check",
+              "panelId": "#51fddef0f16b",
+              "controlId": "#51fddef0f16b",
+              "rect": [
+                290,
+                854,
+                180,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Boolean with string values",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "gpt.ini",
+                "User\\Registry.pol"
+              ],
+              "groups": {
+                "machine": false,
+                "user": true,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "gpt.ini": 1,
+                "User\\Registry.pol": 1
+              },
+              "gptVersionBefore": {
+                "raw": 131072,
+                "machine": 0,
+                "user": 2
+              },
+              "gptVersionAfter": {
+                "raw": 196608,
+                "machine": 0,
+                "user": 3
+              }
+            }
+          }
+        ],
+        "finalTitle": "Boolean with string values"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 52,
+          "sha256": "3f8e263ed5391a247d615ec55b8943ff5a57cbec36d48e18ab5baf5658bfef7c"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "User.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        }
+      },
+      "gptVersion": {
+        "raw": 196608,
+        "machine": 0,
+        "user": 3
+      }
+    }
+  ]
+}

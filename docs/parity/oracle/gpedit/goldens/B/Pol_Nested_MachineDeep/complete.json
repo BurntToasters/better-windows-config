@@ -1,0 +1,19 @@
+{
+  "case": "B/Pol_Nested_MachineDeep",
+  "planHash": "7356c7d425ffbbf5625aa5c0e086e942d9c810cb62b42b55c8488a880704d033",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/Machine.Registry.pol",
+    "step-01-enabled-defaults/Machine.comment.cmtx",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-disabled/Machine.Registry.pol",
+    "step-02-disabled/Machine.comment.cmtx",
+    "step-02-disabled/gpt.ini",
+    "step-03-not-configured/Machine.Registry.pol",
+    "step-03-not-configured/Machine.comment.cmtx",
+    "step-03-not-configured/gpt.ini"
+  ]
+}

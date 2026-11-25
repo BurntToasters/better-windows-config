@@ -1,0 +1,569 @@
+{
+  "case": "E/Decimal_Soft_OutOfRange",
+  "description": "soft decimal 1 to 100 given 1000 and 0",
+  "planVersion": 2,
+  "planHash": "0b68919f03eb13ed490f0a1435ad91f2287120404ff5260f88cd55f02794ff09",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal with a soft range' state Enabled options [Soft number: = text '1000'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal with a soft range",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Soft number:",
+            "expectKind": "decimalTextBox",
+            "text": "1000",
+            "elementId": "SoftNumber"
+          }
+        ],
+        "policyId": "Pol_Decimal_Soft",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step above",
+      "plan": "snapshot  [step above]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step above"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal with a soft range' state Enabled options [Soft number: = typed text '0'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal with a soft range",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Soft number:",
+            "expectKind": "decimalTextBox",
+            "text": "0",
+            "typed": true,
+            "elementId": "SoftNumber"
+          }
+        ],
+        "policyId": "Pol_Decimal_Soft",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step below",
+      "plan": "snapshot  [step below]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step below"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "above",
+      "folder": "step-01-above",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 158,
+          "sha256": "8831a4eeb6a9ca08187701f85505c89f705bb1d70848a2e35158f466537904b1"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 158
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "below",
+      "folder": "step-02-below",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 158,
+          "sha256": "7c788cee2479299d6088c8d742fa11df54494c03e05ac9b4020d316a3ae70258"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 158
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Decimal with a soft range",
+        "before": {
+          "title": "Decimal with a soft range",
+          "windowTitle": "Decimal with a soft range",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number between 1 and 100 that is marked soft.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Soft number:",
+              "panelId": "#fc950cd55441",
+              "controlId": "66802",
+              "rect": [
+                76,
+                640,
+                414,
+                58
+              ],
+              "enabled": false,
+              "text": "1"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "1000",
+            "before": "50",
+            "immediate": "1000",
+            "observed": "1000",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Soft number:",
+            "labelMatch": "exact",
+            "kind": "#05585f55fed2",
+            "controlId": "66802"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal with a soft range",
+          "windowTitle": "Decimal with a soft range",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number between 1 and 100 that is marked soft.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Soft number:",
+              "panelId": "#fc950cd55441",
+              "controlId": "66802",
+              "rect": [
+                76,
+                640,
+                414,
+                58
+              ],
+              "enabled": true,
+              "text": "1000"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Decimal with a soft range",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Decimal with a soft range"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 158,
+          "sha256": "8831a4eeb6a9ca08187701f85505c89f705bb1d70848a2e35158f466537904b1"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Decimal with a soft range",
+        "before": {
+          "title": "Decimal with a soft range",
+          "windowTitle": "Decimal with a soft range",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number between 1 and 100 that is marked soft.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Soft number:",
+              "panelId": "#fc950cd55441",
+              "controlId": "66806",
+              "rect": [
+                128,
+                692,
+                414,
+                58
+              ],
+              "enabled": true,
+              "text": "100"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "typed": true,
+            "multiline": false,
+            "requested": "0",
+            "before": "100",
+            "immediate": "0",
+            "observed": "1",
+            "clamped": true,
+            "set": "#a11a75e0feee",
+            "label": "Soft number:",
+            "labelMatch": "exact",
+            "kind": "#05585f55fed2",
+            "controlId": "66806"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal with a soft range",
+          "windowTitle": "Decimal with a soft range",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number between 1 and 100 that is marked soft.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": false
+            },
+            "Cancel": {
+              "enabled": false
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#05585f55fed2",
+              "label": "Soft number:",
+              "panelId": "#fc950cd55441",
+              "controlId": "66806",
+              "rect": [
+                128,
+                692,
+                414,
+                58
+              ],
+              "enabled": true,
+              "text": "1"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "boxesBeforePress": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#c292eda8b688"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "enabledBefore": true,
+            "titleBefore": "Decimal with a soft range",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Decimal with a soft range"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 158,
+          "sha256": "7c788cee2479299d6088c8d742fa11df54494c03e05ac9b4020d316a3ae70258"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    }
+  ]
+}

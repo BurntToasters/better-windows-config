@@ -1,0 +1,16 @@
+{
+  "case": "G/User_Ok",
+  "planHash": "83befcb8bdc696b4a90514e5692cfd7ebc63e884d86718c5c59997cd5c5d4828",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled/User.Registry.pol",
+    "step-01-enabled/User.comment.cmtx",
+    "step-01-enabled/gpt.ini",
+    "step-02-enabled-again/User.Registry.pol",
+    "step-02-enabled-again/User.comment.cmtx",
+    "step-02-enabled-again/gpt.ini"
+  ]
+}

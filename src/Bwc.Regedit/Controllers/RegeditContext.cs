@@ -1063,13 +1063,13 @@ internal sealed partial class RegeditContext
                 Shell.ListContent.SetRows(listing.Rows);
                 if (unreadablePath is not null && unreadable is not null)
                 {
-                    _ = ShowUnreadableKeyAsync(unreadablePath, unreadable);
+                    ShowUnreadableKeyAsync(unreadablePath, unreadable).Forget("unreadable key message");
                     return;
                 }
 
                 if (failure is not null)
                 {
-                    _ = ShowUnreadableKeyWithoutDetailAsync(unreadablePath ?? node.Name, failure);
+                    ShowUnreadableKeyWithoutDetailAsync(unreadablePath ?? node.Name, failure).Forget("unreadable key message without detail");
                     return;
                 }
 

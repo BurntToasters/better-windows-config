@@ -18,12 +18,14 @@ import {
   auditNsisSource,
   buildPayloadNsh,
   publishSigningTargets,
+  REQUIRED_PUBLISH_FILES,
   SIGNING_DEFINE_NAMES,
   signingDefines,
   signingPathProblem,
 } from "./build-installer.js";
 import {
   bwcSigningTargets,
+  isBwcSigningTarget,
   missingSigningVariables,
   signingPolicy,
   SIGNING_REQUIRED_VARIABLES,
@@ -58,10 +60,15 @@ const PUBLISH_FIXTURE = [
   "BetterWindowsConfig.runtimeconfig.json",
   "BwcRegedit.exe",
   "BwcRegedit.dll",
+  "BwcGpedit.exe",
+  "BwcGpedit.dll",
+  "BwcGpedit.pdb",
+  "BwcGpeditOther.exe",
   "BwcUpdate.exe",
   "Bwc.Core.dll",
   "Bwc.Registry.dll",
   "Bwc.Regedit.dll",
+  "Bwc.Gpo.dll",
   "Bwc.UI.dll",
   "Microsoft.UI.Xaml.dll",
   "Microsoft.WindowsAppRuntime.Bootstrap.dll",
@@ -74,9 +81,12 @@ const EXPECTED_TARGETS = [
   "BetterWindowsConfig.dll",
   "BetterWindowsConfig.exe",
   "Bwc.Core.dll",
+  "Bwc.Gpo.dll",
   "Bwc.Regedit.dll",
   "Bwc.Registry.dll",
   "Bwc.UI.dll",
+  "BwcGpedit.dll",
+  "BwcGpedit.exe",
   "BwcRegedit.dll",
   "BwcRegedit.exe",
   "BwcUpdate.exe",
@@ -180,7 +190,7 @@ function findUnsignedPublishExe() {
   const publishRoot = path.join(REPO_ROOT, "publish");
   if (!fs.existsSync(publishRoot)) return null;
   for (const rid of fs.readdirSync(publishRoot)) {
-    for (const name of ["BwcUpdate.exe", "BwcRegedit.exe", "BetterWindowsConfig.exe"]) {
+    for (const name of ["BwcUpdate.exe", "BwcRegedit.exe", "BwcGpedit.exe", "BetterWindowsConfig.exe"]) {
       const candidate = path.join(publishRoot, rid, name);
       if (!fs.existsSync(candidate)) continue;
       if (hasCertificateTable(fs.readFileSync(candidate)) === false) return candidate;
@@ -244,6 +254,47 @@ function checkTargets(fixtureDir) {
   }
   if (problems.length) fail(name, problems.join("; "));
   else pass(name, `${EXPECTED_TARGETS.length} root files; runtime, Microsoft, and subfolder files are left alone`);
+}
+
+function readRepoFile(...parts) {
+  return fs.readFileSync(path.join(REPO_ROOT, ...parts), "utf8").replace(/\r\n/g, "\n");
+}
+
+/**
+ * Every tool of Bwc.Core ToolCatalog (and the Hub) is known to the installer, the signing list, the required-file
+ * check, and the AUMID helper. The C# table is the source: a tool added there without a row in the other places fails
+ * here, and so does a shortcut define that the installer never creates, deletes, or gives an AUMID.
+ */
+function checkToolCatalog() {
+  const name = "tools: every catalog tool is installed, signed, and given an AUMID";
+  const catalog = readRepoFile("src", "Bwc.Core", "ToolCatalog.cs");
+  const identity = readRepoFile("src", "Bwc.Core", "AppIdentity.cs");
+  const common = readRepoFile("installer", "include", "bwc-common.nsh");
+  const nsi = readRepoFile("installer", "bwc.nsi");
+  const rules = readRepoFile("src", "Bwc.Update", "Helper", "ShortcutAumidRules.cs");
+  const exes = ["BetterWindowsConfig.exe", ...[...catalog.matchAll(/"(Bwc[A-Za-z]+\.exe)"/g)].map((match) => match[1])];
+  const problems = [];
+  if (exes.length < 3) problems.push(`ToolCatalog.cs lists ${exes.length - 1} tool exe(s); expected at least two`);
+  for (const exe of exes) {
+    if (!REQUIRED_PUBLISH_FILES.includes(exe)) problems.push(`${exe} is not in REQUIRED_PUBLISH_FILES`);
+    if (!isBwcSigningTarget(exe) || !isBwcSigningTarget(exe.replace(/\.exe$/, ".dll"))) problems.push(`${exe} or its dll is not a signing target`);
+    if (!common.includes(`"${exe}"`)) problems.push(`bwc-common.nsh has no define for ${exe}`);
+  }
+  const shortcuts = [...common.matchAll(/^!define BWC_([A-Z]+)_SHORTCUT "([^"]+)"/gm)];
+  if (shortcuts.length !== exes.length) problems.push(`bwc-common.nsh defines ${shortcuts.length} shortcut(s) for ${exes.length} exe(s)`);
+  for (const [, key, file] of shortcuts) {
+    const aumid = common.match(new RegExp(`^!define BWC_${key}_AUMID "([^"]+)"`, "m"))?.[1];
+    const count = (pattern) => nsi.split("\n").filter((line) => pattern.test(line)).length;
+    if (!aumid) problems.push(`BWC_${key}_AUMID is not defined`);
+    if (count(new RegExp(`^\\s*CreateShortCut .*BWC_${key}_SHORTCUT`)) !== 1) problems.push(`bwc.nsi must create BWC_${key}_SHORTCUT once`);
+    if (count(new RegExp(`BWC_SET_AUMID_BODY .*BWC_${key}_SHORTCUT.*BWC_${key}_AUMID`)) !== 1) problems.push(`bwc.nsi must set BWC_${key}_AUMID once`);
+    if (count(new RegExp(`^\\s*Delete .*BWC_${key}_SHORTCUT`)) !== 2) problems.push(`bwc.nsi must delete BWC_${key}_SHORTCUT in the rollback and the uninstall`);
+    if (aumid && !identity.includes(`"${aumid}"`)) problems.push(`${aumid} is not an AppIdentity id`);
+    if (aumid && !rules.includes(`"${aumid}"`)) problems.push(`${aumid} is not in ShortcutAumidRules`);
+    if (!rules.includes(`"${file}"`)) problems.push(`"${file}" is not in ShortcutAumidRules`);
+  }
+  if (problems.length) fail(name, problems.join("; "));
+  else pass(name, `${exes.length} exes, ${shortcuts.length} shortcuts, each with an AUMID in AppIdentity and ShortcutAumidRules`);
 }
 
 function checkDefines() {
@@ -473,6 +524,7 @@ function main() {
       checkPolicy,
       checkMissingVariables,
       () => checkTargets(publishDir),
+      checkToolCatalog,
       checkDefines,
       checkPathGuard,
       () => checkNsisSource(publishDir),

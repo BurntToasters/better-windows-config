@@ -1,0 +1,1672 @@
+{
+  "case": "B/Pol_Enum_ItemValueList",
+  "description": "Pol_Enum_ItemValueList under Computer Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
+  "planVersion": 2,
+  "planHash": "be8d6f7e3827e9be2d5b15929dd1d2813110a27d886bd3b00813c5e3dfdd6ede",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice whose items write extra values' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice whose items write extra values",
+        "state": "Enabled",
+        "policyId": "Pol_Enum_ItemValueList",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step enabled-defaults",
+      "plan": "snapshot  [step enabled-defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice whose items write extra values' state Enabled options [Profile: = item 'Profile A'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice whose items write extra values",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Profile:",
+            "expectKind": "dropdownList",
+            "item": "Profile A",
+            "elementId": "ProfileChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_ItemValueList",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step enabled-alt1-item0",
+      "plan": "snapshot  [step enabled-alt1-item0]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt1-item0"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice whose items write extra values' state Enabled options [Profile: = item 'Profile B'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice whose items write extra values",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Profile:",
+            "expectKind": "dropdownList",
+            "item": "Profile B",
+            "elementId": "ProfileChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_ItemValueList",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step enabled-alt2-item1",
+      "plan": "snapshot  [step enabled-alt2-item1]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt2-item1"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice whose items write extra values' state Enabled options [Profile: = item 'Profile C'] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice whose items write extra values",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Profile:",
+            "expectKind": "dropdownList",
+            "item": "Profile C",
+            "elementId": "ProfileChoice"
+          }
+        ],
+        "policyId": "Pol_Enum_ItemValueList",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step enabled-alt3-item2",
+      "plan": "snapshot  [step enabled-alt3-item2]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt3-item2"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice whose items write extra values' state Disabled press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice whose items write extra values",
+        "state": "Disabled",
+        "policyId": "Pol_Enum_ItemValueList",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Choice whose items write extra values' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ],
+        "policy": "Choice whose items write extra values",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Enum_ItemValueList",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled-defaults",
+      "folder": "step-01-enabled-defaults",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-alt1-item0",
+      "folder": "step-02-enabled-alt1-item0",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 492,
+          "sha256": "0cae60d7e5849916a43d37f60f4f4163975a3c97927015e8adf1c27088bc77cb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 492
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "enabled-alt2-item1",
+      "folder": "step-03-enabled-alt2-item1",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 492,
+          "sha256": "5d610d944761a0dfe1c484920c08729c744e77470628127b97d6b803782e8040"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 492
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "enabled-alt3-item2",
+      "folder": "step-04-enabled-alt3-item2",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 632,
+          "sha256": "4f148a4671932fbf7d43fcb35be3b1e15d1c0d276c3d7e6102c91cae96764029"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 632
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "disabled",
+      "folder": "step-05-disabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 658,
+          "sha256": "c87bdb84477a22dc27c14249ff6e3f182454ab27d0cca826b923e28be3870837"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 658
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "label": "not-configured",
+      "folder": "step-06-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "6b9dc0c0f2a39b11d083099134a721eb8d73061de6548f26931adf1725ce199b"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "3d7852515a0bf5fb21e7bd617587b28631bf49dfe21ba731d567c4c55a6f2f16"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 148
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Choice whose items write extra values",
+        "before": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                284,
+                848,
+                328,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                284,
+                848,
+                328,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice whose items write extra values",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#0474db6e43e3"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "applyEnabledAfter": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                284,
+                848,
+                328,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "Choice whose items write extra values",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": null
+          }
+        },
+        "finalTitle": "Choice whose items write extra values"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Choice whose items write extra values",
+        "before": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                336,
+                900,
+                328,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Profile A",
+            "requestedIndex": 0,
+            "beforeIndex": -1,
+            "observedIndex": 0,
+            "observedText": "Profile A",
+            "items": [
+              "Profile A",
+              "Profile B",
+              "Profile C"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Profile:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#4797d1e4a4da"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                336,
+                900,
+                328,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Profile A"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice whose items write extra values",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice whose items write extra values"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 492,
+          "sha256": "0cae60d7e5849916a43d37f60f4f4163975a3c97927015e8adf1c27088bc77cb"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Choice whose items write extra values",
+        "before": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                388,
+                952,
+                328,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Profile A"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Profile B",
+            "requestedIndex": 1,
+            "beforeIndex": 0,
+            "observedIndex": 1,
+            "observedText": "Profile B",
+            "items": [
+              "Profile A",
+              "Profile B",
+              "Profile C"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Profile:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#4797d1e4a4da"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                388,
+                952,
+                328,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": 1,
+              "selectedText": "Profile B"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice whose items write extra values",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice whose items write extra values"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 492,
+          "sha256": "5d610d944761a0dfe1c484920c08729c744e77470628127b97d6b803782e8040"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 2,
+      "gptVersionAfter": 3,
+      "data": {
+        "policy": "Choice whose items write extra values",
+        "before": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                440,
+                1004,
+                328,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": 1,
+              "selectedText": "Profile B"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "requestedItem": "Profile C",
+            "requestedIndex": 2,
+            "beforeIndex": 1,
+            "observedIndex": 2,
+            "observedText": "Profile C",
+            "items": [
+              "Profile A",
+              "Profile B",
+              "Profile C"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Profile:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#4797d1e4a4da"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                440,
+                1004,
+                328,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "Profile C"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice whose items write extra values",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice whose items write extra values"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 632,
+          "sha256": "4f148a4671932fbf7d43fcb35be3b1e15d1c0d276c3d7e6102c91cae96764029"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 3,
+      "gptVersionAfter": 4,
+      "data": {
+        "policy": "Choice whose items write extra values",
+        "before": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                492,
+                1056,
+                328,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": 2,
+              "selectedText": "Profile C"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                492,
+                1056,
+                328,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Profile A"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice whose items write extra values",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice whose items write extra values"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 658,
+          "sha256": "c87bdb84477a22dc27c14249ff6e3f182454ab27d0cca826b923e28be3870837"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "6b0864dbdcd387ac396e46597984ee7857edeb250bff87964386fa3cee40e52f"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      }
+    },
+    {
+      "index": 10,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 4,
+      "gptVersionAfter": 5,
+      "data": {
+        "policy": "Choice whose items write extra values",
+        "before": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                544,
+                1108,
+                328,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Choice whose items write extra values",
+          "windowTitle": "Choice whose items write extra values",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#e999b3009cea",
+              "label": "Profile:",
+              "panelId": "#ae275ae3609d",
+              "controlId": "#4797d1e4a4da",
+              "rect": [
+                544,
+                1108,
+                328,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Profile A",
+                "Profile B",
+                "Profile C"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Choice whose items write extra values",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 5,
+                "machine": 5,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Choice whose items write extra values"
+      }
+    },
+    {
+      "index": 11,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 148,
+          "sha256": "6b9dc0c0f2a39b11d083099134a721eb8d73061de6548f26931adf1725ce199b"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "3d7852515a0bf5fb21e7bd617587b28631bf49dfe21ba731d567c4c55a6f2f16"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 5,
+        "machine": 5,
+        "user": 0
+      }
+    }
+  ]
+}

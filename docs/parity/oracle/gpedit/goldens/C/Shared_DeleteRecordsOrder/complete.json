@@ -1,0 +1,28 @@
+{
+  "case": "C/Shared_DeleteRecordsOrder",
+  "planHash": "7f344e8a90a86b2e616172797821004573c227ea6e2b037f497a484bf61cbb8c",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-zeta-disabled/Machine.Registry.pol",
+    "step-01-zeta-disabled/Machine.comment.cmtx",
+    "step-01-zeta-disabled/gpt.ini",
+    "step-02-alpha-disabled/Machine.Registry.pol",
+    "step-02-alpha-disabled/Machine.comment.cmtx",
+    "step-02-alpha-disabled/gpt.ini",
+    "step-03-mid-disabled/Machine.Registry.pol",
+    "step-03-mid-disabled/Machine.comment.cmtx",
+    "step-03-mid-disabled/gpt.ini",
+    "step-04-alpha-not-configured/Machine.Registry.pol",
+    "step-04-alpha-not-configured/Machine.comment.cmtx",
+    "step-04-alpha-not-configured/gpt.ini",
+    "step-05-zeta-not-configured/Machine.Registry.pol",
+    "step-05-zeta-not-configured/Machine.comment.cmtx",
+    "step-05-zeta-not-configured/gpt.ini",
+    "step-06-mid-not-configured/Machine.Registry.pol",
+    "step-06-mid-not-configured/Machine.comment.cmtx",
+    "step-06-mid-not-configured/gpt.ini"
+  ]
+}

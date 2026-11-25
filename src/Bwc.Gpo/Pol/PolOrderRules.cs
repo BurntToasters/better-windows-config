@@ -1,0 +1,131 @@
+namespace Bwc.Gpo.Pol;
+
+/// <summary>
+/// Every record-order and file-shape rule of the model, in one place. A rule that names a capture case is settled by it;
+/// one that points at a row of the Gaps section of docs/parity/gpedit-audit.md has no capture yet
+/// (docs/contracts/policy-engine.md, "Ordered model").
+/// </summary>
+internal static class PolOrderRules
+{
+    /// <summary>
+    /// The order keys are written in, settled by D/Order_KeysDescending, D/Order_KeysInterleaved and D/Order_ParentAfterChild
+    /// (the saved file puts keys in this order whatever the order they were in). A tree walk: key paths split on backslash,
+    /// each segment compared ordinally by uppercase, a key before its descendants. Ties between distinct spellings that
+    /// compare equal are broken ordinally so the output is deterministic. The regedit display comparer (NLS, user
+    /// locale) is not used because saved bytes must not depend on the locale.
+    /// </summary>
+    public static IComparer<string> KeyComparer { get; } = new RegistryKeyComparer();
+
+    /// <summary>
+    /// Value-name prefixes of the instructions that belong to one value and are removed with it by
+    /// <see cref="PolDocument.RemoveInstructions"/>. No capture removes a value that has a soft or delete instruction beside
+    /// it and then saves again: gap GAP-01 in docs/parity/gpedit-audit.md.
+    /// </summary>
+    public static readonly string[] PerValueInstructionPrefixes = [PolFormat.DeletePrefix, PolFormat.SoftPrefix];
+
+    /// <summary>
+    /// The bytes written for a document with no records: the bare 8-byte header. Settled by B/Pol_List_Additive step 6, where
+    /// the last Not Configured leaves a Registry.pol of 8 bytes.
+    /// </summary>
+    public static byte[] EmptyDocumentBytes() => PolFormat.Header.ToArray();
+
+    /// <summary>
+    /// Classic probe (2026-11-18): setting a value to different data removes its record and appends the new one at the
+    /// end of its key. Setting the same type and data changes nothing, see <see cref="IsSameContent"/>.
+    /// </summary>
+    public static LinkedListNode<PolRecord> ReplaceByAppend(
+        LinkedList<PolRecord> recordsOfKey,
+        LinkedListNode<PolRecord> existing,
+        PolRecord replacement)
+    {
+        recordsOfKey.Remove(existing);
+        return recordsOfKey.AddLast(replacement);
+    }
+
+    /// <summary>Classic probe (2026-11-18): a set with the same type and data bytes is not a change.</summary>
+    public static bool IsSameContent(PolRecord existing, uint type, ReadOnlySpan<byte> data) =>
+        existing.Type == type && existing.Data.Span.SequenceEqual(data);
+
+    /// <summary>
+    /// A new value, including one created again after it was deleted, goes to the end of its key.
+    /// </summary>
+    public static LinkedListNode<PolRecord> AppendToKey(LinkedList<PolRecord> recordsOfKey, PolRecord record) =>
+        recordsOfKey.AddLast(record);
+
+    /// <summary>
+    /// <c>**delvals.</c> goes to the front of its key, before every other record (B/Pol_List_Plain, B/Pol_SharedList_Two,
+    /// C/SharedList_TwoThenOne). A record in front of it would be deleted when the file is applied, so the front keeps every
+    /// existing record meaningful. A record that already exists is moved to the front too (the old node is removed first).
+    /// </summary>
+    public static LinkedListNode<PolRecord> PlaceDeleteValues(
+        LinkedList<PolRecord> recordsOfKey,
+        LinkedListNode<PolRecord>? existing,
+        PolRecord record)
+    {
+        if (existing is not null)
+        {
+            recordsOfKey.Remove(existing);
+        }
+
+        return recordsOfKey.AddFirst(record);
+    }
+
+    private sealed class RegistryKeyComparer : IComparer<string>
+    {
+        public int Compare(string? x, string? y)
+        {
+            if (ReferenceEquals(x, y))
+            {
+                return 0;
+            }
+
+            if (x is null)
+            {
+                return -1;
+            }
+
+            if (y is null)
+            {
+                return 1;
+            }
+
+            var i = 0;
+            var j = 0;
+            while (true)
+            {
+                var endX = x.IndexOf('\\', i);
+                if (endX < 0)
+                {
+                    endX = x.Length;
+                }
+
+                var endY = y.IndexOf('\\', j);
+                if (endY < 0)
+                {
+                    endY = y.Length;
+                }
+
+                var result = x.AsSpan(i, endX - i).CompareTo(y.AsSpan(j, endY - j), StringComparison.OrdinalIgnoreCase);
+                if (result != 0)
+                {
+                    return result;
+                }
+
+                var xDone = endX >= x.Length;
+                var yDone = endY >= y.Length;
+                if (xDone || yDone)
+                {
+                    if (xDone && yDone)
+                    {
+                        return string.CompareOrdinal(x, y);
+                    }
+
+                    return xDone ? -1 : 1;
+                }
+
+                i = endX + 1;
+                j = endY + 1;
+            }
+        }
+    }
+}

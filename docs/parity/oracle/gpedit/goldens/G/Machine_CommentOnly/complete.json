@@ -1,0 +1,16 @@
+{
+  "case": "G/Machine_CommentOnly",
+  "planHash": "ba17f07ff88c6644ac434787ba48e126be490a84771d3560ed2386678445495c",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-comment/Machine.Registry.pol",
+    "step-01-comment/Machine.comment.cmtx",
+    "step-01-comment/gpt.ini",
+    "step-02-enabled/Machine.Registry.pol",
+    "step-02-enabled/Machine.comment.cmtx",
+    "step-02-enabled/gpt.ini"
+  ]
+}

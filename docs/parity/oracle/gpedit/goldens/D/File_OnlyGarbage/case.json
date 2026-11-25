@@ -1,0 +1,238 @@
+{
+  "case": "D/File_OnlyGarbage",
+  "description": "Registry.pol that is eight bytes of text",
+  "planVersion": 2,
+  "planHash": "c4bb02f174c59a16d5238a3d347fa3a29e58b3ff2dc81b71db2757ede0088bf4",
+  "startState": {
+    "description": "garbage Registry.pol",
+    "files": [
+      {
+        "name": "Machine.Registry.pol",
+        "size": 8,
+        "sha256": "c4966e1dfb7325330b14fb9e30539c5fa6eb286266c2f7dac7e95b5727d6cb1c"
+      }
+    ]
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "label": "step start",
+      "plan": "snapshot  [step start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step start"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "readList",
+      "label": null,
+      "plan": "readList at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "readList",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "editPolicy",
+      "label": "read state of Pol_Class_Machine under Computer",
+      "plan": "editPolicy 'Class machine flag' press [Cancel] at Computer/Administrative Templates/BWC Oracle/Basics  [read state of Pol_Class_Machine under Computer]",
+      "op": {
+        "kind": "editPolicy",
+        "label": "read state of Pol_Class_Machine under Computer",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class machine flag",
+        "policyId": "Pol_Class_Machine",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Zulu sort case' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Sort cases",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ],
+        "policy": "Zulu sort case",
+        "state": "Enabled",
+        "policyId": "Pol_Sort_Zulu",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step unrelated-save",
+      "plan": "snapshot  [step unrelated-save]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step unrelated-save"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Zulu sort case' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Sort cases",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ],
+        "policy": "Zulu sort case",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Sort_Zulu",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step unrelated-cleared",
+      "plan": "snapshot  [step unrelated-cleared]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step unrelated-cleared"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "after-refusal",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "c4966e1dfb7325330b14fb9e30539c5fa6eb286266c2f7dac7e95b5727d6cb1c"
+        },
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 1,
+      "kind": "selectNode",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 2,
+      "kind": "readList",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 3,
+      "kind": "editPolicy",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": false,
+      "skipped": true,
+      "startRefused": true
+    }
+  ],
+  "startRefused": true,
+  "startFilesUnchanged": false
+}

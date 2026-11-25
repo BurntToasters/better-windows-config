@@ -1,0 +1,28 @@
+{
+  "case": "C/Cmtx_FirstSave_ThenUser",
+  "planHash": "b64fec9a0d37f2d030eef77a32238463b6e4b0431bc0338bec1991ef7f32e621",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.comment.cmtx",
+    "step-01-start/Machine.comment.cmtx",
+    "step-01-start/gpt.ini",
+    "step-02-machine/Machine.Registry.pol",
+    "step-02-machine/Machine.comment.cmtx",
+    "step-02-machine/gpt.ini",
+    "step-03-user/Machine.Registry.pol",
+    "step-03-user/Machine.comment.cmtx",
+    "step-03-user/User.Registry.pol",
+    "step-03-user/User.comment.cmtx",
+    "step-03-user/gpt.ini",
+    "step-04-user-comment/Machine.Registry.pol",
+    "step-04-user-comment/Machine.comment.cmtx",
+    "step-04-user-comment/User.Registry.pol",
+    "step-04-user-comment/User.comment.cmtx",
+    "step-04-user-comment/gpt.ini"
+  ]
+}

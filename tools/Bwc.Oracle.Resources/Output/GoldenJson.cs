@@ -17,9 +17,12 @@ internal static class GoldenJson
     };
 
     /// Two-space indent, LF newlines, trailing newline. No timestamps, so output is byte-identical across runs.
-    public static string Serialize(GoldenFile file)
+    public static string Serialize(GoldenFile file) => Serialize<GoldenFile>(file);
+
+    /// The same options for any other dump (forms, console file, index).
+    public static string Serialize<T>(T value)
     {
-        string json = JsonSerializer.Serialize(file, Options);
+        string json = JsonSerializer.Serialize(value, Options);
         // The serializer writes Environment.NewLine. Raw CR never appears inside strings (they are escaped).
         return json.Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
     }

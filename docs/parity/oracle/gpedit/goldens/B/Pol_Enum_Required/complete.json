@@ -1,0 +1,23 @@
+{
+  "case": "B/Pol_Enum_Required",
+  "planHash": "413ba1d8fb894dea4571fa9bd4096933e5b61d7dfd1ce92f65cb3e5e6c528ecb",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-enabled-alt1-item0/Machine.Registry.pol",
+    "step-02-enabled-alt1-item0/Machine.comment.cmtx",
+    "step-02-enabled-alt1-item0/gpt.ini",
+    "step-03-enabled-alt2-item1/Machine.Registry.pol",
+    "step-03-enabled-alt2-item1/Machine.comment.cmtx",
+    "step-03-enabled-alt2-item1/gpt.ini",
+    "step-04-disabled/Machine.Registry.pol",
+    "step-04-disabled/Machine.comment.cmtx",
+    "step-04-disabled/gpt.ini",
+    "step-05-not-configured/Machine.Registry.pol",
+    "step-05-not-configured/Machine.comment.cmtx",
+    "step-05-not-configured/gpt.ini"
+  ]
+}

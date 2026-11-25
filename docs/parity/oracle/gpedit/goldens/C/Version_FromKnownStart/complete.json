@@ -1,0 +1,22 @@
+{
+  "case": "C/Version_FromKnownStart",
+  "planHash": "a338dd33cafa74a3450d3263bbac55ecc540b684c13024e0c82c6090ccb8ef80",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-machine/Machine.Registry.pol",
+    "step-02-machine/Machine.comment.cmtx",
+    "step-02-machine/gpt.ini",
+    "step-03-user/Machine.Registry.pol",
+    "step-03-user/Machine.comment.cmtx",
+    "step-03-user/User.Registry.pol",
+    "step-03-user/User.comment.cmtx",
+    "step-03-user/gpt.ini"
+  ]
+}

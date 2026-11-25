@@ -1,0 +1,324 @@
+{
+  "case": "E/Next_WithInvalid",
+  "description": "required decimal left empty and Next Setting pressed, then Cancel",
+  "planVersion": 2,
+  "planHash": "e4bd1d075b92af4addb59e0aee5e564e538d2bd0c64f3ff2726ee01a76693f7c",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Decimal that is required' state Enabled options [Required number: = text ''] press [Next, Cancel] at User/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "editPolicy",
+        "root": "User",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ],
+        "policy": "Decimal that is required",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Required number:",
+            "expectKind": "decimalTextBox",
+            "text": "",
+            "elementId": "RequiredNumber"
+          }
+        ],
+        "press": [
+          "Next",
+          "Cancel"
+        ],
+        "policyId": "Pol_Decimal_Required",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": true
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step next",
+      "plan": "snapshot  [step next]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step next"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "next",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Decimal that is required",
+        "before": {
+          "title": "Decimal that is required",
+          "windowTitle": "Decimal that is required",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number that must be entered. It has no range. The presentation turns the spin buttons off.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Required number:",
+              "panelId": "#e89a7390c9d6",
+              "controlId": "#46886a766af5",
+              "rect": [
+                180,
+                744,
+                468,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "",
+            "before": "1",
+            "immediate": "",
+            "observed": "",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Required number:",
+            "labelMatch": "exact",
+            "kind": "#68e85187d390",
+            "controlId": "#46886a766af5"
+          }
+        ],
+        "afterSet": {
+          "title": "Decimal that is required",
+          "windowTitle": "Decimal that is required",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A number that must be entered. It has no range. The presentation turns the spin buttons off.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Required number:",
+              "panelId": "#e89a7390c9d6",
+              "controlId": "#46886a766af5",
+              "rect": [
+                180,
+                744,
+                468,
+                58
+              ],
+              "enabled": true,
+              "text": ""
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "Next",
+            "enabledBefore": true,
+            "titleBefore": "Decimal that is required",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#0474db6e43e3"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "titleAfter": "Long decimal required, soft, stored as text",
+            "moved": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "Long decimal required, soft, stored as text",
+          "windowTitle": "Long decimal required, soft, stored as text",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A 64-bit number that is required, soft, and stored as a string value.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "#ebdd7dcea300",
+              "panelId": "#90e74ad3ed30",
+              "controlId": "#58ae412117b9",
+              "rect": [
+                180,
+                744,
+                524,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "Long decimal required, soft, stored as text",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": null
+          }
+        },
+        "finalTitle": "Long decimal required, soft, stored as text"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    }
+  ]
+}

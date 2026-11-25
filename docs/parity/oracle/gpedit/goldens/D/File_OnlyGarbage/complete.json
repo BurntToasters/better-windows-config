@@ -1,0 +1,10 @@
+{
+  "case": "D/File_OnlyGarbage",
+  "planHash": "c4bb02f174c59a16d5238a3d347fa3a29e58b3ff2dc81b71db2757ede0088bf4",
+  "files": [
+    "Machine.Registry.pol",
+    "case.json",
+    "gpt.ini",
+    "start/Machine.Registry.pol"
+  ]
+}

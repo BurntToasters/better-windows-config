@@ -1,0 +1,10 @@
+{
+  "case": "E/List_Explicit_EmptyValue",
+  "planHash": "01ff7527f2cff24247704d81076acc00cd61ca6851cdd557698db7d00d4185af",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini"
+  ]
+}

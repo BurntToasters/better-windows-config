@@ -33,6 +33,10 @@ if ((Split-Path -Leaf $RunnerRoot) -ne 'BwcElevatedRunner') {
     Write-Host ('Refusing to delete an unexpected folder: {0}' -f $RunnerRoot)
     exit 1
 }
+$MarkerPath = Join-Path $RunnerRoot 'real-save.marker'
+if (Test-Path -LiteralPath $MarkerPath) {
+    Remove-Item -LiteralPath $MarkerPath -Force
+}
 if (Test-Path -LiteralPath $RunnerRoot) {
     Remove-Item -LiteralPath $RunnerRoot -Recurse -Force
     Write-Host ('Removed {0}.' -f $RunnerRoot)

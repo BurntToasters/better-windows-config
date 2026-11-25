@@ -1,0 +1,692 @@
+# Better Windows Config: gpedit parity audit
+
+## Method
+
+This file holds the verdicts for `docs/parity/gpedit-inventory.md` (release 0.2.0, branch `next-0.2.0`). Each of the 534 inventory rows has one line below, and the declared differences are listed again in their own section. Every verdict started as `open`. The audit piece (A1) and the pieces that build each feature move a row to a verdict, in this file and in the inventory together, so the Status column of the inventory stays equal to this file.
+
+Verdicts:
+
+- `pass`: a named test or golden proves the row. E2E tests are named by method (`tests/Bwc.E2E`), engine tests by class (`tests/Bwc.Policy.Tests`, `tests/Bwc.Gpo.Tests`). A row that states no behavior says so.
+- `declared-difference`: BWC differs on purpose. The reason is in the row.
+- `gap`: not proven or not built. The Piece column names the work piece that closes it.
+- `removed`: the row was retired by a user decision. It carries the reason and needs no further verdict.
+- `open`: not judged yet.
+
+Inputs for the verdicts: the capture goldens under `docs/parity/oracle/gpedit/goldens` (336 cases), the static dump, `string-parity.json` for MSG rows, and the visual review against the group F captures. The recapture of the 11 CAP-4 cases is committed (6eba6cb to f01bc41): the goldens hold the recaptured bytes, and a POL row that cites one of them is judged on those bytes.
+
+When a piece closes a gap, it changes the row here and in the inventory to `pass` with its test, or to `declared-difference` with the reason.
+
+State after A1 (2026-11-22, HEAD 5ccff10): every row has a verdict. E2E evidence is the latest full arm64 E2E flavor run (`artifacts/e2e/result-win-arm64-e2e-full.json`, from commit a28ee65) and the later filtered runs; every test named here passed. The U3b tests (`Console_Options_*`, `Gpedit_Help_*`) came after the full run and passed in filtered runs, marked "filtered run". Engine classes passed in the latest quick gate. MSG counts are those of the current `string-parity.json`; the counts in the inventory's oracle column are older. The 7 rows that waited for the CAP-4 recapture (POL-018, POL-020, POL-021, POL-059 to POL-062) are `pass` now, each with the test that replays its recaptured cases. `tests/Bwc.Policy.Tests/Golden/awaiting-recapture.txt` holds no case, and `AwaitingRecaptureListIsEmpty` passes. The policy test project, with the ReleaseGate tests included, ran 1541 tests with 0 failed.
+
+## Totals
+
+| Section | pass | declared-difference | gap | removed | open |
+| --- | --- | --- | --- | --- | --- |
+| MENU | 36 | 4 | 0 | 1 | 0 |
+| CTX | 9 | 2 | 0 | 0 | 0 |
+| TOOL | 16 | 1 | 0 | 0 | 0 |
+| DLG | 35 | 88 | 0 | 0 | 0 |
+| ACC | 41 | 9 | 0 | 0 | 0 |
+| MSG | 8 | 85 | 0 | 0 | 0 |
+| VIEW | 28 | 15 | 0 | 0 | 0 |
+| TREE | 17 | 2 | 0 | 1 | 0 |
+| BEH | 24 | 4 | 0 | 1 | 0 |
+| POL | 75 | 0 | 0 | 0 | 0 |
+| ADMX | 32 | 0 | 0 | 0 | 0 |
+| All (534) | 321 | 210 | 0 | 3 | 0 |
+
+## Gaps
+
+Engine rules that no capture settles are listed first (E6c). Each has a pointer comment in the source. The gap rows of the audit follow them.
+
+| ID | Rule | What is missing | Where |
+| --- | --- | --- | --- |
+| GAP-01 | The value-name prefixes (`**del.`, `**soft.`) removed with their value when a value is replaced or cleared. | No capture sets or clears a value that has a soft or delete record next to it and then saves. | `PolOrderRules.PerValueInstructionPrefixes` |
+| GAP-02 | The flag of the refresh call after a save. | Group G captures show classic omits `RP_FORCE` (`*_Disabled` step 1 skipped `v=1` right after `*_Ok` left `gpsvc` at `v=1`). BWC intentionally passes `RP_FORCE` (gpo-store.md H5). | `UserenvPolicyRefresher` |
+| GAP-03 | An additive list keeps the foreign values of its key. | B/Pol_List_Additive starts empty; no start has a foreign value at an additive key. | `PolicyRules.AdditiveListKeepsOtherValues` |
+| GAP-04 | Enabling an additive list removes a delete-values record of its key. | No start has a delete-values record at an additive key. | `PolicyRules.AdditiveListRemovesDelvals` |
+| GAP-05 | A tail after the last record that is not one stray character (odd length, several characters, a lone NUL) is refused. | D/File_TrailingBytes has one stray character only. | `PolReader.IsStrayTail` |
+| GAP-06 | A key that a new record joins takes the spelling of its ancestors; on load two spellings of one key merge under the first. | D/Case_KeyDiffers and D/Case_KeyTwoSpellings show one level; deeper trees and ties between several first spellings are not captured. | `PolDocument.SpellNewKey` |
+| GAP-07 | The namespaces that stay in comment.cmtx after the first save of a session. | Only the one-namespace case is captured (A/Machine_Enabled, A/User_Enabled). | `CmtxDocument.RestrictNamespacesTo` |
+
+Gap rows of the audit (A1): 0 open gap rows remain (`ACC 0, MSG 0, VIEW 0, TREE 0, BEH 0, POL 0, ADMX 0`). Piece A2 closed `BEH-027` and `POL-068` to `POL-072` in elevated run `20261125-043437-21d28993` (`708/708` checks, `29/29` Group G cases in `GpeditInterop_GroupG_LiveRegistryReplay`), and `ACC-030` and `ACC-031` were declared by user decision on 2026-11-24.
+
+Notes for the fix pieces:
+
+- The context menu rows (CTX-001 to CTX-006) and TOOL-009 were closed by A3a-1; CTX-010, TOOL-014, ACC-001, ACC-003, ACC-005 and ACC-008 were declared by it (user to confirm).
+- The MSG gaps were closed by A3b (the 17 rows, `pass` or `declared-difference`). The string check now compares access keys, a trailing ellipsis, the label before a help line or tooltip, a format string with its argument (`with <module>:<id>` in the citing comment), the console frame strings and the managed resources of the setting dialog (`forms:` ids); `docs/failure-modes/oracle.md`, section 19. BWC text that was changed to the classic wording: the three Filter Options refusals, Line up Icons, the Administrative Templates node text.
+- The latest full E2E run fails one check only, the category guard: `Gpedit_ReadOnly_Notice` has no E2EOnly category and is not on the allowlist. The test itself passes. A3 adds the category.
+
+## Declared differences
+
+The declared differences of section 3 of the inventory, and the two user decisions of 2026-11-22.
+
+| ID | Difference | Reason | Piece |
+| --- | --- | --- | --- |
+| DIFF-001 | BWC opens read-only when the process is not elevated or the edition is Home. Classic refuses to open. | Showing current policy is useful and safe; writing is blocked. | G4, E3 |
+| DIFF-002 | The Extended view pane is native. Classic shows an HTML page. | The HTML control is not available to a WinUI tool. | U2c |
+| DIFF-003 | Save reads, modifies and writes under a file lock, so an edit made outside BWC is not overwritten. | Safer than classic's whole-file rewrite from a stale model. | E3 |
+| DIFF-004 | A backup of the three GPO files (Registry.pol, gpt.ini, comment.cmtx) is kept before the first write of a session in `%ProgramData%\BetterWindowsConfig\gpedit\backup`, last 10. | Recovery from a bad edit; classic keeps no backup. | E3 |
+| DIFF-005 | Imported templates live in the BWC store, not the system folder. Classic `.adm` files are not supported. | Keeps system files untouched and the store admin-only. | G6, E5 |
+| DIFF-006 | Help Topics and About follow the precedent set by the Registry Editor. | Consistent with the existing tool. | U3b |
+| DIFF-007 | Refresh is a BWC addition: the Action menu, all three context menus, the toolbar button and F5 reload the templates and the policy files. Classic has no Refresh entry in any dump and F5 does nothing (ACC-004, ACC-027, ACC-044, BEH-022). | A policy file or template that changes while the editor runs is otherwise visible only after a restart. | G2 |
+| MENU-037 | No Favorites menu. | Removed by the user decision of 2026-11-22. Classic shows no Favorites menu at run time, so BWC builds none. | none |
+| TREE-020 | No Extra Registry Settings node. | Removed by the user decision of 2026-11-22. Classic shows no Extra Registry Settings node; records that match no policy stay invisible (BEH-014). | none |
+| BEH-012 | Retired: the Extra Registry Settings node row. | Retired by the user decision of 2026-11-22 (no Extra Registry Settings node); replaced by BEH-014. | none |
+
+The differences decided during the overnight run, with the rows that carry them (the reason is quoted in each row):
+
+| Difference | Rows | Source |
+| --- | --- | --- |
+| Template load errors show as a status bar notice and the Problems list, not a start message box. | DLG-121, DLG-122, VIEW-038, VIEW-040 | `docs/failure-modes/gpedit-templates.md` |
+| One bad template does not hide the rest, and every problem is recorded. | BEH-009 | `docs/failure-modes/gpedit-templates.md` |
+| Template import refuses classic `.adm` files. | BEH-008 | DIFF-005, `docs/failure-modes/gpedit-templates.md` |
+| Sorting is kept per node. | BEH-025 | `docs/failure-modes/gpedit-filter.md` |
+| The Options page fixes or disables the console-authoring parts and has OK and Cancel. | DLG-119 | `docs/failure-modes/console-options.md` |
+| The setting dialog has no maximize box, and each radio button is a tab stop. | DLG-089, DLG-095, VIEW-027 to VIEW-037 | `docs/failure-modes/gpedit-dialog.md` |
+| The tree context menu is a BWC definition (not captured). | CTX-009 | `docs/failure-modes/gpedit-commands.md` |
+| No menu on a column header or the description pane (not captured, no commands there). | CTX-010 | `docs/failure-modes/gpedit-commands.md`, section 11; declared by the manager, user to confirm |
+| No action pane toggle button (BWC has no action pane). | TOOL-014 | `docs/failure-modes/gpedit-commands.md`, section 11; declared by the manager, user to confirm |
+| Ctrl+P, Ctrl+F10, Ctrl+F5 and Ctrl+Alt+Shift+F7 are not bound (not captured; the multiple-window console keys have no meaning in the single-window frame). | ACC-001, ACC-003, ACC-005, ACC-008 | `docs/failure-modes/gpedit-commands.md`, section 11; declared by the manager, user to confirm |
+| The icon arrangement entries run over the view modes: BWC has no free icon placement, so Line Up Icons lays the grid out again and Auto Arrange toggles. | CTX-003 | `docs/failure-modes/gpedit-commands.md`, section 11.11 |
+| Each template problem shows a BWC sentence for its engine code, with the code kept as a detail; classic shows its own texts in one start-up box. | MSG-031 to MSG-033 | `docs/failure-modes/gpedit-templates.md`, section 10 |
+| The Show Contents refusals and the number and text validation messages are the managed texts of the setting dialog, not the native admtmpl texts of ids 33 to 36 and 100 to 103. | MSG-024, MSG-028 | MSG-093 (string-parity, `forms:` ids) |
+| The Export List write errors and the Filter Options status words are BWC wording; the Export List file types differ from classic in letter case only. | MSG-038, MSG-059 | `docs/failure-modes/console-frame.md`, `docs/failure-modes/gpedit-filter.md`; the case fix is open (Resources.resw of Bwc.UI) |
+| Alt+Left and Alt+Right walk the console history from any pane (including the result list), handled by the shared console frame. | ACC-030, ACC-031 | User decision of 2026-11-24; `Gpedit_Keys_TreeHistoryResult` |
+
+Not differences: the default list order and the policy id ordering follow classic (VIEW-013, pass). The Export List format and encodings (`docs/failure-modes/console-frame.md`, declared difference 5) are a BWC definition, but no inventory row states classic's format, so no row carries them. The Help web site entry (MENU-034) exists as in classic and opens the project page; it is `pass`, for the user to confirm. Resources classic never shows in the local editor (static menus, wizard pages, Favorites dialogs, the author mode and MDI tables) are `declared-difference` "not reachable in the local editor, not built".
+
+## Rows
+
+### MENU
+
+| ID | Verdict | Evidence or reason | Piece |
+| --- | --- | --- | --- |
+| MENU-001 | pass | Console_Shell_Layout (menuNames: File, Action, View, Help in that order). The static Favorites, snap-in and Window entries are not built (MENU-037, MENU-041). | U3, G2 |
+| MENU-002 | pass | Console_Options_Menu_FileLayout (filtered run). | U3 |
+| MENU-003 | pass | Console_Options_Menu_FileLayout and Console_Options_Menu_AccessKey (filtered run). | U3b |
+| MENU-004 | pass | Console_Options_Menu_FileLayout (filtered run). | U3, G2 |
+| MENU-005 | pass | Console_Options_Menu_FileLayout (filtered run). | U3 |
+| MENU-006 | pass | Gpedit_Menu_Action_NodeKinds and Gpedit_Menu_Action_PolicyRow. | G2 |
+| MENU-007 | pass | Gpedit_Filter_Menu_Action, Console_Export_Menu_NodeKinds, Gpedit_Menu_Action_NodeKinds. The Refresh entry is the DIFF-007 addition. | G2 |
+| MENU-008 | pass | Gpedit_Filter_Menu_Action, Gpedit_Import_Menu_Placement, Console_Export_Menu_NodeKinds. The Refresh entry is the DIFF-007 addition. | G2, G5, G6 |
+| MENU-009 | pass | Gpedit_Filter_Menu_Action, Console_Export_Menu_NodeKinds. The Refresh entry is the DIFF-007 addition. | G2, G5 |
+| MENU-010 | pass | Gpedit_Filter_Menu_Action, Gpedit_Menu_Action_PolicyRow, Console_Export_Menu_NodeKinds. The Refresh entry is the DIFF-007 addition. | G2, G3a |
+| MENU-011 | pass | Gpedit_Import_Menu_Placement. | G6 |
+| MENU-012 | pass | Gpedit_Menu_Action_PolicyRow and Gpedit_Menu_Action_Commands. | G2, G3a |
+| MENU-013 | pass | Gpedit_Filter_Menu_Action. | G5 |
+| MENU-014 | pass | Gpedit_Filter_Menu_Action. | G5 |
+| MENU-015 | pass | Gpedit_Filter_Menu_Action and Gpedit_Filter_KeptOnAcrossNodesAndReApply. | G5 |
+| MENU-016 | pass | Gpedit_Filter_Menu_Action. | G2, G5 |
+| MENU-017 | pass | Console_Export_Menu_NodeKinds. | U3a |
+| MENU-018 | pass | Gpedit_Menu_Action_Commands (Help runs the Help command once). | U3b |
+| MENU-019 | pass | Console_Columns_Menu_Layout. | U3a |
+| MENU-020 | pass | Console_Columns_Menu_Layout and Console_Shell_MenuKeyboard. | U3a |
+| MENU-021 | pass | Gpedit_Filter_Menu_View. | U3a, G5 |
+| MENU-022 | pass | Console_Columns_Menu_Layout and Console_Columns_Dialog_Layout. | U3a |
+| MENU-023 | pass | Console_List_ViewModes and Console_Columns_Menu_Layout. | U3a |
+| MENU-024 | pass | Console_List_ViewModes and Console_Columns_Menu_Layout. | U3a |
+| MENU-025 | pass | Console_List_ViewModes and Console_Columns_Menu_Layout. | U3a |
+| MENU-026 | pass | Console_Columns_Menu_Layout (the list starts in Detail). | U3a |
+| MENU-027 | pass | Gpedit_Filter_Menu_View. | G5 |
+| MENU-028 | pass | Gpedit_Filter_Menu_View. | G5 |
+| MENU-029 | pass | Gpedit_Filter_Menu_View. | G5 |
+| MENU-030 | pass | Console_Columns_Menu_Layout and Console_Customize_Menu_NoToggles. | U3a |
+| MENU-031 | pass | Gpedit_Help_Menu_NodeKinds (filtered run). | U3b |
+| MENU-032 | pass | Gpedit_Help_Menu_NodeKinds (filtered run). | U3b |
+| MENU-033 | pass | Gpedit_Menu_Help_Topics. Help Topics runs the Help command (DIFF-006). | U3b |
+| MENU-034 | pass | Gpedit_Help_WebSite_Entry (filtered run). BWC has the entry, enabled, as classic does; it opens the project page (console-options.md). User to confirm. | U3b, A1 |
+| MENU-035 | pass | Gpedit_Help_About_Box (filtered run). The box follows the Registry Editor (DIFF-006). | U3b |
+| MENU-036 | pass | Gpedit_Help_About_SnapIn and Gpedit_Help_Menu_NodeKinds (filtered run). | U3b |
+| MENU-037 | removed | Removed by the user decision of 2026-11-22. Classic shows no Favorites menu at run time, so BWC builds none. | none |
+| MENU-038 | declared-difference | Static only: not reachable in the local editor, not built. | none |
+| MENU-039 | declared-difference | Static only: not reachable in the local editor, not built. | none |
+| MENU-040 | declared-difference | Static only: not reachable in the local editor, not built. Its view mode and Edit ids are covered by MENU-012 and MENU-023 to MENU-025. | none |
+| MENU-041 | declared-difference | Static only: author mode, MDI and Window menus are not shown by the local editor, not built. | none |
+
+### CTX
+
+| ID | Verdict | Evidence or reason | Piece |
+| --- | --- | --- | --- |
+| CTX-001 | pass | Gpedit_ContextMenu_Layout_NodeKinds and Gpedit_ContextMenu_Layout_Commands: the empty area menu has the export list, View, the arrangement submenu, the line-up entry and Help in the captured groups (Refresh is the DIFF-007 addition, after the line-up entry). | A3a-1 |
+| CTX-002 | pass | Gpedit_ContextMenu_Layout_NodeKinds and Gpedit_ContextMenu_Layout_Commands: the View submenu is columns, the four modes (the current one checked), Customize View, and the filter entries between them at the filter nodes; groups and grayed states equal the capture. | A3a-1 |
+| CTX-003 | pass | Gpedit_ContextMenu_Layout_NodeKinds and Gpedit_ContextMenu_Layout_Commands: the arrangement submenu holds one entry (Auto Arrange, a check item) and the line-up entry follows it. BWC has no free icon placement, so Line Up Icons lays the grid out again and Auto Arrange toggles and lays it out (docs/failure-modes/gpedit-commands.md, 11.11). | A3a-1 |
+| CTX-004 | pass | Gpedit_ContextMenu_Layout_NodeKinds at Software Settings: no export list, View, the arrangement entries, Help. A right click on the placeholder page opens the menu. | A3a-1 |
+| CTX-005 | pass | Gpedit_ContextMenu_Layout_NodeKinds at Administrative Templates (both sides): export list, View with the filter entries between the modes and Customize View, the arrangement entries, Help; no Add/Remove Templates. | A3a-1 |
+| CTX-006 | pass | Gpedit_ContextMenu_Layout_NodeKinds at a category, a category with policies and All Settings (both sides). | A3a-1 |
+| CTX-007 | pass | Gpedit_Filter_ContextMenu_List and Gpedit_ContextMenu_List_PolicyRow. The Refresh entry is the DIFF-007 addition. | G2, G3a, G5 |
+| CTX-008 | pass | Gpedit_ContextMenu_List_NoRow and Gpedit_Menu_Action_NodeKinds. | G2 |
+| CTX-009 | declared-difference | Not captured. BWC definition (gpedit-commands.md, gpedit-filter.md): the tree menu holds the filter entries flat where the node has the filter, then Refresh and Help. Gpedit_ContextMenu_Tree and Gpedit_Filter_ContextMenu_Tree. | G2, A1 |
+| CTX-010 | declared-difference | Not captured, and BWC has no commands for a column header or the description pane, so no menu opens there. Declared by the manager (A3a-1), user to confirm. | A3a-1 |
+| CTX-011 | pass | Gpedit_ContextMenu_List_PolicyRow (a command runs and the menu closes; Escape leaves the focus in the list) and Gpedit_ContextMenu_Tree. | G2 |
+
+### TOOL
+
+| ID | Verdict | Evidence or reason | Piece |
+| --- | --- | --- | --- |
+| TOOL-001 | pass | Console_Shell_Layout (menu and toolbar bands, toolbar control type). | U3, G2 |
+| TOOL-002 | pass | Console_Shell_Layout (menu names and order). The button widths are text widths and are not asserted. | U3 |
+| TOOL-003 | pass | Console_Shell_Layout (buttonSize 23 by 22 DIP, buttons in order) and Gpedit_Filter_Toolbar_Button. | U3, G2 |
+| TOOL-004 | pass | Gpedit_Toolbar_States and Gpedit_Toolbar_History. | G2 |
+| TOOL-005 | pass | Gpedit_Toolbar_States and Gpedit_Toolbar_History. | G2 |
+| TOOL-006 | pass | Console_Shell_Layout (standard order with its separators). | U3 |
+| TOOL-007 | pass | Gpedit_Toolbar_States and Gpedit_Toolbar_Commands. | G2 |
+| TOOL-008 | pass | Gpedit_Toolbar_Commands and Console_Customize_Switches_ActAtOnce. | U3a |
+| TOOL-009 | pass | Gpedit_Toolbar_PropertiesHidden: the Properties button is not shown at any node kind or with a row selected, and the visible standard buttons are the 7 of F/Toolbar_States (Refresh in place of the action pane toggle, DIFF-007 and TOOL-014). Edit stays in the Action menu (Gpedit_Toolbar_Commands). | A3a-1 |
+| TOOL-010 | pass | Console_Shell_Layout (standard order with its separators). | U3 |
+| TOOL-011 | pass | Console_Export_Menu_NodeKinds and Console_Export_Dialog_Types. | U3a |
+| TOOL-012 | pass | Console_Shell_Layout (standard order with its separators). | U3 |
+| TOOL-013 | pass | Gpedit_Toolbar_States and Gpedit_Toolbar_Commands. | U3b |
+| TOOL-014 | declared-difference | BWC has no action pane, so there is nothing for the toggle button to show or hide. Declared by the manager (A3a-1), user to confirm. | A3a-1 |
+| TOOL-015 | pass | Gpedit_Filter_Toolbar_Button and Console_Customize_SnapInToolbars_Editor. | G5 |
+| TOOL-016 | pass | Gpedit_Toolbar_States and Gpedit_Filter_Toolbar_Button. | G2 |
+| TOOL-017 | pass | Console_Customize_Switches_ActAtOnce and Console_Shell_ShowHide. | U3a |
+
+### DLG
+
+| ID | Verdict | Evidence or reason | Piece |
+| --- | --- | --- | --- |
+| DLG-001 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-002 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-003 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-004 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-005 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-006 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-007 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-008 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-009 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-010 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-011 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-012 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-013 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-014 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-015 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-016 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-017 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-018 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-019 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-020 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-021 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-022 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-023 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-024 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-025 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-026 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-027 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-028 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-029 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-030 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-031 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-032 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-033 | pass | Gpedit_Import_Dialog_Layout. | G6 |
+| DLG-034 | pass | Gpedit_Import_Refused_BadFixtures and Gpedit_Import_StoreUnavailable (the details box with Close shows on a refusal). | G6 |
+| DLG-035 | pass | Gpedit_Filter_Dialog_Layout. | G5 |
+| DLG-036 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-037 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-038 | pass | Console_Options_Dialog_Layout (filtered run). | U3b |
+| DLG-039 | declared-difference | A Favorites dialog: not reachable in the local editor (no Favorites menu, MENU-037), not built. | none |
+| DLG-040 | declared-difference | A Favorites dialog: not reachable in the local editor (no Favorites menu, MENU-037), not built. | none |
+| DLG-041 | declared-difference | A Favorites dialog: not reachable in the local editor (no Favorites menu, MENU-037), not built. | none |
+| DLG-042 | declared-difference | A Favorites dialog: not reachable in the local editor (no Favorites menu, MENU-037), not built. | none |
+| DLG-043 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-044 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-045 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-046 | declared-difference | DIFF-006: About follows the Registry Editor's native box. Gpedit_Help_About_Box (filtered run). | U3b |
+| DLG-047 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-048 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-049 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-050 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-051 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-052 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-053 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-054 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-055 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-056 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-057 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-058 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-059 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-060 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-061 | pass | Console_Columns_Dialog_Layout. | U3a |
+| DLG-062 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-063 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-064 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-065 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-066 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-067 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-068 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-069 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-070 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-071 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-072 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-073 | pass | Console_Customize_Dialog_Layout. | U3a |
+| DLG-074 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-075 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-076 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-077 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-078 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-079 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-080 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-081 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-082 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-083 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-084 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-085 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-086 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-087 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-088 | declared-difference | Not opened by any menu of the local editor: not reachable in the local editor, not built. | none |
+| DLG-089 | declared-difference | No maximize box: "BWC keeps its dialog frame without a maximize box" (gpedit-dialog.md, declared difference, section 4). The size, minimum and control set pass in Gpedit_Dialog_Frame and Gpedit_Dialog_Resize. | G3a |
+| DLG-090 | pass | Gpedit_Dialog_Frame and Gpedit_Dialog_Literal (display name, Previous and Next). The 16 x 16 icon is the module icon or its stand-in glyph (gpedit-dialog.md). | G3a |
+| DLG-091 | pass | Gpedit_Dialog_InitialStates and PolicyStateMatrixTests. | G3a, E6c |
+| DLG-092 | pass | Gpedit_Dialog_ApplyOk, Gpedit_Dialog_OkSaves and PolicyGoldenReplayTests (C/Comment_*). | G3a, E6a |
+| DLG-093 | pass | Gpedit_Dialog_Frame (Supported on box, read-only). | G3a |
+| DLG-094 | pass | Gpedit_Dialog_Frame and Gpedit_Dialog_Resize (geometry against the forms data). | G3a, G3b |
+| DLG-095 | declared-difference | Each radio button is a tab stop: "the shared dialog base gives every control a fixed tab stop, classic stops only on the selected radio button" (gpedit-dialog.md). The rest of the order passes in Gpedit_Dialog_Frame and Gpedit_Options_TabOrder. | G3a |
+| DLG-096 | pass | Gpedit_Dialog_ApplyOk. | G3a |
+| DLG-097 | pass | Gpedit_Options_TabOrder and Gpedit_Options_Defaults. | G3b |
+| DLG-098 | pass | Gpedit_Dialog_ApplyOk, Gpedit_Dialog_Cancel, Gpedit_Replay_GroupA and PolicyGoldenReplayTests. | G3a, G4 |
+| DLG-099 | pass | Gpedit_Dialog_PreviousNext (first, last, middle and only policy). | G3a |
+| DLG-100 | pass | Gpedit_Options_Navigation, PolicyGoldenReplayDETests and PolicyEditRefusalTests (E/Next_WithInvalid, E/Previous_WithInvalid). | G3a, E6c |
+| DLG-101 | pass | Gpedit_Options_Validation, Gpedit_Dialog_Validation and PolicyEditRefusalTests. | G3b, E6c |
+| DLG-102 | pass | Gpedit_Options_Elements and Gpedit_Options_Choices. | G3b |
+| DLG-103 | pass | Gpedit_Options_Elements and Gpedit_Options_Numbers. | G3b |
+| DLG-104 | pass | Gpedit_Options_Elements and Gpedit_Options_Numbers. | G3b |
+| DLG-105 | pass | Gpedit_Options_Elements and Gpedit_Options_Layout. | G3b |
+| DLG-106 | pass | Gpedit_Options_Elements and Gpedit_Options_Choices. | G3b |
+| DLG-107 | pass | Gpedit_Options_Elements and Gpedit_Options_Validation. | G3b |
+| DLG-108 | pass | Gpedit_Options_Elements and Gpedit_Options_Choices. | G3b |
+| DLG-109 | pass | Gpedit_Options_Elements and Gpedit_Options_List. | G3b |
+| DLG-110 | pass | Gpedit_Options_Literal. | G3b |
+| DLG-111 | pass | Gpedit_Options_List. | G3b |
+| DLG-112 | pass | Gpedit_Options_List, Gpedit_Options_List_EmptyRefused and PolicyEditRefusalTests. | G3b, E6c |
+| DLG-113 | pass | Gpedit_Filter_Dialog_Layout. | G5 |
+| DLG-114 | pass | Gpedit_Filter_Dialog_Refusals. The message texts are BWC's own (see MSG-038). | G5 |
+| DLG-115 | pass | Gpedit_Import_Dialog_Layout. | G6 |
+| DLG-116 | pass | Gpedit_Import_Add_GoodTemplate, Gpedit_Import_Add_PickerCancelWritesNothing and Gpedit_Import_Refused_BadFixtures. | G6 |
+| DLG-117 | pass | Console_Customize_Dialog_Layout (nine boxes, OK only). Four boxes are shown disabled (console-frame.md decision 3), user to confirm. | U3a |
+| DLG-118 | pass | Console_Columns_Dialog_Layout and Console_Columns_Dialog_Operations. | U3a |
+| DLG-119 | declared-difference | Options console-authoring parts fixed or disabled: "BWC has no console files, no authoring and one mode" (console-options.md); the page has OK and Cancel. Console_Options_Dialog_Layout and Console_Options_Dialog_OkCancel (filtered run). | U3b |
+| DLG-120 | declared-difference | DIFF-006: About follows the Registry Editor. Gpedit_Help_About_Box (filtered run). | U3b |
+| DLG-121 | declared-difference | Load errors as a status bar notice and list: "A modal box at start would block the window for every reader of the editor" (gpedit-templates.md). Gpedit_Templates_LoadErrors_BoxCases. | G6 |
+| DLG-122 | declared-difference | Same decision as DLG-121; the notice "does not re-appear when a node is selected, because it is a pane and not an event" (gpedit-templates.md). Gpedit_Templates_Notice_NotAnEvent. | G6 |
+| DLG-123 | pass | Gpedit_Dialog_Validation, Gpedit_Options_Validation and Gpedit_Filter_Dialog_Refusals. The load-error box is replaced (DLG-121). | G3a, G6 |
+
+### ACC
+
+| ID | Verdict | Evidence or reason | Piece |
+| --- | --- | --- | --- |
+| ACC-001 | declared-difference | Ctrl+P is not captured and the multiple-window console keys have no meaning in BWC's single-window frame; not bound. Declared by the manager (A3a-1), user to confirm. | A3a-1 |
+| ACC-002 | pass | Gpedit_Keys_F1. | G2, U3b |
+| ACC-003 | declared-difference | Ctrl+F10 is not captured and the multiple-window console keys have no meaning in BWC's single-window frame; not bound. Declared by the manager (A3a-1), user to confirm. | A3a-1 |
+| ACC-004 | pass | Gpedit_Keys_F5: no window and no menu. The reload is the DIFF-007 addition. | G2 |
+| ACC-005 | declared-difference | Ctrl+F5 is not captured and the multiple-window console keys have no meaning in BWC's single-window frame; not bound. Declared by the manager (A3a-1), user to confirm. | A3a-1 |
+| ACC-006 | pass | Console_Shell_FocusCycle. | G2 |
+| ACC-007 | pass | Console_Shell_FocusCycle. | G2 |
+| ACC-008 | declared-difference | Ctrl+Alt+Shift+F7 is not captured and the multiple-window console keys have no meaning in BWC's single-window frame; not bound. Declared by the manager (A3a-1), user to confirm. | A3a-1 |
+| ACC-009 | pass | Console_Shell_FocusCycle. | G2 |
+| ACC-010 | pass | Console_Shell_FocusCycle. | G2 |
+| ACC-011 | declared-difference | Table not reached in the local editor (no matching menu command), not built. | none |
+| ACC-012 | declared-difference | Table not reached in the local editor (no matching menu command), not built. | none |
+| ACC-013 | pass | Gpedit_TreeBlind_ExpandCollapseAndKeys. | G2 |
+| ACC-014 | pass | Gpedit_TreeBlind_ExpandCollapseAndKeys. | G2 |
+| ACC-015 | pass | Gpedit_TreeBlind_ExpandCollapseAndKeys and Gpedit_TreeBlind_PlaceholderPages. | G2 |
+| ACC-016 | pass | Gpedit_TreeBlind_ExpandCollapseAndKeys and Gpedit_TreeBlind_PlaceholderPages. | G2 |
+| ACC-017 | pass | Gpedit_Keys_TreeWalk: Home selects the root, Local Computer Policy. | G2 |
+| ACC-018 | pass | Gpedit_Keys_TreeWalk: End selects the last visible node, User Configuration > Administrative Templates. | G2 |
+| ACC-019 | pass | Gpedit_Keys_TreeWalk: PageDown on the last visible node changes nothing. | G2 |
+| ACC-020 | declared-difference | the page length follows the window size; the direction matches the capture (Gpedit_Keys_TreeWalk) | A3 |
+| ACC-021 | pass | Gpedit_Keys_TreeExpand: Plus changes no node and opens no window or menu. | G2 |
+| ACC-022 | pass | Gpedit_Keys_TreeExpand: Minus changes no node and opens no window or menu. | G2 |
+| ACC-023 | pass | Gpedit_Keys_TreeExpand: Asterisk changes no node and opens no window or menu. | G2 |
+| ACC-024 | pass | Gpedit_Keys_History (Backspace selects the parent). | G2 |
+| ACC-025 | pass | Console_Shell_FocusCycle. | G2 |
+| ACC-026 | pass | Console_Shell_FocusCycle. | G2 |
+| ACC-027 | pass | Gpedit_Keys_F5: no window and no menu, selection kept. The reload is the DIFF-007 addition. | G2 |
+| ACC-028 | pass | Console_Shell_FocusCycle. | G2 |
+| ACC-029 | pass | Gpedit_Keys_TreeExpand: Esc changes neither the node nor the focus and opens no window. | G2 |
+| ACC-030 | declared-difference | User decision of 2026-11-24: BWC's shared console frame handles Back for Alt+Left in every pane (including the result list; `Gpedit_Keys_TreeHistoryResult`), whereas classic's capture showed no change with focus on the result side. | G2 |
+| ACC-031 | declared-difference | User decision of 2026-11-24: BWC's shared console frame handles Forward for Alt+Right in every pane (including the result list). | G2 |
+| ACC-032 | pass | Gpedit_Keys_History (Alt+Up in the result pane changes nothing). | G2 |
+| ACC-033 | pass | Gpedit_ContextMenu_Tree and Console_Shell_ContextMenuKey. The capture's focus was on the result side; the tree menu itself is CTX-009. | G2 |
+| ACC-034 | pass | Gpedit_Keys_ListWalk: Down on the last row keeps it. | G2 |
+| ACC-035 | pass | Gpedit_Keys_ListWalk: Up moves to the row before. | G2 |
+| ACC-036 | pass | Gpedit_Keys_ListWalk: Home moves to the first row. | G2 |
+| ACC-037 | pass | Gpedit_Keys_ListWalk: End moves to the last row. | G2 |
+| ACC-038 | pass | Gpedit_Keys_ListWalk: PageDown on the last row keeps it. | G2 |
+| ACC-039 | pass | Gpedit_Keys_ListWalk: PageUp moves to the first row. | G2 |
+| ACC-040 | pass | Gpedit_Keys_ListInert: Space opens no window or menu and keeps the row. | G2 |
+| ACC-041 | pass | Gpedit_Keys_ListInert: Right opens no window or menu and keeps the row. | G2 |
+| ACC-042 | pass | Gpedit_Keys_ListInert: Left opens no window or menu and keeps the row. | G2 |
+| ACC-043 | pass | Gpedit_Keys_ListInert: the policy list is single-select (ConsoleList.MultiSelect is off in Bwc.Gpedit); Ctrl+A leaves one selected row, the focus and the description on the same row, and opens no window or menu. | A3 |
+| ACC-044 | pass | Gpedit_Keys_F5. The reload is the DIFF-007 addition. | G2 |
+| ACC-045 | pass | Console_Shell_FocusCycle. | G2 |
+| ACC-046 | pass | Console_Shell_FocusCycle. | G2 |
+| ACC-047 | pass | Gpedit_ContextMenu_List_PolicyRow and Gpedit_ContextMenu_List_NoRow (the menu key opens the F/Menus_* menu). | G2 |
+| ACC-048 | pass | Gpedit_Keys_Edit. | G2, G3a |
+| ACC-049 | pass | The row states no tracked behavior: the results depend on the machine's own templates. | A1 |
+| ACC-050 | pass | Gpedit_Keys_Edit (Alt+Enter edits a policy row), Gpedit_Keys_Delete (Delete does nothing), Gpedit_Keys_F1 and Gpedit_Keys_WrongPane. BWC definitions in gpedit-commands.md. | G2, A1 |
+
+### MSG
+
+| ID | Verdict | Evidence or reason | Piece |
+| --- | --- | --- | --- |
+| MSG-001 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 13. Id 9 (the window title form) is equal: classic stores the format and the name apart and the check composes them (STR-1 closed), BWC stores the composed text. Not shown: GPO, RSoP and domain texts; the equal ids pass (string-parity). | A3b |
+| MSG-002 | declared-difference | string-parity: equal 3, differs 0, template 0, absent 12. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-003 | declared-difference | string-parity: equal 3, differs 0, template 0, absent 12. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-004 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
+| MSG-005 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 15. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-006 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
+| MSG-007 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 15. Not shown: BWC never shows any id of this block. | none |
+| MSG-008 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 11. Not shown: BWC never shows any id of this block. | none |
+| MSG-009 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 12. Not shown: BWC never shows any id of this block. | none |
+| MSG-010 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-011 | declared-difference | string-parity: equal 3, differs 0, template 0, absent 11. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-012 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 8. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-013 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 7. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-014 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 13. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-015 | declared-difference | string-parity: equal 5, differs 0, template 0, absent 3. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-016 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 4. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-017 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 14. Not shown: BWC never shows any id of this block. | none |
+| MSG-018 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-019 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
+| MSG-020 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 6. Not shown: BWC never shows any id of this block. | none |
+| MSG-021 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 2. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-022 | declared-difference | string-parity: equal 6, differs 0, template 0, absent 2. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-023 | declared-difference | string-parity: equal 4, differs 0, template 0, absent 8. The Add/Remove Templates menu label (id 22) is equal in folded form (access key and ellipsis). Not shown: the .adm, browse, size and modified texts (BWC imports .admx only, DIFF-005); the equal ids pass (string-parity). | A3b |
+| MSG-024 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 14. Ids 33 to 36 (the Show Contents refusals) are the native admtmpl dialog's texts. The setting dialog of the local editor is the managed one, and BWC shows the managed Show Contents refusal texts, which are equal (MSG-093, Gpedit_Options_List). Not shown: ids 33 to 36 and the .adm, merged GPO and Extra Registry texts; the equal ids pass (string-parity). | A3b |
+| MSG-025 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
+| MSG-026 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 7. Not shown: BWC never shows any id of this block. | none |
+| MSG-027 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 4. Not shown: BWC never shows any id of this block. | none |
+| MSG-028 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 6. Ids 100 to 103 (required field, number and range messages) are the native admtmpl texts. BWC shows the managed validation texts of the setting dialog, which are equal (MSG-093, Gpedit_Options_Validation, Gpedit_Dialog_Validation). Not shown: ids 100 to 103; id 104 (a save error: BWC has its own save error texts, DialogSave* in Dialog.resw) and id 105 (the .adm refusal: BWC refuses .adm files in its own import wording, DIFF-005). | A3b |
+| MSG-029 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 1. Id 236 (the Administrative Templates node text) is equal: BWC's text now ends in the same space as classic's (STR-1 closed). Id 237 is not shown. | A3b |
+| MSG-030 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 8. Not shown: BWC never shows any id of this block. | none |
+| MSG-031 | pass | Gpedit_Templates_LoadErrors_BoxCases (sentence.<case>), Gpedit_Templates_LoadErrors_UndefinedUsing (list.sentence) and Gpedit_Templates_LoadErrors_AttributeCases (sentence.<case>): the Problems list shows a sentence for each engine code and keeps the code as a detail. string-parity: equal 0, differs 0, template 1, absent 3. The sentences are BWC wording (Templates.resw, TemplateProblem<Code>); classic shows one start-up box (declared in the load-error rows). | A3b |
+| MSG-032 | pass | Gpedit_Templates_LoadErrors_BoxCases (sentence.<case>) and Gpedit_Templates_LoadErrors_AttributeCases (sentence.<case>): the element codes (MissingAttribute, InvalidAttributeValue, DuplicatePolicy and the others) each have a sentence beside the code. string-parity: equal 0, differs 0, template 3, absent 10. BWC wording, as MSG-031. | A3b |
+| MSG-033 | pass | Gpedit_Templates_LoadErrors_BoxCases (sentence.<case>): the resource codes (MissingAdml, UndefinedString and the others) each have a sentence beside the code. string-parity: equal 0, differs 0, template 1, absent 10. BWC wording, as MSG-031. | A3b |
+| MSG-034 | pass | string-parity: equal 4, differs 0, template 0, absent 0. Every id is equal (string-parity). | G1 |
+| MSG-035 | pass | string-parity: equal 6, differs 0, template 0, absent 0. Every id is equal (string-parity). | G5 |
+| MSG-036 | pass | string-parity: equal 4, differs 0, template 0, absent 0. Every id is equal (string-parity). | G5 |
+| MSG-037 | declared-difference | string-parity: equal 5, differs 0, template 0, absent 1. The Re-Apply Filter labels (ids 3104 and 3105) are equal in folded form, with the Filter and All Settings texts. Not shown: id 3119 (the platform match text; BWC shows the match combo with Any and All). | A3b |
+| MSG-038 | declared-difference | string-parity: equal 3, differs 0, template 3, absent 2. The three refusal messages of Filter Options (ids 3121 to 3123) are equal (BWC now uses the classic texts; id 3123 keeps the classic repeated word). BWC adds one refusal that classic has no message for (a keyword text that is too long). The three status templates (ids 3124 to 3126) are not compared; BWC's filtered status words are its own (gpedit-filter.md). Not shown: id 3120 (platform match text) and id 3127. | A3b |
+| MSG-039 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 6. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-040 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 1. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-041 | declared-difference | string-parity: equal 0, differs 0, template 3, absent 4. Not shown: BWC never shows any id of this block. | none |
+| MSG-042 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 5. Not shown: BWC never shows any id of this block. | none |
+| MSG-043 | declared-difference | string-parity: equal 4, differs 0, template 0, absent 238. The taskpad icon descriptions are not shown: BWC has no taskpads. | none |
+| MSG-044 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 5. Not shown: BWC never shows any id of this block. | none |
+| MSG-045 | declared-difference | string-parity: equal 0, differs 0, template 2, absent 6. Not shown: BWC never shows any id of this block. | none |
+| MSG-046 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 3. Not shown: BWC never shows any id of this block. | none |
+| MSG-047 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 5. Not shown: BWC never shows any id of this block. | none |
+| MSG-048 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 2. Not shown: BWC never shows any id of this block. | none |
+| MSG-049 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 1. Not shown: BWC never shows any id of this block. | none |
+| MSG-050 | declared-difference | string-parity: equal 9, differs 0, template 0, absent 7. The view mode and arrange labels (ids 12001 to 12005, 12007 to 12009, and 12010) are equal in folded form (BWC's Line up Icons now has the classic wording). The help line after each label is not compared. Not shown: the Web view mode (id 12006), the Favorites texts and the snap-in errors; the equal ids pass (string-parity). | A3b |
+| MSG-051 | declared-difference | string-parity: equal 0, differs 0, template 1, absent 5. Not shown: BWC never shows any id of this block. | none |
+| MSG-052 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 2. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-053 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 1. Not shown: BWC never shows any id of this block. | none |
+| MSG-054 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 2. Not shown: BWC never shows any id of this block. | none |
+| MSG-055 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 2. Not shown: BWC never shows any id of this block. | none |
+| MSG-056 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 12. Not shown: BWC never shows any id of this block. | none |
+| MSG-057 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 15. Not shown: BWC never shows any id of this block. | none |
+| MSG-058 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 15. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-059 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. The Export List write errors (ids 13344 to 13346) say what the classic ones say (cannot create, cannot write, read-only) in BWC's words, without the product name and without the file in brackets; showing the file needs a code change that this piece did not make. The file types (ids 13347 and 13348) differ in letter case only (BWC "tab delimited", classic "Tab Delimited"); they live in the shared Resources.resw of Bwc.UI, which this piece does not edit. Not shown: the other ids of the block. | A3b |
+| MSG-060 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 4. Not shown: BWC never shows any id of this block. | none |
+| MSG-061 | declared-difference | string-parity: equal 6, differs 0, template 0, absent 10. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-062 | declared-difference | string-parity: equal 6, differs 0, template 0, absent 9. The toolbar names Back, Forward, Refresh, Help, Export List and the console tree toggles are equal in folded form (the tooltip copy after the name is not compared). Not shown: Stop and Home (BWC has no such buttons, F/Toolbar_States shows 7 standard buttons) and the frame errors. | A3b |
+| MSG-063 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 15. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-064 | declared-difference | string-parity: equal 3, differs 0, template 0, absent 9. Export List (id 13436), View (id 13434) and Help (id 13437) are equal in folded form (ellipsis). Not shown: the action pane toggle name (id 13432, TOOL-014: BWC has no action pane) and the size units. | A3b |
+| MSG-065 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-066 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 5. Not shown: BWC never shows any id of this block. | none |
+| MSG-067 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-068 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-069 | declared-difference | string-parity: equal 3, differs 0, template 0, absent 13. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-070 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-071 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 10. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-072 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
+| MSG-073 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 15. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-074 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 14. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-075 | declared-difference | string-parity: equal 0, differs 0, template 2, absent 14. Not shown: BWC never shows any id of this block. | none |
+| MSG-076 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
+| MSG-077 | declared-difference | string-parity: equal 2, differs 0, template 0, absent 9. DIFF-006: About follows the Registry Editor, so the classic About text is not shown. | none |
+| MSG-078 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 4. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-079 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 1. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-080 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 9. Not shown: BWC never shows any id of this block. | none |
+| MSG-081 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 16. Not shown: BWC never shows any id of this block. | none |
+| MSG-082 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 8. Not shown: BWC never shows any id of this block. | none |
+| MSG-083 | declared-difference | string-parity: equal 1, differs 0, template 0, absent 6. Not shown: BWC never shows the ids that are not equal; the equal ids pass (string-parity). | none |
+| MSG-084 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 2. Not shown: BWC never shows any id of this block. | none |
+| MSG-085 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 2. Not shown: BWC never shows any id of this block. | none |
+| MSG-086 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 6. Not shown: BWC never shows any id of this block. | none |
+| MSG-087 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 2. Not shown: BWC never shows any id of this block. | none |
+| MSG-088 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 7. Not shown: BWC never shows any id of this block. | none |
+| MSG-089 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 3. Not shown: BWC never shows any id of this block. | none |
+| MSG-090 | declared-difference | string-parity: equal 0, differs 0, template 0, absent 1. Not shown: BWC never shows any id of this block. | none |
+| MSG-091 | declared-difference | string-parity: the 17 text entries of Editor.resources (forms:Editor.resources:*): 15 equal, 2 absent. Every button, radio, label and accessible name is equal. Not shown: the accessible descriptions of the Comment and Supported on boxes (BWC names the boxes and sets no description). Sizes and anchors are not strings; Gpedit_Dialog_Frame covers the frame. | A3b |
+| MSG-092 | pass | string-parity: the 3 text entries of ListBoxDialog.resources are equal (forms:ListBoxDialog.resources:*). Gpedit_Options_List shows the dialog. Sizes and anchors are not strings and are judged by DLG-111. | A3b |
+| MSG-093 | pass | string-parity: the 22 text entries of AdmTmplEditor.resources are equal (forms:resources:*): the message captions, validation texts and list column names. Gpedit_Options_Validation and Gpedit_Options_List show them. | A3b |
+
+### VIEW
+
+| ID | Verdict | Evidence or reason | Piece |
+| --- | --- | --- | --- |
+| VIEW-001 | pass | Console_Shell_Layout (four stacked parts, sizes in DIP at any DPI). The 1536 x 1074 px window is the capture machine's placement, not a rule. | U3, G2 |
+| VIEW-002 | pass | Console_Shell_Layout (menuAndToolbarBands). | U3 |
+| VIEW-003 | pass | Console_Shell_Layout (menuAndToolbarBands, buttonSize). | U3 |
+| VIEW-004 | pass | Console_Shell_Layout (tree 156 DIP) and Console_Shell_SplitterDragAndLimits. | U3, G1 |
+| VIEW-005 | pass | Console_Extended_PaneWidth and Console_Extended_DescriptionPane (pane ratio and placement). | U3, G1 |
+| VIEW-006 | pass | Console_Shell_Layout (statusHeight 23 DIP). | U3 |
+| VIEW-007 | pass | Console_List_ColumnsAndHeaders (headerHeight 24 DIP). | U3, G1 |
+| VIEW-008 | pass | Gpedit_ListBlind_CategoryRows. | G1 |
+| VIEW-009 | pass | Gpedit_ListBlind_AllSettings and Gpedit_Filter_Results_AllSettings. | G1, G5 |
+| VIEW-010 | pass | Gpedit_ListBlind_States; the strings are equal in string-parity (MSG-022). | G1 |
+| VIEW-011 | pass | Gpedit_ListBlind_States; the strings are equal in string-parity (MSG-034). | G1 |
+| VIEW-012 | pass | Gpedit_ListBlind_CategoryRows. | G1 |
+| VIEW-013 | pass | Gpedit_ListBlind_SortCasesOrder and Gpedit_Sort_DefaultOrder. The default order follows classic. | G1, G5 |
+| VIEW-014 | pass | Gpedit_Sort_Columns_ThreeClicksEach and Gpedit_Sort_AnotherNode (sort per node, BEH-025). | G5 |
+| VIEW-015 | pass | Gpedit_Sort_DigitsCaseAndSymbols and Gpedit_ListBlind_SortCasesDigitRuns. | G5 |
+| VIEW-016 | pass | Console_Extended_Tabs and Console_Extended_TabSwitch. | U2c, G1 |
+| VIEW-017 | declared-difference | DIFF-002: the Extended pane is native. Console_Extended_DescriptionPane and Gpedit_ListBlind_ExtendedPane. | U2c |
+| VIEW-018 | pass | Console_Extended_TabSwitch. | U2c |
+| VIEW-019 | pass | Gpedit_ListBlind_StatusBar and Gpedit_List_StatusBar (the count; the text is BWC's own). | G1 |
+| VIEW-020 | pass | Gpedit_Filter_CaptureReplay and Gpedit_Filter_OnOffAndStaysOn (flag and narrowed count). The status words are BWC's own (gpedit-filter.md). | G5 |
+| VIEW-021 | pass | Gpedit_TreeBlind_PlaceholderPages. Software Settings shows the BWC placeholder page of BEH-003. | G1 |
+| VIEW-022 | pass | Gpedit_TreeBlind_PlaceholderPages. | G1 |
+| VIEW-023 | declared-difference | BWC uses its own icon set (the Registry Editor icon kinds), not classic's images; user to confirm | A3 |
+| VIEW-024 | pass | Gpedit_TreeBlind_ShapeAndInitialState. | G1 |
+| VIEW-025 | pass | Gpedit_ListBlind_LiteralAmpersand. | G1 |
+| VIEW-026 | pass | Gpedit_Dialog_Frame and Gpedit_Dialog_Resize (client 684 x 604 DIP). | G3a |
+| VIEW-027 | declared-difference | The control and tab-stop counts are of classic's WinForms control tree; BWC differs by the declared radio button tab stops (gpedit-dialog.md). The enabled rule passes in Gpedit_Options_Defaults and Gpedit_Dialog_InitialStates. | G3a |
+| VIEW-028 | declared-difference | Counts of classic's control tree, as VIEW-027. Gpedit_Options_Literal and Gpedit_Options_TabOrder prove the labels and the enabled rule. | G3b |
+| VIEW-029 | declared-difference | Counts of classic's control tree, as VIEW-027. Gpedit_Options_Numbers and Gpedit_Options_TabOrder prove the number box and the enabled rule. | G3b |
+| VIEW-030 | declared-difference | Counts of classic's control tree, as VIEW-027. Gpedit_Options_Numbers proves the long number box. | G3b |
+| VIEW-031 | declared-difference | Counts of classic's control tree, as VIEW-027. Gpedit_Options_Layout proves the text box. | G3b |
+| VIEW-032 | declared-difference | Counts of classic's control tree, as VIEW-027. Gpedit_Options_Choices proves the combo box. | G3b |
+| VIEW-033 | declared-difference | Counts of classic's control tree, as VIEW-027. Gpedit_Options_Elements proves the multi-line box. | G3b |
+| VIEW-034 | declared-difference | Counts of classic's control tree, as VIEW-027. Gpedit_Options_Choices proves the drop-down list. | G3b |
+| VIEW-035 | declared-difference | Counts of classic's control tree, as VIEW-027. Gpedit_Options_List proves the list. | G3b |
+| VIEW-036 | declared-difference | Counts of classic's control tree, as VIEW-027. Gpedit_Options_Elements proves the check boxes in presentation order. | G3b |
+| VIEW-037 | declared-difference | Counts of classic's control tree, as VIEW-027. Console_Extended_HelpShapes and Gpedit_Dialog_Frame cover the scrolling help text. | G3a |
+| VIEW-038 | declared-difference | Load errors as a status bar notice and list instead of the start box (DLG-121). The tree without the bad category passes in Gpedit_Templates_LoadErrors_BoxCases. | G6 |
+| VIEW-039 | pass | Gpedit_Templates_LoadErrors_UndefinedUsing (category and policy show and open). BWC also lists the problem in the notice (gpedit-templates.md), user to confirm. | G6 |
+| VIEW-040 | declared-difference | Load errors as a status bar notice and list instead of the box (DLG-121). Left out of the tree: Gpedit_Templates_LoadErrors_AttributeCases. | G6 |
+| VIEW-041 | pass | Gpedit_Templates_LoadErrors_BoxCases, Gpedit_TreeBlind_BadTemplatesLeaveGoodTree and Gpedit_Tree_BadTemplates. One bad template does not hide the rest. | G6 |
+| VIEW-042 | pass | Gpedit_Filter_OnOffAndStaysOn, Gpedit_Filter_CaptureReplay and Gpedit_Filter_KeptOnAcrossNodesAndReApply. | G5 |
+| VIEW-043 | pass | Gpedit_Menu_Action_NodeKinds (both sides) and Gpedit_Toolbar_States. | G2 |
+
+### TREE
+
+| ID | Verdict | Evidence or reason | Piece |
+| --- | --- | --- | --- |
+| TREE-001 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_Tree_Shape. The icon part is VIEW-023. | G1 |
+| TREE-002 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_Tree_Shape. The icon part is VIEW-023. | G1 |
+| TREE-003 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_Tree_Shape. The icon part is VIEW-023. | G1 |
+| TREE-004 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_Tree_Shape. | G1 |
+| TREE-005 | pass | Gpedit_TreeBlind_ShapeAndInitialState. The icon part is VIEW-023. | G1 |
+| TREE-006 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_TreeBlind_PlaceholderPages. | G1 |
+| TREE-007 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_TreeBlind_PlaceholderPages. | G1 |
+| TREE-008 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_TreeBlind_PlaceholderPages. | G1 |
+| TREE-009 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_Tree_Shape. The icon part is VIEW-023. | G1 |
+| TREE-010 | declared-difference | BWC uses its own icon set (the Registry Editor icon kinds), not classic's images; user to confirm | A3 |
+| TREE-011 | pass | Gpedit_TreeBlind_ShapeAndInitialState and TemplateSetTests. | G1 |
+| TREE-012 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_Tree_Shape. | G1 |
+| TREE-013 | pass | Gpedit_TreeBlind_ShapeAndInitialState. | G1 |
+| TREE-014 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_ListBlind_States. | G1 |
+| TREE-015 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_Tree_Shape. | G1 |
+| TREE-016 | pass | Gpedit_ListBlind_CategoryRows. | G1 |
+| TREE-017 | declared-difference | BWC uses its own icon set (the Registry Editor icon kinds), not classic's images; user to confirm | A3 |
+| TREE-018 | pass | Gpedit_TreeBlind_PlaceholderPages and Gpedit_TreeBlind_ExpandCollapseAndKeys. | G1 |
+| TREE-019 | pass | Gpedit_Keys_TreeWalk (Left, Right, Down, Up) and Gpedit_Keys_TreeExpand (Plus, Minus, Asterisk, Backspace); Gpedit_TreeBlind_ExpandCollapseAndKeys. | G2 |
+| TREE-020 | removed | Removed by the user decision of 2026-11-22. Classic shows no Extra Registry Settings node; records that match no policy stay invisible (BEH-014). | none |
+
+### BEH
+
+| ID | Verdict | Evidence or reason | Piece |
+| --- | --- | --- | --- |
+| BEH-001 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_Tree_Shape. | G1 |
+| BEH-002 | pass | Gpedit_TreeBlind_ShapeAndInitialState and Gpedit_Tree_Shape. | G1, E2 |
+| BEH-003 | pass | Gpedit_TreeBlind_PlaceholderPages and Gpedit_Tree_PlaceholderPages. | G1 |
+| BEH-004 | pass | Gpedit_TreeBlind_ShapeAndInitialState, Gpedit_ListBlind_States and Gpedit_ListBlind_CategoryRows. | G1, E2 |
+| BEH-005 | pass | Gpedit_ReadOnly_Notice, Gpedit_Dialog_ReadOnly and GpoAccessTests (DIFF-001). | G4, E3 |
+| BEH-006 | pass | GpoAccessTests (the Home edition gives the read-only reason) and Gpedit_ReadOnly_Notice (the notice path). The Home text itself is not shown on a Home machine by any run. | G4 |
+| BEH-007 | pass | Gpedit_Import_Add_GoodTemplate, Gpedit_Import_Shadowed and TemplateSourcesTests. | G6, E5 |
+| BEH-008 | declared-difference | Template import refuses .adm (DIFF-005): "Classic `.adm` files are not supported" (gpedit-templates.md, DIFF-005). Gpedit_Import_Refused_ClassicAdm. | G6, E5 |
+| BEH-009 | declared-difference | One bad template does not hide the rest, and every problem is recorded: "BWC does the same, and records every problem, so the list can show all of them" (gpedit-templates.md). The list replaces the message (DLG-121). Gpedit_TreeBlind_AllBadTemplatesRecordedGoodTreeKept and Gpedit_Templates_LoadErrors_BoxCases. | G6, E2 |
+| BEH-010 | pass | Gpedit_Filter_CaptureReplay, Gpedit_Filter_Results_AllSettings, PolicyFilterGoldenTests and FilterTests. | G5, E5 |
+| BEH-011 | pass | PolicySaveContractTests and GpoSaveTests (write order and one refresh call). The refresh flag is GAP-02. | G4, E3 |
+| BEH-012 | removed | Retired by the user decision of 2026-11-22 (no Extra Registry Settings node); replaced by BEH-014. | none |
+| BEH-013 | pass | Gpedit_Toolbar_History and Gpedit_Keys_History. | G2 |
+| BEH-014 | pass | PolicyGoldenReplayDETests (D/Foreign_*, D/Instruction_*) and PolicyGoldenReplayTests (B/Pol_Outside_KeyOutsideRoots). | E6c, G4 |
+| BEH-015 | pass | Gpedit_ListBlind_States, Gpedit_Dialog_InitialStates and PolicyStateMatrixTests. | E6c, G1 |
+| BEH-016 | pass | Gpedit_ListBlind_States and Gpedit_List_States. | G1, E6a |
+| BEH-017 | pass | Gpedit_TreeBlind_SystemTemplatesNoRoot and Gpedit_Tree_SystemTemplates (the window answers while the real templates load). | G1 |
+| BEH-018 | pass | Gpedit_TreeBlind_PersistenceRestart (the root is selected again). | G1 |
+| BEH-019 | pass | Gpedit_Keys_Edit (Enter), Gpedit_Menu_Action_Commands (Edit), Gpedit_ListBlind_ExtendedPane and Console_Extended_Link (the link), Console_List_ActivateAndContext (double click). | G2, G3a |
+| BEH-020 | pass | Gpedit_Dialog_PreviousNext and Gpedit_Refresh_WhileDialogOpen. | G3a |
+| BEH-021 | pass | Gpedit_TreeBlind_PersistenceRestart, Gpedit_Persistence_Restart, Console_Columns_Persist_AcrossRestart and Gpedit_Window_PlacementBeforeShow. | G1, U3a |
+| BEH-022 | declared-difference | DIFF-007: Refresh is a BWC addition. Gpedit_Refresh_Reloads, Gpedit_Refresh_KeepsSelection and Gpedit_Refresh_Templates. | G2 |
+| BEH-023 | pass | Gpedit_ListBlind_ExtendedPane and Console_Extended_DescriptionPane. | U2c, G1 |
+| BEH-024 | pass | Gpedit_ListBlind_StatusBar. | G1 |
+| BEH-025 | declared-difference | Sort per node: "Not decided by the captures: all Basics comments are alike" (gpedit-filter.md); BWC keeps a sort per node. Gpedit_Sort_AnotherNode. | G5 |
+| BEH-026 | pass | Gpedit_Dialog_OkSaves (the list shows the saved state). The live registry part (G/*) is BEH-027. | G4, G1 |
+| BEH-027 | pass | GpeditInterop_GroupG_LiveRegistryReplay (elevated run 20261125-043437-21d28993: 29/29 Group G cases, 194/194 live-registry snapshots at 0, 4 and 8 s) and PolicyGoldenReplayTests (29/29 Group G file replays). | A2 |
+| BEH-028 | pass | CmtxGoldenTests and PolicyGoldenReplayTests (C/Comment_*, C/Cmtx_*). | E6a, G4 |
+| BEH-029 | pass | PolicyGoldenReplayTests (B/Pol_Outside_KeyOutsideRoots, G/Outside_KeyOutsideRoots) and GpeditInterop_GroupG_LiveRegistryReplay (G/Outside_KeyOutsideRoots in elevated run 20261125-043437-21d28993). | E6b, A2 |
+
+### POL
+
+| ID | Verdict | Evidence or reason | Piece |
+| --- | --- | --- | --- |
+| POL-001 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupA. | E6a |
+| POL-002 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupA. | E6a |
+| POL-003 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupA. | E6a |
+| POL-004 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupA. | E6a |
+| POL-005 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupA. | E6a |
+| POL-006 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupA. | E6a |
+| POL-007 | pass | PolicyGoldenReplayTests, GptIniGoldenTests and Gpedit_Replay_GroupA. | E6a |
+| POL-008 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupA. | E6a |
+| POL-009 | pass | PolicyGoldenReplayTests, GptIniGoldenTests and Gpedit_Replay_GroupA. | E6a |
+| POL-010 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupB_ElementKinds. | E6b |
+| POL-011 | pass | PolicyGoldenReplayTests (B cases, G/Value_EnabledDisabledValues) and GpeditInterop_GroupG_LiveRegistryReplay (G/Value_EnabledDisabledValues in elevated run 20261125-043437-21d28993). | E6b, A2 |
+| POL-012 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-013 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-014 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-015 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-016 | pass | PolicyGoldenReplayTests (B case, G/Outside_KeyOutsideRoots) and GpeditInterop_GroupG_LiveRegistryReplay (G/Outside_KeyOutsideRoots in elevated run 20261125-043437-21d28993). | E6b, A2 |
+| POL-017 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-018 | pass | PolicyGoldenReplayTests (group B): B/Pol_Both_WithElements.Computer and .User replay byte for byte against their recaptured goldens. | E6b |
+| POL-019 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupB_ElementKinds. | E6b |
+| POL-020 | pass | PolicyGoldenReplayTests (group B): B/Pol_Decimal_MinMax, B/Pol_Decimal_Soft and B/Pol_Decimal_StoreAsText replay byte for byte against their recaptured goldens. | E6b |
+| POL-021 | pass | PolicyGoldenReplayTests (group B): B/Pol_LongDecimal_Basic replays byte for byte against its recaptured golden. | E6b |
+| POL-022 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupB_ElementKinds. | E6b |
+| POL-023 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-024 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupB_ElementKinds. | E6b |
+| POL-025 | pass | PolicyGoldenReplayTests. Engine rules beyond the captures are GAP-03 and GAP-04. | E6b |
+| POL-026 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-027 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-028 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-029 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-030 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-031 | pass | PolicyGoldenReplayTests. | E6a, E6b |
+| POL-032 | pass | PolicyGoldenReplayTests and GptIniGoldenTests. | E6a |
+| POL-033 | pass | PolicyGoldenReplayTests and GptIniGoldenTests. | E6a, E6b |
+| POL-034 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-035 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-036 | pass | PolicyGoldenReplayTests. | E6b |
+| POL-037 | pass | PolicyGoldenReplayTests and CmtxGoldenTests. | E6a |
+| POL-038 | pass | PolicyGoldenReplayTests, CmtxGoldenTests and GptIniGoldenTests. | E6a |
+| POL-039 | pass | CmtxGoldenTests and PolicyGoldenReplayTests. Later-session namespaces are GAP-07. | E6a |
+| POL-040 | pass | GptIniGoldenTests and PolicyGoldenReplayTests. | E6a |
+| POL-041 | pass | GptIniGoldenTests and PolicyGoldenReplayTests. | E6a |
+| POL-042 | pass | GptIniGoldenTests and PolicyGoldenReplayTests. | E6a |
+| POL-043 | pass | PolicyGoldenReplayDETests and PolicyStateMatrixTests. | E6b, E6c |
+| POL-044 | pass | PolicyGoldenReplayDETests and PolicyStateMatrixTests. | E6c |
+| POL-045 | pass | PolicyGoldenReplayDETests. | E6c |
+| POL-046 | pass | PolicyGoldenReplayDETests and PolicyStateMatrixTests. The soft prefix on a replaced value is GAP-01. | E6c |
+| POL-047 | pass | PolicyGoldenReplayDETests and PolicyStateMatrixTests. | E6c |
+| POL-048 | pass | PolicyGoldenReplayDETests and PolicyStateMatrixTests. | E6c |
+| POL-049 | pass | PolicyGoldenReplayDETests and PolicyStateMatrixTests. | E6c |
+| POL-050 | pass | PolicyGoldenReplayDETests and PolicyStateMatrixTests. | E6c |
+| POL-051 | pass | PolicyGoldenReplayDETests and PolicyStateMatrixTests. | E6c |
+| POL-052 | pass | PolicyGoldenReplayDETests. | E6c |
+| POL-053 | pass | PolicyGoldenReplayDETests. | E6c |
+| POL-054 | pass | PolicyGoldenReplayDETests. Deeper spellings are GAP-06. | E6c |
+| POL-055 | pass | PolicyGoldenReplayDETests. | E6c, G4 |
+| POL-056 | pass | PolicyGoldenReplayDETests and PolicyStateMatrixTests. | E6c |
+| POL-057 | pass | PolMalformedStartGoldenTests, PolicyGoldenReplayDETests (refused-start path) and Gpedit_Save_Errors_MalformedAtSave. | E6c, G4 |
+| POL-058 | pass | PolicyGoldenReplayDETests and PolMalformedStartGoldenTests. Other tails are GAP-05. | E6c |
+| POL-059 | pass | PolicyGoldenReplayDETests (group E): E/Decimal_EdgeValues replays byte for byte against its recaptured golden. | E6c, G3b |
+| POL-060 | pass | PolicyGoldenReplayDETests (group E): E/Decimal_NotNumber replays byte for byte against its recaptured golden. | E6c, G3b |
+| POL-061 | pass | PolicyGoldenReplayDETests (group E): E/Decimal_Soft_OutOfRange and E/Decimal_StoreAsText_OutOfRange replay byte for byte against their recaptured goldens. | E6c, G3b |
+| POL-062 | pass | PolicyGoldenReplayDETests (group E): E/LongDecimal_AboveMax replays byte for byte against its recaptured golden. | E6c, G3b |
+| POL-063 | pass | PolicyGoldenReplayDETests and PolicyEditRefusalTests. | E6c, G3b |
+| POL-064 | pass | PolicyGoldenReplayDETests, PolicyEditRefusalTests and Gpedit_Dialog_Defaults. | E6c, G3b |
+| POL-065 | pass | PolicyGoldenReplayDETests, PolicyEditRefusalTests and Gpedit_Options_List. | E6c, G3b |
+| POL-066 | pass | PolicyGoldenReplayDETests and PolicyEditRefusalTests. | E6c, G3b |
+| POL-067 | pass | PolicyGoldenReplayDETests and PolicyEditRefusalTests. | E6c, G3a |
+| POL-068 | pass | GpeditInterop_GroupG_LiveRegistryReplay (elevated run 20261125-043437-21d28993) and PolicyGoldenReplayTests (G/*_Ok). | A2 |
+| POL-069 | pass | GpeditInterop_GroupG_LiveRegistryReplay (elevated run 20261125-043437-21d28993; BWC applies Flag=1 via RP_FORCE, gpo-store.md H5) and PolicyGoldenReplayTests (G/*_Apply). | A2 |
+| POL-070 | pass | GpeditInterop_GroupG_LiveRegistryReplay (elevated run 20261125-043437-21d28993; BWC applies Disabled step 1 via RP_FORCE and clears on step 2, gpo-store.md H5) and PolicyGoldenReplayTests (G/*_Disabled, G/*_NotConfigured). | A2 |
+| POL-071 | pass | GpeditInterop_GroupG_LiveRegistryReplay (elevated run 20261125-043437-21d28993) and PolicyGoldenReplayTests (G/*_CommentOnly). | A2 |
+| POL-072 | pass | GpeditInterop_GroupG_LiveRegistryReplay (elevated run 20261125-043437-21d28993) and PolicyGoldenReplayTests (G/Elements_*). | A2 |
+| POL-073 | pass | PolicyGoldenReplayTests (K) and KeyBackslashTests. | E6a |
+| POL-074 | pass | PolicyGoldenReplayTests (K) and KeyBackslashTests. | E6a |
+| POL-075 | pass | PolicyGoldenReplayTests (K) and KeyBackslashTests. | E6c |
+
+### ADMX
+
+| ID | Verdict | Evidence or reason | Piece |
+| --- | --- | --- | --- |
+| ADMX-001 | pass | Gpedit_Import_Shadowed, Gpedit_Import_Refused_Duplicates and TemplateSourcesTests. | G6, E5 |
+| ADMX-002 | pass | AdmlLanguageChainTests (tests/Bwc.Policy.Tests): the UI culture's parents, then en-US, as classic's fallback list does (finding LANG-1). | A3 |
+| ADMX-003 | pass | StrictTemplateTests and SystemTemplatesInvariantTests (the shipped templates load). The H attribute cases are refused as in classic (ADMX-012, ADMX-013). | G6 |
+| ADMX-004 | pass | HardeningTests and Gpedit_TreeBlind_BadTemplatesLeaveGoodTree (H/DtdEntity). | G6 |
+| ADMX-005 | pass | PolicyTemplateGoldenTests and Gpedit_Templates_LoadErrors_BoxCases. | G6 |
+| ADMX-006 | pass | PolicyTemplateGoldenTests and Gpedit_Templates_LoadErrors_BoxCases. | G6 |
+| ADMX-007 | pass | PolicyTemplateGoldenTests and Gpedit_Templates_LoadErrors_BoxCases. | G6 |
+| ADMX-008 | pass | PolicyTemplateGoldenTests and Gpedit_Templates_LoadErrors_UndefinedUsing. BWC also lists it (VIEW-039). | G6 |
+| ADMX-009 | pass | PolicyTemplateGoldenTests and Gpedit_Templates_LoadErrors_BoxCases. | G6 |
+| ADMX-010 | pass | PolicyTemplateGoldenTests and Gpedit_Templates_LoadErrors_BoxCases. | G6 |
+| ADMX-011 | pass | PolicyTemplateGoldenTests and Gpedit_Templates_LoadErrors_BoxCases. | G6 |
+| ADMX-012 | pass | PolicyTemplateGoldenTests and Gpedit_Templates_LoadErrors_AttributeCases. | G6 |
+| ADMX-013 | pass | PolicyTemplateGoldenTests and Gpedit_Templates_LoadErrors_AttributeCases. | G6 |
+| ADMX-014 | pass | AdmxParserTests and PolicyGoldenReplayTests (B/Pol_Element_KeyOverride). | E2, E6b |
+| ADMX-015 | pass | AdmxParserTests, PolicyGoldenReplayTests (B/Pol_Value_*) and PolicyStateMatrixTests (D/Mismatch_*). | E2, E6b |
+| ADMX-016 | pass | AdmxParserTests and Gpedit_Options_Elements. | E2, E6b |
+| ADMX-017 | pass | Gpedit_Options_Elements and Gpedit_Options_Choices. | E2, G3b |
+| ADMX-018 | pass | AdmxParserTests, Gpedit_Options_Numbers and PolicyGoldenReplayDETests. | E6b, E6c |
+| ADMX-019 | pass | TemplateSetTests, AdmxBlindTests and Gpedit_TreeBlind_ShapeAndInitialState. | E2, G1 |
+| ADMX-020 | pass | AdmxParserTests, BadTemplateTests and Gpedit_ListBlind_ExtendedPane (the requirements text). | E2 |
+| ADMX-021 | pass | KeyBackslashTests and PolicyGoldenReplayTests (K). | E6a, E6c |
+| ADMX-022 | pass | Gpedit_ListBlind_AllSettings (display-name order, open for a capture with known templates, gpedit-filter.md). | G1, G5 |
+| ADMX-023 | pass | BadTemplateTests and Gpedit_Templates_LoadErrors_BoxCases. | G6, E2 |
+| ADMX-024 | pass | Gpedit_TreeBlind_SystemTemplatesNoRoot, Gpedit_Tree_SystemTemplates and SystemTemplatesInvariantTests. The start-time number (PERF-1) is not recorded. | E2, A1 |
+| ADMX-025 | pass | AdmxParserTests and Gpedit_ListBlind_CategoryRows. | E2 |
+| ADMX-026 | pass | Gpedit_Import_Refused_BadFixtures and TemplateImportTests. | G6 |
+| ADMX-027 | pass | Gpedit_Import_Add_GoodTemplate and TemplateImportIntegrityTests. | G6 |
+| ADMX-028 | pass | Gpedit_Import_Remove_Template and TemplateStoreWriterTests. | G6 |
+| ADMX-029 | pass | TemplateStoreAclTests and Gpedit_Import_Refused_ClassicAdm (DIFF-005). | G6, E5 |
+| ADMX-030 | pass | TemplateImportIntegrityTests. | G6 |
+| ADMX-031 | pass | AdmlTests, Gpedit_ListBlind_LiteralAmpersand and Gpedit_Options_Literal. | E2, G3a |
+| ADMX-032 | pass | PolicyFilterGoldenTests, FilterTests and Gpedit_Filter_CaptureReplay. | G5, E6c |
+
+## Open questions
+
+OQ-01 to OQ-09 are listed in section 4 of the inventory and stay open until the engine pieces (E6a, E6b, E6c) answer them from the POL rows. OQ-09 is answered by the user decision of 2026-11-22: no Extra Registry Settings node, records that match no policy stay invisible and are kept untouched (BEH-014).

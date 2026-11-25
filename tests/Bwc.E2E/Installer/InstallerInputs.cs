@@ -9,7 +9,9 @@ internal sealed record InstallerInputs(
     string InstallerB,
     string VersionA,
     string VersionB,
-    string ResultPath)
+    string ResultPath,
+    string? OldInstaller = null,
+    string? OldVersion = null)
 {
     public const string GateVariable = "BWC_INSTALLER_TEST";
     public const string InstallerAVariable = "BWC_INSTALLER_A";
@@ -17,6 +19,10 @@ internal sealed record InstallerInputs(
     public const string VersionAVariable = "BWC_INSTALLER_VERSION_A";
     public const string VersionBVariable = "BWC_INSTALLER_VERSION_B";
     public const string ResultPathVariable = "BWC_INSTALLER_RESULT";
+
+    /// <summary>The 0.1.x layout setup (no BwcGpedit.exe, two shortcuts), built by the driver.</summary>
+    public const string OldInstallerVariable = "BWC_INSTALLER_OLD";
+    public const string OldVersionVariable = "BWC_INSTALLER_VERSION_OLD";
 
     /// <summary>The inputs, or null when the driver did not start this run.</summary>
     public static InstallerInputs? TryRead()
@@ -26,12 +32,21 @@ internal sealed record InstallerInputs(
             return null;
         }
 
+        string? oldInstaller = Environment.GetEnvironmentVariable(OldInstallerVariable);
+        string? oldVersion = Environment.GetEnvironmentVariable(OldVersionVariable);
+        if (string.IsNullOrWhiteSpace(oldInstaller) != string.IsNullOrWhiteSpace(oldVersion))
+        {
+            throw new InvalidOperationException($"{OldInstallerVariable} and {OldVersionVariable} must be set together. Run scripts/test-installer-e2e.js.");
+        }
+
         return new InstallerInputs(
             Required(InstallerAVariable),
             Required(InstallerBVariable),
             Required(VersionAVariable),
             Required(VersionBVariable),
-            Required(ResultPathVariable));
+            Required(ResultPathVariable),
+            string.IsNullOrWhiteSpace(oldInstaller) ? null : oldInstaller,
+            string.IsNullOrWhiteSpace(oldVersion) ? null : oldVersion);
     }
 
     private static string Required(string name)

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BWC oracle fixture. Authored by Better Windows Config. Not a Microsoft file. -->
+<policyDefinitionResources revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>BWC Oracle Base</displayName>
+  <description>Base definitions for the BWC oracle fixture templates.</description>
+  <resources>
+    <stringTable>
+      <string id="BwcOracle">BWC Oracle</string>
+      <string id="BwcOracle_Help">Fixture settings used by Better Windows Config to compare its policy engine with the classic Local Group Policy Editor. Nothing on the system reads these values.</string>
+      <string id="SUPPORTED_BwcAny">BWC oracle fixture: any system</string>
+      <string id="SUPPORTED_BwcNewer">BWC oracle fixture: newer systems only</string>
+      <string id="SUPPORTED_BwcOlder">BWC oracle fixture: older systems only</string>
+    </stringTable>
+  </resources>
+</policyDefinitionResources>

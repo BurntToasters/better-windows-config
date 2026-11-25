@@ -47,6 +47,7 @@ public static class Log
     private static LogOptions _options = new();
     private static DateOnly _currentDay;
     private static bool _capReached;
+    private static SafeDataFolder? _folder;
 
     /// <summary>Gets the last initialized log directory, or null when never initialized.</summary>
     public static string? Directory { get; private set; }
@@ -55,6 +56,16 @@ public static class Log
     public static string? CurrentFile { get; private set; }
 
     public static void Initialize(string toolId, LogOptions? options = null)
+    {
+        InitializeAs(toolId, options, ElevationProbe.IsElevatedOrHighIntegrity(), null);
+    }
+
+    /// <summary>
+    /// Initializes as if the process were (or were not) elevated. When elevated, the log folder is opened through the
+    /// checked, held folders of <see cref="SafeDataFolder"/>, and a folder that is not safe leaves no file log.
+    /// <paramref name="root"/> is the data root; null means <see cref="AppPaths.BaseDirectory"/>.
+    /// </summary>
+    internal static void InitializeAs(string toolId, LogOptions? options, bool elevated, string? root)
     {
         try
         {
@@ -76,6 +87,16 @@ public static class Log
             }
 
             string directory = ResolveDirectory(toolId, settings.Directory);
+            SafeDataFolder? folder = null;
+            if (elevated)
+            {
+                folder = SafeDataFolder.Acquire(root ?? AppPaths.BaseDirectory, directory, create: true, out _);
+                if (folder is null)
+                {
+                    throw new InvalidOperationException(
+                        $"The log folder '{directory}' is not a safe data folder for an elevated process.");
+                }
+            }
 
             lock (Gate)
             {
@@ -84,8 +105,13 @@ public static class Log
                 Directory = directory;
                 CurrentFile = null;
                 _capReached = false;
+                _folder = folder;
 
-                System.IO.Directory.CreateDirectory(directory);
+                if (folder is null)
+                {
+                    System.IO.Directory.CreateDirectory(directory);
+                }
+
                 _currentDay = DateOnly.FromDateTime(DateTime.UtcNow);
                 DeleteExpiredLocked(directory, settings.RetainDays);
 
@@ -102,6 +128,7 @@ public static class Log
                 _toolId = null;
                 Directory = null;
                 CurrentFile = null;
+                _folder = null;
             }
         }
     }
@@ -244,6 +271,16 @@ public static class Log
 
     private static void AppendLocked(string file, byte[] bytes)
     {
+        if (_folder is not null)
+        {
+            if (!_folder.Append(Path.GetFileName(file), bytes))
+            {
+                throw new IOException($"The log file '{file}' was refused or could not be written.");
+            }
+
+            return;
+        }
+
         using var stream = new FileStream(
             file,
             FileMode.Append,
@@ -297,6 +334,16 @@ public static class Log
 
     private static void EnsureWritable(string path)
     {
+        if (_folder is not null)
+        {
+            if (!_folder.EnsureFile(Path.GetFileName(path)))
+            {
+                throw new IOException($"The log file '{path}' was refused or could not be opened.");
+            }
+
+            return;
+        }
+
         using var stream = new FileStream(
             path,
             FileMode.Append,
@@ -306,6 +353,11 @@ public static class Log
 
     private static long GetFileLength(string path)
     {
+        if (_folder is not null)
+        {
+            return _folder.Length(Path.GetFileName(path));
+        }
+
         try
         {
             var file = new FileInfo(path);
@@ -321,12 +373,17 @@ public static class Log
     private static int NextPartIndex(string directory, DateOnly day)
     {
         int part = 1;
-        while (File.Exists(DailyPath(directory, day, part)))
+        while (FileExists(DailyPath(directory, day, part)))
         {
             part++;
         }
 
         return part;
+    }
+
+    private static bool FileExists(string path)
+    {
+        return _folder is not null ? _folder.Exists(Path.GetFileName(path)) : File.Exists(path);
     }
 
     private static string DailyPath(string directory, DateOnly day, int part)
@@ -343,6 +400,16 @@ public static class Log
         try
         {
             DateTime cutoff = DateTime.UtcNow.AddDays(-retainDays);
+            if (_folder is not null)
+            {
+                foreach (string name in _folder.Names("log-*.txt"))
+                {
+                    _ = _folder.Delete(name, cutoff);
+                }
+
+                return;
+            }
+
             foreach (string path in System.IO.Directory.EnumerateFiles(
                 directory,
                 "log-*.txt",

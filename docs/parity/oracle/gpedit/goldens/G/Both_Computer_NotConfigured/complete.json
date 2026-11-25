@@ -1,0 +1,16 @@
+{
+  "case": "G/Both_Computer_NotConfigured",
+  "planHash": "abea83912706c0ecde8295709769868f1b2fcae891e164fc27f6f947f4c223de",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled/Machine.Registry.pol",
+    "step-01-enabled/Machine.comment.cmtx",
+    "step-01-enabled/gpt.ini",
+    "step-02-not-configured/Machine.Registry.pol",
+    "step-02-not-configured/Machine.comment.cmtx",
+    "step-02-not-configured/gpt.ini"
+  ]
+}

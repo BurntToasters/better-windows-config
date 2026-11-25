@@ -12,12 +12,15 @@
 !define BWC_PUBLISHER "Better Windows Config"
 !define BWC_HUB_EXE "BetterWindowsConfig.exe"
 !define BWC_REGEDIT_EXE "BwcRegedit.exe"
+!define BWC_GPEDIT_EXE "BwcGpedit.exe"
 !define BWC_UPDATER_EXE "BwcUpdate.exe"
 !define BWC_HUB_SHORTCUT "Better Windows Config.lnk"
 !define BWC_REGEDIT_SHORTCUT "Registry Editor (BWC).lnk"
-; Must match Bwc.Core AppIdentity (HubAppUserModelId, RegeditAppUserModelId).
+!define BWC_GPEDIT_SHORTCUT "Local Group Policy Editor (BWC).lnk"
+; Must match Bwc.Core AppIdentity (HubAppUserModelId, RegeditAppUserModelId, GpeditAppUserModelId) and ShortcutAumidRules.
 !define BWC_HUB_AUMID "BetterWindowsConfig.Hub"
 !define BWC_REGEDIT_AUMID "BetterWindowsConfig.Regedit"
+!define BWC_GPEDIT_AUMID "BetterWindowsConfig.Gpedit"
 ; Uninstall key of ship builds (HKLM, 64-bit view). E2E builds use a key under BWC-E2E\<RUNID>, in HKCU for the
 ; per-user sandbox and in HKLM for the E2E-only /MACHINE mode. Registry code uses SHCTX, so SetShellVarContext
 ; picks the hive.
@@ -65,6 +68,9 @@ Var BwcDefaultDir
 ; is ignored.
 Var BwcRawDir
 Var BwcHintNote
+; The uninstaller's template cleanup: <ProgramData>\BetterWindowsConfig and its PolicyDefinitions store folder.
+Var BwcDataRoot
+Var BwcStoreDir
 
 ; ---------------------------------------------------------------------------
 ; Host checks (install only). Both run in .onInit, before any file is touched.
@@ -322,7 +328,7 @@ FunctionEnd
   BwcClose_${ID}_session:
   DetailPrint "Better Windows Config runs in another Windows session (see the lines above). It was not closed."
   IfSilent BwcClose_${ID}_sessionSilent 0
-  MessageBox MB_OK|MB_ICONSTOP "${BWC_PRODUCT} or Registry Editor (BWC) is running in another Windows session, for example for another signed-in user. Sign that user out or close the apps there, then run setup again. Nothing was changed."
+  MessageBox MB_OK|MB_ICONSTOP "${BWC_PRODUCT}, Registry Editor (BWC), or Local Group Policy Editor (BWC) is running in another Windows session, for example for another signed-in user. Sign that user out or close the apps there, then run setup again. Nothing was changed."
   Abort "Stopped: Better Windows Config runs in another Windows session. Nothing was changed."
   BwcClose_${ID}_sessionSilent:
   SetErrorLevel 4
@@ -330,7 +336,7 @@ FunctionEnd
   BwcClose_${ID}_busy:
   DetailPrint "Better Windows Config is still running from ${DIR}."
   IfSilent BwcClose_${ID}_silent 0
-  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${BWC_PRODUCT} or Registry Editor (BWC) is still running from ${DIR}.$\r$\n$\r$\nClose those windows, then click Retry. Click Cancel to stop without changing anything." IDRETRY BwcClose_${ID}_run
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${BWC_PRODUCT}, Registry Editor (BWC), or Local Group Policy Editor (BWC) is still running from ${DIR}.$\r$\n$\r$\nClose those windows, then click Retry. Click Cancel to stop without changing anything." IDRETRY BwcClose_${ID}_run
   Abort "Stopped: Better Windows Config is still running. Nothing was changed."
   BwcClose_${ID}_silent:
   SetErrorLevel 2
@@ -878,6 +884,179 @@ FunctionEnd
 
 Function un.BwcRemoveProtected
   !insertmacro BWC_PROTECTED_CLEAN_BODY "un"
+FunctionEnd
+
+; ---------------------------------------------------------------------------
+; Uninstall: the imported policy templates (installer.md M62 to M65). The Local Group Policy Editor imports ADMX and ADML
+; files into <ProgramData>\BetterWindowsConfig\PolicyDefinitions (ADMX in the folder, ADML in language folders below it).
+; The uninstaller deletes only those two kinds of file, then removes the folders it emptied, and the data root last, each
+; only with RMDir (no /r, so a folder with anything else in it stays). The policy backups live in <data root>\gpedit\backup
+; and are never entered. A link on the path (the data root, the store folder, or any language folder as a junction or
+; symbolic link) skips the whole step, and the check is made for every folder before the first delete. There is no recursive
+; delete and no wildcard delete: each file is deleted by its own name after its attributes show a file.
+; ---------------------------------------------------------------------------
+
+; $R0 = a path. $R1 = "0" when it does not exist (or cannot be read), "1" for a plain folder, "2" for a file (including a
+; file link), "3" for a folder that is a reparse point (junction or symbolic link). The test is the one that
+; BWC_PROTECTED_CLEAN_BODY uses: the directory bit (16) and the reparse bit (1024) of GetFileAttributesW. Uses $R2, $R3.
+Function un.BwcPathKind
+  StrCpy $R1 "0"
+  System::Call 'kernel32::GetFileAttributesW(t "$R0") i .R2'
+  IntCmp $R2 -1 BwcKind_done BwcKind_known BwcKind_known
+  BwcKind_known:
+  IntOp $R3 $R2 & 1040
+  StrCmp $R3 "16" BwcKind_folder 0
+  StrCmp $R3 "1040" BwcKind_link 0
+  StrCpy $R1 "2"
+  Return
+  BwcKind_folder:
+  StrCpy $R1 "1"
+  Return
+  BwcKind_link:
+  StrCpy $R1 "3"
+  BwcKind_done:
+FunctionEnd
+
+; $R0 = a path. $R1 = "1" when its owner is BUILTIN\Administrators (S-1-5-32-544, well-known SID 26) or LocalSystem
+; (S-1-5-18, well-known SID 22), else "0". An owner that cannot be read is "0". A standard user can create and own
+; %ProgramData%\BetterWindowsConfig, and an owner can swap a folder for a junction between the link check and the deletes,
+; so the elevated uninstaller deletes only below folders that a standard user does not own (installer.md M67). The E2E
+; flavor alone also accepts the current user (the unelevated test makes its sandbox folders); ship never does. Uses only
+; $R1 to $R9, so a caller's $0 to $5 stay.
+Function un.BwcOwnerOk
+  StrCpy $R1 "0"
+  System::Call 'advapi32::GetNamedSecurityInfoW(t "$R0", i 1, i 1, *p .R2, p 0, p 0, p 0, *p .R3) i .R4'
+  StrCmp $R4 "0" 0 BwcOwn_done
+  StrCmp $R2 "0" BwcOwn_free 0
+  System::Call 'advapi32::IsWellKnownSid(p $R2, i 26) i .R4'
+  StrCmp $R4 "0" 0 BwcOwn_yes
+  System::Call 'advapi32::IsWellKnownSid(p $R2, i 22) i .R4'
+  StrCmp $R4 "0" 0 BwcOwn_yes
+  !ifdef BWC_E2E
+    ; TokenUser is information class 1. The buffer starts with the user's SID pointer.
+    System::Call 'kernel32::GetCurrentProcess() p .R9'
+    System::Call 'advapi32::OpenProcessToken(p $R9, i 8, *p .R5) i .R4'
+    StrCmp $R4 "0" BwcOwn_free 0
+    System::Alloc 512
+    Pop $R6
+    System::Call 'advapi32::GetTokenInformation(p $R5, i 1, p $R6, i 512, *i .R8) i .R4'
+    System::Call 'kernel32::CloseHandle(p $R5)'
+    StrCmp $R4 "0" BwcOwn_noUser 0
+    System::Call '*$R6(p .R7)'
+    System::Call 'advapi32::EqualSid(p $R2, p $R7) i .R4'
+    System::Free $R6
+    StrCmp $R4 "0" BwcOwn_free BwcOwn_yes
+    BwcOwn_noUser:
+    System::Free $R6
+  !endif
+  Goto BwcOwn_free
+  BwcOwn_yes:
+  StrCpy $R1 "1"
+  BwcOwn_free:
+  System::Call 'kernel32::LocalFree(p $R3)'
+  BwcOwn_done:
+FunctionEnd
+
+; Deletes the imported templates. Never fails the uninstall: a file that stays is left. Uses $0 to $5 and $R0 to $R9.
+Function un.BwcRemoveTemplates
+  !ifdef BWC_E2E
+    ; The E2E flavor never reads the real %ProgramData%. The test names a folder of its own that stands in for it.
+    ReadEnvStr $R0 "BWC_E2E_INSTALLER_PROGRAMDATA"
+    StrCmp $R0 "" 0 BwcTpl_haveRoot
+    DetailPrint "The imported policy templates were not removed: BWC_E2E_INSTALLER_PROGRAMDATA is not set."
+    Return
+    BwcTpl_haveRoot:
+  !else
+    ; $APPDATA is the all-users Common AppData folder (%ProgramData%) under SetShellVarContext all, which a ship run has.
+    StrCpy $R0 "$APPDATA"
+  !endif
+  Call un.BwcPlainAbsPath
+  StrCmp $R1 "1" BwcTpl_plain 0
+  DetailPrint "The imported policy templates were not removed: the ProgramData folder is not a plain absolute path."
+  Return
+  BwcTpl_plain:
+  StrCpy $BwcDataRoot "$R0\BetterWindowsConfig"
+  StrCpy $BwcStoreDir "$BwcDataRoot\PolicyDefinitions"
+
+  ; Every folder on the path is checked before the first delete.
+  StrCpy $R0 "$BwcDataRoot"
+  Call un.BwcPathKind
+  StrCmp $R1 "0" BwcTpl_end 0
+  StrCmp $R1 "1" 0 BwcTpl_skipped
+  Call un.BwcOwnerOk
+  StrCmp $R1 "1" 0 BwcTpl_skipped
+  StrCpy $R0 "$BwcStoreDir"
+  Call un.BwcPathKind
+  StrCmp $R1 "0" BwcTpl_root 0
+  StrCmp $R1 "1" 0 BwcTpl_skipped
+  Call un.BwcOwnerOk
+  StrCmp $R1 "1" 0 BwcTpl_skipped
+  FindFirst $0 $1 "$BwcStoreDir\*.*"
+  BwcTpl_scan:
+  StrCmp $1 "" BwcTpl_scanned 0
+  StrCmp $1 "." BwcTpl_scanNext 0
+  StrCmp $1 ".." BwcTpl_scanNext 0
+  StrCpy $R0 "$BwcStoreDir\$1"
+  Call un.BwcPathKind
+  StrCmp $R1 "3" BwcTpl_skippedClose 0
+  StrCmp $R1 "1" 0 BwcTpl_scanNext
+  Call un.BwcOwnerOk
+  StrCmp $R1 "1" BwcTpl_scanNext BwcTpl_skippedClose
+  BwcTpl_scanNext:
+  FindNext $0 $1
+  Goto BwcTpl_scan
+  BwcTpl_scanned:
+  FindClose $0
+
+  ; Delete the templates. Only a name that ends in .admx or .adml (compared here, not by the wildcard, which can also match
+  ; a longer extension through a short name), and only an entry that is a file.
+  DetailPrint "Removing the imported policy templates from $BwcStoreDir"
+  FindFirst $0 $1 "$BwcStoreDir\*.*"
+  BwcTpl_store:
+  StrCmp $1 "" BwcTpl_storeDone 0
+  StrCmp $1 "." BwcTpl_storeNext 0
+  StrCmp $1 ".." BwcTpl_storeNext 0
+  StrCpy $R0 "$BwcStoreDir\$1"
+  Call un.BwcPathKind
+  StrCmp $R1 "1" BwcTpl_lang 0
+  StrCmp $R1 "2" 0 BwcTpl_storeNext
+  StrCpy $5 $1 5 -5
+  StrCmp $5 ".admx" 0 BwcTpl_storeNext
+  Delete "$BwcStoreDir\$1"
+  Goto BwcTpl_storeNext
+  BwcTpl_lang:
+  StrCpy $2 "$BwcStoreDir\$1"
+  FindFirst $3 $4 "$2\*.*"
+  BwcTpl_langLoop:
+  StrCmp $4 "" BwcTpl_langDone 0
+  StrCmp $4 "." BwcTpl_langNext 0
+  StrCmp $4 ".." BwcTpl_langNext 0
+  StrCpy $R0 "$2\$4"
+  Call un.BwcPathKind
+  StrCmp $R1 "2" 0 BwcTpl_langNext
+  StrCpy $5 $4 5 -5
+  StrCmp $5 ".adml" 0 BwcTpl_langNext
+  Delete "$2\$4"
+  BwcTpl_langNext:
+  FindNext $3 $4
+  Goto BwcTpl_langLoop
+  BwcTpl_langDone:
+  FindClose $3
+  RMDir "$2"
+  BwcTpl_storeNext:
+  FindNext $0 $1
+  Goto BwcTpl_store
+  BwcTpl_storeDone:
+  FindClose $0
+  RMDir "$BwcStoreDir"
+  BwcTpl_root:
+  RMDir "$BwcDataRoot"
+  Goto BwcTpl_end
+  BwcTpl_skippedClose:
+  FindClose $0
+  BwcTpl_skipped:
+  DetailPrint "The imported policy templates were not removed: $BwcDataRoot or a folder in it is a link, a file, unreadable, or not owned by Administrators or SYSTEM."
+  BwcTpl_end:
 FunctionEnd
 
 ; ---------------------------------------------------------------------------

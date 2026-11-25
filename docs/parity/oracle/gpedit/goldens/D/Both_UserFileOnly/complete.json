@@ -1,0 +1,19 @@
+{
+  "case": "D/Both_UserFileOnly",
+  "planHash": "26b834a76d392bc6615e8666c51006b1d66aeada42335ca3ec76a59d3f78710b",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/User.Registry.pol",
+    "step-01-start/User.Registry.pol",
+    "step-01-start/gpt.ini",
+    "step-02-unrelated-save/User.Registry.pol",
+    "step-02-unrelated-save/User.comment.cmtx",
+    "step-02-unrelated-save/gpt.ini",
+    "step-03-unrelated-cleared/User.Registry.pol",
+    "step-03-unrelated-cleared/User.comment.cmtx",
+    "step-03-unrelated-cleared/gpt.ini"
+  ]
+}

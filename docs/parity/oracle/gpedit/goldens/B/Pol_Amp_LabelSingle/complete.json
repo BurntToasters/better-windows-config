@@ -1,0 +1,23 @@
+{
+  "case": "B/Pol_Amp_LabelSingle",
+  "planHash": "b2e99d258d569998383974c7c2554ab3f7857ecac7a0c2434dbfbc0116863258",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-enabled-alt1-text-checked-value-item0/Machine.Registry.pol",
+    "step-02-enabled-alt1-text-checked-value-item0/Machine.comment.cmtx",
+    "step-02-enabled-alt1-text-checked-value-item0/gpt.ini",
+    "step-03-enabled-alt2-text-unchecked-value-item1/Machine.Registry.pol",
+    "step-03-enabled-alt2-text-unchecked-value-item1/Machine.comment.cmtx",
+    "step-03-enabled-alt2-text-unchecked-value-item1/gpt.ini",
+    "step-04-disabled/Machine.Registry.pol",
+    "step-04-disabled/Machine.comment.cmtx",
+    "step-04-disabled/gpt.ini",
+    "step-05-not-configured/Machine.Registry.pol",
+    "step-05-not-configured/Machine.comment.cmtx",
+    "step-05-not-configured/gpt.ini"
+  ]
+}

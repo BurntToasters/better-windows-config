@@ -25,6 +25,7 @@ public partial class ModalDialogWindow : Window
     private bool _accepted;
     private double _preferredWidthDip = 420;
     private double _preferredHeightDip = 220;
+    private DialogMinimumSize? _minimumSize;
 
     public ModalDialogWindow()
         : this(fluentLayout: true)
@@ -76,6 +77,18 @@ public partial class ModalDialogWindow : Window
     protected bool SubmitsOnEnter { get; set; } = true;
 
     /// <summary>
+    /// True for a dialog the user can resize. Opt-in: the default is false, so every dialog keeps a fixed frame. A resizable
+    /// dialog still has no maximize or minimize box, and <see cref="MinimumClientSize"/> is its smallest client area.
+    /// </summary>
+    protected virtual bool IsResizableDialog => false;
+
+    /// <summary>
+    /// The smallest client size in pixels of a resizable dialog at this window DPI. Asked each time the system asks for
+    /// the minimum, so a DPI change is followed. A zero width or height leaves the system minimum for that direction.
+    /// </summary>
+    protected virtual (int Width, int Height) MinimumClientSize(uint dpi) => (0, 0);
+
+    /// <summary>
     /// Shows the window owned by <paramref name="ownerHwnd"/> and returns true when the primary
     /// action completed. A second call returns the first task instead of creating a second modal.
     /// </summary>
@@ -101,13 +114,18 @@ public partial class ModalDialogWindow : Window
 
             var presenter = OverlappedPresenter.CreateForDialog();
             presenter.IsModal = true;
-            presenter.IsResizable = false;
+            presenter.IsResizable = IsResizableDialog;
             presenter.IsMinimizable = false;
             presenter.IsMaximizable = false;
             AppWindow.SetPresenter(presenter);
             AppWindow.IsShownInSwitchers = false;
 
             ApplySizeAndPosition(ownerHwnd);
+            if (IsResizableDialog)
+            {
+                _minimumSize = new DialogMinimumSize(dialogHwnd, MinimumClientSize);
+                _ = _minimumSize.Install();
+            }
 
             Closed += OnClosed;
             Activated += OnWindowActivated;
@@ -137,6 +155,7 @@ public partial class ModalDialogWindow : Window
     private void AbandonShow()
     {
         RestoreOwner();
+        ReleaseMinimumSize();
         _completion?.TrySetResult(false);
         OnShowAbandoned();
         try
@@ -371,7 +390,15 @@ public partial class ModalDialogWindow : Window
         }
 
         RestoreOwner();
+        ReleaseMinimumSize();
         _completion?.TrySetResult(_accepted);
+    }
+
+    /// <summary>Removes the minimum size subclass. Idempotent.</summary>
+    private void ReleaseMinimumSize()
+    {
+        _minimumSize?.Dispose();
+        _minimumSize = null;
     }
 
     /// <summary>

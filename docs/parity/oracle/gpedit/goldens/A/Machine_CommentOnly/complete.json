@@ -1,0 +1,14 @@
+{
+  "case": "A/Machine_CommentOnly",
+  "planHash": "64a46f4100e7b4697b3bcf9f45c9987e627e1924595b284752b1458154b99414",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-saved/Machine.Registry.pol",
+    "step-02-saved/Machine.comment.cmtx",
+    "step-02-saved/gpt.ini"
+  ]
+}

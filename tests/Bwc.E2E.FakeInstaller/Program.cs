@@ -18,9 +18,9 @@ namespace Bwc.E2E.FakeInstaller;
 /// - The record also holds the TEMP and TMP it was started with, whether it runs elevated, and the E2E protected root
 ///   variable, so a test can check what the elevated helper gave the installer. With BWC_E2E_INSTALLER_NO_RELAUNCH=1
 ///   the Hub is not started (the record says so).
-/// - Copied under the name BetterWindowsConfig.exe or BwcRegedit.exe it is a harmless stand-in for that program: it
-///   does nothing and waits up to 90 seconds. The tests use it where starting the real Hub would write the user's real
-///   settings folder, or where a process must never close.
+/// - Copied under the name BetterWindowsConfig.exe, BwcRegedit.exe or BwcGpedit.exe it is a harmless stand-in for that
+///   program: it does nothing and waits up to 90 seconds. The tests use it where starting the real Hub would write the
+///   user's real settings folder, or where a process must never close.
 /// </summary>
 internal static class Program
 {
@@ -29,6 +29,7 @@ internal static class Program
     private const string ProtectedRootVariable = "BWC_E2E_UPDATE_PROTECTED_ROOT";
     private const string StandInHubName = "BetterWindowsConfig";
     private const string StandInRegeditName = "BwcRegedit";
+    private const string StandInGpeditName = "BwcGpedit";
     private const int StandInLifetimeSeconds = 90;
     private const string RelaunchSwitch = "/RELAUNCH";
 
@@ -43,7 +44,8 @@ internal static class Program
     {
         string? ownName = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
         if (string.Equals(ownName, StandInHubName, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(ownName, StandInRegeditName, StringComparison.OrdinalIgnoreCase))
+            || string.Equals(ownName, StandInRegeditName, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(ownName, StandInGpeditName, StringComparison.OrdinalIgnoreCase))
         {
             return RunStandIn();
         }
@@ -122,9 +124,9 @@ internal static class Program
     }
 
     /// <summary>
-    /// The stand-in for the Hub or Regedit of a test install: no window, no work, no file. It waits so that a test can read
-    /// its token and stop it. The console is closed first so nothing flashes. It writes nothing because the shell may start
-    /// it at medium integrity, which cannot write the install folder.
+    /// The stand-in for the Hub, Regedit or Gpedit of a test install: no window, no work, no file. It waits so that a test
+    /// can read its token and stop it. The console is closed first so nothing flashes. It writes nothing because the
+    /// shell may start it at medium integrity, which cannot write the install folder.
     /// </summary>
     private static int RunStandIn()
     {

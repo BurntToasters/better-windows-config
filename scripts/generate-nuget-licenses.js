@@ -2,7 +2,7 @@
 /**
  * Writes THIRD-PARTY-NOTICES.txt for the NuGet packages that ship in the published apps.
  *
- * Inputs: obj/project.assets.json of Bwc.Hub, Bwc.Regedit.App, and Bwc.Update (written by restore
+ * Inputs: obj/project.assets.json of Bwc.Hub, Bwc.Regedit.App, Bwc.Gpedit.App, and Bwc.Update (written by restore
  * or build). A package ships when its target for the chosen RID has runtime, native, resource, or
  * runtimeTargets assets. Build-only and compile-only packages are left out.
  *
@@ -27,6 +27,7 @@ const RID_VALUES = ["win-x64", "win-arm64"];
 const PROJECTS = [
   { name: "Bwc.Hub", dir: "src/Bwc.Hub" },
   { name: "Bwc.Regedit.App", dir: "src/Bwc.Regedit.App" },
+  { name: "Bwc.Gpedit.App", dir: "src/Bwc.Gpedit.App" },
   { name: "Bwc.Update", dir: "src/Bwc.Update" },
 ];
 const LICENSE_FILE_PATTERN = /^(licen[cs]e|copying|notice|third[-_ ]?party)/i;

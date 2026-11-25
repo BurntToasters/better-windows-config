@@ -1,0 +1,5 @@
+# Oracle goldens and fixtures are byte-exact captures; line-ending conversion would break the byte comparison.
+docs/parity/oracle/gpedit/goldens/** -text
+docs/parity/oracle/gpedit/fixture/** -text
+# E2E export fixtures are compared byte for byte with the exported file (CRLF, UTF-16LE with BOM).
+tests/Bwc.E2E/Console/ExportFixtures/** -text

@@ -1,0 +1,10 @@
+{
+  "case": "E/List_Plain_LongEntry",
+  "planHash": "bf0e3d79a76e344f1c34294c194855fb7ee58d191de14b2f60cc0702d2f0c746",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini"
+  ]
+}

@@ -1,0 +1,1311 @@
+{
+  "case": "F/Tree_Computer",
+  "description": "tree order under Computer Configuration: every fixture node and the placeholder nodes, then image indexes",
+  "planVersion": 2,
+  "planHash": "e8f24a9b71a4af57afc229294bb9fbb5617ab82f9d64bc987552aba54523343a",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 1,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "start"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "treeChildren",
+      "label": "children of the root configuration node",
+      "plan": "treeChildren at Computer/  [children of the root configuration node]",
+      "op": {
+        "kind": "treeChildren",
+        "label": "children of the root configuration node",
+        "root": "Computer",
+        "path": []
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Software Settings",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Software Settings"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 3,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Windows Settings",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Windows Settings"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 4,
+      "kind": "treeChildren",
+      "label": "children of Administrative Templates",
+      "plan": "treeChildren at Computer/Administrative Templates  [children of Administrative Templates]",
+      "op": {
+        "kind": "treeChildren",
+        "label": "children of Administrative Templates",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Basics",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Elements",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Elements/Booleans",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Booleans"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Elements/Numbers",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Numbers"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Elements/Choices",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Choices"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 12,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Elements/Lists",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Lists"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 13,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Shared keys",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Shared keys"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 14,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Sort cases",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 15,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Tools & Utilities",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Tools & Utilities"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 16,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Explain text",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Explain text"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 17,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Machine only",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Machine only"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 18,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Machine only/Machine nested",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Machine only",
+          "Machine nested"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 19,
+      "kind": "treeChildren",
+      "label": null,
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Machine only/Machine nested/Machine deep",
+      "op": {
+        "kind": "treeChildren",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Machine only",
+          "Machine nested",
+          "Machine deep"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 20,
+      "kind": "treeChildren",
+      "label": "the category that holds no policy",
+      "plan": "treeChildren at Computer/Administrative Templates/BWC Oracle/Intentionally empty  [the category that holds no policy]",
+      "op": {
+        "kind": "treeChildren",
+        "label": "the category that holds no policy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Intentionally empty"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 21,
+      "kind": "readLayout",
+      "label": "tree image indexes and layout",
+      "plan": "readLayout  [tree image indexes and layout]",
+      "op": {
+        "kind": "readLayout",
+        "label": "tree image indexes and layout"
+      },
+      "optional": true
+    },
+    {
+      "index": 22,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "tree-expanded"
+      },
+      "optional": null
+    },
+    {
+      "index": 23,
+      "kind": "snapshot",
+      "label": "step final",
+      "plan": "snapshot  [step final]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step final"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "final",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 1,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [
+          "Software Settings",
+          "Windows Settings",
+          "Administrative Templates"
+        ],
+        "count": 3
+      }
+    },
+    {
+      "index": 2,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [],
+        "count": 0
+      }
+    },
+    {
+      "index": 3,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [
+          "Name Resolution Policy",
+          "#70a64a447bd9",
+          "Deployed Printers",
+          "Security Settings",
+          "Policy-based QoS"
+        ],
+        "count": 5
+      }
+    },
+    {
+      "index": 4,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [
+          "BWC Oracle",
+          "All Settings"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [
+          "Basics",
+          "Elements",
+          "Explain text",
+          "Machine only",
+          "Shared keys",
+          "Sort cases",
+          "Tools & Utilities"
+        ],
+        "count": 7
+      }
+    },
+    {
+      "index": 6,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [],
+        "count": 0
+      }
+    },
+    {
+      "index": 7,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [
+          "Booleans",
+          "Choices",
+          "Lists",
+          "Numbers",
+          "Texts"
+        ],
+        "count": 5
+      }
+    },
+    {
+      "index": 8,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [],
+        "count": 0
+      }
+    },
+    {
+      "index": 9,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [],
+        "count": 0
+      }
+    },
+    {
+      "index": 10,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [],
+        "count": 0
+      }
+    },
+    {
+      "index": 11,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [],
+        "count": 0
+      }
+    },
+    {
+      "index": 12,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [],
+        "count": 0
+      }
+    },
+    {
+      "index": 13,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [],
+        "count": 0
+      }
+    },
+    {
+      "index": 14,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [],
+        "count": 0
+      }
+    },
+    {
+      "index": 15,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [],
+        "count": 0
+      }
+    },
+    {
+      "index": 16,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [],
+        "count": 0
+      }
+    },
+    {
+      "index": 17,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [
+          "Machine nested"
+        ],
+        "count": 1
+      }
+    },
+    {
+      "index": 18,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [
+          "Machine deep"
+        ],
+        "count": 1
+      }
+    },
+    {
+      "index": 19,
+      "kind": "treeChildren",
+      "ok": true,
+      "data": {
+        "children": [],
+        "count": 0
+      }
+    },
+    {
+      "index": 20,
+      "kind": "treeChildren",
+      "ok": false,
+      "error": "#4d8256f583c0"
+    },
+    {
+      "index": 21,
+      "kind": "readLayout",
+      "ok": true,
+      "data": {
+        "window": {
+          "width": 1536,
+          "height": 1074
+        },
+        "perMonitorV2": true,
+        "toolbars": [
+          {
+            "visible": true,
+            "rect": {
+              "x": 20,
+              "y": 110,
+              "width": 1500,
+              "height": 44
+            },
+            "buttons": [
+              {
+                "index": 0,
+                "command": 1,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 0,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 1,
+                "command": 2,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 23,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 2,
+                "command": 3,
+                "separator": true,
+                "enabled": false,
+                "checked": false,
+                "hidden": false,
+                "style": 1,
+                "x": 46,
+                "y": 0,
+                "width": 8,
+                "height": 22
+              },
+              {
+                "index": 3,
+                "command": 4,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 54,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 4,
+                "command": 5,
+                "separator": false,
+                "enabled": true,
+                "checked": true,
+                "hidden": false,
+                "style": 0,
+                "x": 77,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 5,
+                "command": 6,
+                "separator": true,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 1
+              },
+              {
+                "index": 6,
+                "command": 7,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 7,
+                "command": 8,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 8,
+                "command": 9,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 9,
+                "command": 10,
+                "separator": true,
+                "enabled": false,
+                "checked": false,
+                "hidden": false,
+                "style": 1,
+                "x": 100,
+                "y": 0,
+                "width": 8,
+                "height": 22
+              },
+              {
+                "index": 10,
+                "command": 11,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 11,
+                "command": 12,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 12,
+                "command": 13,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 13,
+                "command": 14,
+                "separator": false,
+                "enabled": false,
+                "checked": false,
+                "hidden": true,
+                "style": 0,
+                "text": ""
+              },
+              {
+                "index": 14,
+                "command": 15,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 108,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 15,
+                "command": 16,
+                "separator": true,
+                "enabled": false,
+                "checked": false,
+                "hidden": false,
+                "style": 1,
+                "x": 131,
+                "y": 0,
+                "width": 8,
+                "height": 22
+              },
+              {
+                "index": 16,
+                "command": 17,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 139,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 17,
+                "command": 18,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 162,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              },
+              {
+                "index": 18,
+                "command": 19,
+                "separator": true,
+                "enabled": false,
+                "checked": false,
+                "hidden": false,
+                "style": 1,
+                "x": 185,
+                "y": 0,
+                "width": 8,
+                "height": 22
+              },
+              {
+                "index": 19,
+                "command": 20,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 0,
+                "x": 193,
+                "y": 0,
+                "width": 23,
+                "height": 22,
+                "text": ""
+              }
+            ],
+            "count": 20
+          },
+          {
+            "visible": true,
+            "rect": {
+              "x": 20,
+              "y": 62,
+              "width": 1500,
+              "height": 44
+            },
+            "buttons": [
+              {
+                "index": 0,
+                "command": 21508,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": true,
+                "style": 8,
+                "text": "#6725e7bbcd28"
+              },
+              {
+                "index": 1,
+                "command": 21513,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 24,
+                "x": 0,
+                "y": 0,
+                "width": 34,
+                "height": 22,
+                "text": "#a222a02aa749"
+              },
+              {
+                "index": 2,
+                "command": 21509,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 24,
+                "x": 34,
+                "y": 0,
+                "width": 49,
+                "height": 22,
+                "text": "#556cc6ef2021"
+              },
+              {
+                "index": 3,
+                "command": 21510,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 24,
+                "x": 83,
+                "y": 0,
+                "width": 40,
+                "height": 22,
+                "text": "#d8042eb735a9"
+              },
+              {
+                "index": 4,
+                "command": 21511,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": true,
+                "style": 24,
+                "text": "#f310d505fd02"
+              },
+              {
+                "index": 5,
+                "command": 21512,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": true,
+                "style": 24,
+                "text": "#ad08e7848be7"
+              },
+              {
+                "index": 6,
+                "command": 21514,
+                "separator": false,
+                "enabled": true,
+                "checked": false,
+                "hidden": false,
+                "style": 24,
+                "x": 123,
+                "y": 0,
+                "width": 40,
+                "height": 22,
+                "text": "#5a3cadef7959"
+              }
+            ],
+            "count": 7
+          }
+        ],
+        "uiaToolbars": [],
+        "list": {
+          "x": 762,
+          "y": 220,
+          "width": 754,
+          "height": 750
+        },
+        "headers": [
+          {
+            "x": 762,
+            "y": 220,
+            "width": 700,
+            "height": 48,
+            "name": "Setting"
+          },
+          {
+            "x": 1462,
+            "y": 220,
+            "width": 54,
+            "height": 48,
+            "name": "State"
+          },
+          {
+            "x": null,
+            "y": null,
+            "width": null,
+            "height": null,
+            "name": "Comment"
+          }
+        ],
+        "treeWindow": {
+          "x": 16,
+          "y": 166,
+          "width": 312,
+          "height": 846
+        },
+        "statusBar": {
+          "x": 16,
+          "y": 1012,
+          "width": 1504,
+          "height": 46
+        },
+        "tree": {
+          "nodes": [
+            {
+              "depth": 0,
+              "name": "Local Computer Policy",
+              "image": 25,
+              "selectedImage": 25,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": false
+            },
+            {
+              "depth": 1,
+              "name": "Computer Configuration",
+              "image": 27,
+              "selectedImage": 27,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": false
+            },
+            {
+              "depth": 2,
+              "name": "Software Settings",
+              "image": 23,
+              "selectedImage": 24,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 2,
+              "name": "Windows Settings",
+              "image": 23,
+              "selectedImage": 24,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": false
+            },
+            {
+              "depth": 3,
+              "name": "Name Resolution Policy",
+              "image": 150,
+              "selectedImage": 150,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 3,
+              "name": "Deployed Printers",
+              "image": 151,
+              "selectedImage": 151,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 3,
+              "name": "Security Settings",
+              "image": 144,
+              "selectedImage": 144,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 3,
+              "name": "Policy-based QoS",
+              "image": 149,
+              "selectedImage": 149,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 2,
+              "name": "Administrative Templates",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": false
+            },
+            {
+              "depth": 3,
+              "name": "BWC Oracle",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": false
+            },
+            {
+              "depth": 4,
+              "name": "Basics",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 4,
+              "name": "Elements",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": false
+            },
+            {
+              "depth": 5,
+              "name": "Booleans",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 5,
+              "name": "Choices",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 5,
+              "name": "Lists",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 5,
+              "name": "Numbers",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 5,
+              "name": "Texts",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 4,
+              "name": "Explain text",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 4,
+              "name": "Machine only",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": false
+            },
+            {
+              "depth": 5,
+              "name": "Machine nested",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": true
+            },
+            {
+              "depth": 6,
+              "name": "Machine deep",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 4,
+              "name": "Shared keys",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 4,
+              "name": "Sort cases",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 4,
+              "name": "Tools & Utilities",
+              "image": 60,
+              "selectedImage": 61,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 3,
+              "name": "All Settings",
+              "image": 68,
+              "selectedImage": 68,
+              "hasChildren": false,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 1,
+              "name": "User Configuration",
+              "image": 28,
+              "selectedImage": 28,
+              "hasChildren": true,
+              "expanded": true,
+              "selected": false
+            },
+            {
+              "depth": 2,
+              "name": "Software Settings",
+              "image": 23,
+              "selectedImage": 24,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 2,
+              "name": "Windows Settings",
+              "image": 23,
+              "selectedImage": 24,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            },
+            {
+              "depth": 2,
+              "name": "Administrative Templates",
+              "image": 70,
+              "selectedImage": 71,
+              "hasChildren": true,
+              "expanded": false,
+              "selected": false
+            }
+          ],
+          "otherNodes": "present, untracked"
+        }
+      }
+    },
+    {
+      "index": 22,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 23,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    }
+  ]
+}

@@ -393,15 +393,10 @@ public sealed class NumberOverflowTests
     /// </summary>
     private static AutomationElement? FindPrompt(AppSession session, UIA3Automation automation, string? exactText)
     {
-        foreach (AutomationElement window in automation.GetDesktop().FindAllChildren(cf => cf.ByControlType(ControlType.Window)))
+        foreach (AutomationElement window in ProcessWindows.Of(automation, session.ProcessId))
         {
             try
             {
-                if (window.Properties.ProcessId.Value != session.ProcessId)
-                {
-                    continue;
-                }
-
                 AutomationElement? message = window.FindFirstDescendant(cf => cf.ByAutomationId(MessageId));
                 if (message is null)
                 {

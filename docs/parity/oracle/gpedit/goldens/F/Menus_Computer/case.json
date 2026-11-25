@@ -1,0 +1,5765 @@
+{
+  "case": "F/Menus_Computer",
+  "description": "main menus and context menus on each node kind and on a row under Computer Configuration",
+  "planVersion": 2,
+  "planHash": "b51dd73f9daf4bf86c51fe4a59dfab9cf914c5eca45e640a5194e0b84daa70c5",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "label": "root configuration node",
+      "plan": "selectNode at Computer/  [root configuration node]",
+      "op": {
+        "kind": "selectNode",
+        "label": "root configuration node",
+        "root": "Computer",
+        "path": []
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "dumpMenu",
+      "label": "File menu at root configuration node",
+      "plan": "dumpMenu File  [File menu at root configuration node]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "File menu at root configuration node",
+        "menu": "File"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "dumpMenu",
+      "label": "Action menu at root configuration node",
+      "plan": "dumpMenu Action  [Action menu at root configuration node]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Action menu at root configuration node",
+        "menu": "Action"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "dumpMenu",
+      "label": "View menu at root configuration node",
+      "plan": "dumpMenu View  [View menu at root configuration node]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "View menu at root configuration node",
+        "menu": "View"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "dumpMenu",
+      "label": "Help menu at root configuration node",
+      "plan": "dumpMenu Help  [Help menu at root configuration node]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Help menu at root configuration node",
+        "menu": "Help"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "dumpMenu",
+      "label": "context menu at root configuration node",
+      "plan": "dumpMenu Context at Computer/  [context menu at root configuration node]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "context menu at root configuration node",
+        "root": "Computer",
+        "path": [],
+        "menu": "Context"
+      },
+      "optional": true
+    },
+    {
+      "index": 6,
+      "kind": "selectNode",
+      "label": "Administrative Templates",
+      "plan": "selectNode at Computer/Administrative Templates  [Administrative Templates]",
+      "op": {
+        "kind": "selectNode",
+        "label": "Administrative Templates",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "dumpMenu",
+      "label": "File menu at Administrative Templates",
+      "plan": "dumpMenu File  [File menu at Administrative Templates]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "File menu at Administrative Templates",
+        "menu": "File"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "dumpMenu",
+      "label": "Action menu at Administrative Templates",
+      "plan": "dumpMenu Action  [Action menu at Administrative Templates]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Action menu at Administrative Templates",
+        "menu": "Action"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "dumpMenu",
+      "label": "View menu at Administrative Templates",
+      "plan": "dumpMenu View  [View menu at Administrative Templates]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "View menu at Administrative Templates",
+        "menu": "View"
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "dumpMenu",
+      "label": "Help menu at Administrative Templates",
+      "plan": "dumpMenu Help  [Help menu at Administrative Templates]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Help menu at Administrative Templates",
+        "menu": "Help"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "dumpMenu",
+      "label": "context menu at Administrative Templates",
+      "plan": "dumpMenu Context at Computer/Administrative Templates  [context menu at Administrative Templates]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "context menu at Administrative Templates",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates"
+        ],
+        "menu": "Context"
+      },
+      "optional": true
+    },
+    {
+      "index": 12,
+      "kind": "selectNode",
+      "label": "BWC Oracle category",
+      "plan": "selectNode at Computer/Administrative Templates/BWC Oracle  [BWC Oracle category]",
+      "op": {
+        "kind": "selectNode",
+        "label": "BWC Oracle category",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 13,
+      "kind": "dumpMenu",
+      "label": "File menu at BWC Oracle category",
+      "plan": "dumpMenu File  [File menu at BWC Oracle category]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "File menu at BWC Oracle category",
+        "menu": "File"
+      },
+      "optional": null
+    },
+    {
+      "index": 14,
+      "kind": "dumpMenu",
+      "label": "Action menu at BWC Oracle category",
+      "plan": "dumpMenu Action  [Action menu at BWC Oracle category]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Action menu at BWC Oracle category",
+        "menu": "Action"
+      },
+      "optional": null
+    },
+    {
+      "index": 15,
+      "kind": "dumpMenu",
+      "label": "View menu at BWC Oracle category",
+      "plan": "dumpMenu View  [View menu at BWC Oracle category]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "View menu at BWC Oracle category",
+        "menu": "View"
+      },
+      "optional": null
+    },
+    {
+      "index": 16,
+      "kind": "dumpMenu",
+      "label": "Help menu at BWC Oracle category",
+      "plan": "dumpMenu Help  [Help menu at BWC Oracle category]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Help menu at BWC Oracle category",
+        "menu": "Help"
+      },
+      "optional": null
+    },
+    {
+      "index": 17,
+      "kind": "dumpMenu",
+      "label": "context menu at BWC Oracle category",
+      "plan": "dumpMenu Context at Computer/Administrative Templates/BWC Oracle  [context menu at BWC Oracle category]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "context menu at BWC Oracle category",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle"
+        ],
+        "menu": "Context"
+      },
+      "optional": true
+    },
+    {
+      "index": 18,
+      "kind": "selectNode",
+      "label": "category with policies",
+      "plan": "selectNode at Computer/Administrative Templates/BWC Oracle/Basics  [category with policies]",
+      "op": {
+        "kind": "selectNode",
+        "label": "category with policies",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 19,
+      "kind": "dumpMenu",
+      "label": "File menu at category with policies",
+      "plan": "dumpMenu File  [File menu at category with policies]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "File menu at category with policies",
+        "menu": "File"
+      },
+      "optional": null
+    },
+    {
+      "index": 20,
+      "kind": "dumpMenu",
+      "label": "Action menu at category with policies",
+      "plan": "dumpMenu Action  [Action menu at category with policies]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Action menu at category with policies",
+        "menu": "Action"
+      },
+      "optional": null
+    },
+    {
+      "index": 21,
+      "kind": "dumpMenu",
+      "label": "View menu at category with policies",
+      "plan": "dumpMenu View  [View menu at category with policies]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "View menu at category with policies",
+        "menu": "View"
+      },
+      "optional": null
+    },
+    {
+      "index": 22,
+      "kind": "dumpMenu",
+      "label": "Help menu at category with policies",
+      "plan": "dumpMenu Help  [Help menu at category with policies]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Help menu at category with policies",
+        "menu": "Help"
+      },
+      "optional": null
+    },
+    {
+      "index": 23,
+      "kind": "dumpMenu",
+      "label": "context menu at category with policies",
+      "plan": "dumpMenu Context at Computer/Administrative Templates/BWC Oracle/Basics  [context menu at category with policies]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "context menu at category with policies",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "menu": "Context"
+      },
+      "optional": true
+    },
+    {
+      "index": 24,
+      "kind": "selectNode",
+      "label": "All Settings",
+      "plan": "selectNode at Computer/Administrative Templates/All Settings  [All Settings]",
+      "op": {
+        "kind": "selectNode",
+        "label": "All Settings",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "All Settings"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 25,
+      "kind": "dumpMenu",
+      "label": "File menu at All Settings",
+      "plan": "dumpMenu File  [File menu at All Settings]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "File menu at All Settings",
+        "menu": "File"
+      },
+      "optional": null
+    },
+    {
+      "index": 26,
+      "kind": "dumpMenu",
+      "label": "Action menu at All Settings",
+      "plan": "dumpMenu Action  [Action menu at All Settings]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Action menu at All Settings",
+        "menu": "Action"
+      },
+      "optional": null
+    },
+    {
+      "index": 27,
+      "kind": "dumpMenu",
+      "label": "View menu at All Settings",
+      "plan": "dumpMenu View  [View menu at All Settings]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "View menu at All Settings",
+        "menu": "View"
+      },
+      "optional": null
+    },
+    {
+      "index": 28,
+      "kind": "dumpMenu",
+      "label": "Help menu at All Settings",
+      "plan": "dumpMenu Help  [Help menu at All Settings]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Help menu at All Settings",
+        "menu": "Help"
+      },
+      "optional": null
+    },
+    {
+      "index": 29,
+      "kind": "dumpMenu",
+      "label": "context menu at All Settings",
+      "plan": "dumpMenu Context at Computer/Administrative Templates/All Settings  [context menu at All Settings]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "context menu at All Settings",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "All Settings"
+        ],
+        "menu": "Context"
+      },
+      "optional": true
+    },
+    {
+      "index": 30,
+      "kind": "selectNode",
+      "label": "Software Settings placeholder",
+      "plan": "selectNode at Computer/Software Settings  [Software Settings placeholder]",
+      "op": {
+        "kind": "selectNode",
+        "label": "Software Settings placeholder",
+        "root": "Computer",
+        "path": [
+          "Software Settings"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 31,
+      "kind": "dumpMenu",
+      "label": "File menu at Software Settings placeholder",
+      "plan": "dumpMenu File  [File menu at Software Settings placeholder]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "File menu at Software Settings placeholder",
+        "menu": "File"
+      },
+      "optional": true
+    },
+    {
+      "index": 32,
+      "kind": "dumpMenu",
+      "label": "Action menu at Software Settings placeholder",
+      "plan": "dumpMenu Action  [Action menu at Software Settings placeholder]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Action menu at Software Settings placeholder",
+        "menu": "Action"
+      },
+      "optional": true
+    },
+    {
+      "index": 33,
+      "kind": "dumpMenu",
+      "label": "View menu at Software Settings placeholder",
+      "plan": "dumpMenu View  [View menu at Software Settings placeholder]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "View menu at Software Settings placeholder",
+        "menu": "View"
+      },
+      "optional": true
+    },
+    {
+      "index": 34,
+      "kind": "dumpMenu",
+      "label": "Help menu at Software Settings placeholder",
+      "plan": "dumpMenu Help  [Help menu at Software Settings placeholder]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Help menu at Software Settings placeholder",
+        "menu": "Help"
+      },
+      "optional": true
+    },
+    {
+      "index": 35,
+      "kind": "dumpMenu",
+      "label": "context menu at Software Settings placeholder",
+      "plan": "dumpMenu Context at Computer/Software Settings  [context menu at Software Settings placeholder]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "context menu at Software Settings placeholder",
+        "root": "Computer",
+        "path": [
+          "Software Settings"
+        ],
+        "menu": "Context"
+      },
+      "optional": true
+    },
+    {
+      "index": 36,
+      "kind": "selectNode",
+      "label": "Windows Settings placeholder",
+      "plan": "selectNode at Computer/Windows Settings  [Windows Settings placeholder]",
+      "op": {
+        "kind": "selectNode",
+        "label": "Windows Settings placeholder",
+        "root": "Computer",
+        "path": [
+          "Windows Settings"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 37,
+      "kind": "dumpMenu",
+      "label": "File menu at Windows Settings placeholder",
+      "plan": "dumpMenu File  [File menu at Windows Settings placeholder]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "File menu at Windows Settings placeholder",
+        "menu": "File"
+      },
+      "optional": true
+    },
+    {
+      "index": 38,
+      "kind": "dumpMenu",
+      "label": "Action menu at Windows Settings placeholder",
+      "plan": "dumpMenu Action  [Action menu at Windows Settings placeholder]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Action menu at Windows Settings placeholder",
+        "menu": "Action"
+      },
+      "optional": true
+    },
+    {
+      "index": 39,
+      "kind": "dumpMenu",
+      "label": "View menu at Windows Settings placeholder",
+      "plan": "dumpMenu View  [View menu at Windows Settings placeholder]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "View menu at Windows Settings placeholder",
+        "menu": "View"
+      },
+      "optional": true
+    },
+    {
+      "index": 40,
+      "kind": "dumpMenu",
+      "label": "Help menu at Windows Settings placeholder",
+      "plan": "dumpMenu Help  [Help menu at Windows Settings placeholder]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Help menu at Windows Settings placeholder",
+        "menu": "Help"
+      },
+      "optional": true
+    },
+    {
+      "index": 41,
+      "kind": "dumpMenu",
+      "label": "context menu at Windows Settings placeholder",
+      "plan": "dumpMenu Context at Computer/Windows Settings  [context menu at Windows Settings placeholder]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "context menu at Windows Settings placeholder",
+        "root": "Computer",
+        "path": [
+          "Windows Settings"
+        ],
+        "menu": "Context"
+      },
+      "optional": true
+    },
+    {
+      "index": 42,
+      "kind": "dumpMenu",
+      "label": "context menu of a policy row",
+      "plan": "dumpMenu Context on 'Class machine flag' at Computer/Administrative Templates/BWC Oracle/Basics  [context menu of a policy row]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "context menu of a policy row",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Basics"
+        ],
+        "policy": "Class machine flag",
+        "menu": "Context"
+      },
+      "optional": null
+    },
+    {
+      "index": 43,
+      "kind": "dumpMenu",
+      "label": "File menu with a policy row selected",
+      "plan": "dumpMenu File  [File menu with a policy row selected]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "File menu with a policy row selected",
+        "menu": "File"
+      },
+      "optional": null
+    },
+    {
+      "index": 44,
+      "kind": "dumpMenu",
+      "label": "Action menu with a policy row selected",
+      "plan": "dumpMenu Action  [Action menu with a policy row selected]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Action menu with a policy row selected",
+        "menu": "Action"
+      },
+      "optional": null
+    },
+    {
+      "index": 45,
+      "kind": "dumpMenu",
+      "label": "View menu with a policy row selected",
+      "plan": "dumpMenu View  [View menu with a policy row selected]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "View menu with a policy row selected",
+        "menu": "View"
+      },
+      "optional": null
+    },
+    {
+      "index": 46,
+      "kind": "dumpMenu",
+      "label": "Help menu with a policy row selected",
+      "plan": "dumpMenu Help  [Help menu with a policy row selected]",
+      "op": {
+        "kind": "dumpMenu",
+        "label": "Help menu with a policy row selected",
+        "menu": "Help"
+      },
+      "optional": null
+    },
+    {
+      "index": 47,
+      "kind": "snapshot",
+      "label": "step final",
+      "plan": "snapshot  [step final]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step final"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "final",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 1,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#c34cf9b3a983",
+            "text": "#230845cfa941",
+            "accelerator": null,
+            "mnemonic": "#148de9c5a7a4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13220
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#2eb7984c42b9",
+            "text": "#d17d84a60499",
+            "accelerator": null,
+            "mnemonic": "#2d711642b726",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57665
+          }
+        ],
+        "uiaNames": [
+          "#230845cfa941",
+          "#d17d84a60499"
+        ],
+        "menu": "File"
+      }
+    },
+    {
+      "index": 2,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1014
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1019
+          }
+        ],
+        "uiaNames": [
+          "#e84daeb06d01",
+          "Help"
+        ],
+        "menu": "Action"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#e4ccfac07e8e",
+            "text": "#b400ec694854",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1000
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#89992f559a31",
+            "text": "#f8303968a3f2",
+            "accelerator": null,
+            "mnemonic": "#cd0aa9856147",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1002
+          },
+          {
+            "index": 3,
+            "raw": "#7ca621a639d0",
+            "text": "#a67e25206b18",
+            "accelerator": null,
+            "mnemonic": "#62c66a7a5dd7",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1003
+          },
+          {
+            "index": 4,
+            "raw": "#9dc561cfde69",
+            "text": "#6f202f54a7b2",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1004
+          },
+          {
+            "index": 5,
+            "raw": "#cc67c2c35b44",
+            "text": "#fb5f27d5457c",
+            "accelerator": null,
+            "mnemonic": "#3f39d5c348e5",
+            "separator": false,
+            "grayed": false,
+            "checked": true,
+            "popup": false,
+            "id": 1005
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#d113e2f41485",
+            "text": "#cb8fe55b4ab8",
+            "accelerator": null,
+            "mnemonic": "#0bfe935e70c3",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1009
+          }
+        ],
+        "uiaNames": [
+          "#b400ec694854",
+          "#f8303968a3f2",
+          "#a67e25206b18",
+          "#6f202f54a7b2",
+          "#fb5f27d5457c",
+          "#cb8fe55b4ab8"
+        ],
+        "menu": "View"
+      }
+    },
+    {
+      "index": 4,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4eb1722ce250",
+            "text": "#cfdb7a908c70",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 12804
+          },
+          {
+            "index": 1,
+            "raw": "#210a1bb7bd5f",
+            "text": "#210ed90ffd4b",
+            "accelerator": null,
+            "mnemonic": "#e632b7095b0b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13245
+          },
+          {
+            "index": 2,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 3,
+            "raw": "#b3cc306e5fcc",
+            "text": "#42e30e1d0981",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57664
+          },
+          {
+            "index": 4,
+            "raw": "#66f76e2632fd",
+            "text": "#edf0cf246d59",
+            "accelerator": null,
+            "mnemonic": "#3e23e8160039",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13242
+          }
+        ],
+        "uiaNames": [
+          "#cfdb7a908c70",
+          "#210ed90ffd4b",
+          "#42e30e1d0981",
+          "#edf0cf246d59"
+        ],
+        "menu": "Help"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1013
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#d8042eb735a9",
+            "text": "View",
+            "accelerator": null,
+            "mnemonic": "#de5a6f78116e",
+            "separator": true,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#e4ccfac07e8e",
+                "text": "#b400ec694854",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1016
+              },
+              {
+                "index": 1,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 2,
+                "raw": "#89992f559a31",
+                "text": "#f8303968a3f2",
+                "accelerator": null,
+                "mnemonic": "#cd0aa9856147",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1018
+              },
+              {
+                "index": 3,
+                "raw": "#7ca621a639d0",
+                "text": "#a67e25206b18",
+                "accelerator": null,
+                "mnemonic": "#62c66a7a5dd7",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              },
+              {
+                "index": 4,
+                "raw": "#9dc561cfde69",
+                "text": "#6f202f54a7b2",
+                "accelerator": null,
+                "mnemonic": "#72dfcfb0c470",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1020
+              },
+              {
+                "index": 5,
+                "raw": "#cc67c2c35b44",
+                "text": "#fb5f27d5457c",
+                "accelerator": null,
+                "mnemonic": "#3f39d5c348e5",
+                "separator": false,
+                "grayed": false,
+                "checked": true,
+                "popup": false,
+                "id": 1021
+              },
+              {
+                "index": 6,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 7,
+                "raw": "#d113e2f41485",
+                "text": "#cb8fe55b4ab8",
+                "accelerator": null,
+                "mnemonic": "#0bfe935e70c3",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1025
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 4,
+            "raw": "#cf913ba19512",
+            "text": "#ed9aba88ab98",
+            "accelerator": null,
+            "mnemonic": "#a83dd0ccbffe",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#5c3f9f4152b7",
+                "text": "#d58bbb838e09",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1028
+              }
+            ]
+          },
+          {
+            "index": 5,
+            "raw": "#ea0693ab8990",
+            "text": "#b48216e4e8a2",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1029
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1031
+          }
+        ],
+        "uiaNames": [
+          "#e84daeb06d01",
+          "View",
+          "#ed9aba88ab98",
+          "#b48216e4e8a2",
+          "Help"
+        ],
+        "menu": "#a6e600a10fed",
+        "selectedRow": "#6fcb5c1881ee"
+      }
+    },
+    {
+      "index": 6,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 7,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#c34cf9b3a983",
+            "text": "#230845cfa941",
+            "accelerator": null,
+            "mnemonic": "#148de9c5a7a4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13220
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#2eb7984c42b9",
+            "text": "#d17d84a60499",
+            "accelerator": null,
+            "mnemonic": "#2d711642b726",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57665
+          }
+        ],
+        "uiaNames": [
+          "#230845cfa941",
+          "#d17d84a60499"
+        ],
+        "menu": "File"
+      }
+    },
+    {
+      "index": 8,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#81af36e04f72",
+            "text": "#89d7b515a3ff",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1018
+          },
+          {
+            "index": 1,
+            "raw": "#30df5ff0d57a",
+            "text": "#e7fffc5f8ca1",
+            "accelerator": null,
+            "mnemonic": "#f67ab10ad4e4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1020
+          },
+          {
+            "index": 2,
+            "raw": "#7d48cb278692",
+            "text": "#cf4d3b3190ea",
+            "accelerator": null,
+            "mnemonic": "#c4694f2e93d5",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1022
+          },
+          {
+            "index": 3,
+            "raw": "#c77db7d89a17",
+            "text": "#9d637d0e79a1",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": 1024
+          },
+          {
+            "index": 4,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 5,
+            "raw": "#7762f48a5a55",
+            "text": "#0799351bbf2c",
+            "accelerator": null,
+            "mnemonic": "#8254c329a928",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#81af36e04f72",
+                "text": "#89d7b515a3ff",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              },
+              {
+                "index": 1,
+                "raw": "#30df5ff0d57a",
+                "text": "#e7fffc5f8ca1",
+                "accelerator": null,
+                "mnemonic": "#f67ab10ad4e4",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1021
+              },
+              {
+                "index": 2,
+                "raw": "#7d48cb278692",
+                "text": "#cf4d3b3190ea",
+                "accelerator": null,
+                "mnemonic": "#c4694f2e93d5",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1023
+              },
+              {
+                "index": 3,
+                "raw": "#c77db7d89a17",
+                "text": "#9d637d0e79a1",
+                "accelerator": null,
+                "mnemonic": "#3f79bb7b435b",
+                "separator": false,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": 1025
+              }
+            ]
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1014
+          },
+          {
+            "index": 8,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 9,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1027
+          }
+        ],
+        "uiaNames": [
+          "#89d7b515a3ff",
+          "#e7fffc5f8ca1",
+          "#cf4d3b3190ea",
+          "#9d637d0e79a1",
+          "#0799351bbf2c",
+          "#e84daeb06d01",
+          "Help"
+        ],
+        "menu": "Action"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#e4ccfac07e8e",
+            "text": "#b400ec694854",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1000
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#89992f559a31",
+            "text": "#f8303968a3f2",
+            "accelerator": null,
+            "mnemonic": "#cd0aa9856147",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1002
+          },
+          {
+            "index": 3,
+            "raw": "#7ca621a639d0",
+            "text": "#a67e25206b18",
+            "accelerator": null,
+            "mnemonic": "#62c66a7a5dd7",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1003
+          },
+          {
+            "index": 4,
+            "raw": "#9dc561cfde69",
+            "text": "#6f202f54a7b2",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1004
+          },
+          {
+            "index": 5,
+            "raw": "#cc67c2c35b44",
+            "text": "#fb5f27d5457c",
+            "accelerator": null,
+            "mnemonic": "#3f39d5c348e5",
+            "separator": false,
+            "grayed": false,
+            "checked": true,
+            "popup": false,
+            "id": 1005
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#30df5ff0d57a",
+            "text": "#e7fffc5f8ca1",
+            "accelerator": null,
+            "mnemonic": "#f67ab10ad4e4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1008
+          },
+          {
+            "index": 8,
+            "raw": "#7d48cb278692",
+            "text": "#cf4d3b3190ea",
+            "accelerator": null,
+            "mnemonic": "#c4694f2e93d5",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1009
+          },
+          {
+            "index": 9,
+            "raw": "#c77db7d89a17",
+            "text": "#9d637d0e79a1",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": 1010
+          },
+          {
+            "index": 10,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 11,
+            "raw": "#d113e2f41485",
+            "text": "#cb8fe55b4ab8",
+            "accelerator": null,
+            "mnemonic": "#0bfe935e70c3",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1012
+          }
+        ],
+        "uiaNames": [
+          "#b400ec694854",
+          "#f8303968a3f2",
+          "#a67e25206b18",
+          "#6f202f54a7b2",
+          "#fb5f27d5457c",
+          "#e7fffc5f8ca1",
+          "#cf4d3b3190ea",
+          "#9d637d0e79a1",
+          "#cb8fe55b4ab8"
+        ],
+        "menu": "View"
+      }
+    },
+    {
+      "index": 10,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4eb1722ce250",
+            "text": "#cfdb7a908c70",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 12804
+          },
+          {
+            "index": 1,
+            "raw": "#210a1bb7bd5f",
+            "text": "#210ed90ffd4b",
+            "accelerator": null,
+            "mnemonic": "#e632b7095b0b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13245
+          },
+          {
+            "index": 2,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 3,
+            "raw": "#b3cc306e5fcc",
+            "text": "#42e30e1d0981",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57664
+          }
+        ],
+        "uiaNames": [
+          "#cfdb7a908c70",
+          "#210ed90ffd4b",
+          "#42e30e1d0981"
+        ],
+        "menu": "Help"
+      }
+    },
+    {
+      "index": 11,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1013
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#d8042eb735a9",
+            "text": "View",
+            "accelerator": null,
+            "mnemonic": "#de5a6f78116e",
+            "separator": true,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#e4ccfac07e8e",
+                "text": "#b400ec694854",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1016
+              },
+              {
+                "index": 1,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 2,
+                "raw": "#89992f559a31",
+                "text": "#f8303968a3f2",
+                "accelerator": null,
+                "mnemonic": "#cd0aa9856147",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1018
+              },
+              {
+                "index": 3,
+                "raw": "#7ca621a639d0",
+                "text": "#a67e25206b18",
+                "accelerator": null,
+                "mnemonic": "#62c66a7a5dd7",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              },
+              {
+                "index": 4,
+                "raw": "#9dc561cfde69",
+                "text": "#6f202f54a7b2",
+                "accelerator": null,
+                "mnemonic": "#72dfcfb0c470",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1020
+              },
+              {
+                "index": 5,
+                "raw": "#cc67c2c35b44",
+                "text": "#fb5f27d5457c",
+                "accelerator": null,
+                "mnemonic": "#3f39d5c348e5",
+                "separator": false,
+                "grayed": false,
+                "checked": true,
+                "popup": false,
+                "id": 1021
+              },
+              {
+                "index": 6,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 7,
+                "raw": "#30df5ff0d57a",
+                "text": "#e7fffc5f8ca1",
+                "accelerator": null,
+                "mnemonic": "#f67ab10ad4e4",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1024
+              },
+              {
+                "index": 8,
+                "raw": "#7d48cb278692",
+                "text": "#cf4d3b3190ea",
+                "accelerator": null,
+                "mnemonic": "#c4694f2e93d5",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1025
+              },
+              {
+                "index": 9,
+                "raw": "#c77db7d89a17",
+                "text": "#9d637d0e79a1",
+                "accelerator": null,
+                "mnemonic": "#3f79bb7b435b",
+                "separator": false,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": 1026
+              },
+              {
+                "index": 10,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 11,
+                "raw": "#d113e2f41485",
+                "text": "#cb8fe55b4ab8",
+                "accelerator": null,
+                "mnemonic": "#0bfe935e70c3",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1028
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 4,
+            "raw": "#cf913ba19512",
+            "text": "#ed9aba88ab98",
+            "accelerator": null,
+            "mnemonic": "#a83dd0ccbffe",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#5c3f9f4152b7",
+                "text": "#d58bbb838e09",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1031
+              }
+            ]
+          },
+          {
+            "index": 5,
+            "raw": "#ea0693ab8990",
+            "text": "#b48216e4e8a2",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1032
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1034
+          }
+        ],
+        "uiaNames": [
+          "#e84daeb06d01",
+          "View",
+          "#ed9aba88ab98",
+          "#b48216e4e8a2",
+          "Help"
+        ],
+        "menu": "#a6e600a10fed",
+        "selectedRow": "#6fcb5c1881ee"
+      }
+    },
+    {
+      "index": 12,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 13,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#c34cf9b3a983",
+            "text": "#230845cfa941",
+            "accelerator": null,
+            "mnemonic": "#148de9c5a7a4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13220
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#2eb7984c42b9",
+            "text": "#d17d84a60499",
+            "accelerator": null,
+            "mnemonic": "#2d711642b726",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57665
+          }
+        ],
+        "uiaNames": [
+          "#230845cfa941",
+          "#d17d84a60499"
+        ],
+        "menu": "File"
+      }
+    },
+    {
+      "index": 14,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#30df5ff0d57a",
+            "text": "#e7fffc5f8ca1",
+            "accelerator": null,
+            "mnemonic": "#f67ab10ad4e4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1018
+          },
+          {
+            "index": 1,
+            "raw": "#7d48cb278692",
+            "text": "#cf4d3b3190ea",
+            "accelerator": null,
+            "mnemonic": "#c4694f2e93d5",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1020
+          },
+          {
+            "index": 2,
+            "raw": "#c77db7d89a17",
+            "text": "#9d637d0e79a1",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": 1022
+          },
+          {
+            "index": 3,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 4,
+            "raw": "#7762f48a5a55",
+            "text": "#0799351bbf2c",
+            "accelerator": null,
+            "mnemonic": "#8254c329a928",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#30df5ff0d57a",
+                "text": "#e7fffc5f8ca1",
+                "accelerator": null,
+                "mnemonic": "#f67ab10ad4e4",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              },
+              {
+                "index": 1,
+                "raw": "#7d48cb278692",
+                "text": "#cf4d3b3190ea",
+                "accelerator": null,
+                "mnemonic": "#c4694f2e93d5",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1021
+              },
+              {
+                "index": 2,
+                "raw": "#c77db7d89a17",
+                "text": "#9d637d0e79a1",
+                "accelerator": null,
+                "mnemonic": "#3f79bb7b435b",
+                "separator": false,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": 1023
+              }
+            ]
+          },
+          {
+            "index": 5,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 6,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1014
+          },
+          {
+            "index": 7,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 8,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1025
+          }
+        ],
+        "uiaNames": [
+          "#e7fffc5f8ca1",
+          "#cf4d3b3190ea",
+          "#9d637d0e79a1",
+          "#0799351bbf2c",
+          "#e84daeb06d01",
+          "Help"
+        ],
+        "menu": "Action"
+      }
+    },
+    {
+      "index": 15,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#e4ccfac07e8e",
+            "text": "#b400ec694854",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1000
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#89992f559a31",
+            "text": "#f8303968a3f2",
+            "accelerator": null,
+            "mnemonic": "#cd0aa9856147",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1002
+          },
+          {
+            "index": 3,
+            "raw": "#7ca621a639d0",
+            "text": "#a67e25206b18",
+            "accelerator": null,
+            "mnemonic": "#62c66a7a5dd7",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1003
+          },
+          {
+            "index": 4,
+            "raw": "#9dc561cfde69",
+            "text": "#6f202f54a7b2",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1004
+          },
+          {
+            "index": 5,
+            "raw": "#cc67c2c35b44",
+            "text": "#fb5f27d5457c",
+            "accelerator": null,
+            "mnemonic": "#3f39d5c348e5",
+            "separator": false,
+            "grayed": false,
+            "checked": true,
+            "popup": false,
+            "id": 1005
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#30df5ff0d57a",
+            "text": "#e7fffc5f8ca1",
+            "accelerator": null,
+            "mnemonic": "#f67ab10ad4e4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1008
+          },
+          {
+            "index": 8,
+            "raw": "#7d48cb278692",
+            "text": "#cf4d3b3190ea",
+            "accelerator": null,
+            "mnemonic": "#c4694f2e93d5",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1009
+          },
+          {
+            "index": 9,
+            "raw": "#c77db7d89a17",
+            "text": "#9d637d0e79a1",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": 1010
+          },
+          {
+            "index": 10,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 11,
+            "raw": "#d113e2f41485",
+            "text": "#cb8fe55b4ab8",
+            "accelerator": null,
+            "mnemonic": "#0bfe935e70c3",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1012
+          }
+        ],
+        "uiaNames": [
+          "#b400ec694854",
+          "#f8303968a3f2",
+          "#a67e25206b18",
+          "#6f202f54a7b2",
+          "#fb5f27d5457c",
+          "#e7fffc5f8ca1",
+          "#cf4d3b3190ea",
+          "#9d637d0e79a1",
+          "#cb8fe55b4ab8"
+        ],
+        "menu": "View"
+      }
+    },
+    {
+      "index": 16,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4eb1722ce250",
+            "text": "#cfdb7a908c70",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 12804
+          },
+          {
+            "index": 1,
+            "raw": "#210a1bb7bd5f",
+            "text": "#210ed90ffd4b",
+            "accelerator": null,
+            "mnemonic": "#e632b7095b0b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13245
+          },
+          {
+            "index": 2,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 3,
+            "raw": "#b3cc306e5fcc",
+            "text": "#42e30e1d0981",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57664
+          }
+        ],
+        "uiaNames": [
+          "#cfdb7a908c70",
+          "#210ed90ffd4b",
+          "#42e30e1d0981"
+        ],
+        "menu": "Help"
+      }
+    },
+    {
+      "index": 17,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1013
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#d8042eb735a9",
+            "text": "View",
+            "accelerator": null,
+            "mnemonic": "#de5a6f78116e",
+            "separator": true,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#e4ccfac07e8e",
+                "text": "#b400ec694854",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1016
+              },
+              {
+                "index": 1,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 2,
+                "raw": "#89992f559a31",
+                "text": "#f8303968a3f2",
+                "accelerator": null,
+                "mnemonic": "#cd0aa9856147",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1018
+              },
+              {
+                "index": 3,
+                "raw": "#7ca621a639d0",
+                "text": "#a67e25206b18",
+                "accelerator": null,
+                "mnemonic": "#62c66a7a5dd7",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              },
+              {
+                "index": 4,
+                "raw": "#9dc561cfde69",
+                "text": "#6f202f54a7b2",
+                "accelerator": null,
+                "mnemonic": "#72dfcfb0c470",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1020
+              },
+              {
+                "index": 5,
+                "raw": "#cc67c2c35b44",
+                "text": "#fb5f27d5457c",
+                "accelerator": null,
+                "mnemonic": "#3f39d5c348e5",
+                "separator": false,
+                "grayed": false,
+                "checked": true,
+                "popup": false,
+                "id": 1021
+              },
+              {
+                "index": 6,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 7,
+                "raw": "#30df5ff0d57a",
+                "text": "#e7fffc5f8ca1",
+                "accelerator": null,
+                "mnemonic": "#f67ab10ad4e4",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1024
+              },
+              {
+                "index": 8,
+                "raw": "#7d48cb278692",
+                "text": "#cf4d3b3190ea",
+                "accelerator": null,
+                "mnemonic": "#c4694f2e93d5",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1025
+              },
+              {
+                "index": 9,
+                "raw": "#c77db7d89a17",
+                "text": "#9d637d0e79a1",
+                "accelerator": null,
+                "mnemonic": "#3f79bb7b435b",
+                "separator": false,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": 1026
+              },
+              {
+                "index": 10,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 11,
+                "raw": "#d113e2f41485",
+                "text": "#cb8fe55b4ab8",
+                "accelerator": null,
+                "mnemonic": "#0bfe935e70c3",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1028
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 4,
+            "raw": "#cf913ba19512",
+            "text": "#ed9aba88ab98",
+            "accelerator": null,
+            "mnemonic": "#a83dd0ccbffe",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#5c3f9f4152b7",
+                "text": "#d58bbb838e09",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1031
+              }
+            ]
+          },
+          {
+            "index": 5,
+            "raw": "#ea0693ab8990",
+            "text": "#b48216e4e8a2",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1032
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1034
+          }
+        ],
+        "uiaNames": [
+          "#e84daeb06d01",
+          "View",
+          "#ed9aba88ab98",
+          "#b48216e4e8a2",
+          "Help"
+        ],
+        "menu": "#a6e600a10fed",
+        "selectedRow": "#6fcb5c1881ee"
+      }
+    },
+    {
+      "index": 18,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 19,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#c34cf9b3a983",
+            "text": "#230845cfa941",
+            "accelerator": null,
+            "mnemonic": "#148de9c5a7a4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13220
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#2eb7984c42b9",
+            "text": "#d17d84a60499",
+            "accelerator": null,
+            "mnemonic": "#2d711642b726",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57665
+          }
+        ],
+        "uiaNames": [
+          "#230845cfa941",
+          "#d17d84a60499"
+        ],
+        "menu": "File"
+      }
+    },
+    {
+      "index": 20,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#30df5ff0d57a",
+            "text": "#e7fffc5f8ca1",
+            "accelerator": null,
+            "mnemonic": "#f67ab10ad4e4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1018
+          },
+          {
+            "index": 1,
+            "raw": "#7d48cb278692",
+            "text": "#cf4d3b3190ea",
+            "accelerator": null,
+            "mnemonic": "#c4694f2e93d5",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1020
+          },
+          {
+            "index": 2,
+            "raw": "#c77db7d89a17",
+            "text": "#9d637d0e79a1",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": 1022
+          },
+          {
+            "index": 3,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 4,
+            "raw": "#7762f48a5a55",
+            "text": "#0799351bbf2c",
+            "accelerator": null,
+            "mnemonic": "#8254c329a928",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#30df5ff0d57a",
+                "text": "#e7fffc5f8ca1",
+                "accelerator": null,
+                "mnemonic": "#f67ab10ad4e4",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              },
+              {
+                "index": 1,
+                "raw": "#7d48cb278692",
+                "text": "#cf4d3b3190ea",
+                "accelerator": null,
+                "mnemonic": "#c4694f2e93d5",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1021
+              },
+              {
+                "index": 2,
+                "raw": "#c77db7d89a17",
+                "text": "#9d637d0e79a1",
+                "accelerator": null,
+                "mnemonic": "#3f79bb7b435b",
+                "separator": false,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": 1023
+              }
+            ]
+          },
+          {
+            "index": 5,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 6,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1014
+          },
+          {
+            "index": 7,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 8,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1025
+          }
+        ],
+        "uiaNames": [
+          "#e7fffc5f8ca1",
+          "#cf4d3b3190ea",
+          "#9d637d0e79a1",
+          "#0799351bbf2c",
+          "#e84daeb06d01",
+          "Help"
+        ],
+        "menu": "Action"
+      }
+    },
+    {
+      "index": 21,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#e4ccfac07e8e",
+            "text": "#b400ec694854",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1000
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#89992f559a31",
+            "text": "#f8303968a3f2",
+            "accelerator": null,
+            "mnemonic": "#cd0aa9856147",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1002
+          },
+          {
+            "index": 3,
+            "raw": "#7ca621a639d0",
+            "text": "#a67e25206b18",
+            "accelerator": null,
+            "mnemonic": "#62c66a7a5dd7",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1003
+          },
+          {
+            "index": 4,
+            "raw": "#9dc561cfde69",
+            "text": "#6f202f54a7b2",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1004
+          },
+          {
+            "index": 5,
+            "raw": "#cc67c2c35b44",
+            "text": "#fb5f27d5457c",
+            "accelerator": null,
+            "mnemonic": "#3f39d5c348e5",
+            "separator": false,
+            "grayed": false,
+            "checked": true,
+            "popup": false,
+            "id": 1005
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#30df5ff0d57a",
+            "text": "#e7fffc5f8ca1",
+            "accelerator": null,
+            "mnemonic": "#f67ab10ad4e4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1008
+          },
+          {
+            "index": 8,
+            "raw": "#7d48cb278692",
+            "text": "#cf4d3b3190ea",
+            "accelerator": null,
+            "mnemonic": "#c4694f2e93d5",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1009
+          },
+          {
+            "index": 9,
+            "raw": "#c77db7d89a17",
+            "text": "#9d637d0e79a1",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": 1010
+          },
+          {
+            "index": 10,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 11,
+            "raw": "#d113e2f41485",
+            "text": "#cb8fe55b4ab8",
+            "accelerator": null,
+            "mnemonic": "#0bfe935e70c3",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1012
+          }
+        ],
+        "uiaNames": [
+          "#b400ec694854",
+          "#f8303968a3f2",
+          "#a67e25206b18",
+          "#6f202f54a7b2",
+          "#fb5f27d5457c",
+          "#e7fffc5f8ca1",
+          "#cf4d3b3190ea",
+          "#9d637d0e79a1",
+          "#cb8fe55b4ab8"
+        ],
+        "menu": "View"
+      }
+    },
+    {
+      "index": 22,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4eb1722ce250",
+            "text": "#cfdb7a908c70",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 12804
+          },
+          {
+            "index": 1,
+            "raw": "#210a1bb7bd5f",
+            "text": "#210ed90ffd4b",
+            "accelerator": null,
+            "mnemonic": "#e632b7095b0b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13245
+          },
+          {
+            "index": 2,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 3,
+            "raw": "#b3cc306e5fcc",
+            "text": "#42e30e1d0981",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57664
+          }
+        ],
+        "uiaNames": [
+          "#cfdb7a908c70",
+          "#210ed90ffd4b",
+          "#42e30e1d0981"
+        ],
+        "menu": "Help"
+      }
+    },
+    {
+      "index": 23,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1013
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#d8042eb735a9",
+            "text": "View",
+            "accelerator": null,
+            "mnemonic": "#de5a6f78116e",
+            "separator": true,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#e4ccfac07e8e",
+                "text": "#b400ec694854",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1016
+              },
+              {
+                "index": 1,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 2,
+                "raw": "#89992f559a31",
+                "text": "#f8303968a3f2",
+                "accelerator": null,
+                "mnemonic": "#cd0aa9856147",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1018
+              },
+              {
+                "index": 3,
+                "raw": "#7ca621a639d0",
+                "text": "#a67e25206b18",
+                "accelerator": null,
+                "mnemonic": "#62c66a7a5dd7",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              },
+              {
+                "index": 4,
+                "raw": "#9dc561cfde69",
+                "text": "#6f202f54a7b2",
+                "accelerator": null,
+                "mnemonic": "#72dfcfb0c470",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1020
+              },
+              {
+                "index": 5,
+                "raw": "#cc67c2c35b44",
+                "text": "#fb5f27d5457c",
+                "accelerator": null,
+                "mnemonic": "#3f39d5c348e5",
+                "separator": false,
+                "grayed": false,
+                "checked": true,
+                "popup": false,
+                "id": 1021
+              },
+              {
+                "index": 6,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 7,
+                "raw": "#30df5ff0d57a",
+                "text": "#e7fffc5f8ca1",
+                "accelerator": null,
+                "mnemonic": "#f67ab10ad4e4",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1024
+              },
+              {
+                "index": 8,
+                "raw": "#7d48cb278692",
+                "text": "#cf4d3b3190ea",
+                "accelerator": null,
+                "mnemonic": "#c4694f2e93d5",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1025
+              },
+              {
+                "index": 9,
+                "raw": "#c77db7d89a17",
+                "text": "#9d637d0e79a1",
+                "accelerator": null,
+                "mnemonic": "#3f79bb7b435b",
+                "separator": false,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": 1026
+              },
+              {
+                "index": 10,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 11,
+                "raw": "#d113e2f41485",
+                "text": "#cb8fe55b4ab8",
+                "accelerator": null,
+                "mnemonic": "#0bfe935e70c3",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1028
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 4,
+            "raw": "#cf913ba19512",
+            "text": "#ed9aba88ab98",
+            "accelerator": null,
+            "mnemonic": "#a83dd0ccbffe",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#5c3f9f4152b7",
+                "text": "#d58bbb838e09",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1031
+              }
+            ]
+          },
+          {
+            "index": 5,
+            "raw": "#ea0693ab8990",
+            "text": "#b48216e4e8a2",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1032
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1034
+          }
+        ],
+        "uiaNames": [
+          "#e84daeb06d01",
+          "View",
+          "#ed9aba88ab98",
+          "#b48216e4e8a2",
+          "Help"
+        ],
+        "menu": "#a6e600a10fed",
+        "selectedRow": "#6fcb5c1881ee"
+      }
+    },
+    {
+      "index": 24,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "untracked": "depends on the machine's own templates"
+      }
+    },
+    {
+      "index": 25,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#c34cf9b3a983",
+            "text": "#230845cfa941",
+            "accelerator": null,
+            "mnemonic": "#148de9c5a7a4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13220
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#2eb7984c42b9",
+            "text": "#d17d84a60499",
+            "accelerator": null,
+            "mnemonic": "#2d711642b726",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57665
+          }
+        ],
+        "uiaNames": [
+          "#230845cfa941",
+          "#d17d84a60499"
+        ],
+        "menu": "File"
+      }
+    },
+    {
+      "index": 26,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#30df5ff0d57a",
+            "text": "#e7fffc5f8ca1",
+            "accelerator": null,
+            "mnemonic": "#f67ab10ad4e4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1018
+          },
+          {
+            "index": 1,
+            "raw": "#7d48cb278692",
+            "text": "#cf4d3b3190ea",
+            "accelerator": null,
+            "mnemonic": "#c4694f2e93d5",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1020
+          },
+          {
+            "index": 2,
+            "raw": "#c77db7d89a17",
+            "text": "#9d637d0e79a1",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": 1022
+          },
+          {
+            "index": 3,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 4,
+            "raw": "#7762f48a5a55",
+            "text": "#0799351bbf2c",
+            "accelerator": null,
+            "mnemonic": "#8254c329a928",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#30df5ff0d57a",
+                "text": "#e7fffc5f8ca1",
+                "accelerator": null,
+                "mnemonic": "#f67ab10ad4e4",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              },
+              {
+                "index": 1,
+                "raw": "#7d48cb278692",
+                "text": "#cf4d3b3190ea",
+                "accelerator": null,
+                "mnemonic": "#c4694f2e93d5",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1021
+              },
+              {
+                "index": 2,
+                "raw": "#c77db7d89a17",
+                "text": "#9d637d0e79a1",
+                "accelerator": null,
+                "mnemonic": "#3f79bb7b435b",
+                "separator": false,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": 1023
+              }
+            ]
+          },
+          {
+            "index": 5,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 6,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1014
+          },
+          {
+            "index": 7,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 8,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1025
+          }
+        ],
+        "uiaNames": [
+          "#e7fffc5f8ca1",
+          "#cf4d3b3190ea",
+          "#9d637d0e79a1",
+          "#0799351bbf2c",
+          "#e84daeb06d01",
+          "Help"
+        ],
+        "menu": "Action"
+      }
+    },
+    {
+      "index": 27,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#e4ccfac07e8e",
+            "text": "#b400ec694854",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1000
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#89992f559a31",
+            "text": "#f8303968a3f2",
+            "accelerator": null,
+            "mnemonic": "#cd0aa9856147",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1002
+          },
+          {
+            "index": 3,
+            "raw": "#7ca621a639d0",
+            "text": "#a67e25206b18",
+            "accelerator": null,
+            "mnemonic": "#62c66a7a5dd7",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1003
+          },
+          {
+            "index": 4,
+            "raw": "#9dc561cfde69",
+            "text": "#6f202f54a7b2",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1004
+          },
+          {
+            "index": 5,
+            "raw": "#cc67c2c35b44",
+            "text": "#fb5f27d5457c",
+            "accelerator": null,
+            "mnemonic": "#3f39d5c348e5",
+            "separator": false,
+            "grayed": false,
+            "checked": true,
+            "popup": false,
+            "id": 1005
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#30df5ff0d57a",
+            "text": "#e7fffc5f8ca1",
+            "accelerator": null,
+            "mnemonic": "#f67ab10ad4e4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1008
+          },
+          {
+            "index": 8,
+            "raw": "#7d48cb278692",
+            "text": "#cf4d3b3190ea",
+            "accelerator": null,
+            "mnemonic": "#c4694f2e93d5",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1009
+          },
+          {
+            "index": 9,
+            "raw": "#c77db7d89a17",
+            "text": "#9d637d0e79a1",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": 1010
+          },
+          {
+            "index": 10,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 11,
+            "raw": "#d113e2f41485",
+            "text": "#cb8fe55b4ab8",
+            "accelerator": null,
+            "mnemonic": "#0bfe935e70c3",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1012
+          }
+        ],
+        "uiaNames": [
+          "#b400ec694854",
+          "#f8303968a3f2",
+          "#a67e25206b18",
+          "#6f202f54a7b2",
+          "#fb5f27d5457c",
+          "#e7fffc5f8ca1",
+          "#cf4d3b3190ea",
+          "#9d637d0e79a1",
+          "#cb8fe55b4ab8"
+        ],
+        "menu": "View"
+      }
+    },
+    {
+      "index": 28,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4eb1722ce250",
+            "text": "#cfdb7a908c70",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 12804
+          },
+          {
+            "index": 1,
+            "raw": "#210a1bb7bd5f",
+            "text": "#210ed90ffd4b",
+            "accelerator": null,
+            "mnemonic": "#e632b7095b0b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13245
+          },
+          {
+            "index": 2,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 3,
+            "raw": "#b3cc306e5fcc",
+            "text": "#42e30e1d0981",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57664
+          }
+        ],
+        "uiaNames": [
+          "#cfdb7a908c70",
+          "#210ed90ffd4b",
+          "#42e30e1d0981"
+        ],
+        "menu": "Help"
+      }
+    },
+    {
+      "index": 29,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1013
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#d8042eb735a9",
+            "text": "View",
+            "accelerator": null,
+            "mnemonic": "#de5a6f78116e",
+            "separator": true,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#e4ccfac07e8e",
+                "text": "#b400ec694854",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1016
+              },
+              {
+                "index": 1,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 2,
+                "raw": "#89992f559a31",
+                "text": "#f8303968a3f2",
+                "accelerator": null,
+                "mnemonic": "#cd0aa9856147",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1018
+              },
+              {
+                "index": 3,
+                "raw": "#7ca621a639d0",
+                "text": "#a67e25206b18",
+                "accelerator": null,
+                "mnemonic": "#62c66a7a5dd7",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              },
+              {
+                "index": 4,
+                "raw": "#9dc561cfde69",
+                "text": "#6f202f54a7b2",
+                "accelerator": null,
+                "mnemonic": "#72dfcfb0c470",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1020
+              },
+              {
+                "index": 5,
+                "raw": "#cc67c2c35b44",
+                "text": "#fb5f27d5457c",
+                "accelerator": null,
+                "mnemonic": "#3f39d5c348e5",
+                "separator": false,
+                "grayed": false,
+                "checked": true,
+                "popup": false,
+                "id": 1021
+              },
+              {
+                "index": 6,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 7,
+                "raw": "#30df5ff0d57a",
+                "text": "#e7fffc5f8ca1",
+                "accelerator": null,
+                "mnemonic": "#f67ab10ad4e4",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1024
+              },
+              {
+                "index": 8,
+                "raw": "#7d48cb278692",
+                "text": "#cf4d3b3190ea",
+                "accelerator": null,
+                "mnemonic": "#c4694f2e93d5",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1025
+              },
+              {
+                "index": 9,
+                "raw": "#c77db7d89a17",
+                "text": "#9d637d0e79a1",
+                "accelerator": null,
+                "mnemonic": "#3f79bb7b435b",
+                "separator": false,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": 1026
+              },
+              {
+                "index": 10,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 11,
+                "raw": "#d113e2f41485",
+                "text": "#cb8fe55b4ab8",
+                "accelerator": null,
+                "mnemonic": "#0bfe935e70c3",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1028
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 4,
+            "raw": "#cf913ba19512",
+            "text": "#ed9aba88ab98",
+            "accelerator": null,
+            "mnemonic": "#a83dd0ccbffe",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#5c3f9f4152b7",
+                "text": "#d58bbb838e09",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1031
+              }
+            ]
+          },
+          {
+            "index": 5,
+            "raw": "#ea0693ab8990",
+            "text": "#b48216e4e8a2",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1032
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1034
+          }
+        ],
+        "uiaNames": [
+          "#e84daeb06d01",
+          "View",
+          "#ed9aba88ab98",
+          "#b48216e4e8a2",
+          "Help"
+        ],
+        "menu": "#a6e600a10fed",
+        "selectedRow": "#6fcb5c1881ee"
+      }
+    },
+    {
+      "index": 30,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 31,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#c34cf9b3a983",
+            "text": "#230845cfa941",
+            "accelerator": null,
+            "mnemonic": "#148de9c5a7a4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13220
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#2eb7984c42b9",
+            "text": "#d17d84a60499",
+            "accelerator": null,
+            "mnemonic": "#2d711642b726",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57665
+          }
+        ],
+        "uiaNames": [
+          "#230845cfa941",
+          "#d17d84a60499"
+        ],
+        "menu": "File"
+      }
+    },
+    {
+      "index": 32,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1014
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1019
+          }
+        ],
+        "uiaNames": [
+          "#e84daeb06d01",
+          "Help"
+        ],
+        "menu": "Action"
+      }
+    },
+    {
+      "index": 33,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#e4ccfac07e8e",
+            "text": "#b400ec694854",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1000
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#89992f559a31",
+            "text": "#f8303968a3f2",
+            "accelerator": null,
+            "mnemonic": "#cd0aa9856147",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1002
+          },
+          {
+            "index": 3,
+            "raw": "#7ca621a639d0",
+            "text": "#a67e25206b18",
+            "accelerator": null,
+            "mnemonic": "#62c66a7a5dd7",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1003
+          },
+          {
+            "index": 4,
+            "raw": "#9dc561cfde69",
+            "text": "#6f202f54a7b2",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1004
+          },
+          {
+            "index": 5,
+            "raw": "#cc67c2c35b44",
+            "text": "#fb5f27d5457c",
+            "accelerator": null,
+            "mnemonic": "#3f39d5c348e5",
+            "separator": false,
+            "grayed": false,
+            "checked": true,
+            "popup": false,
+            "id": 1005
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#d113e2f41485",
+            "text": "#cb8fe55b4ab8",
+            "accelerator": null,
+            "mnemonic": "#0bfe935e70c3",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1009
+          }
+        ],
+        "uiaNames": [
+          "#b400ec694854",
+          "#f8303968a3f2",
+          "#a67e25206b18",
+          "#6f202f54a7b2",
+          "#fb5f27d5457c",
+          "#cb8fe55b4ab8"
+        ],
+        "menu": "View"
+      }
+    },
+    {
+      "index": 34,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4eb1722ce250",
+            "text": "#cfdb7a908c70",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 12804
+          },
+          {
+            "index": 1,
+            "raw": "#210a1bb7bd5f",
+            "text": "#210ed90ffd4b",
+            "accelerator": null,
+            "mnemonic": "#e632b7095b0b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13245
+          },
+          {
+            "index": 2,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 3,
+            "raw": "#b3cc306e5fcc",
+            "text": "#42e30e1d0981",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57664
+          },
+          {
+            "index": 4,
+            "raw": "#66f76e2632fd",
+            "text": "#edf0cf246d59",
+            "accelerator": null,
+            "mnemonic": "#3e23e8160039",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13242
+          }
+        ],
+        "uiaNames": [
+          "#cfdb7a908c70",
+          "#210ed90ffd4b",
+          "#42e30e1d0981",
+          "#edf0cf246d59"
+        ],
+        "menu": "Help"
+      }
+    },
+    {
+      "index": 35,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#d8042eb735a9",
+            "text": "View",
+            "accelerator": null,
+            "mnemonic": "#de5a6f78116e",
+            "separator": true,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#e4ccfac07e8e",
+                "text": "#b400ec694854",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1015
+              },
+              {
+                "index": 1,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 2,
+                "raw": "#89992f559a31",
+                "text": "#f8303968a3f2",
+                "accelerator": null,
+                "mnemonic": "#cd0aa9856147",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1017
+              },
+              {
+                "index": 3,
+                "raw": "#7ca621a639d0",
+                "text": "#a67e25206b18",
+                "accelerator": null,
+                "mnemonic": "#62c66a7a5dd7",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1018
+              },
+              {
+                "index": 4,
+                "raw": "#9dc561cfde69",
+                "text": "#6f202f54a7b2",
+                "accelerator": null,
+                "mnemonic": "#72dfcfb0c470",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              },
+              {
+                "index": 5,
+                "raw": "#cc67c2c35b44",
+                "text": "#fb5f27d5457c",
+                "accelerator": null,
+                "mnemonic": "#3f39d5c348e5",
+                "separator": false,
+                "grayed": false,
+                "checked": true,
+                "popup": false,
+                "id": 1020
+              },
+              {
+                "index": 6,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 7,
+                "raw": "#d113e2f41485",
+                "text": "#cb8fe55b4ab8",
+                "accelerator": null,
+                "mnemonic": "#0bfe935e70c3",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1024
+              }
+            ]
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#cf913ba19512",
+            "text": "#ed9aba88ab98",
+            "accelerator": null,
+            "mnemonic": "#a83dd0ccbffe",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#5c3f9f4152b7",
+                "text": "#d58bbb838e09",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1027
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "raw": "#ea0693ab8990",
+            "text": "#b48216e4e8a2",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1028
+          },
+          {
+            "index": 4,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 5,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1030
+          }
+        ],
+        "uiaNames": [
+          "View",
+          "#ed9aba88ab98",
+          "#b48216e4e8a2",
+          "Help"
+        ],
+        "menu": "#a6e600a10fed",
+        "selectedRow": "#6fcb5c1881ee"
+      }
+    },
+    {
+      "index": 36,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 37,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#c34cf9b3a983",
+            "text": "#230845cfa941",
+            "accelerator": null,
+            "mnemonic": "#148de9c5a7a4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13220
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#2eb7984c42b9",
+            "text": "#d17d84a60499",
+            "accelerator": null,
+            "mnemonic": "#2d711642b726",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57665
+          }
+        ],
+        "uiaNames": [
+          "#230845cfa941",
+          "#d17d84a60499"
+        ],
+        "menu": "File"
+      }
+    },
+    {
+      "index": 38,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1014
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1019
+          }
+        ],
+        "uiaNames": [
+          "#e84daeb06d01",
+          "Help"
+        ],
+        "menu": "Action"
+      }
+    },
+    {
+      "index": 39,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#e4ccfac07e8e",
+            "text": "#b400ec694854",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1000
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#89992f559a31",
+            "text": "#f8303968a3f2",
+            "accelerator": null,
+            "mnemonic": "#cd0aa9856147",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1002
+          },
+          {
+            "index": 3,
+            "raw": "#7ca621a639d0",
+            "text": "#a67e25206b18",
+            "accelerator": null,
+            "mnemonic": "#62c66a7a5dd7",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1003
+          },
+          {
+            "index": 4,
+            "raw": "#9dc561cfde69",
+            "text": "#6f202f54a7b2",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1004
+          },
+          {
+            "index": 5,
+            "raw": "#cc67c2c35b44",
+            "text": "#fb5f27d5457c",
+            "accelerator": null,
+            "mnemonic": "#3f39d5c348e5",
+            "separator": false,
+            "grayed": false,
+            "checked": true,
+            "popup": false,
+            "id": 1005
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#d113e2f41485",
+            "text": "#cb8fe55b4ab8",
+            "accelerator": null,
+            "mnemonic": "#0bfe935e70c3",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1009
+          }
+        ],
+        "uiaNames": [
+          "#b400ec694854",
+          "#f8303968a3f2",
+          "#a67e25206b18",
+          "#6f202f54a7b2",
+          "#fb5f27d5457c",
+          "#cb8fe55b4ab8"
+        ],
+        "menu": "View"
+      }
+    },
+    {
+      "index": 40,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4eb1722ce250",
+            "text": "#cfdb7a908c70",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 12804
+          },
+          {
+            "index": 1,
+            "raw": "#210a1bb7bd5f",
+            "text": "#210ed90ffd4b",
+            "accelerator": null,
+            "mnemonic": "#e632b7095b0b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13245
+          },
+          {
+            "index": 2,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 3,
+            "raw": "#b3cc306e5fcc",
+            "text": "#42e30e1d0981",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57664
+          },
+          {
+            "index": 4,
+            "raw": "#66f76e2632fd",
+            "text": "#edf0cf246d59",
+            "accelerator": null,
+            "mnemonic": "#3e23e8160039",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13242
+          }
+        ],
+        "uiaNames": [
+          "#cfdb7a908c70",
+          "#210ed90ffd4b",
+          "#42e30e1d0981",
+          "#edf0cf246d59"
+        ],
+        "menu": "Help"
+      }
+    },
+    {
+      "index": 41,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4f44a0fdf8ef",
+            "text": "#e84daeb06d01",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1013
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#d8042eb735a9",
+            "text": "View",
+            "accelerator": null,
+            "mnemonic": "#de5a6f78116e",
+            "separator": true,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#e4ccfac07e8e",
+                "text": "#b400ec694854",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1016
+              },
+              {
+                "index": 1,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 2,
+                "raw": "#89992f559a31",
+                "text": "#f8303968a3f2",
+                "accelerator": null,
+                "mnemonic": "#cd0aa9856147",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1018
+              },
+              {
+                "index": 3,
+                "raw": "#7ca621a639d0",
+                "text": "#a67e25206b18",
+                "accelerator": null,
+                "mnemonic": "#62c66a7a5dd7",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              },
+              {
+                "index": 4,
+                "raw": "#9dc561cfde69",
+                "text": "#6f202f54a7b2",
+                "accelerator": null,
+                "mnemonic": "#72dfcfb0c470",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1020
+              },
+              {
+                "index": 5,
+                "raw": "#cc67c2c35b44",
+                "text": "#fb5f27d5457c",
+                "accelerator": null,
+                "mnemonic": "#3f39d5c348e5",
+                "separator": false,
+                "grayed": false,
+                "checked": true,
+                "popup": false,
+                "id": 1021
+              },
+              {
+                "index": 6,
+                "raw": "",
+                "text": "",
+                "accelerator": null,
+                "mnemonic": null,
+                "separator": true,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": null
+              },
+              {
+                "index": 7,
+                "raw": "#d113e2f41485",
+                "text": "#cb8fe55b4ab8",
+                "accelerator": null,
+                "mnemonic": "#0bfe935e70c3",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1025
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 4,
+            "raw": "#cf913ba19512",
+            "text": "#ed9aba88ab98",
+            "accelerator": null,
+            "mnemonic": "#a83dd0ccbffe",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#5c3f9f4152b7",
+                "text": "#d58bbb838e09",
+                "accelerator": null,
+                "mnemonic": "#559aead08264",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1028
+              }
+            ]
+          },
+          {
+            "index": 5,
+            "raw": "#ea0693ab8990",
+            "text": "#b48216e4e8a2",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1029
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1031
+          }
+        ],
+        "uiaNames": [
+          "#e84daeb06d01",
+          "View",
+          "#ed9aba88ab98",
+          "#b48216e4e8a2",
+          "Help"
+        ],
+        "menu": "#a6e600a10fed",
+        "selectedRow": "#6fcb5c1881ee"
+      }
+    },
+    {
+      "index": 42,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#9a52e0fa1299",
+            "text": "#464c4ffd019e",
+            "accelerator": null,
+            "mnemonic": "#a9f51566bd67",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1012
+          },
+          {
+            "index": 1,
+            "raw": "#30df5ff0d57a",
+            "text": "#e7fffc5f8ca1",
+            "accelerator": null,
+            "mnemonic": "#f67ab10ad4e4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1014
+          },
+          {
+            "index": 2,
+            "raw": "#7d48cb278692",
+            "text": "#cf4d3b3190ea",
+            "accelerator": null,
+            "mnemonic": "#c4694f2e93d5",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1016
+          },
+          {
+            "index": 3,
+            "raw": "#c77db7d89a17",
+            "text": "#9d637d0e79a1",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": 1018
+          },
+          {
+            "index": 4,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 5,
+            "raw": "#7762f48a5a55",
+            "text": "#0799351bbf2c",
+            "accelerator": null,
+            "mnemonic": "#8254c329a928",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#9a52e0fa1299",
+                "text": "#464c4ffd019e",
+                "accelerator": null,
+                "mnemonic": "#a9f51566bd67",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1013
+              },
+              {
+                "index": 1,
+                "raw": "#30df5ff0d57a",
+                "text": "#e7fffc5f8ca1",
+                "accelerator": null,
+                "mnemonic": "#f67ab10ad4e4",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1015
+              },
+              {
+                "index": 2,
+                "raw": "#7d48cb278692",
+                "text": "#cf4d3b3190ea",
+                "accelerator": null,
+                "mnemonic": "#c4694f2e93d5",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1017
+              },
+              {
+                "index": 3,
+                "raw": "#c77db7d89a17",
+                "text": "#9d637d0e79a1",
+                "accelerator": null,
+                "mnemonic": "#3f79bb7b435b",
+                "separator": false,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              }
+            ]
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1021
+          }
+        ],
+        "uiaNames": [
+          "#464c4ffd019e",
+          "#e7fffc5f8ca1",
+          "#cf4d3b3190ea",
+          "#9d637d0e79a1",
+          "#0799351bbf2c",
+          "Help"
+        ],
+        "menu": "#a6e600a10fed",
+        "selectedRow": "Class machine flag"
+      }
+    },
+    {
+      "index": 43,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#c34cf9b3a983",
+            "text": "#230845cfa941",
+            "accelerator": null,
+            "mnemonic": "#148de9c5a7a4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13220
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#2eb7984c42b9",
+            "text": "#d17d84a60499",
+            "accelerator": null,
+            "mnemonic": "#2d711642b726",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57665
+          }
+        ],
+        "uiaNames": [
+          "#230845cfa941",
+          "#d17d84a60499"
+        ],
+        "menu": "File"
+      }
+    },
+    {
+      "index": 44,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#9a52e0fa1299",
+            "text": "#464c4ffd019e",
+            "accelerator": null,
+            "mnemonic": "#a9f51566bd67",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1012
+          },
+          {
+            "index": 1,
+            "raw": "#30df5ff0d57a",
+            "text": "#e7fffc5f8ca1",
+            "accelerator": null,
+            "mnemonic": "#f67ab10ad4e4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1014
+          },
+          {
+            "index": 2,
+            "raw": "#7d48cb278692",
+            "text": "#cf4d3b3190ea",
+            "accelerator": null,
+            "mnemonic": "#c4694f2e93d5",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1016
+          },
+          {
+            "index": 3,
+            "raw": "#c77db7d89a17",
+            "text": "#9d637d0e79a1",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": 1018
+          },
+          {
+            "index": 4,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 5,
+            "raw": "#7762f48a5a55",
+            "text": "#0799351bbf2c",
+            "accelerator": null,
+            "mnemonic": "#8254c329a928",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": true,
+            "id": null,
+            "items": [
+              {
+                "index": 0,
+                "raw": "#9a52e0fa1299",
+                "text": "#464c4ffd019e",
+                "accelerator": null,
+                "mnemonic": "#a9f51566bd67",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1013
+              },
+              {
+                "index": 1,
+                "raw": "#30df5ff0d57a",
+                "text": "#e7fffc5f8ca1",
+                "accelerator": null,
+                "mnemonic": "#f67ab10ad4e4",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1015
+              },
+              {
+                "index": 2,
+                "raw": "#7d48cb278692",
+                "text": "#cf4d3b3190ea",
+                "accelerator": null,
+                "mnemonic": "#c4694f2e93d5",
+                "separator": false,
+                "grayed": false,
+                "checked": false,
+                "popup": false,
+                "id": 1017
+              },
+              {
+                "index": 3,
+                "raw": "#c77db7d89a17",
+                "text": "#9d637d0e79a1",
+                "accelerator": null,
+                "mnemonic": "#3f79bb7b435b",
+                "separator": false,
+                "grayed": true,
+                "checked": false,
+                "popup": false,
+                "id": 1019
+              }
+            ]
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#5a3cadef7959",
+            "text": "Help",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1021
+          }
+        ],
+        "uiaNames": [
+          "#464c4ffd019e",
+          "#e7fffc5f8ca1",
+          "#cf4d3b3190ea",
+          "#9d637d0e79a1",
+          "#0799351bbf2c",
+          "Help"
+        ],
+        "menu": "Action"
+      }
+    },
+    {
+      "index": 45,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#e4ccfac07e8e",
+            "text": "#b400ec694854",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1000
+          },
+          {
+            "index": 1,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 2,
+            "raw": "#89992f559a31",
+            "text": "#f8303968a3f2",
+            "accelerator": null,
+            "mnemonic": "#cd0aa9856147",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1002
+          },
+          {
+            "index": 3,
+            "raw": "#7ca621a639d0",
+            "text": "#a67e25206b18",
+            "accelerator": null,
+            "mnemonic": "#62c66a7a5dd7",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1003
+          },
+          {
+            "index": 4,
+            "raw": "#9dc561cfde69",
+            "text": "#6f202f54a7b2",
+            "accelerator": null,
+            "mnemonic": "#72dfcfb0c470",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1004
+          },
+          {
+            "index": 5,
+            "raw": "#cc67c2c35b44",
+            "text": "#fb5f27d5457c",
+            "accelerator": null,
+            "mnemonic": "#3f39d5c348e5",
+            "separator": false,
+            "grayed": false,
+            "checked": true,
+            "popup": false,
+            "id": 1005
+          },
+          {
+            "index": 6,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 7,
+            "raw": "#30df5ff0d57a",
+            "text": "#e7fffc5f8ca1",
+            "accelerator": null,
+            "mnemonic": "#f67ab10ad4e4",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1008
+          },
+          {
+            "index": 8,
+            "raw": "#7d48cb278692",
+            "text": "#cf4d3b3190ea",
+            "accelerator": null,
+            "mnemonic": "#c4694f2e93d5",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1009
+          },
+          {
+            "index": 9,
+            "raw": "#c77db7d89a17",
+            "text": "#9d637d0e79a1",
+            "accelerator": null,
+            "mnemonic": "#3f79bb7b435b",
+            "separator": false,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": 1010
+          },
+          {
+            "index": 10,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 11,
+            "raw": "#d113e2f41485",
+            "text": "#cb8fe55b4ab8",
+            "accelerator": null,
+            "mnemonic": "#0bfe935e70c3",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 1012
+          }
+        ],
+        "uiaNames": [
+          "#b400ec694854",
+          "#f8303968a3f2",
+          "#a67e25206b18",
+          "#6f202f54a7b2",
+          "#fb5f27d5457c",
+          "#e7fffc5f8ca1",
+          "#cf4d3b3190ea",
+          "#9d637d0e79a1",
+          "#cb8fe55b4ab8"
+        ],
+        "menu": "View"
+      }
+    },
+    {
+      "index": 46,
+      "kind": "dumpMenu",
+      "ok": true,
+      "data": {
+        "items": [
+          {
+            "index": 0,
+            "raw": "#4eb1722ce250",
+            "text": "#cfdb7a908c70",
+            "accelerator": null,
+            "mnemonic": "#44bd7ae60f47",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 12804
+          },
+          {
+            "index": 1,
+            "raw": "#210a1bb7bd5f",
+            "text": "#210ed90ffd4b",
+            "accelerator": null,
+            "mnemonic": "#e632b7095b0b",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 13245
+          },
+          {
+            "index": 2,
+            "raw": "",
+            "text": "",
+            "accelerator": null,
+            "mnemonic": null,
+            "separator": true,
+            "grayed": true,
+            "checked": false,
+            "popup": false,
+            "id": null
+          },
+          {
+            "index": 3,
+            "raw": "#b3cc306e5fcc",
+            "text": "#42e30e1d0981",
+            "accelerator": null,
+            "mnemonic": "#559aead08264",
+            "separator": false,
+            "grayed": false,
+            "checked": false,
+            "popup": false,
+            "id": 57664
+          }
+        ],
+        "uiaNames": [
+          "#cfdb7a908c70",
+          "#210ed90ffd4b",
+          "#42e30e1d0981"
+        ],
+        "menu": "Help"
+      }
+    },
+    {
+      "index": 47,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    }
+  ]
+}

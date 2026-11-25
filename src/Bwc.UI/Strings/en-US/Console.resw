@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Probe gpedit (artifacts/oracle/gpedit/probe.json): automation name of the console tree. An internal window caption, not prose. -->
+  <data name="ConsoleTreeName" xml:space="preserve">
+    <value>Console Embedded Scope</value>
+  </data>
+  <!-- Probe gpedit: automation name of the result pane. An internal window caption, not prose. -->
+  <data name="ConsoleResultName" xml:space="preserve">
+    <value>Console Embedded Window Results</value>
+  </data>
+  <!-- BWC label. The classic splitter has no accessible element. -->
+  <data name="ConsoleSplitterName" xml:space="preserve">
+    <value>Splitter</value>
+  </data>
+  <!-- BWC label. The classic menu is a toolbar band without a name. -->
+  <data name="ConsoleMenuBarName" xml:space="preserve">
+    <value>Menu Bar</value>
+  </data>
+  <!-- BWC label. The classic toolbar band has an empty name. -->
+  <data name="ConsoleToolbarName" xml:space="preserve">
+    <value>Toolbar</value>
+  </data>
+  <!-- BWC label. The classic status bar has an empty name and the automation id StatusBar. -->
+  <data name="ConsoleStatusBarName" xml:space="preserve">
+    <value>Status Bar</value>
+  </data>
+  <!-- Probe gpedit: toolbar button name (item 1). -->
+  <data name="ConsoleToolbarBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <!-- Probe gpedit: toolbar button name (item 2). -->
+  <data name="ConsoleToolbarForward" xml:space="preserve">
+    <value>Forward</value>
+  </data>
+  <!-- BWC label. The probed gpedit toolbar hides this button. -->
+  <data name="ConsoleToolbarUp" xml:space="preserve">
+    <value>Up One Level</value>
+  </data>
+  <!-- Probe gpedit: toolbar button name (item 5). -->
+  <data name="ConsoleToolbarShowHideTree" xml:space="preserve">
+    <value>Show/Hide Console Tree</value>
+  </data>
+  <!-- Probe gpedit: toolbar button name (item 12). -->
+  <data name="ConsoleToolbarProperties" xml:space="preserve">
+    <value>Properties</value>
+  </data>
+  <!-- BWC label. The probed gpedit toolbar hides this button. -->
+  <data name="ConsoleToolbarRefresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <!-- Probe gpedit: toolbar button name (item 15). -->
+  <data name="ConsoleToolbarExportList" xml:space="preserve">
+    <value>Export List</value>
+  </data>
+  <!-- Probe gpedit: toolbar button name (item 17). -->
+  <data name="ConsoleToolbarHelp" xml:space="preserve">
+    <value>Help</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: top-level File menu. -->
+  <data name="ConsoleMenuFile" xml:space="preserve">
+    <value>&amp;File</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: top-level Action menu (id 13238). -->
+  <data name="ConsoleMenuAction" xml:space="preserve">
+    <value>&amp;Action</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: top-level View menu (id 13239). -->
+  <data name="ConsoleMenuView" xml:space="preserve">
+    <value>&amp;View</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: top-level Help menu. -->
+  <data name="ConsoleMenuHelp" xml:space="preserve">
+    <value>&amp;Help</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: File menu entry, command 13220. -->
+  <data name="ConsoleMenuFileOptions" xml:space="preserve">
+    <value>O&amp;ptions...</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: File menu entry, command 57665. -->
+  <data name="ConsoleMenuFileExit" xml:space="preserve">
+    <value>E&amp;xit</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 162: View menu entry of SDI user mode, command 13231. -->
+  <data name="ConsoleMenuViewCustomize" xml:space="preserve">
+    <value>Customi&amp;ze View...</value>
+  </data>
+  <!-- Oracle mmc.exe RT_MENU 194: Help menu entry, command 12804. -->
+  <data name="ConsoleMenuHelpTopics" xml:space="preserve">
+    <value>&amp;Help Topics</value>
+  </data>
+  <!-- Probe gpedit (artifacts/oracle/gpedit/probe.json, step result-list): automation name of the result list. An internal window caption, not prose. -->
+  <data name="ConsoleListName" xml:space="preserve">
+    <value>Console Embedded Window Results</value>
+  </data>
+  <!-- Probe gpedit, step result-list: automation name of the result list header. An internal window caption, not prose. -->
+  <data name="ConsoleListHeaderName" xml:space="preserve">
+    <value>Console Embedded Results Header</value>
+  </data>
+  <!-- BWC label: the item status of a column header that the list is sorted by, in ascending order. -->
+  <data name="ConsoleListSortedAscending" xml:space="preserve">
+    <value>Sorted ascending</value>
+  </data>
+  <!-- BWC label: the item status of a column header that the list is sorted by, in descending order. -->
+  <data name="ConsoleListSortedDescending" xml:space="preserve">
+    <value>Sorted descending</value>
+  </data>
+  <!-- Probe gpedit (artifacts/oracle/gpedit/probe.json, step result-list): the tab names of the result pane, the short labels of the classic tab strip. -->
+  <data name="ConsoleExtendedTabExtended" xml:space="preserve">
+    <value>Extended</value>
+  </data>
+  <data name="ConsoleExtendedTabStandard" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <!-- BWC label: automation name of the Extended and Standard tab strip. Classic names it with an empty string. -->
+  <data name="ConsoleExtendedTabsName" xml:space="preserve">
+    <value>Result pane view</value>
+  </data>
+  <!-- BWC label: automation name of the description pane and of its scroller. -->
+  <data name="ConsoleDescriptionPaneName" xml:space="preserve">
+    <value>Description pane</value>
+  </data>
+  <data name="ConsoleDescriptionScrollName" xml:space="preserve">
+    <value>Description text</value>
+  </data>
+  <!-- The link label quoted in the plan (U2c): the link of the description pane of a policy. A host passes it in its model. -->
+  <data name="ConsoleExtendedEditPolicyLink" xml:space="preserve">
+    <value>Edit policy setting</value>
+  </data>
+  <!-- BWC wording: the heading of the first section of a policy description (probe: the string 247 of admtmpl.dll carries a colon and markup; this is the plain label). -->
+  <data name="ConsoleDescriptionRequirements" xml:space="preserve">
+    <value>Requirements</value>
+  </data>
+  <!-- BWC wording: the heading of the help text section of a policy description. -->
+  <data name="ConsoleDescriptionHelpHeading" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <!-- The hint in the description pane when the node has no explain text; classic wording (probe.json). -->
+  <data name="ConsoleDescriptionNoSelectionHint" xml:space="preserve">
+    <value>Select an item to view its description.</value>
+  </data>
+  <!-- BWC wording: View menu entry that opens the column chooser (command 1000). -->
+  <data name="ConsoleMenuViewColumns" xml:space="preserve">
+    <value>Add/Remove &amp;Columns...</value>
+  </data>
+  <!-- BWC wording: Action menu entry that saves the shown list as text (command 13436). -->
+  <data name="ConsoleMenuActionExportList" xml:space="preserve">
+    <value>E&amp;xport List...</value>
+  </data>
+  <!-- BWC wording: Caption of the column chooser. -->
+  <data name="ConsoleColumnsCaption" xml:space="preserve">
+    <value>Add/Remove Columns</value>
+  </data>
+  <!-- BWC wording: Label of the list of the columns that are not shown. -->
+  <data name="ConsoleColumnsLabelAvailable" xml:space="preserve">
+    <value>&amp;Available columns:</value>
+  </data>
+  <!-- BWC wording: Label of the list of the columns that are shown. -->
+  <data name="ConsoleColumnsLabelDisplayed" xml:space="preserve">
+    <value>Display&amp;ed columns:</value>
+  </data>
+  <!-- BWC wording: Accessible name of the list of the columns that are not shown. -->
+  <data name="ConsoleColumnsNameAvailable" xml:space="preserve">
+    <value>Available columns</value>
+  </data>
+  <!-- BWC wording: Accessible name of the list of the columns that are shown. -->
+  <data name="ConsoleColumnsNameDisplayed" xml:space="preserve">
+    <value>Displayed columns</value>
+  </data>
+  <!-- BWC wording: Button that moves the selected available column to the displayed columns. -->
+  <data name="ConsoleColumnsAdd" xml:space="preserve">
+    <value>A&amp;dd &gt;</value>
+  </data>
+  <!-- BWC wording: Button that moves the selected displayed column to the available columns. -->
+  <data name="ConsoleColumnsRemove" xml:space="preserve">
+    <value>&lt; &amp;Remove</value>
+  </data>
+  <!-- BWC wording: Button that moves the selected displayed column one place up. -->
+  <data name="ConsoleColumnsMoveUp" xml:space="preserve">
+    <value>M&amp;ove Up</value>
+  </data>
+  <!-- BWC wording: Button that moves the selected displayed column one place down. -->
+  <data name="ConsoleColumnsMoveDown" xml:space="preserve">
+    <value>Mo&amp;ve Down</value>
+  </data>
+  <!-- BWC wording: Button that restores the default columns and order in the dialog. -->
+  <data name="ConsoleColumnsRestore" xml:space="preserve">
+    <value>Re&amp;store Defaults</value>
+  </data>
+  <!-- BWC wording: OK button of the frame dialogs. -->
+  <data name="ConsoleDialogOk" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <!-- BWC wording: Cancel button of the frame dialogs. -->
+  <data name="ConsoleDialogCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <!-- BWC wording: Caption of the Customize View dialog. -->
+  <data name="ConsoleCustomizeCaption" xml:space="preserve">
+    <value>Customize View</value>
+  </data>
+  <!-- BWC wording: Text at the top of the Customize View dialog. -->
+  <data name="ConsoleCustomizeIntro" xml:space="preserve">
+    <value>Select the parts of the window to show.</value>
+  </data>
+  <!-- BWC wording: Group caption of the console switches of Customize View. -->
+  <data name="ConsoleCustomizeGroupConsole" xml:space="preserve">
+    <value>Console</value>
+  </data>
+  <!-- BWC wording: Group caption of the snap-in switches of Customize View. -->
+  <data name="ConsoleCustomizeGroupSnapIn" xml:space="preserve">
+    <value>Snap-in</value>
+  </data>
+  <!-- BWC wording: Customize View: the console tree and its splitter. -->
+  <data name="ConsoleCustomizeConsoleTree" xml:space="preserve">
+    <value>&amp;Console tree</value>
+  </data>
+  <!-- BWC wording: Customize View: the standard menus (shown disabled, BWC has no such switch). -->
+  <data name="ConsoleCustomizeStandardMenus" xml:space="preserve">
+    <value>Standard m&amp;enus</value>
+  </data>
+  <!-- BWC wording: Customize View: the eight standard toolbar buttons. -->
+  <data name="ConsoleCustomizeStandardToolbar" xml:space="preserve">
+    <value>Standard tool&amp;bar</value>
+  </data>
+  <!-- BWC wording: Customize View: the status bar. -->
+  <data name="ConsoleCustomizeStatusBar" xml:space="preserve">
+    <value>&amp;Status bar</value>
+  </data>
+  <!-- BWC wording: Customize View: the description pane of the Extended tab. -->
+  <data name="ConsoleCustomizeDescriptionBar" xml:space="preserve">
+    <value>&amp;Description bar</value>
+  </data>
+  <!-- BWC wording: Customize View: taskpad navigation tabs (shown disabled, BWC has no taskpads). -->
+  <data name="ConsoleCustomizeTaskpadTabs" xml:space="preserve">
+    <value>Taskpad &amp;navigation tabs</value>
+  </data>
+  <!-- BWC wording: Customize View: the action pane (shown disabled, BWC has none). -->
+  <data name="ConsoleCustomizeActionPane" xml:space="preserve">
+    <value>&amp;Action pane</value>
+  </data>
+  <!-- BWC wording: Customize View: the menus of the snap-in (shown disabled, BWC has no such switch). -->
+  <data name="ConsoleCustomizeSnapInMenus" xml:space="preserve">
+    <value>Snap-in &amp;menus</value>
+  </data>
+  <!-- BWC wording: Customize View: the toolbars of the snap-in, the extension buttons of the host. -->
+  <data name="ConsoleCustomizeSnapInToolbars" xml:space="preserve">
+    <value>Snap-in &amp;toolbars</value>
+  </data>
+  <!-- BWC wording: Caption of the message boxes of Export List. -->
+  <data name="ConsoleExportCaption" xml:space="preserve">
+    <value>Export List</value>
+  </data>
+  <!-- BWC wording: Export List: the file cannot be created. -->
+  <data name="ConsoleExportErrorCreate" xml:space="preserve">
+    <value>The file could not be created.</value>
+  </data>
+  <!-- BWC wording: Export List: the file cannot be written. -->
+  <data name="ConsoleExportErrorWrite" xml:space="preserve">
+    <value>The file could not be written.</value>
+  </data>
+  <!-- BWC wording: Export List: the chosen file is read-only. -->
+  <data name="ConsoleExportErrorReadOnly" xml:space="preserve">
+    <value>The file is read-only.</value>
+  </data>
+  <!-- BWC wording: Help menu entry that opens the project web site, command 13245. -->
+  <data name="ConsoleMenuHelpWebSite" xml:space="preserve">
+    <value>Better Windows Config on the &amp;Web</value>
+  </data>
+  <!-- BWC wording: Help menu entry that shows the About box, command 57664. -->
+  <data name="ConsoleMenuHelpAbout" xml:space="preserve">
+    <value>&amp;About</value>
+  </data>
+  <!-- BWC wording: Caption of the Options dialog of the console frame. -->
+  <data name="ConsoleOptionsCaption" xml:space="preserve">
+    <value>Options</value>
+  </data>
+  <!-- BWC wording: Label before the name box of the Options dialog. -->
+  <data name="ConsoleOptionsNameLabel" xml:space="preserve">
+    <value>Name:</value>
+  </data>
+  <!-- BWC wording: Accessible name of the read-only name box of the Options dialog. -->
+  <data name="ConsoleOptionsNameName" xml:space="preserve">
+    <value>Console name</value>
+  </data>
+  <!-- BWC wording: Change Icon button of the Options dialog. It stays disabled: the icon is fixed. -->
+  <data name="ConsoleOptionsChangeIcon" xml:space="preserve">
+    <value>Change &amp;Icon...</value>
+  </data>
+  <!-- BWC wording: Label before the console mode drop-down of the Options dialog. -->
+  <data name="ConsoleOptionsModeLabel" xml:space="preserve">
+    <value>Console mode:</value>
+  </data>
+  <!-- BWC wording: Accessible name of the console mode drop-down of the Options dialog. -->
+  <data name="ConsoleOptionsModeName" xml:space="preserve">
+    <value>Console mode</value>
+  </data>
+  <!-- BWC wording: The one console mode of BWC, shown in the disabled drop-down. -->
+  <data name="ConsoleOptionsModeValue" xml:space="preserve">
+    <value>Fixed tool</value>
+  </data>
+  <!-- BWC wording: Caption of the Description group of the Options dialog. -->
+  <data name="ConsoleOptionsGroupDescription" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <!-- BWC wording: Accessible name of the description area of the Options dialog. -->
+  <data name="ConsoleOptionsDescriptionName" xml:space="preserve">
+    <value>Console mode description</value>
+  </data>
+  <!-- BWC wording: Text of the description area: what the one console mode means. -->
+  <data name="ConsoleOptionsDescriptionText" xml:space="preserve">
+    <value>This tool has one mode. Its menus, tree and result views are fixed, and no console file is created or changed.</value>
+  </data>
+  <!-- BWC wording: The check box that is checked and disabled: BWC never writes a console file. -->
+  <data name="ConsoleOptionsNoSave" xml:space="preserve">
+    <value>Do not &amp;save changes to this console</value>
+  </data>
+  <!-- BWC wording: The one real choice of the Options dialog; it enables or disables View &gt; Customize View. -->
+  <data name="ConsoleOptionsCustomizeViews" xml:space="preserve">
+    <value>Allow the user to &amp;customize views</value>
+  </data>
+</root>

@@ -1,0 +1,15 @@
+{
+  "case": "C/Version_FromHighMachine",
+  "planHash": "78756bb9d0a030492310b9e8bf813c1a50e73a4c0768e19a736833072bcd51ec",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/gpt.ini",
+    "step-01-start/gpt.ini",
+    "step-02-machine/Machine.Registry.pol",
+    "step-02-machine/Machine.comment.cmtx",
+    "step-02-machine/gpt.ini"
+  ]
+}

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="GpeditCommandEdit" xml:space="preserve">
+    <value>&amp;Edit</value>
+  </data>
+  <data name="GpeditCommandRefresh" xml:space="preserve">
+    <value>&amp;Refresh	F5</value>
+  </data>
+  <data name="GpeditCommandHelp" xml:space="preserve">
+    <value>&amp;Help	F1</value>
+  </data>
+  <!-- Filter entries of the Action and View menus, the policy row menu and the tree menu (docs/failure-modes/gpedit-filter.md). -->
+  <data name="GpeditCommandFilterOn" xml:space="preserve">
+    <value>&amp;Filter On</value>
+  </data>
+  <data name="GpeditCommandFilterOptions" xml:space="preserve">
+    <value>Filter &amp;Options...</value>
+  </data>
+  <data name="GpeditCommandReApplyFilter" xml:space="preserve">
+    <value>Re-&amp;Apply Filter</value>
+  </data>
+  <!-- Add/Remove Templates, first entry of the Action menu at the Administrative Templates node (docs/failure-modes/gpedit-templates.md). -->
+  <data name="GpeditCommandAddRemoveTemplates" xml:space="preserve">
+    <value>A&amp;dd/Remove Templates...</value>
+  </data>
+  <!-- The submenu that repeats the policy and filter entries in the Action menu and in the policy row menu. -->
+  <data name="GpeditCommandTasks" xml:space="preserve">
+    <value>&amp;Tasks</value>
+  </data>
+  <!-- The View submenu of the list menu with no row selected. -->
+  <data name="GpeditCommandViewSubmenu" xml:space="preserve">
+    <value>&amp;View</value>
+  </data>
+  <!-- The four view modes of the View menu and of the View submenu of the list menu. -->
+  <data name="GpeditCommandViewLargeIcons" xml:space="preserve">
+    <value>Lar&amp;ge Icons</value>
+  </data>
+  <data name="GpeditCommandViewSmallIcons" xml:space="preserve">
+    <value>S&amp;mall Icons</value>
+  </data>
+  <data name="GpeditCommandViewList" xml:space="preserve">
+    <value>&amp;List</value>
+  </data>
+  <data name="GpeditCommandViewDetail" xml:space="preserve">
+    <value>&amp;Detail</value>
+  </data>
+  <!-- The icon arrangement submenu, its Auto Arrange entry and the line-up entry of the list menu (docs/failure-modes/gpedit-commands.md, section 11). -->
+  <data name="GpeditCommandArrangeIcons" xml:space="preserve">
+    <value>Arrange &amp;Icons</value>
+  </data>
+  <data name="GpeditCommandAutoArrange" xml:space="preserve">
+    <value>&amp;Auto Arrange</value>
+  </data>
+  <!-- Oracle mmcbase.dll.mui:12009 (the label before the help line). -->
+  <data name="GpeditCommandLineUpIcons" xml:space="preserve">
+    <value>Lin&amp;e up Icons</value>
+  </data>
+  <!-- The name of the Filter button of the toolbar. -->
+  <data name="GpeditToolbarFilter" xml:space="preserve">
+    <value>Filter</value>
+  </data>
+  <data name="GpeditAboutVersion" xml:space="preserve">
+    <value>Version {0}</value>
+  </data>
+  <data name="GpeditAboutVersionUnknown" xml:space="preserve">
+    <value>unknown</value>
+  </data>
+  <!-- Help menu entry of the snap-in About box, command 13242: shown at the configuration nodes and the placeholder nodes. -->
+  <data name="GpeditCommandSnapInAbout" xml:space="preserve">
+    <value>About Local Group Policy Editor s&amp;nap-in</value>
+  </data>
+  <!-- The name of the snap-in; the native box is titled About plus this name. -->
+  <data name="GpeditSnapInName" xml:space="preserve">
+    <value>Local Group Policy Editor snap-in</value>
+  </data>
+</root>

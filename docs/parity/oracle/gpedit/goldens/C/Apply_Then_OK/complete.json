@@ -1,0 +1,16 @@
+{
+  "case": "C/Apply_Then_OK",
+  "planHash": "9464c8253a949b92cc772340fd08a9ff08b150c6624b3a83403f24b4ae1800f2",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-apply-then-ok/Machine.Registry.pol",
+    "step-01-apply-then-ok/Machine.comment.cmtx",
+    "step-01-apply-then-ok/gpt.ini",
+    "step-02-apply-then-ok-disabled/Machine.Registry.pol",
+    "step-02-apply-then-ok-disabled/Machine.comment.cmtx",
+    "step-02-apply-then-ok-disabled/gpt.ini"
+  ]
+}

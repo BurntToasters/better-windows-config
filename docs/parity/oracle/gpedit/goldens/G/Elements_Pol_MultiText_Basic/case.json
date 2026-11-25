@@ -1,0 +1,949 @@
+{
+  "case": "G/Elements_Pol_MultiText_Basic",
+  "description": "Pol_MultiText_Basic: Enabled with values (registry types), then Not Configured",
+  "planVersion": 2,
+  "planHash": "ffb03842712e2589f9c9000153b9f8c79590b755fa1cefa8bf0f8daad2a58a0d",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "label": "registry at start",
+      "plan": "snapshot  [registry at start]",
+      "op": {
+        "kind": "snapshot",
+        "label": "registry at start"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Multiple text lines' state Enabled options [#0 = 2 lines] press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Multiple text lines",
+        "state": "Enabled",
+        "options": [
+          {
+            "index": 0,
+            "expectKind": "multiText",
+            "lines": [
+              "alpha",
+              "beta"
+            ],
+            "elementId": "MultiLines"
+          }
+        ],
+        "policyId": "Pol_MultiText_Basic",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "snapshot",
+      "label": "step enabled",
+      "plan": "snapshot  [step enabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "wait",
+      "label": "wait 4 s",
+      "plan": "wait 4000 ms  [wait 4 s]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "snapshot",
+      "label": "enabled: registry 4 s later",
+      "plan": "snapshot  [enabled: registry 4 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "enabled: registry 4 s later"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "wait",
+      "label": "wait 4 s more",
+      "plan": "wait 4000 ms  [wait 4 s more]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s more",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "snapshot",
+      "label": "enabled: registry 8 s later",
+      "plan": "snapshot  [enabled: registry 8 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "enabled: registry 8 s later"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Multiple text lines' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Elements/Texts",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Elements",
+          "Texts"
+        ],
+        "policy": "Multiple text lines",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_MultiText_Basic",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "wait",
+      "label": "wait 4 s",
+      "plan": "wait 4000 ms  [wait 4 s]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 10,
+      "kind": "snapshot",
+      "label": "not-configured: registry 4 s later",
+      "plan": "snapshot  [not-configured: registry 4 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "not-configured: registry 4 s later"
+      },
+      "optional": null
+    },
+    {
+      "index": 11,
+      "kind": "wait",
+      "label": "wait 4 s more",
+      "plan": "wait 4000 ms  [wait 4 s more]",
+      "op": {
+        "kind": "wait",
+        "label": "wait 4 s more",
+        "waitMs": 4000
+      },
+      "optional": null
+    },
+    {
+      "index": 12,
+      "kind": "snapshot",
+      "label": "not-configured: registry 8 s later",
+      "plan": "snapshot  [not-configured: registry 8 s later]",
+      "op": {
+        "kind": "snapshot",
+        "label": "not-configured: registry 8 s later"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled",
+      "folder": "step-01-enabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 160,
+          "sha256": "f17117c07790abae2ce0544ce40233614e1136de33056675f0f196165e9a2ba9"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 160
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "not-configured",
+      "folder": "step-02-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "4db24e823e9f9262f5164dbf974a3de0a61eac40d1fc1a430112712068e38833"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 1,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Multiple text lines",
+        "before": {
+          "title": "Multiple text lines",
+          "windowTitle": "Multiple text lines",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A multi-line text box that writes a REG_MULTI_SZ value.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#a486986104d7",
+              "panelId": "#05839db94909",
+              "controlId": "",
+              "rect": [
+                186,
+                744,
+                212,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                180,
+                796,
+                564,
+                168
+              ],
+              "enabled": false,
+              "text": "",
+              "lines": [
+                ""
+              ]
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "typed": true,
+            "multiline": true,
+            "requested": "#4854aaef7450",
+            "before": "",
+            "immediate": "#4854aaef7450",
+            "observed": "#4854aaef7450",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "",
+            "labelMatch": "index",
+            "kind": "#8abcf1af72d3",
+            "controlId": "#68e85187d390"
+          }
+        ],
+        "afterSet": {
+          "title": "Multiple text lines",
+          "windowTitle": "Multiple text lines",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A multi-line text box that writes a REG_MULTI_SZ value.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#a486986104d7",
+              "panelId": "#05839db94909",
+              "controlId": "",
+              "rect": [
+                186,
+                744,
+                212,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                180,
+                796,
+                564,
+                168
+              ],
+              "enabled": true,
+              "text": "#4854aaef7450",
+              "lines": [
+                "alpha",
+                "beta"
+              ]
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Multiple text lines",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "liveRegistry": {
+                "after": {
+                  "HKLM\\Software\\Policies\\BWC-Oracle": {},
+                  "HKLM\\Software\\Policies\\BWC-Oracle\\Elements": {},
+                  "HKLM\\Software\\Policies\\BWC-Oracle\\Elements\\Text": {
+                    "MultiLines": {
+                      "type": "MultiString",
+                      "data": [
+                        "alpha",
+                        "beta"
+                      ]
+                    }
+                  },
+                  "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+                  "HKCU\\Software\\Policies\\BWC-Oracle": null,
+                  "HKCU\\Software\\BWC-Oracle-Gpedit": null
+                },
+                "changed": true,
+                "waited": true,
+                "timedOut": false
+              }
+            }
+          }
+        ],
+        "finalTitle": "Multiple text lines"
+      }
+    },
+    {
+      "index": 2,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 160,
+          "sha256": "f17117c07790abae2ce0544ce40233614e1136de33056675f0f196165e9a2ba9"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Elements": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Elements\\Text": {
+          "MultiLines": {
+            "type": "MultiString",
+            "data": [
+              "alpha",
+              "beta"
+            ]
+          }
+        },
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 3,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 4,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 160,
+          "sha256": "f17117c07790abae2ce0544ce40233614e1136de33056675f0f196165e9a2ba9"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Elements": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Elements\\Text": {
+          "MultiLines": {
+            "type": "MultiString",
+            "data": [
+              "alpha",
+              "beta"
+            ]
+          }
+        },
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 5,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 6,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 160,
+          "sha256": "f17117c07790abae2ce0544ce40233614e1136de33056675f0f196165e9a2ba9"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Elements": {},
+        "HKLM\\Software\\Policies\\BWC-Oracle\\Elements\\Text": {
+          "MultiLines": {
+            "type": "MultiString",
+            "data": [
+              "alpha",
+              "beta"
+            ]
+          }
+        },
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 7,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Multiple text lines",
+        "before": {
+          "title": "Multiple text lines",
+          "windowTitle": "Multiple text lines",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A multi-line text box that writes a REG_MULTI_SZ value.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#a486986104d7",
+              "panelId": "#05839db94909",
+              "controlId": "",
+              "rect": [
+                238,
+                796,
+                212,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                232,
+                848,
+                564,
+                168
+              ],
+              "enabled": true,
+              "text": "#4854aaef7450",
+              "lines": [
+                "alpha",
+                "beta"
+              ]
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Enabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Multiple text lines",
+          "windowTitle": "Multiple text lines",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "A multi-line text box that writes a REG_MULTI_SZ value.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": false
+            },
+            "Next": {
+              "enabled": true
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": -1,
+              "kind": "#0141dc6310a1",
+              "label": "#a486986104d7",
+              "panelId": "#05839db94909",
+              "controlId": "",
+              "rect": [
+                238,
+                796,
+                212,
+                52
+              ]
+            },
+            {
+              "index": 1,
+              "controlIndex": 0,
+              "kind": "#8abcf1af72d3",
+              "label": "",
+              "panelId": "#9f8812a6e2fe",
+              "controlId": "#68e85187d390",
+              "rect": [
+                232,
+                848,
+                564,
+                168
+              ],
+              "enabled": false,
+              "text": "",
+              "lines": [
+                ""
+              ]
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Multiple text lines",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "liveRegistry": {
+                "after": {
+                  "HKLM\\Software\\Policies\\BWC-Oracle": null,
+                  "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+                  "HKCU\\Software\\Policies\\BWC-Oracle": null,
+                  "HKCU\\Software\\BWC-Oracle-Gpedit": null
+                },
+                "changed": true,
+                "waited": true,
+                "timedOut": false
+              }
+            }
+          }
+        ],
+        "finalTitle": "Multiple text lines"
+      }
+    },
+    {
+      "index": 8,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "4db24e823e9f9262f5164dbf974a3de0a61eac40d1fc1a430112712068e38833"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 9,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 10,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "4db24e823e9f9262f5164dbf974a3de0a61eac40d1fc1a430112712068e38833"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    },
+    {
+      "index": 11,
+      "kind": "wait",
+      "ok": true
+    },
+    {
+      "index": 12,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "4db24e823e9f9262f5164dbf974a3de0a61eac40d1fc1a430112712068e38833"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "liveRegistry": {
+        "HKLM\\Software\\Policies\\BWC-Oracle": null,
+        "HKLM\\Software\\BWC-Oracle-Gpedit": null,
+        "HKCU\\Software\\Policies\\BWC-Oracle": null,
+        "HKCU\\Software\\BWC-Oracle-Gpedit": null
+      }
+    }
+  ]
+}

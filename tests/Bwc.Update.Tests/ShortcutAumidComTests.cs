@@ -35,6 +35,11 @@ public sealed unsafe class ShortcutAumidComTests
 
             Assert.IsTrue(second.Ok, second.Detail);
             Assert.AreEqual("BetterWindowsConfig.Regedit", ShortcutAumid.ReadAppId(shortcut), "a second write replaces the first");
+
+            var third = ShortcutAumid.Write(shortcut, "BetterWindowsConfig.Gpedit");
+
+            Assert.IsTrue(third.Ok, third.Detail);
+            Assert.AreEqual("BetterWindowsConfig.Gpedit", ShortcutAumid.ReadAppId(shortcut), "the third tool's id is stored (SA16)");
         }
         finally
         {

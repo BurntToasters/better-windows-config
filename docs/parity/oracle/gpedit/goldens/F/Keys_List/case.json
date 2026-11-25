@@ -1,0 +1,322 @@
+{
+  "case": "F/Keys_List",
+  "description": "keys in the result list on the sort cases node, with a row selected",
+  "planVersion": 2,
+  "planHash": "0285590825302cf1906cb25ada921299a2edb39bb6e557101192ffa2286476a3",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "label": null,
+      "plan": "selectNode at Computer/Administrative Templates/BWC Oracle/Sort cases",
+      "op": {
+        "kind": "selectNode",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ]
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "pressKey",
+      "label": "list keys",
+      "plan": "pressKey [Down, Up, Home, End, PageDown, PageUp, Space, Right, Left, Ctrl+A, F5, Tab, Shift+Tab, Apps, Enter] in list on 'Zulu sort case' at Computer/Administrative Templates/BWC Oracle/Sort cases  [list keys]",
+      "op": {
+        "kind": "pressKey",
+        "label": "list keys",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Sort cases"
+        ],
+        "policy": "Zulu sort case",
+        "name": "list",
+        "keys": [
+          "Down",
+          "Up",
+          "Home",
+          "End",
+          "PageDown",
+          "PageUp",
+          "Space",
+          "Right",
+          "Left",
+          "Ctrl+A",
+          "F5",
+          "Tab",
+          "Shift+Tab",
+          "Apps",
+          "Enter"
+        ]
+      },
+      "optional": true
+    },
+    {
+      "index": 2,
+      "kind": "screenshot",
+      "label": null,
+      "plan": "screenshot",
+      "op": {
+        "kind": "screenshot",
+        "name": "after-list-keys"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step final",
+      "plan": "snapshot  [step final]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step final"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "final",
+      "folder": ".",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "selectNode",
+      "ok": true,
+      "data": {
+        "listStable": true
+      }
+    },
+    {
+      "index": 1,
+      "kind": "pressKey",
+      "ok": true,
+      "data": {
+        "target": "list",
+        "steps": [
+          {
+            "key": "#b86d11af7918",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Zulu sort case",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#55490a4bf3a8",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Alpha Policy",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#3a78695388b3",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Policy 1",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#f4db1e48476f",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Zulu sort case",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#cb5a196c2528",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Zulu sort case",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#0ffcb4d7f662",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Policy 1",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#20eac5aae274",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Policy 1",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#883361d5d682",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Policy 1",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#58eb9032e3bb",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Policy 1",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#93400ebf5f4d",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Policy 1",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#6cd28ed32abf",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "",
+            "focusedName": "Policy 1",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#90ddf1963abb",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "#3867725bda49",
+            "focusedName": "",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#4408064d9bba",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "#3867725bda49",
+            "focusedName": "",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#89dd748442c1",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [],
+            "popupMenus": 0,
+            "focusedClass": "#3867725bda49",
+            "focusedName": "",
+            "dialogsClosed": 0,
+            "menusClosed": 0
+          },
+          {
+            "key": "#dc8659db6d41",
+            "selectedBefore": "#345a5e333af3",
+            "selectedAfter": "#345a5e333af3",
+            "newWindows": [
+              {
+                "kind": "Setting",
+                "title": "Policy 1"
+              }
+            ],
+            "popupMenus": 0,
+            "focusedClass": "#116f86cc77a4",
+            "focusedName": "Next Setting",
+            "dialogsClosed": 1,
+            "menusClosed": 0
+          }
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "kind": "screenshot",
+      "ok": true
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    }
+  ]
+}

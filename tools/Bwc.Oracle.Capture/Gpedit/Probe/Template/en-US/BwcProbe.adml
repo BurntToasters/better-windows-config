@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources revision="1.0" schemaVersion="1.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>BWC Probe</displayName>
+  <description>BWC-authored probe policies for the gpedit oracle.</description>
+  <resources>
+    <stringTable>
+      <string id="SupportedBwcProbe">BWC probe only</string>
+      <string id="BwcProbe">BWC Probe</string>
+      <string id="BwcProbe_Help">Probe policies written by the BWC oracle. They write only below Software\Policies\BWC-Oracle.</string>
+      <string id="Probe_Zeta">Probe Zeta setting</string>
+      <string id="Probe_Zeta_Help">Writes the DWORD value Zeta under Software\Policies\BWC-Oracle\Probe. Has an enabled value and a disabled value.</string>
+      <string id="Probe_Alpha">Probe Alpha setting</string>
+      <string id="Probe_Alpha_Help">Writes the DWORD value Alpha under Software\Policies\BWC-Oracle\Probe. Has an enabled value only.</string>
+      <string id="Probe_Options">Probe Options setting</string>
+      <string id="Probe_Options_Help">Has one decimal, one text, one drop-down, one check box and one list option.</string>
+      <string id="EnumOne">First choice</string>
+      <string id="EnumTwo">Second choice</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="Probe_Options">
+        <decimalTextBox refId="Probe_Decimal" defaultValue="5" spinStep="1">Decimal option:</decimalTextBox>
+        <textBox refId="Probe_Text">
+          <label>Text option:</label>
+          <defaultValue>hello</defaultValue>
+        </textBox>
+        <dropdownList refId="Probe_Enum" defaultItem="0">Drop-down option:</dropdownList>
+        <checkBox refId="Probe_Boolean" defaultChecked="true">Check box option</checkBox>
+        <listBox refId="Probe_List">List option:</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

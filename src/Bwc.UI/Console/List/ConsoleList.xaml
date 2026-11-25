@@ -1,0 +1,56 @@
+<UserControl
+    x:Class="Bwc.UI.Console.List.ConsoleList"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Microsoft.UI.Xaml.Controls"
+    xmlns:local="using:Bwc.UI.Console.List"
+    AutomationProperties.AutomationId="ConsoleList"
+    Background="Transparent"
+    IsTabStop="True"
+    UseSystemFocusVisuals="False">
+
+    <UserControl.Resources>
+        <DataTemplate x:Key="ItemTemplate">
+            <local:ConsoleListItemElement />
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border
+            x:Name="HeaderHost"
+            Grid.Row="0"
+            Height="24"
+            AutomationProperties.AutomationId="ConsoleListHeader"
+            Background="Transparent">
+            <Grid x:Name="HeaderClip">
+                <local:ConsoleListHeader
+                    x:Name="Header"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top" />
+            </Grid>
+        </Border>
+
+        <ScrollViewer
+            x:Name="Body"
+            Grid.Row="1"
+            AutomationProperties.AutomationId="ConsoleListBody"
+            HorizontalScrollBarVisibility="Auto"
+            HorizontalScrollMode="Enabled"
+            IsTabStop="False"
+            Padding="0"
+            VerticalScrollBarVisibility="Auto"
+            VerticalScrollMode="Enabled"
+            ZoomMode="Disabled">
+            <controls:ItemsRepeater
+                x:Name="Repeater"
+                HorizontalAlignment="Stretch"
+                ItemTemplate="{StaticResource ItemTemplate}"
+                VerticalAlignment="Top" />
+        </ScrollViewer>
+    </Grid>
+</UserControl>

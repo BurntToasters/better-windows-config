@@ -37,9 +37,14 @@ export const SIGNING_REQUIRED_VARIABLES = Object.freeze([
   "AZURE_ARTIFACT_SIGNING_PUBLISHER_DN",
 ]);
 
-// BWC's own binaries in a publish folder root: the three apps (exe and dll) and every Bwc.*.dll.
+// The apps that sit in a publish folder root, by file name without the extension: the Hub, the tools of Bwc.Core
+// ToolCatalog (Registry Editor, Local Group Policy Editor), and the NativeAOT updater helper. The one table behind the
+// signing list and the required-file check of build-installer.js.
+export const BWC_ROOT_APPS = Object.freeze(["BetterWindowsConfig", "BwcRegedit", "BwcGpedit", "BwcUpdate"]);
+
+// BWC's own binaries in a publish folder root: every app of BWC_ROOT_APPS (exe and dll) and every Bwc.*.dll.
 // Runtime, Microsoft, and third-party files never match.
-const BWC_BINARY = /^(?:Bwc\.[^\\/]+|BwcRegedit|BwcUpdate|BetterWindowsConfig)\.(?:dll|exe)$/i;
+const BWC_BINARY = new RegExp(`^(?:Bwc\\.[^\\\\/]+|${BWC_ROOT_APPS.join("|")})\\.(?:dll|exe)$`, "i");
 
 // Beta recovery overrides. A stable release must not use any of them.
 export const STABLE_FORBIDDEN_ENV = Object.freeze([

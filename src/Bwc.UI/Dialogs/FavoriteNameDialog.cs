@@ -1,3 +1,4 @@
+using Bwc.Core;
 using Microsoft.UI.Xaml.Controls;
 using WinRT.Interop;
 
@@ -49,7 +50,7 @@ public sealed class FavoriteNameDialog : ClassicDialog
         FavoriteNameRejection? rejection = _validate(text);
         if (rejection is not null)
         {
-            _ = ShowRejectionAsync(rejection);
+            ShowRejectionAsync(rejection).Forget("favorite name rejection");
             return false;
         }
 

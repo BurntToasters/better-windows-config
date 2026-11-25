@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
@@ -15,6 +16,9 @@ namespace Bwc.E2E.Editing;
 internal sealed class EditingDriver : IDisposable
 {
     private static readonly TimeSpan UiTimeout = TimeSpan.FromSeconds(15);
+
+    // How long an Invoke call may run before the command counts as started and still running.
+    private static readonly TimeSpan InvokeGrace = TimeSpan.FromSeconds(5);
 
     private readonly AppSession _session;
     private readonly UIA3Automation _automation;
@@ -51,7 +55,7 @@ internal sealed class EditingDriver : IDisposable
             {
                 if (element.Patterns.Invoke.IsSupported)
                 {
-                    element.Patterns.Invoke.Pattern.Invoke();
+                    InvokePattern(element);
                 }
                 else
                 {
@@ -62,6 +66,21 @@ internal sealed class EditingDriver : IDisposable
             {
                 element.Click();
             }
+        }
+    }
+
+    /// <summary>
+    /// Calls the Invoke pattern on a background task. A command that shows a native modal window does not return from
+    /// the call until the window closes, so the call is given a grace period and then counts as started. A call that
+    /// returns or throws inside the grace period behaves as a direct call, so the callers keep their click fallback.
+    /// </summary>
+    private static void InvokePattern(AutomationElement element)
+    {
+        Task call = Task.Run(() => element.Patterns.Invoke.Pattern.Invoke());
+        if (!call.Wait(InvokeGrace))
+        {
+            // The call is still inside the command. Its end, or its failure, is observed here and ignored.
+            _ = call.ContinueWith(static finished => _ = finished.Exception, TaskContinuationOptions.OnlyOnFaulted);
         }
     }
 
@@ -77,32 +96,51 @@ internal sealed class EditingDriver : IDisposable
         }
     }
 
-    internal bool WaitForDialog(TimeSpan? timeout = null) =>
-        WaitForElement("DialogRoot", timeout ?? UiTimeout) is not null;
+    internal bool WaitForDialog(
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
+        WaitForElement("DialogRoot", timeout ?? UiTimeout, callerFile, callerLine) is not null;
 
     /// <summary>
     /// Dismisses a message box whose OK button has the focus. Enter is sent once, and the message text must
     /// clear. A prompt underneath is left open.
     /// </summary>
-    internal bool DismissErrorBox(TimeSpan? timeout = null)
+    internal bool DismissErrorBox(
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         Keyboard.Type(VirtualKeyShort.RETURN);
         return ControlTestSupport.WaitUntil(
             () => TextOf("DialogErrorText").Length == 0,
-            timeout ?? TimeSpan.FromSeconds(10));
+            timeout ?? TimeSpan.FromSeconds(10),
+            callerFile: callerFile,
+            callerLine: callerLine);
     }
 
-    internal bool WaitForNoDialog(TimeSpan? timeout = null) =>
+    internal bool WaitForNoDialog(
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0) =>
         ControlTestSupport.WaitUntil(
             () => FindElement("DialogRoot") is null,
-            timeout ?? TimeSpan.FromSeconds(10));
+            timeout ?? TimeSpan.FromSeconds(10),
+            callerFile: callerFile,
+            callerLine: callerLine);
 
-    internal AutomationElement? WaitForElement(string automationId, TimeSpan? timeout = null)
+    internal AutomationElement? WaitForElement(
+        string automationId,
+        TimeSpan? timeout = null,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         AutomationElement? result = null;
         _ = ControlTestSupport.WaitUntil(
             () => (result = FindElement(automationId)) is not null,
-            timeout ?? UiTimeout);
+            timeout ?? UiTimeout,
+            callerFile: callerFile,
+            callerLine: callerLine);
         return result;
     }
 
@@ -137,7 +175,7 @@ internal sealed class EditingDriver : IDisposable
         {
             if (element.Patterns.Invoke.IsSupported)
             {
-                element.Patterns.Invoke.Pattern.Invoke();
+                InvokePattern(element);
                 return true;
             }
         }
@@ -261,29 +299,28 @@ internal sealed class EditingDriver : IDisposable
         return $"0x{foreground.ToInt64():X} class='{Win32.ClassNameOf(foreground)}' main={foreground == _session.MainHwnd}";
     }
 
+    // Counted for the timing record. The windows come from the app process. The desktop tree is asked only when
+    // no window of the process was listed or one of them could not be read.
     private AutomationElement? FindElement(string automationId)
+    {
+        long started = E2ETimings.Now();
+        try
+        {
+            return FindElementUncounted(automationId);
+        }
+        finally
+        {
+            E2ETimings.Current.RecordLookup("EditingDriver.FindElement", started);
+        }
+    }
+
+    private AutomationElement? FindElementUncounted(string automationId)
     {
         try
         {
-            AutomationElement desktop = _automation.GetDesktop();
-
-            foreach (AutomationElement window in desktop.FindAllChildren(cf => cf.ByControlType(ControlType.Window)))
+            AutomationElement[] windows = ProcessWindows.Of(_automation, _session.ProcessId, out int skipped);
+            foreach (AutomationElement window in windows)
             {
-                int processId;
-                try
-                {
-                    processId = window.Properties.ProcessId.Value;
-                }
-                catch (Exception)
-                {
-                    continue;
-                }
-
-                if (processId != _session.ProcessId)
-                {
-                    continue;
-                }
-
                 try
                 {
                     AutomationElement? found = window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
@@ -298,10 +335,14 @@ internal sealed class EditingDriver : IDisposable
                 }
             }
 
-            AutomationElement? global = desktop.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
-            if (global is not null && global.Properties.ProcessId.Value == _session.ProcessId)
+            if (windows.Length == 0 || skipped > 0)
             {
-                return global;
+                AutomationElement desktop = _automation.GetDesktop();
+                AutomationElement? global = desktop.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
+                if (global is not null && global.Properties.ProcessId.Value == _session.ProcessId)
+                {
+                    return global;
+                }
             }
         }
         catch (Exception)

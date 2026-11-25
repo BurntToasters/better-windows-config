@@ -11,6 +11,19 @@
     <PackageReference Include="FlaUI.Core" />
   </ItemGroup>
 
+  <!-- The engine that seeds the sandbox policy object of the Gpedit tests (a sandbox folder inside the run data root only). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Bwc.Gpo\Bwc.Gpo.csproj" />
+  </ItemGroup>
+
+  <!--
+    The capture case reader of the policy tests, linked and not referenced: the replay tests read the same case.json and
+    golden files and check their sizes and hashes before a case is replayed. The test project itself is never referenced.
+  -->
+  <ItemGroup>
+    <Compile Include="..\Bwc.Policy.Tests\Golden\GoldenCase.cs" Link="Gpedit\Replay\GoldenCase.cs" />
+  </ItemGroup>
+
   <!--
     The stand-in installer for the Hub install test. Only the build order matters: the reference copies no
     assembly. Its build publishes FakeInstaller.exe for each architecture into artifacts/e2e/fake-installer.

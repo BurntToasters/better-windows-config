@@ -1,0 +1,24 @@
+<UserControl
+    x:Class="Bwc.Gpedit.GpeditRootView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:console="using:Bwc.UI.Console.Shell"
+    AutomationProperties.AutomationId="GpeditRoot"
+    AutomationProperties.Name="Local Group Policy Editor">
+
+    <Grid x:Name="RootGrid" Background="{StaticResource BwcFaceBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <console:ConsoleShell x:Name="Shell" Grid.Row="0" />
+        <TextBlock
+            x:Name="ReadOnlyNotice"
+            Grid.Row="1"
+            Visibility="Collapsed"
+            TextWrapping="Wrap"
+            Margin="6,3,6,3"
+            AutomationProperties.AutomationId="GpeditReadOnlyNotice" />
+    </Grid>
+
+</UserControl>

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Bwc.E2E.AppServices;
 using Bwc.E2E.Controls;
@@ -365,7 +366,12 @@ internal static class ImportExportWindows
     }
 
     /// <summary>Waits for the owned progress dialog and returns its HWND, or zero on timeout.</summary>
-    internal static IntPtr WaitForProgress(UIA3Automation automation, IntPtr mainHwnd, TimeSpan timeout)
+    internal static IntPtr WaitForProgress(
+        UIA3Automation automation,
+        IntPtr mainHwnd,
+        TimeSpan timeout,
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0)
     {
         IntPtr found = IntPtr.Zero;
         _ = ControlTestSupport.WaitUntil(
@@ -374,7 +380,9 @@ internal static class ImportExportWindows
                 found = FindProgress(automation, mainHwnd);
                 return found != IntPtr.Zero;
             },
-            timeout);
+            timeout,
+            callerFile: callerFile,
+            callerLine: callerLine);
         return found;
     }
 

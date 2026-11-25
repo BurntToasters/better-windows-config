@@ -389,7 +389,7 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
     private void OnCopyKeyNameRequested(object? sender, EventArgs e) => _keyCommands.CopySelectedKeyName();
 
     private void OnTreeExpandFailed(object? sender, TreeNodeErrorEventArgs e) =>
-        _ = _context.ShowExpandFailedAsync(e.Node, e.Exception);
+        _context.ShowExpandFailedAsync(e.Node, e.Exception).Forget("tree expand failed message");
 
     private void OnWriteFinished(object? sender, EventArgs e) => WriteFinished?.Invoke(this, EventArgs.Empty);
 
@@ -476,7 +476,7 @@ public sealed partial class RegeditRootView : UserControl, IRegeditEditCommands
         == CoreVirtualKeyStates.Down;
 
     private void OnAddressSuggestionsRequested(object? sender, AddressSuggestionRequestedEventArgs e) =>
-        _ = ShowAddressSuggestionsAsync(e.Text);
+        ShowAddressSuggestionsAsync(e.Text).Forget("address suggestions");
 
     /// <summary>
     /// Computes the list for the text and shows it. A newer request makes this answer stale, so only the last one shows.

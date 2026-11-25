@@ -3,18 +3,29 @@ namespace Bwc.Update;
 /// <summary>
 /// The rules of <c>--set-aumid &lt;shortcut&gt; &lt;app id&gt;</c> (docs/failure-modes/update-elevation.md,
 /// section SA). The mode
-/// runs inside the elevated installer and writes into a Start menu shortcut, so it accepts only the two shortcuts of this
-/// product, with their own ids, directly in the folder the installer used. Everything here is pure except
-/// <see cref="FileProblem"/>, which reads attributes.
+/// runs inside the elevated installer and writes into a Start menu shortcut, so it accepts only the shortcuts of this
+/// product (<see cref="Shortcuts"/>), with their own ids, directly in the folder the installer used. Everything here is
+/// pure except <see cref="FileProblem"/>, which reads attributes.
 /// </summary>
 public static class ShortcutAumidRules
 {
     public const string HubShortcutName = "Better Windows Config.lnk";
     public const string RegeditShortcutName = "Registry Editor (BWC).lnk";
+    public const string GpeditShortcutName = "Local Group Policy Editor (BWC).lnk";
 
-    // Must match Bwc.Core AppIdentity (HubAppUserModelId, RegeditAppUserModelId) and the installer defines.
+    // Must match Bwc.Core AppIdentity (HubAppUserModelId, RegeditAppUserModelId, GpeditAppUserModelId) and the installer
+    // defines.
     public const string HubAppId = "BetterWindowsConfig.Hub";
     public const string RegeditAppId = "BetterWindowsConfig.Regedit";
+    public const string GpeditAppId = "BetterWindowsConfig.Gpedit";
+
+    /// <summary>The one table of the shortcuts the helper writes: each app id with the file name that belongs to it.</summary>
+    public static IReadOnlyList<(string AppId, string ShortcutName)> Shortcuts { get; } =
+    [
+        (HubAppId, HubShortcutName),
+        (RegeditAppId, RegeditShortcutName),
+        (GpeditAppId, GpeditShortcutName),
+    ];
 
     /// <summary>
     /// Null when the two values may be passed on, else the usage problem (SA2, SA3). The path must be a drive path in its
@@ -28,9 +39,9 @@ public static class ShortcutAumidRules
             return "--set-aumid needs a shortcut path and an app id";
         }
 
-        if (!string.Equals(appId, HubAppId, StringComparison.Ordinal) && !string.Equals(appId, RegeditAppId, StringComparison.Ordinal))
+        if (ExpectedShortcutName(appId) is null)
         {
-            return "the app id must be " + HubAppId + " or " + RegeditAppId;
+            return "the app id must be one of " + string.Join(", ", Shortcuts.Select(row => row.AppId));
         }
 
         if (shortcut.Length < 8 || !char.IsAsciiLetter(shortcut[0]) || shortcut[1] != ':' || shortcut[2] != '\\')
@@ -78,12 +89,7 @@ public static class ShortcutAumidRules
         ArgumentNullException.ThrowIfNull(folderAllowed);
 
         var name = Path.GetFileName(shortcut);
-        var expected = appId switch
-        {
-            HubAppId => HubShortcutName,
-            RegeditAppId => RegeditShortcutName,
-            _ => null,
-        };
+        var expected = ExpectedShortcutName(appId);
         if (expected is null || !string.Equals(name, expected, StringComparison.OrdinalIgnoreCase))
         {
             return "the shortcut name does not belong to the app id";
@@ -93,6 +99,19 @@ public static class ShortcutAumidRules
         if (string.IsNullOrEmpty(folder) || !folderAllowed(folder))
         {
             return "the shortcut is not in the folder the installer writes to";
+        }
+
+        return null;
+    }
+
+    private static string? ExpectedShortcutName(string appId)
+    {
+        foreach (var (id, name) in Shortcuts)
+        {
+            if (string.Equals(id, appId, StringComparison.Ordinal))
+            {
+                return name;
+            }
         }
 
         return null;

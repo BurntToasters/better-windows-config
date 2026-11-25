@@ -3,10 +3,10 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO.Pipes;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
 
 // The accept-attempt counter is the observable the backoff test checks (docs/failure-modes/core.md).
 [assembly: InternalsVisibleTo("Bwc.Core.Tests")]
@@ -48,12 +48,13 @@ public sealed partial class SingleInstance : IDisposable
     private const int AcceptRetryMaximumDelayMilliseconds = 1000;
     private const int AbnormalClientDelayMilliseconds = 25;
     private const string LocalServerName = ".";
-    private const uint TokenQueryAccess = 0x0008;
-    private const int TokenIntegrityLevelClass = 25;
 
     private readonly string _pipeName;
     private readonly Mutex _mutex;
     private readonly bool _ownsMutex;
+    private readonly bool _isFirst;
+    private readonly IntegrityLevel _serverLevel;
+    private readonly Func<SafePipeHandle, IntegrityLevel> _readClientLevel;
     private readonly int _ownerThreadId;
     private readonly CancellationTokenSource _cancellation = new();
     private readonly object _serverGate = new();
@@ -62,16 +63,27 @@ public sealed partial class SingleInstance : IDisposable
     private NamedPipeServerStream? _activeServer;
     private int _disposed;
     private int _acceptAttempts;
+    private int _refusedClients;
 
-    private SingleInstance(string instanceName, string pipeName, Mutex mutex, bool ownsMutex)
+    private SingleInstance(
+        string instanceName,
+        string pipeName,
+        Mutex mutex,
+        bool ownsMutex,
+        bool isFirst,
+        IntegrityLevel serverLevel,
+        Func<SafePipeHandle, IntegrityLevel> readClientLevel)
     {
         InstanceName = instanceName;
         _pipeName = pipeName;
         _mutex = mutex;
         _ownsMutex = ownsMutex;
+        _isFirst = isFirst;
+        _serverLevel = serverLevel;
+        _readClientLevel = readClientLevel;
         _ownerThreadId = Environment.CurrentManagedThreadId;
 
-        if (ownsMutex)
+        if (isFirst)
         {
             _acceptTask = Task.Run(() => AcceptLoopAsync(_cancellation.Token));
             ObserveFaults(_acceptTask);
@@ -80,7 +92,7 @@ public sealed partial class SingleInstance : IDisposable
 
     public event Action<string>? MessageReceived;
 
-    public bool IsFirstInstance => _ownsMutex;
+    public bool IsFirstInstance => _isFirst;
 
     public string InstanceName { get; }
 
@@ -90,7 +102,34 @@ public sealed partial class SingleInstance : IDisposable
     /// </summary>
     internal int AcceptAttempts => Volatile.Read(ref _acceptAttempts);
 
+    /// <summary>
+    /// The number of clients the server disconnected because their integrity level was below its own, or could not be
+    /// read. Tests read it. It is not a product signal.
+    /// </summary>
+    internal int RefusedClients => Volatile.Read(ref _refusedClients);
+
+    /// <summary>
+    /// The test seam: <paramref name="serverLevel"/> replaces this process's level in the client comparison, and
+    /// <paramref name="readClientLevel"/> (when set) replaces the read of the connected client's level. The identity
+    /// suffix still comes from the real level.
+    /// </summary>
+    internal static SingleInstance Create(
+        string toolId,
+        IntegrityLevel serverLevel,
+        Func<SafePipeHandle, IntegrityLevel>? readClientLevel)
+    {
+        return CreateCore(toolId, serverLevel, readClientLevel ?? IntegrityNative.ReadPipeClient);
+    }
+
     public static SingleInstance Create(string toolId)
+    {
+        return CreateCore(toolId, IntegrityNative.ReadCurrent(), IntegrityNative.ReadPipeClient);
+    }
+
+    private static SingleInstance CreateCore(
+        string toolId,
+        IntegrityLevel serverLevel,
+        Func<SafePipeHandle, IntegrityLevel> readClientLevel)
     {
         AppPaths.ValidateToolId(toolId);
 
@@ -102,7 +141,18 @@ public sealed partial class SingleInstance : IDisposable
         var mutex = new Mutex(initiallyOwned: true, instanceName, out bool createdNew);
         try
         {
-            return new SingleInstance(instanceName, pipeName, mutex, createdNew);
+            // A mutex that already exists proves nothing: any process of this user can create the name first. This
+            // launch is a later instance only when the existing instance answers on the pipe.
+            bool isFirst = createdNew || !ExistingInstanceAnswers(pipeName);
+            if (!createdNew && isFirst)
+            {
+                Log.Warn(
+                    "SingleInstance mutex " + instanceName + " was held and nothing answered on the pipe within " +
+                    ConnectTimeoutMilliseconds.ToString(CultureInfo.InvariantCulture) +
+                    " ms. This launch starts as the first instance.");
+            }
+
+            return new SingleInstance(instanceName, pipeName, mutex, createdNew, isFirst, serverLevel, readClientLevel);
         }
         catch
         {
@@ -332,6 +382,26 @@ public sealed partial class SingleInstance : IDisposable
                 connectionAccepted = true;
                 retryDelay = AcceptRetryInitialDelayMilliseconds;
 
+                // Read the client first, before it can exit. A client below this server's level, or one that cannot be
+                // read, is disconnected without reading a byte.
+                IntegrityLevel clientLevel = _readClientLevel(server.SafePipeHandle);
+                if (!IntegrityPolicy.Accepts(_serverLevel, clientLevel))
+                {
+                    Interlocked.Increment(ref _refusedClients);
+                    Log.Warn(
+                        "SingleInstance refused a client of integrity level " + IntegrityPolicy.ToSuffix(clientLevel) +
+                        " on a " + IntegrityPolicy.ToSuffix(_serverLevel) + " server.");
+
+                    // Dropping the connection happens in the finally block. Pause first so a stream of refused
+                    // clients cannot drive a tight loop.
+                    if (!await DelayAsync(AbnormalClientDelayMilliseconds, token).ConfigureAwait(false))
+                    {
+                        break;
+                    }
+
+                    continue;
+                }
+
                 Task<string?> readTask = ReadMessageAsync(server, token);
                 ObserveFaults(readTask);
                 string? message = await readTask
@@ -559,92 +629,29 @@ public sealed partial class SingleInstance : IDisposable
         }
     }
 
-    private static string GetIntegrityLevel()
+    private static string GetIntegrityLevel() => IntegrityPolicy.ToSuffix(IntegrityNative.ReadCurrent());
+
+    /// <summary>
+    /// True when a server answers on the pipe: a connect with no message, bounded by the connect timeout. The server
+    /// treats it as a client that sent nothing. A missing, busy, or foreign-owned pipe counts as no answer.
+    /// </summary>
+    private static bool ExistingInstanceAnswers(string pipeName)
     {
-        IntPtr token = IntPtr.Zero;
-        IntPtr buffer = IntPtr.Zero;
         try
         {
-            if (!OpenProcessToken(GetCurrentProcess(), TokenQueryAccess, out token))
-            {
-                return "unknown";
-            }
-
-            _ = GetTokenInformation(token, TokenIntegrityLevelClass, IntPtr.Zero, 0, out int length);
-            if (length <= 0)
-            {
-                return "unknown";
-            }
-
-            buffer = Marshal.AllocHGlobal(length);
-            if (!GetTokenInformation(token, TokenIntegrityLevelClass, buffer, length, out _))
-            {
-                return "unknown";
-            }
-
-            // TOKEN_MANDATORY_LABEL starts with SID_AND_ATTRIBUTES, whose first field is the SID.
-            IntPtr sid = Marshal.ReadIntPtr(buffer);
-            if (sid == IntPtr.Zero)
-            {
-                return "unknown";
-            }
-
-            byte subAuthorityCount = Marshal.ReadByte(sid, 1);
-            if (subAuthorityCount == 0)
-            {
-                return "unknown";
-            }
-
-            int offset = 8 + ((subAuthorityCount - 1) * 4);
-            int rid = Marshal.ReadInt32(sid, offset);
-            return rid switch
-            {
-                >= 0x4000 => "system",
-                >= 0x3000 => "high",
-                >= 0x2000 => "medium",
-                >= 0x1000 => "low",
-                _ => "unknown",
-            };
+            using var probe = new NamedPipeClientStream(
+                LocalServerName,
+                pipeName,
+                PipeDirection.Out,
+                PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            probe.Connect(ConnectTimeoutMilliseconds);
+            return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException
+            or System.Security.SecurityException or InvalidOperationException or ObjectDisposedException)
         {
-            SafeTrace.WriteLine("SingleInstance could not read the integrity level: " + ex.Message);
-            return "unknown";
-        }
-        finally
-        {
-            if (buffer != IntPtr.Zero)
-            {
-                Marshal.FreeHGlobal(buffer);
-            }
-
-            if (token != IntPtr.Zero)
-            {
-                _ = CloseHandle(token);
-            }
+            SafeTrace.WriteLine("SingleInstance probe got no answer: " + ex.Message);
+            return false;
         }
     }
-
-    [LibraryImport("kernel32.dll")]
-    private static partial IntPtr GetCurrentProcess();
-
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool CloseHandle(IntPtr handle);
-
-    [LibraryImport("advapi32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool OpenProcessToken(
-        IntPtr processHandle,
-        uint desiredAccess,
-        out IntPtr tokenHandle);
-
-    [LibraryImport("advapi32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool GetTokenInformation(
-        IntPtr tokenHandle,
-        int tokenInformationClass,
-        IntPtr tokenInformation,
-        int tokenInformationLength,
-        out int returnLength);
 }

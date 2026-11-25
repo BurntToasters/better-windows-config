@@ -146,7 +146,8 @@ public sealed class DragDropTests
         var start = new Point(a.Left + (a.Width / 2), a.Top + (a.Height / 2));
         var end = new Point(b.Left + (b.Width / 2), b.Top + (b.Height / 2));
 
-        Mouse.MoveTo(start);
+        // The approach has no button down, so the cursor is placed on the source. The press and the move are real.
+        Mouse.Position = start;
         Thread.Sleep(150);
         Mouse.Down(MouseButton.Left);
         Thread.Sleep(150);

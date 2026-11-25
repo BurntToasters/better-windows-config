@@ -54,6 +54,12 @@ internal static partial class Win32Dialog
     [LibraryImport("user32.dll")]
     internal static partial int GetWindowRect(nint hWnd, out WindowRect lpRect);
 
+    [LibraryImport("user32.dll")]
+    internal static partial int GetClientRect(nint hWnd, out WindowRect lpRect);
+
+    internal static bool TryGetClientRect(nint hwnd, out WindowRect rect) =>
+        GetClientRect(hwnd, out rect) != 0;
+
     [StructLayout(LayoutKind.Sequential)]
     internal struct WindowRect
     {

@@ -55,7 +55,7 @@ public partial class App : Application
         {
             window.DispatcherQueue.TryEnqueue(() =>
             {
-                _ = window.ShowUpdateResultAsync(updateResult);
+                window.ShowUpdateResultAsync(updateResult).Forget("Hub update result message");
             });
         }
     }

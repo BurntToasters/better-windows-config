@@ -277,7 +277,8 @@ internal static class Program
         scope = ShortcutAumidE2EScope.For(
             Path.GetTempPath(),
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-            commonPrograms);
+            commonPrograms,
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp"));
 #endif
         var problem = ShortcutAumidRules.ScopeProblem(shortcut, appId, scope) ?? ShortcutAumidRules.FileProblem(shortcut);
         if (problem is not null)

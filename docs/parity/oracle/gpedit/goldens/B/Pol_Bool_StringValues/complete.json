@@ -1,0 +1,25 @@
+{
+  "case": "B/Pol_Bool_StringValues",
+  "planHash": "9a927db23b9bec3ebd735d23538b12dd655a944b5338c68f0c4d280256ce31e2",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-enabled-defaults/User.Registry.pol",
+    "step-01-enabled-defaults/User.comment.cmtx",
+    "step-01-enabled-defaults/gpt.ini",
+    "step-02-enabled-alt1-checked/User.Registry.pol",
+    "step-02-enabled-alt1-checked/User.comment.cmtx",
+    "step-02-enabled-alt1-checked/gpt.ini",
+    "step-03-enabled-alt2-unchecked/User.Registry.pol",
+    "step-03-enabled-alt2-unchecked/User.comment.cmtx",
+    "step-03-enabled-alt2-unchecked/gpt.ini",
+    "step-04-disabled/User.Registry.pol",
+    "step-04-disabled/User.comment.cmtx",
+    "step-04-disabled/gpt.ini",
+    "step-05-not-configured/User.Registry.pol",
+    "step-05-not-configured/User.comment.cmtx",
+    "step-05-not-configured/gpt.ini"
+  ]
+}

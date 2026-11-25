@@ -16,13 +16,33 @@ public sealed class OptionalPrivilegeScope : IDisposable
     public const string TakeOwnershipPrivilege = "SeTakeOwnershipPrivilege";
 
     private readonly SafeFileHandle? _token;
-    private readonly List<LUID> _enabledByThisScope;
+    private readonly List<(string Name, LUID Luid)> _enabledByThisScope;
+    private readonly Func<string, int>? _restoreOverride;
     private int _disposed;
 
-    private OptionalPrivilegeScope(SafeFileHandle? token, List<LUID> enabledByThisScope)
+    private OptionalPrivilegeScope(
+        SafeFileHandle? token,
+        List<(string Name, LUID Luid)> enabledByThisScope,
+        Func<string, int>? restoreOverride)
     {
         _token = token;
         _enabledByThisScope = enabledByThisScope;
+        _restoreOverride = restoreOverride;
+    }
+
+    /// <summary>
+    /// Test seam: a scope that claims <paramref name="names"/> as enabled and whose restore call is
+    /// <paramref name="restore"/> (privilege name to Win32 error, 0 for success). It never touches the process token.
+    /// </summary>
+    internal static OptionalPrivilegeScope CreateForRestoreTest(string[] names, Func<string, int> restore)
+    {
+        var enabled = new List<(string Name, LUID Luid)>();
+        foreach (string name in names)
+        {
+            enabled.Add((name, default));
+        }
+
+        return new OptionalPrivilegeScope(new SafeFileHandle(IntPtr.Zero, ownsHandle: false), enabled, restore);
     }
 
     /// <summary>The privileges this scope turned on. Zero when the token has none of them or they were already on.</summary>
@@ -35,7 +55,7 @@ public sealed class OptionalPrivilegeScope : IDisposable
     public static OptionalPrivilegeScope Enable(params string[] names)
     {
         ArgumentNullException.ThrowIfNull(names);
-        var enabled = new List<LUID>();
+        var enabled = new List<(string Name, LUID Luid)>();
 
         if (names.Length == 0 ||
             !PrivilegeScope.TryOpenToken(
@@ -43,7 +63,7 @@ public sealed class OptionalPrivilegeScope : IDisposable
                 out SafeFileHandle? token,
                 out _))
         {
-            return new OptionalPrivilegeScope(null, enabled);
+            return new OptionalPrivilegeScope(null, enabled, null);
         }
 
         try
@@ -60,12 +80,12 @@ public sealed class OptionalPrivilegeScope : IDisposable
                     PrivilegeScope.FindPrivilege(privileges, luid, out bool present, out bool alreadyEnabled);
                     if (present && !alreadyEnabled && TryEnable(token!, luid))
                     {
-                        enabled.Add(luid);
+                        enabled.Add((name, luid));
                     }
                 }
             }
 
-            var scope = new OptionalPrivilegeScope(token, enabled);
+            var scope = new OptionalPrivilegeScope(token, enabled, null);
             token = null;
             return scope;
         }
@@ -86,9 +106,16 @@ public sealed class OptionalPrivilegeScope : IDisposable
         {
             if (_token is not null)
             {
-                foreach (LUID luid in _enabledByThisScope)
+                foreach ((string name, LUID luid) in _enabledByThisScope)
                 {
-                    PrivilegeScope.DisablePrivilege(_token, luid);
+                    int win32Error = _restoreOverride is null
+                        ? PrivilegeScope.DisablePrivilege(_token, luid)
+                        : _restoreOverride(name);
+
+                    if (win32Error != 0)
+                    {
+                        PrivilegeDiagnostics.ReportRestoreFailed(name, win32Error);
+                    }
                 }
             }
         }

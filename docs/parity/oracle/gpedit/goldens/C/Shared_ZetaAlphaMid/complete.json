@@ -1,0 +1,25 @@
+{
+  "case": "C/Shared_ZetaAlphaMid",
+  "planHash": "4cedf11deea13ac6777f3edbdf017cca886bd768bbb425b7221677415fbe69f0",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-zeta/Machine.Registry.pol",
+    "step-01-zeta/Machine.comment.cmtx",
+    "step-01-zeta/gpt.ini",
+    "step-02-alpha/Machine.Registry.pol",
+    "step-02-alpha/Machine.comment.cmtx",
+    "step-02-alpha/gpt.ini",
+    "step-03-mid/Machine.Registry.pol",
+    "step-03-mid/Machine.comment.cmtx",
+    "step-03-mid/gpt.ini",
+    "step-04-alpha-not-configured/Machine.Registry.pol",
+    "step-04-alpha-not-configured/Machine.comment.cmtx",
+    "step-04-alpha-not-configured/gpt.ini",
+    "step-05-alpha-enabled-again/Machine.Registry.pol",
+    "step-05-alpha-enabled-again/Machine.comment.cmtx",
+    "step-05-alpha-enabled-again/gpt.ini"
+  ]
+}

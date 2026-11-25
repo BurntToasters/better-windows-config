@@ -17,14 +17,38 @@ internal sealed class InstallerRun : IDisposable
 {
     public const string HubExeName = "BetterWindowsConfig.exe";
     public const string RegeditExeName = "BwcRegedit.exe";
+    public const string GpeditExeName = "BwcGpedit.exe";
     public const string UpdaterExeName = "BwcUpdate.exe";
     public const string UninstallerName = "Uninstall.exe";
+
+    /// <summary>The E2E uninstaller reads this as the folder that stands in for %ProgramData% (installer.md M65).</summary>
+    public const string ProgramDataVariable = "BWC_E2E_INSTALLER_PROGRAMDATA";
+
+    public sealed record ProductShortcut(string Name, string AppId, string ExeName);
+
+    /// <summary>
+    /// The one table of the Start menu shortcuts the installer writes: file name, AppUserModelID, and the exe the shortcut
+    /// starts (and takes its icon from, index 0). Every installer check reads this table (installer.md M53 to M55,
+    /// installer-e2e.md 92 to 94), so a fourth tool is one row here and one in the installer.
+    /// </summary>
+    public static readonly IReadOnlyList<ProductShortcut> ProductShortcuts =
+    [
+        new("Better Windows Config.lnk", "BetterWindowsConfig.Hub", HubExeName),
+        new("Registry Editor (BWC).lnk", "BetterWindowsConfig.Regedit", RegeditExeName),
+        new("Local Group Policy Editor (BWC).lnk", "BetterWindowsConfig.Gpedit", GpeditExeName),
+    ];
+
+    /// <summary>The shortcuts of the 0.1.x layout: the table without the Local Group Policy Editor row (R1).</summary>
+    public static readonly IReadOnlyList<ProductShortcut> OldLayoutShortcuts =
+        [.. ProductShortcuts.Where(shortcut => shortcut.ExeName != GpeditExeName)];
+
     private const string RegistryParent = @"Software\BWC-E2E";
     private const string UninstallSubkey = @"Uninstall\BetterWindowsConfig";
     private const string MachineParentName = "BWC-E2E";
     private const string MachineStartMenuPrefix = "BWC-E2E-";
     private static readonly string[] MachineSiblingSuffixes = ["", ".new", ".old", ".upd"];
-    private static readonly string[] ProcessNames = ["BetterWindowsConfig", "BwcRegedit", "BwcUpdate"];
+    private static readonly string[] ProcessNames =
+        [.. ProductShortcuts.Select(shortcut => Path.GetFileNameWithoutExtension(shortcut.ExeName)), "BwcUpdate"];
     private static readonly TimeSpan CleanupWait = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan MachineUninstallTimeout = TimeSpan.FromSeconds(120);
     private readonly List<Process> _started = [];
@@ -86,7 +110,15 @@ internal sealed class InstallerRun : IDisposable
 
     public string RegeditExe => Path.Combine(InstallDir, RegeditExeName);
 
+    public string GpeditExe => Path.Combine(InstallDir, GpeditExeName);
+
     public string UpdaterExe => Path.Combine(InstallDir, UpdaterExeName);
+
+    /// <summary>
+    /// The stand-in for %ProgramData% inside this run's folder. The per-user uninstaller gets it through
+    /// <see cref="ProgramDataVariable"/>, so the template cleanup never looks at the real folder. Not created here.
+    /// </summary>
+    public string ProgramDataRoot => Path.Combine(Root, "programdata");
 
     public string UninstallerExe => Path.Combine(InstallDir, UninstallerName);
 
@@ -152,11 +184,15 @@ internal sealed class InstallerRun : IDisposable
 
     /// <summary>
     /// Runs the uninstaller silently. NSIS uninstallers may copy themselves out and return early, so the test waits
-    /// for the install folder to go, not for the process.
+    /// for the install folder to go, not for the process. The per-user run passes <see cref="ProgramDataRoot"/> as the
+    /// data-root seam unless <paramref name="withProgramData"/> is false.
     /// </summary>
-    public bool Uninstall(TimeSpan timeout)
+    public bool Uninstall(TimeSpan timeout, bool withProgramData = true)
     {
-        using (Process process = Start(UninstallerExe, "/S /RUNID=" + RunId, environment: null))
+        Dictionary<string, string>? environment = withProgramData && !Machine
+            ? new Dictionary<string, string>(StringComparer.Ordinal) { [ProgramDataVariable] = ProgramDataRoot }
+            : null;
+        using (Process process = Start(UninstallerExe, "/S /RUNID=" + RunId, environment))
         {
             _ = process.WaitForExit(timeout);
         }
@@ -249,7 +285,7 @@ internal sealed class InstallerRun : IDisposable
         return key is not null;
     }
 
-    /// <summary>The number of .lnk files the installer wrote to the shortcut folder.</summary>
+    /// <summary>The number of .lnk files in the shortcut folder (<see cref="ProductShortcuts"/> has the expected).</summary>
     public int ShortcutCount() =>
         Directory.Exists(ShortcutDir) ? Directory.GetFiles(ShortcutDir, "*.lnk", SearchOption.AllDirectories).Length : 0;
 

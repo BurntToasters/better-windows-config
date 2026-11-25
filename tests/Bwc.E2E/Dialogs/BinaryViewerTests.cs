@@ -184,10 +184,18 @@ public sealed class BinaryViewerTests
     /// </summary>
     private static void CheckRows(AutomationElement? list, string checkId, string first, string second, bool selected = true)
     {
-        IReadOnlyList<string> rows = list is null
-            ? Array.Empty<string>()
-            : list.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem)).Select(item => item.Name).ToArray();
-        bool ok = selected && rows.Count == 2 && rows[0] == first && rows[1] == second;
+        // The list is refilled after the format changes, so one read can land between two rows. The rows are read again
+        // until they match or three seconds pass, and the check compares the last read.
+        IReadOnlyList<string> rows = Array.Empty<string>();
+        bool Matches()
+        {
+            rows = list is null
+                ? Array.Empty<string>()
+                : list.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem)).Select(item => item.Name).ToArray();
+            return rows.Count == 2 && rows[0] == first && rows[1] == second;
+        }
+
+        bool ok = ControlTestSupport.WaitUntil(Matches, TimeSpan.FromSeconds(3)) && selected;
         E2EResults.Record(
             checkId,
             ok,

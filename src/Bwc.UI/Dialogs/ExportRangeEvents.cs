@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Bwc.Core;
 using Microsoft.UI.Dispatching;
 using Windows.Win32;
 
@@ -316,7 +317,7 @@ internal sealed class ExportRangeEvents : IFileDialogEvents
         }
 
         // The box is shown after this callback returns, so the file dialog's own message loop keeps running.
-        _ = _queue.TryEnqueue(() => { _ = ShowMissingBranchAsync(caption, message); });
+        _ = _queue.TryEnqueue(() => { ShowMissingBranchAsync(caption, message).Forget("export range missing branch message"); });
     }
 
     private static async Task ShowMissingBranchAsync(string caption, string message)

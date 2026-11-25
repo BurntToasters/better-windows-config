@@ -46,7 +46,7 @@ internal static class RegeditFileDialogs
         catch (Exception ex)
         {
             Log.Warn("Registry Editor could not show a file dialog: " + ex.Message);
-            _ = context.ShowErrorAsync(context.Messages.ForCommandFailure().ToErrorDialog());
+            context.ShowErrorAsync(context.Messages.ForCommandFailure().ToErrorDialog()).Forget("file dialog failure message");
             return null;
         }
         finally

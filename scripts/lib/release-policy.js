@@ -659,9 +659,23 @@ export function readQualityGateResult(root) {
   }
 }
 
+/** The architectures a release gate must cover, in the order the recorded proof names them. */
+export const GATE_REQUIRED_RIDS = Object.freeze(["win-arm64", "win-x64"]);
+
+/** The GUI E2E steps test-all.js runs for each rid in a full gate. */
+const GATE_E2E_STEPS = Object.freeze(["e2e-ship", "e2e-flavor"]);
+
 /**
- * Checks a quality-gate result for the release commit. A passing quick gate records e2e as
- * "skipped" (the release VM runs no GUI E2E); a passing full gate records "passed".
+ * The full-gate-only step that test-all.js runs after the per-RID steps of every RID. It belongs to no rid.
+ * The proof finds it by name, never by its position among the steps.
+ */
+const GATE_RELEASE_STEP = "test-policy-release-gate";
+
+/**
+ * Checks a quality-gate result for the release commit. Only a full gate counts: one run of
+ * `test-all.js --rid all` (no --quick) that passed on a clean HEAD, with both architectures, their
+ * GUI E2E steps and the release gate step (test-policy-release-gate, which runs last) passed. A quick
+ * gate, a gate for one rid, and a gate with a skipped, NOT RUN, or failed step are refused.
  */
 export function qualityGateProof(gate, head) {
   if (!gate || typeof gate !== "object") {
@@ -686,15 +700,63 @@ export function qualityGateProof(gate, head) {
       detail: "the quality gate ran on a dirty tree; rerun it on a clean checkout of HEAD",
     };
   }
-  const quick = gate.quick === true;
+  if (gate.quick !== false) {
+    return {
+      ok: false,
+      reason: "gate-quick",
+      detail: "the quality gate was a quick run, which skips the GUI E2E; run `node scripts/test-all.js --rid all` without --quick",
+    };
+  }
+  const rids = Array.isArray(gate.rids) ? gate.rids : [];
+  const steps = Array.isArray(gate.steps) ? gate.steps : [];
+  for (const rid of GATE_REQUIRED_RIDS) {
+    const entry = rids.find((candidate) => candidate?.rid === rid);
+    if (!entry || entry.status === "skipped" || entry.status === "not-run") {
+      return {
+        ok: false,
+        reason: "gate-rid-missing",
+        detail: `the quality gate has no completed run for ${rid}; run \`node scripts/test-all.js --rid all\` without --quick`,
+      };
+    }
+    if (entry.status !== "pass") {
+      return { ok: false, reason: "gate-failed", detail: `the quality gate did not pass for ${rid}` };
+    }
+  }
+  const failedStep = steps.find((step) => step?.pass !== true);
+  if (failedStep) {
+    return { ok: false, reason: "gate-failed", detail: `the quality gate step ${String(failedStep.name)} did not pass` };
+  }
+  for (const rid of GATE_REQUIRED_RIDS) {
+    for (const name of GATE_E2E_STEPS) {
+      const step = steps.find((candidate) => candidate?.rid === rid && candidate?.name === name);
+      const result = step?.e2eResult;
+      const ran = Boolean(step) && step.exitCode === 0 && result?.exists === true && result?.pass === true && !(result.failed > 0);
+      if (!ran) {
+        return {
+          ok: false,
+          reason: "gate-e2e-not-run",
+          detail: `the quality gate has no passing ${name} for ${rid} (skipped, NOT RUN, or no passing result file)`,
+        };
+      }
+    }
+  }
+  const releaseStep = steps.find((candidate) => candidate?.name === GATE_RELEASE_STEP);
+  if (!releaseStep || releaseStep.pass !== true || releaseStep.exitCode !== 0) {
+    return {
+      ok: false,
+      reason: "gate-release-step-not-run",
+      detail: `the quality gate has no passing ${GATE_RELEASE_STEP} (it runs last, after every rid; it did not run or did not pass)`,
+    };
+  }
   return {
     ok: true,
     record: {
       source: QUALITY_GATE_RESULT_RELATIVE_PATH,
       commit: gateCommit,
       pass: true,
-      mode: quick ? "quick" : "full",
-      e2e: quick ? "skipped" : "passed",
+      mode: "full",
+      rids: [...GATE_REQUIRED_RIDS],
+      e2e: "passed",
     },
   };
 }

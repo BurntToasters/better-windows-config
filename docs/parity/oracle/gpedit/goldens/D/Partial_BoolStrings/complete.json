@@ -1,0 +1,19 @@
+{
+  "case": "D/Partial_BoolStrings",
+  "planHash": "61d327098840fb55eaf692e10db3002d5bc61eeed436f21f23e35d80b9622c55",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "start/User.Registry.pol",
+    "step-01-start/User.Registry.pol",
+    "step-01-start/gpt.ini",
+    "step-02-unrelated-save/User.Registry.pol",
+    "step-02-unrelated-save/User.comment.cmtx",
+    "step-02-unrelated-save/gpt.ini",
+    "step-03-unrelated-cleared/User.Registry.pol",
+    "step-03-unrelated-cleared/User.comment.cmtx",
+    "step-03-unrelated-cleared/gpt.ini"
+  ]
+}

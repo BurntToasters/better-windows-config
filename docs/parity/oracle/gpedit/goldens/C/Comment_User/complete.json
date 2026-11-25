@@ -1,0 +1,19 @@
+{
+  "case": "C/Comment_User",
+  "planHash": "e7e7f4c5e042683801211158345e8e3ebff6adf6ed283af4dd027ebc31e4138e",
+  "files": [
+    "User.Registry.pol",
+    "User.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-add/User.Registry.pol",
+    "step-01-add/User.comment.cmtx",
+    "step-01-add/gpt.ini",
+    "step-02-edit/User.Registry.pol",
+    "step-02-edit/User.comment.cmtx",
+    "step-02-edit/gpt.ini",
+    "step-03-remove/User.Registry.pol",
+    "step-03-remove/User.comment.cmtx",
+    "step-03-remove/gpt.ini"
+  ]
+}

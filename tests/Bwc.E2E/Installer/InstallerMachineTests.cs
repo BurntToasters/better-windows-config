@@ -26,10 +26,6 @@ public sealed class InstallerMachineTests
     private const string NotElevated =
         "Not elevated: the machine-mode installer tests run only through the elevated runner (node scripts/elevated-runner/run.js).";
 
-    private const string HubAumid = "BetterWindowsConfig.Hub";
-    private const string RegeditAumid = "BetterWindowsConfig.Regedit";
-    private const string HubShortcut = "Better Windows Config.lnk";
-    private const string RegeditShortcut = "Registry Editor (BWC).lnk";
     private const string TrustedKeyVariable = "BWC_E2E_UPDATE_TRUSTED_KEY";
     private const string ProtectedRootVariable = "BWC_E2E_UPDATE_PROTECTED_ROOT";
     private const string ForceElevatedVariable = "BWC_E2E_UPDATE_FORCE_ELEVATED";
@@ -314,6 +310,7 @@ public sealed class InstallerMachineTests
         [
             run.HubExe,
             run.RegeditExe,
+            run.GpeditExe,
             run.UpdaterExe,
             run.UninstallerExe,
             Path.Combine(run.InstallDir, "installed-files.txt"),
@@ -324,7 +321,7 @@ public sealed class InstallerMachineTests
         MachineChecks.Record(
             prefix + ".files",
             missing.Length == 0,
-            missing.Length == 0 ? "The Hub, Registry Editor, updater, uninstaller, manifest, LICENSE, and notices are in " + run.InstallDir + "." : "Missing: " + string.Join(", ", missing));
+            missing.Length == 0 ? "The Hub, Registry Editor, Local Group Policy Editor, updater, uninstaller, manifest, LICENSE, and notices are in " + run.InstallDir + "." : "Missing: " + string.Join(", ", missing));
         string? hubVersion = InstallerRun.VersionOf(run.HubExe);
         MachineChecks.Record(prefix + ".files.version", hubVersion == version, $"The installed Hub exe reports {hubVersion}, expected {version}.");
         MachineChecks.Record(
@@ -369,17 +366,24 @@ public sealed class InstallerMachineTests
             $"HKLM\\Software\\WOW6432Node\\BWC-E2E\\{run.RunId} must not exist (the setup writes the 64-bit view). If it does, remove it by hand.");
     }
 
-    /// <summary>Two all-users shortcuts with their AUMIDs, and no folder for the run in the user's own Start menu.</summary>
+    /// <summary>
+    /// All-users shortcuts (<see cref="InstallerRun.ProductShortcuts"/>: Hub, Registry Editor, Local Group Policy Editor)
+    /// with their AUMIDs, and no folder for the run in the user's own Start menu.
+    /// </summary>
     private static void CheckShortcuts(InstallerRun run, string prefix)
     {
-        string hub = Path.Combine(run.ShortcutDir, HubShortcut);
-        string regedit = Path.Combine(run.ShortcutDir, RegeditShortcut);
+        IReadOnlyList<InstallerRun.ProductShortcut> expected = InstallerRun.ProductShortcuts;
         MachineChecks.Record(
             prefix + ".shortcuts.files",
-            File.Exists(hub) && File.Exists(regedit) && run.ShortcutCount() == 2,
-            $"The all-users folder {run.ShortcutDir} holds {run.ShortcutCount()} shortcut(s); expected the Hub and Registry Editor shortcuts.");
-        MachineChecks.Record(prefix + ".shortcuts.hubAumid", ShortcutAumidIs(hub, HubAumid, out string hubNotes), hubNotes);
-        MachineChecks.Record(prefix + ".shortcuts.regeditAumid", ShortcutAumidIs(regedit, RegeditAumid, out string regeditNotes), regeditNotes);
+            expected.All(shortcut => File.Exists(Path.Combine(run.ShortcutDir, shortcut.Name))) && run.ShortcutCount() == expected.Count,
+            $"The all-users folder {run.ShortcutDir} holds {run.ShortcutCount()} shortcut(s); expected {string.Join(", ", expected.Select(shortcut => shortcut.Name))}.");
+        foreach ((string name, string appId, _) in expected)
+        {
+            string shortcut = Path.Combine(run.ShortcutDir, name);
+            string key = appId[(appId.LastIndexOf('.') + 1)..].ToLowerInvariant();
+            MachineChecks.Record(prefix + ".shortcuts." + key + "Aumid", ShortcutAumidIs(shortcut, appId, out string notes), notes);
+        }
+
         string perUser = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "BWC-E2E-" + run.RunId);
         MachineChecks.Record(prefix + ".shortcuts.notPerUser", !Directory.Exists(perUser), $"The current user's Start menu has no folder {perUser}.");
     }
@@ -783,7 +787,7 @@ public sealed class InstallerMachineTests
             "unin.shortcuts",
             !Directory.Exists(run.ShortcutDir),
             Directory.Exists(run.ShortcutDir) ? $"{run.ShortcutDir} is still there." : "The all-users shortcuts and their folder are gone.");
-        string[] payload = [run.HubExe, run.RegeditExe, run.UpdaterExe, Path.Combine(run.InstallDir, "installed-files.txt"), Path.Combine(run.InstallDir, "LICENSE")];
+        string[] payload = [run.HubExe, run.RegeditExe, run.GpeditExe, run.UpdaterExe, Path.Combine(run.InstallDir, "installed-files.txt"), Path.Combine(run.InstallDir, "LICENSE")];
         string[] left = payload.Where(File.Exists).ToArray();
         MachineChecks.Record("unin.payload", left.Length == 0, left.Length == 0 ? "The payload files are gone." : "Still there: " + string.Join(", ", left));
         MachineChecks.Record("unin.upd", !Directory.Exists(run.ProtectedDir), "The protected folder <install dir>.upd is gone, with the tmp child.");

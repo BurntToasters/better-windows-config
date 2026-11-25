@@ -33,6 +33,34 @@ finds the same files. When a tool runs as a different user, `LocalApplicationDat
 that user's profile, so it gets a separate tree instead of an access-denied error. A shared
 machine-wide override of `BWC_DATA_ROOT` deliberately opts out of that separation.
 
+### Elevated data folder and links (CORE-1)
+
+The Registry Editor and the Local Group Policy Editor run elevated, and a non-elevated process of the
+same user controls both `BWC_DATA_ROOT` (inherited through the consent prompt) and the default folder
+`%LOCALAPPDATA%\BetterWindowsConfig`. It could plant a junction, symlink, or hard link there and aim an
+elevated append, move, or delete at another file. Two decisions are pure functions (`DataPathPolicy`) so
+that no test needs an elevated process. Elevation comes from the process token (elevated or high
+integrity); a token that cannot be read counts as elevated.
+
+| Case | Behavior |
+| --- | --- |
+| Ship flavor, elevated, `BWC_DATA_ROOT` set | The variable is ignored and the per-user default is used. |
+| Ship flavor, not elevated, `BWC_DATA_ROOT` set | Honored as before (the ship E2E suite relies on it). |
+| E2E flavor, elevated, `BWC_DATA_ROOT` set | Honored (the elevated test runner needs its sandbox); the link rules below still apply. |
+| Elevation cannot be determined (token query fails) | Treated as elevated. |
+| Not elevated, any flavor | No link checks and no change from the behavior before this fix. |
+| Elevated, a folder from the data root down to the log or settings folder is a junction or symlink | No file log is opened and settings live in memory only. Nothing is created, written, moved, or deleted, and the link target is untouched. |
+| Elevated, the tool folder is replaced by a junction after start | The folders are opened once and held without delete sharing for the process lifetime, so they cannot be renamed or replaced while held. A replacement before the open is the junction case above. |
+| Elevated, the final path of a folder handle is not the expected path | Treated as unsafe, same as a junction. The expected path is the final path of the parent plus the folder name, so a profile relocated by a junction above the data root still works. |
+| Elevated, the log file (daily or part) is a hard link (link count above 1) or a symlink | That file is not appended to and not deleted; logging stops for the process. |
+| Elevated, the settings file is a hard link or a symlink | The store stops using disk: load returns defaults, save keeps the value in memory, and the file is not read, written, moved, or deleted. |
+| Elevated, the log directory given in `LogOptions` is outside the data root | Treated as unsafe; no file log. |
+| Elevated, a file handle's final path is not the expected file in the held folder | Treated as unsafe, same as a link. |
+
+Every elevated write, move, and delete goes through a handle that was opened with
+`FILE_FLAG_OPEN_REPARSE_POINT` and checked (not a reparse point, one hard link, expected final path), and
+a rename or delete is applied to that handle, not to a path.
+
 ## Log
 
 ### Relative or invalid directory override
@@ -176,6 +204,16 @@ corruption. The original file is moved, never deleted, to
 exists, a numeric suffix is added so the older corrupt copy is preserved. The original bytes are
 unchanged by the move. `Load` then returns a fresh `T`.
 
+### Many corrupt copies kept (CORE-3)
+
+Each corrupt file is kept as `<file>.bad-*`, and a settings file that keeps corrupting would fill the
+folder. After a file is moved aside, only the newest 5 `<file>.bad-*` files are kept and the oldest are
+deleted first. Only names that match exactly what the store creates
+(`<file>.bad-<yyyyMMddTHHmmssZ>` with an optional `-<n>` suffix) are counted or deleted; other files,
+including `.tmp-*` and look-alike names, are left alone. A delete failure goes to the safe trace helper
+and does not fail the load. Exactly 5 or fewer copies are all kept. When elevated, the delete goes through
+a checked handle like every other elevated delete (see the elevated data folder section).
+
 ### Oversized file
 
 `Load` checks the file length before allocating the read buffer. The documented cap is
@@ -228,7 +266,8 @@ share a pipe by accident beyond the explicit `unknown` fallback.
 ### Mutex ownership
 
 The first instance creates the named mutex with initial ownership. A second instance opens the
-same mutex, sees `createdNew == false`, and starts no server. Disposal releases the mutex only
+same mutex, sees `createdNew == false`, and starts no server when the existing instance answers on the pipe
+(see "Client integrity level and a squatted mutex"). Disposal releases the mutex only
 when this object owns it and disposal happens on the creating thread, because Windows mutex
 ownership is thread affine. Closing the handle from another thread still releases the kernel
 object; it simply skips `ReleaseMutex` to avoid `ApplicationException`.
@@ -297,6 +336,34 @@ only to the current user SID. A different user cannot send activation messages e
 the pipe name. Because the key also includes the integrity level, a medium-integrity process and
 an elevated high-integrity process of the same user use different instances rather than fighting
 over one pipe.
+
+### Client integrity level and a squatted mutex (AF7, CORE-2 and CORE-3)
+
+The pipe ACL only separates users. A non-elevated process of the same user can compute the "high"
+pipe name of an elevated tool and connect to it. The message can carry a `.reg` path, which opens the
+import confirmation in the elevated window with no UAC prompt. After a client connects, the server
+reads the client process id (`GetNamedPipeClientProcessId`), opens that process and reads its token
+integrity level. `IntegrityPolicy.Accepts(serverLevel, clientLevel)` is the pure rule: a client below
+the server's own level is refused, a client whose process or level cannot be read is refused, and a
+client at the same level or higher is accepted. A server whose own level is unknown refuses every
+client (fail closed). A refused client is disconnected, nothing is delivered, and one line is logged.
+The client may still see `Sent` (the pipe is one way) or a broken pipe; the refusal is the server's decision.
+
+The same user can also create the mutex name first, which made the real tool believe another instance
+runs. When the mutex already exists, `Create` now connects to the pipe (no message) with the
+three-second timeout. Only when the existing instance answers is this launch a later instance
+(`IsFirstInstance` is false, and the caller sends its message and exits, as before). When nobody
+answers, the launch starts as the first instance: it serves the pipe without owning the mutex, and
+logs that the mutex was held without an answering instance. Disposal then does not release a mutex it
+never owned.
+
+| ID | Case | Risk | Required result | Test |
+|----|------|------|-----------------|------|
+| SI-I1 | Client integrity level below the server's | Non-elevated process drives the elevated window | Refused: disconnected, no message delivered, one log line | `ClientBelowServerLevelIsRefusedAndNothingIsDelivered`, `Accepts_ClientBelowServer_IsRefused` |
+| SI-I2 | Client process or level cannot be read | Unverifiable client treated as trusted | Refused | `ClientWithUnknownLevelIsRefused`, `Accepts_UnknownClient_IsRefused`, `Accepts_UnknownServer_IsRefused` |
+| SI-I3 | Client at the same level, or higher | Legitimate second launch refused | Accepted and delivered, as today | `ClientAtOrAboveServerLevelIsAccepted`, `Accepts_ClientAtOrAboveServer_IsAccepted`, `MessageRoundTripsToTheFirstInstance` |
+| SI-M1 | Mutex held by a process that serves no pipe | Real tool refuses to start | Starts as the first instance after the connect timeout; logs the held mutex | `MutexHeldWithoutAnswerDoesNotBlockTheStart` |
+| SI-M2 | Real second instance (mutex held, pipe answers) | Two windows | Not first; message delivered; the caller exits | `MutexHeldWithoutAnswerDoesNotBlockTheStart` (third start), `MessageRoundTripsToTheFirstInstance` |
 
 ### Dispose while accepting
 
@@ -376,6 +443,22 @@ cannot be queried.
 The Hub subscribes to `Application.UnhandledException` and reports through `CrashHandler`.
 `Handled` is not set, so the process still terminates after the log entry and optional dialog.
 The existing launcher rows, automation ids, and merged resource dictionaries are unchanged.
+
+## Fire-and-forget tasks
+
+### Faulted task that nobody awaits (CORE-4)
+
+A call that returns a `Task` and is started without `await` drops its exception: nothing observes
+the task, so the fault reaches `TaskScheduler.UnobservedTaskException` only at a later garbage
+collection, with no entry naming the operation that failed. `TaskExtensions.Forget(context)`
+attaches a continuation that runs on every outcome. A faulted task logs one ERROR entry through
+`Log.Exception` with the context text and the exception type and message, and the continuation then
+ends, so the fault counts as observed. A cancelled task and a completed task log nothing. A task
+that faults after the call returns is logged when it faults. A null context is logged as
+`unnamed task` instead of failing. The continuation itself never throws: the logging call is
+guarded, so a logger failure falls back to the safe trace helper and cannot become a new unobserved
+fault. A null task is a programming error at the call site and throws `ArgumentNullException`
+immediately, before anything is started.
 
 ## Verification
 

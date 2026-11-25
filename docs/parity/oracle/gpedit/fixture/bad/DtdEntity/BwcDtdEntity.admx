@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE policyDefinitions [
+  <!ENTITY bwcvalue "EntityExpandedValue">
+]>
+<!-- BWC oracle bad fixture. Authored by Better Windows Config. Not a Microsoft file. -->
+<policyDefinitions revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <policyNamespaces>
+    <target prefix="bad" namespace="BWC.Policies.Bad.DtdEntity" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <supportedOn>
+    <definitions>
+      <definition name="SUPPORTED_Bad" displayName="$(string.SUPPORTED_Bad)" />
+    </definitions>
+  </supportedOn>
+  <categories>
+    <category name="BadRoot" displayName="$(string.BadRoot)" />
+  </categories>
+  <policies>
+    <policy name="Pol_Bad" class="Machine" displayName="$(string.Pol_Bad)" explainText="$(string.Pol_Bad_Help)" key="Software\Policies\BWC-Oracle\Bad\DtdEntity" valueName="&bwcvalue;">
+      <parentCategory ref="BadRoot" />
+      <supportedOn ref="SUPPORTED_Bad" />
+    </policy>
+  </policies>
+</policyDefinitions>

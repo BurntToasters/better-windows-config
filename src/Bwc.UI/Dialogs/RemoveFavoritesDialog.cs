@@ -1,3 +1,4 @@
+using Bwc.Core;
 using Microsoft.UI.Xaml.Controls;
 using WinRT.Interop;
 
@@ -59,7 +60,7 @@ public sealed class RemoveFavoritesDialog : ClassicDialog
 
         if (selected.Count == 0)
         {
-            _ = ShowEmptySelectionAsync();
+            ShowEmptySelectionAsync().Forget("remove favorites empty selection");
             return false;
         }
 

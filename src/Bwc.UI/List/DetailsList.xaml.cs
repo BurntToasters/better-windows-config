@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Bwc.Core;
 using Bwc.UI.Theme;
 using Bwc.UI.Tree;
 using Microsoft.UI.Dispatching;
@@ -262,7 +263,7 @@ public sealed partial class DetailsList : UserControl
         if (list.Count > BackgroundSortThreshold)
         {
             ResetRows(list);
-            _ = SortInBackgroundAsync(version, list);
+            SortInBackgroundAsync(version, list).Forget("details list background sort");
             return;
         }
 

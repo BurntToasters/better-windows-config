@@ -26,6 +26,8 @@ internal static class Program
         "  export-text   classic File > Export, Text Files (*.txt), of BWC-Oracle; not measured (no file written), see regedit-export-text.json\n" +
         "  resource-viewers  Modify and Display... on REG_RESOURCE_LIST, FULL and REQUIREMENTS values (regedit-resource-viewers.json)\n" +
         "  cleanup   delete HKCU\\Software\\BWC-Oracle\n" +
+        "  gpedit probe [--dry-run]  classic gpedit.msc UI Automation and Registry.pol order probe; needs an elevated terminal (artifacts/oracle/gpedit/probe.json)\n" +
+        "  gpedit restore | status | selftest  undo an unfinished gpedit capture, show its backup manifest, check the session code in a sandbox\n" +
         "  --allow-dpi  record UI captures at a DPI other than 96 (the DPI is written into each output)";
 
     private static int Main(string[] args)
@@ -161,6 +163,9 @@ internal static class Program
                     // Reads the image resource only. regedit is not started, so no session or GUI lock is needed.
                     ManifestCapture.Run(paths);
                     return 0;
+
+                case "gpedit":
+                    return Gpedit.GpeditCommands.Run(paths, args);
 
                 case "cleanup":
                     GuiLock.Run(() => RegistryGuard.DeleteOracleTree());

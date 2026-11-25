@@ -1,0 +1,385 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BWC oracle fixture. Authored by Better Windows Config. Not a Microsoft file. -->
+<policyDefinitionResources revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>BWC Oracle</displayName>
+  <description>Policies for the BWC oracle fixture. They exercise every template shape the policy engine handles.</description>
+  <resources>
+    <stringTable>
+      <!-- supportedOn -->
+      <string id="SUPPORTED_LocalOnly">BWC oracle fixture: defined in the same file as the policy</string>
+
+      <!-- categories -->
+      <string id="Cat_Basics">Basics</string>
+      <string id="Cat_Basics_Help">Class, value forms, value lists, and key placement.</string>
+      <string id="Cat_Elements">Elements</string>
+      <string id="Cat_Booleans">Booleans</string>
+      <string id="Cat_Numbers">Numbers</string>
+      <string id="Cat_Texts">Texts</string>
+      <string id="Cat_Choices">Choices</string>
+      <string id="Cat_Lists">Lists</string>
+      <string id="Cat_Shared">Shared keys</string>
+      <string id="Cat_SortCases">Sort cases</string>
+      <string id="Cat_Ampersand">Tools &amp; Utilities</string>
+      <string id="Cat_Explain">Explain text</string>
+      <string id="Cat_MachineOnly">Machine only</string>
+      <string id="Cat_MachineNested">Machine nested</string>
+      <string id="Cat_MachineDeep">Machine deep</string>
+      <string id="Cat_UserOnly">User only</string>
+      <string id="Cat_UserNested">User nested</string>
+      <string id="Cat_EmptyCategory">Intentionally empty</string>
+
+      <!-- directly under the top category -->
+      <string id="Pol_Top_DirectUnderRoot">Top level user flag</string>
+      <string id="Pol_Top_DirectUnderRoot_Help">A user policy that sits directly under the top category, next to the subcategories. It writes the flag TopFlag.</string>
+
+      <!-- basics -->
+      <string id="Pol_Class_Machine">Class machine flag</string>
+      <string id="Pol_Class_Machine_Help">A machine policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.</string>
+      <string id="Pol_Class_User">Class user flag</string>
+      <string id="Pol_Class_User_Help">A user policy with a value name and no explicit values. Enabled writes 1 and Disabled writes 0.</string>
+      <string id="Pol_Class_Both">Class both flag</string>
+      <string id="Pol_Class_Both_Help">A policy of class Both. It appears under Computer Configuration and under User Configuration and writes to the matching hive file of each.</string>
+      <string id="Pol_Value_Decimal">Decimal enabled and disabled values</string>
+      <string id="Pol_Value_Decimal_Help">Enabled writes the number 5 and Disabled writes the number 9 to ModeNumber.</string>
+      <string id="Pol_Value_String">String enabled and disabled values</string>
+      <string id="Pol_Value_String_Help">Enabled writes the text on and Disabled writes the text off to ModeText.</string>
+      <string id="Pol_Value_EnabledOnly">Enabled value only</string>
+      <string id="Pol_Value_EnabledOnly_Help">The template defines an enabled value of 7 and no disabled value. The oracle records what Disabled writes.</string>
+      <string id="Pol_Value_DisabledOnly">Disabled value only</string>
+      <string id="Pol_Value_DisabledOnly_Help">The template defines a disabled value of 3 and no enabled value. The oracle records what Enabled writes.</string>
+      <string id="Pol_Value_NoValueName_ElementsOnly">No value name, elements only</string>
+      <string id="Pol_Value_NoValueName_ElementsOnly_Help">This policy has no value name of its own. Only its two elements write values.</string>
+      <string id="Pol_Value_EnabledListOnly">Enabled list only</string>
+      <string id="Pol_Value_EnabledListOnly_Help">An enabled list of three values. The second item overrides the key. There is no value name and there are no elements.</string>
+      <string id="Pol_Value_DisabledListOnly">Disabled list only</string>
+      <string id="Pol_Value_DisabledListOnly_Help">A disabled list of two values. The second item overrides the key. There is no value name and there are no elements.</string>
+      <string id="Pol_Value_BothLists">Enabled list and disabled list with value name</string>
+      <string id="Pol_Value_BothLists_Help">A policy that has a value name together with an enabled list and a disabled list.</string>
+      <string id="Pol_Element_KeyOverride">Element key differs from policy key</string>
+      <string id="Pol_Element_KeyOverride_Help">The policy writes ElementKeyFlag in its own key, and its text element writes in a different subkey.</string>
+      <string id="Pol_Outside_KeyOutsideRoots">Key outside the policy roots</string>
+      <string id="Pol_Outside_KeyOutsideRoots_Help">The only policy of the fixture that writes outside Software\Policies. It writes OutsideFlag under Software\BWC-Oracle-Gpedit.</string>
+      <string id="Pol_Both_WithElements">Class both with an element</string>
+      <string id="Pol_Both_WithElements_Help">A policy of class Both that also has a number element, so each hive file receives a flag and a number.</string>
+
+      <!-- booleans -->
+      <string id="Pol_Bool_TrueFalseValues">Boolean with true and false values</string>
+      <string id="Pol_Bool_TrueFalseValues_Help">A check box that writes the number 10 when checked and the number 20 when cleared.</string>
+      <string id="Pol_Bool_StringValues">Boolean with string values</string>
+      <string id="Pol_Bool_StringValues_Help">A check box that writes the text yes when checked and the text no when cleared. It starts checked.</string>
+      <string id="Pol_Bool_TrueFalseLists">Boolean with true and false lists</string>
+      <string id="Pol_Bool_TrueFalseLists_Help">A check box whose checked state writes a list of two values and whose cleared state writes a different list of two values. Some items override the key.</string>
+      <string id="Pol_Bool_NoFalseValue">Boolean without a false value</string>
+      <string id="Pol_Bool_NoFalseValue_Help">A check box with a true value of 1 and no false value. The oracle records what a cleared box writes.</string>
+      <string id="Pol_Bool_TwoChecksReverseOrder">Two checks defined in reverse name order</string>
+      <string id="Pol_Bool_TwoChecksReverseOrder_Help">Two check boxes share one key. ZetaCheck is defined before AlphaCheck, so the record order shows whether the policy engine follows definition order or name order.</string>
+
+      <!-- numbers -->
+      <string id="Pol_Decimal_MinMax">Decimal with a range</string>
+      <string id="Pol_Decimal_MinMax_Help">A number between 10 and 500. The presentation starts at 25 and steps by 5.</string>
+      <string id="Pol_Decimal_Required">Decimal that is required</string>
+      <string id="Pol_Decimal_Required_Help">A number that must be entered. It has no range. The presentation turns the spin buttons off.</string>
+      <string id="Pol_Decimal_Soft">Decimal with a soft range</string>
+      <string id="Pol_Decimal_Soft_Help">A number between 1 and 100 that is marked soft.</string>
+      <string id="Pol_Decimal_StoreAsText">Decimal stored as text</string>
+      <string id="Pol_Decimal_StoreAsText_Help">A number from 0 to 65535 that is stored as a string value instead of a DWORD.</string>
+      <string id="Pol_LongDecimal_Basic">Long decimal with a range</string>
+      <string id="Pol_LongDecimal_Basic_Help">A 64-bit number from 0 to 9000000000000.</string>
+      <string id="Pol_LongDecimal_RequiredSoftText">Long decimal required, soft, stored as text</string>
+      <string id="Pol_LongDecimal_RequiredSoftText_Help">A 64-bit number that is required, soft, and stored as a string value.</string>
+
+      <!-- texts -->
+      <string id="Pol_Text_Plain">Plain text</string>
+      <string id="Pol_Text_Plain_Help">A text box with a default value. It writes a REG_SZ string.</string>
+      <string id="Pol_Text_Expandable">Expandable text</string>
+      <string id="Pol_Text_Expandable_Help">A text box whose value is stored as an expandable string.</string>
+      <string id="Pol_Text_MaxLength">Text with a length limit</string>
+      <string id="Pol_Text_MaxLength_Help">A text box that accepts at most 12 characters.</string>
+      <string id="Pol_Text_Required">Text that is required</string>
+      <string id="Pol_Text_Required_Help">A text box that must not be empty.</string>
+      <string id="Pol_Text_ComboBoxSuggestions">Text with a combo box and suggestions</string>
+      <string id="Pol_Text_ComboBoxSuggestions_Help">A text element shown as a combo box with four suggestions and a default. The suggestions are sorted.</string>
+      <string id="Pol_Text_ComboBoxNoSortRequired">Text with an unsorted required combo box</string>
+      <string id="Pol_Text_ComboBoxNoSortRequired_Help">A required text element shown as a combo box whose suggestions keep the order of the template.</string>
+      <string id="Pol_MultiText_Basic">Multiple text lines</string>
+      <string id="Pol_MultiText_Basic_Help">A multi-line text box that writes a REG_MULTI_SZ value.</string>
+      <string id="Pol_MultiText_Limits">Multiple text lines with limits</string>
+      <string id="Pol_MultiText_Limits_Help">A required multi-line text box with at most 3 strings of at most 20 characters.</string>
+
+      <!-- enums -->
+      <string id="Pol_Enum_DecimalItems">Choice with decimal items</string>
+      <string id="Pol_Enum_DecimalItems_Help">A drop-down list whose items write the numbers 0 to 3.</string>
+      <string id="Pol_Enum_DecimalItems_Zero">Zero</string>
+      <string id="Pol_Enum_DecimalItems_One">One</string>
+      <string id="Pol_Enum_DecimalItems_Two">Two</string>
+      <string id="Pol_Enum_DecimalItems_Three">Three</string>
+      <string id="Pol_Enum_StringItems">Choice with string items</string>
+      <string id="Pol_Enum_StringItems_Help">A drop-down list whose items write the texts red, green, and blue.</string>
+      <string id="Pol_Enum_StringItems_Red">Red</string>
+      <string id="Pol_Enum_StringItems_Green">Green</string>
+      <string id="Pol_Enum_StringItems_Blue">Blue</string>
+      <string id="Pol_Enum_ItemValueList">Choice whose items write extra values</string>
+      <string id="Pol_Enum_ItemValueList_Help">A drop-down list in which profile A and profile C write extra values besides the selected number. Profile B writes nothing extra. One extra value overrides the key.</string>
+      <string id="Pol_Enum_ItemValueList_A">Profile A</string>
+      <string id="Pol_Enum_ItemValueList_B">Profile B</string>
+      <string id="Pol_Enum_ItemValueList_C">Profile C</string>
+      <string id="Pol_Enum_Required">Choice that is required</string>
+      <string id="Pol_Enum_Required_Help">A required drop-down list with two items.</string>
+      <string id="Pol_Enum_Required_Low">Low</string>
+      <string id="Pol_Enum_Required_High">High</string>
+      <string id="Pol_Enum_NoSortDefaultItem">Choice without sorting and with a default item</string>
+      <string id="Pol_Enum_NoSortDefaultItem_Help">A drop-down list that keeps the order of the template and starts on the second item.</string>
+      <string id="Pol_Enum_NoSortDefaultItem_Zulu">Zulu</string>
+      <string id="Pol_Enum_NoSortDefaultItem_Alpha">Alpha</string>
+      <string id="Pol_Enum_NoSortDefaultItem_Mike">Mike</string>
+
+      <!-- lists -->
+      <string id="Pol_List_Plain">List with default naming</string>
+      <string id="Pol_List_Plain_Help">A list that sets no value prefix and no other attributes.</string>
+      <string id="Pol_List_EmptyPrefix">List with an empty value prefix</string>
+      <string id="Pol_List_EmptyPrefix_Help">A list whose value prefix is an empty string.</string>
+      <string id="Pol_List_Additive">Additive list</string>
+      <string id="Pol_List_Additive_Help">A list marked additive.</string>
+      <string id="Pol_List_ExplicitValue">List with explicit values</string>
+      <string id="Pol_List_ExplicitValue_Help">A list whose Show Contents dialog has a name column and a value column.</string>
+      <string id="Pol_List_ValuePrefix">List with a value prefix</string>
+      <string id="Pol_List_ValuePrefix_Help">A user list whose value names start with the prefix Item.</string>
+      <string id="Pol_List_Expandable">Expandable list</string>
+      <string id="Pol_List_Expandable_Help">A list whose entries are stored as expandable strings.</string>
+      <string id="Pol_List_PolicyValueName">List with a policy value name</string>
+      <string id="Pol_List_PolicyValueName_Help">A policy that has its own value name, ListSwitch, together with a list in a subkey.</string>
+
+      <!-- shared keys -->
+      <string id="Pol_Shared_Zeta">Shared key, Zeta</string>
+      <string id="Pol_Shared_Zeta_Help">Writes Zeta in a key that three policies share. It is defined first although its name sorts last.</string>
+      <string id="Pol_Shared_Alpha">Shared key, Alpha</string>
+      <string id="Pol_Shared_Alpha_Help">Writes Alpha in the shared key. It is defined second although its name sorts first.</string>
+      <string id="Pol_Shared_Mid">Shared key, Mid</string>
+      <string id="Pol_Shared_Mid_Help">Writes Mid in the shared key. It is defined third.</string>
+      <string id="Pol_Shared_ElementsReverseOrder">Shared key, elements in reverse order</string>
+      <string id="Pol_Shared_ElementsReverseOrder_Help">One policy writes Gate and two elements into the shared key. The text element ZetaElement is defined before the number element AlphaElement.</string>
+      <string id="Pol_SharedList_One">Shared list, first policy</string>
+      <string id="Pol_SharedList_One_Help">A list that writes into a key shared with the second shared list policy.</string>
+      <string id="Pol_SharedList_Two">Shared list, second policy</string>
+      <string id="Pol_SharedList_Two_Help">A list that writes into the same key as the first shared list policy.</string>
+
+      <!-- sort cases -->
+      <string id="Pol_Sort_Zulu">Zulu sort case</string>
+      <string id="Pol_Sort_Zulu_Help">A sort case. Its display name starts with a late letter.</string>
+      <string id="Pol_Sort_LowerAlpha">alpha policy</string>
+      <string id="Pol_Sort_LowerAlpha_Help">A sort case. Its display name is all lower case.</string>
+      <string id="Pol_Sort_Digit10">Policy 10</string>
+      <string id="Pol_Sort_Digit10_Help">A sort case. The number in the name is 10.</string>
+      <string id="Pol_Sort_Digit2">Policy 2</string>
+      <string id="Pol_Sort_Digit2_Help">A sort case. The number in the name is 2.</string>
+      <string id="Pol_Sort_LeadingSymbol">#Symbol policy</string>
+      <string id="Pol_Sort_LeadingSymbol_Help">A sort case. The display name starts with a number sign.</string>
+      <string id="Pol_Sort_NonAscii">Éclair policy</string>
+      <string id="Pol_Sort_NonAscii_Help">A sort case. The display name starts with an accented capital letter.</string>
+      <string id="Pol_Sort_Digit1">Policy 1</string>
+      <string id="Pol_Sort_Digit1_Help">A sort case. The number in the name is 1.</string>
+      <string id="Pol_Sort_UpperAlpha">Alpha Policy</string>
+      <string id="Pol_Sort_UpperAlpha_Help">A sort case. Its display name differs from the lower case one only by capitals.</string>
+
+      <!-- ampersand -->
+      <string id="Pol_Amp_DisplayName">Research &amp; Development flag</string>
+      <string id="Pol_Amp_DisplayName_Help">The display name has a literal ampersand. The editor must show it as written and must not turn it into a keyboard mnemonic.</string>
+      <string id="Pol_Amp_LabelSingle">Labels with single ampersands</string>
+      <string id="Pol_Amp_LabelSingle_Help">Every label of this policy contains one literal ampersand: a text label, a check box, a number label, a drop-down label, and two drop-down items.</string>
+      <string id="Pol_Amp_LabelSingle_ItemOne">Tom &amp; Jerry</string>
+      <string id="Pol_Amp_LabelSingle_ItemTwo">Salt &amp; Pepper</string>
+      <string id="Pol_Amp_LabelDouble">Label with a double ampersand</string>
+      <string id="Pol_Amp_LabelDouble_Help">The text label contains two ampersands in a row. The oracle records whether classic shows one or two.</string>
+
+      <!-- explain text -->
+      <string id="Pol_Explain_MultiParagraph">Explain text with several paragraphs</string>
+      <string id="Pol_Explain_MultiParagraph_Help">This is the first paragraph of the explanation.
+
+This is the second paragraph. It follows an empty line.
+
+This is the third paragraph.
+It continues on a new line without an empty line before it.</string>
+      <string id="Pol_Explain_EmptyString">Explain text that is an empty string</string>
+      <string id="Pol_Explain_EmptyString_Help"></string>
+      <string id="Pol_Explain_AttributeOmitted">Explain text attribute omitted</string>
+
+      <!-- nested -->
+      <string id="Pol_Nested_MachineTop">Nested machine policy, top level</string>
+      <string id="Pol_Nested_MachineTop_Help">A machine policy in the first level of the machine only branch.</string>
+      <string id="Pol_Nested_MachineMid">Nested machine policy, middle level</string>
+      <string id="Pol_Nested_MachineMid_Help">A machine policy in the second level of the machine only branch.</string>
+      <string id="Pol_Nested_MachineDeep">Nested machine policy, deep level</string>
+      <string id="Pol_Nested_MachineDeep_Help">A machine policy in the third level of the machine only branch.</string>
+      <string id="Pol_Nested_UserDeep">Nested user policy, deep level</string>
+      <string id="Pol_Nested_UserDeep_Help">A user policy in the second level of the user only branch. The first level has no policy of its own.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="Pol_Value_NoValueName_ElementsOnly">
+        <textBox refId="OnlyText">
+          <label>Only text:</label>
+          <defaultValue>start</defaultValue>
+        </textBox>
+        <decimalTextBox refId="OnlyNumber" defaultValue="4">Only number:</decimalTextBox>
+      </presentation>
+      <presentation id="Pol_Element_KeyOverride">
+        <textBox refId="OverrideText">
+          <label>Text in the other key:</label>
+        </textBox>
+      </presentation>
+      <presentation id="Pol_Both_WithElements">
+        <decimalTextBox refId="BothNumber" defaultValue="42">Shared number:</decimalTextBox>
+      </presentation>
+
+      <presentation id="Pol_Bool_TrueFalseValues">
+        <checkBox refId="TrueFalseCheck">Number check</checkBox>
+      </presentation>
+      <presentation id="Pol_Bool_StringValues">
+        <checkBox refId="StringCheck" defaultChecked="true">String check</checkBox>
+      </presentation>
+      <presentation id="Pol_Bool_TrueFalseLists">
+        <checkBox refId="ListCheck">List check</checkBox>
+      </presentation>
+      <presentation id="Pol_Bool_NoFalseValue">
+        <checkBox refId="NoFalseCheck">Check without a false value</checkBox>
+      </presentation>
+      <presentation id="Pol_Bool_TwoChecksReverseOrder">
+        <checkBox refId="ZetaCheck">Zeta check</checkBox>
+        <checkBox refId="AlphaCheck">Alpha check</checkBox>
+      </presentation>
+
+      <presentation id="Pol_Decimal_MinMax">
+        <decimalTextBox refId="MinMaxNumber" defaultValue="25" spin="true" spinStep="5">Number from 10 to 500:</decimalTextBox>
+      </presentation>
+      <presentation id="Pol_Decimal_Required">
+        <decimalTextBox refId="RequiredNumber" spin="false">Required number:</decimalTextBox>
+      </presentation>
+      <presentation id="Pol_Decimal_Soft">
+        <decimalTextBox refId="SoftNumber" defaultValue="50">Soft number:</decimalTextBox>
+      </presentation>
+      <presentation id="Pol_Decimal_StoreAsText">
+        <decimalTextBox refId="TextNumber" defaultValue="8080">Number stored as text:</decimalTextBox>
+      </presentation>
+      <presentation id="Pol_LongDecimal_Basic">
+        <longDecimalTextBox refId="LongNumber" defaultValue="123456789012" spin="true" spinStep="1000">Long number:</longDecimalTextBox>
+      </presentation>
+      <presentation id="Pol_LongDecimal_RequiredSoftText">
+        <longDecimalTextBox refId="LongTextNumber" spin="false">Required long number:</longDecimalTextBox>
+      </presentation>
+
+      <presentation id="Pol_Text_Plain">
+        <textBox refId="PlainText">
+          <label>Plain text:</label>
+          <defaultValue>plain default</defaultValue>
+        </textBox>
+      </presentation>
+      <presentation id="Pol_Text_Expandable">
+        <textBox refId="ExpandText">
+          <label>Path with variables:</label>
+          <defaultValue>%SystemRoot%\bwc-oracle</defaultValue>
+        </textBox>
+      </presentation>
+      <presentation id="Pol_Text_MaxLength">
+        <textBox refId="ShortText">
+          <label>Short text:</label>
+        </textBox>
+      </presentation>
+      <presentation id="Pol_Text_Required">
+        <textBox refId="RequiredText">
+          <label>Required text:</label>
+        </textBox>
+      </presentation>
+      <presentation id="Pol_Text_ComboBoxSuggestions">
+        <comboBox refId="ComboText">
+          <label>Pick or type a city:</label>
+          <default>Oslo</default>
+          <suggestion>Paris</suggestion>
+          <suggestion>Oslo</suggestion>
+          <suggestion>Lima</suggestion>
+          <suggestion>Cairo</suggestion>
+        </comboBox>
+      </presentation>
+      <presentation id="Pol_Text_ComboBoxNoSortRequired">
+        <comboBox refId="ComboNoSortText" noSort="true">
+          <label>Pick or type a size:</label>
+          <suggestion>Large</suggestion>
+          <suggestion>Medium</suggestion>
+          <suggestion>Small</suggestion>
+        </comboBox>
+      </presentation>
+      <presentation id="Pol_MultiText_Basic">
+        <text>One entry per line.</text>
+        <multiTextBox refId="MultiLines" />
+      </presentation>
+      <presentation id="Pol_MultiText_Limits">
+        <text>At most three lines.</text>
+        <multiTextBox refId="LimitedLines" defaultHeight="3" />
+      </presentation>
+
+      <presentation id="Pol_Enum_DecimalItems">
+        <dropdownList refId="DecimalChoice">Number choice:</dropdownList>
+      </presentation>
+      <presentation id="Pol_Enum_StringItems">
+        <dropdownList refId="StringChoice">Color choice:</dropdownList>
+      </presentation>
+      <presentation id="Pol_Enum_ItemValueList">
+        <dropdownList refId="ProfileChoice">Profile:</dropdownList>
+      </presentation>
+      <presentation id="Pol_Enum_Required">
+        <dropdownList refId="RequiredChoice">Level:</dropdownList>
+      </presentation>
+      <presentation id="Pol_Enum_NoSortDefaultItem">
+        <dropdownList refId="UnsortedChoice" noSort="true" defaultItem="1">Unsorted choice:</dropdownList>
+      </presentation>
+
+      <presentation id="Pol_List_Plain">
+        <listBox refId="PlainList">Plain entries:</listBox>
+      </presentation>
+      <presentation id="Pol_List_EmptyPrefix">
+        <listBox refId="EmptyPrefixList">Entries with an empty prefix:</listBox>
+      </presentation>
+      <presentation id="Pol_List_Additive">
+        <listBox refId="AdditiveList">Additive entries:</listBox>
+      </presentation>
+      <presentation id="Pol_List_ExplicitValue">
+        <listBox refId="ExplicitList">Name and value entries:</listBox>
+      </presentation>
+      <presentation id="Pol_List_ValuePrefix">
+        <listBox refId="PrefixList">Prefixed entries:</listBox>
+      </presentation>
+      <presentation id="Pol_List_Expandable">
+        <listBox refId="ExpandList">Expandable entries:</listBox>
+      </presentation>
+      <presentation id="Pol_List_PolicyValueName">
+        <listBox refId="SwitchedList">Switched entries:</listBox>
+      </presentation>
+
+      <presentation id="Pol_Shared_ElementsReverseOrder">
+        <textBox refId="ZetaElement">
+          <label>Zeta text:</label>
+        </textBox>
+        <decimalTextBox refId="AlphaElement" defaultValue="1">Alpha number:</decimalTextBox>
+      </presentation>
+      <presentation id="Pol_SharedList_One">
+        <listBox refId="SharedListOne">First shared entries:</listBox>
+      </presentation>
+      <presentation id="Pol_SharedList_Two">
+        <listBox refId="SharedListTwo">Second shared entries:</listBox>
+      </presentation>
+
+      <presentation id="Pol_Amp_LabelSingle">
+        <textBox refId="AmpText">
+          <label>Name &amp; address:</label>
+          <defaultValue>Fish &amp; Chips</defaultValue>
+        </textBox>
+        <checkBox refId="AmpCheck">Save &amp; close</checkBox>
+        <decimalTextBox refId="AmpNumber" defaultValue="3">Rock &amp; roll count:</decimalTextBox>
+        <dropdownList refId="AmpChoice">Pick &amp; choose:</dropdownList>
+      </presentation>
+      <presentation id="Pol_Amp_LabelDouble">
+        <textBox refId="DoubleAmpText">
+          <label>Fish &amp;&amp; Chips:</label>
+        </textBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

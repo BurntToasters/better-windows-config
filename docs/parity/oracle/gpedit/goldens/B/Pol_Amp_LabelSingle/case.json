@@ -1,0 +1,2013 @@
+{
+  "case": "B/Pol_Amp_LabelSingle",
+  "description": "Pol_Amp_LabelSingle under Computer Configuration: Enabled with defaults, Enabled with alternate values, Disabled, Not Configured",
+  "planVersion": 2,
+  "planHash": "b2e99d258d569998383974c7c2554ab3f7857ecac7a0c2434dbfbc0116863258",
+  "startState": {
+    "description": "empty folder",
+    "files": []
+  },
+  "optionalFailures": 0,
+  "ops": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Labels with single ampersands' state Enabled press [OK] at Computer/Administrative Templates/BWC Oracle/Tools & Utilities",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Tools & Utilities"
+        ],
+        "policy": "Labels with single ampersands",
+        "state": "Enabled",
+        "policyId": "Pol_Amp_LabelSingle",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "label": "step enabled-defaults",
+      "plan": "snapshot  [step enabled-defaults]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-defaults"
+      },
+      "optional": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Labels with single ampersands' state Enabled options [Name & address: = text 'bwc-alt'; Save & close = checked True; Rock & roll count: = text '77'; Pick & choose: = item 'Tom & Jerry'] press [OK] at Computer/Administrative Templates/BWC Oracle/Tools & Utilities",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Tools & Utilities"
+        ],
+        "policy": "Labels with single ampersands",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Name & address:",
+            "expectKind": "textBox",
+            "text": "bwc-alt",
+            "elementId": "AmpText"
+          },
+          {
+            "label": "Save & close",
+            "expectKind": "checkBox",
+            "checked": true,
+            "elementId": "AmpCheck"
+          },
+          {
+            "label": "Rock & roll count:",
+            "expectKind": "decimalTextBox",
+            "text": "77",
+            "elementId": "AmpNumber"
+          },
+          {
+            "label": "Pick & choose:",
+            "expectKind": "dropdownList",
+            "item": "Tom & Jerry",
+            "elementId": "AmpChoice"
+          }
+        ],
+        "policyId": "Pol_Amp_LabelSingle",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "label": "step enabled-alt1-text+checked+value+item0",
+      "plan": "snapshot  [step enabled-alt1-text+checked+value+item0]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt1-text+checked+value+item0"
+      },
+      "optional": null
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Labels with single ampersands' state Enabled options [Name & address: = text 'bwc-alt'; Save & close = checked False; Rock & roll count: = text '77'; Pick & choose: = item 'Salt & Pepper'] press [OK] at Computer/Administrative Templates/BWC Oracle/Tools & Utilities",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Tools & Utilities"
+        ],
+        "policy": "Labels with single ampersands",
+        "state": "Enabled",
+        "options": [
+          {
+            "label": "Name & address:",
+            "expectKind": "textBox",
+            "text": "bwc-alt",
+            "elementId": "AmpText"
+          },
+          {
+            "label": "Save & close",
+            "expectKind": "checkBox",
+            "checked": false,
+            "elementId": "AmpCheck"
+          },
+          {
+            "label": "Rock & roll count:",
+            "expectKind": "decimalTextBox",
+            "text": "77",
+            "elementId": "AmpNumber"
+          },
+          {
+            "label": "Pick & choose:",
+            "expectKind": "dropdownList",
+            "item": "Salt & Pepper",
+            "elementId": "AmpChoice"
+          }
+        ],
+        "policyId": "Pol_Amp_LabelSingle",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "label": "step enabled-alt2-text+unchecked+value+item1",
+      "plan": "snapshot  [step enabled-alt2-text+unchecked+value+item1]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step enabled-alt2-text+unchecked+value+item1"
+      },
+      "optional": null
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Labels with single ampersands' state Disabled press [OK] at Computer/Administrative Templates/BWC Oracle/Tools & Utilities",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Tools & Utilities"
+        ],
+        "policy": "Labels with single ampersands",
+        "state": "Disabled",
+        "policyId": "Pol_Amp_LabelSingle",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "label": "step disabled",
+      "plan": "snapshot  [step disabled]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step disabled"
+      },
+      "optional": null
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "label": null,
+      "plan": "editPolicy 'Labels with single ampersands' state Not Configured press [OK] at Computer/Administrative Templates/BWC Oracle/Tools & Utilities",
+      "op": {
+        "kind": "editPolicy",
+        "root": "Computer",
+        "path": [
+          "Administrative Templates",
+          "BWC Oracle",
+          "Tools & Utilities"
+        ],
+        "policy": "Labels with single ampersands",
+        "state": "Not Configured",
+        "press": [
+          "OK"
+        ],
+        "policyId": "Pol_Amp_LabelSingle",
+        "policyNamespace": "BWC.Policies.Oracle"
+      },
+      "optional": null
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "label": "step not-configured",
+      "plan": "snapshot  [step not-configured]",
+      "op": {
+        "kind": "snapshot",
+        "label": "step not-configured"
+      },
+      "optional": null
+    }
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "label": "enabled-defaults",
+      "folder": "step-01-enabled-defaults",
+      "files": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null,
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 11
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "label": "enabled-alt1-text+checked+value+item0",
+      "folder": "step-02-enabled-alt1-text-checked-value-item0",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 454,
+          "sha256": "71c8324af4592aaf7bc71af595acdaf1efe5a54a5aae3af38959604f0fe5288a"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 454
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "label": "enabled-alt2-text+unchecked+value+item1",
+      "folder": "step-03-enabled-alt2-text-unchecked-value-item1",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 466,
+          "sha256": "2f203359f101b84da32ab0ce4f3cabc2dd030679fc60c54c6076d710c0e727a8"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 466
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "label": "disabled",
+      "folder": "step-04-disabled",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 490,
+          "sha256": "9110c43a6853d97757b39f417102552077d55d312128242818b8cea22c9b8fce"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 127
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 490
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "label": "not-configured",
+      "folder": "step-05-not-configured",
+      "files": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "bbff97b1f1386f1ac16f8e6f9cbe1f14c21d84b7e9f674638465cc046494d153"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      },
+      "listing": [
+        {
+          "path": "gpt.ini",
+          "size": 50
+        },
+        {
+          "path": "Machine\\comment.cmtx",
+          "size": 539
+        },
+        {
+          "path": "Machine\\Registry.pol",
+          "size": 8
+        }
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "index": 0,
+      "kind": "editPolicy",
+      "ok": true,
+      "data": {
+        "policy": "Labels with single ampersands",
+        "before": {
+          "title": "Labels with single ampersands",
+          "windowTitle": "Labels with single ampersands",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Every label of this policy contains one literal ampersand: a text label, a check box, a number label, a drop-down label, and two drop-down items.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Name & address:",
+              "panelId": "#6e1115e0a876",
+              "controlId": "#c5ae96ead4c8",
+              "rect": [
+                180,
+                744,
+                452,
+                110
+              ],
+              "enabled": false,
+              "text": ""
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Save & close",
+              "panelId": "#cfc7f91e52db",
+              "controlId": "#cfc7f91e52db",
+              "rect": [
+                186,
+                860,
+                166,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            },
+            {
+              "index": 2,
+              "controlIndex": 2,
+              "kind": "#05585f55fed2",
+              "label": "Rock & roll count:",
+              "panelId": "#9169ac0356a9",
+              "controlId": "3933486",
+              "rect": [
+                180,
+                910,
+                448,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            },
+            {
+              "index": 3,
+              "controlIndex": 3,
+              "kind": "#e999b3009cea",
+              "label": "Pick & choose:",
+              "panelId": "#8b265b48f437",
+              "controlId": "#2f62de1bf2fb",
+              "rect": [
+                180,
+                968,
+                432,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Salt & Pepper",
+                "Tom & Jerry"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Labels with single ampersands",
+          "windowTitle": "Labels with single ampersands",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Every label of this policy contains one literal ampersand: a text label, a check box, a number label, a drop-down label, and two drop-down items.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Name & address:",
+              "panelId": "#6e1115e0a876",
+              "controlId": "#c5ae96ead4c8",
+              "rect": [
+                180,
+                744,
+                452,
+                110
+              ],
+              "enabled": true,
+              "text": "#c0f8a602ab54"
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Save & close",
+              "panelId": "#cfc7f91e52db",
+              "controlId": "#cfc7f91e52db",
+              "rect": [
+                186,
+                860,
+                166,
+                44
+              ],
+              "enabled": true,
+              "checkState": 0
+            },
+            {
+              "index": 2,
+              "controlIndex": 2,
+              "kind": "#05585f55fed2",
+              "label": "Rock & roll count:",
+              "panelId": "#9169ac0356a9",
+              "controlId": "3933486",
+              "rect": [
+                180,
+                910,
+                448,
+                58
+              ],
+              "enabled": true,
+              "text": "3"
+            },
+            {
+              "index": 3,
+              "controlIndex": 3,
+              "kind": "#e999b3009cea",
+              "label": "Pick & choose:",
+              "panelId": "#8b265b48f437",
+              "controlId": "#2f62de1bf2fb",
+              "rect": [
+                180,
+                968,
+                432,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Salt & Pepper",
+                "Tom & Jerry"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Labels with single ampersands",
+            "pressed": true,
+            "blockedByMessageBox": true,
+            "messageBoxes": [
+              {
+                "title": "#befe31d7c120",
+                "class": "#32770",
+                "kind": "MessageBox",
+                "texts": [
+                  "#0474db6e43e3"
+                ],
+                "buttons": [
+                  {
+                    "text": "OK",
+                    "id": 2
+                  }
+                ],
+                "answeredWith": "OK",
+                "answeredVia": "BM_CLICK",
+                "answerRequested": null,
+                "answerFallback": false
+              }
+            ],
+            "closed": false,
+            "applyEnabledAfter": true,
+            "files": {
+              "changed": false,
+              "changedFiles": [],
+              "groups": {
+                "machine": false,
+                "user": false,
+                "gptIni": false
+              },
+              "settleTimedOut": false,
+              "writes": {},
+              "gptVersionAfter": null
+            }
+          }
+        ],
+        "blockedByMessageBox": true,
+        "dialogStillOpen": {
+          "title": "Labels with single ampersands",
+          "windowTitle": "Labels with single ampersands",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Every label of this policy contains one literal ampersand: a text label, a check box, a number label, a drop-down label, and two drop-down items.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Name & address:",
+              "panelId": "#6e1115e0a876",
+              "controlId": "#c5ae96ead4c8",
+              "rect": [
+                180,
+                744,
+                452,
+                110
+              ],
+              "enabled": true,
+              "text": "#c0f8a602ab54"
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Save & close",
+              "panelId": "#cfc7f91e52db",
+              "controlId": "#cfc7f91e52db",
+              "rect": [
+                186,
+                860,
+                166,
+                44
+              ],
+              "enabled": true,
+              "checkState": 0
+            },
+            {
+              "index": 2,
+              "controlIndex": 2,
+              "kind": "#05585f55fed2",
+              "label": "Rock & roll count:",
+              "panelId": "#9169ac0356a9",
+              "controlId": "3933486",
+              "rect": [
+                180,
+                910,
+                448,
+                58
+              ],
+              "enabled": true,
+              "text": "3"
+            },
+            {
+              "index": 3,
+              "controlIndex": 3,
+              "kind": "#e999b3009cea",
+              "label": "Pick & choose:",
+              "panelId": "#8b265b48f437",
+              "controlId": "#2f62de1bf2fb",
+              "rect": [
+                180,
+                968,
+                432,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Salt & Pepper",
+                "Tom & Jerry"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "cancelledAtEnd": {
+          "button": "Cancel",
+          "enabledBefore": true,
+          "titleBefore": "Labels with single ampersands",
+          "pressed": true,
+          "messageBoxes": [],
+          "closed": true,
+          "files": {
+            "changed": false,
+            "changedFiles": [],
+            "groups": {
+              "machine": false,
+              "user": false,
+              "gptIni": false
+            },
+            "settleTimedOut": false,
+            "writes": {},
+            "gptVersionAfter": null
+          }
+        },
+        "finalTitle": "Labels with single ampersands"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": null,
+        "gpt.ini": {
+          "size": 11,
+          "sha256": "77c7c10b4c860d5ddf4e057e713383e61e9f21bcf0ec4cfbbc16193f2e28f340"
+        },
+        "Machine.comment.cmtx": null,
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": null
+    },
+    {
+      "index": 2,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini",
+        "Machine\\comment.cmtx"
+      ],
+      "gptVersionBefore": null,
+      "gptVersionAfter": 1,
+      "data": {
+        "policy": "Labels with single ampersands",
+        "before": {
+          "title": "Labels with single ampersands",
+          "windowTitle": "Labels with single ampersands",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Every label of this policy contains one literal ampersand: a text label, a check box, a number label, a drop-down label, and two drop-down items.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Name & address:",
+              "panelId": "#6e1115e0a876",
+              "controlId": "#c5ae96ead4c8",
+              "rect": [
+                232,
+                796,
+                452,
+                110
+              ],
+              "enabled": false,
+              "text": ""
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Save & close",
+              "panelId": "#cfc7f91e52db",
+              "controlId": "#cfc7f91e52db",
+              "rect": [
+                238,
+                912,
+                166,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            },
+            {
+              "index": 2,
+              "controlIndex": 2,
+              "kind": "#05585f55fed2",
+              "label": "Rock & roll count:",
+              "panelId": "#9169ac0356a9",
+              "controlId": "110888120",
+              "rect": [
+                232,
+                962,
+                448,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            },
+            {
+              "index": 3,
+              "controlIndex": 3,
+              "kind": "#e999b3009cea",
+              "label": "Pick & choose:",
+              "panelId": "#8b265b48f437",
+              "controlId": "#2f62de1bf2fb",
+              "rect": [
+                232,
+                1020,
+                432,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Salt & Pepper",
+                "Tom & Jerry"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Not Configured",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "bwc-alt",
+            "before": "#c0f8a602ab54",
+            "immediate": "bwc-alt",
+            "observed": "bwc-alt",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Name & address:",
+            "labelMatch": "exact",
+            "kind": "#68e85187d390",
+            "controlId": "#c5ae96ead4c8"
+          },
+          {
+            "requested": true,
+            "beforeCheckState": 0,
+            "observedCheckState": 1,
+            "set": "#a11a75e0feee",
+            "label": "Save & close",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#cfc7f91e52db"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "77",
+            "before": "3",
+            "immediate": "77",
+            "observed": "77",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Rock & roll count:",
+            "labelMatch": "exact",
+            "kind": "#05585f55fed2",
+            "controlId": "110888120"
+          },
+          {
+            "requestedItem": "Tom & Jerry",
+            "requestedIndex": 1,
+            "beforeIndex": -1,
+            "observedIndex": 1,
+            "observedText": "Tom & Jerry",
+            "items": [
+              "Salt & Pepper",
+              "Tom & Jerry"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Pick & choose:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#2f62de1bf2fb"
+          }
+        ],
+        "afterSet": {
+          "title": "Labels with single ampersands",
+          "windowTitle": "Labels with single ampersands",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Every label of this policy contains one literal ampersand: a text label, a check box, a number label, a drop-down label, and two drop-down items.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Name & address:",
+              "panelId": "#6e1115e0a876",
+              "controlId": "#c5ae96ead4c8",
+              "rect": [
+                232,
+                796,
+                452,
+                110
+              ],
+              "enabled": true,
+              "text": "bwc-alt"
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Save & close",
+              "panelId": "#cfc7f91e52db",
+              "controlId": "#cfc7f91e52db",
+              "rect": [
+                238,
+                912,
+                166,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            },
+            {
+              "index": 2,
+              "controlIndex": 2,
+              "kind": "#05585f55fed2",
+              "label": "Rock & roll count:",
+              "panelId": "#9169ac0356a9",
+              "controlId": "110888120",
+              "rect": [
+                232,
+                962,
+                448,
+                58
+              ],
+              "enabled": true,
+              "text": "77"
+            },
+            {
+              "index": 3,
+              "controlIndex": 3,
+              "kind": "#e999b3009cea",
+              "label": "Pick & choose:",
+              "panelId": "#8b265b48f437",
+              "controlId": "#2f62de1bf2fb",
+              "rect": [
+                232,
+                1020,
+                432,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Salt & Pepper",
+                "Tom & Jerry"
+              ],
+              "selectedIndex": 1,
+              "selectedText": "Tom & Jerry"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Labels with single ampersands",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini",
+                "Machine\\comment.cmtx"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1,
+                "Machine\\comment.cmtx": 1
+              },
+              "gptVersionBefore": null,
+              "gptVersionAfter": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Labels with single ampersands"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 454,
+          "sha256": "71c8324af4592aaf7bc71af595acdaf1efe5a54a5aae3af38959604f0fe5288a"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "43186df0cecee1e90f7362bc10b0fa6e95a827b345805dacbb7683cdc649ac23"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 1,
+        "machine": 1,
+        "user": 0
+      }
+    },
+    {
+      "index": 4,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 1,
+      "gptVersionAfter": 2,
+      "data": {
+        "policy": "Labels with single ampersands",
+        "before": {
+          "title": "Labels with single ampersands",
+          "windowTitle": "Labels with single ampersands",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Every label of this policy contains one literal ampersand: a text label, a check box, a number label, a drop-down label, and two drop-down items.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Name & address:",
+              "panelId": "#6e1115e0a876",
+              "controlId": "#c5ae96ead4c8",
+              "rect": [
+                284,
+                848,
+                452,
+                110
+              ],
+              "enabled": true,
+              "text": "bwc-alt"
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Save & close",
+              "panelId": "#cfc7f91e52db",
+              "controlId": "#cfc7f91e52db",
+              "rect": [
+                290,
+                964,
+                166,
+                44
+              ],
+              "enabled": true,
+              "checkState": 1
+            },
+            {
+              "index": 2,
+              "controlIndex": 2,
+              "kind": "#05585f55fed2",
+              "label": "Rock & roll count:",
+              "panelId": "#9169ac0356a9",
+              "controlId": "417006260",
+              "rect": [
+                284,
+                1014,
+                448,
+                58
+              ],
+              "enabled": true,
+              "text": "77"
+            },
+            {
+              "index": 3,
+              "controlIndex": 3,
+              "kind": "#e999b3009cea",
+              "label": "Pick & choose:",
+              "panelId": "#8b265b48f437",
+              "controlId": "#2f62de1bf2fb",
+              "rect": [
+                284,
+                1072,
+                432,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Salt & Pepper",
+                "Tom & Jerry"
+              ],
+              "selectedIndex": 1,
+              "selectedText": "Tom & Jerry"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Enabled",
+            "before": "Enabled",
+            "observed": "Enabled"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "bwc-alt",
+            "before": "bwc-alt",
+            "immediate": "bwc-alt",
+            "observed": "bwc-alt",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Name & address:",
+            "labelMatch": "exact",
+            "kind": "#68e85187d390",
+            "controlId": "#c5ae96ead4c8"
+          },
+          {
+            "requested": false,
+            "beforeCheckState": 1,
+            "observedCheckState": 0,
+            "set": "#a11a75e0feee",
+            "label": "Save & close",
+            "labelMatch": "exact",
+            "kind": "#dafa34cfe6c0",
+            "controlId": "#cfc7f91e52db"
+          },
+          {
+            "typed": false,
+            "multiline": false,
+            "requested": "77",
+            "before": "77",
+            "immediate": "77",
+            "observed": "77",
+            "clamped": false,
+            "set": "#a11a75e0feee",
+            "label": "Rock & roll count:",
+            "labelMatch": "exact",
+            "kind": "#05585f55fed2",
+            "controlId": "417006260"
+          },
+          {
+            "requestedItem": "Salt & Pepper",
+            "requestedIndex": 0,
+            "beforeIndex": 1,
+            "observedIndex": 0,
+            "observedText": "Salt & Pepper",
+            "items": [
+              "Salt & Pepper",
+              "Tom & Jerry"
+            ],
+            "set": "#a11a75e0feee",
+            "label": "Pick & choose:",
+            "labelMatch": "exact",
+            "kind": "#e999b3009cea",
+            "controlId": "#2f62de1bf2fb"
+          }
+        ],
+        "afterSet": {
+          "title": "Labels with single ampersands",
+          "windowTitle": "Labels with single ampersands",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Every label of this policy contains one literal ampersand: a text label, a check box, a number label, a drop-down label, and two drop-down items.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Name & address:",
+              "panelId": "#6e1115e0a876",
+              "controlId": "#c5ae96ead4c8",
+              "rect": [
+                284,
+                848,
+                452,
+                110
+              ],
+              "enabled": true,
+              "text": "bwc-alt"
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Save & close",
+              "panelId": "#cfc7f91e52db",
+              "controlId": "#cfc7f91e52db",
+              "rect": [
+                290,
+                964,
+                166,
+                44
+              ],
+              "enabled": true,
+              "checkState": 0
+            },
+            {
+              "index": 2,
+              "controlIndex": 2,
+              "kind": "#05585f55fed2",
+              "label": "Rock & roll count:",
+              "panelId": "#9169ac0356a9",
+              "controlId": "417006260",
+              "rect": [
+                284,
+                1014,
+                448,
+                58
+              ],
+              "enabled": true,
+              "text": "77"
+            },
+            {
+              "index": 3,
+              "controlIndex": 3,
+              "kind": "#e999b3009cea",
+              "label": "Pick & choose:",
+              "panelId": "#8b265b48f437",
+              "controlId": "#2f62de1bf2fb",
+              "rect": [
+                284,
+                1072,
+                432,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Salt & Pepper",
+                "Tom & Jerry"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Salt & Pepper"
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Labels with single ampersands",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 1,
+                "machine": 1,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Labels with single ampersands"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 466,
+          "sha256": "2f203359f101b84da32ab0ce4f3cabc2dd030679fc60c54c6076d710c0e727a8"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "b8714f4af39a16c69eca9ad868457528818eecc54b7adb48a976d588bd39981d"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 2,
+        "machine": 2,
+        "user": 0
+      }
+    },
+    {
+      "index": 6,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 2,
+      "gptVersionAfter": 3,
+      "data": {
+        "policy": "Labels with single ampersands",
+        "before": {
+          "title": "Labels with single ampersands",
+          "windowTitle": "Labels with single ampersands",
+          "state": "Enabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Every label of this policy contains one literal ampersand: a text label, a check box, a number label, a drop-down label, and two drop-down items.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Name & address:",
+              "panelId": "#6e1115e0a876",
+              "controlId": "#c5ae96ead4c8",
+              "rect": [
+                336,
+                900,
+                452,
+                110
+              ],
+              "enabled": true,
+              "text": "bwc-alt"
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Save & close",
+              "panelId": "#cfc7f91e52db",
+              "controlId": "#cfc7f91e52db",
+              "rect": [
+                342,
+                1016,
+                166,
+                44
+              ],
+              "enabled": true,
+              "checkState": 0
+            },
+            {
+              "index": 2,
+              "controlIndex": 2,
+              "kind": "#05585f55fed2",
+              "label": "Rock & roll count:",
+              "panelId": "#9169ac0356a9",
+              "controlId": "157745266",
+              "rect": [
+                336,
+                1066,
+                448,
+                58
+              ],
+              "enabled": true,
+              "text": "77"
+            },
+            {
+              "index": 3,
+              "controlIndex": 3,
+              "kind": "#e999b3009cea",
+              "label": "Pick & choose:",
+              "panelId": "#8b265b48f437",
+              "controlId": "#2f62de1bf2fb",
+              "rect": [
+                336,
+                1124,
+                432,
+                58
+              ],
+              "enabled": true,
+              "items": [
+                "Salt & Pepper",
+                "Tom & Jerry"
+              ],
+              "selectedIndex": 0,
+              "selectedText": "Salt & Pepper"
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Disabled",
+            "before": "Enabled",
+            "observed": "Disabled"
+          }
+        ],
+        "afterSet": {
+          "title": "Labels with single ampersands",
+          "windowTitle": "Labels with single ampersands",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Every label of this policy contains one literal ampersand: a text label, a check box, a number label, a drop-down label, and two drop-down items.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Name & address:",
+              "panelId": "#6e1115e0a876",
+              "controlId": "#c5ae96ead4c8",
+              "rect": [
+                336,
+                900,
+                452,
+                110
+              ],
+              "enabled": false,
+              "text": ""
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Save & close",
+              "panelId": "#cfc7f91e52db",
+              "controlId": "#cfc7f91e52db",
+              "rect": [
+                342,
+                1016,
+                166,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            },
+            {
+              "index": 2,
+              "controlIndex": 2,
+              "kind": "#05585f55fed2",
+              "label": "Rock & roll count:",
+              "panelId": "#9169ac0356a9",
+              "controlId": "157745266",
+              "rect": [
+                336,
+                1066,
+                448,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            },
+            {
+              "index": 3,
+              "controlIndex": 3,
+              "kind": "#e999b3009cea",
+              "label": "Pick & choose:",
+              "panelId": "#8b265b48f437",
+              "controlId": "#2f62de1bf2fb",
+              "rect": [
+                336,
+                1124,
+                432,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Salt & Pepper",
+                "Tom & Jerry"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Labels with single ampersands",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 2,
+                "machine": 2,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Labels with single ampersands"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 490,
+          "sha256": "9110c43a6853d97757b39f417102552077d55d312128242818b8cea22c9b8fce"
+        },
+        "gpt.ini": {
+          "size": 127,
+          "sha256": "e67b58025359481e917299e56959d3b2eeaad7542aa0dbfe357f3c40fcff7637"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 3,
+        "machine": 3,
+        "user": 0
+      }
+    },
+    {
+      "index": 8,
+      "kind": "editPolicy",
+      "ok": true,
+      "changedFiles": [
+        "Machine\\Registry.pol",
+        "gpt.ini"
+      ],
+      "gptVersionBefore": 3,
+      "gptVersionAfter": 4,
+      "data": {
+        "policy": "Labels with single ampersands",
+        "before": {
+          "title": "Labels with single ampersands",
+          "windowTitle": "Labels with single ampersands",
+          "state": "Disabled",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Every label of this policy contains one literal ampersand: a text label, a check box, a number label, a drop-down label, and two drop-down items.",
+          "buttons": {
+            "Apply": {
+              "enabled": false
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Name & address:",
+              "panelId": "#6e1115e0a876",
+              "controlId": "#c5ae96ead4c8",
+              "rect": [
+                388,
+                952,
+                452,
+                110
+              ],
+              "enabled": false,
+              "text": ""
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Save & close",
+              "panelId": "#cfc7f91e52db",
+              "controlId": "#cfc7f91e52db",
+              "rect": [
+                394,
+                1068,
+                166,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            },
+            {
+              "index": 2,
+              "controlIndex": 2,
+              "kind": "#05585f55fed2",
+              "label": "Rock & roll count:",
+              "panelId": "#9169ac0356a9",
+              "controlId": "281150056",
+              "rect": [
+                388,
+                1118,
+                448,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            },
+            {
+              "index": 3,
+              "controlIndex": 3,
+              "kind": "#e999b3009cea",
+              "label": "Pick & choose:",
+              "panelId": "#8b265b48f437",
+              "controlId": "#2f62de1bf2fb",
+              "rect": [
+                388,
+                1176,
+                432,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Salt & Pepper",
+                "Tom & Jerry"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "sets": [
+          {
+            "set": "#4ba69735ca53",
+            "requested": "Not Configured",
+            "before": "Disabled",
+            "observed": "Not Configured"
+          }
+        ],
+        "afterSet": {
+          "title": "Labels with single ampersands",
+          "windowTitle": "Labels with single ampersands",
+          "state": "Not Configured",
+          "comment": "",
+          "supportedOn": "BWC oracle fixture: any system",
+          "help": "Every label of this policy contains one literal ampersand: a text label, a check box, a number label, a drop-down label, and two drop-down items.",
+          "buttons": {
+            "Apply": {
+              "enabled": true
+            },
+            "OK": {
+              "enabled": true
+            },
+            "Cancel": {
+              "enabled": true
+            },
+            "Previous": {
+              "enabled": true
+            },
+            "Next": {
+              "enabled": false
+            }
+          },
+          "options": [
+            {
+              "index": 0,
+              "controlIndex": 0,
+              "kind": "#68e85187d390",
+              "label": "Name & address:",
+              "panelId": "#6e1115e0a876",
+              "controlId": "#c5ae96ead4c8",
+              "rect": [
+                388,
+                952,
+                452,
+                110
+              ],
+              "enabled": false,
+              "text": ""
+            },
+            {
+              "index": 1,
+              "controlIndex": 1,
+              "kind": "#dafa34cfe6c0",
+              "label": "Save & close",
+              "panelId": "#cfc7f91e52db",
+              "controlId": "#cfc7f91e52db",
+              "rect": [
+                394,
+                1068,
+                166,
+                44
+              ],
+              "enabled": false,
+              "checkState": 0
+            },
+            {
+              "index": 2,
+              "controlIndex": 2,
+              "kind": "#05585f55fed2",
+              "label": "Rock & roll count:",
+              "panelId": "#9169ac0356a9",
+              "controlId": "281150056",
+              "rect": [
+                388,
+                1118,
+                448,
+                58
+              ],
+              "enabled": false,
+              "text": "0"
+            },
+            {
+              "index": 3,
+              "controlIndex": 3,
+              "kind": "#e999b3009cea",
+              "label": "Pick & choose:",
+              "panelId": "#8b265b48f437",
+              "controlId": "#2f62de1bf2fb",
+              "rect": [
+                388,
+                1176,
+                432,
+                58
+              ],
+              "enabled": false,
+              "items": [
+                "Salt & Pepper",
+                "Tom & Jerry"
+              ],
+              "selectedIndex": -1,
+              "selectedText": null
+            }
+          ]
+        },
+        "presses": [
+          {
+            "button": "OK",
+            "enabledBefore": true,
+            "titleBefore": "Labels with single ampersands",
+            "pressed": true,
+            "messageBoxes": [],
+            "closed": true,
+            "files": {
+              "changed": true,
+              "changedFiles": [
+                "Machine\\Registry.pol",
+                "gpt.ini"
+              ],
+              "groups": {
+                "machine": true,
+                "user": false,
+                "gptIni": true
+              },
+              "settleTimedOut": false,
+              "writes": {
+                "Machine\\Registry.pol": 1,
+                "gpt.ini": 1
+              },
+              "gptVersionBefore": {
+                "raw": 3,
+                "machine": 3,
+                "user": 0
+              },
+              "gptVersionAfter": {
+                "raw": 4,
+                "machine": 4,
+                "user": 0
+              }
+            }
+          }
+        ],
+        "finalTitle": "Labels with single ampersands"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "snapshot",
+      "ok": true,
+      "state": {
+        "Machine.Registry.pol": {
+          "size": 8,
+          "sha256": "5bb1f21f806938a043563024b13b33d74a2b95b767c5f81bde8456e9d0413a89"
+        },
+        "gpt.ini": {
+          "size": 50,
+          "sha256": "bbff97b1f1386f1ac16f8e6f9cbe1f14c21d84b7e9f674638465cc046494d153"
+        },
+        "Machine.comment.cmtx": {
+          "size": 539,
+          "sha256": "f07320e49fce49468c5d7122fee8545fc70704c18b2646e59f23680e92832773"
+        },
+        "User.Registry.pol": null,
+        "User.comment.cmtx": null
+      },
+      "gptVersion": {
+        "raw": 4,
+        "machine": 4,
+        "user": 0
+      }
+    }
+  ]
+}

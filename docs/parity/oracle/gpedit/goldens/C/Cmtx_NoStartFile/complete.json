@@ -1,0 +1,19 @@
+{
+  "case": "C/Cmtx_NoStartFile",
+  "planHash": "dae8dd33f98f788aa63c342334d6093393507fb88b9f4757aac19cd36dada67c",
+  "files": [
+    "Machine.Registry.pol",
+    "Machine.comment.cmtx",
+    "case.json",
+    "gpt.ini",
+    "step-01-first-save/Machine.Registry.pol",
+    "step-01-first-save/Machine.comment.cmtx",
+    "step-01-first-save/gpt.ini",
+    "step-02-comment-on-other/Machine.Registry.pol",
+    "step-02-comment-on-other/Machine.comment.cmtx",
+    "step-02-comment-on-other/gpt.ini",
+    "step-03-second-save/Machine.Registry.pol",
+    "step-03-second-save/Machine.comment.cmtx",
+    "step-03-second-save/gpt.ini"
+  ]
+}

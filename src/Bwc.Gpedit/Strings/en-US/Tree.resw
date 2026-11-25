@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Oracle gpedit.dll.mui:9 ("%s Policy") with gpedit.dll.mui:38 ("Local Computer"): the root of the console tree. -->
+  <data name="GpeditNodeRoot" xml:space="preserve">
+    <value>Local Computer Policy</value>
+  </data>
+  <!-- Oracle gpedit.dll.mui:29 -->
+  <data name="GpeditNodeComputerConfiguration" xml:space="preserve">
+    <value>Computer Configuration</value>
+  </data>
+  <!-- Oracle gpedit.dll.mui:30 -->
+  <data name="GpeditNodeUserConfiguration" xml:space="preserve">
+    <value>User Configuration</value>
+  </data>
+  <!-- Oracle gpedit.dll.mui:34 -->
+  <data name="GpeditNodeSoftwareSettings" xml:space="preserve">
+    <value>Software Settings</value>
+  </data>
+  <!-- Oracle gpedit.dll.mui:33 -->
+  <data name="GpeditNodeWindowsSettings" xml:space="preserve">
+    <value>Windows Settings</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:19 -->
+  <data name="GpeditNodeAdministrativeTemplates" xml:space="preserve">
+    <value>Administrative Templates</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:3118 -->
+  <data name="GpeditNodeAllSettings" xml:space="preserve">
+    <value>All Settings</value>
+  </data>
+  <!-- Classic probe, step navigate (Windows Settings, computer side): the placeholder children. -->
+  <data name="GpeditPlaceholderNameResolutionPolicy" xml:space="preserve">
+    <value>Name Resolution Policy</value>
+  </data>
+  <data name="GpeditPlaceholderScriptsStartup" xml:space="preserve">
+    <value>Scripts (Startup/Shutdown)</value>
+  </data>
+  <data name="GpeditPlaceholderScriptsLogon" xml:space="preserve">
+    <value>Scripts (Logon/Logoff)</value>
+  </data>
+  <data name="GpeditPlaceholderDeployedPrinters" xml:space="preserve">
+    <value>Deployed Printers</value>
+  </data>
+  <data name="GpeditPlaceholderSecuritySettings" xml:space="preserve">
+    <value>Security Settings</value>
+  </data>
+  <data name="GpeditPlaceholderPolicyBasedQos" xml:space="preserve">
+    <value>Policy-based QoS</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:4 -->
+  <data name="GpeditColumnName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:6 -->
+  <data name="GpeditColumnSetting" xml:space="preserve">
+    <value>Setting</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:5 -->
+  <data name="GpeditColumnState" xml:space="preserve">
+    <value>State</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:2000 -->
+  <data name="GpeditColumnComment" xml:space="preserve">
+    <value>Comment</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:8 -->
+  <data name="GpeditStateEnabled" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:9 -->
+  <data name="GpeditStateDisabled" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:10 -->
+  <data name="GpeditStateNotConfigured" xml:space="preserve">
+    <value>Not configured</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:2001 -->
+  <data name="GpeditCommentYes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:2002 -->
+  <data name="GpeditCommentNo" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:3126 (the format %1!d! setting(s) as {0}). -->
+  <data name="GpeditStatusSettingCount" xml:space="preserve">
+    <value>{0} setting(s)</value>
+  </data>
+  <!-- The fourth column of the All Settings list: where the setting is found. -->
+  <data name="GpeditColumnPath" xml:space="preserve">
+    <value>Path</value>
+  </data>
+  <!-- The status text of a list while Filter On is on: shown and total. -->
+  <data name="GpeditStatusFilteredCount" xml:space="preserve">
+    <value>{0} of {1} setting(s)</value>
+  </data>
+  <!-- The flag at the right end of the status bar while Filter On is on. -->
+  <data name="GpeditStatusFilterFlag" xml:space="preserve">
+    <value>Filter On</value>
+  </data>
+  <!-- The UIA name of a policy row: the display name followed by the word setting ({0} is the display name) (classic probe, step result-list). -->
+  <data name="GpeditPolicyRowName" xml:space="preserve">
+    <value>{0} setting</value>
+  </data>
+  <!-- Oracle gpedit.dll.mui:251 -->
+  <data name="GpeditDescriptionComputerConfiguration" xml:space="preserve">
+    <value>Administrators use the Computer Configuration node in Group Policy to set policies that are applied to computers, regardless of who logs onto them.</value>
+  </data>
+  <!-- Oracle gpedit.dll.mui:252 -->
+  <data name="GpeditDescriptionUserConfiguration" xml:space="preserve">
+    <value>Administrators use the User Configuration node in Group Policy to set policies that are applied to users, regardless of which computer they log on to.</value>
+  </data>
+  <!-- Oracle gpedit.dll.mui:255 -->
+  <data name="GpeditDescriptionSoftwareSettingsComputer" xml:space="preserve">
+    <value>Software Settings are applied to all users who log on to the computer. This node has a Software Installation subnode.</value>
+  </data>
+  <!-- Oracle gpedit.dll.mui:253 -->
+  <data name="GpeditDescriptionSoftwareSettingsUser" xml:space="preserve">
+    <value>Software Settings are applied to users regardless of which computer they log on to. This node has a Software Installation subnode.</value>
+  </data>
+  <!-- Oracle gpedit.dll.mui:256 -->
+  <data name="GpeditDescriptionWindowsSettingsComputer" xml:space="preserve">
+    <value>Windows Settings are applied to all users who log on to the computer. This node has two subnodes: Security Settings and Scripts.</value>
+  </data>
+  <!-- Oracle gpedit.dll.mui:254 -->
+  <data name="GpeditDescriptionWindowsSettingsUser" xml:space="preserve">
+    <value>Windows Settings are applied to users regardless of which computer they log on to. This node has five subnodes: Folder Redirection, Security Settings, Scripts, Remote Installation Services, and Internet Explorer Maintenance</value>
+  </data>
+  <!-- Oracle admtmpl.dll.mui:236 -->
+  <data name="GpeditDescriptionAdministrativeTemplates" xml:space="preserve">
+    <value>The Group Policy Administrative Templates node contains all registry-based policy information. </value>
+  </data>
+  <!-- BWC authored: the page of a node whose snap-in extension is not part of this release (declared difference). -->
+  <data name="GpeditPlaceholderTitle" xml:space="preserve">
+    <value>Not available yet</value>
+  </data>
+  <!-- BWC authored. {0} is the node name. -->
+  <data name="GpeditPlaceholderText" xml:space="preserve">
+    <value>{0} is not available in this version of Better Windows Config yet. Use Administrative Templates to view and change policy settings.</value>
+  </data>
+  <!-- BWC authored: the Name of the page, read by screen readers. -->
+  <data name="GpeditPlaceholderPageName" xml:space="preserve">
+    <value>Not available yet</value>
+  </data>
+  <!-- BWC authored: the notice of a window that cannot save because the process is not elevated. -->
+  <data name="GpeditReadOnlyNotElevated" xml:space="preserve">
+    <value>This window is read-only. Start the editor as an administrator to change policy settings.</value>
+  </data>
+  <!-- BWC authored: the notice of a window that cannot save because this account cannot write the local policy folder. -->
+  <data name="GpeditReadOnlyNoWriteAccess" xml:space="preserve">
+    <value>This window is read-only. This account cannot write to the local policy folder.</value>
+  </data>
+  <!-- BWC authored: the notice of a window that cannot save because this edition of Windows has no Local Group Policy. -->
+  <data name="GpeditReadOnlyHomeEdition" xml:space="preserve">
+    <value>This window is read-only. This edition of Windows does not apply Local Group Policy.</value>
+  </data>
+</root>

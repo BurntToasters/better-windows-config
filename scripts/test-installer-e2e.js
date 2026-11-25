@@ -7,6 +7,12 @@
  * files are never changed. Then runs the Installer tests (tests/Bwc.E2E/Installer) with the paths in the environment.
  * Those tests install A silently, press Download and Install in the Hub, and check the update.
  *
+ * A third setup, the "old layout" (R1, docs/failure-modes/installer-e2e.md 107 to 124), stands in for a 0.1.x install: the
+ * current tree published as 0.1.99 into publish/<rid>-e2e-old, with every BwcGpedit file left out of the NSIS file list and
+ * a copy of installer/bwc.nsi (in artifacts/installer/work, never written back) without the Gpedit shortcut and its
+ * AppUserModelID. It exists only in this script and only in the E2E flavor; build-installer.js and the release build never
+ * see it. The test updates it to B and requires the three-tool layout. It is not built by --prepare.
+ *
  * Usage: node scripts/test-installer-e2e.js --rid win-arm64|win-x64 [--prepare]
  *
  * --prepare builds A and B the same way and stops: it writes artifacts/e2e/installer-inputs.json (paths, versions,
@@ -30,6 +36,7 @@ import {
   listPublishFiles,
   makensisArgs,
   readNsisVersion,
+  REQUIRED_PUBLISH_FILES as BUILD_REQUIRED_PUBLISH_FILES,
   SIGNING_DEFINE_NAMES,
   validatePayload,
   buildPayloadNsh,
@@ -53,11 +60,23 @@ const RID_ARCH = new Map([
 const PUBLISH_PROJECTS = [
   "src/Bwc.Hub/Bwc.Hub.csproj",
   "src/Bwc.Regedit.App/Bwc.Regedit.App.csproj",
+  "src/Bwc.Gpedit.App/Bwc.Gpedit.App.csproj",
   "src/Bwc.Update/Bwc.Update.csproj",
 ];
 const UPDATE_PROJECT = "src/Bwc.Update/Bwc.Update.csproj";
-const REQUIRED_PUBLISH_FILES = ["BetterWindowsConfig.dll", "BetterWindowsConfig.exe", "BwcUpdate.exe"];
+const REQUIRED_PUBLISH_FILES = ["BetterWindowsConfig.dll", ...BUILD_REQUIRED_PUBLISH_FILES];
 const NSIS_SCRIPT = path.join(REPO_ROOT, "installer", "bwc.nsi");
+// The old layout (R1): a fixed version below every 0.2.x, and the files it leaves out of the payload list.
+const OLD_LAYOUT_VERSION = "0.1.99";
+const OLD_LAYOUT_DROPPED_FILE = /^BwcGpedit\./i;
+const OLD_LAYOUT_KEPT_EXES = ["BetterWindowsConfig.exe", "BwcRegedit.exe", "BwcUpdate.exe"];
+// Checks the result must hold and pass, so a run where the old-layout case was skipped or filtered out cannot pass (121).
+const REQUIRED_PROOF_CHECKS = [
+  "old.a.noGpeditExe",
+  "old.after.shortcuts",
+  "old.after.gpedit.starts",
+  "old.after.userData",
+];
 const LICENSE_FILE = path.join(REPO_ROOT, "LICENSE");
 const ICON_FILE = path.join(REPO_ROOT, "resources", "bwc.ico");
 const INSTALLER_DIR = path.join(REPO_ROOT, "artifacts", "installer");
@@ -72,14 +91,15 @@ const EXIT_NSIS_MISSING = 3;
 
 const usage = `Usage: node ${SCRIPT} --rid win-arm64|win-x64 [--prepare]
 
-Builds unsigned E2E installers A (package.json version) and B (next patch), then runs the Installer E2E tests:
-an in-app update from A to B through the Hub, a case with BwcRegedit open, an uninstall, the refusal to install
+Builds unsigned E2E installers A (package.json version) and B (next patch), plus an old-layout installer (0.1.99, no
+Local Group Policy Editor, two shortcuts), then runs the Installer E2E tests: an update from the old layout to B
+that must end with three tools, an in-app update from A to B through the Hub, a case with BwcRegedit and BwcGpedit open, an uninstall, the refusal to install
 over a newer version, and the refusal of the E2E /MACHINE switch without an elevated token. The E2E installer is the
 per-user sandbox, so everything here runs unelevated; the per-machine proof is the elevated runner (docs/installer.md).
 
 Options:
   --rid win-x64|win-arm64   Required. The app runtime identifier.
-  --prepare                 Build A and B, write artifacts/e2e/installer-inputs.json, run no test. Run this
+  --prepare                 Build A and B (not the old layout), write artifacts/e2e/installer-inputs.json, run no test. Run this
                             (unelevated) right before the elevated runner: the Elevated installer tests read the file.
   --help                    Show this help.
 
@@ -121,6 +141,18 @@ export function nextPatchVersion(version) {
   }
   const [major, minor, patch] = version.split(".").map(Number);
   return `${major}.${minor}.${patch + 1}`;
+}
+
+/** Compares two plain X.Y.Z versions: negative, zero, or positive like a - b. */
+function compareVersions(a, b) {
+  const left = a.split(".").map(Number);
+  const right = b.split(".").map(Number);
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] !== right[index]) {
+      return left[index] - right[index];
+    }
+  }
+  return 0;
 }
 
 function stamp(date) {
@@ -241,7 +273,7 @@ function publishB(rid, version, outDir) {
   }
   const dllVersion = productVersionOf(path.join(outDir, "BetterWindowsConfig.dll"));
   if (dllVersion !== version) {
-    throw new Error(`the B payload reports version ${dllVersion}, expected ${version}`);
+    throw new Error(`the ${path.basename(outDir)} payload reports version ${dllVersion}, expected ${version}`);
   }
 }
 
@@ -256,9 +288,64 @@ function productVersionOf(filePath) {
   return text.split("+")[0].trim();
 }
 
-/** Builds B with the same NSIS source and defines as build-installer.js, from the B payload folder, unsigned. */
-function buildInstallerB(rid, version, publishDir, makensis) {
-  const base = `BetterWindowsConfig-${version}-${rid}-e2e`;
+/**
+ * The NSIS source of the old layout: a copy of installer/bwc.nsi without the statements that write the Local Group Policy
+ * Editor shortcut and its AppUserModelID, and with BWC_ROOT pointing at the real installer folder (the copy lives elsewhere).
+ * Each of the three lines must occur exactly once, or this throws, so a changed bwc.nsi fails the build instead of producing
+ * an old setup that quietly keeps three shortcuts (installer-e2e.md 108, 109). The source file is never written.
+ */
+export function oldLayoutNsisSource(text, installerDir) {
+  const shortcut = /^\s*CreateShortCut\b.*\$\{BWC_GPEDIT_SHORTCUT\}/;
+  const aumid = /^\s*!insertmacro\s+BWC_SET_AUMID_BODY\b.*\$\{BWC_GPEDIT_AUMID\}/;
+  const root = /^\s*!define\s+BWC_ROOT\s+"\$\{__FILEDIR__\}"\s*$/;
+  const lines = text.split("\n");
+  for (const [name, pattern] of [
+    ["the Gpedit shortcut", shortcut],
+    ["the Gpedit AppUserModelID", aumid],
+    ["the BWC_ROOT define", root],
+  ]) {
+    const hits = lines.filter((line) => pattern.test(line)).length;
+    if (hits !== 1) {
+      throw new Error(`the Gpedit statements were not found in bwc.nsi: ${name} matched ${hits} line(s), expected 1`);
+    }
+  }
+  const kept = [];
+  for (const line of lines) {
+    if (shortcut.test(line) || aumid.test(line)) {
+      continue;
+    }
+    kept.push(root.test(line) ? `!define BWC_ROOT "${installerDir}"${line.endsWith("\r") ? "\r" : ""}` : line);
+  }
+  return kept.join("\n");
+}
+
+/**
+ * The payload list of the old layout: every file but the BwcGpedit files. Throws when nothing was dropped, when a Gpedit
+ * exe is left, or when the filter took one of the other apps (installer-e2e.md 107).
+ */
+export function oldLayoutFiles(files) {
+  const kept = files.filter((file) => !OLD_LAYOUT_DROPPED_FILE.test(file.rel));
+  if (kept.length === files.length) {
+    throw new Error("the old layout drops no file: the publish folder has no BwcGpedit.* file");
+  }
+  if (kept.some((file) => file.rel.toLowerCase() === "bwcgpedit.exe")) {
+    throw new Error("the old layout still lists BwcGpedit.exe");
+  }
+  for (const name of OLD_LAYOUT_KEPT_EXES) {
+    if (!kept.some((file) => file.rel === name)) {
+      throw new Error(`the old layout lost ${name}`);
+    }
+  }
+  return kept;
+}
+
+/**
+ * Builds an E2E setup with the same NSIS source and defines as build-installer.js, from a payload folder, unsigned. The old
+ * layout (oldLayout true) drops the BwcGpedit files and compiles the patched copy of bwc.nsi; B takes neither path.
+ */
+function buildInstallerB(rid, version, publishDir, makensis, { oldLayout = false } = {}) {
+  const label = oldLayout ? "the old layout" : "B";
+  const base = `BetterWindowsConfig-${version}-${rid}-e2e${oldLayout ? "-old-layout" : ""}`;
   const setup = path.join(INSTALLER_DIR, `${base}-setup.exe`);
   const work = path.join(INSTALLER_DIR, "work", base);
   rmSync(setup, { force: true });
@@ -266,7 +353,8 @@ function buildInstallerB(rid, version, publishDir, makensis) {
 
   const noticesPath = path.join(work, "THIRD-PARTY-NOTICES.txt");
   generateNugetNotices({ rid, outPath: noticesPath });
-  const files = listPublishFiles(publishDir);
+  const allFiles = listPublishFiles(publishDir);
+  const files = oldLayout ? oldLayoutFiles(allFiles) : allFiles;
   validatePayload(files);
   const payloadText = buildPayloadNsh(files, { rid, flavor: "e2e" });
   const payloadPath = path.join(work, "payload.nsh");
@@ -289,8 +377,14 @@ function buildInstallerB(rid, version, publishDir, makensis) {
     ["BWC_E2E", true],
   ];
 
+  let scriptPath = NSIS_SCRIPT;
+  if (oldLayout) {
+    scriptPath = path.join(work, "bwc-old-layout.nsi");
+    writeFileSync(scriptPath, oldLayoutNsisSource(readFileSync(NSIS_SCRIPT, "utf8"), path.dirname(NSIS_SCRIPT)), "utf8");
+  }
+
   const problems = auditNsisSource({
-    scriptPath: NSIS_SCRIPT,
+    scriptPath,
     installerDir: path.dirname(NSIS_SCRIPT),
     defines: [...defines.map(([name]) => name), ...SIGNING_DEFINE_NAMES],
     payloadText,
@@ -299,8 +393,8 @@ function buildInstallerB(rid, version, publishDir, makensis) {
     throw new Error(`the NSIS source is not internally consistent: ${problems.join("; ")}`);
   }
 
-  console.log(`installer-e2e: building installer B (${version}, ${rid}, e2e) with ${path.basename(makensis.path)}`);
-  const result = spawnSync(makensis.path, makensisArgs({ defines, scriptPath: NSIS_SCRIPT }), {
+  console.log(`installer-e2e: building installer ${label} (${version}, ${rid}, e2e) with ${path.basename(makensis.path)}`);
+  const result = spawnSync(makensis.path, makensisArgs({ defines, scriptPath }), {
     cwd: REPO_ROOT,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
@@ -308,19 +402,19 @@ function buildInstallerB(rid, version, publishDir, makensis) {
   });
   if (result.error || result.status !== 0 || !existsSync(setup)) {
     const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.split(/\r?\n/).slice(-40).join("\n");
-    throw new Error(`makensis failed for installer B: ${result.error?.message ?? `exit ${result.status}`}\n${output}`);
+    throw new Error(`makensis failed for installer ${label}: ${result.error?.message ?? `exit ${result.status}`}\n${output}`);
   }
-  // B is an E2E setup like A, so it must never ask for elevation (the same audit build-installer.js runs).
+  // B and the old layout are E2E setups like A, so they must never ask for elevation (the same audit build-installer.js runs).
   const manifest = checkSetupManifestLevel(readFileSync(setup), "e2e");
   if (!manifest.ok) {
     rmSync(setup, { force: true });
-    throw new Error(`installer B: ${manifest.problem}`);
+    throw new Error(`installer ${label}: ${manifest.problem}`);
   }
   return setup;
 }
 
 /** Runs the Installer tests. The result file is the verdict, so a missing or stale file is a failure. */
-function runInstallerTests({ rid, publishA, setupA, setupB, versionA, versionB, runId }) {
+function runInstallerTests({ rid, publishA, setupA, setupB, setupOld, versionA, versionB, versionOld, runId }) {
   rmSync(RESULT_PATH, { force: true });
   const dotnet = dotnetCommand();
   const args = [
@@ -345,6 +439,8 @@ function runInstallerTests({ rid, publishA, setupA, setupB, versionA, versionB, 
     BWC_INSTALLER_B: setupB,
     BWC_INSTALLER_VERSION_A: versionA,
     BWC_INSTALLER_VERSION_B: versionB,
+    BWC_INSTALLER_OLD: setupOld,
+    BWC_INSTALLER_VERSION_OLD: versionOld,
     BWC_INSTALLER_RESULT: RESULT_PATH,
   };
   console.log(`installer-e2e: ${dotnet} ${args.join(" ")}`);
@@ -440,8 +536,14 @@ function main(argv = process.argv.slice(2)) {
 
   const versionA = readPackageVersion();
   const versionB = nextPatchVersion(versionA);
+  const versionOld = OLD_LAYOUT_VERSION;
+  if (compareVersions(versionOld, versionA) >= 0) {
+    console.error(`installer-e2e: the old layout version ${versionOld} must be below package.json ${versionA}.`);
+    return EXIT_USAGE;
+  }
   const publishA = path.join(REPO_ROOT, "publish", `${rid}-e2e`);
   const publishNext = path.join(REPO_ROOT, "publish", `${rid}-e2e-next`);
+  const publishOld = path.join(REPO_ROOT, "publish", `${rid}-e2e-old`);
   const runId = `${stamp(new Date())}-${randomBytes(4).toString("hex")}`;
   console.log(`installer-e2e: rid=${rid} A=${versionA} B=${versionB} runId=${runId}`);
 
@@ -451,6 +553,7 @@ function main(argv = process.argv.slice(2)) {
 
   let setupA;
   let setupB;
+  let setupOld;
   try {
     buildInstallerA(rid);
     setupA = path.join(INSTALLER_DIR, `BetterWindowsConfig-${versionA}-${rid}-e2e-setup.exe`);
@@ -459,6 +562,10 @@ function main(argv = process.argv.slice(2)) {
     }
     publishB(rid, versionB, publishNext);
     setupB = buildInstallerB(rid, versionB, publishNext, makensis);
+    if (!options.prepare) {
+      publishB(rid, versionOld, publishOld);
+      setupOld = buildInstallerB(rid, versionOld, publishOld, makensis, { oldLayout: true });
+    }
   } catch (error) {
     console.error(`installer-e2e: FAIL while building: ${error.message}`);
     return 1;
@@ -475,7 +582,7 @@ function main(argv = process.argv.slice(2)) {
   }
 
   mkdirSync(E2E_DIR, { recursive: true });
-  const testExit = runInstallerTests({ rid, publishA, setupA, setupB, versionA, versionB, runId });
+  const testExit = runInstallerTests({ rid, publishA, setupA, setupB, setupOld, versionA, versionB, versionOld, runId });
   const verdict = readVerdict();
   if (verdict === null) {
     console.error(`installer-e2e: FAIL: dotnet test exited ${testExit} and wrote no verdict.`);
@@ -484,9 +591,14 @@ function main(argv = process.argv.slice(2)) {
 
   const checks = Array.isArray(verdict.checks) ? verdict.checks : [];
   const failed = checks.filter((check) => check.pass !== true);
-  const pass = testExit === 0 && verdict.pass === true && checks.length > 0 && failed.length === 0;
+  const missingProof = REQUIRED_PROOF_CHECKS.filter((id) => !checks.some((check) => check.id === id && check.pass === true));
+  const pass =
+    testExit === 0 && verdict.pass === true && checks.length > 0 && failed.length === 0 && missingProof.length === 0;
   console.log("");
-  console.log(`installer-e2e: ${pass ? "PASS" : "FAIL"} ${rid} ${versionA} -> ${versionB}`);
+  console.log(`installer-e2e: ${pass ? "PASS" : "FAIL"} ${rid} ${versionA} -> ${versionB}, old layout ${versionOld} -> ${versionB}`);
+  for (const id of missingProof) {
+    console.log(`  MISSING proof check ${id}: the old-layout case did not record it as passed`);
+  }
   console.log(`installer-e2e: ${checks.length - failed.length} of ${checks.length} checks passed`);
   for (const check of failed) {
     console.log(`  FAILED ${check.id}: ${check.notes}`);

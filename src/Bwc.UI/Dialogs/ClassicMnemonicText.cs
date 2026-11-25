@@ -58,6 +58,22 @@ internal sealed class ClassicMnemonicText
         _mnemonicIndex = index;
     }
 
+    private ClassicMnemonicText(string literal, bool _)
+    {
+        Plain = literal;
+        _mnemonicIndex = -1;
+    }
+
+    /// <summary>
+    /// Text shown exactly as given: no marker is read, there is no access key, and nothing is dropped. Used for text
+    /// from ADML templates, where an ampersand is part of the text.
+    /// </summary>
+    internal static ClassicMnemonicText Literal(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        return new ClassicMnemonicText(source, true);
+    }
+
     /// <summary>The text as shown and read by automation, with markers removed.</summary>
     internal string Plain { get; }
 

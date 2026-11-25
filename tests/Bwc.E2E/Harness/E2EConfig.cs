@@ -13,6 +13,7 @@ public sealed class E2EConfig
 {
     public const string HubExeName = "BetterWindowsConfig.exe";
     public const string RegeditExeName = "BwcRegedit.exe";
+    public const string GpeditExeName = "BwcGpedit.exe";
     public const string DataRootEnvironmentVariable = "BWC_DATA_ROOT";
 
     /// <summary>Set by scripts/test-e2e.js: "full" when the run has no user filter, otherwise "filtered".</summary>
@@ -76,6 +77,8 @@ public sealed class E2EConfig
 
     public string RegeditExePath => Path.Combine(PublishDir, RegeditExeName);
 
+    public string GpeditExePath => Path.Combine(PublishDir, GpeditExeName);
+
     public string PublishCommand => $"node scripts/dotnet-build.js --rid {Rid} --flavor {Flavor}";
 
     public static E2EConfig Create() => new();
@@ -137,7 +140,7 @@ public sealed class E2EConfig
     }
 
     /// <summary>
-    /// Verifies both application executables exist and throws an error that names the publish command.
+    /// Verifies the three application executables exist and throws an error that names the publish command.
     /// </summary>
     public void EnsureExecutablesExist()
     {
@@ -150,6 +153,11 @@ public sealed class E2EConfig
         if (!File.Exists(RegeditExePath))
         {
             missing.Add(RegeditExeName);
+        }
+
+        if (!File.Exists(GpeditExePath))
+        {
+            missing.Add(GpeditExeName);
         }
 
         if (missing.Count == 0)

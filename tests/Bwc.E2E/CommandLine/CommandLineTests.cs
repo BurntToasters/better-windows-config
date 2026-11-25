@@ -422,6 +422,154 @@ public sealed class CommandLineTests
             $"Whole-registry export checks failed:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
     }
 
+    /// <summary>
+    /// A named-key /e and /a stream to a temp file and move it over the target (AF8). The bytes are exactly what the
+    /// old in-memory path wrote. A key that does not exist exits 1 with the same message and leaves the old target, or
+    /// creates none. A locked target fails and keeps its content. No temp file is left beside the target in any run.
+    /// The expected bytes were captured from the build before the change.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("CommandLine")]
+    [TestCategory("Mutating")]
+    public void CommandLine_NamedKeyExportKeepsBytesAndLeavesTheTargetOnFailure()
+    {
+        _checkStart = E2EResults.CheckCount;
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireMutatingFlavor(config);
+
+        try
+        {
+            config.EnsureExecutablesExist();
+        }
+        catch (Exception ex)
+        {
+            E2EResults.Record("commandline.named.publish", false, ex.Message);
+            Assert.Fail(ex.Message);
+            return;
+        }
+
+        var sandbox = new SandboxRegistry(config);
+        string tempDir = Path.Combine(config.ArtifactsDir, "command-line", config.RunId + "-named");
+        string target = Path.Combine(tempDir, "named.reg");
+        string missingTarget = Path.Combine(tempDir, "missing.reg");
+        try
+        {
+            sandbox.Cleanup();
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+
+            Directory.CreateDirectory(tempDir);
+            SeedSandbox(sandbox);
+            string root = $@"HKEY_CURRENT_USER\{sandbox.RunRootPath}";
+
+            string expectedV5 =
+                "Windows Registry Editor Version 5.00\r\n\r\n"
+                + "[" + root + "]\r\n"
+                + "@=\"default text\"\r\n"
+                + "\"Text\"=\"hello\"\r\n"
+                + "\"Dword\"=dword:01020304\r\n"
+                + "\"Binary\"=hex:00,01,02,fe,ff\r\n\r\n"
+                + "[" + root + "\\Child]\r\n"
+                + "\"Qword\"=hex(b):88,77,66,55,44,33,22,11\r\n\r\n";
+            string expectedRegedit4 = expectedV5
+                .Replace("Windows Registry Editor Version 5.00", "REGEDIT4", StringComparison.Ordinal);
+
+            File.WriteAllText(target, OldWholeContent, Encoding.ASCII);
+            CommandResult v5 = Run(config, sandbox, "/e", target, sandbox.RunRootDisplayPath);
+            byte[] v5Bytes = File.ReadAllBytes(target);
+            byte[] v5Expected = EncodeV5(expectedV5);
+            Record(
+                "commandline.named.v5.bytes",
+                v5.Exited && v5.ExitCode == 0 && v5Bytes.AsSpan().SequenceEqual(v5Expected),
+                $"exit={v5.ExitCode}, bytes={v5Bytes.Length}, expected={v5Expected.Length}, equal={v5Bytes.AsSpan().SequenceEqual(v5Expected)}, stderr='{v5.StandardError.Trim()}'.");
+            Record(
+                "commandline.named.v5.noTemp",
+                LeftoversBeside(tempDir, target).Length == 0,
+                $"other files beside the target={string.Join(",", LeftoversBeside(tempDir, target))}.");
+
+            File.WriteAllText(target, OldWholeContent, Encoding.ASCII);
+            CommandResult ansi = Run(config, sandbox, "/a", target, sandbox.RunRootDisplayPath);
+            byte[] ansiBytes = File.ReadAllBytes(target);
+            byte[] ansiExpected = Encoding.ASCII.GetBytes(expectedRegedit4);
+            Record(
+                "commandline.named.regedit4.bytes",
+                ansi.Exited && ansi.ExitCode == 0 && ansiBytes.AsSpan().SequenceEqual(ansiExpected),
+                $"exit={ansi.ExitCode}, bytes={ansiBytes.Length}, expected={ansiExpected.Length}, equal={ansiBytes.AsSpan().SequenceEqual(ansiExpected)}, stderr='{ansi.StandardError.Trim()}'.");
+            Record(
+                "commandline.named.regedit4.noTemp",
+                LeftoversBeside(tempDir, target).Length == 0,
+                $"other files beside the target={string.Join(",", LeftoversBeside(tempDir, target))}.");
+
+            // A key that does not exist: exit 1, the message names the file, the old target is byte for byte as it was.
+            string missingKey = sandbox.RunRootDisplayPath + @"\NoSuchKey";
+            File.WriteAllText(target, OldWholeContent, Encoding.ASCII);
+            CommandResult missing = Run(config, sandbox, "/e", target, missingKey);
+            string keptAfterMissing = File.ReadAllText(target, Encoding.ASCII);
+            Record(
+                "commandline.named.missingKey",
+                missing.Exited
+                    && missing.ExitCode == 1
+                    && missing.StandardError.StartsWith("BwcRegedit: Export failed for '" + target + "': ", StringComparison.Ordinal)
+                    && missing.StandardError.Contains(
+                        @"OpenKey failed for Computer\HKEY_CURRENT_USER\" + sandbox.RunRootPath + @"\NoSuchKey"
+                            + " with Win32 error 2: The system cannot find the file specified.",
+                        StringComparison.Ordinal)
+                    && string.Equals(keptAfterMissing, OldWholeContent, StringComparison.Ordinal),
+                $"exit={missing.ExitCode}, old content kept={string.Equals(keptAfterMissing, OldWholeContent, StringComparison.Ordinal)}, stderr='{missing.StandardError.Trim()}'.");
+            Record(
+                "commandline.named.missingKey.noTemp",
+                LeftoversBeside(tempDir, target).Length == 0,
+                $"other files beside the target={string.Join(",", LeftoversBeside(tempDir, target))}.");
+
+            // The same failure with no old target: no file is created.
+            CommandResult missingNew = Run(config, sandbox, "/a", missingTarget, missingKey);
+            Record(
+                "commandline.named.missingKey.noFile",
+                missingNew.Exited
+                    && missingNew.ExitCode == 1
+                    && !File.Exists(missingTarget)
+                    && LeftoversBeside(tempDir, target).Length == 0,
+                $"exit={missingNew.ExitCode}, target created={File.Exists(missingTarget)}, other files={string.Join(",", LeftoversBeside(tempDir, target))}.");
+
+            // A locked target: the run fails, the old content stays, and nothing else is left.
+            File.WriteAllText(target, OldWholeContent, Encoding.ASCII);
+            CommandResult locked;
+            using (new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                locked = Run(config, sandbox, "/e", target, sandbox.RunRootDisplayPath);
+            }
+
+            string keptAfterLock = File.ReadAllText(target, Encoding.ASCII);
+            Record(
+                "commandline.named.lockedTarget",
+                locked.Exited && locked.ExitCode == 1 && string.Equals(keptAfterLock, OldWholeContent, StringComparison.Ordinal),
+                $"exit={locked.ExitCode}, old content kept={string.Equals(keptAfterLock, OldWholeContent, StringComparison.Ordinal)}, stderr='{locked.StandardError.Trim()}'.");
+            Record(
+                "commandline.named.lockedTarget.noTemp",
+                LeftoversBeside(tempDir, target).Length == 0,
+                $"other files beside the target={string.Join(",", LeftoversBeside(tempDir, target))}.");
+        }
+        finally
+        {
+            sandbox.Cleanup();
+            try
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, recursive: true);
+                }
+            }
+            catch (IOException)
+            {
+                // The temp folder is scoped to this run and is removed best effort.
+            }
+        }
+
+        FailIfNeeded();
+    }
+
     private const string OldWholeContent = "OLD CONTENT, KEEP ME\r\n";
     private static readonly TimeSpan WholeRegistryTimeout = TimeSpan.FromMinutes(15);
 
