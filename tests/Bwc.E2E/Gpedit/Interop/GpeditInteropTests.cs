@@ -115,7 +115,7 @@ public sealed class GpeditInteropTests
             checks.Record("bwc.category", located, "The ship editor shows Computer Configuration > Administrative Templates > BWC Oracle > Basics.");
             if (located)
             {
-                using GpeditDialog? dialog = GpeditDialog.Open(run, InteropShip.FixturePolicy);
+                using GpeditDialog? dialog = GpeditDialog.Open(run, InteropShip.FixturePolicyRow);
                 checks.Record("bwc.dialog", dialog is not null, "The setting dialog of '" + InteropShip.FixturePolicy + "' opens on the golden files.");
                 if (dialog is not null)
                 {
@@ -221,7 +221,7 @@ public sealed class GpeditInteropTests
     /// <summary>Opens the fixture policy, selects a state, presses OK, and waits for the dialog to close.</summary>
     private static void OpenAndSet(GpeditRun run, GpeditChecks checks, string prefix, string radioId, string expectedState)
     {
-        using GpeditDialog? dialog = GpeditDialog.Open(run, InteropShip.FixturePolicy);
+        using GpeditDialog? dialog = GpeditDialog.Open(run, InteropShip.FixturePolicyRow);
         checks.Record(prefix + ".dialog", dialog is not null, "The setting dialog of '" + InteropShip.FixturePolicy + "' opens.");
         if (dialog is null)
         {

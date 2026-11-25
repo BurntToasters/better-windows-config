@@ -601,13 +601,21 @@ internal sealed class ClassicGpedit : IDisposable
         {
             return MainWindow.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem))
                 .Where(row => !row.IsOffscreen)
-                .FirstOrDefault(row => string.Equals(ShellRun.SafeName(row), policyName, StringComparison.Ordinal));
+                .FirstOrDefault(row => RowNameIs(ShellRun.SafeName(row), policyName));
         }
         catch (Exception)
         {
             return null;
         }
     }
+
+    /// <summary>
+    /// True when a list row is the policy: classic can name the row with the bare display name or with the
+    /// "<c>display name</c> setting" spelling BWC uses. The setting dialog title is always the bare name.
+    /// </summary>
+    private static bool RowNameIs(string rowName, string policyName) =>
+        string.Equals(rowName, policyName, StringComparison.Ordinal)
+        || string.Equals(rowName, policyName + " setting", StringComparison.Ordinal);
 
     private List<string> VisibleListRows()
     {
@@ -768,6 +776,13 @@ internal static class GoldenInterop
 internal static class InteropShip
 {
     internal const string FixturePolicy = "Decimal enabled and disabled values";
+
+    /// <summary>
+    /// The result-list row of the fixture policy. Classic names a policy row "<c>display name</c> setting", and BWC
+    /// copies that, so the list lookups use this name. The dialog title stays the bare display name.
+    /// </summary>
+    internal const string FixturePolicyRow = FixturePolicy + " setting";
+
     internal static readonly string[] CategoryPath = ["Computer Configuration", "Administrative Templates", "BWC Oracle", "Basics"];
 
     /// <summary>publish/&lt;rid&gt;, the ship folder the elevated runner verifies before the run.</summary>
