@@ -436,7 +436,10 @@ FunctionEnd
   ClearErrors
   FileRead $R0 $R1
   IfErrors BwcOut_${ID}_close 0
-  ; Remove a trailing CR if FileRead kept one.
+  ; FileRead keeps the trailing CR LF (or LF). Strip LF first, then CR.
+  StrCpy $R3 $R1 1 -1
+  StrCmp $R3 "$\n" 0 +2
+  StrCpy $R1 $R1 -1
   StrCpy $R3 $R1 1 -1
   StrCmp $R3 "$\r" 0 +2
   StrCpy $R1 $R1 -1
@@ -450,10 +453,14 @@ FunctionEnd
   ClearErrors
   Rename "$INSTDIR\$R1" "$INSTDIR${BWC_BACKUP_SUFFIX}\$R1"
   IfErrors BwcOut_${ID}_failed_open 0
-  ${GetParent} "$INSTDIR\$R1" $R4
+  StrCpy $R4 "$INSTDIR\$R1"
+  BwcOut_${ID}_rmdir:
+  ${GetParent} "$R4" $R4
+  StrCmp $R4 "" BwcOut_${ID}_loop 0
   StrCmp $R4 "$INSTDIR" BwcOut_${ID}_loop 0
+  ClearErrors
   RMDir "$R4"
-  Goto BwcOut_${ID}_loop
+  IfErrors BwcOut_${ID}_loop BwcOut_${ID}_rmdir
   BwcOut_${ID}_failed_open:
   FileClose $R0
   BwcOut_${ID}_failed:
@@ -476,6 +483,10 @@ FunctionEnd
   ClearErrors
   FileRead $R0 $R1
   IfErrors BwcRes_${ID}_close 0
+  ; FileRead keeps the trailing CR LF (or LF). Strip LF first, then CR.
+  StrCpy $R3 $R1 1 -1
+  StrCmp $R3 "$\n" 0 +2
+  StrCpy $R1 $R1 -1
   StrCpy $R3 $R1 1 -1
   StrCmp $R3 "$\r" 0 +2
   StrCpy $R1 $R1 -1

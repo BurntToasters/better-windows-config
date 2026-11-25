@@ -70,12 +70,14 @@ const NSIS_SCRIPT = path.join(REPO_ROOT, "installer", "bwc.nsi");
 const OLD_LAYOUT_VERSION = "0.1.99";
 const OLD_LAYOUT_DROPPED_FILE = /^BwcGpedit\./i;
 const OLD_LAYOUT_KEPT_EXES = ["BetterWindowsConfig.exe", "BwcRegedit.exe", "BwcUpdate.exe"];
-// Checks the result must hold and pass, so a run where the old-layout case was skipped or filtered out cannot pass (121).
+// Checks the result must hold and pass, so a run where a required case was skipped or filtered out cannot pass (121, 125, 126).
 const REQUIRED_PROOF_CHECKS = [
   "old.a.noGpeditExe",
   "old.after.shortcuts",
   "old.after.gpedit.starts",
   "old.after.userData",
+  "upfail.filesRestored",
+  "upstale.staleFileGone",
 ];
 const LICENSE_FILE = path.join(REPO_ROOT, "LICENSE");
 const ICON_FILE = path.join(REPO_ROOT, "resources", "bwc.ico");
@@ -597,7 +599,7 @@ function main(argv = process.argv.slice(2)) {
   console.log("");
   console.log(`installer-e2e: ${pass ? "PASS" : "FAIL"} ${rid} ${versionA} -> ${versionB}, old layout ${versionOld} -> ${versionB}`);
   for (const id of missingProof) {
-    console.log(`  MISSING proof check ${id}: the old-layout case did not record it as passed`);
+    console.log(`  MISSING proof check ${id}: a required installer proof case did not record it as passed`);
   }
   console.log(`installer-e2e: ${checks.length - failed.length} of ${checks.length} checks passed`);
   for (const check of failed) {
