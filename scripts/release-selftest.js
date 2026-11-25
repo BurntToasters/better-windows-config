@@ -2115,7 +2115,7 @@ async function runRestrictedLaunchCases(cases) {
  * D1, D2, D3, D5, D7: synchronous restricted launcher (`scripts/lib/run-restricted.js`) and
  * `test-all.js --quick --release-gate` plan checks.
  */
-function runRestrictedSyncAndGatePlanCases(cases) {
+function runRestrictedSyncAndGatePlanCases(temp, cases) {
   const node = process.execPath;
   const tricky = ["a b", 'q"x', "tr\\", "end\\\\", "", "uni \u00e9", '--flag="v w"'];
   const ok = runRestrictedSync(node, ["-e", "console.log(JSON.stringify(process.argv.slice(1)))", ...tricky], { timeoutMs: 60_000 });
@@ -2180,6 +2180,42 @@ function runRestrictedSyncAndGatePlanCases(cases) {
     `releaseGate=${quickReleasePlan.steps.length}, plainQuick=${plainQuickPlan.steps.length}`,
     cases,
   );
+
+  const psExe = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const probeScript = [
+    "$ErrorActionPreference = 'Stop'",
+    "$id = [Security.Principal.WindowsIdentity]::GetCurrent()",
+    "$psi = New-Object Diagnostics.ProcessStartInfo",
+    `$psi.FileName = '${node.replace(/'/g, "''")}'`,
+    "$psi.Arguments = '-e setTimeout(()=>{},400)'",
+    "$psi.UseShellExecute = $false",
+    "$psi.CreateNoWindow = $true",
+    "$child = [Diagnostics.Process]::Start($psi)",
+    "$byId = [Diagnostics.Process]::GetProcessById($child.Id)",
+    "$child.WaitForExit()",
+    "[Console]::Out.Write($id.User.Value + '|' + $id.Owner.Value + '|' + $child.ExitCode + '|' + ($byId.Id -eq $child.Id))",
+  ].join("; ");
+  const encodedProbe = Buffer.from(probeScript, "utf16le").toString("base64");
+  const nodeDriver =
+    "const {spawnSync}=require('node:child_process');" +
+    "const r=spawnSync(process.argv[1],['-NoProfile','-NonInteractive','-EncodedCommand',process.argv[2]],{encoding:'utf8',windowsHide:true});" +
+    "if(r.status!==0){process.stderr.write(String(r.stderr||r.error||r.status));process.exit(9);}" +
+    "process.stdout.write(r.stdout);";
+  const daclProbe = runRestrictedSync(node, ["-e", nodeDriver, psExe, encodedProbe], { timeoutMs: 60_000 });
+  const probeText = daclProbe.stdout.trim();
+  const parts = probeText.split("|");
+  expectCheck(
+    "C28/D8 restricted token sets TokenOwner to user SID and allows CREATE_NO_WINDOW grandchild + Process.GetProcessById",
+    daclProbe.ok === true &&
+      daclProbe.status === 0 &&
+      parts.length === 4 &&
+      parts[0].startsWith("S-1-5-") &&
+      parts[0] === parts[1] &&
+      parts[2] === "0" &&
+      parts[3] === "True",
+    JSON.stringify({ ok: daclProbe.ok, status: daclProbe.status, probeText, stderr: daclProbe.stderr.trim() }),
+    cases,
+  );
 }
 
 async function main() {
@@ -2203,7 +2239,7 @@ async function main() {
     runPublishDecisionCases(cases);
     runReadinessCliCases(temp, fixture, cases);
     await runRestrictedLaunchCases(cases);
-    runRestrictedSyncAndGatePlanCases(cases);
+    runRestrictedSyncAndGatePlanCases(temp, cases);
     expectCheck(
       "release-verify accepts --allow-published (the publish rerun check)",
       (() => {
