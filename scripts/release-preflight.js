@@ -40,6 +40,7 @@ Options:
                           origin ancestry, gh auth, and the release list. The readiness checks read
                           the environment (.env through the npm script) and never print secrets.
   --artifact-dir <dir>    Validate a D5 artifact directory as part of preflight.
+  --gate-proof <path>     Portable full-gate JSON file or folder (repeatable; outside artifacts/gate/result.json).
   --json                  Print one JSON line.
   --help                  Show this help.
 
@@ -50,7 +51,7 @@ function main(argv = process.argv.slice(2)) {
   let options;
   try {
     const parsed = parseArguments(argv, {
-      values: ["root", "version", "channel", "trusted-key", "artifact-dir"],
+      values: ["root", "version", "channel", "trusted-key", "artifact-dir", { name: "gate-proof", multi: true }],
       flags: ["allow-detached", "require-trusted-key", "json", "help"],
     });
     if (parsed.has("help")) {
@@ -72,6 +73,7 @@ function main(argv = process.argv.slice(2)) {
       trustedKey: parsed.get("trusted-key"),
       requireTrustedKey: parsed.has("require-trusted-key"),
       artifactDir: parsed.get("artifact-dir") ? path.resolve(parsed.get("artifact-dir")) : null,
+      gateProof: parsed.all("gate-proof"),
       json: parsed.has("json"),
     };
   } catch (error) {

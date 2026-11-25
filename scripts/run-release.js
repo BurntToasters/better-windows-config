@@ -5,6 +5,8 @@
  *
  * release:win      stable policy, preflight, the full quality gate (`test:all --rid all`, GUI E2E included,
  *                  so run it on a machine with a GUI session), a release session that records that gate, a clean release folder, then continue.
+ *                  With `--gate-proof <path>`, verifies portable full-gate GUI proof covering both RIDs, runs `test:all -- --quick --release-gate --rid all`
+ *                  (safe over elevated SSH), and records both proofs in the session (`npm run release:win:vm` uses `artifacts/gate/proof`).
  * --continue       the gate (policy, preflight with the signing readiness checks, session verify),
  *                  then build both RIDs, the live updater client rehearsal (release:rehearse:client, before any
  *                  paid signing), the installers, the signed bundle, GPG signatures, Authenticode, the single
@@ -26,7 +28,7 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectExecutionOf } from "./direct-execution.mjs";
 import { EXIT, describeError } from "./lib/cli.js";
-import { embeddedReleaseKeys, readPackageVersion } from "./lib/release-policy.js";
+import { checkGateProofPaths, embeddedReleaseKeys, readPackageVersion } from "./lib/release-policy.js";
 import { channelForVersion, tryParseSemVer } from "./lib/semver.js";
 import { isExplicitTruthy, SIGNING_REQUIRED_VARIABLES } from "./release-policy.js";
 
@@ -54,19 +56,22 @@ function usageError(message, exitCode = EXIT.USAGE) {
 function printHelp() {
   console.log(`Usage:
   node ${SCRIPT}                       Stable policy, preflight, full gate, session, clean, then continue.
+  node ${SCRIPT} --gate-proof <path>   Verify portable GUI gate proof (file or folder, repeatable),
+                                       run quick+release-gate on the VM, record session, clean, continue.
   node ${SCRIPT} --continue            Gate, build, sign, bundle, upload the draft, verify it, mirror.
   node ${SCRIPT} --continue --from <step>
                                        The gate, then the steps from <step> on (release:win:upload is
                                        --from release:draft). Valid steps: ${continueStepNames().join(", ")}.
 
 The trusted release key is the one embedded in src/Bwc.Update/Signing/TrustedKeys.cs. A placeholder
-there refuses the run (docs/RELEASE.md, "User-owned steps"). Flags: --continue, --from, --help.`);
+there refuses the run (docs/RELEASE.md, "User-owned steps"). Flags: --gate-proof, --continue, --from, --help.`);
 }
 
-/** The run mode and the resume step from argv. Unknown flags and positional arguments are usage errors. */
+/** The run mode, portable proof paths, and resume step from argv. Unknown flags and positional arguments are usage errors. */
 export function parseReleaseArgs(argv) {
   const known = new Set(["--continue", "--help", "-h"]);
   const positionals = [];
+  const gateProof = [];
   let continueFlag = false;
   let help = false;
   let from = null;
@@ -81,6 +86,17 @@ export function parseReleaseArgs(argv) {
       index += 1;
     } else if (arg.startsWith("--from=")) {
       from = arg.slice("--from=".length);
+    } else if (arg === "--gate-proof") {
+      const value = argv[index + 1];
+      if (value === undefined || value.startsWith("-")) {
+        throw usageError("--gate-proof needs a file or folder path");
+      }
+      gateProof.push(value);
+      index += 1;
+    } else if (arg.startsWith("--gate-proof=")) {
+      const value = arg.slice("--gate-proof=".length);
+      if (!value) throw usageError("--gate-proof needs a non-empty file or folder path");
+      gateProof.push(value);
     } else if (arg.startsWith("-")) {
       if (!known.has(arg)) throw usageError(`Unknown release flag: ${arg}`);
       if (arg === "--continue") continueFlag = true;
@@ -90,9 +106,12 @@ export function parseReleaseArgs(argv) {
     }
   }
   if (positionals.length > 0) {
-    throw usageError(`Unexpected argument: ${positionals[0]}. Usage: node ${SCRIPT} [--continue] [--from <step>]`);
+    throw usageError(`Unexpected argument: ${positionals[0]}. Usage: node ${SCRIPT} [--gate-proof <path>] [--continue] [--from <step>]`);
   }
-  if (help) return { help: true, mode: continueFlag ? "continue" : "win", from: null };
+  if (help) return { help: true, mode: continueFlag ? "continue" : "win", from: null, gateProof };
+  if (continueFlag && gateProof.length > 0) {
+    throw usageError("--gate-proof cannot be used with --continue");
+  }
   if (from !== null) {
     if (!continueFlag) throw usageError("--from needs --continue");
     if (from === "") throw usageError(`--from needs a step name. Valid steps: ${continueStepNames().join(", ")}`);
@@ -100,7 +119,7 @@ export function parseReleaseArgs(argv) {
       throw usageError(`Unknown --from step: ${from}. Valid steps: ${continueStepNames().join(", ")}`);
     }
   }
-  return { help: false, mode: continueFlag ? "continue" : "win", from };
+  return { help: false, mode: continueFlag ? "continue" : "win", from, gateProof };
 }
 
 /** Relative folder that holds one channel's assembled bundle: artifacts/release/<version>/<channel>. */
@@ -145,14 +164,18 @@ export function continueStepNames() {
 }
 
 /** The ordered steps of release:win (mode "win") or release:win:continue (mode "continue"). */
-export function releaseSteps(mode, { version, env = process.env, from = null }) {
+export function releaseSteps(mode, { version, env = process.env, from = null, gateProof = [] }) {
   if (mode === "win") {
+    const proofArgs = gateProof.flatMap((value) => ["--gate-proof", value]);
     return [
       { name: "release:policy", args: [] },
-      { name: "release:preflight", args: ["--", "--require-trusted-key"] },
-      { name: "test:all", args: ["--", "--rid", "all"] },
+      { name: "release:preflight", args: ["--", "--require-trusted-key", ...proofArgs] },
+      {
+        name: "test:all",
+        args: gateProof.length > 0 ? ["--", "--quick", "--release-gate", "--rid", "all"] : ["--", "--rid", "all"],
+      },
       // --force replaces a session left by an earlier attempt, so the proof is for this run's gate.
-      { name: "release:session:create", args: ["--", "--require-gate", "--force"] },
+      { name: "release:session:create", args: ["--", "--require-gate", "--force", ...proofArgs] },
       { name: CLEAN_STEP, args: [] },
       { name: "release:win:continue", args: [] },
     ];
@@ -308,6 +331,12 @@ export function main(argv = process.argv.slice(2), runner = null, { root = REPO_
     printHelp();
     return EXIT.OK;
   }
+  if (options.gateProof.length > 0) {
+    const proofPaths = checkGateProofPaths(root, options.gateProof);
+    if (!proofPaths.ok) {
+      throw usageError(`[${proofPaths.reason}] ${proofPaths.detail}`, EXIT.USAGE);
+    }
+  }
   const version = readPackageVersion(root);
   if (!tryParseSemVer(version)) {
     throw usageError(`package.json version is not SemVer: ${version}`);
@@ -317,7 +346,7 @@ export function main(argv = process.argv.slice(2), runner = null, { root = REPO_
   if (!keys.ok) {
     throw usageError(keys.detail, keys.reason === "missing-trusted-key-source" ? EXIT.MISSING : EXIT.REFUSED);
   }
-  const steps = releaseSteps(options.mode, { version, env, from: options.from });
+  const steps = releaseSteps(options.mode, { version, env, from: options.from, gateProof: options.gateProof });
   const run = runner ?? npmRunner(root, version);
   for (const step of steps) {
     run(step.name, step.args);
