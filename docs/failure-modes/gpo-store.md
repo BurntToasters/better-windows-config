@@ -20,7 +20,7 @@ one named place so the correction touches one spot:
 | Does a comment-only change bump the version | `GptIniRules.CommentOnlyChangeBumpsVersion` | True. A comment-only first save writes `comment.cmtx`, the empty 8-byte `Registry.pol` and `gpt.ini` with the version raised (capture `A/Machine_CommentOnly`, `A/User_CommentOnly`, settled, D3, D10). |
 | Shape of a comment entry | `CmtxFormat.WriteComment` | `<comment policyRef="ns0:Name" commentText="$(resource.ns0_Name)"></comment>` under `admTemplate`, and `<string id="ns0_Name">text</string>` in `stringTable`. |
 | The first-save rewrite of the namespace list | `CmtxDocument.RestrictNamespacesTo` | The store does not call it. `PolicySave.Save` calls it inside its edit when something changed, so the first save writes one `using` line (capture `A/Machine_Enabled`, `A/User_Enabled`, settled, D5). |
-| Refresh call and flags | `PolicyRefresh.cs`, `UserenvPolicyRefresher` | `RefreshPolicyEx(machine, RP_FORCE)` after every save that wrote `Registry.pol`, for the saved side only (group G). |
+| Refresh call and flags | `PolicyRefresh.cs`, `UserenvPolicyRefresher` | `RefreshPolicyEx(machine, RP_FORCE)` after every save that wrote `Registry.pol` (including the first comment-only save that creates the 8-byte empty `Registry.pol`), for the saved side only. Classic omits `RP_FORCE` (settled by group G `*_Disabled` captures); BWC keeps `RP_FORCE` so a version collision never skips applying. |
 | Zero-byte `Registry.pol` | `GpoStore` load | A failure for the side, as classic refuses it as malformed (`D/File_Empty`); a bad header is a failure too; neither is overwritten. |
 | Home detection | `GpoAccess.IsHomeEdition` | `EditionID` starts with `Core` (Core, CoreN, CoreSingleLanguage, CoreCountrySpecific). |
 
@@ -183,8 +183,8 @@ holder is free), so no process can lose a lock to a delete.
 | H2 | The call blocks | It cannot be cancelled once started. It runs inside the save, after the lock is released, so another BWC instance is not held up. |
 | H3 | Home edition (no `userenv` policy engine for local GPO) | The tool is read-only there, so no save and no refresh occur. If a refresh were called anyway the failure is H1. |
 | H4 | User side refresh from an elevated process | `RefreshPolicyEx(false, ...)` refreshes the calling user's policy. That is the elevated admin's token, which for a split-token admin is the same user. Documented, as classic. |
-| H5 | Wrong flag | `RP_FORCE` (1) forces a refresh even if the version did not change (BWC bumps it anyway). Which flags classic uses is group G, *verify against oracle*. |
-| H6 | A refresh when no policy value changed | Not called: a comment-only save, or a save with no change. |
+| H5 | Wrong flag | `RP_FORCE` (1) forces a refresh even if the version did not change. Settled against group G: classic omits `RP_FORCE` (proven by the 2026-11-21 group G capture where `*_Disabled` step 1 wrote `v=1` right after `*_Ok` left `gpsvc` cached at `v=1` and classic skipped applying it); BWC intentionally keeps `RP_FORCE` so a version collision cannot silently skip applying a policy. |
+| H6 | Comment-only and no-change saves | Unobservable for classic on comment-only saves (`G/*_CommentOnly` shows the live registry unchanged at 0, 4 and 8 s and `gpt.ini` version raised; with nothing to apply, a refresh leaves no trace). BWC's implementation choice: a first comment-only save creates the 8-byte empty `Registry.pol` and refreshes (`GpoSaveTests.Save_CommentOnly_WritesCmtxAndTheEmptyPol_BumpsTheVersion_Refreshes`); a subsequent comment-only save (when `Registry.pol` already exists and is unchanged) and a no-change save skip refresh. |
 | H7 | The recorder | `RecordingPolicyRefresher` appends one line per call (`Machine` or `User`) to a file in the sandbox root through `GpoFileWriter` (policy checked), and calls nothing native. |
 | H8 | Refresh named elsewhere | Only `PolicyRefresh.cs` names the API; the guard enforces it. |
 

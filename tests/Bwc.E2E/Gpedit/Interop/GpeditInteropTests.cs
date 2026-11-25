@@ -115,7 +115,7 @@ public sealed class GpeditInteropTests
             checks.Record("bwc.category", located, "The ship editor shows Computer Configuration > Administrative Templates > BWC Oracle > Basics.");
             if (located)
             {
-                using GpeditDialog? dialog = GpeditDialog.Open(run, InteropShip.FixturePolicyRow);
+                using GpeditDialog? dialog = GpeditDialog.Open(run, InteropShip.FixturePolicyRow, waitReadout: false);
                 checks.Record("bwc.dialog", dialog is not null, "The setting dialog of '" + InteropShip.FixturePolicy + "' opens on the golden files.");
                 if (dialog is not null)
                 {
@@ -141,36 +141,49 @@ public sealed class GpeditInteropTests
     [TestCategory("Gpedit")]
     [TestCategory("Elevated")]
     [TestCategory("E2EOnly")]
-    public void GpeditInterop_RealSaveWithRefresh()
+    public void GpeditInterop_GroupG_LiveRegistryReplay()
     {
         E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         RequireReady();
-        var checks = new GpeditChecks("interop", "real-save-with-refresh");
+        var checks = new GpeditChecks("interop", "groupg");
+        var report = new GroupGReport();
         RealPolicyFolder? policy = null;
         RealTemplates? templates = null;
-        FixtureRegistry? registry = null;
+        OracleLiveRegistry? registry = null;
         try
         {
             templates = RealTemplates.Install();
             policy = RealPolicyFolder.Capture();
-            registry = FixtureRegistry.Capture();
-            using GpeditRun run = GpeditRun.OpenShip("gpedit-interop-real-save-with-refresh", InteropShip.EditorExe);
-            bool located = InteropShip.SelectCategory(run);
-            checks.Record("bwc.category", located, "The ship editor shows Computer Configuration > Administrative Templates > BWC Oracle > Basics.");
-            if (located)
-            {
-                OpenAndSet(run, checks, "bwc.enable", GpeditDialog.Enabled, "Enabled");
-                ModeResult applied = WaitForModeNumber(5);
-                checks.Record("registry.appeared", applied.Matches, "The refresh applies ModeNumber after OK: " + applied.Describe());
-                checks.Record("registry.appeared.kind", applied.LateKind == RegistryValueKind.DWord, "ModeNumber is a " + applied.LateKind + ", expected DWord.");
+            registry = OracleLiveRegistry.Capture();
 
-                OpenAndSet(run, checks, "bwc.notConfigured", GpeditDialog.NotConfigured, "Not Configured");
-                ModeResult removed = WaitForModeNumber(null);
-                checks.Record("registry.removed", removed.Matches, "The refresh removes ModeNumber after Not Configured: " + removed.Describe());
+            string groupDir = Path.Combine(GoldenRepo.Goldens, "G");
+            string[] caseNames = Directory.GetDirectories(groupDir)
+                .Select(Path.GetFileName)
+                .Where(name => name is not null)
+                .Select(name => name!)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            checks.Record("groupg.count", caseNames.Length == 29, $"Expected 29 Group G cases, found {caseNames.Length}.");
+
+            foreach (string name in caseNames)
+            {
+                string caseId = "G/" + name;
+                try
+                {
+                    GoldenCase golden = GoldenCase.Load(caseId);
+                    var driver = new ShipGReplayDriver(policy, checks, report);
+                    bool passed = driver.Run(golden);
+                    checks.Record($"groupg.{name}.complete", passed, passed ? $"{caseId} passed files and live registry." : $"{caseId} had differences.");
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    checks.Record($"groupg.{name}.complete", false, $"{caseId} threw {ex.GetType().Name}: {ex.Message}");
+                }
             }
         }
         finally
         {
+            _ = report.Write();
             RecordCleanup(checks, registry, policy, templates);
         }
 
@@ -221,7 +234,7 @@ public sealed class GpeditInteropTests
     /// <summary>Opens the fixture policy, selects a state, presses OK, and waits for the dialog to close.</summary>
     private static void OpenAndSet(GpeditRun run, GpeditChecks checks, string prefix, string radioId, string expectedState)
     {
-        using GpeditDialog? dialog = GpeditDialog.Open(run, InteropShip.FixturePolicyRow);
+        using GpeditDialog? dialog = GpeditDialog.Open(run, InteropShip.FixturePolicyRow, waitReadout: false);
         checks.Record(prefix + ".dialog", dialog is not null, "The setting dialog of '" + InteropShip.FixturePolicy + "' opens.");
         if (dialog is null)
         {
@@ -258,10 +271,23 @@ public sealed class GpeditInteropTests
     }
 
     /// <summary>Restores the registry value, the real policy files and the templates, and records each result.</summary>
-    private static void RecordCleanup(GpeditChecks checks, FixtureRegistry? registry, RealPolicyFolder? policy, RealTemplates? templates)
+    private static void RecordCleanup(GpeditChecks checks, FixtureRegistry? registry, RealPolicyFolder? policy, RealTemplates? templates) =>
+        RecordCleanup(checks, registry is null ? null : registry.Restore, "the registry was not captured.", "The fixture registry value is back.", policy, templates);
+
+    /// <summary>Restores the four BWC-Oracle keys, the real policy files and the templates, and records each result.</summary>
+    private static void RecordCleanup(GpeditChecks checks, OracleLiveRegistry? registry, RealPolicyFolder? policy, RealTemplates? templates) =>
+        RecordCleanup(checks, registry is null ? null : registry.Restore, "the BWC-Oracle registry keys were not captured.", "The four BWC-Oracle registry keys are back.", policy, templates);
+
+    private static void RecordCleanup(
+        GpeditChecks checks,
+        Func<IReadOnlyList<string>>? restoreRegistry,
+        string missingRegistryMessage,
+        string registryRestoredMessage,
+        RealPolicyFolder? policy,
+        RealTemplates? templates)
     {
-        IReadOnlyList<string> registryProblems = Problems(registry is null ? null : registry.Restore, "the registry was not captured.");
-        checks.Record("cleanup.registry", registryProblems.Count == 0, registryProblems.Count == 0 ? "The fixture registry value is back." : string.Join("; ", registryProblems));
+        IReadOnlyList<string> registryProblems = Problems(restoreRegistry, missingRegistryMessage);
+        checks.Record("cleanup.registry", registryProblems.Count == 0, registryProblems.Count == 0 ? registryRestoredMessage : string.Join("; ", registryProblems));
 
         IReadOnlyList<string> policyProblems = Problems(policy is null ? null : policy.Restore, "the policy folder was not captured.");
         checks.Record("cleanup.policyFiles", policyProblems.Count == 0, policyProblems.Count == 0 ? "The five real policy files are back byte for byte." : string.Join("; ", policyProblems));

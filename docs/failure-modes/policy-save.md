@@ -61,7 +61,7 @@ these ways, and none of them is a skip.
 
 | Id | Way it goes wrong | What the harness does |
 |---|---|---|
-| R1 | The case folder, `case.json`, `complete.json` or a step folder is missing, or the snapshots do not match the steps. | Fails naming the path. |
+| R1 | The case folder, `case.json`, `complete.json` or a step folder is missing, or the step snapshots (`label` `"step <label>"`) do not match the steps 1-to-1, or a non-step snapshot holds no `liveRegistry`. | Fails naming the path or mismatch. |
 | R2 | A golden file differs from the size or SHA-256 in `case.json` (a wrong, stale or line-ending-converted golden). | Fails before any replay, naming the file. |
 | R3 | A step folder holds a file that is none of the five names. | Fails. |
 | R4 | A file that classic did not write exists in the sandbox, or a written one is absent. | Fails naming the file; an absent file must be absent. |
@@ -77,8 +77,8 @@ these ways, and none of them is a skip.
 | R14 | An option value cannot be mapped (unknown element id, enum item that is not a label, a number that is not text of digits while classic showed no box). | Fails naming the option. |
 | R15 | A start that classic refused (`startRefused`) opens, saves or changes in the engine. | Fails: the store must report a failure on open, a save must throw a malformed-file failure, and the start files stay byte-identical. |
 | R16 | The state the engine reads before an operation differs from the state the dialog showed (`before.state`). | Fails naming the operation (every replayed group). |
-| R17 | An operation kind the engine cannot replay is met. | Fails; only `snapshot`, `editPolicy`, `selectNode` and `readList` are accepted. |
-| R18 | A case folder exists on disk that no row names. | `ReplayRowsCoverEveryCaseOfTheGroups` fails. |
+| R17 | An operation kind the engine cannot replay is met. | Fails; only `snapshot`, `editPolicy`, `selectNode`, `readList` and `wait` are accepted (`wait` is a no-op; non-step `snapshot` ops skip file comparison). |
+| R18 | A case folder exists on disk that no row names. | `ReplayRowsCoverEveryCaseOfTheGroups` fails (groups A, B, C, G and K). |
 | R19 | The sandbox is under a real policy folder, or a run folder is left behind. | The sandbox is a new GUID folder under the temp folder, built through `SandboxGpoStorePolicy`, removed in `Dispose`. |
 
 ## E6c. Groups D and E (written before the tests, dispatch T)
@@ -182,3 +182,14 @@ validator.
 | C5 | A row of an explicit list with only a name has an empty value. | `E/List_Explicit_NameOnly` |
 | C6 | A rule is applied to a case outside group E. | None may be: the B and C rows keep passing without the rules. |
 | C7 | A rule hides an engine difference (a wrong rule gives a wrong value that happens to match). | The rows compare every byte of every file; a rule that is not what classic did cannot give the golden. |
+
+## Group G. Live-registry cases in engine replay
+
+Group G (29 cases under `goldens/G`) interleaves file-step snapshots (`step <label>`) with `wait` (4 s) operations and live-registry-only `snapshot` operations (`registry at start`, `<label>: registry 4 s later`, `<label>: registry 8 s later`). Engine replay verifies the GPO file bytes at every step snapshot and ignores live-registry timing, which requires elevation (`GpeditInterop_GroupG_LiveRegistryReplay`).
+
+| Id | Way it fails | Expected | Case, test |
+|---|---|---|---|
+| G1 | `SeedStart` treats `op 0` (`registry at start`) as a step snapshot and seeds `Steps[0]` (`enabled`) as the start state. | `SeedStart` checks `IsStepSnapshot` (`label` starts with `"step "`), so `op 0` leaves the start state empty (`[General]\r\n`). | all 29 G cases, `PolicyGoldenReplayTests` |
+| G2 | A non-step snapshot increments the step counter or fails when `liveRegistry` is missing. | Only `IsStepSnapshot` compares files and advances `step`; `GoldenCase.VerifyComplete` still requires every non-step `snapshot` to hold `observed.liveRegistry` and every step snapshot to match `Steps` 1-to-1. | `GoldenHarnessTests` |
+| G3 | `wait` is rejected as an unknown operation kind. | `wait` is a no-op in engine replay. | all 29 G cases |
+| G4 | A Group G case folder on disk has no replay row. | `ReplayRowsCoverEveryCaseOfTheGroups` asserts all 29 G cases. | `PolicyGoldenReplayTests` |

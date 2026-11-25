@@ -78,7 +78,7 @@ When the task runs, `run-elevated.ps1` does only this:
 3. checks the E2E publish folder and the ship publish folder, and asks for a build if either is
    missing or wrong;
 4. starts the task with `schtasks /Run /TN "BWC Elevated E2E"`, polls the task state and
-   `last-run.txt`, and stops after 30 minutes. The task disables itself before it writes its final
+   `last-run.txt`, and stops after 60 minutes. The task disables itself before it writes its final
    record, so a stop is followed by a 60 second wait for that record before the run counts as
    NOT RUN;
 5. prints the result and the artifact summary from `artifacts/e2e/result-<rid>-e2e.json`.
@@ -200,9 +200,11 @@ The E2E tests (`tests/Bwc.E2E`) are run by `run.js` through `test-e2e.js --filte
   - `GpeditInterop_ClassicWrites_BwcReadsByFileCopy`: copies the classic-written step of golden
     `B/Pol_Value_Decimal` into the real policy folder, opens the dialog in the ship editor, and requires its state and
     shown options to equal the golden `before` read. It presses only Cancel, then restores the files.
-  - `GpeditInterop_RealSaveWithRefresh`: after OK and after Not Configured, reads the live
-    `HKLM\Software\Policies\BWC-Oracle\Basics` value with the oracle matrix timing (settle up to 6 s, then one late read
-    after 4 s). The value must appear and later be gone.
+  - `GpeditInterop_GroupG_LiveRegistryReplay`: replays all 29 cases of `goldens/G` through the ship editor
+    (Machine, User, Class Both, OK, Apply+Cancel, Disabled, Not Configured, comment-only, Outside, Enabled/Disabled
+    values, and all 7 element-type policies), comparing the five policy files byte for byte and comparing the four
+    `BWC-Oracle` registry roots at 0, 4, and 8 s (with the documented `RP_FORCE` expectation on the 8 classic
+    version-collision cases). Writes `artifacts/e2e/visual/gpedit/gpedit-interop-groupg.json`.
   - `GpeditInterop_UpdateClosesElevatedEditor`: starts the ship Local Group Policy Editor elevated, and the ship
     `BwcUpdate.exe --close-running --install-dir publish/<rid>` must close it.
   Failure modes: `docs/failure-modes/e2e-harness.md`, section 49.

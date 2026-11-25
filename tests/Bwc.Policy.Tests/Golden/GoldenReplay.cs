@@ -52,14 +52,19 @@ internal static class GoldenReplay
             switch (op.Kind)
             {
                 case "snapshot":
-                    CompareStep(golden, sandbox, golden.Steps[step], $"after operation {op.Index}");
-                    step++;
+                    if (op.IsStepSnapshot)
+                    {
+                        CompareStep(golden, sandbox, golden.Steps[step], $"after operation {op.Index}");
+                        step++;
+                    }
+
                     break;
                 case "editPolicy":
                     ReplayEdit(golden, sandbox, op);
                     break;
                 case "selectNode":
                 case "readList":
+                case "wait":
                     break;
                 default:
                     Assert.Fail($"{golden.Id} operation {op.Index}: the replay cannot run an operation of kind '{op.Kind}'.");
@@ -70,7 +75,7 @@ internal static class GoldenReplay
 
     private static void SeedStart(GoldenCase golden, GoldenSandbox sandbox)
     {
-        if (golden.Ops[0].Kind == "snapshot")
+        if (golden.Ops[0].IsStepSnapshot)
         {
             foreach (var name in GoldenFiles.Names.Where(n => golden.Steps[0].Files[n] is not null))
             {

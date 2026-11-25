@@ -26,8 +26,8 @@ internal static class AwaitingRecapture
 }
 
 /// <summary>
-/// The golden replay (pieces E6a and E6b, docs/failure-modes/policy-save.md section R and
-/// docs/failure-modes/policy-defaults.md section B): each case of groups A, B, C and K is copied into a
+/// The golden replay (pieces E6a, E6b and Group G file replay, docs/failure-modes/policy-save.md section R and
+/// docs/failure-modes/policy-defaults.md section B): each case of groups A, B, C, G and K is copied into a
 /// sandbox GPO folder, its structured operations are saved through <see cref="Bwc.Policy.Model.PolicySave"/>
 /// and every file of every recorded step must equal the capture byte for byte. A missing case, a damaged
 /// golden or a CAP-4 step fails; none skips.
@@ -94,10 +94,22 @@ public sealed class PolicyGoldenReplayTests
         "Version_MachineUserCarry",
     ];
 
+    internal static readonly string[] GroupG =
+    [
+        "Both_Computer_Apply", "Both_Computer_CommentOnly", "Both_Computer_Disabled", "Both_Computer_NotConfigured",
+        "Both_Computer_Ok", "Both_User_Apply", "Both_User_CommentOnly", "Both_User_Disabled",
+        "Both_User_NotConfigured", "Both_User_Ok", "Elements_Pol_Decimal_MinMax", "Elements_Pol_Decimal_StoreAsText",
+        "Elements_Pol_Enum_ItemValueList", "Elements_Pol_List_ExplicitValue", "Elements_Pol_LongDecimal_Basic",
+        "Elements_Pol_MultiText_Basic", "Elements_Pol_Text_Expandable", "Machine_Apply", "Machine_CommentOnly",
+        "Machine_Disabled", "Machine_NotConfigured", "Machine_Ok", "Outside_KeyOutsideRoots", "User_Apply",
+        "User_CommentOnly", "User_Disabled", "User_NotConfigured", "User_Ok", "Value_EnabledDisabledValues",
+    ];
+
     private static IEnumerable<string> ReplayedCases() =>
         GroupA.Select(c => "A/" + c)
             .Concat(GroupB.Select(c => "B/" + c))
             .Concat(GroupC.Select(c => "C/" + c))
+            .Concat(GroupG.Select(c => "G/" + c))
             .Concat(GroupK.Select(c => "K/" + c));
 
     public static IEnumerable<string[]> Rows() =>
@@ -119,11 +131,12 @@ public sealed class PolicyGoldenReplayTests
     public void ReplayRowsCoverEveryCaseOfTheGroups()
     {
         var expected = ReplayedCases().Order(StringComparer.Ordinal).ToArray();
-        var onDisk = new[] { "A", "B", "C", "K" }
+        var onDisk = new[] { "A", "B", "C", "G", "K" }
             .SelectMany(g => Directory.GetDirectories(Path.Combine(GoldenRepo.Goldens, g)).Select(d => g + "/" + Path.GetFileName(d)))
             .Order(StringComparer.Ordinal)
             .ToArray();
-        CollectionAssert.AreEqual(expected, onDisk, "Every case folder of groups A, B, C and K needs a replay row, and every row a folder.");
+        CollectionAssert.AreEqual(expected, onDisk, "Every case folder of groups A, B, C, G and K needs a replay row, and every row a folder.");
+        Assert.AreEqual(29, GroupG.Length, "Group G holds 29 cases.");
     }
 
     [TestMethod]

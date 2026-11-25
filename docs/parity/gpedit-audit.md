@@ -26,14 +26,14 @@ State after A1 (2026-11-22, HEAD 5ccff10): every row has a verdict. E2E evidence
 | CTX | 9 | 2 | 0 | 0 | 0 |
 | TOOL | 16 | 1 | 0 | 0 | 0 |
 | DLG | 35 | 88 | 0 | 0 | 0 |
-| ACC | 41 | 7 | 2 | 0 | 0 |
+| ACC | 41 | 9 | 0 | 0 | 0 |
 | MSG | 8 | 85 | 0 | 0 | 0 |
 | VIEW | 28 | 15 | 0 | 0 | 0 |
 | TREE | 17 | 2 | 0 | 1 | 0 |
-| BEH | 23 | 4 | 1 | 1 | 0 |
-| POL | 70 | 0 | 5 | 0 | 0 |
+| BEH | 24 | 4 | 0 | 1 | 0 |
+| POL | 75 | 0 | 0 | 0 | 0 |
 | ADMX | 32 | 0 | 0 | 0 | 0 |
-| All (534) | 315 | 208 | 8 | 3 | 0 |
+| All (534) | 321 | 210 | 0 | 3 | 0 |
 
 ## Gaps
 
@@ -42,30 +42,14 @@ Engine rules that no capture settles are listed first (E6c). Each has a pointer 
 | ID | Rule | What is missing | Where |
 | --- | --- | --- | --- |
 | GAP-01 | The value-name prefixes (`**del.`, `**soft.`) removed with their value when a value is replaced or cleared. | No capture sets or clears a value that has a soft or delete record next to it and then saves. | `PolOrderRules.PerValueInstructionPrefixes` |
-| GAP-02 | The flag of the refresh call after a save. | The editor does not show which call it makes. | `UserenvPolicyRefresher` |
+| GAP-02 | The flag of the refresh call after a save. | Group G captures show classic omits `RP_FORCE` (`*_Disabled` step 1 skipped `v=1` right after `*_Ok` left `gpsvc` at `v=1`). BWC intentionally passes `RP_FORCE` (gpo-store.md H5). | `UserenvPolicyRefresher` |
 | GAP-03 | An additive list keeps the foreign values of its key. | B/Pol_List_Additive starts empty; no start has a foreign value at an additive key. | `PolicyRules.AdditiveListKeepsOtherValues` |
 | GAP-04 | Enabling an additive list removes a delete-values record of its key. | No start has a delete-values record at an additive key. | `PolicyRules.AdditiveListRemovesDelvals` |
 | GAP-05 | A tail after the last record that is not one stray character (odd length, several characters, a lone NUL) is refused. | D/File_TrailingBytes has one stray character only. | `PolReader.IsStrayTail` |
 | GAP-06 | A key that a new record joins takes the spelling of its ancestors; on load two spellings of one key merge under the first. | D/Case_KeyDiffers and D/Case_KeyTwoSpellings show one level; deeper trees and ties between several first spellings are not captured. | `PolDocument.SpellNewKey` |
 | GAP-07 | The namespaces that stay in comment.cmtx after the first save of a session. | Only the one-namespace case is captured (A/Machine_Enabled, A/User_Enabled). | `CmtxDocument.RestrictNamespacesTo` |
 
-Gap rows of the audit (A1). Each line names the row, what is missing and the piece that closes it: A3 for a fix or a test after this audit, A2 for the elevated run (a real save with refresh). Gap rows by section: ACC 2, MSG 0, VIEW 0, TREE 0, BEH 1, POL 5, ADMX 1.
-
-| Row | What is missing | Piece |
-| --- | --- | --- |
-| ACC-030 | Alt+Left with the focus on the result side: BWC walks the history (the console frame handles it in every pane); the capture shows no change. | A3 |
-| ACC-031 | Alt+Right with the focus on the result side: the same frame difference as ACC-030. | A3 |
-| BEH-027 | The refresh timing of group G needs a real elevated save with refresh. | A2 |
-| POL-068 | The live registry after OK (group G), elevated only. | A2 |
-| POL-069 | The live registry after Apply then Cancel (group G), elevated only. | A2 |
-| POL-070 | The live registry after Disabled and Not Configured (group G), elevated only. | A2 |
-| POL-071 | The live registry after a comment-only change (group G), elevated only. | A2 |
-| POL-072 | The live registry types for element policies (group G), elevated only. | A2 |
-
-| Piece | Rows |
-| --- | --- |
-| A3 | ACC-030, ACC-031 |
-| A2 | BEH-027, POL-068, POL-069, POL-070, POL-071, POL-072 |
+Gap rows of the audit (A1): 0 open gap rows remain (`ACC 0, MSG 0, VIEW 0, TREE 0, BEH 0, POL 0, ADMX 0`). Piece A2 closed `BEH-027` and `POL-068` to `POL-072` in elevated run `20261125-043437-21d28993` (`708/708` checks, `29/29` Group G cases in `GpeditInterop_GroupG_LiveRegistryReplay`), and `ACC-030` and `ACC-031` were declared by user decision on 2026-11-24.
 
 Notes for the fix pieces:
 
@@ -108,6 +92,7 @@ The differences decided during the overnight run, with the rows that carry them 
 | Each template problem shows a BWC sentence for its engine code, with the code kept as a detail; classic shows its own texts in one start-up box. | MSG-031 to MSG-033 | `docs/failure-modes/gpedit-templates.md`, section 10 |
 | The Show Contents refusals and the number and text validation messages are the managed texts of the setting dialog, not the native admtmpl texts of ids 33 to 36 and 100 to 103. | MSG-024, MSG-028 | MSG-093 (string-parity, `forms:` ids) |
 | The Export List write errors and the Filter Options status words are BWC wording; the Export List file types differ from classic in letter case only. | MSG-038, MSG-059 | `docs/failure-modes/console-frame.md`, `docs/failure-modes/gpedit-filter.md`; the case fix is open (Resources.resw of Bwc.UI) |
+| Alt+Left and Alt+Right walk the console history from any pane (including the result list), handled by the shared console frame. | ACC-030, ACC-031 | User decision of 2026-11-24; `Gpedit_Keys_TreeHistoryResult` |
 
 Not differences: the default list order and the policy id ordering follow classic (VIEW-013, pass). The Export List format and encodings (`docs/failure-modes/console-frame.md`, declared difference 5) are a BWC definition, but no inventory row states classic's format, so no row carries them. The Help web site entry (MENU-034) exists as in classic and opens the project page; it is `pass`, for the user to confirm. Resources classic never shows in the local editor (static menus, wizard pages, Favorites dialogs, the author mode and MDI tables) are `declared-difference` "not reachable in the local editor, not built".
 
@@ -358,8 +343,8 @@ Not differences: the default list order and the policy id ordering follow classi
 | ACC-027 | pass | Gpedit_Keys_F5: no window and no menu, selection kept. The reload is the DIFF-007 addition. | G2 |
 | ACC-028 | pass | Console_Shell_FocusCycle. | G2 |
 | ACC-029 | pass | Gpedit_Keys_TreeExpand: Esc changes neither the node nor the focus and opens no window. | G2 |
-| ACC-030 | gap | The capture shows no change with the focus on the result side. BWC's console frame raises Back for Alt+Left in every pane, so with the focus on the result list the history is walked (Gpedit_Keys_TreeHistoryResult notes it). Difference in the shared console frame (Bwc.UI/Console/Shell), not a small fix. | A3 |
-| ACC-031 | gap | Same as ACC-030 for Alt+Right: the console frame raises Forward in every pane. Not asserted. | A3 |
+| ACC-030 | declared-difference | User decision of 2026-11-24: BWC's shared console frame handles Back for Alt+Left in every pane (including the result list; `Gpedit_Keys_TreeHistoryResult`), whereas classic's capture showed no change with focus on the result side. | G2 |
+| ACC-031 | declared-difference | User decision of 2026-11-24: BWC's shared console frame handles Forward for Alt+Right in every pane (including the result list). | G2 |
 | ACC-032 | pass | Gpedit_Keys_History (Alt+Up in the result pane changes nothing). | G2 |
 | ACC-033 | pass | Gpedit_ContextMenu_Tree and Console_Shell_ContextMenuKey. The capture's focus was on the result side; the tree menu itself is CTX-009. | G2 |
 | ACC-034 | pass | Gpedit_Keys_ListWalk: Down on the last row keeps it. | G2 |
@@ -581,9 +566,9 @@ Not differences: the default list order and the policy id ordering follow classi
 | BEH-024 | pass | Gpedit_ListBlind_StatusBar. | G1 |
 | BEH-025 | declared-difference | Sort per node: "Not decided by the captures: all Basics comments are alike" (gpedit-filter.md); BWC keeps a sort per node. Gpedit_Sort_AnotherNode. | G5 |
 | BEH-026 | pass | Gpedit_Dialog_OkSaves (the list shows the saved state). The live registry part (G/*) is BEH-027. | G4, G1 |
-| BEH-027 | gap | Elevated only: the refresh timing of group G needs a real save with refresh. | A2 |
+| BEH-027 | pass | GpeditInterop_GroupG_LiveRegistryReplay (elevated run 20261125-043437-21d28993: 29/29 Group G cases, 194/194 live-registry snapshots at 0, 4 and 8 s) and PolicyGoldenReplayTests (29/29 Group G file replays). | A2 |
 | BEH-028 | pass | CmtxGoldenTests and PolicyGoldenReplayTests (C/Comment_*, C/Cmtx_*). | E6a, G4 |
-| BEH-029 | pass | PolicyGoldenReplayTests (B/Pol_Outside_KeyOutsideRoots). The live part (G/Outside_KeyOutsideRoots) is A2. | E6b |
+| BEH-029 | pass | PolicyGoldenReplayTests (B/Pol_Outside_KeyOutsideRoots, G/Outside_KeyOutsideRoots) and GpeditInterop_GroupG_LiveRegistryReplay (G/Outside_KeyOutsideRoots in elevated run 20261125-043437-21d28993). | E6b, A2 |
 
 ### POL
 
@@ -599,12 +584,12 @@ Not differences: the default list order and the policy id ordering follow classi
 | POL-008 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupA. | E6a |
 | POL-009 | pass | PolicyGoldenReplayTests, GptIniGoldenTests and Gpedit_Replay_GroupA. | E6a |
 | POL-010 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupB_ElementKinds. | E6b |
-| POL-011 | pass | PolicyGoldenReplayTests (B cases). The live case G/Value_EnabledDisabledValues is A2 (POL-068 to POL-072). | E6b |
+| POL-011 | pass | PolicyGoldenReplayTests (B cases, G/Value_EnabledDisabledValues) and GpeditInterop_GroupG_LiveRegistryReplay (G/Value_EnabledDisabledValues in elevated run 20261125-043437-21d28993). | E6b, A2 |
 | POL-012 | pass | PolicyGoldenReplayTests. | E6b |
 | POL-013 | pass | PolicyGoldenReplayTests. | E6b |
 | POL-014 | pass | PolicyGoldenReplayTests. | E6b |
 | POL-015 | pass | PolicyGoldenReplayTests. | E6b |
-| POL-016 | pass | PolicyGoldenReplayTests (B case). The live case G/Outside_KeyOutsideRoots is A2. | E6b |
+| POL-016 | pass | PolicyGoldenReplayTests (B case, G/Outside_KeyOutsideRoots) and GpeditInterop_GroupG_LiveRegistryReplay (G/Outside_KeyOutsideRoots in elevated run 20261125-043437-21d28993). | E6b, A2 |
 | POL-017 | pass | PolicyGoldenReplayTests. | E6b |
 | POL-018 | pass | PolicyGoldenReplayTests (group B): B/Pol_Both_WithElements.Computer and .User replay byte for byte against their recaptured goldens. | E6b |
 | POL-019 | pass | PolicyGoldenReplayTests and Gpedit_Replay_GroupB_ElementKinds. | E6b |
@@ -656,11 +641,11 @@ Not differences: the default list order and the policy id ordering follow classi
 | POL-065 | pass | PolicyGoldenReplayDETests, PolicyEditRefusalTests and Gpedit_Options_List. | E6c, G3b |
 | POL-066 | pass | PolicyGoldenReplayDETests and PolicyEditRefusalTests. | E6c, G3b |
 | POL-067 | pass | PolicyGoldenReplayDETests and PolicyEditRefusalTests. | E6c, G3a |
-| POL-068 | gap | Elevated only: the live registry after a real save with refresh (group G). | A2 |
-| POL-069 | gap | Elevated only: the live registry after a real save with refresh (group G). | A2 |
-| POL-070 | gap | Elevated only: the live registry after a real save with refresh (group G). | A2 |
-| POL-071 | gap | Elevated only: the live registry after a real save with refresh (group G). | A2 |
-| POL-072 | gap | Elevated only: the live registry after a real save with refresh (group G). | A2 |
+| POL-068 | pass | GpeditInterop_GroupG_LiveRegistryReplay (elevated run 20261125-043437-21d28993) and PolicyGoldenReplayTests (G/*_Ok). | A2 |
+| POL-069 | pass | GpeditInterop_GroupG_LiveRegistryReplay (elevated run 20261125-043437-21d28993; BWC applies Flag=1 via RP_FORCE, gpo-store.md H5) and PolicyGoldenReplayTests (G/*_Apply). | A2 |
+| POL-070 | pass | GpeditInterop_GroupG_LiveRegistryReplay (elevated run 20261125-043437-21d28993; BWC applies Disabled step 1 via RP_FORCE and clears on step 2, gpo-store.md H5) and PolicyGoldenReplayTests (G/*_Disabled, G/*_NotConfigured). | A2 |
+| POL-071 | pass | GpeditInterop_GroupG_LiveRegistryReplay (elevated run 20261125-043437-21d28993) and PolicyGoldenReplayTests (G/*_CommentOnly). | A2 |
+| POL-072 | pass | GpeditInterop_GroupG_LiveRegistryReplay (elevated run 20261125-043437-21d28993) and PolicyGoldenReplayTests (G/Elements_*). | A2 |
 | POL-073 | pass | PolicyGoldenReplayTests (K) and KeyBackslashTests. | E6a |
 | POL-074 | pass | PolicyGoldenReplayTests (K) and KeyBackslashTests. | E6a |
 | POL-075 | pass | PolicyGoldenReplayTests (K) and KeyBackslashTests. | E6c |

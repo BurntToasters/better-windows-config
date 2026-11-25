@@ -105,8 +105,7 @@ const managedWriteAllowlist = new Map([
   ],
   [
     "tests/Bwc.E2E/Gpedit/Interop/GpeditInteropSupport.cs",
-    "Restores only HKLM Software/Policies/BWC-Oracle Basics ModeNumber, the fixture value the policy writes, " +
-      "and removes the two fixture keys again only when they did not exist before and are empty.",
+    "Backs up, clears, and restores only the four fixed BWC-Oracle fixture keys (HKLM/HKCU Software/Policies/BWC-Oracle and Software/BWC-Oracle-Gpedit) through AssertAllowed.",
   ],
   [
     "tools/Bwc.Oracle.Capture/Gpedit/Session/SelfTest.cs",

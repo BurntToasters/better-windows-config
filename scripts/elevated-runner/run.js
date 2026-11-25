@@ -39,7 +39,7 @@ const START_GRACE_MS = 120_000;
 // The task disables itself before it writes its final record, so a state that is no longer Running
 // with a fresh record that still says running is not the end yet. Wait this long for the record.
 const STOP_GRACE_MS = 60_000;
-const TIMEOUT_MS = 30 * 60_000;
+const TIMEOUT_MS = 60 * 60_000;
 const EXIT_PASS = 0;
 const EXIT_FAIL = 1;
 const EXIT_SETUP = 2;

@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Bwc.E2E.ConsoleFrame;
 using Bwc.E2E.Controls;
@@ -102,6 +104,83 @@ internal sealed class RealPolicyFolder
 
             File.Copy(step.PathOf(flat), target, overwrite: true);
         }
+    }
+
+    /// <summary>Deletes the five known GPO files so a case starts from an empty policy folder.</summary>
+    internal void ClearForCase()
+    {
+        foreach ((string _, string relative) in Files)
+        {
+            string path = Path.Combine(Root, relative);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    /// <summary>Compares the five GPO files against one golden step and returns any differences.</summary>
+    internal List<string> CompareGoldenStep(GoldenStep step)
+    {
+        var problems = new List<string>();
+        foreach ((string flat, string relative) in Files)
+        {
+            string path = Path.Combine(Root, relative);
+            byte[]? actual = File.Exists(path) ? File.ReadAllBytes(path) : null;
+            if (step.Files[flat] is null)
+            {
+                if (actual is not null)
+                {
+                    problems.Add($"{flat} must be absent but holds {actual.Length} bytes");
+                }
+
+                continue;
+            }
+
+            byte[] expected = File.ReadAllBytes(step.PathOf(flat));
+            if (actual is null)
+            {
+                problems.Add($"{flat} is missing; expected {expected.Length} bytes");
+            }
+            else if (!expected.AsSpan().SequenceEqual(actual))
+            {
+                problems.Add($"{flat} differs: {DiffBytes(expected, actual)}");
+            }
+        }
+
+        return problems;
+    }
+
+    /// <summary>Reads the size and SHA-256 of each of the five GPO files for the verification artifact.</summary>
+    internal Dictionary<string, (long Size, string Sha256)?> SnapshotFileMetadata()
+    {
+        var map = new Dictionary<string, (long Size, string Sha256)?>(StringComparer.Ordinal);
+        foreach ((string flat, string relative) in Files)
+        {
+            string path = Path.Combine(Root, relative);
+            if (!File.Exists(path))
+            {
+                map[flat] = null;
+                continue;
+            }
+
+            byte[] bytes = File.ReadAllBytes(path);
+            string sha = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+            map[flat] = (bytes.LongLength, sha);
+        }
+
+        return map;
+    }
+
+    private static string DiffBytes(byte[] expected, byte[] actual)
+    {
+        int at = 0;
+        while (at < expected.Length && at < actual.Length && expected[at] == actual[at])
+        {
+            at++;
+        }
+
+        return $"expected {expected.Length} bytes, got {actual.Length}, first difference at offset {at}";
     }
 
     /// <summary>Puts every one of the five files back, including the absent ones, and returns the differences.</summary>
@@ -1099,5 +1178,966 @@ internal static class InteropShip
 
         return tree.FindAllDescendants(cf => cf.ByControlType(ControlType.TreeItem))
             .FirstOrDefault(row => string.Equals(ShellRun.SafeName(row), name, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Walks Local Computer Policy, Computer or User Configuration, and each path segment in tree order, searching
+    /// strictly after the previous node so shared names under Computer and User never collide.
+    /// </summary>
+    internal static bool SelectPath(GpeditRun run, string root, IReadOnlyList<string> path, string expectedRow)
+    {
+        string rootNode = string.Equals(root, "Computer", StringComparison.Ordinal)
+            ? "Computer Configuration"
+            : "User Configuration";
+        var segments = new List<string>(2 + path.Count) { GpeditRun.RootName, rootNode };
+        segments.AddRange(path);
+
+        int afterIndex = -1;
+        for (int i = 0; i < segments.Count; i++)
+        {
+            string segment = segments[i];
+            TimeSpan timeout = i == 0 ? TimeSpan.FromSeconds(120) : TimeSpan.FromSeconds(60);
+            int foundIndex = -1;
+            AutomationElement? node = null;
+            bool ok = ShellRun.WaitUntil(
+                () =>
+                {
+                    (node, foundIndex) = FindTreeNodeAfter(run, segment, afterIndex);
+                    return node is not null;
+                },
+                timeout);
+            if (!ok || node is null)
+            {
+                return false;
+            }
+
+            string state = ControlTestSupport.StateOf(node);
+            if (state is "Collapsed" or "PartiallyExpanded")
+            {
+                _ = ControlTestSupport.Expand(node);
+            }
+
+            ControlTestSupport.Select(node);
+            Thread.Sleep(250);
+            afterIndex = foundIndex;
+        }
+
+        return ShellRun.WaitUntil(
+            () => run.Rows().Any(r => string.Equals(r.Name, expectedRow, StringComparison.Ordinal)),
+            TimeSpan.FromSeconds(15));
+    }
+
+    private static (AutomationElement? Element, int Index) FindTreeNodeAfter(GpeditRun run, string name, int afterIndex)
+    {
+        try
+        {
+            AutomationElement? tree = run.Shell.Find(ShellRun.TreeControlId);
+            if (tree is null)
+            {
+                return (null, -1);
+            }
+
+            AutomationElement[] items = tree.FindAllDescendants(cf => cf.ByControlType(ControlType.TreeItem));
+            for (int i = afterIndex + 1; i < items.Length; i++)
+            {
+                if (string.Equals(ShellRun.SafeName(items[i]), name, StringComparison.Ordinal))
+                {
+                    return (items[i], i);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // The tree may rebuild while expanding; the caller polls again.
+        }
+
+        return (null, -1);
+    }
+}
+
+/// <summary>
+/// Reads, backs up, clears, and restores the four fixed BWC-Oracle registry keys (HKLM and HKCU,
+/// Software\Policies\BWC-Oracle and Software\BWC-Oracle-Gpedit) using the same JSON shape as the oracle driver.
+/// </summary>
+internal sealed class OracleLiveRegistry
+{
+    private sealed record RootSpec(RegistryHive Hive, string SubKey, string Display);
+
+    private sealed record CapturedValue(string Name, RegistryValueKind Kind, object Data);
+
+    private sealed class CapturedKey
+    {
+        internal List<CapturedValue> Values { get; } = [];
+        internal Dictionary<string, CapturedKey> Children { get; } = new(StringComparer.Ordinal);
+    }
+
+    private static readonly RootSpec[] AllowedRoots =
+    [
+        new(RegistryHive.LocalMachine, @"Software\Policies\BWC-Oracle", @"HKLM\Software\Policies\BWC-Oracle"),
+        new(RegistryHive.LocalMachine, @"Software\BWC-Oracle-Gpedit", @"HKLM\Software\BWC-Oracle-Gpedit"),
+        new(RegistryHive.CurrentUser, @"Software\Policies\BWC-Oracle", @"HKCU\Software\Policies\BWC-Oracle"),
+        new(RegistryHive.CurrentUser, @"Software\BWC-Oracle-Gpedit", @"HKCU\Software\BWC-Oracle-Gpedit"),
+    ];
+
+    private readonly Dictionary<string, CapturedKey?> _before;
+    private readonly string _beforeJson;
+
+    private OracleLiveRegistry(Dictionary<string, CapturedKey?> before, string beforeJson)
+    {
+        _before = before;
+        _beforeJson = beforeJson;
+    }
+
+    /// <summary>Snapshots all four BWC-Oracle roots in memory without modifying the registry.</summary>
+    internal static OracleLiveRegistry Capture()
+    {
+        var before = new Dictionary<string, CapturedKey?>(StringComparer.Ordinal);
+        foreach (RootSpec spec in AllowedRoots)
+        {
+            AssertAllowed(spec.Hive, spec.SubKey);
+            using RegistryKey baseKey = RegistryKey.OpenBaseKey(spec.Hive, RegistryView.Registry64);
+            using RegistryKey? key = baseKey.OpenSubKey(spec.SubKey, writable: false);
+            before[spec.Display] = key is null ? null : CaptureTree(key);
+        }
+
+        return new OracleLiveRegistry(before, Read().ToJsonString());
+    }
+
+    /// <summary>Reads the four BWC-Oracle roots in the exact JSON format recorded by the oracle capture.</summary>
+    internal static JsonObject Read()
+    {
+        var result = new JsonObject();
+        foreach (RootSpec spec in AllowedRoots)
+        {
+            AssertAllowed(spec.Hive, spec.SubKey);
+            using RegistryKey baseKey = RegistryKey.OpenBaseKey(spec.Hive, RegistryView.Registry64);
+            using RegistryKey? key = baseKey.OpenSubKey(spec.SubKey, writable: false);
+            if (key is null)
+            {
+                result[spec.Display] = null;
+                continue;
+            }
+
+            Walk(key, spec.Display, result);
+        }
+
+        return result;
+    }
+
+    /// <summary>Clears all four BWC-Oracle roots before a Group G case and verifies they stay absent.</summary>
+    internal static void ClearAll()
+    {
+        Thread.Sleep(500);
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            foreach (RootSpec spec in AllowedRoots)
+            {
+                AssertAllowed(spec.Hive, spec.SubKey);
+                using RegistryKey baseKey = RegistryKey.OpenBaseKey(spec.Hive, RegistryView.Registry64);
+                baseKey.DeleteSubKeyTree(spec.SubKey, throwOnMissingSubKey: false);
+            }
+
+            Thread.Sleep(200);
+            if (AreAllAbsent())
+            {
+                return;
+            }
+        }
+
+        throw new InvalidOperationException("One or more BWC-Oracle registry keys remained after ClearAll: " + Read().ToJsonString());
+    }
+
+    /// <summary>Restores all four BWC-Oracle roots to their captured baseline and reports any problems.</summary>
+    internal IReadOnlyList<string> Restore()
+    {
+        var problems = new List<string>();
+        try
+        {
+            foreach (RootSpec spec in AllowedRoots)
+            {
+                AssertAllowed(spec.Hive, spec.SubKey);
+                using RegistryKey baseKey = RegistryKey.OpenBaseKey(spec.Hive, RegistryView.Registry64);
+                baseKey.DeleteSubKeyTree(spec.SubKey, throwOnMissingSubKey: false);
+                CapturedKey? captured = _before[spec.Display];
+                if (captured is not null)
+                {
+                    using RegistryKey created = baseKey.CreateSubKey(spec.SubKey, writable: true);
+                    RestoreTree(created, captured);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            problems.Add("registry: " + ex.Message);
+            return problems;
+        }
+
+        string actualJson = Read().ToJsonString();
+        if (!string.Equals(_beforeJson, actualJson, StringComparison.Ordinal))
+        {
+            problems.Add($"BWC-Oracle registry differs after restore. Expected {_beforeJson}, got {actualJson}.");
+        }
+
+        return problems;
+    }
+
+    private static void AssertAllowed(RegistryHive hive, string subKey)
+    {
+        bool match = AllowedRoots.Any(r => r.Hive == hive && string.Equals(r.SubKey, subKey, StringComparison.OrdinalIgnoreCase));
+        if (!match)
+        {
+            throw new InvalidOperationException($"Refused registry operation outside the four BWC-Oracle roots: {hive}\\{subKey}.");
+        }
+    }
+
+    private static bool AreAllAbsent()
+    {
+        foreach (RootSpec spec in AllowedRoots)
+        {
+            using RegistryKey baseKey = RegistryKey.OpenBaseKey(spec.Hive, RegistryView.Registry64);
+            using RegistryKey? key = baseKey.OpenSubKey(spec.SubKey, writable: false);
+            if (key is not null)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static CapturedKey CaptureTree(RegistryKey key)
+    {
+        var node = new CapturedKey();
+        foreach (string name in key.GetValueNames().OrderBy(n => n, StringComparer.Ordinal))
+        {
+            RegistryValueKind kind = key.GetValueKind(name);
+            object? data = key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+            if (data is not null)
+            {
+                node.Values.Add(new CapturedValue(name, kind, data));
+            }
+        }
+
+        foreach (string sub in key.GetSubKeyNames().OrderBy(n => n, StringComparer.Ordinal))
+        {
+            using RegistryKey? child = key.OpenSubKey(sub, writable: false);
+            if (child is not null)
+            {
+                node.Children[sub] = CaptureTree(child);
+            }
+        }
+
+        return node;
+    }
+
+    private static void RestoreTree(RegistryKey target, CapturedKey captured)
+    {
+        foreach (CapturedValue value in captured.Values)
+        {
+            target.SetValue(value.Name, value.Data, value.Kind);
+        }
+
+        foreach ((string subName, CapturedKey child) in captured.Children)
+        {
+            using RegistryKey subKey = target.CreateSubKey(subName, writable: true);
+            RestoreTree(subKey, child);
+        }
+    }
+
+    private static void Walk(RegistryKey key, string path, JsonObject into)
+    {
+        var values = new JsonObject();
+        foreach (string name in key.GetValueNames().OrderBy(n => n, StringComparer.Ordinal))
+        {
+            RegistryValueKind kind = key.GetValueKind(name);
+            object? data = key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+            values[name.Length == 0 ? "(Default)" : name] = new JsonObject
+            {
+                ["type"] = kind.ToString(),
+                ["data"] = Format(data),
+            };
+        }
+
+        into[path] = values;
+        foreach (string sub in key.GetSubKeyNames().OrderBy(n => n, StringComparer.Ordinal))
+        {
+            using RegistryKey? child = key.OpenSubKey(sub, writable: false);
+            if (child is not null)
+            {
+                Walk(child, path + "\\" + sub, into);
+            }
+        }
+    }
+
+    private static JsonNode? Format(object? data) => data switch
+    {
+        null => null,
+        byte[] bytes => JsonValue.Create(Convert.ToHexString(bytes).ToLowerInvariant()),
+        string[] lines => new JsonArray(lines.Select(l => (JsonNode?)JsonValue.Create(l)).ToArray()),
+        string text => JsonValue.Create(text),
+        int number => JsonValue.Create(number),
+        long number => JsonValue.Create(number),
+        _ => JsonValue.Create(data.ToString()),
+    };
+}
+
+/// <summary>
+/// Replays one Group G capture case through the ship Local Group Policy Editor on the real policy folder and
+/// verifies both the five GPO files and the live BWC-Oracle registry at 0, 4, and 8 s.
+/// </summary>
+internal sealed class ShipGReplayDriver
+{
+    private static readonly TimeSpan FileSettleTimeout = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan RegistrySettleTimeout = TimeSpan.FromSeconds(6);
+
+    // Classic omits RP_FORCE, so in the 2026-11-21 capture these 8 cases wrote gpt.ini v=1 right after *_Ok left
+    // gpsvc cached at v=1 and skipped applying step 1. BWC intentionally passes RP_FORCE and applies Flag=1.
+    private static readonly Dictionary<string, (string Hive, string Flag, bool HasDisabledStep)> VersionCollisionCases =
+        new(StringComparer.Ordinal)
+        {
+            ["G/Machine_Apply"] = ("HKLM", "MachineFlag", false),
+            ["G/User_Apply"] = ("HKCU", "UserFlag", false),
+            ["G/Both_Computer_Apply"] = ("HKLM", "BothFlag", false),
+            ["G/Both_User_Apply"] = ("HKCU", "BothFlag", false),
+            ["G/Machine_Disabled"] = ("HKLM", "MachineFlag", true),
+            ["G/User_Disabled"] = ("HKCU", "UserFlag", true),
+            ["G/Both_Computer_Disabled"] = ("HKLM", "BothFlag", true),
+            ["G/Both_User_Disabled"] = ("HKCU", "BothFlag", true),
+        };
+
+    private readonly RealPolicyFolder _policy;
+    private readonly GpeditChecks _checks;
+    private readonly GroupGReport _report;
+
+    internal ShipGReplayDriver(RealPolicyFolder policy, GpeditChecks checks, GroupGReport report)
+    {
+        _policy = policy;
+        _checks = checks;
+        _report = report;
+    }
+
+    internal bool Run(GoldenCase golden)
+    {
+        _policy.ClearForCase();
+        OracleLiveRegistry.ClearAll();
+
+        string scope = "gpedit-interop-" + SanitizeScope(golden.Id);
+        using GpeditRun run = GpeditRun.OpenShip(scope, InteropShip.EditorExe);
+        bool allPassed = true;
+        int stepIndex = 0;
+
+        foreach (GoldenOp op in golden.Ops)
+        {
+            switch (op.Kind)
+            {
+                case "wait":
+                    Thread.Sleep(op.Op["waitMs"]?.GetValue<int>() ?? 4000);
+                    break;
+                case "snapshot":
+                    (JsonObject expectedReg, string regMode) = ExpectedLiveRegistry(golden, op);
+                    if (op.IsStepSnapshot)
+                    {
+                        GoldenStep step = golden.Steps[stepIndex];
+                        bool filesOk = VerifyStepFiles(golden, step, op.Index);
+                        bool regOk = VerifyLiveRegistry(golden, op, expectedReg, regMode, settle: true);
+                        allPassed &= filesOk && regOk;
+                        stepIndex++;
+                    }
+                    else
+                    {
+                        bool regOk = VerifyLiveRegistry(golden, op, expectedReg, regMode, settle: false);
+                        allPassed &= regOk;
+                    }
+
+                    break;
+                case "editPolicy":
+                    bool editOk = ExecuteEdit(run, golden, op);
+                    allPassed &= editOk;
+                    if (!editOk)
+                    {
+                        return false;
+                    }
+
+                    break;
+                default:
+                    _checks.Record($"{golden.Id}.op{op.Index}.kind", false, $"Unsupported Group G op kind '{op.Kind}'.");
+                    return false;
+            }
+        }
+
+        return allPassed;
+    }
+
+    private bool VerifyStepFiles(GoldenCase golden, GoldenStep step, int opIndex)
+    {
+        bool matched = ShellRun.WaitUntil(() => _policy.CompareGoldenStep(step).Count == 0, FileSettleTimeout);
+        List<string> problems = _policy.CompareGoldenStep(step);
+        Dictionary<string, (long Size, string Sha256)?> actualMeta = _policy.SnapshotFileMetadata();
+        _report.AddFileStep(golden, step, actualMeta, problems);
+
+        bool pass = matched || problems.Count == 0;
+        _checks.Record(
+            $"{golden.Id}.step{step.Number}.files",
+            pass,
+            pass
+                ? $"after op {opIndex} the five GPO files match '{step.Label}' byte for byte."
+                : $"after op {opIndex} ('{step.Label}'): {string.Join(" | ", problems)}");
+        return pass;
+    }
+
+    private bool VerifyLiveRegistry(GoldenCase golden, GoldenOp op, JsonObject expected, string mode, bool settle)
+    {
+        if (settle)
+        {
+            _ = ShellRun.WaitUntil(() => CompareLiveRegistry(expected, OracleLiveRegistry.Read()).Count == 0, RegistrySettleTimeout);
+            Thread.Sleep(500);
+        }
+
+        JsonObject actual = OracleLiveRegistry.Read();
+        List<string> problems = CompareLiveRegistry(expected, actual);
+        _report.AddRegistrySnapshot(golden.Id, op.Index, op.Text("label") ?? string.Empty, mode, expected, actual, problems);
+
+        bool pass = problems.Count == 0;
+        _checks.Record(
+            $"{golden.Id}.op{op.Index}.registry",
+            pass,
+            pass
+                ? $"liveRegistry ({op.Text("label")}, {mode}) matches expected."
+                : $"liveRegistry ({op.Text("label")}, {mode}): {string.Join(" | ", problems)}");
+        return pass;
+    }
+
+    private bool ExecuteEdit(GpeditRun run, GoldenCase golden, GoldenOp op)
+    {
+        string ctx = $"{golden.Id}.op{op.Index}";
+        string root = op.Text("root") ?? throw new InvalidOperationException($"{ctx}: missing root.");
+        string[] path = (op.Op["path"] as JsonArray ?? []).Select(n => n!.GetValue<string>()).ToArray();
+        string policy = op.Text("policy") ?? throw new InvalidOperationException($"{ctx}: missing policy.");
+        string rowName = policy + " setting";
+
+        bool selected = InteropShip.SelectPath(run, root, path, rowName);
+        _checks.Record($"{ctx}.navigate", selected, $"Selected {root}/{string.Join("/", path)} with row '{rowName}'.");
+        if (!selected)
+        {
+            return false;
+        }
+
+        using GpeditDialog? dialog = GpeditDialog.Open(run, rowName, waitReadout: false);
+        _checks.Record($"{ctx}.opens", dialog is not null, $"Opened setting dialog for '{rowName}'.");
+        if (dialog is null)
+        {
+            return false;
+        }
+
+        JsonArray? options = op.Op["options"] as JsonArray;
+        string? state = op.Text("state") ?? (options is { Count: > 0 } ? "Enabled" : null);
+        if (state is not null)
+        {
+            string radio = state switch
+            {
+                "Enabled" => GpeditDialog.Enabled,
+                "Disabled" => GpeditDialog.Disabled,
+                _ => GpeditDialog.NotConfigured,
+            };
+            if (!dialog.IsSelected(radio))
+            {
+                _ = dialog.Select(radio);
+            }
+
+            bool stateOk = string.Equals(InteropShip.DialogState(dialog), state, StringComparison.Ordinal);
+            _checks.Record($"{ctx}.state", stateOk, $"State is '{InteropShip.DialogState(dialog)}', expected '{state}'.");
+            if (!stateOk)
+            {
+                return false;
+            }
+        }
+
+        if (options is { Count: > 0 })
+        {
+            if (!WaitFirstOptionEnabled(dialog, options))
+            {
+                _checks.Record($"{ctx}.optionsEnabled", false, "Option controls did not enable after selecting Enabled.");
+                return false;
+            }
+
+            foreach (JsonObject option in options.OfType<JsonObject>())
+            {
+                if (!SetShipOption(dialog, option, ctx))
+                {
+                    return false;
+                }
+            }
+        }
+
+        if (op.Text("comment") is { } comment && !string.Equals(dialog.TextOf(GpeditDialog.Comment), comment, StringComparison.Ordinal))
+        {
+            bool typed = dialog.SetComment(comment);
+            bool commentOk = typed && string.Equals(dialog.TextOf(GpeditDialog.Comment), comment, StringComparison.Ordinal);
+            _checks.Record($"{ctx}.comment", commentOk, $"Comment is '{dialog.TextOf(GpeditDialog.Comment)}', expected '{comment}'.");
+            if (!commentOk)
+            {
+                return false;
+            }
+        }
+
+        return ExecutePresses(dialog, op, ctx);
+    }
+
+    private static bool WaitFirstOptionEnabled(GpeditDialog dialog, JsonArray options)
+    {
+        JsonObject? first = options.OfType<JsonObject>().FirstOrDefault();
+        if (first is null)
+        {
+            return true;
+        }
+
+        string kind = first["expectKind"]?.GetValue<string>() ?? string.Empty;
+        string label = first["label"]?.GetValue<string>() ?? string.Empty;
+        string elementId = first["elementId"]?.GetValue<string>() ?? string.Empty;
+        string suffix = label.Length > 0 ? label : elementId;
+        string[] candidateIds = kind switch
+        {
+            "decimalTextBox" or "longDecimalTextBox" or "spinner" => ["textBox" + suffix, "numericUpDown" + suffix + ".Text"],
+            "textBox" => ["textBox" + suffix],
+            "comboBox" => ["comboBox" + suffix],
+            "dropdownList" => ["dropDownList" + suffix],
+            "multiText" => ["multiTextBox" + suffix],
+            "list" => ["button" + suffix],
+            _ => [],
+        };
+        if (candidateIds.Length == 0)
+        {
+            return true;
+        }
+
+        return ShellRun.WaitUntil(
+            () => candidateIds.Any(id => dialog.Find(id, 0.2)?.IsEnabled == true),
+            TimeSpan.FromSeconds(3));
+    }
+
+    private bool SetShipOption(GpeditDialog dialog, JsonObject option, string ctx)
+    {
+        string kind = option["expectKind"]?.GetValue<string>() ?? string.Empty;
+        string elementId = option["elementId"]?.GetValue<string>() ?? string.Empty;
+        string label = option["label"]?.GetValue<string>() ?? string.Empty;
+        string suffix = label.Length > 0 ? label : elementId;
+        string id = $"{ctx}.option.{elementId}";
+
+        switch (kind)
+        {
+            case "decimalTextBox":
+            case "longDecimalTextBox":
+            case "spinner":
+                string digits = option["text"]!.GetValue<string>();
+                string? numberBox = new[] { "textBox" + suffix, "numericUpDown" + suffix + ".Text" }
+                    .FirstOrDefault(c => dialog.Find(c, 0.5) is not null);
+                bool numOk = numberBox is not null
+                    && dialog.TypeInto(numberBox, digits)
+                    && string.Equals(dialog.TextOf(numberBox), digits, StringComparison.Ordinal);
+                _checks.Record(id, numOk, $"Number box '{suffix}' holds '{(numberBox is null ? "<missing>" : dialog.TextOf(numberBox))}', expected '{digits}'.");
+                return numOk;
+
+            case "textBox":
+            case "comboBox":
+                string text = option["text"]?.GetValue<string>() ?? option["item"]!.GetValue<string>();
+                string box = (kind == "comboBox" ? "comboBox" : "textBox") + suffix;
+                bool textOk = dialog.TypeInto(box, text) && string.Equals(dialog.TextOf(box), text, StringComparison.Ordinal);
+                _checks.Record(id, textOk, $"Text box '{suffix}' holds '{dialog.TextOf(box)}', expected '{text}'.");
+                return textOk;
+
+            case "dropdownList":
+                string item = option["item"]!.GetValue<string>();
+                bool chosen = dialog.Choose("dropDownList" + suffix, item);
+                _checks.Record(id, chosen, $"Selected '{item}' in drop-down '{suffix}'.");
+                return chosen;
+
+            case "multiText":
+                string[] lines = (option["lines"] as JsonArray ?? []).Select(l => l!.GetValue<string>()).ToArray();
+                bool multiOk = TypeMultiLines(dialog, "multiTextBox" + suffix, lines);
+                _checks.Record(id, multiOk, $"Typed {lines.Length} line(s) into '{suffix}'.");
+                return multiOk;
+
+            case "list":
+                return SetShipList(dialog, option, suffix, id);
+
+            default:
+                _checks.Record(id, false, $"Unsupported Group G option kind '{kind}'.");
+                return false;
+        }
+    }
+
+    private bool SetShipList(GpeditDialog dialog, JsonObject option, string suffix, string id)
+    {
+        List<string[]> rows = (option["rows"] as JsonArray ?? [])
+            .Select(r => ((JsonArray)r!).Select(c => c!.GetValue<string>()).ToArray())
+            .ToList();
+        bool clear = option["clearRows"]?.GetValue<bool>() == true;
+        _ = dialog.Invoke("button" + suffix);
+        GpeditContents? contents = GpeditContents.Wait(dialog);
+        _checks.Record($"{id}.opens", contents is not null, $"Show... of '{suffix}' opened Show Contents.");
+        if (contents is null)
+        {
+            return false;
+        }
+
+        int columns = contents.Cell(0, 1) is null ? 1 : 2;
+        int existing = contents.Rows(columns).Count;
+        if (clear)
+        {
+            for (int i = 0; i < existing; i++)
+            {
+                contents.DeleteRow(0);
+            }
+        }
+
+        int at = clear ? 0 : existing;
+        foreach (string[] cells in rows)
+        {
+            for (int c = 0; c < cells.Length; c++)
+            {
+                contents.Edit(at, c, cells[c]);
+            }
+
+            at++;
+        }
+
+        _ = contents.Ok();
+        bool closed = contents.WaitClosed();
+        _checks.Record($"{id}.closes", closed, "Show Contents closed after OK.");
+        return closed;
+    }
+
+    private static bool TypeMultiLines(GpeditDialog dialog, string controlId, string[] lines)
+    {
+        if (!dialog.FocusControl(controlId))
+        {
+            return false;
+        }
+
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
+        Thread.Sleep(100);
+        Keyboard.Type(VirtualKeyShort.DELETE);
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (i > 0)
+            {
+                Keyboard.Type(VirtualKeyShort.RETURN);
+            }
+
+            Keyboard.Type(lines[i]);
+        }
+
+        Thread.Sleep(300);
+        return true;
+    }
+
+    private bool ExecutePresses(GpeditDialog dialog, GoldenOp op, string ctx)
+    {
+        string[] presses = (op.Op["press"] as JsonArray)?.Select(p => p!.GetValue<string>()).ToArray() ?? ["OK"];
+        for (int k = 0; k < presses.Length; k++)
+        {
+            string buttonName = presses[k];
+            string buttonId = buttonName switch
+            {
+                "OK" => GpeditDialog.Ok,
+                "Apply" => GpeditDialog.Apply,
+                "Cancel" => GpeditDialog.Cancel,
+                _ => throw new InvalidOperationException($"Unsupported button '{buttonName}'."),
+            };
+
+            bool invoked = dialog.Invoke(buttonId);
+            if (buttonName == "Apply")
+            {
+                bool applied = invoked && ShellRun.WaitUntil(() => !dialog.IsEnabled(GpeditDialog.Apply), TimeSpan.FromSeconds(30));
+                _checks.Record($"{ctx}.press{k}.applied", applied, "Apply completed and disabled again.");
+                if (!applied)
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                bool closed = invoked && InteropShip.WaitClosed(dialog, TimeSpan.FromSeconds(30));
+                _checks.Record($"{ctx}.press{k}.closes", closed, $"{buttonName} closed the dialog.");
+                if (!closed)
+                {
+                    return false;
+                }
+            }
+        }
+
+        if (dialog.Find(GpeditDialog.Cancel, 0.4) is not null)
+        {
+            _ = dialog.Invoke(GpeditDialog.Cancel);
+            bool closedAtEnd = InteropShip.WaitClosed(dialog, TimeSpan.FromSeconds(15));
+            _checks.Record($"{ctx}.cancelAtEnd", closedAtEnd, "Cancel closed the dialog after Apply.");
+            return closedAtEnd;
+        }
+
+        return true;
+    }
+
+    private static (JsonObject Expected, string Mode) ExpectedLiveRegistry(GoldenCase golden, GoldenOp op)
+    {
+        if (VersionCollisionCases.TryGetValue(golden.Id, out (string Hive, string Flag, bool HasDisabledStep) info))
+        {
+            string label = op.Text("label") ?? string.Empty;
+            bool isAppliedStep = label.StartsWith("step apply", StringComparison.Ordinal)
+                || label.StartsWith("apply:", StringComparison.Ordinal)
+                || label.StartsWith("step enabled", StringComparison.Ordinal)
+                || label.StartsWith("enabled:", StringComparison.Ordinal);
+            if (isAppliedStep)
+            {
+                return (BuildFlagLiveRegistry(info.Hive, info.Flag), "rp-force-override");
+            }
+
+            return (op.LiveRegistry!, info.HasDisabledStep && label.Contains("disabled", StringComparison.Ordinal)
+                ? "classic-disabled"
+                : "classic-start");
+        }
+
+        return (op.LiveRegistry!, "classic-verbatim");
+    }
+
+    private static JsonObject BuildFlagLiveRegistry(string hive, string flagName)
+    {
+        string policyRoot = hive + @"\Software\Policies\BWC-Oracle";
+        string basicsKey = policyRoot + @"\Basics";
+        string gpeditRoot = hive + @"\Software\BWC-Oracle-Gpedit";
+        string otherHive = hive == "HKLM" ? "HKCU" : "HKLM";
+
+        var root = new JsonObject();
+        if (hive == "HKLM")
+        {
+            root[policyRoot] = new JsonObject();
+            root[basicsKey] = new JsonObject
+            {
+                [flagName] = new JsonObject { ["type"] = "DWord", ["data"] = 1 },
+            };
+            root[gpeditRoot] = null;
+            root[otherHive + @"\Software\Policies\BWC-Oracle"] = null;
+            root[otherHive + @"\Software\BWC-Oracle-Gpedit"] = null;
+        }
+        else
+        {
+            root[otherHive + @"\Software\Policies\BWC-Oracle"] = null;
+            root[otherHive + @"\Software\BWC-Oracle-Gpedit"] = null;
+            root[policyRoot] = new JsonObject();
+            root[basicsKey] = new JsonObject
+            {
+                [flagName] = new JsonObject { ["type"] = "DWord", ["data"] = 1 },
+            };
+            root[gpeditRoot] = null;
+        }
+
+        return root;
+    }
+
+    private static List<string> CompareLiveRegistry(JsonObject expected, JsonObject actual)
+    {
+        var problems = new List<string>();
+        foreach (KeyValuePair<string, JsonNode?> pair in expected)
+        {
+            if (!actual.TryGetPropertyValue(pair.Key, out JsonNode? actualNode))
+            {
+                problems.Add($"missing key '{pair.Key}'");
+                continue;
+            }
+
+            if (pair.Value is null && actualNode is null)
+            {
+                continue;
+            }
+
+            if (pair.Value is null || actualNode is null)
+            {
+                problems.Add($"key '{pair.Key}' expected {(pair.Value is null ? "null" : "present")}, got {(actualNode is null ? "null" : "present")}");
+                continue;
+            }
+
+            if (pair.Value is JsonObject expectedValues && actualNode is JsonObject actualValues)
+            {
+                CompareValues(pair.Key, expectedValues, actualValues, problems);
+            }
+            else
+            {
+                problems.Add($"key '{pair.Key}' shape mismatch");
+            }
+        }
+
+        foreach (KeyValuePair<string, JsonNode?> pair in actual)
+        {
+            if (!expected.ContainsKey(pair.Key))
+            {
+                problems.Add($"unexpected key '{pair.Key}'");
+            }
+        }
+
+        return problems;
+    }
+
+    private static void CompareValues(string keyPath, JsonObject expected, JsonObject actual, List<string> problems)
+    {
+        foreach (KeyValuePair<string, JsonNode?> pair in expected)
+        {
+            if (!actual.TryGetPropertyValue(pair.Key, out JsonNode? actualEntry) || actualEntry is not JsonObject actualObj || pair.Value is not JsonObject expectedObj)
+            {
+                problems.Add($"{keyPath}\\{pair.Key} missing or invalid");
+                continue;
+            }
+
+            string? expectedType = expectedObj["type"]?.GetValue<string>();
+            string? actualType = actualObj["type"]?.GetValue<string>();
+            if (!string.Equals(expectedType, actualType, StringComparison.Ordinal))
+            {
+                problems.Add($"{keyPath}\\{pair.Key} type expected '{expectedType}', got '{actualType}'");
+            }
+
+            if (!JsonDataEquals(expectedObj["data"], actualObj["data"]))
+            {
+                problems.Add($"{keyPath}\\{pair.Key} data expected {expectedObj["data"]?.ToJsonString()}, got {actualObj["data"]?.ToJsonString()}");
+            }
+        }
+
+        foreach (KeyValuePair<string, JsonNode?> pair in actual)
+        {
+            if (!expected.ContainsKey(pair.Key))
+            {
+                problems.Add($"unexpected value '{keyPath}\\{pair.Key}'");
+            }
+        }
+    }
+
+    private static bool JsonDataEquals(JsonNode? expected, JsonNode? actual)
+    {
+        if (expected is null && actual is null)
+        {
+            return true;
+        }
+
+        if (expected is null || actual is null)
+        {
+            return false;
+        }
+
+        if (expected is JsonValue ev && actual is JsonValue av)
+        {
+            if (ev.TryGetValue(out decimal ed) && av.TryGetValue(out decimal ad))
+            {
+                return ed == ad;
+            }
+
+            return string.Equals(ev.ToJsonString(), av.ToJsonString(), StringComparison.Ordinal);
+        }
+
+        if (expected is JsonArray ea && actual is JsonArray aa)
+        {
+            return ea.Count == aa.Count && Enumerable.Range(0, ea.Count).All(i => JsonDataEquals(ea[i], aa[i]));
+        }
+
+        return string.Equals(expected.ToJsonString(), actual.ToJsonString(), StringComparison.Ordinal);
+    }
+
+    private static string SanitizeScope(string caseId) =>
+        caseId.Replace('/', '-').Replace('_', '-').ToLowerInvariant();
+}
+
+/// <summary>
+/// Writes the verifiable Group G elevated replay artifact to
+/// <c>artifacts/e2e/visual/gpedit/gpedit-interop-groupg.json</c>.
+/// </summary>
+internal sealed class GroupGReport
+{
+    private readonly List<FileStepRow> _fileRows = [];
+    private readonly List<RegistrySnapshotRow> _registryRows = [];
+
+    internal sealed record FileStepRow(
+        string Case,
+        int Step,
+        string Label,
+        string File,
+        long? ExpectedSize,
+        string? ExpectedSha256,
+        long? ActualSize,
+        string? ActualSha256,
+        bool Equal);
+
+    internal sealed record RegistrySnapshotRow(
+        string Case,
+        int OpIndex,
+        string Label,
+        string Mode,
+        JsonObject Expected,
+        JsonObject Actual,
+        bool Equal,
+        IReadOnlyList<string> Problems);
+
+    internal void AddFileStep(
+        GoldenCase golden,
+        GoldenStep step,
+        Dictionary<string, (long Size, string Sha256)?> actualMeta,
+        List<string> problems)
+    {
+        _ = problems;
+        foreach (string flat in GoldenFiles.Names)
+        {
+            GoldenFile? expected = step.Files[flat];
+            actualMeta.TryGetValue(flat, out (long Size, string Sha256)? actual);
+            bool equal = expected is null
+                ? actual is null
+                : actual is not null && expected.Size == actual.Value.Size && string.Equals(expected.Sha256, actual.Value.Sha256, StringComparison.OrdinalIgnoreCase);
+            _fileRows.Add(new FileStepRow(
+                golden.Id,
+                step.Number,
+                step.Label,
+                flat,
+                expected?.Size,
+                expected?.Sha256,
+                actual?.Size,
+                actual?.Sha256,
+                equal));
+        }
+    }
+
+    internal void AddRegistrySnapshot(
+        string caseId,
+        int opIndex,
+        string label,
+        string mode,
+        JsonObject expected,
+        JsonObject actual,
+        List<string> problems)
+    {
+        _registryRows.Add(new RegistrySnapshotRow(
+            caseId,
+            opIndex,
+            label,
+            mode,
+            (JsonObject)expected.DeepClone(),
+            (JsonObject)actual.DeepClone(),
+            problems.Count == 0,
+            problems));
+    }
+
+    internal string Write()
+    {
+        string folder = Path.Combine(GuiGate.Config.ArtifactsDir, "visual", GpeditRun.Area);
+        Directory.CreateDirectory(folder);
+        string path = Path.Combine(folder, "gpedit-interop-groupg.json");
+        var document = new
+        {
+            report = "interop-groupg",
+            fileChecks = _fileRows.Count,
+            fileEqual = _fileRows.Count(r => r.Equal),
+            fileDifferent = _fileRows.Count(r => !r.Equal),
+            registrySnapshots = _registryRows.Count,
+            registryEqual = _registryRows.Count(r => r.Equal),
+            registryDifferent = _registryRows.Count(r => !r.Equal),
+            fileRows = _fileRows,
+            registryRows = _registryRows,
+        };
+        File.WriteAllText(path, JsonSerializer.Serialize(document, new JsonSerializerOptions { WriteIndented = true }));
+        E2EResults.Note("gpedit.interop.groupg.artifact", path);
+        return path;
     }
 }

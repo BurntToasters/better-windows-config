@@ -698,7 +698,7 @@ internal sealed class GpeditDialog : IDisposable
     /// Selects a policy row and opens its dialog with Enter (<paramref name="byKey"/>) or a double click. Returns null when no
     /// dialog appeared.
     /// </summary>
-    internal static GpeditDialog? Open(GpeditRun run, string rowName, bool byKey = true)
+    internal static GpeditDialog? Open(GpeditRun run, string rowName, bool byKey = true, bool waitReadout = true)
     {
         var driver = new EditingDriver(run.Shell.Session);
         var dialog = new GpeditDialog(run, driver);
@@ -720,7 +720,11 @@ internal sealed class GpeditDialog : IDisposable
             return null;
         }
 
-        _ = dialog.WaitForReadout();
+        if (waitReadout)
+        {
+            _ = dialog.WaitForReadout();
+        }
+
         _ = ClassicDialogTestsBridge.EnsureForeground(dialog.Hwnd);
         return dialog;
     }

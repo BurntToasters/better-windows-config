@@ -81,6 +81,15 @@ internal sealed class GoldenOp
 
     internal JsonObject? Data => Observed?["data"] as JsonObject;
 
+    internal JsonObject? LiveRegistry => Observed?["liveRegistry"] as JsonObject;
+
+    /// <summary>
+    /// True for a step snapshot (<c>label</c> starts with <c>"step "</c>) that corresponds to a folder in
+    /// <see cref="GoldenCase.Steps"/>; false for live-registry-only snapshots (such as Group G's start/4 s/8 s reads).
+    /// </summary>
+    internal bool IsStepSnapshot =>
+        Kind == "snapshot" && (Text("label")?.StartsWith("step ", StringComparison.Ordinal) ?? false);
+
     internal string? Text(string name) => Op[name] is JsonValue value && value.TryGetValue(out string? text) ? text : null;
 }
 
@@ -196,10 +205,29 @@ internal sealed class GoldenCase
     private void VerifyComplete()
     {
         Assert.IsTrue(Steps.Count > 0, $"Capture case {Id} records no step.");
-        var snapshots = Ops.Count(o => o.Kind == "snapshot");
         if (!StartRefused)
         {
-            Assert.AreEqual(Steps.Count, snapshots, $"Capture case {Id} is incomplete: {snapshots} snapshot operations but {Steps.Count} steps.");
+            var stepSnapshots = Ops.Where(o => o.IsStepSnapshot).ToList();
+            Assert.AreEqual(
+                Steps.Count,
+                stepSnapshots.Count,
+                $"Capture case {Id} is incomplete: {stepSnapshots.Count} step snapshot operations but {Steps.Count} steps.");
+            for (var i = 0; i < Steps.Count; i++)
+            {
+                var expectedLabel = "step " + Steps[i].Label;
+                var actualLabel = stepSnapshots[i].Text("label");
+                Assert.AreEqual(
+                    expectedLabel,
+                    actualLabel,
+                    $"Capture case {Id} step {Steps[i].Number}: expected snapshot '{expectedLabel}', got '{actualLabel}'.");
+            }
+
+            foreach (var op in Ops.Where(o => o.Kind == "snapshot" && !o.IsStepSnapshot))
+            {
+                Assert.IsNotNull(
+                    op.LiveRegistry,
+                    $"Capture case {Id} non-step snapshot operation {op.Index} ('{op.Text("label")}') has no observed liveRegistry.");
+            }
         }
 
         foreach (var step in Steps)

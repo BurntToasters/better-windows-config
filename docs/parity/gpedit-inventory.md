@@ -269,8 +269,8 @@
 | ACC-027 | Tree pane, F5 (step 15): opens no window and no menu; selection stays. | F/Keys_Tree | G2 | pass |
 | ACC-028 | Tree pane, F6 (step 16): focus moves to the result side. | F/Keys_Tree | G2 | pass |
 | ACC-029 | Tree pane, Esc (step 17): no effect on selection or focus; no window. | F/Keys_Tree | G2 | pass (Gpedit_Keys_TreeExpand) |
-| ACC-030 | Tree pane, Alt+Left (step 18): no change to selection or focus in this capture (history keys; the capture's focus is on the result side). | F/Keys_Tree | G2 | gap |
-| ACC-031 | Tree pane, Alt+Right (step 19): no change in this capture. | F/Keys_Tree | G2 | gap |
+| ACC-030 | Tree pane, Alt+Left (step 18): no change to selection or focus in this capture (history keys; the capture's focus is on the result side). | F/Keys_Tree | G2 | declared-difference |
+| ACC-031 | Tree pane, Alt+Right (step 19): no change in this capture. | F/Keys_Tree | G2 | declared-difference |
 | ACC-032 | Tree pane, Alt+Up (step 20): no change in this capture. | F/Keys_Tree | G2 | pass |
 | ACC-033 | Tree pane, Apps (step 21): no popup menu opens in this capture (focus is on the result side). | F/Keys_Tree | G2 | pass |
 | ACC-034 | Result list, Down (F/Keys_List step 1): the focus stays on the last row (the start row is the last). | F/Keys_List | G2 | pass (Gpedit_Keys_ListWalk) |
@@ -492,7 +492,7 @@
 | BEH-024 | The status bar counts policy rows only. A node that holds folder rows and no policy shows an empty bar or a count of the policies it does hold. | F/Nodes_Computer, F/Nodes_User | G1 | pass |
 | BEH-025 | Sorting is kept per node: another node keeps its own sort after a header click elsewhere. | F/Sort_Columns | G5 | declared-difference |
 | BEH-026 | After OK or Apply the list's state and comment cells for that policy show the new values at once. | A/*, G/* | G4, G1 | pass |
-| BEH-027 | Policy refresh runs after every save that changed a file, for both sides and for comment-only changes; its timing is the one recorded in group G. | G/* | G4, E3 | gap |
+| BEH-027 | After a policy save, the live registry reflects the saved values at 0, 4 and 8 s for both sides, options and clearing; after a comment-only save, gpt.ini version increases and the live registry stays unchanged (whether classic calls refresh on comment-only is unobservable; gpo-store.md H6). | G/* | G4, E3 | pass |
 | BEH-028 | A comment edit is written to comment.cmtx and everything another tool put into that file is kept. | C/Comment_*, C/Cmtx_* | E6a, G4 | pass |
 | BEH-029 | Records with a policy key outside the usual policy roots are read and written like any other. | B/Pol_Outside_KeyOutsideRoots, G/Outside_KeyOutsideRoots | E6b | pass |
 
@@ -567,11 +567,11 @@
 | POL-065 | List entries: a plain list with an empty or duplicate entry and an explicit list with an empty or duplicate name are refused with a message box; an explicit list with an empty value or a one-cell row, a 300 character entry and special characters are written. | E/List_Plain_EmptyEntry, E/List_Plain_DuplicateEntries, E/List_Plain_LongEntry, E/List_Plain_SpecialCharacters, E/List_Explicit_EmptyName, E/List_Explicit_EmptyValue, E/List_Explicit_DuplicateNames, E/List_Explicit_NameOnly | E6c, G3b | pass |
 | POL-066 | Multi-line text limits (too many lines, a line too long, nothing): each step is refused with a message box. | E/MultiText_Limits | E6c, G3b | pass |
 | POL-067 | Next Setting with a required number empty: a message box, nothing written. Previous Setting with the same edit: no message box, nothing written. | E/Next_WithInvalid, E/Previous_WithInvalid | E6c, G3a | pass |
-| POL-068 | The live registry after OK on a machine, a user and a class Both policy, and after a second OK with no change. | G/Machine_Ok, G/User_Ok, G/Both_Computer_Ok, G/Both_User_Ok | E6a, G4 | gap |
-| POL-069 | The live registry after Apply and then Cancel. | G/Machine_Apply, G/User_Apply, G/Both_Computer_Apply, G/Both_User_Apply | E6a, G4 | gap |
-| POL-070 | The live registry after Disabled and after Not Configured: applied values are changed or removed. | G/Machine_Disabled, G/User_Disabled, G/Both_Computer_Disabled, G/Both_User_Disabled, G/Machine_NotConfigured, G/User_NotConfigured, G/Both_Computer_NotConfigured, G/Both_User_NotConfigured | E6a, G4 | gap |
-| POL-071 | The live registry after a comment-only change and after Enabled with the comment. | G/Machine_CommentOnly, G/User_CommentOnly, G/Both_Computer_CommentOnly, G/Both_User_CommentOnly | E6a, G4 | gap |
-| POL-072 | Registry types and values written live for element policies, then removed by Not Configured. | G/Elements_* | E6a, G4 | gap |
+| POL-068 | The live registry after OK on a machine, a user and a class Both policy, and after a second OK with no change. | G/Machine_Ok, G/User_Ok, G/Both_Computer_Ok, G/Both_User_Ok | E6a, G4 | pass |
+| POL-069 | The live registry after Apply and then Cancel. | G/Machine_Apply, G/User_Apply, G/Both_Computer_Apply, G/Both_User_Apply | E6a, G4 | pass |
+| POL-070 | The live registry after Disabled and after Not Configured: applied values are changed or removed. | G/Machine_Disabled, G/User_Disabled, G/Both_Computer_Disabled, G/Both_User_Disabled, G/Machine_NotConfigured, G/User_NotConfigured, G/Both_Computer_NotConfigured, G/Both_User_NotConfigured | E6a, G4 | pass |
+| POL-071 | The live registry after a comment-only change and after Enabled with the comment. | G/Machine_CommentOnly, G/User_CommentOnly, G/Both_Computer_CommentOnly, G/Both_User_CommentOnly | E6a, G4 | pass |
+| POL-072 | Registry types and values written live for element policies, then removed by Not Configured. | G/Elements_* | E6a, G4 | pass |
 | POL-073 | A policy key with a leading backslash: Enabled then Not Configured writes the key in the form classic uses. | K/KeyLeadingBackslash_Enable | E6a | pass |
 | POL-074 | A policy key with a trailing backslash: Enabled then Not Configured. | K/KeyTrailingBackslash_Enable | E6a | pass |
 | POL-075 | Reading a Registry.pol whose key is spelled as the template spells it and one spelled trimmed, for both edge templates. The leading-backslash file as written makes classic refuse to open. | K/KeyLeadingBackslash_ReadAsWritten, K/KeyLeadingBackslash_ReadTrimmed, K/KeyTrailingBackslash_ReadAsWritten, K/KeyTrailingBackslash_ReadTrimmed | E6c | pass |

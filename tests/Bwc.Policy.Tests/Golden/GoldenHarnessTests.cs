@@ -175,4 +175,41 @@ public sealed class GoldenHarnessTests
         Assert.IsFalse(UnnoticedEditRule.IsUnnoticed(true, false, false, false), "Apply was enabled");
         Assert.IsFalse(UnnoticedEditRule.IsUnnoticed(true, false, true, true), "a message box refused it");
     }
+
+    [TestMethod]
+    public void G1_G2_Load_RejectsBrokenGroupGSnapshots_AndNoGroupGHasCap4()
+    {
+        const string caseId = "G/Machine_Ok";
+        using (var sandbox = new GoldenSandbox())
+        {
+            var root = sandbox.CopyCase(GoldenCase.FolderOf(caseId), caseId);
+            var casePath = Path.Combine(GoldenCase.FolderOf(caseId, root), "case.json");
+            var node = (JsonObject)JsonNode.Parse(File.ReadAllBytes(casePath))!;
+            var startObserved = node["observed"]!.AsArray().OfType<JsonObject>().Single(o => o["index"]!.GetValue<int>() == 0);
+            startObserved.Remove("liveRegistry");
+            sandbox.Overwrite(casePath, Encoding.UTF8.GetBytes(node.ToJsonString()));
+
+            var ex = Assert.Throws<AssertFailedException>(() => GoldenCase.Load(caseId, root));
+            StringAssert.Contains(ex.Message, "liveRegistry");
+        }
+
+        using (var sandbox = new GoldenSandbox())
+        {
+            var root = sandbox.CopyCase(GoldenCase.FolderOf(caseId), caseId);
+            var casePath = Path.Combine(GoldenCase.FolderOf(caseId, root), "case.json");
+            var node = (JsonObject)JsonNode.Parse(File.ReadAllBytes(casePath))!;
+            var stepOp = node["ops"]!.AsArray().OfType<JsonObject>().First(o => o["kind"]!.GetValue<string>() == "snapshot" && o["label"]!.GetValue<string>().StartsWith("step ", StringComparison.Ordinal));
+            stepOp["label"] = "step wrong-label";
+            ((JsonObject)stepOp["op"]!)["label"] = "step wrong-label";
+            sandbox.Overwrite(casePath, Encoding.UTF8.GetBytes(node.ToJsonString()));
+
+            var ex = Assert.Throws<AssertFailedException>(() => GoldenCase.Load(caseId, root));
+            StringAssert.Contains(ex.Message, "expected snapshot");
+        }
+
+        foreach (var id in PolicyGoldenReplayTests.GroupG.Select(c => "G/" + c))
+        {
+            Assert.IsNull(UnnoticedEditRule.FindInCase(GoldenCase.Load(id)), id);
+        }
+    }
 }
