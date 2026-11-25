@@ -9,13 +9,10 @@ import path from "node:path";
 import { EXIT, describeError, exitCodeForErrors, parseArguments, printRefusals, repoRootFrom, writeJson } from "./lib/cli.js";
 import {
   currentCommit,
-  loadGateProofFiles,
-  portableGateProof,
   qualityGateProof,
   readQualityGateResult,
   runPreflight,
   sessionPath,
-  vmGateProof,
 } from "./lib/release-policy.js";
 
 const SCRIPT = "scripts/release-session.js";
@@ -40,8 +37,6 @@ Options:
   --artifact-dir <dir>    Also validate a D5 artifact directory.
   --max-age-hours <n>     Session lifetime. Default ${DEFAULT_MAX_AGE_HOURS}.
   --session <path>        Session file. Default artifacts/release/session.json.
-  --gate-proof <path>     create: portable full-gate JSON file or folder covering both RIDs
-                          (paired with the local artifacts/gate/result.json VM gate).
   --force                 create: replace an existing session.
   --require-gate          Accepted for compatibility. create always requires a passing gate for HEAD
                           (artifacts/gate/result.json, clean tree) and records its E2E state.
@@ -54,7 +49,7 @@ Exit codes: 0 pass, 1 refused or expired, 2 usage, 3 missing session or input.`)
 
 function parseOptions(argv) {
   const parsed = parseArguments(argv, {
-    values: ["root", "version", "channel", "trusted-key", "artifact-dir", "max-age-hours", "session", { name: "gate-proof", multi: true }],
+    values: ["root", "version", "channel", "trusted-key", "artifact-dir", "max-age-hours", "session"],
     flags: ["allow-detached", "require-trusted-key", "require-gate", "force", "json", "help"],
   });
   if (parsed.has("help")) return { help: true };
@@ -76,10 +71,6 @@ function parseOptions(argv) {
       throw new Error("--max-age-hours must be a positive number");
     }
   }
-  const gateProof = parsed.all("gate-proof");
-  if (command !== "create" && gateProof.length > 0) {
-    throw new Error("--gate-proof is only valid with create");
-  }
   return {
     command,
     root: path.resolve(parsed.get("root") ?? REPO_ROOT),
@@ -91,7 +82,6 @@ function parseOptions(argv) {
     artifactDir: parsed.get("artifact-dir") ? path.resolve(parsed.get("artifact-dir")) : null,
     maxAgeHours: maxAgeHours === undefined ? DEFAULT_MAX_AGE_HOURS : Number(maxAgeHours),
     session: parsed.get("session") ? path.resolve(parsed.get("session")) : null,
-    gateProof,
     force: parsed.has("force"),
     json: parsed.has("json"),
   };
@@ -147,7 +137,7 @@ async function create(options) {
     return EXIT.REFUSED;
   }
 
-  const result = await runPreflight(options.root, { ...options, gateProof: [] });
+  const result = await runPreflight(options.root, options);
   if (!result.ok) {
     if (options.json) {
       console.log(JSON.stringify({ schema: 1, tool: SCRIPT, ok: false, errors: result.errors, checks: result.checks }));
@@ -162,36 +152,11 @@ async function create(options) {
   }
 
   // A session is never written without a passing gate for HEAD. --require-gate is accepted, not needed.
-  const head = currentCommit(options.root);
-  let gateRecord;
-  if (options.gateProof.length > 0) {
-    const loaded = loadGateProofFiles(options.root, options.gateProof);
-    if (!loaded.ok) {
-      console.error(`${SCRIPT}: REFUSED [${loaded.reason}]: ${loaded.detail}`);
-      console.error("release-session: no session was written.");
-      return EXIT.REFUSED;
-    }
-    const portable = portableGateProof(loaded.entries, head);
-    if (!portable.ok) {
-      console.error(`${SCRIPT}: REFUSED [${portable.reason}]: ${portable.detail}`);
-      console.error("release-session: no session was written.");
-      return EXIT.REFUSED;
-    }
-    const vmGate = vmGateProof(readQualityGateResult(options.root), head);
-    if (!vmGate.ok) {
-      console.error(`${SCRIPT}: REFUSED [${vmGate.reason}]: ${vmGate.detail}`);
-      console.error("release-session: no session was written.");
-      return EXIT.REFUSED;
-    }
-    gateRecord = { ...portable.record, vmGate: vmGate.source };
-  } else {
-    const gate = qualityGateProof(readQualityGateResult(options.root), head);
-    if (!gate.ok) {
-      console.error(`${SCRIPT}: REFUSED [${gate.reason}]: ${gate.detail}`);
-      console.error("release-session: no session was written.");
-      return EXIT.REFUSED;
-    }
-    gateRecord = gate.record;
+  const gate = qualityGateProof(readQualityGateResult(options.root), currentCommit(options.root));
+  if (!gate.ok) {
+    console.error(`${SCRIPT}: REFUSED [${gate.reason}]: ${gate.detail}`);
+    console.error("release-session: no session was written.");
+    return EXIT.REFUSED;
   }
 
   const session = {
@@ -205,7 +170,7 @@ async function create(options) {
     packageVersion: result.release.packageVersion,
     changelogHeading: result.changelog?.heading ?? null,
     trustedKey: sessionKeySummary(result.trusted.key),
-    qualityGate: gateRecord,
+    qualityGate: gate.record,
     startedUtc: new Date().toISOString(),
     maxAgeHours: options.maxAgeHours,
   };

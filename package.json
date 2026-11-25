@@ -45,7 +45,6 @@
     "release:sign:gpg": "node --env-file-if-exists=.env scripts/gpg-sign.js",
     "release:authenticode": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/verify-windows-authenticode.ps1",
     "release:win": "node --env-file-if-exists=.env scripts/run-release.js",
-    "release:win:vm": "node --env-file-if-exists=.env scripts/run-release.js --gate-proof artifacts/gate/proof",
     "release:win:continue": "node --env-file-if-exists=.env scripts/run-release.js --continue",
     "release:win:resume": "npm run prerelease:prepare && npm run release:win:continue",
     "release:win:upload": "node --env-file-if-exists=.env scripts/run-release.js --continue --from release:draft",

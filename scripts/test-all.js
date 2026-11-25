@@ -875,7 +875,7 @@ function main(argv = process.argv.slice(2)) {
     plan.rids.some((entry) => entry.rid === "win-arm64")
   ) {
     console.error(
-      "test-all: win-arm64 GUI E2E cannot run on an x64 host. Run --rid win-x64 on x64, --quick for builds/tests only, or `npm run release:win -- --gate-proof <path>` on the release VM.",
+      "test-all: win-arm64 GUI E2E cannot run on an x64 host. Run --rid win-x64 on x64, or --quick (with optional --release-gate) for builds and non-GUI tests.",
     );
     return 2;
   }
