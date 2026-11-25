@@ -61,28 +61,27 @@ The preflight checks this, and a dirty tree is refused.
 
 ### 3. Build, gate, sign, and upload the draft
 
-```powershell
-npm run release:win
-```
+The full quality gate runs GUI E2E for both `win-arm64` and `win-x64`. Because an x64 release VM accessed over OpenSSH cannot start `win-arm64` binaries or a desktop GUI session, there are two entry points:
 
-`release:win:continue` resumes the same flow, and `release:win:upload` starts at `release:draft`. None of them takes a
-feed option.
+- **Interactive ARM64 desktop (GUI session):** `npm run release:win` runs the full `node scripts/test-all.js --rid all` gate locally on clean `main` HEAD.
+- **x64 SSH release VM (`npm run release:win:vm` or `--gate-proof <path>`):**
+  1. Run the full GUI gate on clean `main` HEAD on interactive desktop machine(s): either `node scripts/test-all.js --rid all` on ARM64 Windows (producing one `artifacts/gate/result.json`), OR `node scripts/test-all.js --rid win-arm64` on ARM64 and `node scripts/test-all.js --rid win-x64` on x64 (two files).
+  2. Copy the JSON file(s) into `artifacts/gate/proof/` on the release VM (for example `artifacts/gate/proof/result.json`, or `artifacts/gate/proof/win-arm64.json` and `artifacts/gate/proof/win-x64.json`). Never place the copied proof at `artifacts/gate/result.json` because `test-all.js` deletes and rewrites that file.
+  3. On the x64 SSH release VM, run:
+
+     ```powershell
+     npm run release:win:vm
+     ```
+
+     (`npm run release:win:vm` runs `node --env-file-if-exists=.env scripts/run-release.js --gate-proof artifacts/gate/proof`; pass `--gate-proof <file>` repeatedly or `--gate-proof <dir>` to use another location.)
+
+Both `release:win` and `release:win:vm` run `release:win:continue` at the end; `release:win:upload` starts at `release:draft`. None of them takes a feed option.
 
 This runs, in order:
 
 1. The stable policy (no beta overrides, no non-canonical GitHub target).
-2. `release:preflight --require-trusted-key`. Before anything is built, it checks the update key
-   (decrypts, and is embedded in `TrustedKeys.cs`), the GPG key (a probe file is signed in a temporary
-   folder), `AFTER_PACK_LOC` (exists, is writable, is outside the repository), the Azure variables and
-   SignTool, `makensis.exe`, the Node version, that HEAD is pushed to `origin/main`, `gh auth status`,
-   that no published release exists for the tag, and that the version is newer than the latest
-   published release. Every local failure is listed in one run. The reasons are RP1 to RP24 in
-   [failure-modes/release.md](failure-modes/release.md).
-3. The full quality gate: one `node scripts/test-all.js --rid all` run (no `--quick`) that passed on a clean
-   HEAD for both `win-arm64` and `win-x64`, including their GUI E2E steps. Run it on a machine with a GUI
-   session. A quick gate, a one-rid gate, and a gate with a skipped, NOT RUN, or failed step are refused
-   (`qualityGateProof` and `GATE_REQUIRED_RIDS` in `scripts/lib/release-policy.js`). The gate stops at the first
-   failure and writes `artifacts/gate/result.json`. Its steps run in this order:
+2. `release:preflight --require-trusted-key` (plus `--gate-proof <path>...` when `--gate-proof` is given). Before anything is built, it validates any portable GUI gate proof (full clean-HEAD run covering both `win-arm64` and `win-x64`) and checks the update key (decrypts, and is embedded in `TrustedKeys.cs`), the GPG key (a probe file is signed in a temporary folder), `AFTER_PACK_LOC` (exists, is writable, is outside the repository), the Azure variables and SignTool, `makensis.exe`, the Node version, that HEAD is pushed to `origin/main`, `gh auth status`, that no published release exists for the tag, and that the version is newer than the latest published release. Every local failure is listed in one run. The reasons are RP1 to RP24 and Q17 to Q23 in [failure-modes/release.md](failure-modes/release.md).
+3. The quality gate: without `--gate-proof`, one `node scripts/test-all.js --rid all` run (no `--quick`) for both `win-arm64` and `win-x64`, including their GUI E2E steps. With `--gate-proof`, `node scripts/test-all.js --quick --release-gate --rid all` on the VM (automatically running all `dotnet` build and test steps unelevated through `scripts/run-restricted.ps1` when called from an elevated SSH shell). A quick gate without portable GUI proof, a one-rid gate, and a gate with a skipped, NOT RUN, or failed step are refused (`qualityGateProof`, `portableGateProof`, and `GATE_REQUIRED_RIDS` in `scripts/lib/release-policy.js`). The gate stops at the first failure and writes `artifacts/gate/result.json`. Its steps run in this order:
    - Shared steps, run once: `sync-version`, `sync-version-selftest`, `registry-writer`, `registry-writer-selftest`, `policy-writer`,
      `policy-writer-selftest`, `no-em-dash`, `no-em-dash-selftest`, `regedit-strings`, `tracked-paths-selftest`,
      `tracked-paths`, `oracle-json-selftest`, `oracle-json`, `e2e-timing-selftest`, `changelog-version`,
@@ -90,14 +89,14 @@ This runs, in order:
      and `signing-selftest`.
    - Builds and test projects, run once: `build-arm64`, `build-x64`, `test-core`, `test-gpo`, `test-policy`,
      `test-registry-e2e`, `test-registry-shipping`, `test-update`, and `test-update-e2e`.
-   - For each rid (`win-arm64`, then `win-x64`): `publish-ship`, `verify-flavor-ship`, `e2e-ship`, `publish-e2e`,
+   - For each rid (`win-arm64`, then `win-x64`, skipped when `--quick --release-gate` is used with `--gate-proof`): `publish-ship`, `verify-flavor-ship`, `e2e-ship`, `publish-e2e`,
      `verify-flavor-e2e`, and `e2e-flavor`. The two E2E steps must each have a passing
      `artifacts/e2e/result-<rid>-<flavor>.json`.
-   - `test-policy-release-gate`, last, after the steps of every rid, and only in a full gate. It runs the
+   - `test-policy-release-gate`, last, after the steps of every rid (and also included with `--quick --release-gate`). It runs the
      tests tagged `ReleaseGate` in `tests/Bwc.Policy.Tests` and fails while a capture case still awaits a
-     recapture. It belongs to no rid. It must have passed (`qualityGateProof` refuses `gate-release-step-not-run`
+     recapture. It belongs to no rid. It must have passed (`qualityGateProof` and `vmGateProof` refuse `gate-release-step-not-run`
      when it is missing or did not pass).
-4. A release session that records the gate with `mode: "full"`, both rids, and E2E `passed`.
+4. A release session that records the gate with `mode: "full"`, both rids, and E2E `passed` (and `sources` + `vmGate` when `--gate-proof` is used).
 5. A clean `artifacts/release/<version>/` folder, then `npm run release:win:continue`.
 
 The continuation starts with the same gate (policy, preflight, session verify). It then builds both
@@ -625,6 +624,8 @@ A dry run that finds a refusal still prints the plan and exits 1.
 | `asset-replace-stable` | `--replace-assets` was given for a stable release. Exit 1. |
 | `gate-missing`, `gate-failed`, `gate-commit-mismatch`, `gate-dirty-tree`, `gate-quick`, `gate-rid-missing`, `gate-e2e-not-run`, `gate-release-step-not-run` | `release-session.js create` found no full quality gate that passed on HEAD for both rids: none, a failed step, another commit, a dirty tree, a quick run, a missing rid, a skipped E2E step, or a release gate step that did not run. The gate is required by default. Exit 1, no session written. |
 | `missing-quality-gate` | `release-session.js verify` (and the draft, verify, and publish checks) found a session with no recorded gate. Exit 1. |
+| `gate-proof-conflict` | A `--gate-proof` path is `artifacts/gate/result.json`, `artifacts/gate`, or inside `artifacts/gate/logs`, which `test-all.js` rewrites. Store proofs under `artifacts/gate/proof/`. Exit 2 in `run-release.js`, 1 in preflight and session. |
+| `gate-proof-invalid` | A `--gate-proof` path or a `.json` file in a proof folder is a symbolic link or not a regular file or folder. Exit 1. |
 | `asset-incomplete` | A draft asset is not in the `uploaded` state. Pass `--replace-assets` to delete and re-upload it. Exit 1. |
 | `asset-url-malformed` | A manifest installer URL has a malformed percent escape. Exit 1. |
 | `key-missing`, `password-missing`, `malformed-secret-key`, `embedded-key-mismatch` | Readiness (RP1 to RP4): the update key is absent, encrypted without its password, malformed, or not embedded. |

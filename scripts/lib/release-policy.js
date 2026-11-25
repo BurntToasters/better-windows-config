@@ -472,11 +472,32 @@ export async function runPreflight(root, options = {}) {
   errors.push(...trusted.errors);
   checks.push(...trusted.checks);
 
+  if (Array.isArray(options.gateProof) && options.gateProof.length > 0) {
+    const head = branch.commit ?? currentCommit(root);
+    const loaded = loadGateProofFiles(root, options.gateProof);
+    if (!loaded.ok) {
+      errors.push({ reason: loaded.reason, detail: loaded.detail, exitCode: EXIT.REFUSED });
+    } else {
+      const proof = portableGateProof(loaded.entries, head);
+      if (!proof.ok) {
+        errors.push({ reason: proof.reason, detail: proof.detail, exitCode: EXIT.REFUSED });
+      } else {
+        checks.push({ name: "gate-proof", pass: true, detail: proof.record.source });
+      }
+    }
+  }
+
   // The signing readiness checks run only when the caller injects dependencies (the signing VM).
   if (options.readiness && release.ok) {
     const ready = checkReleaseReadiness(
       root,
-      { version: release.version, channel: release.channel, commit: currentCommit(root), env: options.readiness.env },
+      {
+        version: release.version,
+        channel: release.channel,
+        commit: currentCommit(root),
+        env: options.readiness.env,
+        skipNetwork: errors.length > 0,
+      },
       options.readiness.deps,
     );
     errors.push(...ready.errors);
@@ -671,6 +692,188 @@ const GATE_E2E_STEPS = Object.freeze(["e2e-ship", "e2e-flavor"]);
  */
 const GATE_RELEASE_STEP = "test-policy-release-gate";
 
+function validateCommonGate(gate, head, sourceLabel, missingDetail) {
+  if (!gate || typeof gate !== "object") {
+    return { ok: false, reason: "gate-missing", detail: missingDetail };
+  }
+  const label = sourceLabel ? `${sourceLabel}: ` : "";
+  if (gate.pass !== true) {
+    return { ok: false, reason: "gate-failed", detail: `${label}the quality gate did not pass` };
+  }
+  const gateCommit = gate.git?.commit ?? null;
+  if (gateCommit !== head) {
+    return {
+      ok: false,
+      reason: "gate-commit-mismatch",
+      detail: `${label}the quality gate ran on ${String(gateCommit).slice(0, 12)}, not HEAD ${String(head).slice(0, 12)}`,
+    };
+  }
+  // test-all.js records git.dirty. A gate that ran on uncommitted files does not describe HEAD.
+  if (gate.git?.dirty === true) {
+    return {
+      ok: false,
+      reason: "gate-dirty-tree",
+      detail: `${label}the quality gate ran on a dirty tree; rerun it on a clean checkout of HEAD`,
+    };
+  }
+  const steps = Array.isArray(gate.steps) ? gate.steps : [];
+  const failedStep = steps.find((step) => step?.pass !== true);
+  if (failedStep) {
+    return {
+      ok: false,
+      reason: "gate-failed",
+      detail: `${label}the quality gate step ${String(failedStep.name)} did not pass`,
+    };
+  }
+  const releaseStep = steps.find((candidate) => candidate?.name === GATE_RELEASE_STEP);
+  if (!releaseStep || releaseStep.pass !== true || releaseStep.exitCode !== 0) {
+    return {
+      ok: false,
+      reason: "gate-release-step-not-run",
+      detail: `${label}the quality gate has no passing ${GATE_RELEASE_STEP} (it runs last, after every rid; it did not run or did not pass)`,
+    };
+  }
+  return { ok: true, gateCommit, steps };
+}
+
+function validateRidE2e(steps, rid, sourceLabel) {
+  const label = sourceLabel ? `${sourceLabel}: ` : "";
+  for (const name of GATE_E2E_STEPS) {
+    const step = steps.find((candidate) => candidate?.rid === rid && candidate?.name === name);
+    const result = step?.e2eResult;
+    const ran = Boolean(step) && step.exitCode === 0 && result?.exists === true && result?.pass === true && !(result.failed > 0);
+    if (!ran) {
+      return {
+        ok: false,
+        reason: "gate-e2e-not-run",
+        detail: `${label}the quality gate has no passing ${name} for ${rid} (skipped, NOT RUN, or no passing result file)`,
+      };
+    }
+  }
+  return null;
+}
+
+function foldPath(value) {
+  const resolved = path.resolve(value);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+function toRepoDisplayPath(root, filePath) {
+  const relative = path.relative(root, filePath).split(path.sep).join("/");
+  return relative && !relative.startsWith("..") && !path.isAbsolute(relative) ? relative : filePath;
+}
+
+/**
+ * Checks --gate-proof paths so they never point at `artifacts/gate/result.json`, `artifacts/gate`,
+ * or `artifacts/gate/logs`, which `test-all.js` deletes and rewrites before each run.
+ */
+export function checkGateProofPaths(root, rawPaths) {
+  if (!Array.isArray(rawPaths) || rawPaths.length === 0) {
+    return { ok: false, reason: "gate-missing", detail: "no portable gate proof path was given" };
+  }
+  const gateDir = foldPath(path.join(root, "artifacts", "gate"));
+  const gateResult = foldPath(path.join(root, QUALITY_GATE_RESULT_RELATIVE_PATH));
+  const gateLogs = foldPath(path.join(root, "artifacts", "gate", "logs"));
+  const resolved = [];
+
+  for (const raw of rawPaths) {
+    const text = String(raw ?? "").trim();
+    if (!text) {
+      return { ok: false, reason: "gate-proof-invalid", detail: "gate proof path cannot be empty" };
+    }
+    const abs = path.resolve(root, text);
+    const folded = foldPath(abs);
+    if (folded === gateResult || folded === gateDir || folded === gateLogs || isPathInside(gateLogs, folded)) {
+      return {
+        ok: false,
+        reason: "gate-proof-conflict",
+        detail: `${text} collides with artifacts/gate/result.json or artifacts/gate/logs (rewritten by test-all.js); store portable proofs under artifacts/gate/proof/ or outside artifacts/gate`,
+      };
+    }
+    resolved.push(abs);
+  }
+  return { ok: true, resolved };
+}
+
+/** Loads regular .json files from one or more --gate-proof file or folder paths (refuses symlinks). */
+export function loadGateProofFiles(root, rawPaths) {
+  const checked = checkGateProofPaths(root, rawPaths);
+  if (!checked.ok) return checked;
+
+  const files = [];
+  const seen = new Set();
+  const addFile = (abs) => {
+    const key = foldPath(abs);
+    if (seen.has(key)) return;
+    seen.add(key);
+    files.push(abs);
+  };
+
+  for (const abs of checked.resolved) {
+    let info;
+    try {
+      info = fs.lstatSync(abs);
+    } catch {
+      return { ok: false, reason: "gate-missing", detail: `gate proof path not found: ${toRepoDisplayPath(root, abs)}` };
+    }
+    if (info.isSymbolicLink()) {
+      return { ok: false, reason: "gate-proof-invalid", detail: `gate proof path cannot be a symbolic link: ${toRepoDisplayPath(root, abs)}` };
+    }
+    if (info.isDirectory()) {
+      let dirEntries;
+      try {
+        dirEntries = fs.readdirSync(abs, { withFileTypes: true });
+      } catch (error) {
+        return { ok: false, reason: "gate-missing", detail: `could not read gate proof folder ${toRepoDisplayPath(root, abs)}: ${error instanceof Error ? error.message : String(error)}` };
+      }
+      dirEntries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      let count = 0;
+      for (const entry of dirEntries) {
+        if (!/\.json$/i.test(entry.name)) continue;
+        const child = path.join(abs, entry.name);
+        let childInfo;
+        try {
+          childInfo = fs.lstatSync(child);
+        } catch {
+          return { ok: false, reason: "gate-missing", detail: `could not inspect ${toRepoDisplayPath(root, child)}` };
+        }
+        if (childInfo.isSymbolicLink()) {
+          return { ok: false, reason: "gate-proof-invalid", detail: `gate proof file cannot be a symbolic link: ${toRepoDisplayPath(root, child)}` };
+        }
+        if (childInfo.isDirectory()) continue;
+        if (!childInfo.isFile()) {
+          return { ok: false, reason: "gate-proof-invalid", detail: `gate proof entry is not a regular file: ${toRepoDisplayPath(root, child)}` };
+        }
+        addFile(child);
+        count += 1;
+      }
+      if (count === 0) {
+        return { ok: false, reason: "gate-missing", detail: `no .json gate proof files found in ${toRepoDisplayPath(root, abs)}` };
+      }
+    } else if (info.isFile()) {
+      addFile(abs);
+    } else {
+      return { ok: false, reason: "gate-proof-invalid", detail: `gate proof path is neither a file nor a folder: ${toRepoDisplayPath(root, abs)}` };
+    }
+  }
+
+  const entries = [];
+  for (const file of files) {
+    const displayPath = toRepoDisplayPath(root, file);
+    try {
+      const gate = JSON.parse(fs.readFileSync(file, "utf8"));
+      entries.push({ path: displayPath, gate });
+    } catch (error) {
+      return {
+        ok: false,
+        reason: "gate-missing",
+        detail: `unreadable gate proof ${displayPath}: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+  return { ok: true, entries };
+}
+
 /**
  * Checks a quality-gate result for the release commit. Only a full gate counts: one run of
  * `test-all.js --rid all` (no --quick) that passed on a clean HEAD, with both architectures, their
@@ -678,6 +881,7 @@ const GATE_RELEASE_STEP = "test-policy-release-gate";
  * gate, a gate for one rid, and a gate with a skipped, NOT RUN, or failed step are refused.
  */
 export function qualityGateProof(gate, head) {
+  // The order of the checks is part of the contract (Q1 to Q16): header, quick, rids, steps, e2e, release step.
   if (!gate || typeof gate !== "object") {
     return { ok: false, reason: "gate-missing", detail: `no passing quality gate at ${QUALITY_GATE_RESULT_RELATIVE_PATH}` };
   }
@@ -692,7 +896,6 @@ export function qualityGateProof(gate, head) {
       detail: `the quality gate ran on ${String(gateCommit).slice(0, 12)}, not HEAD ${String(head).slice(0, 12)}`,
     };
   }
-  // test-all.js records git.dirty. A gate that ran on uncommitted files does not describe HEAD.
   if (gate.git?.dirty === true) {
     return {
       ok: false,
@@ -708,7 +911,6 @@ export function qualityGateProof(gate, head) {
     };
   }
   const rids = Array.isArray(gate.rids) ? gate.rids : [];
-  const steps = Array.isArray(gate.steps) ? gate.steps : [];
   for (const rid of GATE_REQUIRED_RIDS) {
     const entry = rids.find((candidate) => candidate?.rid === rid);
     if (!entry || entry.status === "skipped" || entry.status === "not-run") {
@@ -722,23 +924,14 @@ export function qualityGateProof(gate, head) {
       return { ok: false, reason: "gate-failed", detail: `the quality gate did not pass for ${rid}` };
     }
   }
+  const steps = Array.isArray(gate.steps) ? gate.steps : [];
   const failedStep = steps.find((step) => step?.pass !== true);
   if (failedStep) {
     return { ok: false, reason: "gate-failed", detail: `the quality gate step ${String(failedStep.name)} did not pass` };
   }
   for (const rid of GATE_REQUIRED_RIDS) {
-    for (const name of GATE_E2E_STEPS) {
-      const step = steps.find((candidate) => candidate?.rid === rid && candidate?.name === name);
-      const result = step?.e2eResult;
-      const ran = Boolean(step) && step.exitCode === 0 && result?.exists === true && result?.pass === true && !(result.failed > 0);
-      if (!ran) {
-        return {
-          ok: false,
-          reason: "gate-e2e-not-run",
-          detail: `the quality gate has no passing ${name} for ${rid} (skipped, NOT RUN, or no passing result file)`,
-        };
-      }
-    }
+    const e2eError = validateRidE2e(steps, rid, "");
+    if (e2eError) return e2eError;
   }
   const releaseStep = steps.find((candidate) => candidate?.name === GATE_RELEASE_STEP);
   if (!releaseStep || releaseStep.pass !== true || releaseStep.exitCode !== 0) {
@@ -759,6 +952,85 @@ export function qualityGateProof(gate, head) {
       e2e: "passed",
     },
   };
+}
+
+/**
+ * Validates a set of portable full-gate JSON files (either one --rid all file or two per-RID files
+ * for win-arm64 and win-x64). Every file is checked strictly; together they must cover both RIDs.
+ */
+export function portableGateProof(entries, head) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return { ok: false, reason: "gate-missing", detail: "no portable gate proof files were loaded" };
+  }
+  const provenRids = new Set();
+  const sources = [];
+
+  for (const item of entries) {
+    const label = item?.path || "(portable proof)";
+    const gate = item?.gate;
+    const common = validateCommonGate(gate, head, label, `${label}: gate proof is empty or invalid`);
+    if (!common.ok) return common;
+    if (gate.quick !== false) {
+      return {
+        ok: false,
+        reason: "gate-quick",
+        detail: `${label}: the portable gate proof was a quick run; it must be a full GUI E2E run without --quick`,
+      };
+    }
+    const rids = Array.isArray(gate.rids) ? gate.rids : [];
+    for (const entry of rids) {
+      const rid = entry?.rid;
+      if (!GATE_REQUIRED_RIDS.includes(rid)) continue;
+      if (entry.status === "skipped" || entry.status === "not-run") {
+        return {
+          ok: false,
+          reason: "gate-rid-missing",
+          detail: `${label}: the quality gate has no completed run for ${rid}`,
+        };
+      }
+      if (entry.status !== "pass") {
+        return { ok: false, reason: "gate-failed", detail: `${label}: the quality gate did not pass for ${rid}` };
+      }
+      const e2eError = validateRidE2e(common.steps, rid, label);
+      if (e2eError) return e2eError;
+      provenRids.add(rid);
+    }
+    sources.push(label);
+  }
+
+  for (const rid of GATE_REQUIRED_RIDS) {
+    if (!provenRids.has(rid)) {
+      return {
+        ok: false,
+        reason: "gate-rid-missing",
+        detail: `the portable gate proof has no completed GUI E2E run for ${rid}`,
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    record: {
+      source: sources.length === 1 ? sources[0] : sources.join(", "),
+      sources,
+      commit: head,
+      pass: true,
+      mode: "full",
+      rids: [...GATE_REQUIRED_RIDS],
+      e2e: "passed",
+    },
+  };
+}
+
+/**
+ * Checks the local VM's `artifacts/gate/result.json` when paired with a validated portable GUI proof.
+ * Accepts `--quick --release-gate` as well as full runs, and still requires pass, clean HEAD, zero
+ * failed steps, and a passing `test-policy-release-gate` step.
+ */
+export function vmGateProof(gate, head) {
+  const common = validateCommonGate(gate, head, "", `no passing quality gate at ${QUALITY_GATE_RESULT_RELATIVE_PATH}`);
+  if (!common.ok) return common;
+  return { ok: true, source: QUALITY_GATE_RESULT_RELATIVE_PATH };
 }
 
 // ---- signing readiness (preflight --require-trusted-key) ----------------------------------------
@@ -843,7 +1115,7 @@ export function checkReleaseReadiness(root, options, deps) {
   return { ...result, ok: result.errors.length === 0 };
 }
 
-function readinessChecks(root, { version, channel, commit, env = process.env }, deps) {
+function readinessChecks(root, { version, channel, commit, env = process.env, skipNetwork = false }, deps) {
   const errors = [];
   const checks = [];
   const refuse = (reason, detail, exitCode = READINESS_EXIT[reason] ?? EXIT.REFUSED) => {
@@ -918,7 +1190,8 @@ function readinessChecks(root, { version, channel, commit, env = process.env }, 
     pass("pushed", `origin/${branch}`);
   }
 
-  if (errors.length > 0) return { errors, checks, networkSkipped: true };
+  // A gate proof or other preflight refusal found before readiness also skips the network (RP24, R19).
+  if (errors.length > 0 || skipNetwork) return { errors, checks, networkSkipped: true };
 
   // Network checks, only after every local check passed.
   const auth = deps.ghAuthStatus();

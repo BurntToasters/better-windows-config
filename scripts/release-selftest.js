@@ -19,11 +19,17 @@ import { assetBytesMatch } from "./lib/github-release.js";
 import {
   assetFilesFromManifest,
   checkBranch,
+  checkGateProofPaths,
   checkReleaseReadiness,
+  loadGateProofFiles,
   malformedInstallerUrls,
+  portableGateProof,
   qualityGateProof,
   satisfiesEngineRange,
+  vmGateProof,
 } from "./lib/release-policy.js";
+import { resolveExecutable, runRestrictedSync } from "./lib/run-restricted.js";
+import { buildPlan } from "./test-all.js";
 import { publishIsGood } from "./build-installer.js";
 import { envelope, generateKeyPair, signFile } from "./lib/minisign.js";
 import { buildEnvironment } from "./lib/build-environment.js";
@@ -2089,6 +2095,239 @@ async function runRestrictedLaunchCases(cases) {
   expectCheck("C24 a client that hangs is ended at the timeout and refused timeout", hung?.reason === "timeout", String(hung?.message), cases);
 }
 
+/**
+ * Q17 to Q24, R18, R19: portable full-gate GUI proofs (single --rid all file or two per-RID files)
+ * paired with a clean local VM quick+release-gate run.
+ */
+function runPortableGateProofCases(temp, fixture, cases) {
+  const repo = path.join(temp, "portable-gate-repo");
+  fs.mkdirSync(repo, { recursive: true });
+  git(repo, ["init", "-q", "-b", "experimental"]);
+  writeRepository(repo, { embedded: [fixture.keyA.publicKeyText] });
+  commitAll(repo, "portable gate fixture");
+  const head = git(repo, ["rev-parse", "HEAD"]);
+  const common = ["--root", repo, "--version", VERSION, "--channel", "beta", "--trusted-key", path.join(fixture.keys, "a.pub")];
+
+  const makeFullGate = (rids, overrides = {}) => ({
+    schema: 2,
+    rid: rids.length === 2 ? "all" : rids[0],
+    quick: false,
+    releaseGate: true,
+    pass: true,
+    git: { commit: head, dirty: false },
+    ...fullGateRids(rids),
+    ...overrides,
+  });
+  const makeVmGate = (overrides = {}) => ({
+    schema: 2,
+    rid: "all",
+    quick: true,
+    releaseGate: true,
+    pass: true,
+    git: { commit: head, dirty: false },
+    rids: [
+      { rid: "win-arm64", platform: "ARM64", status: "skipped", steps: [] },
+      { rid: "win-x64", platform: "x64", status: "skipped", steps: [] },
+    ],
+    steps: [{ name: "validate", rid: null, pass: true, exitCode: 0, e2eResult: null }, releaseGateStep()],
+    ...overrides,
+  });
+
+  // R18: conflict paths
+  for (const conflict of ["artifacts/gate/result.json", "artifacts/gate", "artifacts/gate/logs", "artifacts/gate/logs/01.log"]) {
+    const res = checkGateProofPaths(repo, [conflict]);
+    expectCheck(`R18 checkGateProofPaths refuses ${conflict} (gate-proof-conflict)`, !res.ok && res.reason === "gate-proof-conflict", JSON.stringify(res), cases);
+  }
+  expectCheck("R18 checkGateProofPaths accepts artifacts/gate/proof", checkGateProofPaths(repo, ["artifacts/gate/proof"]).ok === true, "proof dir", cases);
+  expectCheck("R18 checkGateProofPaths accepts artifacts/gate/proof/result.json", checkGateProofPaths(repo, ["artifacts/gate/proof/result.json"]).ok === true, "proof file", cases);
+
+  // Q17: single --rid all file (direct file and folder)
+  const singleDir = path.join(repo, "artifacts", "gate", "proof-single");
+  const singleFile = path.join(singleDir, "result.json");
+  writeJson(singleFile, makeFullGate(["win-arm64", "win-x64"]));
+  const loadedSingleFile = loadGateProofFiles(repo, [singleFile]);
+  const proofSingleFile = loadedSingleFile.ok ? portableGateProof(loadedSingleFile.entries, head) : loadedSingleFile;
+  expectCheck("Q17 portableGateProof accepts one --rid all file", proofSingleFile.ok === true && proofSingleFile.record?.mode === "full", JSON.stringify(proofSingleFile), cases);
+
+  const loadedSingleDir = loadGateProofFiles(repo, [singleDir]);
+  const proofSingleDir = loadedSingleDir.ok ? portableGateProof(loadedSingleDir.entries, head) : loadedSingleDir;
+  expectCheck("Q17 portableGateProof accepts a folder holding one --rid all file", proofSingleDir.ok === true && proofSingleDir.record?.sources?.length === 1, JSON.stringify(proofSingleDir), cases);
+
+  // Q18: two per-RID files (repeated flags and one directory)
+  const splitDir = path.join(repo, "artifacts", "gate", "proof-split");
+  const armFile = path.join(splitDir, "win-arm64.json");
+  const x64File = path.join(splitDir, "win-x64.json");
+  writeJson(armFile, makeFullGate(["win-arm64"]));
+  writeJson(x64File, makeFullGate(["win-x64"]));
+  writeText(path.join(splitDir, "notes.txt"), "ignored\n");
+  fs.mkdirSync(path.join(splitDir, "subdir.json"), { recursive: true });
+
+  const loadedSplitFlags = loadGateProofFiles(repo, [armFile, x64File]);
+  const proofSplitFlags = loadedSplitFlags.ok ? portableGateProof(loadedSplitFlags.entries, head) : loadedSplitFlags;
+  expectCheck("Q18 portableGateProof accepts two per-RID files via repeated flags", proofSplitFlags.ok === true && proofSplitFlags.record?.sources?.length === 2, JSON.stringify(proofSplitFlags), cases);
+
+  const loadedSplitDir = loadGateProofFiles(repo, [splitDir]);
+  const proofSplitDir = loadedSplitDir.ok ? portableGateProof(loadedSplitDir.entries, head) : loadedSplitDir;
+  expectCheck("Q18 portableGateProof accepts two per-RID files in one folder (ignoring non-.json and subdirs)", proofSplitDir.ok === true && proofSplitDir.record?.sources?.length === 2, JSON.stringify(proofSplitDir), cases);
+
+  // Q19: missing, empty dir, unreadable JSON
+  const emptyDir = path.join(temp, "empty-proof-dir");
+  fs.mkdirSync(emptyDir, { recursive: true });
+  const badJsonFile = path.join(temp, "bad-proof.json");
+  writeText(badJsonFile, "{ not valid json");
+  expectCheck("Q19 missing proof path refuses gate-missing", loadGateProofFiles(repo, [path.join(temp, "no-such-proof")]).reason === "gate-missing", "missing", cases);
+  expectCheck("Q19 empty proof folder refuses gate-missing", loadGateProofFiles(repo, [emptyDir]).reason === "gate-missing", "empty dir", cases);
+  expectCheck("Q19 unreadable JSON proof refuses gate-missing", loadGateProofFiles(repo, [badJsonFile]).reason === "gate-missing", "bad json", cases);
+
+  // Q20: one valid file + one bad file
+  const badCases = [
+    ["wrong commit", makeFullGate(["win-x64"], { git: { commit: "f".repeat(40), dirty: false } }), "gate-commit-mismatch"],
+    ["dirty tree", makeFullGate(["win-x64"], { git: { commit: head, dirty: true } }), "gate-dirty-tree"],
+    ["quick run", makeFullGate(["win-x64"], { quick: true }), "gate-quick"],
+    ["failed step", makeFullGate(["win-x64"], { steps: [{ name: "test-core", rid: null, pass: false, exitCode: 1 }] }), "gate-failed"],
+    [
+      "missing release gate step",
+      (() => {
+        const g = makeFullGate(["win-x64"]);
+        g.steps = g.steps.filter((s) => s.name !== "test-policy-release-gate");
+        return g;
+      })(),
+      "gate-release-step-not-run",
+    ],
+  ];
+  for (const [label, badGate, expectedReason] of badCases) {
+    const res = portableGateProof(
+      [
+        { path: "win-arm64.json", gate: makeFullGate(["win-arm64"]) },
+        { path: "win-x64.json", gate: badGate },
+      ],
+      head,
+    );
+    expectCheck(`Q20 one valid + one bad (${label}) refuses ${expectedReason}`, !res.ok && res.reason === expectedReason, JSON.stringify(res), cases);
+  }
+
+  // Q21: two files covering only win-x64
+  const onlyX64 = portableGateProof(
+    [
+      { path: "x64-a.json", gate: makeFullGate(["win-x64"]) },
+      { path: "x64-b.json", gate: makeFullGate(["win-x64"]) },
+    ],
+    head,
+  );
+  expectCheck("Q21 two files covering only win-x64 refuses gate-rid-missing", !onlyX64.ok && onlyX64.reason === "gate-rid-missing", JSON.stringify(onlyX64), cases);
+
+  // R19: release-preflight.js --gate-proof
+  const onlyOneRidDir = path.join(temp, "one-rid-proof");
+  writeJson(path.join(onlyOneRidDir, "win-x64.json"), makeFullGate(["win-x64"]));
+  expectRefusal("R19 preflight --gate-proof with missing path refuses gate-missing", run("scripts/release-preflight.js", [...common, "--gate-proof", path.join(temp, "absent-proof")]), ["gate-missing"], cases);
+  expectRefusal("R19 preflight --gate-proof with one rid refuses gate-rid-missing", run("scripts/release-preflight.js", [...common, "--gate-proof", onlyOneRidDir]), ["gate-rid-missing"], cases);
+  expectPass("R19 preflight --gate-proof with valid split proofs passes", run("scripts/release-preflight.js", [...common, "--gate-proof", splitDir]), cases, "portable proof accepted");
+
+  // Q22 & Q24: release-session.js create --gate-proof paired with local VM gate
+  const sessionPath = path.join(repo, "artifacts", "release", "session.json");
+  fs.rmSync(path.join(repo, GATE_PATH), { force: true });
+  expectRefusal("Q22 session create --gate-proof without local VM gate refuses gate-missing", run("scripts/release-session.js", ["create", ...common, "--gate-proof", splitDir, "--force"]), ["gate-missing"], cases);
+
+  writeJson(path.join(repo, GATE_PATH), makeVmGate({ pass: false }));
+  expectRefusal("Q22 session create --gate-proof with failed local VM gate refuses gate-failed", run("scripts/release-session.js", ["create", ...common, "--gate-proof", splitDir, "--force"]), ["gate-failed"], cases);
+
+  writeJson(path.join(repo, GATE_PATH), makeVmGate({ git: { commit: head, dirty: true } }));
+  expectRefusal("Q22 session create --gate-proof with dirty local VM gate refuses gate-dirty-tree", run("scripts/release-session.js", ["create", ...common, "--gate-proof", splitDir, "--force"]), ["gate-dirty-tree"], cases);
+
+  writeJson(path.join(repo, GATE_PATH), makeVmGate({ git: { commit: "f".repeat(40), dirty: false } }));
+  expectRefusal("Q22 session create --gate-proof with wrong-commit local VM gate refuses gate-commit-mismatch", run("scripts/release-session.js", ["create", ...common, "--gate-proof", splitDir, "--force"]), ["gate-commit-mismatch"], cases);
+
+  writeJson(path.join(repo, GATE_PATH), makeVmGate({ steps: [{ name: "validate", rid: null, pass: true, exitCode: 0 }] }));
+  expectRefusal("Q22 session create --gate-proof without local ReleaseGate step refuses gate-release-step-not-run", run("scripts/release-session.js", ["create", ...common, "--gate-proof", splitDir, "--force"]), ["gate-release-step-not-run"], cases);
+
+  writeJson(path.join(repo, GATE_PATH), makeVmGate());
+  expectPass("Q22 session create --gate-proof passes with clean local quick+release-gate VM result", run("scripts/release-session.js", ["create", ...common, "--gate-proof", splitDir, "--force"]), cases, "session written");
+  const writtenGate = JSON.parse(fs.readFileSync(sessionPath, "utf8")).qualityGate;
+  expectCheck(
+    "Q24 session qualityGate records full mode, both rids, e2e passed, sources, and vmGate",
+    writtenGate?.mode === "full" &&
+      writtenGate?.e2e === "passed" &&
+      JSON.stringify(writtenGate?.rids) === '["win-arm64","win-x64"]' &&
+      Array.isArray(writtenGate?.sources) &&
+      writtenGate.sources.length === 2 &&
+      writtenGate?.vmGate === "artifacts/gate/result.json",
+    JSON.stringify(writtenGate),
+    cases,
+  );
+  expectCheck("vmGateProof helper accepts quick:true with passing ReleaseGate", vmGateProof(makeVmGate(), head).ok === true, "vmGateProof", cases);
+}
+
+/**
+ * D1, D2, D3, D5, D7: synchronous restricted launcher (`scripts/lib/run-restricted.js`) and
+ * `test-all.js --quick --release-gate` plan checks.
+ */
+function runRestrictedSyncAndGatePlanCases(cases) {
+  const node = process.execPath;
+  const tricky = ["a b", 'q"x', "tr\\", "end\\\\", "", "uni \u00e9", '--flag="v w"'];
+  const ok = runRestrictedSync(node, ["-e", "console.log(JSON.stringify(process.argv.slice(1)))", ...tricky], { timeoutMs: 60_000 });
+  expectCheck(
+    "D1 runRestrictedSync runs node unelevated at medium integrity and preserves tricky args",
+    ok.ok === true &&
+      ok.status === 0 &&
+      ok.launch?.mode === "restricted-token" &&
+      ok.launch?.elevated === false &&
+      ok.launch?.integrity === "0x2000" &&
+      ok.stdout.trim() === JSON.stringify(tricky),
+    JSON.stringify({ ok: ok.ok, status: ok.status, launch: ok.launch, stdout: ok.stdout.trim() }),
+    cases,
+  );
+
+  expectCheck(
+    "D2 resolveExecutable resolves node and returns null for missing executable",
+    resolveExecutable("node") !== null && resolveExecutable("bwc-nonexistent-exe-xyz-123") === null,
+    String(resolveExecutable("node")),
+    cases,
+  );
+
+  const missing = runRestrictedSync(path.join(os.tmpdir(), "bwc-no-such-exe.exe"), ["--version"], { timeoutMs: 60_000 });
+  expectCheck(
+    "D3 runRestrictedSync refuses missing executable with deelevate-failed",
+    missing.ok === false && missing.reason === "deelevate-failed",
+    JSON.stringify(missing),
+    cases,
+  );
+
+  const dllInit = runRestrictedSync(node, ["-e", "process.exit(-1073741502)"], { timeoutMs: 60_000 });
+  expectCheck(
+    "D3 runRestrictedSync maps 0xC0000142 to deelevate-failed naming desktop",
+    dllInit.ok === false && dllInit.reason === "deelevate-failed" && dllInit.detail.includes("0xC0000142"),
+    JSON.stringify(dllInit),
+    cases,
+  );
+
+  const hung = runRestrictedSync(node, ["-e", "setTimeout(() => {}, 120000)"], { timeoutMs: 2_000 });
+  expectCheck(
+    "D7 runRestrictedSync terminates a hung child at timeout",
+    hung.ok === false && hung.reason === "timeout",
+    JSON.stringify(hung),
+    cases,
+  );
+
+  const badFlag = run("scripts/test-all.js", ["--release-gate"]);
+  expectCheck(
+    "D5 test-all.js --release-gate without --quick exits 2",
+    badFlag.status === EXIT.USAGE,
+    `exit ${badFlag.status}: ${badFlag.stderr.trim()}`,
+    cases,
+  );
+
+  const quickReleasePlan = buildPlan({ rid: "all", quick: true, releaseGate: true });
+  const plainQuickPlan = buildPlan({ rid: "all", quick: true, releaseGate: false });
+  expectCheck(
+    "D5 buildPlan({quick:true, releaseGate:true}) includes test-policy-release-gate and no GUI E2E",
+    quickReleasePlan.steps.some((s) => s.name === "test-policy-release-gate") &&
+      !quickReleasePlan.steps.some((s) => /e2e-(ship|flavor)/.test(s.name)) &&
+      !plainQuickPlan.steps.some((s) => s.name === "test-policy-release-gate"),
+    `releaseGate=${quickReleasePlan.steps.length}, plainQuick=${plainQuickPlan.steps.length}`,
+    cases,
+  );
+}
+
 async function main() {
   const started = Date.now();
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "bwc-release-selftest-"));
@@ -2103,6 +2342,7 @@ async function main() {
     await runHardeningCases(temp, fixture, cases);
     await runPolicyCases(temp, fixture, cases);
     await runSessionGateCases(temp, fixture, cases);
+    runPortableGateProofCases(temp, fixture, cases);
     runDetachedBranchCases(temp, cases);
     runGateProofAndUrlCases(cases);
     runPublishReuseCases(temp, cases);
@@ -2110,6 +2350,7 @@ async function main() {
     runPublishDecisionCases(cases);
     runReadinessCliCases(temp, fixture, cases);
     await runRestrictedLaunchCases(cases);
+    runRestrictedSyncAndGatePlanCases(cases);
     expectCheck(
       "release-verify accepts --allow-published (the publish rerun check)",
       (() => {

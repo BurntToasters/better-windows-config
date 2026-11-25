@@ -762,6 +762,71 @@ check("--from through main records the same steps as releaseSteps", () => {
   );
 });
 
+// ---- --gate-proof: portable GUI gate proof for the x64 SSH release VM (R3, R6, R17, R18) ------
+
+const PROOF = "artifacts/gate/proof";
+
+check("--gate-proof: separate, =, and repeated forms are parsed in order; the mode stays win", () => {
+  assertEqual(parseReleaseArgs(["--gate-proof", PROOF]).gateProof, [PROOF], "separate");
+  assertEqual(parseReleaseArgs([`--gate-proof=${PROOF}`]).gateProof, [PROOF], "equals");
+  assertEqual(parseReleaseArgs(["--gate-proof", "a.json", "--gate-proof=b.json"]).gateProof, ["a.json", "b.json"], "repeated");
+  assertEqual(parseReleaseArgs(["--gate-proof", PROOF]).mode, "win", "mode");
+  assertEqual(parseReleaseArgs([]).gateProof, [], "default");
+});
+
+check("R17 --gate-proof with --continue, or with no or an empty value, is a usage error (exit 2)", () => {
+  for (const argv of [["--continue", "--gate-proof", PROOF], ["--gate-proof"], ["--gate-proof="], ["--gate-proof", "--continue"]]) {
+    try {
+      parseReleaseArgs(argv);
+    } catch (error) {
+      assertEqual(error.exitCode, EXIT.USAGE, `exit for ${argv.join(" ")}`);
+      continue;
+    }
+    throw new Error(`accepted ${argv.join(" ")}`);
+  }
+});
+
+check("R18 --gate-proof at the gate result, the gate folder, or its logs refuses before any step", () => {
+  for (const target of ["artifacts/gate/result.json", "artifacts/gate", "artifacts/gate/logs", "artifacts/gate/logs/01-x.log", "ARTIFACTS/Gate/Result.json"]) {
+    const calls = [];
+    try {
+      main(["--gate-proof", target], (name) => calls.push(name), { root: fromRoot, env: cleanEnv() });
+    } catch (error) {
+      assertEqual(error.exitCode, EXIT.USAGE, `exit for ${target}`);
+      if (!/gate-proof-conflict/.test(error.message)) throw new Error(`${target}: ${error.message}`);
+      assertEqual(calls, [], `calls for ${target}`);
+      continue;
+    }
+    throw new Error(`accepted ${target}`);
+  }
+});
+
+check("R3 release:win with --gate-proof: exact steps, quick+release-gate VM gate, proof passed to preflight and session", () => {
+  assertEqual(
+    releaseSteps("win", { version: VERSION, env: cleanEnv(), gateProof: [PROOF] }),
+    [
+      { name: "release:policy", args: [] },
+      { name: "release:preflight", args: ["--", "--require-trusted-key", "--gate-proof", PROOF] },
+      { name: "test:all", args: ["--", "--quick", "--release-gate", "--rid", "all"] },
+      { name: "release:session:create", args: ["--", "--require-gate", "--force", "--gate-proof", PROOF] },
+      { name: "release:clean", args: [] },
+      { name: "release:win:continue", args: [] },
+    ],
+    "steps",
+  );
+  const calls = [];
+  main(["--gate-proof", PROOF], (name, args) => calls.push({ name, args }), { root: fromRoot, env: cleanEnv() });
+  assertEqual(calls, releaseSteps("win", { version: VERSION, env: cleanEnv(), gateProof: [PROOF] }), "recorded through main");
+});
+
+check("package.json: release:win:vm is release:win with the artifacts/gate/proof folder", () => {
+  assertEqual(
+    pkgScripts["release:win:vm"],
+    "node --env-file-if-exists=.env scripts/run-release.js --gate-proof artifacts/gate/proof",
+    "vm",
+  );
+});
+
 check("release:win:upload is the continue flow from release:draft, and release:finalize is gone", () => {
   assertEqual(
     pkgScripts["release:win:upload"],

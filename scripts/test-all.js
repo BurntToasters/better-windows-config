@@ -9,11 +9,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDirectExecutionOf } from "./direct-execution.mjs";
+import { elevationState } from "./elevated-runner/elevation.mjs";
 import {
   checkPublishFlavor,
   formatFlavorReport,
   publishFolderName,
 } from "./flavor-metadata.js";
+import { resolveExecutable, runRestrictedSync } from "./lib/run-restricted.js";
 
 const SCRIPT = "scripts/test-all.js";
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -53,7 +56,7 @@ function hostPlatform() {
 
 function printHelp() {
   console.log(`Usage:
-  node ${SCRIPT} [--rid win-x64|win-arm64|all] [--quick] [--help]
+  node ${SCRIPT} [--rid win-x64|win-arm64|all] [--quick [--release-gate]] [--help]
 
 Runs the quality gate steps in order and writes artifacts/gate/result.json
 (schema 2). Each step's full stdout and stderr goes to
@@ -77,9 +80,10 @@ check id comparison of E2E result files.
 test-update-e2e runs tests/Bwc.Update.Tests with -p:BwcFlavor=E2E, so the
 branch compiled only in that flavor runs too. test-gpo and test-policy run tests/Bwc.Gpo.Tests
 and tests/Bwc.Policy.Tests without the tests tagged ReleaseGate. test-policy-release-gate runs
-only those tests of tests/Bwc.Policy.Tests, in a full gate only, last: it fails while a capture case
+only those tests of tests/Bwc.Policy.Tests, in a full gate (or --quick --release-gate), last: it fails while a capture case
 still awaits a recapture (docs/failure-modes/quality-gate.md). A step that exits 3 (NOT RUN, for one e2e-ship from an elevated
-shell) is a failed step.
+shell) is a failed step. When run from an elevated shell on Windows (such as OpenSSH as Administrator),
+dotnet build and test steps run unelevated through scripts/run-restricted.ps1; e2e-ship never runs there.
 Unless --quick, each RID then runs publish-ship, verify-flavor-ship, e2e-ship,
 publish-e2e, verify-flavor-e2e, e2e-flavor, and after the steps of every RID the one
 full-gate-only step test-policy-release-gate runs last (it belongs to no RID, and it fails
@@ -89,14 +93,15 @@ artifacts/e2e/result-<rid>-<flavor>.json when that file exists. Tests tagged
 Elevated are skipped by every step; scripts/elevated-runner/run.js runs them.
 
 Options:
-  --rid <rid>  win-x64, win-arm64, or all. Default from process.arch.
-               The test projects always use the host architecture, so
-               win-x64 on an ARM64 machine still runs them as ARM64. all runs
-               the builds and the test projects once, and the publish and
-               E2E steps once for each RID.
-  --quick      Run both architecture builds and all test projects, but
-               skip the publish, flavor, E2E and release gate steps.
-  --help       Show this help.
+  --rid <rid>     win-x64, win-arm64, or all. Default from process.arch.
+                  The test projects always use the host architecture, so
+                  win-x64 on an ARM64 machine still runs them as ARM64. all runs
+                  the builds and the test projects once, and the publish and
+                  E2E steps once for each RID.
+  --quick         Run both architecture builds and all test projects, but
+                  skip the publish, flavor, E2E and release gate steps.
+  --release-gate  With --quick: also run test-policy-release-gate last.
+  --help          Show this help.
 
 Exit codes: 0 every step passed, 1 a step failed, 2 argument error.`);
 }
@@ -105,6 +110,7 @@ function parseArgs(argv) {
   const options = {
     rid: defaultRid(),
     quick: false,
+    releaseGate: false,
     help: false,
   };
 
@@ -116,6 +122,10 @@ function parseArgs(argv) {
     }
     if (arg === "--quick") {
       options.quick = true;
+      continue;
+    }
+    if (arg === "--release-gate") {
+      options.releaseGate = true;
       continue;
     }
     if (arg === "--rid") {
@@ -139,6 +149,11 @@ function parseArgs(argv) {
   }
 
   if (options.help) return options;
+  if (options.releaseGate && !options.quick) {
+    throw new Error(
+      "--release-gate is only used with --quick (a full gate already runs test-policy-release-gate)",
+    );
+  }
   if (hostPlatform() === null) {
     throw new Error(
       `unsupported process.arch "${process.arch}"; the test projects need arm64 or x64`,
@@ -172,6 +187,7 @@ function dotnetStep(name, args) {
     name,
     executable: "dotnet",
     args,
+    deelevate: true,
     display: ["dotnet", ...args].join(" "),
   };
 }
@@ -402,13 +418,13 @@ function ridSteps(rid) {
 }
 
 // Shared steps run once. Each RID then gets its own publish, flavor, and E2E steps. The full-gate-only
-// release gate steps come last, after every RID, and belong to no RID.
+// release gate steps come last, after every RID (or with --quick --release-gate), and belong to no RID.
 function buildPlan(options) {
   const everyRid = options.rid === ALL_RIDS;
   const shared = sharedSteps(hostPlatform());
   // The release gate step runs after the per-RID steps of every RID, so a capture case that awaits a
   // recapture cannot stop the gate before the GUI evidence is collected. It still fails the gate.
-  const final = options.quick ? [] : releaseGateSteps(hostPlatform());
+  const final = !options.quick || options.releaseGate ? releaseGateSteps(hostPlatform()) : [];
   const rids = (everyRid ? ALL_RID_ORDER : [options.rid]).map(
     (rid) => ({
       rid,
@@ -582,7 +598,7 @@ function probeDotnetVersion() {
   return { version: String(result.stdout).trim() || null, error: null };
 }
 
-function collectEnvironment() {
+function collectEnvironment(elevation = elevationState()) {
   return {
     node: process.version,
     dotnet: probeDotnetVersion(),
@@ -592,6 +608,8 @@ function collectEnvironment() {
       release: os.release(),
     },
     arch: process.arch,
+    elevated: elevation.known ? elevation.elevated : null,
+    elevationDetail: elevation.detail,
   };
 }
 
@@ -636,7 +654,7 @@ function readE2eResult(filePath) {
   return result;
 }
 
-function executeStep(step) {
+function executeStep(step, { needDeelevate = false } = {}) {
   if (step.run) {
     return step.run();
   }
@@ -647,11 +665,62 @@ function executeStep(step) {
       stderr: "",
       error: null,
       summary: `test project not found: ${step.project}`,
+      launch: null,
     };
   }
   if (step.e2eResultPath) {
     // The gate owns this run, so a result file left by an earlier run must not count.
     fs.rmSync(step.e2eResultPath, { force: true });
+  }
+
+  if (step.deelevate && needDeelevate) {
+    const fallbacks = step.executable === "dotnet" ? [DOTNET_FALLBACK] : [];
+    const resolved = resolveExecutable(step.executable, fallbacks);
+    if (!resolved) {
+      return {
+        status: null,
+        stdout: "",
+        stderr: "",
+        error: Object.assign(new Error(`spawn ${step.executable} ENOENT`), { code: "ENOENT" }),
+        summary: null,
+        launch: null,
+      };
+    }
+
+    const restricted = runRestrictedSync(resolved, step.args, {
+      cwd: ROOT,
+      env: spawnOptions().env,
+      timeoutMs: STEP_TIMEOUT_MS,
+    });
+    if (!restricted.ok) {
+      if (restricted.reason === "timeout") {
+        return {
+          status: null,
+          stdout: restricted.stdout,
+          stderr: restricted.stderr,
+          error: Object.assign(new Error(restricted.detail), { code: "ETIMEDOUT" }),
+          summary: null,
+          launch: restricted.launch,
+        };
+      }
+      return {
+        status: 1,
+        stdout: restricted.stdout,
+        stderr: restricted.stderr,
+        error: null,
+        summary: `deelevate-failed: ${restricted.detail}`,
+        launch: restricted.launch,
+      };
+    }
+
+    return {
+      status: restricted.status,
+      stdout: restricted.stdout,
+      stderr: restricted.stderr,
+      error: null,
+      summary: null,
+      launch: restricted.launch,
+    };
   }
 
   let result = spawnSync(step.executable, step.args, spawnOptions());
@@ -669,6 +738,7 @@ function executeStep(step) {
     stderr: String(result.stderr ?? ""),
     error: result.error ?? null,
     summary: null,
+    launch: null,
   };
 }
 
@@ -676,7 +746,7 @@ function withTrailingNewline(text) {
   return text.length === 0 || text.endsWith("\n") ? text : `${text}\n`;
 }
 
-function runStep(step, number) {
+function runStep(step, number, context = {}) {
   const startedMs = Date.now();
   const startedUtc = new Date(startedMs).toISOString();
   const logPath = path.join(
@@ -686,7 +756,7 @@ function runStep(step, number) {
 
   let outcome;
   try {
-    outcome = executeStep(step);
+    outcome = executeStep(step, context);
   } catch (error) {
     outcome = {
       status: null,
@@ -694,6 +764,7 @@ function runStep(step, number) {
       stderr: "",
       error: null,
       summary: `step could not run: ${errorText(error)}`,
+      launch: null,
     };
   }
   const durationMs = Date.now() - startedMs;
@@ -714,10 +785,17 @@ function runStep(step, number) {
     summary = pickSummary(output) || (pass ? "ok" : "no output");
   }
 
+  const launchLine = outcome.launch
+    ? [
+        `# launch: ${outcome.launch.mode} (elevated=${outcome.launch.elevated}, ` +
+          `integrity=${outcome.launch.integrity}, desktop=${outcome.launch.desktop})`,
+      ]
+    : [];
   const logText = [
     `# gate step ${number}: ${step.name}`,
     `# rid: ${step.rid ?? "(shared)"}`,
     `# command: ${step.display}`,
+    ...launchLine,
     `# started: ${startedUtc}`,
     "# ----- stdout -----",
     withTrailingNewline(outcome.stdout),
@@ -791,6 +869,17 @@ function main(argv = process.argv.slice(2)) {
 
   const plan = buildPlan(options);
   const testPlatform = hostPlatform();
+  if (
+    !options.quick &&
+    testPlatform === "x64" &&
+    plan.rids.some((entry) => entry.rid === "win-arm64")
+  ) {
+    console.error(
+      "test-all: win-arm64 GUI E2E cannot run on an x64 host. Run --rid win-x64 on x64, --quick for builds/tests only, or `npm run release:win -- --gate-proof <path>` on the release VM.",
+    );
+    return 2;
+  }
+
   const startedMs = Date.now();
   const startedUtc = new Date(startedMs).toISOString();
 
@@ -806,19 +895,27 @@ function main(argv = process.argv.slice(2)) {
     return 1;
   }
 
+  const elevation = elevationState();
+  const needDeelevate =
+    process.platform === "win32" && (!elevation.known || elevation.elevated);
   const git = collectGitState();
-  const environment = collectEnvironment();
+  const environment = collectEnvironment(elevation);
   const results = [];
   let pass = true;
 
   console.log(
     `test-all: rid=${options.rid} test-platform=${testPlatform} mode=${
-      options.quick ? "quick" : "full"
+      options.quick ? (options.releaseGate ? "quick+release-gate" : "quick") : "full"
     }`,
   );
+  if (needDeelevate) {
+    console.log(
+      `test-all: elevated shell detected (${elevation.detail}); dotnet steps will run via scripts/run-restricted.ps1 (medium integrity).`,
+    );
+  }
 
   for (let index = 0; index < plan.steps.length; index += 1) {
-    const result = runStep(plan.steps[index], index + 1);
+    const result = runStep(plan.steps[index], index + 1, { needDeelevate });
     results.push(result);
     const label = result.rid ? `${result.name} (${result.rid})` : result.name;
     const status = result.pass ? "PASS" : "FAIL";
@@ -843,6 +940,7 @@ function main(argv = process.argv.slice(2)) {
     rid: options.rid,
     testPlatform,
     quick: options.quick,
+    releaseGate: !options.quick || options.releaseGate,
     pass,
     git,
     environment,
@@ -877,4 +975,8 @@ function main(argv = process.argv.slice(2)) {
   return pass ? 0 : 1;
 }
 
-process.exitCode = main();
+export { buildPlan, executeStep, parseArgs };
+
+if (isDirectExecutionOf(import.meta.url)) {
+  process.exitCode = main();
+}
