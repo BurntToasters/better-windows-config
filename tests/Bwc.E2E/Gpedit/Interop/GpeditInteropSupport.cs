@@ -396,7 +396,10 @@ internal sealed class FixtureRegistry
 internal sealed class ClassicGpedit : IDisposable
 {
     private static readonly TimeSpan WindowTimeout = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan TreeTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan NavigationTimeout = TimeSpan.FromSeconds(30);
+    private const string MainWindowClass = "MMCMainFrame";
+    private const string TreeClass = "SysTreeView32";
 
     private readonly Process _process;
     private readonly UIA3Automation _automation;
@@ -435,7 +438,7 @@ internal sealed class ClassicGpedit : IDisposable
         catch
         {
             automation.Dispose();
-            Stop(process);
+            _ = Stop(process);
             process.Dispose();
             throw;
         }
@@ -444,9 +447,7 @@ internal sealed class ClassicGpedit : IDisposable
     /// <summary>Expands the path from Computer Configuration down to a category and selects the last node.</summary>
     internal void SelectCategory(params string[] path)
     {
-        AutomationElement tree = WaitFor(
-            () => MainWindow.FindFirstDescendant(cf => cf.ByControlType(ControlType.Tree)),
-            NavigationTimeout) ?? throw new InvalidOperationException("The classic console has no tree.");
+        AutomationElement tree = WaitForTree();
         AutomationElement current = WaitFor(
             () => tree.FindFirstChild(cf => cf.ByControlType(ControlType.TreeItem)),
             NavigationTimeout) ?? throw new InvalidOperationException("The classic tree has no root item.");
@@ -518,14 +519,21 @@ internal sealed class ClassicGpedit : IDisposable
 
     public void Dispose()
     {
+        int pid = _process.Id;
+        bool gone;
         try
         {
-            Stop(_process);
+            gone = Stop(_process);
         }
         finally
         {
             _automation.Dispose();
             _process.Dispose();
+        }
+
+        if (!gone)
+        {
+            throw new InvalidOperationException($"mmc.exe (pid {pid}) was still running after it was closed and killed.");
         }
     }
 
@@ -540,8 +548,8 @@ internal sealed class ClassicGpedit : IDisposable
                 throw new InvalidOperationException($"mmc.exe exited with code 0x{process.ExitCode:X8} before showing a window.");
             }
 
-            IntPtr hwnd = process.MainWindowHandle;
-            if (hwnd != IntPtr.Zero && Win32.IsWindow(hwnd) && Win32.IsVisible(hwnd))
+            IntPtr hwnd = FindMainWindow(process.Id);
+            if (hwnd != IntPtr.Zero)
             {
                 return hwnd;
             }
@@ -549,29 +557,185 @@ internal sealed class ClassicGpedit : IDisposable
             Thread.Sleep(200);
         }
 
-        throw new TimeoutException($"mmc.exe showed no main window within {timeout.TotalSeconds:0} s.");
+        throw new TimeoutException(
+            $"mmc.exe showed no {MainWindowClass} window within {timeout.TotalSeconds:0} s. Top-level classes seen: {TopLevelClasses(process.Id)}.");
     }
 
-    private static void Stop(Process process)
+    // The visible MMCMainFrame top-level window with an area, of this process only. Process.MainWindowHandle is
+    // not used: it can name a window that is not the console frame.
+    private static IntPtr FindMainWindow(int processId)
+    {
+        foreach (IntPtr hwnd in TopLevelWindows(processId))
+        {
+            if (Win32.IsVisible(hwnd) && HasArea(hwnd) && string.Equals(Win32.ClassNameOf(hwnd), MainWindowClass, StringComparison.Ordinal))
+            {
+                return hwnd;
+            }
+        }
+
+        return IntPtr.Zero;
+    }
+
+    private static bool Stop(Process process)
     {
         try
         {
             if (process.HasExited)
             {
-                return;
+                return true;
             }
 
             _ = process.CloseMainWindow();
-            if (!process.WaitForExit(TimeSpan.FromSeconds(10)))
+            if (process.WaitForExit(TimeSpan.FromSeconds(10)))
             {
-                process.Kill(entireProcessTree: true);
-                _ = process.WaitForExit(TimeSpan.FromSeconds(5));
+                return true;
             }
+
+            process.Kill(entireProcessTree: true);
+            return process.WaitForExit(TimeSpan.FromSeconds(10));
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
         {
-            // The process exited while it was being closed.
+            // The process exited while it was being closed, or it could not be closed; HasExited tells which.
+            return process.HasExited;
         }
+    }
+
+    // The tree is the one visible SysTreeView32 child window with an area, taken with automation FromHandle.
+    // Only when that finds nothing, the UI Automation searches over the main window run: by control type Tree,
+    // then by class SysTreeView32.
+    private AutomationElement? FindTree(out string route)
+    {
+        AutomationElement? byWindow = TreeByWindow();
+        if (byWindow is not null)
+        {
+            route = "hwnd";
+            return byWindow;
+        }
+
+        AutomationElement window = MainWindow;
+        AutomationElement? byType = window.FindFirstDescendant(cf => cf.ByControlType(ControlType.Tree));
+        if (byType is not null)
+        {
+            route = "uiaType";
+            return byType;
+        }
+
+        AutomationElement? byClass = window.FindFirstDescendant(cf => cf.ByClassName(TreeClass));
+        route = byClass is null ? "none" : "uiaClass";
+        return byClass;
+    }
+
+    private AutomationElement? TreeByWindow()
+    {
+        List<IntPtr> trees = ChildWindows(Hwnd)
+            .Where(child => string.Equals(Win32.ClassNameOf(child), TreeClass, StringComparison.Ordinal) && Win32.IsVisible(child) && HasArea(child))
+            .ToList();
+        if (trees.Count != 1)
+        {
+            return null;
+        }
+
+        IntPtr tree = trees[0];
+        AutomationElement element = _automation.FromHandle(tree);
+        bool same = new IntPtr(element.Properties.NativeWindowHandle.Value) == tree;
+        return same && Win32.IsWindow(tree) && Win32.IsVisible(tree) ? element : null;
+    }
+
+    // Polls until a tree exists and has at least one TreeItem child, for up to 60 s.
+    // A failed lookup inside the poll is a miss, not an error.
+    private AutomationElement WaitForTree()
+    {
+        AutomationElement? tree = null;
+        string route = "none";
+        bool ready = ControlTestSupport.WaitUntil(
+            () =>
+            {
+                try
+                {
+                    tree = FindTree(out route);
+                    return tree is not null && tree.FindFirstChild(cf => cf.ByControlType(ControlType.TreeItem)) is not null;
+                }
+                catch (Exception)
+                {
+                    return false;
+                }
+            },
+            TreeTimeout);
+        if (ready && tree is not null)
+        {
+            return tree;
+        }
+
+        throw new InvalidOperationException(
+            $"The classic console has no tree with an item within {TreeTimeout.TotalSeconds:0} s. Last route: {route}. {DescribeChildren()}");
+    }
+
+    private string DescribeChildren()
+    {
+        try
+        {
+            List<string> classes = ChildWindows(Hwnd).Select(Win32.ClassNameOf).ToList();
+            int trees = classes.Count(name => string.Equals(name, TreeClass, StringComparison.Ordinal));
+            return $"Child window classes of the main window ({classes.Count}): {string.Join("|", classes.Distinct(StringComparer.Ordinal))}. " +
+                $"{TreeClass} windows: {trees}.";
+        }
+        catch (Exception ex)
+        {
+            return "The child windows could not be read: " + ex.Message;
+        }
+    }
+
+    private static bool HasArea(IntPtr hwnd) =>
+        Win32.GetWindowRect(hwnd, out Win32.NativeRect rect) && rect.Right > rect.Left && rect.Bottom > rect.Top;
+
+    private static string TopLevelClasses(int processId) =>
+        string.Join("|", TopLevelWindows(processId).Select(hwnd => Win32.ClassNameOf(hwnd) + (Win32.IsVisible(hwnd) ? "" : " (hidden)")));
+
+    private static List<IntPtr> TopLevelWindows(int processId)
+    {
+        var handles = new List<IntPtr>();
+        _ = NativeEnum.EnumWindows(
+            (hwnd, _) =>
+            {
+                if (Win32.ProcessIdOf(hwnd) == unchecked((uint)processId))
+                {
+                    handles.Add(hwnd);
+                }
+
+                return true;
+            },
+            IntPtr.Zero);
+        return handles;
+    }
+
+    private static List<IntPtr> ChildWindows(IntPtr parent)
+    {
+        var handles = new List<IntPtr>();
+        _ = NativeEnum.EnumChildWindows(
+            parent,
+            (hwnd, _) =>
+            {
+                handles.Add(hwnd);
+                return true;
+            },
+            IntPtr.Zero);
+        return handles;
+    }
+
+    private static class NativeEnum
+    {
+        internal delegate bool EnumProc(IntPtr hwnd, IntPtr lParam);
+
+#pragma warning disable SYSLIB1054 // The two enumerations are small and need no LibraryImport plumbing.
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        internal static extern bool EnumWindows(EnumProc callback, IntPtr lParam);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        internal static extern bool EnumChildWindows(IntPtr parent, EnumProc callback, IntPtr lParam);
+#pragma warning restore SYSLIB1054
     }
 
     private ClassicPolicyDialog? FindSettingDialog(string policyName)
