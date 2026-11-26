@@ -43,6 +43,16 @@ Better Windows Config! Faithful, modern re-implementations of the classic Window
   - Ctrl+P, Ctrl+F10, Ctrl+F5, and Ctrl+Alt+Shift+F7 are not bound.
 - Writing policies on Windows Home and on non-English Windows was simulated only. It has not been verified on real machines.
 
+### Unreleased
+
+- **Updater:** Refusals relaunch the Hub from the helper's own folder at the shell's integrity level; an elevated helper never starts an elevated Hub.
+- **Core:** Elevated file access, enumeration, and child creation use the held resolved path even if an ancestor junction is retargeted.
+- **Local Group Policy Editor:** Read-only controls and collapsed menu commands do not respond to keyboard access keys.
+- **Local Group Policy Editor:** Null settings maps use defaults, and the Add/Remove Templates dialog cannot close while an add or remove is running.
+- **Local Group Policy Editor:** Additive prefixed lists remove stale values after entries are deleted or reordered.
+- **Local Group Policy Editor:** Partial saves refresh the model, and save controls stay locked while a write is running.
+- **Local Group Policy Editor:** Enter and Escape on an untouched trailing Show Contents row accept or cancel; committing a cleared two-column row keeps focus at the following row's first column.
+
 ## Changes in `v0.1.5:`
 
 - **Update:** This update is purely to test the new BWC updater.
