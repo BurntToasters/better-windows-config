@@ -436,6 +436,36 @@ if (dotnet === undefined) {
   process.exit(1);
 }
 
+if (flavor === "e2e" && !elevatedRun) {
+  const resourceArgs = [
+    "run",
+    "--project",
+    "tools/Bwc.Oracle.Resources/Bwc.Oracle.Resources.csproj",
+    "-c",
+    "Release",
+    `-p:Platform=${testHost}`,
+    "--",
+    "--tool",
+    "regedit",
+    "--out",
+    "docs/parity/oracle",
+  ];
+  console.log("");
+  console.log(`Preparing the classic resource oracle: ${dotnet} ${resourceArgs.join(" ")}`);
+  let resourceRun;
+  try {
+    resourceRun = await runStreaming(dotnet, resourceArgs, { cwd: repoRoot });
+  } catch (error) {
+    console.error(`Could not start the classic resource oracle: ${error.message}`);
+    process.exit(1);
+  }
+
+  if (resourceRun.code !== 0) {
+    console.error(`Classic resource oracle failed with exit code ${resourceRun.code}.`);
+    process.exit(resourceRun.code ?? 1);
+  }
+}
+
 const testArgs = [
   "test",
   "tests/Bwc.E2E/Bwc.E2E.csproj",

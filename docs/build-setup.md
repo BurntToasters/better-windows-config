@@ -173,6 +173,14 @@ node scripts/flavor-metadata.js --rid win-arm64 --flavor e2e
 - `scripts/test-e2e.js` writes `artifacts/e2e/result-<rid>-<flavor>.json`. The file holds the checks,
   notes, and known gaps, and it records the commit and the run ID.
 
+Before a non-elevated `--flavor e2e` test run, `scripts/test-e2e.js` refreshes the ignored
+`docs/parity/oracle/regedit-resources.json` using
+`dotnet run --project tools/Bwc.Oracle.Resources/Bwc.Oracle.Resources.csproj -c Release
+-p:Platform=<testHost> -- --tool regedit --out docs/parity/oracle`. `<testHost>` is the host
+platform (`x64` or `ARM64`), independent of `--rid`. This read-only resource extractor supplies
+the classic strings and dialog tests; it does not launch Regedit or change HKCU. Ship and
+Elevated-only runs skip this preparation.
+
 ### E2E flavor never elevates
 
 The E2E flavor must not raise UAC when an agent or developer starts an exe directly.
