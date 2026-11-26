@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Xml.Linq;
 using Bwc.E2E.ConsoleFrame;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Editing;
@@ -255,6 +256,45 @@ internal sealed class GpeditSandbox
         }
 
         TemplateRoot = target;
+    }
+
+    /// <summary>
+    /// Copies the standard fixture for context-menu tests and removes policies other than the Machine, User and Both
+    /// class examples from the private copy. Category declarations and the checked-in fixture stay unchanged.
+    /// </summary>
+    internal void UseCompactContextMenuTemplates()
+    {
+        UseTemplatesWithBadCases();
+
+        const string admxNamespace = "http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions";
+        string path = Path.Combine(TemplateRoot, "BwcOracle.admx");
+        XDocument document = XDocument.Load(path, LoadOptions.PreserveWhitespace);
+        XNamespace ns = admxNamespace;
+        XElement policies = document.Root?.Element(ns + "policies")
+            ?? throw new InvalidDataException($"The BWC Oracle template has no policies element: {path}.");
+        var retainedNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Pol_Class_Machine",
+            "Pol_Class_User",
+            "Pol_Class_Both",
+        };
+        List<XElement> policyElements = policies.Elements(ns + "policy").ToList();
+        HashSet<string> foundNames = policyElements
+            .Select(policy => (string?)policy.Attribute("name"))
+            .Where(name => name is not null && retainedNames.Contains(name))
+            .Select(name => name!)
+            .ToHashSet(StringComparer.Ordinal);
+        if (!foundNames.SetEquals(retainedNames))
+        {
+            throw new InvalidDataException($"The BWC Oracle template is missing one of the context-menu policies: {path}.");
+        }
+
+        foreach (XElement policy in policyElements.Where(policy => !retainedNames.Contains((string?)policy.Attribute("name") ?? string.Empty)))
+        {
+            policy.Remove();
+        }
+
+        document.Save(path, SaveOptions.DisableFormatting);
     }
 
     /// <summary>
