@@ -27,6 +27,129 @@ public sealed class PolicyListInstructionTests
     private static string[] Entries(PolicyStateSnapshot snapshot, string id) =>
         ((ListValue)snapshot.Elements[id]).Entries.Select(e => e.Data).ToArray();
 
+    private static ListEntry[] Removed(ListElement element, IReadOnlyList<ListEntry> oldEntries, IReadOnlyList<ListEntry> finalEntries) =>
+        [.. PolicyListEntryRemoval.FindRemoved(element, oldEntries, finalEntries)];
+
+    private static (PolicyDefinition Policy, ListElement Element, string Key) AdditivePrefixPolicy(TempTemplates templates)
+    {
+        templates.AddSimple(
+            "Prefix",
+            "T.Prefix",
+            """
+            <policy name="AddPrefix" class="Machine" displayName="$(string.AddPrefix)" key="Software\T">
+              <parentCategory ref="Root" /><supportedOn ref="SUP" />
+              <elements><list id="PrefixList" key="Software\T\List" additive="true" valuePrefix="Item" /></elements>
+            </policy>
+            """,
+            """<string id="AddPrefix">Add prefix</string>""");
+        var policy = templates.Load().FindPolicy("T.Prefix", "AddPrefix") ?? throw new AssertFailedException("AddPrefix");
+        return (policy, policy.Element<ListElement>("PrefixList"), @"Software\T\List");
+    }
+
+    [TestMethod]
+    public void AdditiveValuePrefix_MiddleDeletionRemovesShiftedEntryAndStaysStableAfterRegistryPolRoundtrip()
+    {
+        using var templates = new TempTemplates();
+        var (policy, element, key) = AdditivePrefixPolicy(templates);
+        var document = Parse(RecSz(key, "Item1", "alpha"), RecSz(key, "Item2", "bravo"), RecSz(key, "Item3", "charlie"));
+        var oldEntries = ((ListValue)PolicyStateReader.Read(policy, document).Elements["PrefixList"]).Entries;
+        var finalEntries = new[] { ListEntry.Of("alpha"), ListEntry.Of("charlie") };
+        var removed = Removed(element, oldEntries, finalEntries);
+
+        CollectionAssert.AreEqual(new[] { "Item2", "Item3" }, removed.Select(entry => entry.Name).ToArray());
+        var edit = PolicyEdit.Enabled(("PrefixList", ElementValue.FromListWithRemoved(finalEntries, removed)));
+        var result = PolicyStateWriter.Apply(policy, document, edit);
+        Assert.IsTrue(result.IsValid, string.Join(", ", result.Problems));
+        AssertBytes(document, RecSz(key, "Item1", "alpha"), RecSz(key, "Item2", "charlie"));
+
+        var roundtrip = PolDocument.Parse(document.ToBytes());
+        var persisted = ((ListValue)PolicyStateReader.Read(policy, roundtrip).Elements["PrefixList"]).Entries;
+        var secondRemoved = Removed(element, persisted, finalEntries);
+        Assert.AreEqual(0, secondRemoved.Length);
+        var second = PolicyStateWriter.Apply(
+            policy,
+            roundtrip,
+            PolicyEdit.Enabled(("PrefixList", ElementValue.FromListWithRemoved(finalEntries, secondRemoved))));
+        Assert.IsFalse(second.Changed);
+        Assert.IsFalse(roundtrip.HasChanges);
+        AssertBytes(roundtrip, RecSz(key, "Item1", "alpha"), RecSz(key, "Item2", "charlie"));
+    }
+
+    [TestMethod]
+    public void ValuePrefixRemoval_UsesGeneratedNamesForFirstDeletionReorderAndDuplicateData()
+    {
+        var element = P("Pol_List_ValuePrefix").Element<ListElement>("PrefixList");
+        var original = new[]
+        {
+            new ListEntry("Item1", "alpha"),
+            new ListEntry("Item2", "bravo"),
+            new ListEntry("Item3", "charlie"),
+        };
+
+        CollectionAssert.AreEqual(
+            new[] { "Item1", "Item2", "Item3" },
+            Removed(element, original, [ListEntry.Of("bravo"), ListEntry.Of("charlie")]).Select(entry => entry.Name).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { "Item1", "Item2" },
+            Removed(element, original, [ListEntry.Of("bravo"), ListEntry.Of("alpha"), ListEntry.Of("charlie")])
+                .Select(entry => entry.Name).ToArray());
+
+        var duplicates = new[]
+        {
+            new ListEntry("Item1", "same"),
+            new ListEntry("Item2", "same"),
+            new ListEntry("Item3", "tail"),
+        };
+        CollectionAssert.AreEqual(
+            new[] { "Item2", "Item3" },
+            Removed(element, duplicates, [ListEntry.Of("same"), ListEntry.Of("tail")])
+                .Select(entry => entry.Name).ToArray());
+    }
+
+    [TestMethod]
+    public void ListRemoval_EmptyPrefixExplicitAndUnprefixedListsKeepTheirIdentityRules()
+    {
+        var emptyPrefix = P("Pol_List_EmptyPrefix").Element<ListElement>("EmptyPrefixList");
+        Assert.AreEqual(string.Empty, emptyPrefix.ValuePrefix);
+        var emptyPrefixOld = new[]
+        {
+            new ListEntry("1", "alpha"),
+            new ListEntry("2", "bravo"),
+            new ListEntry("3", "charlie"),
+        };
+        CollectionAssert.AreEqual(
+            new[] { "2", "3" },
+            Removed(emptyPrefix, emptyPrefixOld, [ListEntry.Of("alpha"), ListEntry.Of("charlie")])
+                .Select(entry => entry.Name).ToArray());
+
+        var explicitList = P("Pol_List_ExplicitValue").Element<ListElement>("ExplicitList");
+        Assert.AreEqual(0, Removed(explicitList, [new ListEntry("Name", "old")], [new ListEntry("name", "edited")]).Length);
+
+        var unprefixed = P("Pol_List_Additive").Element<ListElement>("AdditiveList");
+        Assert.IsNull(unprefixed.ValuePrefix);
+        Assert.AreEqual(0, Removed(unprefixed, [ListEntry.Of("alpha"), ListEntry.Of("bravo")],
+            [ListEntry.Of("bravo"), ListEntry.Of("alpha")]).Length);
+    }
+
+    [TestMethod]
+    public void AdditiveValuePrefix_ConcurrentModificationOfRemovedNameIsRetained()
+    {
+        using var templates = new TempTemplates();
+        var (policy, element, key) = AdditivePrefixPolicy(templates);
+        var baseDocument = Parse(RecSz(key, "Item1", "alpha"), RecSz(key, "Item2", "bravo"), RecSz(key, "Item3", "charlie"));
+        var oldEntries = ((ListValue)PolicyStateReader.Read(policy, baseDocument).Elements["PrefixList"]).Entries;
+        var currentDocument = Parse(RecSz(key, "Item1", "alpha"), RecSz(key, "Item2", "bravo"), RecSz(key, "Item3", "changed elsewhere"));
+        var finalEntries = new[] { ListEntry.Of("alpha"), ListEntry.Of("charlie") };
+        var removed = Removed(element, oldEntries, finalEntries);
+        var edit = PolicyEdit.Enabled(("PrefixList", ElementValue.FromListWithRemoved(finalEntries, removed)));
+
+        var result = PolicyStateWriter.Apply(policy, currentDocument, edit);
+
+        Assert.IsTrue(result.IsValid, string.Join(", ", result.Problems));
+        Assert.AreEqual("changed elsewhere", PolData.TryGetString(currentDocument.GetValue(key, "Item3")!.Data.Span));
+        Assert.AreEqual("charlie", PolData.TryGetString(currentDocument.GetValue(key, "Item2")!.Data.Span));
+    }
+
     [TestMethod]
     public void NonAdditive_Enabled_WritesDelvalsThenTheEntries()
     {
