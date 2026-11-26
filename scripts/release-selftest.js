@@ -23,6 +23,9 @@ import {
   malformedInstallerUrls,
   qualityGateProof,
   satisfiesEngineRange,
+  captureSourceState,
+  invalidatePublishArtifact,
+  sameCleanSourceState,
 } from "./lib/release-policy.js";
 import { resolveExecutable, runRestrictedSync } from "./lib/run-restricted.js";
 import { buildPlan } from "./test-all.js";
@@ -2036,22 +2039,109 @@ function runGateProofAndUrlCases(cases) {
   );
 }
 
-/** Publish folder reuse: the build record must match this version and pass, and name HEAD when it names a commit. */
+/** Publish reuse requires a passing, reusable record for the same clean source commit and current clean HEAD. */
 function runPublishReuseCases(temp, cases) {
   const build = path.join(temp, "reuse-build");
   const publish = path.join(temp, "reuse-publish", "win-x64");
-  writeText(path.join(publish, "BetterWindowsConfig.exe"), "exe");
+  const recordPath = path.join(build, "win-x64.json");
+  const exePath = path.join(publish, "BetterWindowsConfig.exe");
+  writeText(exePath, "exe");
+  const cleanHead = { commit: FAKE_COMMIT, clean: true };
+  const unavailableGitState = captureSourceState(temp);
   const reuse = (fields, extra = {}) => {
-    writeJson(path.join(build, "win-x64.json"), { schema: 2, version: VERSION, rid: "win-x64", flavor: "ship", pass: true, ...fields });
-    return publishIsGood({ rid: "win-x64", flavor: "ship", publishDir: publish, buildArtifactDir: build, packageVersion: VERSION, ...extra });
+    writeJson(recordPath, {
+      schema: 2,
+      version: VERSION,
+      rid: "win-x64",
+      flavor: "ship",
+      pass: true,
+      commit: FAKE_COMMIT,
+      clean: true,
+      reusable: true,
+      ...fields,
+    });
+    return publishIsGood({
+      rid: "win-x64",
+      flavor: "ship",
+      publishDir: publish,
+      buildArtifactDir: build,
+      packageVersion: VERSION,
+      sourceState: cleanHead,
+      ...extra,
+    });
   };
-  expectCheck("publish reuse: a passing record for this version is reused", reuse({}) === true, "reused", cases);
+  expectCheck("publish reuse: a passing record for the matching clean commit is reused", reuse({}) === true, "reused", cases);
   expectCheck("publish reuse: a record for another version is not reused", reuse({ version: OTHER_VERSION }) === false, "not reused", cases);
+  expectCheck("publish reuse: a record for another RID is not reused", reuse({ rid: "win-arm64" }) === false, "not reused", cases);
+  expectCheck("publish reuse: a record for another flavor is not reused", reuse({ flavor: "e2e" }) === false, "not reused", cases);
   expectCheck("publish reuse: a failed record is not reused", reuse({ pass: false }) === false, "not reused", cases);
-  expectCheck("publish reuse: a record naming HEAD is reused", reuse({ commit: FAKE_COMMIT }, { head: FAKE_COMMIT }) === true, "reused", cases);
   expectCheck(
-    "publish reuse: a record naming another commit is not reused",
-    reuse({ commit: FAKE_COMMIT }, { head: "f".repeat(40) }) === false,
+    "publish reuse: a legacy record without a commit is not reused",
+    reuse({ commit: undefined }) === false,
+    "not reused",
+    cases,
+  );
+  expectCheck("publish reuse: a record naming another commit is not reused", reuse({ commit: "f".repeat(40) }) === false, "not reused", cases);
+  expectCheck(
+    "publish reuse: a clean build for another current HEAD is not reused",
+    reuse({}, { sourceState: { commit: "f".repeat(40), clean: true } }) === false,
+    "not reused",
+    cases,
+  );
+  expectCheck("publish reuse: a dirty build record is not reused", reuse({ clean: false, reusable: false }) === false, "not reused", cases);
+  expectCheck("publish reuse: a non-reusable record is not reused", reuse({ reusable: false }) === false, "not reused", cases);
+  expectCheck(
+    "publish reuse: a dirty current checkout is not reused",
+    reuse({}, { sourceState: { commit: FAKE_COMMIT, clean: false } }) === false,
+    "not reused",
+    cases,
+  );
+  expectCheck(
+    "publish reuse: an unavailable git state cannot prove a clean source identity",
+    unavailableGitState.commit === null && unavailableGitState.clean === null,
+    JSON.stringify(unavailableGitState),
+    cases,
+  );
+  expectCheck(
+    "publish reuse: a record is not reused when git state is unavailable",
+    reuse({}, { sourceState: unavailableGitState }) === false,
+    "not reused",
+    cases,
+  );
+  expectCheck(
+    "publish reuse: a missing publish executable is not reused",
+    (() => {
+      fs.rmSync(exePath, { force: true });
+      const result = reuse({});
+      writeText(exePath, "exe");
+      return result === false;
+    })(),
+    "not reused",
+    cases,
+  );
+
+  expectCheck(
+    "publish reuse: source state is reusable only for the same clean commit at both ends",
+    sameCleanSourceState(cleanHead, cleanHead) &&
+      !sameCleanSourceState(cleanHead, { commit: "f".repeat(40), clean: true }) &&
+      !sameCleanSourceState({ commit: FAKE_COMMIT, clean: false }, cleanHead) &&
+      !sameCleanSourceState(cleanHead, { commit: FAKE_COMMIT, clean: false }),
+    "commit or clean state changed",
+    cases,
+  );
+
+  reuse({});
+  invalidatePublishArtifact(recordPath);
+  expectCheck(
+    "publish reuse: a publish interrupted after record invalidation cannot leave the old success reusable",
+    publishIsGood({
+      rid: "win-x64",
+      flavor: "ship",
+      publishDir: publish,
+      buildArtifactDir: build,
+      packageVersion: VERSION,
+      sourceState: cleanHead,
+    }) === false,
     "not reused",
     cases,
   );

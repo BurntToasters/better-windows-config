@@ -48,6 +48,32 @@ export function currentCommit(root) {
   return commit.toLowerCase();
 }
 
+/** Reads the source identity needed to prove a build can be reused. Git failures make it non-reusable. */
+export function captureSourceState(root) {
+  try {
+    return { commit: currentCommit(root), clean: porcelainPaths(root).length === 0 };
+  } catch {
+    return { commit: null, clean: null };
+  }
+}
+
+/** True only when both build endpoints are the same exact commit and both worktrees are clean. */
+export function sameCleanSourceState(start, end) {
+  const isExactCommit = (value) => typeof value === "string" && /^[0-9a-f]{40}$/i.test(value);
+  return (
+    start?.clean === true &&
+    end?.clean === true &&
+    isExactCommit(start.commit) &&
+    isExactCommit(end.commit) &&
+    start.commit.toLowerCase() === end.commit.toLowerCase()
+  );
+}
+
+/** Removes the previous publish verdict before its output folder is modified. */
+export function invalidatePublishArtifact(filePath) {
+  fs.rmSync(filePath, { force: true });
+}
+
 export function currentBranch(root) {
   return git(root, ["rev-parse", "--abbrev-ref", "HEAD"], { allowFailure: true });
 }

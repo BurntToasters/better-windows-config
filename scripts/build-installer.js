@@ -33,7 +33,7 @@ import {
   SKIP_ENV,
   signingPolicy,
 } from "./release-policy.js";
-import { currentCommit, readPackageVersion } from "./lib/release-policy.js";
+import { captureSourceState, readPackageVersion, sameCleanSourceState } from "./lib/release-policy.js";
 import { parsePackageVersion } from "./sync-version-helpers.js";
 
 const SCRIPT = "scripts/build-installer.js";
@@ -656,9 +656,8 @@ function relativeToRepo(absolute) {
 }
 
 /**
- * True when artifacts/build says the publish for this flavor passed, for the current package version, and
- * the main EXE exists. A record that names a commit must name HEAD. dotnet-build.js records no commit today,
- * so only the version is checked for it. Any read or git failure answers false, so the publish runs again.
+ * True when artifacts/build proves a successful publish for this exact clean source commit, version, RID, and flavor.
+ * Older records without the clean-state proof, and any read or git failure, require a fresh publish.
  */
 export function publishIsGood({
   rid,
@@ -666,7 +665,7 @@ export function publishIsGood({
   publishDir,
   buildArtifactDir = BUILD_ARTIFACT_DIR,
   packageVersion = readPackageVersion(REPO_ROOT),
-  head = null,
+  sourceState = undefined,
 }) {
   const artifactPath = path.join(buildArtifactDir, `${publishFolderName(rid, flavor)}.json`);
   if (!fs.existsSync(artifactPath) || !fs.existsSync(path.join(publishDir, "BetterWindowsConfig.exe"))) {
@@ -675,11 +674,9 @@ export function publishIsGood({
   try {
     const record = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
     if (record.pass !== true || record.flavor !== flavor || record.rid !== rid) return false;
-    if (record.version !== packageVersion) return false;
-    if (record.commit !== undefined && record.commit !== null) {
-      return record.commit === (head ?? currentCommit(REPO_ROOT));
-    }
-    return true;
+    if (record.version !== packageVersion || record.reusable !== true || record.clean !== true) return false;
+    const currentState = sourceState === undefined ? captureSourceState(REPO_ROOT) : sourceState;
+    return sameCleanSourceState({ commit: record.commit, clean: record.clean }, currentState);
   } catch {
     return false;
   }
