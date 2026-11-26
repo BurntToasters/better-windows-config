@@ -12,7 +12,7 @@ public sealed partial class GpeditRootView
     private bool _modalBusy;
 
     /// <summary>Whether an entrypoint may reserve the modal owner.</summary>
-    private bool ModalCommandsAllowed => _model is not null && !_closed && !_modalBusy;
+    private bool ModalCommandsAllowed => !_closed && !_modalBusy && (!IsEditorHost || _model is not null);
 
     /// <summary>Reserves the owner for one policy, filter, template, frame or Help dialog.</summary>
     private bool TryReserveModal()
