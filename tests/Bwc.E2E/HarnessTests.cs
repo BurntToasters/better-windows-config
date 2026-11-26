@@ -120,6 +120,14 @@ public sealed class HarnessTests
             ControlTestSupport.PrepareDpi();
             var config = GuiGate.Config;
             using var session = new AppSession(config, config.HubExePath);
+            bool toolRowsReady = ControlTestSupport.WaitUntil(
+                () => IsVisibleAndUsableToolRow(session, "ToolRow_regedit") &&
+                    IsVisibleAndUsableToolRow(session, "ToolRow_gpedit"),
+                TimeSpan.FromSeconds(15));
+            Assert.IsTrue(
+                toolRowsReady,
+                "ToolRow_regedit and ToolRow_gpedit did not both become visible with usable UIA bounds before capture.");
+
             var path = E2EResults.CaptureScreenshot("harness.screenshot", session);
             try
             {
@@ -134,6 +142,18 @@ public sealed class HarnessTests
                 }
             }
         });
+    }
+
+    private static bool IsVisibleAndUsableToolRow(AppSession session, string automationId)
+    {
+        var row = session.Find(automationId);
+        if (row is null || row.Properties.IsOffscreen.ValueOrDefault)
+        {
+            return false;
+        }
+
+        var bounds = row.BoundingRectangle;
+        return bounds.Width > 0 && bounds.Height > 0;
     }
 
     private static void Run(string id, Action action)
