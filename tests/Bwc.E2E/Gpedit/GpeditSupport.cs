@@ -266,11 +266,12 @@ internal sealed class GpeditSandbox
     {
         UseTemplatesWithBadCases();
 
-        const string admxNamespace = "http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions";
         string path = Path.Combine(TemplateRoot, "BwcOracle.admx");
         XDocument document = XDocument.Load(path, LoadOptions.PreserveWhitespace);
-        XNamespace ns = admxNamespace;
-        XElement policies = document.Root?.Element(ns + "policies")
+        XElement root = document.Root
+            ?? throw new InvalidDataException($"The BWC Oracle template has no root element: {path}.");
+        XNamespace ns = root.Name.Namespace;
+        XElement policies = root.Element(ns + "policies")
             ?? throw new InvalidDataException($"The BWC Oracle template has no policies element: {path}.");
         var retainedNames = new HashSet<string>(StringComparer.Ordinal)
         {
