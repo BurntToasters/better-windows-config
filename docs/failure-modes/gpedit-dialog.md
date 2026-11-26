@@ -272,7 +272,7 @@ The contract the code must meet (the names are the ones the tests look for):
 | W3 | Another process holds the write lock file. The save waits for ever, hangs the window, or reports a generic failure. | After the lock timeout (15 s) the message `DialogSaveError.LockTimeout` appears; the window does not stay unresponsive; the dialog stays open; nothing is written; OK saves once the lock is free. | `Gpedit_Save_Errors_LockHeld` |
 | W4 | `Registry.pol` has the read-only attribute and the save clears it, writes the other files first, or shows a generic text. | `DialogSaveError.ReadOnlyFile`, the attribute is kept, no file of the five changed (the store checks every target before its first write), OK saves once the attribute is gone. | `Gpedit_Save_Errors_ReadOnlyFile` |
 | W5 | `Registry.pol` turned malformed between open and save and the save overwrites it, or works from the model of open time. | The store reads under the lock, finds the malformed file and throws `Malformed`; `DialogSaveError.Malformed`; the bad file is left as it is; nothing else is written. | `Gpedit_Save_Errors_MalformedAtSave` |
-| W6 | A save writes some files and then fails (a write error on the second file) and the dialog says "not saved", or keeps the old model. | The store does not roll back. The dialog says that files were written (`DialogSaveError.Partial`), the model is read back from disk, the list shows what is on disk. | none through the window: the E2E sandbox cannot fail the second write. Engine: `tests/Bwc.Gpo.Tests/GpoSaveTests.cs` (`WriteObserver`, `WrittenFiles`). The message mapping is covered by `Gpedit_Save_Errors_TextsDiffer` for the three kinds a user can cause |
+| W6 | A save writes some files and then fails (a comment before `Registry.pol`, or `Registry.pol` before `gpt.ini`) and the dialog says "not saved", keeps the old model, or drops the pending edit. | The store does not roll back. It reads the snapshot again and rethrows the original partial failure with its `WrittenFiles`; the dialog says which files were written (`DialogSaveError.Partial`), updates the host model/list from disk, stays open and dirty, and keeps the user's controls and original baseline for retry. A failure before any write leaves the snapshot and host untouched. A failed reread is logged and does not replace the original save error. While saving, mouse input cannot change radios, comment or options. | Adapter: `tests/Bwc.Policy.Tests/Golden/PolicySaveStoreTests.cs` (both partial-write orders, zero-write failure, retry and reread failure). Engine: `tests/Bwc.Gpo.Tests/GpoSaveTests.cs` (`WriteObserver`, `WrittenFiles`). The message mapping is covered by `Gpedit_Save_Errors_TextsDiffer` for the three kinds a user can cause |
 | W7 | The refresh after a write fails and the dialog treats the save as failed (the user saves again and the version rises twice), or hides the failure. | `RefreshFailed` is a notice, not an error: the files are on disk, the model is replaced, the baseline is clean, and the message `DialogSaveError.RefreshFailed` says the change takes effect at the next policy refresh. | none through the window (the sandbox refresher only records). Engine: `GpoSaveTests` |
 | W8 | The loaded model is not replaced by the saved result: the list shows the memory edit, F5 shows something else, or the dialog reopens with the pre-save state. | After OK the list shows the saved state and comment; the dialog reopens clean with the saved values; after F5 the same; F5 writes nothing. | `Gpedit_Save_ModelReplaced` |
 | W9 | Cancel after Apply reverts the change, saves again or writes a version bump; OK after Apply writes again. | Apply writes the files of the capture; Cancel changes nothing; OK after Apply (nothing pending) writes nothing. | `Gpedit_Replay_GroupA`: `A/Machine_Apply_Cancel`, `A/Machine_Apply_OK` |
@@ -298,9 +298,10 @@ OK closing without a save is not silent, and a check that OK writes no file was 
 
 - `PolicySaveStore` (`src/Bwc.Gpedit/Save/PolicySaveStore.cs`) implements `IPolicyEditStore`. `Apply` calls
   `PolicySave.Save(store, target.Side, ...)`, so the side is the side of the node the policy was opened from. When files were
-  written it opens the store again, so `PolFor` and `CommentsFor` give what is on disk. The view keeps one `GpoStore` for the
-  window (it makes the backup of the session once) and, on `Applied`, replaces the loaded model with
-  `GpeditModel.WithSnapshot(store.Snapshot)` before it rebuilds the rows.
+  written it opens the store again, so `PolFor` and `CommentsFor` give what is on disk. If the save throws after writing some
+  files, it also reads a fresh snapshot, logs a failed reread, and rethrows the original failure with its `WrittenFiles`. The
+  view keeps one `GpoStore` for the window (it makes the backup of the session once) and, on `Applied`, replaces the loaded
+  model with `GpeditModel.WithSnapshot(store.Snapshot)` before it rebuilds the rows.
 - `InMemoryPolicyEditStore` was deleted. The guard rule `in-memory-store` (`scripts/check-policy-writer.js`, cases (a) to (f) of
   `--self-test`) stops it from coming back into a ship file.
 - Access comes from the one place that chooses the policy object, `GpeditStorePolicy.Choose`. Ship: `GpoAccess.Check` (not
@@ -309,11 +310,14 @@ OK closing without a save is not silent, and a check that OK writes no file was 
   `GpeditReadOnlyNotice` under the status bar with the first reason, and the dialog shows `DialogReadOnlyNotice` (or a notice that
   its policy file could not be read) at the left of the buttons. In read-only mode Apply is disabled and OK only closes.
 - The save runs on the thread pool: the lock can take 15 seconds, and the window must not freeze. While it runs the dialog is
-  busy: OK, Cancel, Apply, Previous and Next are disabled, keys are swallowed, and a close from the caption is refused. OK closes the
-  dialog when the save succeeded. A `GpoStoreException` becomes one message box whose text has the id `DialogSaveError.<Kind>`
+  busy: OK, Cancel, Apply, Previous, Next, the state radios, Comment and the option controls are disabled, keys are swallowed,
+  and a close from the caption is refused. The edit controls are restored according to read-only status and selected state when
+  the save ends. OK closes the dialog when the save succeeded. A `GpoStoreException` becomes one message box whose text has the id `DialogSaveError.<Kind>`
   (`SaveErrorMessages`): `ReadOnlyFile`, `Malformed`, `LockTimeout` (also `LockUnavailable`), `InUse`, `Partial` (files written
-  before the failure, named in the text), `ReadOnlyMode` and `Failed`. A refresh failure after a write is `RefreshFailed`: a notice,
-  the dialog counts the change as saved.
+  before the failure, named in the text), `ReadOnlyMode` and `Failed`. After a partial write the dialog reads the policy model
+  again and raises `Applied` so the host rebuilds its model and rows, but keeps the open controls and baseline as the user's
+  pending edit; it does not count the partial save as applied. A refresh failure after a complete write is `RefreshFailed`: a
+  notice, the dialog counts the change as saved.
 - `PolicyOptionsView.Load` takes the value of a field that has no stored value from `PolicyDefaults.For`. The fields keep no default
   logic of their own any more. An enum with no `defaultItem` loads with nothing selected and reads no value, so the validator
   refuses OK until an item is chosen; an Enabled list with no rows is refused by the same validator.

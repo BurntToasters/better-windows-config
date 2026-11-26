@@ -8,6 +8,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Bwc.Policy\Bwc.Policy.csproj" />
+    <ProjectReference Include="..\..\src\Bwc.Gpo\Bwc.Gpo.csproj" />
+  </ItemGroup>
+
+  <!-- Compile the UI-free save adapter and its dialog seam here, so partial-write behavior is tested without WinUI. -->
+  <ItemGroup>
+    <Compile Include="..\..\src\Bwc.Gpedit\Save\PolicySaveStore.cs" Link="Gpedit\PolicySaveStore.cs" />
+    <Compile Include="..\..\src\Bwc.Gpedit.Editor\Dialog\IPolicyEditStore.cs" Link="Gpedit\IPolicyEditStore.cs" />
+    <Compile Include="..\..\src\Bwc.Gpedit.Editor\Dialog\PolicyRef.cs" Link="Gpedit\PolicyRef.cs" />
   </ItemGroup>
 
   <!-- BWC-authored fixture templates, copied next to the test assembly as Fixture\... (including Fixture\bad\...). -->
