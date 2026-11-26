@@ -516,7 +516,60 @@ public sealed class UpdateApplierTests
 
         Assert.AreEqual(UpdateFailure.InstallDirUnsafe, outcome.Failure, outcome.Detail);
         Assert.AreEqual(0, h.Host.Launched, "no prompt for a folder that is not the helper's own");
-        CollectionAssert.AreEqual(new[] { "--update-result", "InstallDirUnsafe" }, h.Host.Started.Single().Args.ToArray());
+        var relaunch = h.Host.Started.Single();
+        CollectionAssert.AreEqual(new[] { "--update-result", "InstallDirUnsafe" }, relaunch.Args.ToArray());
+        Assert.AreEqual(Path.Combine(h.Host.HelperDirectory, "BetterWindowsConfig.exe"), relaunch.Exe, "the Hub comes back from the helper's own folder");
+        Assert.AreEqual(h.Host.HelperDirectory, relaunch.WorkDir);
+    }
+
+    [TestMethod]
+    public async Task Refusal_Hub_Relaunch_Never_Uses_The_Requested_Install_Dir()
+    {
+        // ME13: the requested folder failed the same-folder rule, so it must not choose which BetterWindowsConfig.exe runs.
+        using var h = new Harness();
+        var hostile = h.Dir.Sub("not the helper folder");
+
+        var outcome = await h.Applier.ApplyAsync(h.Request() with { InstallDir = hostile }, CancellationToken.None);
+
+        Assert.AreEqual(UpdateFailure.InstallDirUnsafe, outcome.Failure, outcome.Detail);
+        var relaunch = h.Host.Started.Single();
+        Assert.AreEqual(Path.Combine(h.Host.HelperDirectory, "BetterWindowsConfig.exe"), relaunch.Exe);
+        Assert.AreEqual(h.Host.HelperDirectory, relaunch.WorkDir);
+        Assert.IsFalse(relaunch.Exe.StartsWith(hostile, StringComparison.OrdinalIgnoreCase), "the requested folder is never started from");
+    }
+
+    [TestMethod]
+    public async Task Refusal_Wait_For_Exit_Looks_At_The_Helper_Folder_Not_The_Requested_One()
+    {
+        // ME13: a requested folder that cannot be normalized made the process check fail closed and stall for the whole timeout.
+        using var h = new Harness();
+        var seen = new List<string>();
+        h.Host.LiveFolder = folder => seen.Add(folder);
+        h.Host.Live = _ => [4242];
+
+        var outcome = await h.Applier.ApplyAsync(
+            h.Request(pids: [4242], wait: TimeSpan.FromMilliseconds(200)) with { InstallDir = "relative\\dir" },
+            CancellationToken.None);
+
+        Assert.AreEqual(UpdateFailure.InstallDirUnsafe, outcome.Failure, outcome.Detail);
+        Assert.IsTrue(seen.Count > 0, "the refusal waited for the old Hub");
+        Assert.IsTrue(seen.All(f => string.Equals(f, h.Host.HelperDirectory, StringComparison.OrdinalIgnoreCase)), "the wait used " + string.Join(";", seen));
+    }
+
+    [TestMethod]
+    public void Unexpected_Error_Relaunch_Is_At_Shell_Integrity_From_The_Helper_Folder()
+    {
+        // ME15: the last-resort Hub relaunch of --apply used StartDetached from --install-dir, so an elevated helper
+        // that threw started an elevated Hub from a caller-chosen folder.
+        var host = new FakeHost { Elevated = true };
+
+        var started = HubLauncher.RelaunchAfterUnexpected(host);
+
+        Assert.IsTrue(started);
+        Assert.AreEqual(0, host.Started.Count, "never a plain start");
+        var shell = host.ShellStarted.Single();
+        Assert.AreEqual(Path.Combine(host.HelperDirectory, "BetterWindowsConfig.exe"), shell.Exe);
+        CollectionAssert.AreEqual(new[] { "--update-result", "Unexpected" }, shell.Args.ToArray());
     }
 
     [TestMethod]
@@ -659,7 +712,28 @@ public sealed class UpdateApplierTests
 
         Assert.AreEqual(UpdateFailure.RunningElevated, outcome.Failure, outcome.Detail);
         Assert.AreEqual(0, h.Host.Launched, "an elevated medium helper starts nothing");
-        CollectionAssert.AreEqual(new[] { "--update-result", "RunningElevated" }, h.Host.Started.Single().Args.ToArray());
+        // ME14: an elevated helper never starts the Hub itself, so no elevated Hub is left behind.
+        Assert.AreEqual(0, h.Host.Started.Count, "no plain start from an elevated helper");
+        var relaunch = h.Host.ShellStarted.Single();
+        CollectionAssert.AreEqual(new[] { "--update-result", "RunningElevated" }, relaunch.Args.ToArray());
+        Assert.AreEqual(Path.Combine(h.Host.HelperDirectory, "BetterWindowsConfig.exe"), relaunch.Exe);
+    }
+
+    [TestMethod]
+    public async Task Apply_Elevated_Refused_Ignores_A_Hostile_Install_Dir()
+    {
+        // ME14 with ME13: refused before the folder is validated, so the requested folder must not be used at all.
+        using var h = new Harness();
+        h.Host.Elevated = true;
+        var hostile = h.Dir.Sub("hostile");
+
+        var outcome = await h.Applier.ApplyAsync(h.Request() with { InstallDir = hostile }, CancellationToken.None);
+
+        Assert.AreEqual(UpdateFailure.RunningElevated, outcome.Failure, outcome.Detail);
+        Assert.AreEqual(0, h.Host.Started.Count);
+        var relaunch = h.Host.ShellStarted.Single();
+        Assert.AreEqual(Path.Combine(h.Host.HelperDirectory, "BetterWindowsConfig.exe"), relaunch.Exe);
+        Assert.AreEqual(h.Host.HelperDirectory, relaunch.WorkDir);
     }
 
     [TestMethod]
