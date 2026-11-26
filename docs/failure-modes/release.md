@@ -237,8 +237,8 @@ by hand, so a release writes no old-name feed file. 0.1.2 and later read `bwc-<c
 | ID | Case | Risk | Required result |
 |----|------|------|-----------------|
 | N1 | The build record in `artifacts/build` names another version than `package.json` | A publish folder from an older version is reused in a new installer | Not reused. `dotnet-build.js` runs again. |
-| N2 | The build record has a `commit` that differs from HEAD | A publish from another commit is reused | Not reused. `dotnet-build.js` records no commit today, so only the version is checked. Add the commit check when it is recorded. |
-| N3 | The build record has `pass` other than true, or its `rid` or `flavor` differ | A failed or wrong-flavor publish is reused | Not reused (existing behavior). |
+| N2 | The build record's `commit` differs from HEAD | A publish from another commit is reused | Not reused. A successful build records its commit only when the source state at build start and finish is the same clean commit. |
+| N3 | The record is legacy, dirty or non-reusable, failed, or has the wrong `rid` or `flavor` | An unproven, failed, or wrong-flavor publish is reused | Not reused. Legacy records without `clean: true` and `reusable: true`, and builds with a dirty or changed source state, cause `dotnet-build.js` to run again. |
 
 ## Release VM flow
 

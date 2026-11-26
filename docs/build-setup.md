@@ -4,15 +4,20 @@
 
 | Tool | Version | Notes |
 |---|---|---|
-| .NET SDK | 10.0.404 (pinned in `global.json`, `rollForward: latestFeature`) | `winget install Microsoft.DotNet.SDK.10` |
+| .NET SDK | 10.0.404 (pinned in `global.json`, `rollForward: latestFeature`) | Install the SDK selected by `global.json`. |
 | Windows App SDK | 2.6.5 (NuGet `Microsoft.WindowsAppSDK`) | Restored from NuGet; nothing to install |
-| Windows SDK projection | `net10.0-windows10.0.26100.0` | Restored from NuGet |
+| Windows SDK projection | `net10.0-windows10.0.26100.0` | Managed TFM targeting pack restored from NuGet; this is not the native Windows SDK. |
+| MSVC C++ Build Tools | x64 and ARM64 toolsets | Required to publish the NativeAOT `BwcUpdate.exe` for the matching RID. |
+| Native Windows SDK | Installed Windows SDK | Required by the NativeAOT linker; the repository does not pin a minimum version. |
 | Node.js | `^26.13.1` (`engines.node` in `package.json`) | Build and release scripts; CI reads the same field |
 | NSIS | 3.10+ | Installer (not needed for app builds) |
 | GnuPG | 2.4+ | Release signing only |
 
-Visual Studio is not required. `dotnet build`, `dotnet publish`, and `dotnet test` work from a
-plain terminal, including the XAML compiler.
+The full Visual Studio IDE is optional. Managed `dotnet build` and `dotnet test` commands work
+from a plain terminal with the pinned .NET SDK and restored packages. Full app publishes and
+installer builds publish `BwcUpdate.exe` as NativeAOT, so they require the MSVC C++ toolset for
+each RID being published and the Windows SDK. The release VM publishes both RIDs and needs both
+the x64 and ARM64 toolsets; Visual Studio Build Tools are sufficient.
 
 Tests run on Microsoft.Testing.Platform. `global.json` opts in with
 `"test": { "runner": "Microsoft.Testing.Platform" }`; without it the .NET 10 SDK refuses
@@ -84,7 +89,11 @@ After the steps of every RID, a full gate (no `--quick`) runs `test-policy-relea
 the tests tagged `ReleaseGate` in `Bwc.Policy.Tests`, and fails while a capture case still awaits a
 recapture. It belongs to no RID (`rid` is null in `steps`), and it fails the gate when it fails, but the
 GUI evidence of every RID is collected before it runs.
-A release needs one full `--rid all` gate that passed on a clean HEAD (see `docs/RELEASE.md`).
+The release VM uses `node scripts/test-all.js --quick --release-gate --rid all`: it builds the
+solution for both architectures, runs the shared non-GUI test projects once on the host
+architecture, and runs `test-policy-release-gate` last on the host architecture. It skips per-RID
+publishes and GUI E2E. The release also requires local interactive GUI E2E evidence collected
+before the VM run; it does not require a full `--rid all` gate (see `docs/RELEASE.md`).
 
 The test projects always build and run for the host architecture (`process.arch`:
 ARM64 or x64), whatever `--rid` is. `--rid` only picks the app RID for the publish and E2E
