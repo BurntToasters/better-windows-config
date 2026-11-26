@@ -52,6 +52,15 @@ Better Windows Config! Faithful, modern re-implementations of the classic Window
 - **Local Group Policy Editor:** Additive prefixed lists remove stale values after entries are deleted or reordered.
 - **Local Group Policy Editor:** Partial saves refresh the model, and save controls stay locked while a write is running.
 - **Local Group Policy Editor:** Enter and Escape on an untouched trailing Show Contents row accept or cancel; committing a cleared two-column row keeps focus at the following row's first column.
+- **Local Group Policy Editor:** Retrying a partial save completes version metadata and refresh, with dirty comparisons rebased to the partial disk state.
+- **Local Group Policy Editor:** Show Contents accepts named explicit-list rows with empty data.
+- **Local Group Policy Editor:** Long-decimal spin buttons step unsigned values without signed overflow.
+- **Core:** Singleton identity uses the normalized effective data root.
+- **Local Group Policy Editor:** Modal dialogs share one reservation, and queued Refresh runs after the last dialog closes.
+- **Hub:** Startup update dialogs wait behind an existing modal without re-enabling the Hub early.
+- **Local Group Policy Editor:** Refresh updates cached policy write access without creating another session backup.
+- **Hub:** Closing the Hub cancels startup update checks and ignores late UI results.
+- **Console export:** CSV fields containing line breaks are quoted.
 
 ## Changes in `v0.1.5:`
 
