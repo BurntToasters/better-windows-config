@@ -417,7 +417,6 @@ function buildInstallerB(rid, version, publishDir, makensis, { oldLayout = false
 
 /** Runs the Installer tests. The result file is the verdict, so a missing or stale file is a failure. */
 function runInstallerTests({ rid, publishA, setupA, setupB, setupOld, versionA, versionB, versionOld, runId }) {
-  rmSync(RESULT_PATH, { force: true });
   const dotnet = dotnetCommand();
   const args = [
     "test",
@@ -514,13 +513,19 @@ function main(argv = process.argv.slice(2)) {
     console.error(usage);
     return EXIT_USAGE;
   }
+  rmSync(options.prepare ? INPUTS_PATH : RESULT_PATH, { force: true });
+
   if (rid === "win-arm64" && process.arch !== "arm64") {
     console.error("An ARM64 app cannot run on this x64 host. Use --rid win-x64.");
     return EXIT_USAGE;
   }
 
   const elevation = elevationState();
-  if (elevation.known && elevation.elevated) {
+  if (!elevation.known) {
+    console.error(`installer-e2e: could not verify that this shell is unelevated: ${elevation.detail}`);
+    return EXIT_USAGE;
+  }
+  if (elevation.elevated) {
     console.error("installer-e2e: run this from an unelevated shell. The Hub must run asInvoker, never elevated.");
     return EXIT_USAGE;
   }
@@ -548,10 +553,6 @@ function main(argv = process.argv.slice(2)) {
   const publishOld = path.join(REPO_ROOT, "publish", `${rid}-e2e-old`);
   const runId = `${stamp(new Date())}-${randomBytes(4).toString("hex")}`;
   console.log(`installer-e2e: rid=${rid} A=${versionA} B=${versionB} runId=${runId}`);
-
-  if (options.prepare) {
-    rmSync(INPUTS_PATH, { force: true });
-  }
 
   let setupA;
   let setupB;

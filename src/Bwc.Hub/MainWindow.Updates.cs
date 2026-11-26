@@ -67,6 +67,8 @@ public sealed partial class MainWindow
             return;
         }
 
+        string? previousChannel = _settings.UpdateChannel;
+        bool previousCheckForUpdatesOnStartup = _settings.CheckForUpdatesOnStartup;
         _settings.UpdateChannel = dialog.Channel;
         _settings.CheckForUpdatesOnStartup = dialog.CheckOnStartup;
         try
@@ -76,6 +78,8 @@ public sealed partial class MainWindow
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            _settings.UpdateChannel = previousChannel;
+            _settings.CheckForUpdatesOnStartup = previousCheckForUpdatesOnStartup;
             await ShowMessageAsync(
                 HubStrings.Get("UpdateSettingsTitle"),
                 HubStrings.Format("SettingsSaveFailed", ex.Message),
