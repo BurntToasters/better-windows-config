@@ -124,15 +124,20 @@ Enabled.
 Failure mode: the spin step is 1 where `spinStep` says 5, Up passes the maximum or Down passes the minimum, the step is a
 multiple of the step instead of a step from the current value, the box has spin buttons when `spin` is false, a long decimal
 above 2^63 breaks the control, a letter can be typed, a number above the range is accepted, soft ranges are treated as soft,
-the number is shown with a thousands separator.
+the number is shown with a thousands separator, or a typed or pasted 20-digit number above `ulong.MaxValue` stays visible
+while `Entered` silently falls back to `_last` and saves a previous number. An overstrict guard can also reject `ulong.MaxValue` or
+reject an empty intermediate value instead of allowing blank editing.
 
 - Handling: a decimal or long decimal box whose control says `spin` is not false is a `ClassicSpinBox` (minimum from the
   element or 0; maximum from the element or 2^32 - 1, at most 2^63 - 1; step `spinStep` or 1). Otherwise it is a plain text box
-  with the same digit filter. The text is the plain invariant number. `soft` does not change the range (the engine ignores it,
+  with the same digit filter. Proposed text is at most 20 ASCII digits; nonempty text must parse as an invariant `ulong`, while
+  blank text remains allowed during editing and retains the last valid number. Thus `ulong.MaxValue` is accepted and a larger value
+  cannot reach `Entered`. The text is the plain invariant number. `soft` does not change the range (the engine ignores it,
   `PolicyRules.SoftIgnoredByValidation`).
 - E2E: `Gpedit_Options_Numbers` on `Pol_Decimal_MinMax` (10 to 500, step 5): Up gives 30 from 25, Down twice gives 20, Down from
   10 stays 10 and Up at 498 stops at 500; on `Pol_LongDecimal_Basic` Up adds 1000; `Pol_Decimal_Required` (`spin="false"`) has
-  no spin buttons; letters typed are ignored.
+  no spin buttons; letters typed are ignored. On `Pol_LongDecimal_RequiredSoftText`, `ulong.MaxValue` is visible and read back,
+  blank editing keeps that last valid number, and typed overflow is refused before the UI and readout can diverge.
 
 ## 6. Text, combo box and multi-line boxes
 
@@ -176,7 +181,9 @@ Failure mode: the "Show..." button is missing or does nothing, it opens an empty
 list shows two columns or the explicit list shows one, the columns are swapped (value first), a new row cannot be added
 (the grid always ends with an empty row), a row cannot be edited or deleted, Cancel keeps the changes, OK drops the changes,
 an empty value or an empty name is accepted, a duplicate is accepted, a message appears without moving the focus to the row,
-the entered order is lost, the dialog does not block the policy dialog, the policy dialog is not marked changed after OK.
+an untouched trailing row swallows Enter or Escape so the dialog cannot accept or cancel, Enter after clearing a two-column
+row advances to the following row's other column, the entered order is lost, the dialog does not block the policy dialog, or
+the policy dialog is not marked changed after OK.
 
 - Handling: the "Show..." button opens `ShowContentsDialog` (a classic dialog over `ClassicEditableGrid`): columns "Value" for a
   plain list, "Value name" and "Value" for an `explicitValue` list, the rows of the current list. OK validates the rows
@@ -186,21 +193,28 @@ the entered order is lost, the dialog does not block the policy dialog, the poli
   marked.
 - E2E: `Gpedit_Options_List` on `Pol_List_Plain`, `Pol_List_ExplicitValue`: columns and names, add two rows by typing,
   delete one, OK, Apply, reopen and see the rows; Cancel keeps the old list; a duplicate shows the message and the focus is
-  on the cell; an empty value shows the message.
+  on the cell; an empty value shows the message; Enter on the untouched trailing row accepts a valid list and Escape cancels.
 
 ## 10. Removed entries of an additive list
 
 Failure mode: `ListValue.Removed` is empty, so the engine cannot remove the entry the user deleted from an additive list and the
 policy file keeps it; or it holds every entry; or it holds an entry that the user only edited; or it holds entries of another
-policy.
+policy. An implicit prefixed list can also leave a stale value when deleting or reordering shifts later generated names: old
+`Item1=alpha`, `Item2=bravo`, `Item3=charlie`, then final `Item1=alpha`, `Item2=charlie` must remove both old `Item2` and old
+`Item3`. Comparing only row data considers `charlie` kept and lets stale `Item3` survive. Duplicate data can hide this shift.
+Treating an empty `valuePrefix` as absent also picks the wrong duplicate comparer in Show Contents.
 
-- Handling: the base of a list is the list of the snapshot (`PolicyStateSnapshot.Elements`, with the stored value names). When
-  Apply asks for the values, `Removed` holds each base entry that is not in the final list (explicit list: its name is not in
-  the final names; plain list: its data is not in the final data). After a successful Apply the base is the new snapshot, so a
-  second Apply does not remove twice.
+- Handling: the base of a list is the list of the snapshot (`PolicyStateSnapshot.Elements`, with the stored value names).
+  `PolicyListEntryRemoval.FindRemoved` supplies one pure removal calculation to callers. For `explicitValue`, it matches names case-insensitively;
+  for an implicit list with `valuePrefix` present, even empty, an old row is kept only if a final row has the same generated
+  name (`PolicyRules.ListEntryName`) and data; for an implicit list without a prefix, it preserves the existing data comparison.
+  `ShowContentsDialog` uses the prefix-presence check when choosing its duplicate comparer. The writer still removes an old value
+  only if its current data matches the old row, so a concurrent edit is retained. After a successful Apply the base is the new
+  snapshot, so a second Apply is stable.
 - E2E: `Gpedit_Options_List` seeds `Pol_List_Additive` Enabled with three entries, deletes the middle one in Show Contents,
   presses Apply and reads `V.AdditiveList` (two entries, one removed, the removed one is the deleted one), and the reopened
-  dialog shows two entries.
+  dialog shows two entries. `PolicyListInstructionTests` additionally checks first and middle deletion, reorder, duplicate data,
+  empty prefix, explicit and unprefixed compatibility, concurrent modification, repeated Apply, and a Registry.pol roundtrip.
 
 ## 11. An ampersand becomes a mnemonic
 

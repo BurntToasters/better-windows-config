@@ -199,7 +199,8 @@ internal sealed class NumberField : OptionField
     private static void OnBeforeTextChanging(TextBox sender, TextBoxBeforeTextChangingEventArgs args)
     {
         string text = args.NewText;
-        if (text.Length > 20 || !text.All(char.IsAsciiDigit))
+        if (text.Length > 20 || !text.All(char.IsAsciiDigit) ||
+            (text.Length > 0 && !ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out _)))
         {
             args.Cancel = true;
         }

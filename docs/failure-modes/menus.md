@@ -143,6 +143,12 @@ matching submenu. The match is case insensitive, only among enabled items, and t
 the open popup (not the bar). Separators and disabled items are skipped. When a submenu is open, the
 only the innermost open popup is searched, as in a Win32 menu, so a letter that matches a parent item while a submenu is open does nothing.
 
+Failure mode (0.2.0 audit): `ClassicMenuBuilder.SetCommandVisible` hides a context-sensitive command by
+collapsing the item and leaves it enabled. A letter then still matched the collapsed item, so a command the
+user cannot see ran: in the Local Group Policy Editor, Alt+H then N opened the snap-in About box on nodes where
+it is not in the Help menu, and Alt+V then O opened Filter Options on nodes without filter commands. Guard: a
+collapsed item takes no part in the match (and so cannot make a visible item ambiguous either).
+
 ### Letter while no popup is open
 
 A letter with the bar active opens the top-level item (existing behavior, see `TryMnemonic`).

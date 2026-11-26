@@ -362,6 +362,37 @@ public sealed class GpeditOptionsTests
             }
         }
 
+        using (GpeditDialog? dialog = GpeditDialog.Open(run, "Long decimal required, soft, stored as text setting"))
+        {
+            checks.Record("longText.opens", dialog is not null, "the long decimal text policy opens.");
+            if (dialog is not null)
+            {
+                _ = dialog.Select(GpeditDialog.Enabled);
+                const string LongText = "textBoxRequired long number:";
+                string maximum = ulong.MaxValue.ToString(CultureInfo.InvariantCulture);
+                _ = dialog.TypeInto(LongText, maximum);
+                checks.Record(
+                    "longText.ulongMax",
+                    dialog.TextOf(LongText) == maximum && Number(dialog, "LongTextNumber") == maximum,
+                    $"field='{dialog.TextOf(LongText)}', readout={Number(dialog, "LongTextNumber")}, expected {maximum}.");
+
+                _ = dialog.TypeInto(LongText, string.Empty);
+                checks.Record(
+                    "longText.blankEditing",
+                    dialog.TextOf(LongText) == string.Empty && Number(dialog, "LongTextNumber") == maximum,
+                    $"blank field retains readout {Number(dialog, "LongTextNumber")}, expected {maximum}.");
+
+                const string Overflow = "18446744073709551616";
+                const string LastValidPrefix = "1844674407370955161";
+                _ = dialog.TypeInto(LongText, Overflow);
+                checks.Record(
+                    "longText.overflowTypedRejected",
+                    dialog.TextOf(LongText) == LastValidPrefix && Number(dialog, "LongTextNumber") == LastValidPrefix,
+                    $"overflow field='{dialog.TextOf(LongText)}', readout={Number(dialog, "LongTextNumber")}, expected valid prefix {LastValidPrefix}.");
+                Close(dialog);
+            }
+        }
+
         run.GoTo(Root, User, Admin, Oracle, "Elements", "Texts");
         using (GpeditDialog? dialog = GpeditDialog.Open(run, "Text with a length limit setting"))
         {
@@ -612,6 +643,29 @@ public sealed class GpeditOptionsTests
 
             checks.Record("plain.caption", contents.Caption == ResourceText("Options", "ContentsCaption"), $"caption='{contents.Caption}'.");
             checks.Record("plain.oneColumn", contents.CellName(0, 0) == "Value, new row" && contents.Cell(0, 1) is null, $"first cell name='{contents.CellName(0, 0)}', second column cell present={contents.Cell(0, 1) is not null}.");
+            _ = ClassicDialogTestsBridge.EnsureForeground(ClassicDialogTestsBridge.HandleOf(contents.Cell(0, 0)!));
+            contents.Cell(0, 0)?.Focus();
+            Thread.Sleep(150);
+            Keyboard.Type(VirtualKeyShort.ESCAPE);
+            Thread.Sleep(200);
+            bool escapeFromNewRowCloses = contents.WaitClosed();
+            checks.Record("plain.escapeFromNewRowCloses", escapeFromNewRowCloses, "Escape from the untouched trailing row cancels Show Contents.");
+            if (!escapeFromNewRowCloses)
+            {
+                _ = contents.Cancel();
+                _ = contents.WaitClosed();
+            }
+
+            checks.Record("plain.escapeFromNewRowKeeps", ListData(dialog, "PlainList").Length == 0, "Escape from the untouched trailing row leaves the list empty.");
+            _ = dialog.Invoke(PlainButton);
+            contents = GpeditContents.Wait(dialog);
+            checks.Record("plain.escapeReopens", contents is not null, "Show Contents reopens after Escape from its untouched trailing row.");
+            if (contents is null)
+            {
+                checks.AssertAllPassed();
+                return;
+            }
+
             contents.Edit(0, 0, "one");
             contents.Cell(1, 0)?.Focus();
             Thread.Sleep(150);
@@ -633,8 +687,23 @@ public sealed class GpeditOptionsTests
                 contents.Edit(1, 0, "two");
                 contents.Edit(2, 0, "three");
                 contents.DeleteRow(1);
-                _ = contents.Ok();
-                checks.Record("plain.okCloses", contents.WaitClosed(), "OK closes Show Contents.");
+                string trailingCellName = contents.CellName(2, 0);
+                _ = ClassicDialogTestsBridge.EnsureForeground(ClassicDialogTestsBridge.HandleOf(contents.Cell(2, 0)!));
+                contents.Cell(2, 0)?.Focus();
+                Thread.Sleep(150);
+                bool trailingCellFocused = dialog.FocusedId() == "dataGrid.R2C0";
+                Keyboard.Type(VirtualKeyShort.RETURN);
+                Thread.Sleep(200);
+                bool enterFromNewRowCloses = contents.WaitClosed();
+                checks.Record(
+                    "plain.enterFromNewRowCloses",
+                    trailingCellFocused && trailingCellName == "Value, new row" && enterFromNewRowCloses,
+                    $"Enter on the untouched trailing row closed Show Contents={enterFromNewRowCloses}, focused trailing cell={trailingCellFocused}, cell name='{trailingCellName}'.");
+                if (!enterFromNewRowCloses)
+                {
+                    _ = contents.Ok();
+                    _ = contents.WaitClosed();
+                }
             }
 
             checks.Record("plain.okKeeps", ListData(dialog, "PlainList").SequenceEqual(["one", "three"]), $"entries={string.Join("|", ListData(dialog, "PlainList"))}.");

@@ -259,6 +259,13 @@ Guard: the root handles Alt+letter. A static label routes to the next tab stop a
 (the Win32 `WM_SYSCHAR` behavior). A button is invoked, a check box or radio button is selected
 and focused. The E2E check sends Alt+V, Alt+H, and Alt+D and checks the focused element.
 
+Failure mode (0.2.0 audit): only the button case checked `IsEnabled`, so Alt+letter changed a disabled
+check box or radio button. In the policy setting dialog of a read-only store Alt+E, Alt+D, or Alt+C
+changed the state and marked the dialog dirty; File > Options and View > Customize View toggled their
+disabled check boxes. Guard: a disabled button, check box, or radio button takes no access key at all
+(no focus, no change). E2E: `Gpedit_Dialog_ReadOnly` sends Alt+D to the disabled radio buttons and checks
+that the state, the Apply button, and the list are unchanged.
+
 ### 3.7 Alt cue left on
 
 The underline cue for mnemonics is shown while Alt is held. If the Alt key-up is lost, for
@@ -921,10 +928,13 @@ next row, or the empty row). E2E: Delete on a focused cell removes exactly that 
 ### 14.16 Grid: edit state leaks
 
 Failure mode: a cell stays editable after focus leaves it, so typed keys go to two cells; Escape closes the dialog instead of
-cancelling the edit; or Enter in an edit presses OK. Guard: only one cell is editing at a time. Enter commits and moves to
-the next column, Escape reverts the cell and is consumed when it ends an edit (it reaches the dialog only when no edit is
-open), losing focus commits, and a row whose cells are all empty after a commit is removed. Enter that is not in an edit goes
-to the dialog (default button). E2E: Escape in an edit keeps the dialog open and the old text.
+cancelling the edit; or Enter in an edit presses OK. Enter or Escape on an untouched trailing row is swallowed, so the dialog
+cannot accept or cancel. Enter that commits the last nonempty cell of a two-column row removes that row and advances into the
+next row's other column. Guard: only one cell is editing at a time. Enter commits and moves to the next column only while the
+edited cell remains in the grid; Escape reverts the cell and is consumed only when it ends an edit (it reaches the dialog when
+no edit is open), losing focus commits, and a row whose cells are all empty after a commit is removed. The trailing empty row
+accepts text without an edit, but Enter and Escape reach the dialog when it is untouched. E2E: Additions_EditableGridTwoColumns checks
+Escape in an edit keeps the old text and clearing a row does not advance the focus into the following row.
 
 ### 14.17 Grid: keyboard navigation and typing
 

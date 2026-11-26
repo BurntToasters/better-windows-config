@@ -448,6 +448,23 @@ public sealed class ClassicDialogAdditionsTests
         Press(host, VirtualKeyShort.ESCAPE);
         E2EResults.Record("additions.grid2.escape-after-delete", Value(host, 0, 0) == "alpha", $"R0C0='{Value(host, 0, 0)}', expected 'alpha'.");
 
+        // Clearing a two-column row removes it on commit. Focus stays on the following row's first column.
+        Press(host, VirtualKeyShort.RIGHT);
+        ExpectFocus(host, "GridMain.R0C1", "Right moves to the value column before clearing the row");
+        Press(host, VirtualKeyShort.F2);
+        Press(host, VirtualKeyShort.DELETE);
+        Press(host, VirtualKeyShort.RETURN);
+        E2EResults.Record("additions.grid2.clear-value", Value(host, 0, 1) == string.Empty, $"R0C1='{Value(host, 0, 1)}', expected empty.");
+        Press(host, VirtualKeyShort.LEFT);
+        ExpectFocus(host, "GridMain.R0C0", "Left returns to the name column before clearing the row");
+        Press(host, VirtualKeyShort.F2);
+        Press(host, VirtualKeyShort.DELETE);
+        Press(host, VirtualKeyShort.RETURN);
+        E2EResults.Record(
+            "additions.grid2.removed-row-focus",
+            Value(host, 0, 0) == "gamma" && FocusedId(host.Automation) == "GridMain.R0C0" && CellName(host, 1, 0) == "Value name, new row",
+            $"following row value='{Value(host, 0, 0)}', focus='{FocusedId(host.Automation)}', next row name='{CellName(host, 1, 0)}'.");
+
         // Tab leaves the grid.
         Press(host, VirtualKeyShort.TAB);
         ExpectFocus(host, PrimaryId, "Tab leaves the grid for OK");
@@ -457,8 +474,8 @@ public sealed class ClassicDialogAdditionsTests
         string rows = RowsOf(report);
         E2EResults.Record(
             "additions.grid2.report",
-            report.GetProperty("accepted").GetBoolean() && report.GetProperty("columns").GetInt32() == 2 && rows == "alpha|9;gamma|3",
-            $"accepted={report.GetProperty("accepted").GetBoolean()}, rows='{rows}', expected 'alpha|9;gamma|3'.");
+            report.GetProperty("accepted").GetBoolean() && report.GetProperty("columns").GetInt32() == 2 && rows == "gamma|3",
+            $"accepted={report.GetProperty("accepted").GetBoolean()}, rows='{rows}', expected 'gamma|3'.");
         Finish(start, "two column grid");
     }
 

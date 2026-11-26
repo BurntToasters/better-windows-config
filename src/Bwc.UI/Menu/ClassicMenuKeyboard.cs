@@ -386,14 +386,15 @@ public sealed unsafe class ClassicMenuKeyboard : IDisposable
         MenuFlyoutSubItem? open = FindExpandedSubItem(top.Items);
         IList<MenuFlyoutItemBase> scope = open is not null ? open.Items : top.Items;
 
-        // Only enabled items in the open popup with this access key. Separators have no key and are skipped.
+        // Only enabled, visible items in the open popup with this access key. Separators have no key and are skipped.
+        // A collapsed item (a command hidden for this node) is not in the menu, so it takes no key.
         var matches = new List<Control>();
         foreach (MenuFlyoutItemBase entry in scope)
         {
             if (entry is MenuFlyoutItem or MenuFlyoutSubItem)
             {
                 var control = (Control)entry;
-                if (control.IsEnabled && MatchesAccessKey(control.AccessKey, letter))
+                if (control.IsEnabled && control.Visibility == Visibility.Visible && MatchesAccessKey(control.AccessKey, letter))
                 {
                     matches.Add(control);
                 }

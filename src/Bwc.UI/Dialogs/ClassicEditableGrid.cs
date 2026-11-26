@@ -266,7 +266,8 @@ public sealed class ClassicEditableGrid : ContentControl, IClassicFocusHost
         }
 
         Row row = _rows[rowIndex];
-        bool editing = ReferenceEquals(_editing, cell) || row.IsNew;
+        bool activeEdit = ReferenceEquals(_editing, cell);
+        bool editing = activeEdit || row.IsNew; // The trailing row accepts text without an active edit.
         bool ctrlOrAlt = IsDown(VirtualKey.Control) || IsDown(VirtualKey.Menu);
 
         switch (e.Key)
@@ -315,17 +316,17 @@ public sealed class ClassicEditableGrid : ContentControl, IClassicFocusHost
 
                 return;
 
-            case VirtualKey.Enter when editing:
+            case VirtualKey.Enter when activeEdit:
                 e.Handled = true;
                 EndEdit(commit: true);
-                if (column < _columns.Count - 1 && rowIndex < _rows.Count)
+                if (column < _columns.Count - 1 && TryLocate(cell, out _, out _))
                 {
                     MoveTo(rowIndex, column + 1);
                 }
 
                 return;
 
-            case VirtualKey.Escape when editing:
+            case VirtualKey.Escape when activeEdit:
                 // Consumed only when it ends an edit. Otherwise it reaches the dialog and cancels it.
                 e.Handled = true;
                 EndEdit(commit: false);
