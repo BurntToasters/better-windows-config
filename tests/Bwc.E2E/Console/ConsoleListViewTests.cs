@@ -48,6 +48,8 @@ public sealed class ConsoleListViewTests
             double[] viewport = run.Doubles("Viewport");
             double itemW = run.Doubles("ItemSize").ElementAtOrDefault(0);
             double itemH = run.Doubles("ItemSize").ElementAtOrDefault(1);
+            double expectedDetailPitchPixels = Math.Round(19 * run.Scale, MidpointRounding.AwayFromZero);
+            double expectedDetailPitch = expectedDetailPitchPixels / run.Scale;
             int perLine = run.Int("PerLine");
             ListItemView? first = items.FirstOrDefault();
             checks.Record(id + "Realized", items.Count >= 3 && first is not null && first.Index == 0, $"realized items={items.Count}, first index={first?.Index}.");
@@ -66,8 +68,14 @@ public sealed class ConsoleListViewTests
             {
                 case "Detail":
                 {
-                    double step1 = run.Logical(items[1].Rect.Top - items[0].Rect.Top);
-                    checks.Record(id + "Layout", Near(itemH, 19, 0.1) && Near(step1, 19, 1) && Near(firstHeight, 19, 1.5), $"row height={firstHeight:0.##}, step={step1:0.##}, ItemSize={itemW:0.##}x{itemH:0.##}; expected 19.");
+                    double step1Pixels = items[1].Rect.Top - items[0].Rect.Top;
+                    checks.Record(
+                        id + "Layout",
+                        Near(itemH, expectedDetailPitch, 0.05) &&
+                            Near(step1Pixels, expectedDetailPitchPixels, 0.5) &&
+                            Near(firstHeight, expectedDetailPitch, 0.05) &&
+                            Near(first.Rect.Height, expectedDetailPitchPixels, 0.5),
+                        $"row height={firstHeight:0.##} DIP, step={step1Pixels:0.##} px, ItemSize={itemW:0.##}x{itemH:0.##} DIP; expected pitch {expectedDetailPitchPixels:0.##} px ({expectedDetailPitch:0.##} DIP) from 19 DIP at scale {run.Scale:0.##}.");
                     checks.Record(id + "Wide", firstWidth >= 640, $"row width={firstWidth:0.##} DIP; at least the columns (650).");
                     break;
                 }
@@ -108,7 +116,8 @@ public sealed class ConsoleListViewTests
             Expect(checks, run, id + "Home", 0);
             int page = mode switch
             {
-                "Detail" => Math.Max(1, (int)(viewport[1] / 19)),
+                // Production divides the DIP viewport by ItemSize().Height; this is the same ratio in physical pixels.
+                "Detail" => Math.Max(1, (int)((viewport[1] * run.Scale) / expectedDetailPitchPixels)),
                 "List" => Math.Max(1, (int)(viewport[0] / Math.Max(1, itemW))) * Math.Max(1, perLine),
                 _ => Math.Max(1, (int)(viewport[1] / (mode == "LargeIcons" ? 75 : 19))) * Math.Max(1, perLine),
             };

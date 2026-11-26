@@ -534,12 +534,36 @@ internal sealed class GpeditRun : IDisposable
 
         for (int level = current.Length; level > Math.Max(common, 1); level--)
         {
-            int before = level;
-            AutomationElement? up = Shell.Find(ShellRun.ButtonId("UpOneLevel"));
-            up?.Patterns.Invoke.PatternOrDefault?.Invoke();
-            if (!ShellRun.WaitUntil(() => NodePath().Length < before, TimeSpan.FromSeconds(8)))
+            string[] expectedCurrent = current[..level];
+            string[] expectedParent = current[..(level - 1)];
+            FlaUI.Core.Patterns.IInvokePattern? invoke = null;
+            bool ready = ShellRun.WaitUntil(
+                () =>
+                {
+                    if (!NodePath().SequenceEqual(expectedCurrent))
+                    {
+                        invoke = null;
+                        return false;
+                    }
+
+                    AutomationElement? up = Shell.Find(ShellRun.ButtonId("UpOneLevel"));
+                    invoke = up is { IsEnabled: true } ? up.Patterns.Invoke.PatternOrDefault : null;
+                    return invoke is not null;
+                },
+                TimeSpan.FromSeconds(8));
+            if (!ready || invoke is null)
             {
-                throw new InvalidOperationException($"Up One Level did not leave '{string.Join(" > ", NodePath())}'.");
+                throw new InvalidOperationException(
+                    $"Up One Level was unavailable before navigation. Required current path '{string.Join(" > ", expectedCurrent)}'; " +
+                    $"current path '{string.Join(" > ", NodePath())}'; reason: an enabled Up One Level button with Invoke was unavailable during readiness wait.");
+            }
+
+            invoke.Invoke();
+            if (!ShellRun.WaitUntil(() => NodePath().SequenceEqual(expectedParent), TimeSpan.FromSeconds(8)))
+            {
+                throw new InvalidOperationException(
+                    $"Up One Level did not select the required parent path '{string.Join(" > ", expectedParent)}'. " +
+                    $"Current path '{string.Join(" > ", NodePath())}'; reason: the parent path was not reached after one invocation.");
             }
         }
 
