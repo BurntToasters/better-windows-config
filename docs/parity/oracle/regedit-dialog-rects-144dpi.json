@@ -1,0 +1,249 @@
+{
+  "schema": 1,
+  "generator": "Bwc.Oracle.Capture dialogs",
+  "provenance": {
+    "captureCommand": "Bwc.Oracle.Capture dialogs --allow-dpi",
+    "sourceArtifact": "artifacts/native-x64-metrics/docs/parity/oracle/regedit-dialog-rects.json",
+    "architecture": "X64"
+  },
+  "os": {
+    "productName": "Windows 10 Enterprise",
+    "currentBuild": "26200",
+    "ubr": 9974,
+    "displayVersion": "25H2",
+    "processArchitecture": "X64"
+  },
+  "regedit": {
+    "path": "C:\\Windows\\regedit.exe",
+    "fileVersion": "10.0.26100.8457 (WinBuild.160101.0800)",
+    "compatLayer": "RunAsInvoker"
+  },
+  "dpi": {
+    "system": 144,
+    "window": 144,
+    "requiredForParity": 96,
+    "overrideAllowed": true
+  },
+  "note": "Only the classic find, add-favorite, and remove-favorite dialog measurements are retained. Rectangles are device pixels relative to each dialog client origin.",
+  "dialogs": [
+    {
+      "name": "add-favorite",
+      "kind": "dialog",
+      "class": "#32770",
+      "windowWidth": 452,
+      "windowHeight": 219,
+      "clientOffsetX": 11,
+      "clientOffsetY": 45,
+      "clientWidth": 430,
+      "clientHeight": 163,
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "x": 299,
+          "y": 18,
+          "width": 113,
+          "height": 35
+        },
+        {
+          "id": 2,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "x": 299,
+          "y": 60,
+          "width": 113,
+          "height": 35
+        },
+        {
+          "id": 1190,
+          "class": "Edit",
+          "visible": true,
+          "enabled": true,
+          "x": 16,
+          "y": 68,
+          "width": 270,
+          "height": 30
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "x": 16,
+          "y": 38,
+          "width": 169,
+          "height": 20
+        }
+      ]
+    },
+    {
+      "name": "find",
+      "kind": "dialog",
+      "class": "#32770",
+      "windowWidth": 616,
+      "windowHeight": 296,
+      "clientOffsetX": 11,
+      "clientOffsetY": 45,
+      "clientWidth": 594,
+      "clientHeight": 240,
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": false,
+          "x": 468,
+          "y": 15,
+          "width": 113,
+          "height": 35
+        },
+        {
+          "id": 2,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "x": 468,
+          "y": 60,
+          "width": 113,
+          "height": 35
+        },
+        {
+          "id": 1150,
+          "class": "Edit",
+          "visible": true,
+          "enabled": true,
+          "x": 113,
+          "y": 15,
+          "width": 338,
+          "height": 35
+        },
+        {
+          "id": 1151,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "x": 14,
+          "y": 200,
+          "width": 245,
+          "height": 25
+        },
+        {
+          "id": 1152,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "x": 27,
+          "y": 95,
+          "width": 79,
+          "height": 25
+        },
+        {
+          "id": 1153,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "x": 27,
+          "y": 125,
+          "width": 79,
+          "height": 25
+        },
+        {
+          "id": 1154,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "x": 27,
+          "y": 155,
+          "width": 79,
+          "height": 25
+        },
+        {
+          "id": 1160,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "x": 14,
+          "y": 65,
+          "width": 437,
+          "height": 125
+        },
+        {
+          "id": 1161,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "x": 270,
+          "y": 200,
+          "width": 245,
+          "height": 25
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "x": 14,
+          "y": 20,
+          "width": 90,
+          "height": 20
+        }
+      ]
+    },
+    {
+      "name": "remove-favorite",
+      "kind": "dialog",
+      "class": "#32770",
+      "windowWidth": 459,
+      "windowHeight": 314,
+      "clientOffsetX": 11,
+      "clientOffsetY": 45,
+      "clientWidth": 437,
+      "clientHeight": 258,
+      "controls": [
+        {
+          "id": 1,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "x": 308,
+          "y": 18,
+          "width": 113,
+          "height": 35
+        },
+        {
+          "id": 2,
+          "class": "Button",
+          "visible": true,
+          "enabled": true,
+          "x": 308,
+          "y": 70,
+          "width": 113,
+          "height": 35
+        },
+        {
+          "id": 1191,
+          "class": "ListBox",
+          "visible": true,
+          "enabled": true,
+          "x": 16,
+          "y": 58,
+          "width": 272,
+          "height": 180
+        },
+        {
+          "id": 65535,
+          "class": "Static",
+          "visible": true,
+          "enabled": true,
+          "x": 16,
+          "y": 18,
+          "width": 209,
+          "height": 20
+        }
+      ]
+    }
+  ]
+}
