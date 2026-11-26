@@ -445,8 +445,6 @@ if (flavor === "e2e" && !elevatedRun) {
     "Release",
     `-p:Platform=${testHost}`,
     "--",
-    "--tool",
-    "regedit",
     "--out",
     "docs/parity/oracle",
   ];

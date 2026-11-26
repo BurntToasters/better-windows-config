@@ -2302,11 +2302,16 @@ public sealed class HubTests
 
     private static void CheckToolIcons(AppSession hub, UIA3Automation automation, string capturePath, string checkPrefix)
     {
-        var tools = new[] { ("regedit", "Registry Editor"), ("gpedit", "Local Group Policy Editor") };
+        var tools = new[]
+        {
+            (AutomationId: "ToolIcon_regedit", Name: "Registry Editor"),
+            (AutomationId: "ToolIcon_gpedit", Name: "Local Group Policy Editor"),
+        };
         if (string.IsNullOrWhiteSpace(capturePath) || !File.Exists(capturePath))
         {
-            foreach ((string id, string name) in tools)
+            foreach ((string automationId, string name) in tools)
             {
+                string id = automationId["ToolIcon_".Length..];
                 E2EResults.Record(checkPrefix + "." + id, false, $"{name} icon capture was missing.");
             }
 
@@ -2317,9 +2322,10 @@ public sealed class HubTests
         Rectangle frame = HubUi.CaptureFrameRect(hub.MainHwnd);
         var imageBounds = new Rectangle(0, 0, capture.Width, capture.Height);
         bool frameMatches = frame.Width == capture.Width && frame.Height == capture.Height;
-        foreach ((string id, string name) in tools)
+        foreach ((string automationId, string name) in tools)
         {
-            AutomationElement? icon = HubUi.FindInProcess(automation, hub.ProcessId, "ToolIcon_" + id, ElementTimeout);
+            string id = automationId["ToolIcon_".Length..];
+            AutomationElement? icon = HubUi.FindInProcess(automation, hub.ProcessId, automationId, ElementTimeout);
             AutomationElement? row = HubUi.FindInProcess(automation, hub.ProcessId, "ToolRow_" + id, ElementTimeout);
             Rectangle screenIcon = icon?.BoundingRectangle ?? Rectangle.Empty;
             var iconPixels = new Rectangle(screenIcon.Left - frame.Left, screenIcon.Top - frame.Top, screenIcon.Width, screenIcon.Height);
