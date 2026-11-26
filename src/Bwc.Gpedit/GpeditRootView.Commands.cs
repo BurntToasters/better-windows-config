@@ -86,18 +86,30 @@ public sealed partial class GpeditRootView
     /// <summary>Help: counts the request in the E2E flavor and shows the About box in the ship flavor.</summary>
     private void RunHelp()
     {
-        RecordCommand(CommandHelp);
-        _helpRequests++;
-        UpdateReadout();
+        if (!TryReserveModal())
+        {
+            return;
+        }
+
+        try
+        {
+            RecordCommand(CommandHelp);
+            _helpRequests++;
+            UpdateReadout();
 #if !BWC_E2E
-        ShowHelp();
+            ShowHelp();
 #endif
+        }
+        finally
+        {
+            ReleaseModal();
+        }
     }
 
 #if !BWC_E2E
     private void ShowHelp()
     {
-        if (_helpOpen || _policyDialog is not null || XamlRoot?.ContentIslandEnvironment is not { } environment)
+        if (_helpOpen || !_modalBusy || _closed || XamlRoot?.ContentIslandEnvironment is not { } environment)
         {
             return;
         }

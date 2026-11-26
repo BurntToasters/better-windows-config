@@ -43,6 +43,18 @@ internal sealed class GpeditTemplateStore
     /// </summary>
     internal IReadOnlyList<TemplateRowInfo> ReadRows()
     {
+#if BWC_E2E
+        if (int.TryParse(
+            Environment.GetEnvironmentVariable("BWC_E2E_GPEDIT_TEMPLATE_READ_DELAY_MS"),
+            NumberStyles.None,
+            CultureInfo.InvariantCulture,
+            out int delayMilliseconds)
+            && delayMilliseconds is > 0 and <= 15000)
+        {
+            Thread.Sleep(delayMilliseconds);
+        }
+#endif
+
         TemplateSourcesResult loaded = _sources.Load(_culture);
         if (loaded.Store != TemplateStoreStatus.Ready)
         {

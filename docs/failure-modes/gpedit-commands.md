@@ -125,16 +125,21 @@ Handling: `UpdateToolbarStates` runs after a node change, a row selection change
   next Refresh after the file is fixed recovers. The failure of a reload never throws into a task that nobody observes
   (the `finally` of `RunPolicyDialogAsync` has the same fault).
 - The disk is changed and the window shows the new state before any Refresh: classic reads on request only.
-- A reload while the setting dialog is open: the dialog stays on the model it was opened with and stays open; the
-  main window does not swap its store under the dialog. The reload is refused or deferred until the dialog closes, and
-  Refresh works after it closes.
+- A reload while a setting, filter, templates, frame or Help modal is open: the dialog stays on the model it was opened with and
+  stays open; the main window does not replace its model under it. The request stays queued and one fresh reload runs after the
+  last modal closes.
+- A load that finishes while any modal is open: it is not applied under the dialog. Its request is coalesced into a reload after
+  the last modal closes, so a template change made in the open dialog is included.
+- The editor closes while the template dialog is still preparing its rows: the continuation does not open a modal or start a
+  reload after close.
 - Event handlers of the replaced model stay subscribed, so one Enter raises two edit requests after two reloads.
 
 Handling: one reload gate with a per-load token source that is cancelled and disposed when the next load starts or the view
 unloads; the new model replaces the old in one step on the UI thread; the selection is kept by node path and row tag.
 Checks: `Gpedit_Refresh_Reloads` (`unchangedBeforeRefresh`, `firstRefresh`, `secondRefresh`, `filesUntouched`, `backForward`),
 `Gpedit_Refresh_Templates`, `Gpedit_Refresh_KeepsSelection`, `Gpedit_Refresh_VanishedNode`, `Gpedit_Refresh_Burst`,
-`Gpedit_Refresh_Failure`, `Gpedit_Refresh_WhileDialogOpen`, `Gpedit_Keys_F5`.
+`Gpedit_Refresh_Failure`, `Gpedit_Refresh_WhileDialogOpen`, `Gpedit_Import_Dialog_ModalRace`,
+`Gpedit_Import_Dialog_ClosedDuringPreload`, `Gpedit_Keys_F5`.
 
 ## 6. History keeps nodes of a replaced model (GPE-5)
 
@@ -280,8 +285,11 @@ keys have no meaning in BWC's single-window frame).
 
 ## Decisions of the code dispatch
 
-- A Refresh while the setting dialog is open is refused (logged, no state change, `LastCommand` keeps its value). A load that
-  finishes while the dialog is open is dropped, so the model under the dialog is never replaced.
+- A single modal reservation covers policy, filter, templates, frame, and Help dialogs. Entry points reserve it before async
+  setup and release it when the dialog returns; another modal cannot stack over the owner.
+- A Refresh while any modal is open is queued. A load that finishes while the modal is open is not applied under it; after the
+  last modal closes, one fresh load applies the queued request. Closing the view drops the request and any pending template
+  continuation.
 - A Refresh while a reload is in flight cancels it and starts one more load; the replaced load is never applied, so a burst
   gives one applied reload (`Refreshes` counts applied reloads only). A Refresh during the first load waits for it, then loads
   again.

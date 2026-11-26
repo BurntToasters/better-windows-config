@@ -30,7 +30,7 @@ public sealed partial class GpeditRootView
         GpeditTreeSource.InfoOf(node) is { Kind: GpeditNodeKind.AdministrativeTemplates };
 
     private bool TemplatesCommandAllowed =>
-        _model is not null && _policyDialog is null && _filterDialog is null && _templatesDialog is null && !_templatesOpening && !_closed;
+        _model is not null && ModalCommandsAllowed && _policyDialog is null && _filterDialog is null && _templatesDialog is null && !_templatesOpening;
 
     /// <summary>The Add/Remove Templates entry, at the front of the Action popup and of the tasks submenu.</summary>
     private List<ClassicCommandItem> TemplateItems() =>
@@ -40,11 +40,12 @@ public sealed partial class GpeditRootView
 
     private void RunAddRemoveTemplates()
     {
-        if (!TemplatesCommandAllowed || !NodeHasTemplates(Shell.TreeContent.SelectedNode))
+        if (!TemplatesCommandAllowed || !NodeHasTemplates(Shell.TreeContent.SelectedNode) || !TryReserveModal())
         {
             return;
         }
 
+        _templatesOpening = true;
         RecordCommand(CommandAddRemoveTemplates);
         _ = RunAddRemoveTemplatesAsync();
     }
@@ -55,11 +56,10 @@ public sealed partial class GpeditRootView
     /// </summary>
     private async Task RunAddRemoveTemplatesAsync()
     {
-        _templatesOpening = true;
         GpeditTemplatesDialog? dialog = null;
         try
         {
-            if (XamlRoot?.ContentIslandEnvironment is not { } environment || _model is not { } model)
+            if (_closed || XamlRoot?.ContentIslandEnvironment is not { } environment || _model is not { } model)
             {
                 return;
             }
@@ -96,20 +96,24 @@ public sealed partial class GpeditRootView
         {
             _templatesOpening = false;
             _templatesDialog = null;
-        }
-
-        try
-        {
-            if (dialog is { Changed: true } && !_closed)
+            try
             {
-                ReloadAfterTemplates();
+                if (dialog is { Changed: true } && !_closed)
+                {
+                    ReloadAfterTemplates();
+                }
+
+                if (!_closed)
+                {
+                    StateChanged();
+                }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                Log.Warn("The window could not be updated after the Add/Remove Templates dialog closed: " + ex.Message);
             }
 
-            StateChanged();
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            Log.Warn("The window could not be updated after the Add/Remove Templates dialog closed: " + ex.Message);
+            ReleaseModal();
         }
     }
 

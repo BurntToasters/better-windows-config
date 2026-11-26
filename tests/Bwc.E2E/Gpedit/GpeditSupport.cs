@@ -63,6 +63,9 @@ internal sealed class GpeditSandbox
     /// <summary>True makes the in-memory store of the editor report read-only (BWC_E2E_GPEDIT_READONLY=1).</summary>
     internal bool ReadOnly { get; set; }
 
+    /// <summary>Holds the import-store listing in the E2E flavor to exercise the template preload race.</summary>
+    internal int TemplateReadDelayMilliseconds { get; set; }
+
     /// <summary>The sandbox for a test. <paramref name="name"/> is the name given to <see cref="GpeditRun.Open"/>.</summary>
     internal static GpeditSandbox Create(string name) => new("console-" + name);
 
@@ -82,6 +85,11 @@ internal sealed class GpeditSandbox
         if (ReadOnly)
         {
             environment["BWC_E2E_GPEDIT_READONLY"] = "1";
+        }
+
+        if (TemplateReadDelayMilliseconds > 0)
+        {
+            environment["BWC_E2E_GPEDIT_TEMPLATE_READ_DELAY_MS"] = TemplateReadDelayMilliseconds.ToString(CultureInfo.InvariantCulture);
         }
 
         if (shape)

@@ -62,7 +62,8 @@ public sealed partial class GpeditRootView
     /// <summary>True for the nodes that have the filter: Administrative Templates, a category and All Settings.</summary>
     private static bool NodeHasFilter(TreeNode? node) => GpeditTreeSource.InfoOf(node) is { HasFilter: true };
 
-    private bool FilterCommandsAllowed => _model is not null && _policyDialog is null && _filterDialog is null && _templatesDialog is null && !_closed;
+    private bool FilterCommandsAllowed =>
+        _model is not null && ModalCommandsAllowed && _policyDialog is null && _filterDialog is null && _templatesDialog is null;
 
     /// <summary>Filter On: switches the filter on with the options kept, or off.</summary>
     private void RunToggleFilter()
@@ -102,7 +103,7 @@ public sealed partial class GpeditRootView
     /// <summary>Filter Options: opens the dialog. OK takes the options and turns Filter On on; Cancel does nothing.</summary>
     private void RunFilterOptions()
     {
-        if (!FilterCommandsAllowed || _model is not { } model || XamlRoot?.ContentIslandEnvironment is not { } environment)
+        if (!FilterCommandsAllowed || _model is not { } model || XamlRoot?.ContentIslandEnvironment is not { } environment || !TryReserveModal())
         {
             return;
         }
@@ -116,6 +117,7 @@ public sealed partial class GpeditRootView
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             Log.Warn("The Filter Options dialog could not be created: " + ex.Message);
+            ReleaseModal();
             return;
         }
 
@@ -141,17 +143,22 @@ public sealed partial class GpeditRootView
 
         try
         {
-            if (accepted && dialog.AcceptedOptions is { } options && _model is { } model && _filter.TryAccept(options, model, out _))
+            if (!_closed && accepted && dialog.AcceptedOptions is { } options && _model is { } model && _filter.TryAccept(options, model, out _))
             {
                 ApplyFilterChange();
             }
 
-            StateChanged();
+            if (!_closed)
+            {
+                StateChanged();
+            }
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             Log.Warn("The window could not be updated after the Filter Options dialog closed: " + ex.Message);
         }
+
+        ReleaseModal();
     }
 
     /// <summary>The filter changed: the tree and the list are made again, with the selection kept where it can be.</summary>

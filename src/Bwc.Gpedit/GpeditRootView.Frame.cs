@@ -19,7 +19,7 @@ public sealed partial class GpeditRootView
     private bool _frameDialogOpen;
 
     /// <summary>True while a modal dialog of the frame is open, so a second command does not stack another on it.</summary>
-    private bool FrameDialogAllowed => !_frameDialogOpen && !_closed && _policyDialog is null && _filterDialog is null && _templatesDialog is null;
+    private bool FrameDialogAllowed => ModalCommandsAllowed && !_frameDialogOpen && _policyDialog is null && _filterDialog is null && _templatesDialog is null;
 
     /// <summary>The window that owns the frame dialogs, or false while the view is not in a window.</summary>
     private bool TryGetOwnerHandle(out nint owner)
@@ -51,19 +51,24 @@ public sealed partial class GpeditRootView
 
     private void RunColumns()
     {
-        if (!FrameDialogAllowed || _list.Columns.Count == 0 || !TryGetOwnerHandle(out nint owner))
+        if (!FrameDialogAllowed || _list.Columns.Count == 0 || !TryGetOwnerHandle(out nint owner) || !TryReserveModal())
         {
             return;
         }
 
+        _frameDialogOpen = true;
         _ = RunColumnsAsync(owner);
     }
 
     private async Task RunColumnsAsync(nint owner)
     {
-        _frameDialogOpen = true;
         try
         {
+            if (_closed)
+            {
+                return;
+            }
+
             var dialog = new ConsoleColumnsDialog(_list.Columns);
             if (await dialog.ShowAsync(owner) && dialog.Result is { } result && !_closed)
             {
@@ -82,6 +87,7 @@ public sealed partial class GpeditRootView
         finally
         {
             _frameDialogOpen = false;
+            ReleaseModal();
         }
     }
 
@@ -90,19 +96,24 @@ public sealed partial class GpeditRootView
     private void RunCustomize()
     {
         // The menu entry is disabled while the options forbid customizing; the guard keeps any other way in out as well.
-        if (!_options.AllowCustomizeViews || !FrameDialogAllowed || !TryGetOwnerHandle(out nint owner))
+        if (!_options.AllowCustomizeViews || !FrameDialogAllowed || !TryGetOwnerHandle(out nint owner) || !TryReserveModal())
         {
             return;
         }
 
+        _frameDialogOpen = true;
         _ = RunCustomizeAsync(owner);
     }
 
     private async Task RunCustomizeAsync(nint owner)
     {
-        _frameDialogOpen = true;
         try
         {
+            if (_closed)
+            {
+                return;
+            }
+
             var now = new ConsoleViewSwitches(
                 Shell.IsTreeVisible,
                 Shell.IsToolbarVisible,
@@ -121,6 +132,7 @@ public sealed partial class GpeditRootView
         finally
         {
             _frameDialogOpen = false;
+            ReleaseModal();
         }
     }
 
@@ -141,7 +153,7 @@ public sealed partial class GpeditRootView
 
     private void RunExport()
     {
-        if (!FrameDialogAllowed || !TryGetOwnerHandle(out nint owner))
+        if (!FrameDialogAllowed || !TryGetOwnerHandle(out nint owner) || !TryReserveModal())
         {
             return;
         }
@@ -152,6 +164,7 @@ public sealed partial class GpeditRootView
         if (!DispatcherQueue.TryEnqueue(() => _ = ExportAsync(owner)))
         {
             _frameDialogOpen = false;
+            ReleaseModal();
         }
     }
 
@@ -159,6 +172,11 @@ public sealed partial class GpeditRootView
     {
         try
         {
+            if (_closed)
+            {
+                return;
+            }
+
             ExportListDialogResult? choice = CommonFileDialogs.ShowExportListSave(owner);
             if (choice is null || _closed)
             {
@@ -179,6 +197,7 @@ public sealed partial class GpeditRootView
         finally
         {
             _frameDialogOpen = false;
+            ReleaseModal();
         }
     }
 }

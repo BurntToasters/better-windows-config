@@ -362,7 +362,7 @@ public sealed partial class GpeditRootView
             return;
         }
 #endif
-        if (_policyDialog is not null || _model is not { } model || XamlRoot?.ContentIslandEnvironment is not { } environment)
+        if (_policyDialog is not null || !ModalCommandsAllowed || _model is not { } model || XamlRoot?.ContentIslandEnvironment is not { } environment)
         {
             return;
         }
@@ -383,15 +383,22 @@ public sealed partial class GpeditRootView
             index = 0;
         }
 
-        var store = new PolicySaveStore(SaveStoreOf(model), model.Snapshot, model.IsReadOnly);
+        if (!TryReserveModal())
+        {
+            return;
+        }
+
+        PolicySaveStore store;
         PolicySettingDialog dialog;
         try
         {
+            store = new PolicySaveStore(SaveStoreOf(model), model.Snapshot, model.IsReadOnly);
             dialog = new PolicySettingDialog(order, index, store);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             Log.Warn($"The setting dialog of '{policy.FullName}' could not be created: {ex.Message}");
+            ReleaseModal();
             return;
         }
 
@@ -416,13 +423,18 @@ public sealed partial class GpeditRootView
             _policyDialog = null;
             try
             {
-                SelectPolicyRow(dialog.Shown);
-                StateChanged();
+                if (!_closed)
+                {
+                    SelectPolicyRow(dialog.Shown);
+                    StateChanged();
+                }
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 Log.Warn("The window could not be updated after the setting dialog closed: " + ex.Message);
             }
+
+            ReleaseModal();
         }
     }
 
@@ -440,6 +452,10 @@ public sealed partial class GpeditRootView
         if (_gpoStore is null || !string.Equals(_gpoStore.Policy.GpoRoot, policy.GpoRoot, StringComparison.OrdinalIgnoreCase))
         {
             _gpoStore = new GpoStore(policy, new GpoStoreOptions { Access = model.Access });
+        }
+        else
+        {
+            _gpoStore.UpdateAccess(model.Access);
         }
 
         return _gpoStore;
