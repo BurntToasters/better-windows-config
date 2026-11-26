@@ -1,3 +1,4 @@
+using Bwc.E2E.Controls;
 using Bwc.E2E.Harness;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -116,6 +117,7 @@ public sealed class HarnessTests
     {
         Run("harness.screenshot", () =>
         {
+            ControlTestSupport.PrepareDpi();
             var config = GuiGate.Config;
             using var session = new AppSession(config, config.HubExePath);
             var path = E2EResults.CaptureScreenshot("harness.screenshot", session);
