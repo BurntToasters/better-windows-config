@@ -152,7 +152,7 @@ internal sealed class SafeDataFolder
         }
 
         SafeFileHandle opened = CreateFileW(
-            System.IO.Path.Combine(Path, name),
+            System.IO.Path.Combine(FinalPath, name),
             access,
             share,
             IntPtr.Zero,
@@ -236,7 +236,7 @@ internal sealed class SafeDataFolder
     public List<string> Names(string pattern)
     {
         var names = new List<string>();
-        foreach (string full in System.IO.Directory.EnumerateFiles(Path, pattern, SearchOption.TopDirectoryOnly))
+        foreach (string full in System.IO.Directory.EnumerateFiles(FinalPath, pattern, SearchOption.TopDirectoryOnly))
         {
             names.Add(System.IO.Path.GetFileName(full));
         }
@@ -388,7 +388,7 @@ internal sealed class SafeDataFolder
 
     private static SafeDataFolder? OpenHeld(string path, string expectedFinal, bool create, out FolderAccess result)
     {
-        SafeFileHandle handle = OpenFolderHandle(path);
+        SafeFileHandle handle = OpenFolderHandle(expectedFinal);
         if (handle.IsInvalid)
         {
             int error = Marshal.GetLastWin32Error();
@@ -406,8 +406,8 @@ internal sealed class SafeDataFolder
             }
 
             // The parent is held and checked, so the new folder is created inside it.
-            System.IO.Directory.CreateDirectory(path);
-            handle = OpenFolderHandle(path);
+            System.IO.Directory.CreateDirectory(expectedFinal);
+            handle = OpenFolderHandle(expectedFinal);
             if (handle.IsInvalid)
             {
                 handle.Dispose();
