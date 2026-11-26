@@ -257,12 +257,24 @@ trimming and Native AOT cannot remove members that the serializer needs at runti
 ### Identity key construction
 
 The instance key contains the tool id, a short hash of the current user's SID, a short hash of the
-install folder (the full path of the application base directory, case-insensitive) and of `BWC_DATA_ROOT`
-when it is set, and the process integrity level. Copies installed in different folders, or runs with
-different data roots, never forward to each other. If the SID cannot be read, the user name is hashed instead so creation still
+install folder (the full path of the application base directory, case-insensitive), the normalized
+effective `AppPaths.BaseDirectory`, and the process integrity level. The effective root is normalized
+the same way as the install folder, after `AppPaths` has applied its invalid, relative, flavor, and
+elevation rules. Thus an unset root, an ignored relative value, and an explicit default root share one
+scope when they resolve to the same directory. Two accepted data roots remain separate. Ship builds
+running elevated scope the data directory they actually use, even if `BWC_DATA_ROOT` was inherited and
+ignored. Copies installed in different folders, or runs with different effective data roots, never
+forward to each other. If the SID cannot be read, the user name is hashed instead so creation still
 succeeds. If the integrity level query fails, the token `unknown` is used. A failure to query the
 integrity level never makes `Create` throw, and it cannot make two different integrity levels
 share a pipe by accident beyond the explicit `unknown` fallback.
+
+| ID | Failure case | Required result | Probe |
+|----|--------------|-----------------|-------|
+| SI4a | Unset `BWC_DATA_ROOT`, an ignored relative value, or the explicit effective default | Same install folder and effective data root produce the same instance name and scope hash | `SingleInstanceTests.EffectiveDefaultAndIgnoredRootsShareScope` |
+| SI4b | Two different fully qualified roots accepted by `AppPaths` | Their scope hashes and instance names differ | `SingleInstanceTests.DifferentEffectiveRootsHaveDifferentScopesAndEquivalentRootsShare` |
+| SI4c | An elevated ship process inherits a root that `AppPaths` ignores | It shares the per-user effective default scope with an unset root, not a hash of the ignored text | Source review only (the elevated check was not executed) |
+| SI4d | Root normalization changes install-folder, user, integrity, or session boundaries | Install folder, SID, integrity level, and session remain independent identity inputs | Source review of `BuildIdentitySuffix` and the session-suffixed pipe name; existing pipe-name checks |
 
 ### Mutex ownership
 

@@ -582,15 +582,15 @@ public sealed partial class SingleInstance : IDisposable
     }
 
     /// <summary>
-    /// Hashes the install folder and, when set, the data root. Two copies from different folders, or two
-    /// runs with different data roots, have different keys and do not forward to each other. Two launches
-    /// from the same folder and data root share a key, so the second one activates the first.
+    /// Hashes the install folder and the effective data root chosen by <see cref="AppPaths"/>. Two copies
+    /// from different folders, or two runs with different effective roots, have different keys and do not
+    /// forward to each other. Two launches from the same folder and effective root share a key, so the
+    /// second one activates the first.
     /// </summary>
     private static string BuildScopeHash()
     {
         string installFolder = NormalizeFolder(AppContext.BaseDirectory);
-        string configuredRoot = Environment.GetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable)?.Trim() ?? string.Empty;
-        string dataRoot = configuredRoot.Length == 0 ? string.Empty : NormalizeFolder(configuredRoot);
+        string dataRoot = NormalizeFolder(AppPaths.BaseDirectory);
         string scope = "install=" + installFolder + "\nroot=" + dataRoot;
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(scope));
         return Convert.ToHexString(hash.AsSpan(0, 8)).ToLowerInvariant();
