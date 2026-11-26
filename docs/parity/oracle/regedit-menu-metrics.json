@@ -17,6 +17,54 @@
     "scale": 2,
     "note": "Same 192 DPI as regedit-metrics.json. One DIP is two device pixels. Every px value below is a device pixel at 192 DPI."
   },
+  "supplementalCaptures": [
+    {
+      "dpi": 144,
+      "scale": 1.5,
+      "environment": {
+        "productName": "Windows 11 Enterprise",
+        "currentBuild": "26200",
+        "ubr": 9974,
+        "displayVersion": "25H2",
+        "processArchitecture": "X64"
+      },
+      "provenance": {
+        "sourceArtifacts": [
+          "artifacts/native-x64-metrics/docs/parity/oracle/regedit-metrics.json",
+          "artifacts/e2e/visual/menus/measurements.json"
+        ],
+        "method": "Native menu-bar item rectangles were captured in a separate output checkout/fixture with Bwc.Oracle.Capture metrics --allow-dpi, using GetMenuBarInfo/GetMenuItemRect. The oracle seeded and then removed HKCU\\Software\\BWC-Oracle and restored the classic applet state. Classic File popup row heights and File/Edit widths came from the E2E visual measurement summary."
+      },
+      "reproduction": [
+        "Use Windows 11 Enterprise x64 build 26200.9974 (25H2) at 150% display scaling, which gives the windows a 144 DPI scale.",
+        "In a separate output checkout/fixture, run Bwc.Oracle.Capture metrics --allow-dpi to capture the native menu bar with GetMenuBarInfo/GetMenuItemRect. The oracle seeds then removes HKCU\\Software\\BWC-Oracle and restores the classic applet state.",
+        "Launch C:\\Windows\\regedit.exe with __COMPAT_LAYER=RunAsInvoker on the child process. Open File with Alt+F to read its classic popup item rectangles and row heights; open Edit with Alt+E to measure its item width; close each popup with Escape.",
+        "Run node scripts/test-e2e.js --rid win-x64 --build --filter TestCategory=Menus to regenerate artifacts/e2e/visual/menus/measurements.json and compare BWC popup widths with the live classic widths."
+      ],
+      "menuBar": {
+        "heightPx": 29,
+        "items": [
+          { "text": "&File", "offsetFromFirstItemPx": 0, "widthPx": 48, "heightPx": 29 },
+          { "text": "&Edit", "offsetFromFirstItemPx": 48, "widthPx": 52, "heightPx": 29 },
+          { "text": "&View", "offsetFromFirstItemPx": 100, "widthPx": 59, "heightPx": 29 },
+          { "text": "F&avorites", "offsetFromFirstItemPx": 159, "widthPx": 92, "heightPx": 29 },
+          { "text": "&Help", "offsetFromFirstItemPx": 251, "widthPx": 59, "heightPx": 29 }
+        ]
+      },
+      "popup": {
+        "file": {
+          "items": 8,
+          "separators": 4,
+          "itemHeightPx": 35,
+          "widthPx": 414,
+          "itemTopsPx": [3, 38, 84, 119, 165, 200, 246, 292]
+        },
+        "edit": {
+          "widthPx": 301
+        }
+      }
+    }
+  ],
   "method": [
     "Started regedit with __COMPAT_LAYER=RunAsInvoker on the child, found the new RegEdit_RegEdit window, and held Local\\BwcGuiTestLock while it ran.",
     "Menu bar rectangles were read from UI Automation (MenuBar children) and match regedit-metrics.json exactly.",

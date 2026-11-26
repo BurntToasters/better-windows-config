@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Microsoft.UI.Xaml;
 
 namespace Bwc.UI.Menu;
 
@@ -12,6 +13,10 @@ public static class ClassicMenuMetrics
 {
     /// <summary>Classic padding on each side of a top-level label, in DIPs (14 px at 192 DPI).</summary>
     public const double BarItemPaddingDip = 7;
+
+    private const double Measured144DpiScale = 1.5;
+    private const double MeasuredPopupItemHeightPx = 35;
+    private const double MeasuredPopupChromeWidthPx = 9.5;
 
     private const uint SpiGetNonClientMetrics = 0x0029;
     private const int LfFaceSize = 32;
@@ -56,7 +61,8 @@ public static class ClassicMenuMetrics
                 return 0;
             }
 
-            return size.cx / scale + (2 * BarItemPaddingDip);
+            int paddingPxPerSide = (int)Math.Round(BarItemPaddingDip * scale, MidpointRounding.AwayFromZero);
+            return (size.cx + (2 * paddingPxPerSide)) / scale;
         }
         finally
         {
@@ -102,8 +108,35 @@ public static class ClassicMenuMetrics
             return 0;
         }
 
-        return PopupTextLeftDip + (labelPx / scale) + PopupAcceleratorGapDip + (acceleratorPx / scale) + PopupAcceleratorInsetDip;
+        double width = PopupTextLeftDip + (labelPx / scale) + PopupAcceleratorGapDip + (acceleratorPx / scale) + PopupAcceleratorInsetDip;
+        if (IsMeasured144DpiScale(scale))
+        {
+            width += MeasuredPopupChromeWidthPx / scale;
+        }
+
+        return width;
     }
+
+    /// <summary>Returns the measured 144-DPI row height; other scales keep the existing style height.</summary>
+    public static double? PopupItemHeightDip(double scale) =>
+        IsMeasured144DpiScale(scale) ? MeasuredPopupItemHeightPx / scale : null;
+
+    /// <summary>Applies the measured row height or restores the item's style height at other scales.</summary>
+    public static void ApplyPopupItemHeight(FrameworkElement item, double scale)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        if (PopupItemHeightDip(scale) is double height)
+        {
+            item.Height = height;
+        }
+        else
+        {
+            item.ClearValue(FrameworkElement.HeightProperty);
+        }
+    }
+
+    private static bool IsMeasured144DpiScale(double scale) =>
+        Math.Abs(scale - Measured144DpiScale) < 0.001;
 
     /// <summary>The widest text in device pixels in the menu font, or -1 when the font cannot be measured.</summary>
     private static double MaxTextWidthPx(IReadOnlyList<string> texts, double scale)

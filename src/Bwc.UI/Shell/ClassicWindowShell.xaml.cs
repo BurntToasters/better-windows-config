@@ -570,16 +570,18 @@ public sealed partial class ClassicWindowShell : UserControl
         }
 
         double width = ClassicMenuMetrics.PopupItemWidthDip(labels, accelerators, scale);
-        if (width > 0)
+        foreach (var entry in items)
         {
-            foreach (var entry in items)
+            if (entry is MenuFlyoutItem or MenuFlyoutSubItem)
             {
-                if (entry is MenuFlyoutItem or MenuFlyoutSubItem)
+                var element = (FrameworkElement)entry;
+                if (width > 0)
                 {
-                    var element = (FrameworkElement)entry;
                     element.MinWidth = width;
                     ObserveEntryVisibility(element);
                 }
+
+                ClassicMenuMetrics.ApplyPopupItemHeight(element, scale);
             }
         }
 
