@@ -47,7 +47,9 @@
 !define BWC_DIGITS "0123456789"
 
 ; Runtime state shared by install and uninstall. Set in .onInit and un.onInit.
+!ifdef BWC_E2E
 Var BwcRunId
+!endif
 Var BwcShortcutDir
 Var BwcUninstallKey
 Var BwcParentPid
